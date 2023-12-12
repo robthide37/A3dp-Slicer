@@ -133,9 +133,20 @@ inline Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> perp(cons
     return { - v.y(), v.x() };
 }
 
+#if _DEBUG
+double ccw_angle_old_test(const Vec2crd &me, const Vec2crd &p1, const Vec2crd &p2)
+{
+    //FIXME this calculates an atan2 twice! Project one vector into the other!
+    double angle = atan2(p1.x() - (me).x(), p1.y() - (me).y())
+                 - atan2(p2.x() - (me).x(), p2.y() - (me).y());
+    // we only want to return only positive angles
+    return angle <= 0 ? angle + 2*PI : angle;
+}
+#endif
+
 // Angle from v1 to v2, returning double atan2(y, x) normalized to <-PI, PI>.
 template<typename Derived, typename Derived2>
-inline double angle(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBase<Derived2> &v2) {
+inline double angle_ccw(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBase<Derived2> &v2) {
     static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "angle(): first parameter is not a 2D vector");
     static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "angle(): second parameter is not a 2D vector");
     auto v1d = v1.template cast<double>();
@@ -155,12 +166,12 @@ inline Eigen::Matrix<typename Derived::Scalar, 3, 1, Eigen::DontAlign> to_3d(con
     return { pt.x(), pt.y(), z };
 }
 
-inline Vec2d   unscale(coord_t x, coord_t y) { return Vec2d(unscale<double>(x), unscale<double>(y)); }
-inline Vec2d   unscale(const Vec2crd &pt) { return Vec2d(unscale<double>(pt.x()), unscale<double>(pt.y())); }
-inline Vec2d   unscale(const Vec2d   &pt) { return Vec2d(unscale<double>(pt.x()), unscale<double>(pt.y())); }
-inline Vec3d   unscale(coord_t x, coord_t y, coord_t z) { return Vec3d(unscale<double>(x), unscale<double>(y), unscale<double>(z)); }
-inline Vec3d   unscale(const Vec3crd &pt) { return Vec3d(unscale<double>(pt.x()), unscale<double>(pt.y()), unscale<double>(pt.z())); }
-inline Vec3d   unscale(const Vec3d   &pt) { return Vec3d(unscale<double>(pt.x()), unscale<double>(pt.y()), unscale<double>(pt.z())); }
+inline Vec2d   unscale(coord_t x, coord_t y) { return Vec2d(unscaled(x), unscaled(y)); }
+inline Vec2d   unscale(const Vec2crd &pt) { return Vec2d(unscaled(pt.x()), unscaled(pt.y())); }
+inline Vec2d   unscale(const Vec2d   &pt) { return Vec2d(unscaled(pt.x()), unscaled(pt.y())); }
+inline Vec3d   unscale(coord_t x, coord_t y, coord_t z) { return Vec3d(unscaled(x), unscaled(y), unscaled(z)); }
+inline Vec3d   unscale(const Vec3crd &pt) { return Vec3d(unscaled(pt.x()), unscaled(pt.y()), unscaled(pt.z())); }
+inline Vec3d   unscale(const Vec3d   &pt) { return Vec3d(unscaled(pt.x()), unscaled(pt.y()), unscaled(pt.z())); }
 
 inline std::string to_string(const Vec2crd &pt) { return std::string("[") + float_to_string_decimal_point(pt.x()) + ", " + float_to_string_decimal_point(pt.y()) + "]"; }
 inline std::string to_string(const Vec2d   &pt) { return std::string("[") + float_to_string_decimal_point(pt.x()) + ", " + float_to_string_decimal_point(pt.y()) + "]"; }
@@ -228,7 +239,7 @@ public:
     Point& operator+=(const Point& rhs) { this->x() += rhs.x(); this->y() += rhs.y(); return *this; }
     Point& operator-=(const Point& rhs) { this->x() -= rhs.x(); this->y() -= rhs.y(); return *this; }
 	Point& operator*=(const double &rhs) { this->x() = coord_t(this->x() * rhs); this->y() = coord_t(this->y() * rhs); return *this; }
-    Point operator*(const double &rhs) const { return Point(this->x() * rhs, this->y() * rhs); }
+    //Point operator*(const double &rhs) const { return Point(this->x() * rhs, this->y() * rhs); } //already exist outside
 
     void   rotate(double angle) { this->rotate(std::cos(angle), std::sin(angle)); }
     void   rotate(double cos_a, double sin_a) {
@@ -242,6 +253,7 @@ public:
     Point  rotated(double angle) const { Point res(*this); res.rotate(angle); return res; }
     Point  rotated(double cos_a, double sin_a) const { Point res(*this); res.rotate(cos_a, sin_a); return res; }
     Point  rotated(double angle, const Point &center) const { Point res(*this); res.rotate(angle, center); return res; }
+    Point  projection_onto(const Point &line_pa, const Point &line_pb) const;
     Point  interpolate(const double percent, const Point &p) const;
 
     double distance_to(const Point &point) const { return (point - *this).cast<double>().norm(); }

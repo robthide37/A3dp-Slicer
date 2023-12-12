@@ -11,6 +11,7 @@
 #define slic3r_Extruder_hpp_
 
 #include "libslic3r.h"
+#include "GCode/GcodeFormatter.hpp"
 #include "Point.hpp"
 
 namespace Slic3r {
@@ -20,7 +21,7 @@ class GCodeConfig;
 class Tool
 {
 public:
-    Tool(uint16_t id, GCodeConfig *config);
+    Tool(uint16_t id, GCodeConfig &config);
     ~Tool() = default;
 
     /*void   reset() {
@@ -41,6 +42,7 @@ public:
     virtual std::pair<double, double> retract(double retract_length, double restart_extra, double restart_extra_from_toolchange);
     virtual std::pair<double, double> unretract();
     virtual void                      reset_retract();
+    virtual bool                      need_unretract();
     // How much to retract yet before retract_length is reached?
     // The value is quantized to G-code resolution.
     virtual double                    retract_to_go(double retract_length) const;
@@ -81,12 +83,13 @@ public:
     virtual double retract_restart_extra() const;
     virtual double retract_length_toolchange() const;
     virtual double retract_restart_extra_toolchange() const;
+    virtual Vec2d  xy_offset() const;
     virtual int16_t temp_offset() const;
     virtual int8_t fan_offset() const;
 
 protected:
     // Private constructor to create a key for a search in std::set.
-    Tool(uint16_t id) : m_id(id) {}
+    Tool(uint16_t id) : m_id(id), m_formatter(1, 1) {}
 
     // Reference to GCodeWriter instance owned by GCodeWriter.
     GCodeConfig *m_config;
@@ -104,13 +107,15 @@ protected:
     double       m_restart_extra { 0 };
     double       m_restart_extra_toolchange;
     double       m_e_per_mm3;
+    // to quantize E
+    GCodeFormatter m_formatter;
 };
 
 
 class Mill : public Tool
 {
 public:
-    Mill(uint16_t mill_id, GCodeConfig* config);
+    Mill(uint16_t mill_id, GCodeConfig &config);
     ~Mill() = default;
     double retract_lift() const override;
 
@@ -125,7 +130,7 @@ protected:
 class Extruder : public Tool
 {
 public:
-    Extruder(uint16_t id, GCodeConfig* config);
+    Extruder(uint16_t id, GCodeConfig &config);
     virtual ~Extruder() {}
 
     double filament_diameter() const override;
@@ -140,6 +145,7 @@ public:
     double retract_restart_extra() const override;
     double retract_length_toolchange() const override;
     double retract_restart_extra_toolchange() const override;
+    Vec2d  xy_offset() const override;
     int16_t temp_offset() const override;
     int8_t fan_offset() const override;
 

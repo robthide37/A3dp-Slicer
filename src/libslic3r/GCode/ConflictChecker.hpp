@@ -12,6 +12,9 @@
 #include <vector>
 #include <optional>
 
+
+//used only in Print::process() after brim generation, to check for object collision
+// arc is done just after, so we don't need to worry about it
 namespace Slic3r {
 
 struct LineWithID
@@ -56,10 +59,11 @@ public:
         for (const ExtrusionPath &path : _piles[_curPileIdx]) {
             Polyline check_polyline;
             for (int i = 0; i < (int)_offsets.size(); ++i) {
-                check_polyline = path.polyline;
+                check_polyline = path.as_polyline().to_polyline();
                 check_polyline.translate(_offsets[i]);
-                Lines tmpLines = check_polyline.lines();
-                for (const Line& line : tmpLines) { lines.emplace_back(line, _id, i, path.role()); }
+                for (size_t i = 1; i < check_polyline.size(); ++i) {
+                    lines.emplace_back(Line(check_polyline.points[i - 1], check_polyline.points[i]), _id, i, path.role());
+                }
             }
         }
         return lines;

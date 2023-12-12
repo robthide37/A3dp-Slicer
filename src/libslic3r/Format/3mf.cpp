@@ -3338,8 +3338,8 @@ namespace Slic3r {
                                         catch (Exception) {}
                                         if (def != nullptr) {
                                             log << "map : " << "\n";
-                                            for (const auto& entry : *def->enum_keys_map) {
-                                                log << "\t" << entry.first << " : " << entry.second << "\n";
+                                            for (int i=0;i<def->enum_def->values().size();++i) {
+                                                log << "\t" << i << " : " << def->enum_def->label(i) << "->" << def->enum_def->value(i) << "\n";
                                             }
                                         }
                                     }
@@ -3584,8 +3584,8 @@ namespace Slic3r {
                                 catch (Exception) {}
                                 if (def != nullptr) {
                                     log << "map : " << "\n";
-                                    for (const auto& entry : *def->enum_keys_map) {
-                                        log << "\t" << entry.first << " : " << entry.second << "\n";
+                                    for (int i=0;i<def->enum_def->values().size();++i) {
+                                        log << "\t" << i << " : " << def->enum_def->label(i) << "->" << def->enum_def->value(i) << "\n";
                                     }
                                 }
                             }
@@ -3693,8 +3693,8 @@ namespace Slic3r {
                                             catch (Exception) {}
                                             if (def != nullptr) {
                                                 log << "map : " << "\n";
-                                                for (const auto& entry : *def->enum_keys_map) {
-                                                    log << "\t" << entry.first << " : " << entry.second << "\n";
+                                                for (int i=0;i<def->enum_def->values().size();++i) {
+                                                    log << "\t" << i << " : " << def->enum_def->label(i) << "->" << def->enum_def->value(i) << "\n";
                                                 }
                                             }
                                         }

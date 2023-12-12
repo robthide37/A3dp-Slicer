@@ -13,14 +13,15 @@
 
 namespace Slic3r {
 
-Tool::Tool(uint16_t id, GCodeConfig* config) :
+Tool::Tool(uint16_t id, GCodeConfig &config) :
     m_id(id),
-    m_config(config)
+    m_config(&config),
+    m_formatter(config.gcode_precision_xyz, config.gcode_precision_e)
 {
     //reset();
 }
 
-Extruder::Extruder(uint16_t id, GCodeConfig* config) :
+Extruder::Extruder(uint16_t id, GCodeConfig &config) :
     Tool(id, config)
 {
     // set extra_toolchange to be init for when it will be new current extruder
@@ -32,11 +33,11 @@ Extruder::Extruder(uint16_t id, GCodeConfig* config) :
         m_e_per_mm3 /= this->filament_crossection();
 }
 
-Mill::Mill(uint16_t mill_id, GCodeConfig* config) :
+Mill::Mill(uint16_t mill_id, GCodeConfig &config) :
     Tool(mill_id, config)
 {
     m_mill_id = mill_id;
-    m_id = mill_id + (uint16_t)config->retract_length.values.size();
+    m_id = mill_id + (uint16_t)config.retract_length.values.size();
 }
 
 std::pair<double, double> Tool::extrude(double dE)
@@ -46,7 +47,7 @@ std::pair<double, double> Tool::extrude(double dE)
     if (m_config->use_relative_e_distances)
         m_E = 0.;
     // Quantize extruder delta to G-code resolution.
-    dE = GCodeFormatter::quantize_e(dE);
+    dE = m_formatter.quantize_e(dE);
     m_E          += dE;
     m_absolute_E += dE;
     if (dE < 0.)
@@ -63,13 +64,13 @@ std::pair<double, double> Tool::extrude(double dE)
    value supplied will overwrite the previous one if any. */
 std::pair<double, double> Tool::retract(double length, double restart_extra, double restart_extra_toolchange)
 {
-    assert(! std::isnan(retract_length));
+    assert(! std::isnan(retract_length()));
     assert(! std::isnan(restart_extra) && restart_extra >= 0);
     // in case of relative E distances we always reset to 0 before any output
     if (m_config->use_relative_e_distances)
         m_E = 0.;
     // Quantize extruder delta to G-code resolution.
-    double to_retract = this->retract_to_go(retract_length);
+    double to_retract = this->retract_to_go(retract_length());
     if (to_retract > 0.) {
         m_E             -= to_retract;
         m_absolute_E    -= to_retract;
@@ -81,12 +82,9 @@ std::pair<double, double> Tool::retract(double length, double restart_extra, dou
         m_restart_extra_toolchange = restart_extra_toolchange;
     return std::make_pair(to_retract, m_E);
 }
-double Tool::retract_to_go(double retract_length) const
-{
-    return std::max(0., GCodeFormatter::quantize_e(retract_length - m_retracted));
-}
+double Tool::retract_to_go(double retract_length) const { return std::max(0., m_formatter.quantize_e(retract_length - m_retracted)); }
 
-double Tool::unretract()
+std::pair<double, double> Tool::unretract()
 {
     auto [dE, emitE] = this->extrude(m_retracted + m_restart_extra + m_restart_extra_toolchange);
     m_retracted     = 0.;
@@ -96,7 +94,7 @@ double Tool::unretract()
     return std::make_pair(dE, emitE);
 }
 
-double Tool::need_unretract() {
+bool Tool::need_unretract() {
     return m_retracted + m_restart_extra + m_restart_extra_toolchange != 0;
 }
 
@@ -109,7 +107,7 @@ void Tool::reset_retract() {
 }
 // Setting the retract state from the script.
 // Sets current retraction value & restart extra filament amount if retracted > 0.
-void Extruder::set_retracted(double retracted, double restart_extra)
+void Tool::set_retracted(double retracted, double restart_extra)
 {
     if (retracted < - EPSILON)
         throw Slic3r::RuntimeError("Custom G-code reports negative z_retracted.");
@@ -202,6 +200,8 @@ double Tool::retract_restart_extra_toolchange() const
     return 0;
 }
 
+Vec2d Tool::xy_offset() const { return Vec2d{0., 0.}; }
+
 int16_t Tool::temp_offset() const
 {
     return 0;
@@ -243,6 +243,11 @@ double Extruder::retract_length() const
     return m_config->retract_length.get_at(m_id);
 }
 
+double Extruder::retract_lift() const
+{
+    return m_config->retract_lift.get_at(m_id);
+}
+
 int Extruder::retract_speed() const
 {
     return int(floor(m_config->retract_speed.get_at(m_id)+0.5));
@@ -268,6 +273,8 @@ double Extruder::retract_restart_extra_toolchange() const
 {
     return m_config->retract_restart_extra_toolchange.get_at(m_id);
 }
+
+Vec2d Extruder::xy_offset() const { return m_config->extruder_offset.get_at(m_id); }
 
 int16_t Extruder::temp_offset() const
 {

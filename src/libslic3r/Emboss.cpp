@@ -338,8 +338,8 @@ bool Emboss::divide_segments_for_close_point(ExPolygons &expolygons, double dist
                 const Points &poly_pts = poly.points;
                 const Point &line_a = poly_pts[id.point_index];
                 const Point &line_b = (!ids.is_last_point(id)) ? poly_pts[id.point_index + 1] : poly_pts.front();
-                assert(line_a == lines[index].a.cast<int>());
-                assert(line_b == lines[index].b.cast<int>());
+                assert(line_a == lines[index].a.cast<coord_t>());
+                assert(line_b == lines[index].b.cast<coord_t>());
                 if (p == line_a || p == line_b) continue;
 
                 divs.emplace_back(p, index);
@@ -819,8 +819,8 @@ const Glyph* get_glyph(
 }
 
 Point to_point(const stbtt__point &point) {
-    return Point(static_cast<int>(std::round(point.x / SHAPE_SCALE)),
-                 static_cast<int>(std::round(point.y / SHAPE_SCALE)));
+    return Point(static_cast<coord_t>(std::round(point.x / SHAPE_SCALE)),
+                 static_cast<coord_t>(std::round(point.y / SHAPE_SCALE)));
 }
 
 } // namespace
@@ -1504,7 +1504,7 @@ indexed_triangle_set polygons2model_unique(
     const Points              &points)
 {
     // CW order of triangle indices
-    std::vector<Vec3i> shape_triangles=Triangulation::triangulate(shape2d, points);
+    std::vector<Vec3i32> shape_triangles=Triangulation::triangulate(shape2d, points);
     uint32_t           count_point     = points.size();
 
     indexed_triangle_set result;
@@ -1525,10 +1525,10 @@ indexed_triangle_set polygons2model_unique(
                            std::make_move_iterator(back_points.end()));
     result.indices.reserve(shape_triangles.size() * 2 + points.size() * 2);
     // top triangles - change to CCW
-    for (const Vec3i &t : shape_triangles)
+    for (const Vec3i32 &t : shape_triangles)
         result.indices.emplace_back(t.x(), t.z(), t.y());
     // bottom triangles - use CW
-    for (const Vec3i &t : shape_triangles)
+    for (const Vec3i32 &t : shape_triangles)
         result.indices.emplace_back(t.x() + count_point, 
                                     t.y() + count_point,
                                     t.z() + count_point);
@@ -1564,7 +1564,7 @@ indexed_triangle_set polygons2model_duplicit(
 {
     // CW order of triangle indices
     std::vector<uint32_t> changes = Triangulation::create_changes(points, duplicits);
-    std::vector<Vec3i> shape_triangles = Triangulation::triangulate(shape2d, points, changes);
+    std::vector<Vec3i32> shape_triangles = Triangulation::triangulate(shape2d, points, changes);
     uint32_t count_point = *std::max_element(changes.begin(), changes.end()) + 1;
 
     indexed_triangle_set result;
@@ -1596,10 +1596,10 @@ indexed_triangle_set polygons2model_duplicit(
 
     result.indices.reserve(shape_triangles.size() * 2 + points.size() * 2);
     // top triangles - change to CCW
-    for (const Vec3i &t : shape_triangles)
+    for (const Vec3i32 &t : shape_triangles)
         result.indices.emplace_back(t.x(), t.z(), t.y());
     // bottom triangles - use CW
-    for (const Vec3i &t : shape_triangles)
+    for (const Vec3i32 &t : shape_triangles)
         result.indices.emplace_back(t.x() + count_point, t.y() + count_point,
                                     t.z() + count_point);
 

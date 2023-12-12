@@ -196,7 +196,7 @@ protected:
      * Maps the point to the grid coordinates.
      */
     Point from_grid_point(const Point &point) const {
-        return point.operator*((double)m_cell_size) + m_unsupported_points_bbox.min;
+        return Point(point.x() * double(m_cell_size), point.y() * double(m_cell_size)) + m_unsupported_points_bbox.min;
     }
 
 #ifdef LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT

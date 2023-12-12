@@ -46,13 +46,19 @@
 #include "Semver.hpp"
 
 using coord_t = 
-#if 0
-// Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
+#define COORD_64B 1
+#ifndef COORD_64B
+    // Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
     int32_t;
 #else
     //FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
     int64_t;
 #endif
+
+inline std::uint16_t operator "" _u(unsigned long long value)
+{
+    return static_cast<std::uint16_t>(value);
+}
 
 using coordf_t = double;
 
@@ -105,13 +111,13 @@ using deque =
     std::deque<T, Allocator>;
 #endif // _WIN32
 
-//template<typename T, typename Q>
-//inline T unscale(Q v) { return T(v) * T(SCALING_FACTOR); }
+template<typename T, typename Q>
+inline T unscale(Q v) { return T(v) * T(SCALING_FACTOR); }
 
-inline double unscaled(coord_t v) { return double(v) * SCALING_FACTOR; }
-inline double unscaled(coordf_t v) { return v * SCALING_FACTOR; }
-inline coord_t scale_t(double v) { return coord_t(v * UNSCALING_FACTOR); }
-inline coordf_t scale_d(double v) { return coordf_t(v * UNSCALING_FACTOR); }
+constexpr double   unscaled(coord_t v) { return double(v) * SCALING_FACTOR; }
+constexpr double   unscaled(coordf_t v) { return v * SCALING_FACTOR; }
+constexpr coord_t  scale_t(double v) { return coord_t(v * UNSCALING_FACTOR); }
+constexpr coordf_t scale_d(double v) { return coordf_t(v * UNSCALING_FACTOR); }
 
 enum Axis { 
 	X=0,
@@ -520,6 +526,14 @@ public:
     }
 };
 #endif
+
+
+// from PrintConfig.hpp, but also used in extrusionentity & polyline
+enum class ArcFittingType {
+    Disabled,
+    Bambu,
+    EmitCenter // arcwelder
+};
 
 } // namespace Slic3r
 

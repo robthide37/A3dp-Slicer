@@ -92,7 +92,7 @@ public:
 
 protected:
     bool centered() const override { return true; }
-    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double resolution, InfillPolylineOutput &output) override;
+    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double resolution, InfillPolylineOutput &output) const override;
 };
 
 } // namespace Slic3r

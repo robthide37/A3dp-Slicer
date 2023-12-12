@@ -175,6 +175,7 @@ set(SLIC3R_SOURCES
     GCode/FindReplace.hpp
     GCode/LabelObjects.cpp
     GCode/LabelObjects.hpp
+    GCode/GCodeFormatter.hpp
     GCode/GCodeWriter.cpp
     GCode/GCodeWriter.hpp
     GCode/PostProcessor.cpp
@@ -189,8 +190,8 @@ set(SLIC3R_SOURCES
     GCode/SpiralVase.hpp
     GCode/SeamPlacer.cpp
     GCode/SeamPlacer.hpp
-    GCode/SmoothPath.cpp
-    GCode/SmoothPath.hpp
+    #GCode/SmoothPath.cpp
+    #GCode/SmoothPath.hpp
     GCode/ToolOrdering.cpp
     GCode/ToolOrdering.hpp
     GCode/Wipe.cpp

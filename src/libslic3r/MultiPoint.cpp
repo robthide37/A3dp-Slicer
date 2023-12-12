@@ -23,7 +23,7 @@ void MultiPoint::scale(double factor_x, double factor_y)
     }
 }
 
-void MultiPoint::translate(const Point &v)
+void MultiPoint::translate(const Vector &v)
 {
     for (Point &pt : points)
         pt += v;
@@ -58,7 +58,7 @@ int MultiPoint::find_point(const Point &point) const
     return -1;  // not found
 }
 
-int MultiPoint::find_point(const Point &point, double scaled_epsilon) const
+int MultiPoint::find_point(const Point &point, coordf_t scaled_epsilon) const
 {
     if (scaled_epsilon == 0)
         return this->find_point(point);

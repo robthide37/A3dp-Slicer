@@ -6937,7 +6937,7 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
         return;
 
     //get skirt & brim color
-    const std::array<float, 4> color = m_gcode_viewer.get_extrusion_colors()[ExtrusionRole::erSkirt];
+    const std::array<float, 4> color = m_gcode_viewer.get_extrusion_colors()[ ExtrusionRole::Skirt];
 
     // number of skirt layers
     size_t total_layer_count = 0;
@@ -7422,7 +7422,7 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
     ctxt.wipe_tower_angle = ctxt.print->config().wipe_tower_rotation_angle.value/180.f * PI;
     ctxt.wipe_tower_pos = Vec2f(ctxt.print->config().wipe_tower_x.value, ctxt.print->config().wipe_tower_y.value);
 
-    ctxt.color_support = m_gcode_viewer.get_extrusion_colors()[ExtrusionRole::erWipeTower];
+    ctxt.color_support = m_gcode_viewer.get_extrusion_colors()[ ExtrusionRole::WipeTower];
 
     BOOST_LOG_TRIVIAL(debug) << "Loading wipe tower toolpaths in parallel - start" << m_volumes.log_memory_info() << log_memory_info();
 

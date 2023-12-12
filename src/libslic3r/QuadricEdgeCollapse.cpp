@@ -892,7 +892,7 @@ void QuadricEdgeCollapse::store_surround(const char *obj_filename,
         triangles.insert(ti);
         if (item.second == 0) continue;
 
-        const Vec3i &t = its.indices[ti];
+        const Vec3i32 &t = its.indices[ti];
         for (size_t i = 0; i < 3; ++i) {
             const auto &v_info = v_infos[t[i]];
             for (size_t d = 0; d < v_info.count; ++d) {

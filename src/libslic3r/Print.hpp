@@ -579,6 +579,8 @@ struct PrintStatistics
     static const std::string TotalFilamentCost;
     static const std::string TotalFilamentCostMask;
     static const std::string TotalFilamentCostValueMask;
+};
+
 class BrimLoop {
 public:
     BrimLoop(const Polygon& p) : lines(Polylines{ p.split_at_first_point() }), is_loop(true) {}
@@ -593,13 +595,6 @@ public:
             poly.points.resize(poly.points.size() - 1);
         return poly;
     }
-};
-
-typedef std::vector<PrintObject*>       PrintObjectPtrs;
-typedef std::vector<const PrintObject*> ConstPrintObjectPtrs;
-class ConstPrintObjectPtrsAdaptor : public ConstVectorOfPtrsAdaptor<PrintObject> {
-    friend Print;
-    ConstPrintObjectPtrsAdaptor(const PrintObjectPtrs *data) : ConstVectorOfPtrsAdaptor<PrintObject>(data) {}
 };
 
 using PrintObjectPtrs          = std::vector<PrintObject*>;
@@ -665,6 +660,7 @@ public:
 
     std::set<uint16_t>  object_extruders(const ConstPrintObjectPtrs& objects) const;
     std::set<uint16_t>  object_extruders(const PrintObjectPtrs &objects) const;
+    std::set<uint16_t>  object_extruders() const;
     std::set<uint16_t>  support_material_extruders() const;
     std::set<uint16_t>  extruders() const;
     double              max_allowed_layer_height() const;

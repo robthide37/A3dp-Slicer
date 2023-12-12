@@ -34,7 +34,7 @@ std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius)
     std::vector<Node> ret;
 
     double surface_area = 0.;
-    for (const Vec3i &face : its.indices) {
+    for (const Vec3i32 &face : its.indices) {
         std::array<Vec3f, 3> tri = {its.vertices[face(0)],
                                     its.vertices[face(1)],
                                     its.vertices[face(2)]};
@@ -59,7 +59,7 @@ std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius)
         if (face_id < 0 || face_id >= int(its.indices.size()))
             continue;
 
-        Vec3i face = its.indices[face_id];
+        Vec3i32 face = its.indices[face_id];
 
         if (face(0) >= int(its.vertices.size()) ||
             face(1) >= int(its.vertices.size()) ||

@@ -34,7 +34,7 @@
 #include "GCode/LabelObjects.hpp"
 #include "GCode/PressureEqualizer.hpp"
 #include "GCode/RetractWhenCrossingPerimeters.hpp"
-#include "GCode/SmoothPath.hpp"
+// #include "GCode/SmoothPath.hpp"
 #include "GCode/SpiralVase.hpp"
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/Wipe.hpp"
@@ -223,7 +223,7 @@ public:
         m_second_layer_things_done(false),
         m_silent_time_estimator_enabled(false),
         m_last_obj_copy(nullptr, Point(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max())),
-        m_last_too_small(GCodeExtrusionRole::erNone)
+        m_last_too_small(ExtrusionPath{ExtrusionAttributes{ExtrusionRole::None}})
     {
         cooldown_marker_init();
     }
@@ -243,7 +243,7 @@ public:
     Vec2d           point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
         static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "GCodeGenerator::point_to_gcode(): first parameter is not a 2D vector");
         return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin 
-            - m_writer.current_tool_offset());
+            - m_writer.current_tool_offset();
     }
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
     template<typename Derived>
@@ -293,7 +293,7 @@ public:
 private:
     class GCodeOutputStream {
     public:
-        GCodeOutputStream(FILE* f, GCodeProcessor& processor, GCode& gcodegen) : f(f), m_processor(processor), m_gcodegen(gcodegen) {}
+        GCodeOutputStream(FILE* f, GCodeProcessor& processor) : f(f), m_processor(processor) {}
         ~GCodeOutputStream() { this->close(); }
 
         // Set a find-replace post-processor to modify the G-code before GCodePostProcessor.
@@ -328,7 +328,6 @@ private:
         // If suppressed, the backoup holds m_find_replace.
         GCodeFindReplace *m_find_replace_backup { nullptr };
         GCodeProcessor   &m_processor;
-        GCode            &m_gcodegen;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);
 
@@ -343,7 +342,6 @@ private:
         // Set of object & print layers of the same PrintObject and with the same print_z.
         const ObjectsLayerToPrint       &layers,
         const LayerTools  				&layer_tools,
-        const GCode::SmoothPathCaches   &smooth_path_caches,
         const bool                       last_layer,
 		// Pairs of PrintObject index and its instance index.
 		const std::vector<const PrintInstance*> *ordering,
@@ -360,7 +358,6 @@ private:
         const ToolOrdering                                            &tool_ordering,
         const std::vector<const PrintInstance*>                       &print_object_instances_ordering,
         const std::vector<std::pair<coordf_t, ObjectsLayerToPrint>>   &layers_to_print,
-        const GCode::SmoothPathCache                                  &smooth_path_cache_global,
         GCodeOutputStream                                             &output_stream);
     // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
     // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
@@ -371,7 +368,6 @@ private:
         const ToolOrdering                      &tool_ordering,
         ObjectsLayerToPrint                      layers_to_print,
         const size_t                             single_object_idx,
-        const GCode::SmoothPathCache            &smooth_path_cache_global,
         GCodeOutputStream                       &output_stream);
 
     void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
@@ -388,20 +384,19 @@ private:
     bool             visitor_flipped; //TODO use instead of reverse() at extrude_entity
     std::string_view visitor_comment;
     double           visitor_speed;
-    GCode::SmoothPathCache *visitor_smooth_path_cache;
-    virtual void use(const ExtrusionPath &path) override { visitor_gcode += extrude_path(path, *visitor_smooth_path_cache, visitor_comment, visitor_speed); };
-    virtual void use(const ExtrusionPath3D &path3D) override { visitor_gcode += extrude_path_3D(path3D, *visitor_smooth_path_cache, visitor_comment, visitor_speed); };
-    virtual void use(const ExtrusionMultiPath &multipath) override { visitor_gcode += extrude_multi_path(multipath, *visitor_smooth_path_cache, visitor_comment, visitor_speed); };
-    virtual void use(const ExtrusionMultiPath3D &multipath) override { visitor_gcode += extrude_multi_path3D(multipath, *visitor_smooth_path_cache, visitor_comment, visitor_speed); };
-    virtual void use(const ExtrusionLoop &loop) override { visitor_gcode += extrude_loop(loop, *visitor_smooth_path_cache, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionPath &path) override { visitor_gcode += extrude_path(path, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionPath3D &path3D) override { visitor_gcode += extrude_path_3D(path3D, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionMultiPath &multipath) override { visitor_gcode += extrude_multi_path(multipath, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionMultiPath3D &multipath) override { visitor_gcode += extrude_multi_path3D(multipath, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionLoop &loop) override { visitor_gcode += extrude_loop(loop, visitor_comment, visitor_speed); };
     virtual void use(const ExtrusionEntityCollection &collection) override;
-    std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_loop_vase(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_multi_path(const ExtrusionMultiPath &multipath, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_multi_path3D(const ExtrusionMultiPath3D &multipath, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_path(const ExtrusionPath &path, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_path_3D(const ExtrusionPath3D &path, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
+    std::string     extrude_entity(const ExtrusionEntityReference &entity, const std::string_view description, double speed = -1.);
+    std::string     extrude_loop(const ExtrusionLoop &loop, const std::string_view description, double speed = -1.);
+    std::string     extrude_loop_vase(const ExtrusionLoop &loop, const std::string_view description, double speed = -1.);
+    std::string     extrude_multi_path(const ExtrusionMultiPath &multipath, const std::string_view description, double speed = -1.);
+    std::string     extrude_multi_path3D(const ExtrusionMultiPath3D &multipath, const std::string_view description, double speed = -1.);
+    std::string     extrude_path(const ExtrusionPath &path, const std::string_view description, double speed = -1.);
+    std::string     extrude_path_3D(const ExtrusionPath3D &path, const std::string_view description, double speed = -1.);
 
     void            split_at_seam_pos(ExtrusionLoop &loop, bool was_clockwise);
     template <typename THING = ExtrusionEntity> // can be templated safely because private
@@ -437,21 +432,19 @@ private:
         const InstanceToPrint    &print_instance;
         // Container for extruder overrides (when wiping into object or infill).
         const LayerTools         &layer_tools;
-        // Optional smooth path interpolating extrusion polylines.
-        const GCode::SmoothPathCache &smooth_path_cache;
         // Is any extrusion possibly marked as wiping extrusion?
         bool                      is_anything_overridden;
         // Round 1 (wiping into object or infill) or round 2 (normal extrusions).
-        bool                      print_wipe_extrusions
+        bool                      print_wipe_extrusions;
     };
     
     // This function will be called for each printing extruder, possibly twice: First for wiping extrusions, second for normal extrusions.
     void process_layer_single_object(
         // output
         std::string              &gcode, 
-        const ExtrudeArgs         args,
+        const ExtrudeArgs        &args,
         // Index of the extruder currently active.
-        const unsigned int        extruder_id,
+        const uint16_t            extruder_id,
         // and the object & support layer of the above.
         const ObjectLayerToPrint &layer_to_print);
     void emit_milling_commands(std::string& gcode);
@@ -460,13 +453,12 @@ private:
     // if no m_region, then it will take the default region config from print_object
     // if no print_object, then it will take the default region config from print
     void set_region_for_extrude(const Print &print, PrintObject *print_object, std::string &gcode);
-    void extrude_perimeters(const ExtrudeArgs &print_args, const LayerIsland &island, string& gcode);
-    void extrude_infill(const ExtrudeArgs& print_args, const LayerIsland &island, bool is_infill_first, string& gcode);
-    void extrude_ironing(const ExtrudeArgs& print_args, const LayerIsland &island, string& gcode);
+    void extrude_perimeters(const ExtrudeArgs &print_args, const LayerIsland &island, std::string &gcode);
+    void extrude_infill(const ExtrudeArgs &print_args, const LayerIsland &island, bool is_infill_first, std::string &gcode);
+    void extrude_ironing(const ExtrudeArgs &print_args, const LayerIsland &island, std::string &gcode);
     
-    void extrude_skirt(const ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override,
-        const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description);
-    std::string     extrude_support(const ExtrusionEntityReferences &support_fills, const GCode::SmoothPathCache &smooth_path_cache);
+    void extrude_skirt(ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override, std::string &gcode, const std::string_view description);
+    std::string     extrude_support(const ExtrusionEntityReferences &support_fills);
     // std::string generate_travel_gcode(
         // const Points3& travel,
         // const std::string& comment
@@ -477,7 +469,7 @@ private:
         // const bool needs_retraction,
         // bool& could_be_wipe_disabled
     // );
-    Polyline        travel_to(std::string& gcode, const Point &point, ExtrusionRole role, std::string comment);
+    Polyline        travel_to(std::string& gcode, const Point &point, ExtrusionRole role);
     void            write_travel_to(std::string& gcode, const Polyline& travel, std::string comment);
     bool            can_cross_perimeter(const Polyline& travel, bool offset);
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None, coordf_t max_min_dist = 0);
@@ -486,7 +478,7 @@ private:
     std::string     unretract() { return m_writer.unlift() + m_writer.unretract(); }
     std::string     set_extruder(uint16_t extruder_id, double print_z, bool no_toolchange = false);
     std::string     toolchange(uint16_t extruder_id, double print_z);
-    bool line_distancer_is_required(const std::vector<unsigned int>& extruder_ids);
+    bool line_distancer_is_required(const std::vector<uint16_t>& extruder_ids);
 
     // Cache for custom seam enforcers/blockers for each layer.
     SeamPlacer                          m_seam_placer;
@@ -523,8 +515,8 @@ private:
         ConfigOptionFloats                 *opt_extruded_weight { nullptr };
         ConfigOptionFloat                  *opt_extruded_volume_total { nullptr };
         ConfigOptionFloat                  *opt_extruded_weight_total { nullptr };
-        ConfigOptionFloats                 *opt_extruder_colour_int { nullptr };
-        ConfigOptionFloats                 *opt_filament_colour_int { nullptr };
+        ConfigOptionInts                   *opt_extruder_colour_int { nullptr };
+        ConfigOptionInts                   *opt_filament_colour_int { nullptr };
         // Caches of the data passed to the script.
         size_t                              num_extruders;
         std::vector<double>                 position;
@@ -632,13 +624,13 @@ private:
     //some post-processing on the file, with their data class
     std::unique_ptr<FanMover> m_fan_mover;
 
-    std::string _extrude(const ExtrusionAttributes &attribs, const Geometry::ArcWelder::Path &path, const std::string_view description, double speed = -1);
-    void _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment);
-    void _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, Point& last_pos, const double path_width);
-    std::string _before_extrude(const ExtrusionAttributes &attribs,, const Geometry::ArcWelder::Path &path, const std::string_view description, double speed = -1);
-    double_t    _compute_speed_mm_per_sec(const ExtrusionAttributes &path_attrs, double speed = -1, double &fan_speed = -1);
-    std::pair<double, double> GCodeGenerator::_compute_acceleration(const ExtrusionAttributes& path_attrs)
-    std::string _after_extrude(const ExtrusionAttributes &attribs, const Geometry::ArcWelder::Path &path);
+    std::string               _extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);
+    void                      _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment);
+    void                      _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, Point& last_pos, const double path_width);
+    std::string               _before_extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);
+    double_t                  _compute_speed_mm_per_sec(const ExtrusionPath &path_attrs, double speed, double &fan_speed);
+    std::pair<double, double> _compute_acceleration(const ExtrusionPath &path);
+    std::string               _after_extrude(const ExtrusionPath &path);
     void print_machine_envelope(GCodeOutputStream &file, const Print &print);
     void _print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
     void _print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
@@ -647,16 +639,12 @@ private:
     // To control print speed of 1st object layer over raft interface.
     bool                                object_layer_over_raft() const { return m_object_layer_over_raft; }
 
-    // Fill in cache of smooth paths for perimeters, fills, ironings and supports of the given object layers.
-    // Based on params, the paths are either decimated to sparser polylines, or interpolated with circular arches.
-    static void                         smooth_path_interpolate(const ObjectLayerToPrint &layers, const GCode::SmoothPathCache::InterpolationParameters &params, GCode::SmoothPathCache &out);
-
     friend class GCode::Wipe;
     friend class GCode::WipeTowerIntegration;
     friend class PressureEqualizer;
 
     //utility for cooling markers
-    static inline std::string _cooldown_marker_speed[ExtrusionRole::erCount];
+    static inline std::string _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Count)];
     bool cooldwon_marker_no_slowdown_section = false;;
     static void cooldown_marker_init();
 };

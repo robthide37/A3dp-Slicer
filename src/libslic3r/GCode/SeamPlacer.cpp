@@ -428,13 +428,13 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
         virtual void use(const ExtrusionLoop& loop) override {
             ExtrusionRole role = loop.role();
             for (const ExtrusionPath& path : loop.paths) {
-                if (path.role() == ExtrusionRole::erExternalPerimeter) {
-                    role = ExtrusionRole::erExternalPerimeter;
+                if (path.role() ==  ExtrusionRole::ExternalPerimeter) {
+                    role =  ExtrusionRole::ExternalPerimeter;
                 }
             }
 
-            if (role == ExtrusionRole::erExternalPerimeter
-                || (is_perimeter(role) && allrandom)) { //for random seam alignment, extract all perimeters
+            if (role ==  ExtrusionRole::ExternalPerimeter || (role.is_perimeter() && allrandom))
+                { // for random seam alignment, extract all perimeters
                 Points p;
                 loop.collect_points(p);
                 polygons->emplace_back(std::move(p));
@@ -923,7 +923,7 @@ void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams> &lay
         float max_weight = min_weight;
 
         for (const SeamCandidate &point : layers[layer_idx].points) {
-            Vec3i color = value_to_rgbi(-PI, PI, point.local_ccw_angle);
+            Vec3i32 color = value_to_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
                     + std::to_string(color.z()) + ")";
             angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
@@ -1073,7 +1073,7 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerI
     seam_data.layers.resize(po->layer_count());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [po, &global_model_info, &seam_data]
+            [po, &global_model_info, &seam_data, is_all_random]
             (tbb::blocked_range<size_t> r) {
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     PrintObjectSeamData::LayerSeams &layer_seams = seam_data.layers[layer_idx];
@@ -1379,8 +1379,8 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                     Point lower_pt{ scale_t(lower_peri->final_seam_position.x()), scale_t(lower_peri->final_seam_position.y()) };
                     //for each segment
                     for (int i = perimeter.start_index; i < perimeter.end_index-1; i++) {
-                        Line l = Line{ Point{scale_t(points[i].position.x()), scale_t(points[i].position.y())}, Point{scale_t(points[i + 1].position.x()), scale_t(points[i + 1].position.y())} };
-                        Point pt = lower_pt.projection_onto(l);
+                        Point pt = lower_pt.projection_onto(Point{scale_t(points[i].position.x()), scale_t(points[i].position.y())},
+                                                            Point{scale_t(points[i + 1].position.x()), scale_t(points[i + 1].position.y())});
                         double dist_sqr = pt.distance_to_square(lower_pt);
                         if (dist_sqr < nearest_sqr_dist) {
                             nearest_sqr_dist = dist_sqr;
@@ -1392,7 +1392,8 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                     }
                     //test last segment
                     {
-                        Point pt = lower_pt.projection_onto(Line{ Point{scale_t(points[perimeter.end_index - 1].position.x()), scale_t(points[perimeter.end_index - 1].position.y())}, Point{scale_t(points[perimeter.start_index].position.x()), scale_t(points[perimeter.start_index].position.y())} });
+                        Point pt = lower_pt.projection_onto(Point{scale_t(points[perimeter.end_index - 1].position.x()), scale_t(points[perimeter.end_index - 1].position.y())},
+                                                            Point{scale_t(points[perimeter.start_index].position.x()), scale_t(points[perimeter.start_index].position.y())} );
                         double dist_sqr = pt.distance_to_square(lower_pt);
                         if (dist_sqr < nearest_sqr_dist) {
                             nearest_sqr_dist = dist_sqr;
@@ -1575,17 +1576,19 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
             GlobalModelInfo global_model_info { };
             gather_enforcers_blockers(global_model_info, po);
             throw_if_canceled_func();
-            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned || configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
+            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned ||
+                configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
                 compute_global_occlusion(global_model_info, po, throw_if_canceled_func);
             }
             throw_if_canceled_func();
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: start";
-            gather_seam_candidates(po, global_model_info, configured_seam_preference == spAllRandom));
+            gather_seam_candidates(po, global_model_info, configured_seam_preference == spAllRandom);
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: end";
             throw_if_canceled_func();
-            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned || configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
+            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned ||
+                configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
                 BOOST_LOG_TRIVIAL(debug)
                 << "SeamPlacer: calculate_candidates_visibility : start";
                 calculate_candidates_visibility(po, global_model_info);
@@ -1637,7 +1640,7 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
 }
 
 static constexpr float MINIMAL_POLYGON_SIDE = scaled<float>(0.2f);
-std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer, ExtrusionLoop& loop, const uint16_t print_object_instance_idx, const Point& last_po, const PrintObject* po) {
+std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer, const ExtrusionLoop& loop, const uint16_t print_object_instance_idx, const Point& last_po, const PrintObject* po) {
 
     bool has_custom_seam_modifier = false;
     if (print_object_instance_idx < po->instances().size()) {
@@ -1714,13 +1717,14 @@ Point SeamPlacer::place_seam(const Layer *layer, const ExtrusionLoop &loop, cons
     const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
     const double unscaled_z = layer->slice_z;
 
-    auto get_next_loop_point = [loop](ExtrusionLoop::ClosestPathPoint current) {
+    //FIXME?: not working on arcs
+    auto get_next_loop_point = [&loop](ExtrusionLoop::ClosestPathPoint current) {
         current.segment_idx += 1;
         if (current.segment_idx >= loop.paths[current.path_idx].polyline.size()) {
             current.path_idx = next_idx_modulo(current.path_idx, loop.paths.size());
             current.segment_idx = 0;
         }
-        current.foot_pt = loop.paths[current.path_idx].polyline.get_points()[current.segment_idx];
+        current.foot_pt = loop.paths[current.path_idx].polyline.get_point(current.segment_idx);
         return current;
     };
 

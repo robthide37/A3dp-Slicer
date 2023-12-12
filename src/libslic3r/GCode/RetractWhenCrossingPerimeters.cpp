@@ -20,7 +20,7 @@ bool RetractWhenCrossingPerimeters::travel_inside_internal_regions(const Layer &
         // Collect expolygons of internal slices.
         for (const LayerRegion *layerm : layer.regions())
             for (const Surface &surface : layerm->slices().surfaces)
-                if (surface.is_internal())
+                if (surface.has_pos_internal())
                     m_internal_islands.emplace_back(&surface.expolygon);
         // Calculate bounding boxes of internal slices.
         std::vector<AABBTreeIndirect::BoundingBoxWrapper> bboxes;

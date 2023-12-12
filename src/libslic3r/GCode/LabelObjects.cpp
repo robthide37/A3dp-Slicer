@@ -5,6 +5,7 @@
 #include "Print.hpp"
 #include "TriangleMeshSlicer.hpp"
 
+#include <boost/regex.hpp>
 
 namespace Slic3r::GCode {
 
@@ -93,13 +94,12 @@ void LabelObjects::init(const Print& print)
 
 
 
-std::string LabelObjects::all_objects_header(coordf_t resolution) const
+std::string LabelObjects::all_objects_header(BoundingBoxf3 &global_bounding_box, coordf_t resolution) const
 {
     if (m_label_objects_style == LabelObjectsStyle::Disabled)
         return std::string();
 
     std::string out;
-    BoundingBoxf3 global_bounding_box;
     Polygon global_outline;
 
     // Let's sort the values according to unique_id so they are in the same order in which they were added.

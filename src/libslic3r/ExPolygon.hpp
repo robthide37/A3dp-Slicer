@@ -82,7 +82,8 @@ public:
     ExPolygons simplify(double tolerance) const;
     void simplify(double tolerance, ExPolygons* expolygons) const;
     void remove_point_too_near(const coord_t tolerance);
-    void medial_axis(double max_width, double min_width, Polylines* polylines) const;
+    void medial_axis(double max_width, double min_width, ThickPolylines &polylines) const;
+    void medial_axis(double max_width, double min_width, Polylines &polylines) const;
     Lines lines() const;
 
     // Number of contours (outer contour with holes).

@@ -59,6 +59,26 @@ Points arc_discretize(const Point &p1, const Point &p2, const double radius, con
     return out;
 }
 
+
+Points arc_discretize(const Point &p1, const Point &p2, const double radius, const bool ccw, const size_t num_steps)
+{
+    Vec2d  center = arc_center(p1.cast<double>(), p2.cast<double>(), radius, ccw);
+    double angle  = arc_angle(p1.cast<double>(), p2.cast<double>(), radius);
+    assert(angle > 0);
+
+    double angle_step = angle / num_steps;
+
+    Points out;
+    out.reserve(num_steps + 1);
+    out.emplace_back(p1);
+    if (!ccw)
+        angle_step *= -1.;
+    for (size_t i = 1; i < num_steps; ++i)
+        out.emplace_back(p1.rotated(angle_step * i, center.cast<coord_t>()));
+    out.emplace_back(p2);
+    return out;
+}
+
 struct Circle
 {
     Point  center;
@@ -842,7 +862,7 @@ PathSegmentProjection point_to_path_projection(const Path &path, const Point &po
         }
     }
 
-    assert(! out.valid() || (out.segment_id >= 0 && out.segment_id < path.size()));
+    assert(! out.valid() || (out.segment_id >= 0 && out.segment_id < path.size() - 1));
     return out;
 }
 

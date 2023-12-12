@@ -29,10 +29,10 @@
 
 namespace Slic3r {
 
-ThickPolylines make_fill_polylines(
-    const Fill *fill, const Surface *surface, const FillParams &params, bool stop_vibrations, bool fill_gaps, bool connect_extrusions)
+ThickPolylines FillEnsuring::make_fill_polylines(
+    const Surface *surface, const FillParams &params, bool stop_vibrations, bool fill_gaps, bool connect_extrusions) const
 {
-    assert(fill->print_config != nullptr && fill->print_object_config != nullptr);
+    assert(this->print_config != nullptr && this->print_object_config != nullptr);
 
     auto rotate_thick_polylines = [](ThickPolylines &tpolylines, double cos_angle, double sin_angle) {
         for (ThickPolyline &tp : tpolylines) {
@@ -49,12 +49,12 @@ ThickPolylines make_fill_polylines(
         return (alow >= blow && alow <= bhigh) || (ahigh >= blow && ahigh <= bhigh) || (blow >= alow && blow <= ahigh) ||
                (bhigh >= alow && bhigh <= ahigh);
     };
-
-    const coord_t           scaled_spacing                      = scaled<coord_t>(fill->spacing);
+    assert(get_spacing() >= 0);
+    const coord_t           scaled_spacing                      = scale_t(this->get_spacing());
     double                  distance_limit_reconnection         = 2.0 * double(scaled_spacing);
     double                  squared_distance_limit_reconnection = distance_limit_reconnection * distance_limit_reconnection;
     Polygons                filled_area                         = to_polygons(surface->expolygon);
-    std::pair<float, Point> rotate_vector                       = fill->_infill_direction(surface);
+    std::pair<float, Point> rotate_vector                       = this->_infill_direction(surface);
     double                  aligning_angle                      = -rotate_vector.first + PI;
     polygons_rotate(filled_area, aligning_angle);
     BoundingBox bb = get_extents(filled_area);
@@ -62,7 +62,7 @@ ThickPolylines make_fill_polylines(
     Polygons inner_area = stop_vibrations ? intersection(filled_area, opening(filled_area, 2 * scaled_spacing, 3 * scaled_spacing)) :
                                             filled_area;
     
-    inner_area = shrink(inner_area, scaled_spacing * 0.5 - scaled<double>(fill->overlap));
+    inner_area = shrink(inner_area, scaled_spacing * 0.5 - scaled<double>(this->overlap));
     
     AABBTreeLines::LinesDistancer<Line> area_walls{to_lines(inner_area)};
 
@@ -187,9 +187,9 @@ ThickPolylines make_fill_polylines(
             for (const Line &segment : polygon_slice) {
                 ThickPolyline &new_path = thick_polylines.emplace_back();
                 new_path.points.push_back(segment.a);
-                new_path.width.push_back(scaled_spacing);
+                new_path.points_width.push_back(scaled_spacing);
                 new_path.points.push_back(segment.b);
-                new_path.width.push_back(scaled_spacing);
+                new_path.points_width.push_back(scaled_spacing);
                 new_path.endpoints = {true, true};
             }
         }
@@ -284,8 +284,8 @@ ThickPolylines make_fill_polylines(
 
         reconstructed_area                     = union_safety_offset(reconstructed_area);
         ExPolygons gaps_for_additional_filling = diff_ex(filled_area, reconstructed_area);
-        if (fill->overlap != 0) {
-            gaps_for_additional_filling = offset_ex(gaps_for_additional_filling, scaled<float>(fill->overlap));
+        if (this->overlap != 0) {
+            gaps_for_additional_filling = offset_ex(gaps_for_additional_filling, scaled<float>(this->overlap));
         }
 
         // BoundingBox bbox = get_extents(filled_area);
@@ -301,8 +301,20 @@ ThickPolylines make_fill_polylines(
             BoundingBox            ex_bb       = ex_poly.contour.bounding_box();
             coord_t                loops_count = (std::max(ex_bb.size().x(), ex_bb.size().y()) + scaled_spacing - 1) / scaled_spacing;
             Polygons               polygons    = to_polygons(ex_poly);
-            Arachne::WallToolPaths wall_tool_paths(polygons, scaled_spacing, scaled_spacing, loops_count, 0, params.layer_height,
-                                                   *fill->print_object_config, *fill->print_config);
+            Arachne::WallToolPaths wall_tool_paths(polygons, 
+                scaled_spacing, scaled_spacing, scaled_spacing, scaled_spacing, 
+                loops_count, 0, 
+                params.layer_height, *this->print_object_config, *this->print_config);
+            /*
+            *     WallToolPaths(const Polygons& outline,
+        coord_t bead_spacing_0,
+        coord_t bead_width_0,
+        coord_t bead_spacing_x,
+        coord_t bead_width_x,
+        size_t inset_count, coord_t wall_0_inset, 
+        coordf_t layer_height, const PrintObjectConfig &print_object_config, const PrintConfig &print_config);
+        */
+
             if (std::vector<Arachne::VariableWidthLines> loops = wall_tool_paths.getToolPaths(); !loops.empty()) {
                 std::vector<const Arachne::ExtrusionLine *> all_extrusions;
                 for (Arachne::VariableWidthLines &loop : loops) {
@@ -350,15 +362,15 @@ ThickPolylines make_fill_polylines(
         connection_endpoints.reserve(thick_polylines.size() * 2);
         for (size_t pl_idx = 0; pl_idx < thick_polylines.size(); pl_idx++) {
             size_t current_idx = connection_endpoints.size();
-            connection_endpoints.push_back({thick_polylines[pl_idx].first_point().cast<double>(), pl_idx, current_idx + 1, true});
-            connection_endpoints.push_back({thick_polylines[pl_idx].last_point().cast<double>(), pl_idx, current_idx, false});
+            connection_endpoints.push_back({thick_polylines[pl_idx].front().cast<double>(), pl_idx, current_idx + 1, true});
+            connection_endpoints.push_back({thick_polylines[pl_idx].back().cast<double>(), pl_idx, current_idx, false});
         }
 
         std::vector<bool> linear_segment_flags(thick_polylines.size());
         for (size_t i = 0;i < thick_polylines.size(); i++) {
             const ThickPolyline& tp = thick_polylines[i];
             linear_segment_flags[i] = tp.points.size() == 2 && tp.points.front().x() == tp.points.back().x() &&
-                                      tp.width.front() == scaled_spacing && tp.width.back() == scaled_spacing;
+                                      tp.points_width.front() == scaled_spacing && tp.points_width.back() == scaled_spacing;
         }
 
         auto coord_fn = [&connection_endpoints](size_t idx, size_t dim) { return connection_endpoints[idx].position[dim]; };
@@ -389,7 +401,7 @@ ThickPolylines make_fill_polylines(
                                    (source_tp.points[1] - source_tp.points[0]).cast<double>() :
                                    (source_tp.points[source_tp.points.size() - 1] - source_tp.points.back()).cast<double>();
 
-                    if (std::abs(Slic3r::angle(v1, v2)) > PI / 6.0) {
+                    if (std::abs(Slic3r::angle_ccw(v1, v2)) > PI / 6.0) {
                         continue;
                     }
 
@@ -411,9 +423,11 @@ ThickPolylines make_fill_polylines(
                     size_t new_end_idx = source_ep.other_end_point_idx;
 
                     target_tp.points.insert(target_tp.points.end(), source_tp.points.begin(), source_tp.points.end());
-                    target_tp.width.push_back(target_tp.width.back());
-                    target_tp.width.push_back(source_tp.width.front());
-                    target_tp.width.insert(target_tp.width.end(), source_tp.width.begin(), source_tp.width.end());
+                    //target_tp.points_width.push_back(target_tp.points_width.back());
+                    //target_tp.points_width.push_back(source_tp.points_width.front());
+                    target_tp.points_width.insert(target_tp.points_width.end(), source_tp.points_width.begin(), source_tp.points_width.end());
+                    assert(source_tp.points.size() == source_tp.points_width.size());
+                    assert(target_tp.points.size() == target_tp.points_width.size());
                     target_ep.used = true;
                     source_ep.used = true;
 
@@ -430,7 +444,7 @@ ThickPolylines make_fill_polylines(
         thick_polylines.erase(std::remove_if(thick_polylines.begin(), thick_polylines.end(),
                                              [scaled_spacing](const ThickPolyline &tp) {
                                                  return tp.length() < scaled_spacing &&
-                                                        std::all_of(tp.width.begin(), tp.width.end(),
+                                                        std::all_of(tp.points_width.begin(), tp.points_width.end(),
                                                                     [scaled_spacing](double w) { return w < scaled_spacing; });
                                              }),
                               thick_polylines.end());
@@ -438,7 +452,7 @@ ThickPolylines make_fill_polylines(
 
     Algorithm::sort_paths(thick_polylines.begin(), thick_polylines.end(), bb.min, double(scaled_spacing) * 1.2, [](const ThickPolyline &tp) {
         Lines ls;
-        Point prev = tp.first_point();
+        Point prev = tp.front();
         for (size_t i = 1; i < tp.points.size(); i++) {
             ls.emplace_back(prev, tp.points[i]);
             prev = ls.back().b;
@@ -453,15 +467,17 @@ ThickPolylines make_fill_polylines(
             for (size_t tp_idx = 1; tp_idx < thick_polylines.size(); tp_idx++) {
                 ThickPolyline &tp   = thick_polylines[tp_idx];
                 ThickPolyline &tail = connected_thick_polylines.back();
-                Point          last = tail.last_point();
-                if ((last - tp.last_point()).cast<double>().squaredNorm() < (last - tp.first_point()).cast<double>().squaredNorm()) {
+                Point          last = tail.back();
+                if ((last - tp.back()).cast<double>().squaredNorm() < (last - tp.front()).cast<double>().squaredNorm()) {
                     tp.reverse();
                 }
-                if ((last - tp.first_point()).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
+                if ((last - tp.front()).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
                     tail.points.insert(tail.points.end(), tp.points.begin(), tp.points.end());
-                    tail.width.push_back(scaled_spacing);
-                    tail.width.push_back(scaled_spacing);
-                    tail.width.insert(tail.width.end(), tp.width.begin(), tp.width.end());
+                    //tail.width.push_back(scaled_spacing);
+                    //tail.width.push_back(scaled_spacing);
+                    tail.points_width.insert(tail.points_width.end(), tp.points_width.begin(), tp.points_width.end());
+                    assert(tail.points.size() == tail.points_width.size());
+                    assert(tp.points.size() == tp.points_width.size());
                 } else {
                     connected_thick_polylines.push_back(tp);
                 }

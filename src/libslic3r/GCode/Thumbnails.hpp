@@ -96,7 +96,6 @@ inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb,
                 throw_if_canceled();
             }
     }
-    }
 }
 
 template<typename ThrowIfCanceledCallback>

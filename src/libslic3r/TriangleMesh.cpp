@@ -1140,7 +1140,7 @@ indexed_triangle_set its_make_sphere(double radius, double fa)
 
     
     // We have a beautiful icosahedron. Now subdivide the triangles.
-    std::vector<Vec3i> neighbors = its_face_neighbors(mesh); // This is cheap, the mesh is small.
+    std::vector<Vec3i32> neighbors = its_face_neighbors(mesh); // This is cheap, the mesh is small.
 
     const double side_len_limit = radius * fa;
     const double side_len = (vertices[1] - vertices[0]).norm();
@@ -1157,7 +1157,7 @@ indexed_triangle_set its_make_sphere(double radius, double fa)
 
     for (int iter=0; iter<iterations; ++iter) {
         std::vector<std::array<DividedEdge, 3>> divided_triangles(indices.size());
-        std::vector<Vec3i> new_neighbors(4*indices.size());
+        std::vector<Vec3i32> new_neighbors(4*indices.size());
 
         int orig_indices_size = int(indices.size());
         for (int i=0; i<orig_indices_size; ++i) { // iterate over all old triangles
@@ -1205,17 +1205,17 @@ indexed_triangle_set its_make_sphere(double radius, double fa)
             // Add three new triangles, reindex the old one.
             const int last_index = indices.size() - 1;
             indices.emplace_back(stl_triangle_vertex_indices(middle_vertices_idxs[0], middle_vertices_idxs[1], middle_vertices_idxs[2]));
-            new_neighbors[indices.size()-1] = Vec3i(last_index+2, last_index+3, i);
+            new_neighbors[indices.size()-1] = Vec3i32(last_index+2, last_index+3, i);
 
             indices.emplace_back(stl_triangle_vertex_indices(middle_vertices_idxs[0], indices[i][1], middle_vertices_idxs[1]));
-            new_neighbors[indices.size()-1] = Vec3i(new_neighbors_per_edge[0].second, new_neighbors_per_edge[1].first, last_index+1);
+            new_neighbors[indices.size()-1] = Vec3i32(new_neighbors_per_edge[0].second, new_neighbors_per_edge[1].first, last_index+1);
 
             indices.emplace_back(stl_triangle_vertex_indices(middle_vertices_idxs[2], middle_vertices_idxs[1], indices[i][2]));
-            new_neighbors[indices.size()-1] = Vec3i(last_index+1, new_neighbors_per_edge[1].second, new_neighbors_per_edge[2].first);
+            new_neighbors[indices.size()-1] = Vec3i32(last_index+1, new_neighbors_per_edge[1].second, new_neighbors_per_edge[2].first);
 
             indices[i][1] = middle_vertices_idxs[0];
             indices[i][2] = middle_vertices_idxs[2];
-            new_neighbors[i] = Vec3i(new_neighbors_per_edge[0].first, last_index+1, new_neighbors_per_edge[2].second);
+            new_neighbors[i] = Vec3i32(new_neighbors_per_edge[0].first, last_index+1, new_neighbors_per_edge[2].second);
 
         }
         neighbors = std::move(new_neighbors);
@@ -1616,7 +1616,7 @@ std::vector<std::pair<int, int>> its_get_open_edges(const indexed_triangle_set& 
     for (size_t i = 0; i < face_neighbors.size(); ++i) {
         for (size_t j = 0; j < 3; ++j) {
             if (face_neighbors[i][j] < 0) {
-                const Vec2i edge_indices = its_triangle_edge(its.indices[i], j);
+                const Vec2i32 edge_indices = its_triangle_edge(its.indices[i], j);
                 ret.emplace_back(edge_indices[0], edge_indices[1]);
             }
         }

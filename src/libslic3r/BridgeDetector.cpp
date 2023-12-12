@@ -504,7 +504,7 @@ void get_trapezoids3_half(const ExPolygon& expoly, Polygons* polygons, float spa
 {
 
     // get all points of this ExPolygon
-    Points pp = expoly;
+    Points pp = to_points(expoly);
 
     if (pp.empty()) return;
 

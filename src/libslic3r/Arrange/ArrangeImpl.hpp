@@ -119,10 +119,10 @@ void arrange(SelectionStrategy &&selstrategy,
         pilebbx.translate(d);
 
         Point corr{0, 0};
-        corr.x() = -std::min(0, pilebbx.min.x() - bedbb.min.x())
-                   -std::max(0, pilebbx.max.x() - bedbb.max.x());
-        corr.y() = -std::min(0, pilebbx.min.y() - bedbb.min.y())
-                   -std::max(0, pilebbx.max.y() - bedbb.max.y());
+        corr.x() = -std::min(coord_t(0), pilebbx.min.x() - bedbb.min.x())
+                   -std::max(coord_t(0), pilebbx.max.x() - bedbb.max.x());
+        corr.y() = -std::min(coord_t(0), pilebbx.min.y() - bedbb.min.y())
+                   -std::max(coord_t(0), pilebbx.max.y() - bedbb.max.y());
 
         d += corr;
 

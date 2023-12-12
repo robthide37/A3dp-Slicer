@@ -284,7 +284,7 @@ inline int its_triangle_edge_index(const stl_triangle_vertex_indices &triangle_i
 using its_triangle = std::array<stl_vertex, 3>;
 
 inline its_triangle its_triangle_vertices(const indexed_triangle_set &its,
-                                          const Vec3i &face)
+                                          const Vec3i32 &face)
 {
     return {its.vertices[face(0)],
             its.vertices[face(1)],

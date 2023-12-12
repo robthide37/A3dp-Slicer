@@ -833,11 +833,11 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             for (Polyline& pline : to_cut.lines) {
                 assert(pline.size() > 0);
                 if (pline.back() == pline.front()) {
-                    ExtrusionPath path(erSkirt, mm3_per_mm, width, height, false);
+                    ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     path.polyline = pline;
                     to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
-                    ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height, false);
+                    ExtrusionPath *extrusion_path = new ExtrusionPath({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     to_add.push_back(extrusion_path);
                     extrusion_path->polyline = pline;
                 }
@@ -869,11 +869,11 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             for (Polyline& pline : to_cut.lines) {
                 assert(pline.size() > 0);
                 if (pline.back() == pline.front()) {
-                    ExtrusionPath path(erSkirt, mm3_per_mm, width, height, false);
+                    ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     path.polyline = pline;
                     to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
-                    ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height, false);
+                    ExtrusionPath *extrusion_path = new ExtrusionPath({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     to_add.push_back(extrusion_path);
                     extrusion_path->polyline = pline;
                 }
@@ -1038,7 +1038,7 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
 
     //simplify & merge
     //get brim resolution (lower resolution if no arc fitting)
-    coordf_t scaled_resolution_brim = (print.config().arc_fitting.value)? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled)? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
     ExPolygons unbrimmable_areas;
     for (ExPolygon& expoly : islands)
         for (ExPolygon& expoly : expoly.simplify(scaled_resolution_brim))
@@ -1187,7 +1187,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
                     //decimate polygon
                     Points points = poly.contour.points;
                     points.push_back(points.front());
-                    points = MultiPoint::_douglas_peucker(points, ear_detection_length);
+                    points = MultiPoint::douglas_peucker(points, ear_detection_length);
                     if (points.size() > 4) { //don't decimate if it's going to be below 4 points, as it's surely enough to fill everything anyway
                         points.erase(points.end() - 1);
                         decimated_polygon.points = points;
@@ -1225,7 +1225,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
     print.throw_if_canceled();
 
     //get brim resolution (low resolution if no arc fitting)
-    coordf_t scaled_resolution_brim = (print.config().arc_fitting.value) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
     if (brim_config.brim_ears_pattern.value == InfillPattern::ipConcentric) {
 
         //create loops (same as standard brim)
@@ -1237,7 +1237,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
             for (ExPolygon& expoly : islands) {
                 Polygon poly = expoly.contour;
                 poly.points.push_back(poly.points.front());
-                Points p = MultiPoint::_douglas_peucker(poly.points, scaled_resolution_brim);
+                Points p = MultiPoint::douglas_peucker(poly.points, scaled_resolution_brim);
                 p.pop_back();
                 poly.points = std::move(p);
                 loops.push_back(poly);
@@ -1274,10 +1274,9 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
         extrusion_entities_append_paths(
             out.set_entities(),
             lines_sorted,
-            erSkirt,
-            float(flow.mm3_per_mm()),
-            float(flow.width()),
-            float(print.get_first_layer_height())
+            ExtrusionAttributes{ExtrusionRole::Skirt,
+                                {float(flow.mm3_per_mm()), float(flow.width()),
+                                    float(print.get_first_layer_height())}}
         );
 
         append(unbrimmable, offset_ex(mouse_ears_ex, flow.scaled_spacing() / 2));
@@ -1309,7 +1308,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
         fill_params.density = 1.f;
         fill_params.fill_exactly = true;
         fill_params.flow = flow;
-        fill_params.role = erSkirt;
+        fill_params.role = ExtrusionRole::Skirt;
         filler->init_spacing(flow.spacing(), fill_params);
         for (const ExPolygon& expoly : new_brim_area) {
             Surface surface(stPosInternal | stDensSparse, expoly);
@@ -1384,7 +1383,7 @@ void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectP
 
     //now get all holes, use them to create loops
     //get brim resolution (low resolution if no arc fitting)
-    coordf_t scaled_resolution_brim = (print.config().arc_fitting.value) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
     std::vector<std::vector<BrimLoop>> loops;
     for (size_t i = 0; i < num_loops; ++i) {
         print.throw_if_canceled();
@@ -1394,7 +1393,7 @@ void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectP
             Polygons temp = offset(poly, double(-flow.scaled_spacing()), jtSquare);
             for (Polygon& poly : temp) {
                 poly.points.push_back(poly.points.front());
-                Points p = MultiPoint::_douglas_peucker(poly.points, scaled_resolution_brim);
+                Points p = MultiPoint::douglas_peucker(poly.points, scaled_resolution_brim);
                 p.pop_back();
                 poly.points = std::move(p);
             }

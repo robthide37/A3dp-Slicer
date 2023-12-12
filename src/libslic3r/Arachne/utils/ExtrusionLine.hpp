@@ -13,7 +13,7 @@
 #include "../../../clipper/clipper_z.hpp"
 
 namespace Slic3r {
-struct ThickPolyline;
+class ThickPolyline;
 }
 
 namespace Slic3r::Arachne

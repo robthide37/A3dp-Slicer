@@ -2,6 +2,7 @@
 #define slic3r_FillSmooth_hpp_
 
 #include "../libslic3r.h"
+#include "../ExtrusionRole.hpp"
 
 #include "FillBase.hpp"
 
@@ -10,7 +11,7 @@ namespace Slic3r {
 class FillSmooth : public Fill
 {
 public:
-    FillSmooth() {
+    FillSmooth() : Fill() {
         nbPass = 2;
         anglePass[0] = 0;
         anglePass[1] = float(M_PI/2);
@@ -18,9 +19,9 @@ public:
         fillPattern[0] = InfillPattern::ipMonotonicWGapFill;//ipRectilinearWGapFill;
         fillPattern[1] = InfillPattern::ipRectilinear;
         fillPattern[2] = InfillPattern::ipRectilinear;
-        rolePass[0] = erNone;// erTopSolidInfill;
-        rolePass[1] = erIroning;
-        rolePass[2] = erIroning;
+        rolePass[0] = ExtrusionRole::None;// ExtrusionRole::TopSolidInfill;
+        rolePass[1] = ExtrusionRole::Ironing;
+        rolePass[2] = ExtrusionRole::Ironing;
         percentWidth[0] = 1;
         percentWidth[1] = 2;
         percentWidth[2] = 1.0;
@@ -51,7 +52,7 @@ protected:
     //if false, it won't overlap inside the perimeters
     bool has_overlap[3];
     // profile for base width, speed, etc.
-    ExtrusionRole rolePass[3];
+    ExtrusionRole rolePass[3] = {ExtrusionRole::None, ExtrusionRole::None, ExtrusionRole::None};
     //fill algorithm to call
     InfillPattern fillPattern[3];
 
@@ -73,9 +74,9 @@ public:
         fillPattern[0] = InfillPattern::ipHilbertCurve; //ipRectilinear
         fillPattern[1] = InfillPattern::ipConcentric;
         fillPattern[2] = InfillPattern::ipRectilinear;
-        rolePass[0] = erSolidInfill;//erSolidInfill
-        rolePass[1] = erTopSolidInfill;
-        rolePass[2] = erIroning;
+        rolePass[0] = ExtrusionRole::SolidInfill;//erSolidInfill
+        rolePass[1] = ExtrusionRole::TopSolidInfill;
+        rolePass[2] = ExtrusionRole::Ironing;
         percentWidth[0] = 1; //0.8
         percentWidth[1] = 1.5;
         percentWidth[2] = 2.8;
@@ -106,9 +107,9 @@ public:
         fillPattern[0] = InfillPattern::ipHilbertCurve; //ipHilbertCurve
         fillPattern[1] = InfillPattern::ipHilbertCurve;
         fillPattern[2] = InfillPattern::ipRectilinear;
-        rolePass[0] = erTopSolidInfill;
-        rolePass[1] = erIroning;
-        rolePass[2] = erIroning;
+        rolePass[0] = ExtrusionRole::TopSolidInfill;
+        rolePass[1] = ExtrusionRole::Ironing;
+        rolePass[2] = ExtrusionRole::Ironing;
         percentWidth[0] = 1;
         percentWidth[1] = 1.5;
         percentWidth[2] = 1.0;

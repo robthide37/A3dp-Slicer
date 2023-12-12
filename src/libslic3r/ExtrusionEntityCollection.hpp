@@ -64,22 +64,22 @@ public:
     /// Operator to convert and flatten this collection to a single vector of ExtrusionPaths.
     explicit operator ExtrusionPaths() const;
 
-    ExtrusionEntitiesPtr::const_iterator    cbegin() const { return this->entities.cbegin(); }
-    ExtrusionEntitiesPtr::const_iterator    cend()   const { return this->entities.cend(); }
-    ExtrusionEntitiesPtr::const_iterator    begin()  const { return this->entities.cbegin(); }
-    ExtrusionEntitiesPtr::const_iterator    end()    const { return this->entities.cend(); }
-    ExtrusionEntitiesPtr::iterator          begin()        { return this->entities.begin(); }
-    ExtrusionEntitiesPtr::iterator          end()          { return this->entities.end(); }
+    ExtrusionEntitiesPtr::const_iterator    cbegin() const { return this->entities().cbegin(); }
+    ExtrusionEntitiesPtr::const_iterator    cend()   const { return this->entities().cend(); }
+    ExtrusionEntitiesPtr::const_iterator    begin()  const { return this->entities().cbegin(); }
+    ExtrusionEntitiesPtr::const_iterator    end()    const { return this->entities().cend(); }
+    //ExtrusionEntitiesPtr::iterator          begin()        { return this->entities.begin(); }
+    //ExtrusionEntitiesPtr::iterator          end()          { return this->entities.end(); }
 
     bool is_collection() const override { return true; }
     ExtrusionRole role() const override {
         ExtrusionRole out{ ExtrusionRole::None };
         for (const ExtrusionEntity *ee : m_entities) {
             ExtrusionRole er = ee->role();
-            if (out == erNone) {
+            if (out == ExtrusionRole::None) {
                 out = er;
             }else if (out != er) {
-                return erMixed;
+                return ExtrusionRole::Mixed;
             }
         }
         return out;
@@ -101,7 +101,7 @@ public:
         if (m_entities.empty())
             m_entities = std::move(src);
         else {
-            entities.insert(entities.end(),
+            m_entities.insert(m_entities.end(),
                 std::make_move_iterator(src.begin()),
                 std::make_move_iterator(src.end()));
             // Removing pointers to polymorphic extrusions from the donor object
@@ -124,7 +124,7 @@ public:
     void reverse() override;
     const Point& first_point() const override { return this->entities().front()->first_point(); }
     const Point& last_point() const override { return this->entities().back()->last_point(); }
-    const Point& middle_point() const override { return this->entities[this->entities.size() / 2]->middle_point(); }
+    const Point& middle_point() const override { return this->entities()[this->entities().size() / 2]->middle_point(); }
     // Produce a list of 2D polygons covered by the extruded paths, offsetted by the extrusion width.
     // Increase the offset by scaled_epsilon to achieve an overlap, so a union will produce no gaps.
     void polygons_covered_by_width(Polygons &out, const float scaled_epsilon) const override;
@@ -137,8 +137,8 @@ public:
     Polygons polygons_covered_by_spacing(const float spacing_ratio, const float scaled_epsilon) const
         { Polygons out; this->polygons_covered_by_spacing(out, spacing_ratio, scaled_epsilon); return out; }
 
-    /// Recursively count paths and loops contained in this collection 
-    size_t size() const { return entities.size(); }
+    /// count of entities inside this container.
+    size_t size() const { return entities().size(); }
     // Recursively count paths and loops contained in this collection. 
     // this->items_count() >= this->size()
     size_t items_count() const;
@@ -146,16 +146,16 @@ public:
     /// You should be iterating over flatten().entities() if you are interested in the underlying ExtrusionEntities (and don't care about hierarchy).
     /// \param preserve_ordering Flag to method that will flatten if and only if the underlying collection is sortable when True (default: False).
     ExtrusionEntityCollection flatten(bool preserve_ordering = false) const;
-    void flatten(bool preserve_ordering = false, ExtrusionEntityCollection& out) const;
+    void flatten(bool preserve_ordering, ExtrusionEntityCollection& out) const;
     double total_volume() const override { double volume=0.; for (const auto& ent : entities()) volume+=ent->total_volume(); return volume; }
 
     // Following methods shall never be called on an ExtrusionEntityCollection.
-    PolylineOrArc as_polyline() const override {
+    ArcPolyline as_polyline() const override {
         throw Slic3r::RuntimeError("Calling as_polyline() on a ExtrusionEntityCollection");
-        return PolylineOrArc();
+        return ArcPolyline();
     };
 
-    void collect_polylines(PolylinesOrArcs &dst) const override {
+    void collect_polylines(ArcPolylines &dst) const override {
         for (const ExtrusionEntity *extrusion_entity : this->entities())
             extrusion_entity->collect_polylines(dst);
     }

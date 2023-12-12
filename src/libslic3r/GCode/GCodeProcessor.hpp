@@ -134,7 +134,7 @@ namespace Slic3r {
                 uint8_t cp_color_id, Vec3f position, float delta_extruder, float feedrate, float width, float height,
                 float mm3_per_mm, float fan_speed, float temperature, float time, float layer_duration, uint16_t layer_id,
                 bool internal_only) :
-                gcode_id(gcode_id), type(type), extrusion_role(extrusion_role), extruder_id(extruder_id), 
+                gcode_id(gcode_id), type(type), extrusion_role(extrusion_role_to_gcode_extrusion_role(extrusion_role)), extruder_id(extruder_id), 
                 cp_color_id(cp_color_id), position(position), delta_extruder(delta_extruder), feedrate(feedrate), 
                 width(width), height(height), mm3_per_mm(mm3_per_mm), fan_speed(fan_speed), 
                 temperature(temperature), time(time), layer_duration(layer_duration), layer_id(layer_id),

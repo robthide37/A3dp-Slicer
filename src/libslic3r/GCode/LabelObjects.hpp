@@ -22,7 +22,7 @@ public:
         Yes
     };
     void init(const Print& print);
-    std::string all_objects_header(coordf_t resolution = scale_d(0.05f)) const;
+    std::string all_objects_header(BoundingBoxf3 &global_bounding_box, coordf_t resolution = scale_d(0.05f)) const;
     std::string start_object(const PrintInstance& print_instance, IncludeName include_name) const;
     std::string stop_object(const PrintInstance& print_instance) const;
 

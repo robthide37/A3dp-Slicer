@@ -762,7 +762,7 @@ GCodeViewer::GCodeViewer()
     //load Extrusion colors
     {
         this->Extrusion_Role_Colors.clear();
-        this->Extrusion_Role_Colors.insert(this->Extrusion_Role_Colors.begin(), GCodeExtrusionRole::erCount,{ 0.00f, 0.00f, 0.00f, 1.f });
+        this->Extrusion_Role_Colors.insert(this->Extrusion_Role_Colors.begin(), GCode ExtrusionRole::Count,{ 0.00f, 0.00f, 0.00f, 1.f });
         this->Extrusion_Role_Colors[GCodeExtrusionRole::None]              = { 0.75f, 0.75f, 0.75f, 1.f }, // note: should never occur
         this->Extrusion_Role_Colors[GCodeExtrusionRole::Perimeter]         = { 1.00f, 0.90f, 0.30f, 1.f };
         this->Extrusion_Role_Colors[GCodeExtrusionRole::ExternalPerimeter] = { 1.00f, 0.49f, 0.22f, 1.f };

@@ -241,9 +241,18 @@ coord_t get_skirt_offset(const Plater* plater) {
     // Try to subtract the skirt from the bed shape so we don't arrange outside of it.
     if (plater->printer_technology() == ptFFF && plater->fff_print().has_skirt()) {
         const auto& print = plater->fff_print();
-        if (!print.objects().empty()) {
-            skirt_inset = print.config().skirts.value * print.skirt_flow().width() +
-                          print.config().skirt_distance.value;
+        
+        if (!print.objects().empty() && print.config().skirts.value > 0) {
+            double max_skirt_width = 0;
+            double max_skirt_spacing = 0;
+            for (unsigned int extruder_id : print.object_extruders()) {
+                Flow   flow = print.skirt_flow(extruder_id);
+                max_skirt_width = std::max(max_skirt_width, flow.width());
+                max_skirt_spacing = std::max(max_skirt_spacing, flow.spacing());
+            }
+            skirt_inset = (print.config().skirts.value - 1) * max_skirt_spacing
+                        + max_skirt_width
+                        + print.config().skirt_distance.value;
         }
     }
 

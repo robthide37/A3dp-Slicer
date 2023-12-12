@@ -9,7 +9,7 @@ using namespace std::string_view_literals;
 
 namespace Slic3r::GCode {
 
-void Wipe::init(const PrintConfig &config, const std::vector<unsigned int> &extruders)
+void Wipe::init(const PrintConfig &config, const GCodeWriter &writer, const std::vector<unsigned int> &extruders)
 {
     this->reset_path();
 
@@ -17,13 +17,13 @@ void Wipe::init(const PrintConfig &config, const std::vector<unsigned int> &extr
     // Paths longer than wipe_xy should never be needed for the wipe move.
     double wipe_xy = 0;
     const bool multimaterial = extruders.size() > 1;
-    for (auto id : extruders)
+    for (auto id : extruders) // != writer.extruders() ?
         if (config.wipe.get_at(id)) {
             // Wipe length to extrusion ratio.
-            const double xy_to_e = this->calc_xy_to_e_ratio(config, id);
-            wipe_xy = std::max(wipe_xy, xy_to_e * config.retract_length.get_at(id));
+            const double xy_to_e = this->calc_xy_to_e_ratio(writer, id);
+            wipe_xy              = std::max(wipe_xy, xy_to_e * writer.gcode_config().retract_length.get_at(id));
             if (multimaterial)
-                wipe_xy = std::max(wipe_xy, xy_to_e * config.retract_length_toolchange.get_at(id));
+                wipe_xy = std::max(wipe_xy, xy_to_e * writer.gcode_config().retract_length_toolchange.get_at(id));
         }
 
     if (wipe_xy == 0)
@@ -32,39 +32,39 @@ void Wipe::init(const PrintConfig &config, const std::vector<unsigned int> &extr
         this->enable(wipe_xy);
 }
 
-void Wipe::set_path(SmoothPath &&path, bool reversed)
+void Wipe::set_path(const ExtrusionPaths &paths, bool reversed)
 {
     this->reset_path();
 
-    if (this->enabled() && ! path.empty()) {
+    if (this->enabled() && ! paths.empty()) {
         if (reversed) {
-            m_path = std::move(path.back().path);
+            m_path = paths.back().as_polyline().get_arc();
             Geometry::ArcWelder::reverse(m_path);
             int64_t len = Geometry::ArcWelder::estimate_path_length(m_path);
-            for (auto it = std::next(path.rbegin()); len < m_wipe_len_max && it != path.rend(); ++ it) {
-                if (it->path_attributes.role.is_bridge())
+            for (auto it = std::next(paths.rbegin()); len < m_wipe_len_max && it != paths.rend(); ++ it) {
+                if (it->role().is_bridge())
                     break; // Do not perform a wipe on bridges.
-                assert(it->path.size() >= 2);
-                assert(m_path.back().point == it->path.back().point);
-                if (m_path.back().point != it->path.back().point)
+                assert(it->size() >= 2);
+                assert(m_path.back().point == it->last_point());
+                if (m_path.back().point != it->last_point())
                     // ExtrusionMultiPath is interrupted in some place. This should not really happen.
                     break;
-                len += Geometry::ArcWelder::estimate_path_length(it->path);
-                m_path.insert(m_path.end(), it->path.rbegin() + 1, it->path.rend());
+                len += Geometry::ArcWelder::estimate_path_length(it->as_polyline().get_arc());
+                m_path.insert(m_path.end(), it->as_polyline().get_arc().rbegin() + 1, it->as_polyline().get_arc().rend());
             }
         } else {
-            m_path = std::move(path.front().path);
+            m_path = std::move(paths.front().as_polyline().get_arc());
             int64_t len = Geometry::ArcWelder::estimate_path_length(m_path);
-            for (auto it = std::next(path.begin()); len < m_wipe_len_max && it != path.end(); ++ it) {
-                if (it->path_attributes.role.is_bridge())
+            for (auto it = std::next(paths.begin()); len < m_wipe_len_max && it != paths.end(); ++ it) {
+                if (it->role().is_bridge())
                     break; // Do not perform a wipe on bridges.
-                assert(it->path.size() >= 2);
-                assert(m_path.back().point == it->path.front().point);
-                if (m_path.back().point != it->path.front().point)
+                assert(it->size() >= 2);
+                assert(m_path.back().point == it->first_point());
+                if (m_path.back().point != it->first_point())
                     // ExtrusionMultiPath is interrupted in some place. This should not really happen.
                     break;
-                len += Geometry::ArcWelder::estimate_path_length(it->path);
-                m_path.insert(m_path.end(), it->path.begin() + 1, it->path.end());
+                len += Geometry::ArcWelder::estimate_path_length(it->as_polyline().get_arc());
+                m_path.insert(m_path.end(), it->as_polyline().get_arc().begin() + 1, it->as_polyline().get_arc().end());
             }
         }
     }
@@ -85,7 +85,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
     std::string     gcode;
     const Tool &extruder = *gcodegen.writer().tool();
     static constexpr const std::string_view wipe_retract_comment = "wipe and retract"sv;
-    const bool use_firmware_retract = gcodegen.writer().config().use_firmware_retraction.value;
+    const bool use_firmware_retract = gcodegen.writer().gcode_config().use_firmware_retraction.value;
     
     if (!gcodegen.writer().tool_is_extruder())
         return "";
@@ -101,7 +101,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
     if (retract_length > 0 && this->has_path()) {
         // Delayed emitting of a wipe start tag.
         bool wiped = false;
-        const double wipe_speed = this->calc_wipe_speed(gcodegen.writer().config);
+        const double wipe_speed = this->calc_wipe_speed(gcodegen.writer());
         auto start_wipe = [&wiped, &gcode, &gcodegen, wipe_speed](){
             if (! wiped) {
                 wiped = true;
@@ -109,7 +109,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                 gcode += gcodegen.writer().set_speed(wipe_speed * 60, {}, gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv);
             }
         };
-        const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer().config, extruder.id());
+        const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer(), extruder.id());
         auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e](const Vec2d &prev_quantized, Vec2d &p) {
             Vec2d  p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(p);
             if (p_quantized == prev_quantized) {
@@ -175,7 +175,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                     // Degenerated arc after quantization. Process it as if it was a line segment.
                     return wipe_linear(prev_quantized, p);
                 // The arc is valid.
-                gcode += gcodegen.writer().extrude_to_xy_G2G3IJ(
+                gcode += gcodegen.writer().extrude_arc_to_xy(
                     p, ij, ccw, use_firmware_retract?0:-dE, wipe_retract_comment);
             }
             retract_length -= dE;
@@ -219,18 +219,111 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
     return gcode;
 }
 
+
+// Returns true if the smooth path is longer than a threshold.
+bool longer_than(const ExtrusionPaths &paths, double length)
+{
+    for (const ExtrusionPath &path : paths) {
+        for (auto it = std::next(path.as_polyline().get_arc().begin()); it != path.as_polyline().get_arc().end(); ++it) {
+            length -= Geometry::ArcWelder::segment_length<double>(*std::prev(it), *it);
+            if (length < 0)
+                return true;
+        }
+    }
+    return length < 0;
+}
+
+
+// 
+// Length of a smooth path.
+//
+std::optional<Point> sample_path_point_at_distance_from_start(const ExtrusionPaths &paths, double distance)
+{
+    if (distance >= 0) {
+        for (const ExtrusionPath &path : paths) {
+            auto it  = path.as_polyline().get_arc().begin();
+            auto end = path.as_polyline().get_arc().end();
+            Point prev_point = it->point;
+            for (++ it; it != end; ++ it) {
+                Point point = it->point;
+                if (it->linear()) {
+                    // Linear segment
+                    Vec2d  v    = (point - prev_point).cast<double>();
+                    double lsqr = v.squaredNorm();
+                    if (lsqr > sqr(distance))
+                        return std::make_optional<Point>(prev_point + (v * (distance / sqrt(lsqr))).cast<coord_t>());
+                    distance -= sqrt(lsqr);
+                } else {
+                    // Circular segment
+                    float angle = Geometry::ArcWelder::arc_angle(prev_point.cast<float>(), point.cast<float>(), it->radius);
+                    double len = std::abs(it->radius) * angle;
+                    if (len > distance) {
+                        // Rotate the segment end point in reverse towards the start point.
+                        return std::make_optional<Point>(prev_point.rotated(- angle * (distance / len),
+                            Geometry::ArcWelder::arc_center(prev_point.cast<float>(), point.cast<float>(), it->radius, it->ccw()).cast<coord_t>()));
+                    }
+                    distance -= len;
+                }
+                if (distance < 0)
+                    return std::make_optional<Point>(point);
+                prev_point = point;
+            }
+        }
+    }
+    // Failed.
+    return {};
+}
+
+std::optional<Point> sample_path_point_at_distance_from_end(const ExtrusionPaths &paths, double distance)
+{
+    if (distance >= 0) {
+        for (const ExtrusionPath& path : paths) {
+            auto it = path.as_polyline().get_arc().begin();
+            auto end = path.as_polyline().get_arc().end();
+            Point prev_point = it->point;
+            for (++it; it != end; ++it) {
+                Point point = it->point;
+                if (it->linear()) {
+                    // Linear segment
+                    Vec2d  v = (point - prev_point).cast<double>();
+                    double lsqr = v.squaredNorm();
+                    if (lsqr > sqr(distance))
+                        return std::make_optional<Point>(prev_point + (v * (distance / sqrt(lsqr))).cast<coord_t>());
+                    distance -= sqrt(lsqr);
+                }
+                else {
+                    // Circular segment
+                    float angle = Geometry::ArcWelder::arc_angle(prev_point.cast<float>(), point.cast<float>(), it->radius);
+                    double len = std::abs(it->radius) * angle;
+                    if (len > distance) {
+                        // Rotate the segment end point in reverse towards the start point.
+                        return std::make_optional<Point>(prev_point.rotated(-angle * (distance / len),
+                            Geometry::ArcWelder::arc_center(prev_point.cast<float>(), point.cast<float>(), it->radius, it->ccw()).cast<coord_t>()));
+                    }
+                    distance -= len;
+                }
+                if (distance < 0)
+                    return std::make_optional<Point>(point);
+                prev_point = point;
+            }
+        }
+    }
+    // Failed.
+    return {};
+}
+
 // Make a little move inwards before leaving loop after path was extruded,
 // thus the current extruder position is at the end of a path and the path
 // may not be closed in case the loop was clipped to hide a seam.
-std::optional<Point> wipe_hide_seam(const SmoothPath &path, bool is_hole, double wipe_length)
+std::optional<Point> wipe_hide_seam(const ExtrusionPaths &paths, bool is_hole, double wipe_length)
 {
-    assert(! path.empty());
-    assert(path.front().path.size() >= 2);
-    assert(path.back().path.size() >= 2);
+    assert(! paths.empty());
+    assert(paths.front().size() >= 2);
+    assert(paths.back().size() >= 2);
 
     // Heuristics for estimating whether there is a chance that the wipe move will fit inside a small perimeter
     // or that the wipe move direction could be calculated with reasonable accuracy.
-    if (longer_than(path, 2.5 * wipe_length)) {
+    if (longer_than(paths, 2.5 * wipe_length)) {
         // The print head will be moved away from path end inside the island.
         Point p_current = path.back().path.back().point;
         Point p_next = path.front().path.front().point;
@@ -240,13 +333,13 @@ std::optional<Point> wipe_hide_seam(const SmoothPath &path, bool is_hole, double
             double l = wipe_length - (p_next - p_current).cast<double>().norm();
             if (l > 0) {
                 // Not yet.
-                std::optional<Point> n = sample_path_point_at_distance_from_start(path, l);
+                std::optional<Point> n = sample_path_point_at_distance_from_start(paths, l);
                 assert(n);
                 if (! n)
                     // Wipe move cannot be calculated, the loop is not long enough. This should not happen due to the longer_than() test above.
                     return {};
             }
-            if (std::optional<Point> p = sample_path_point_at_distance_from_end(path, wipe_length); p)
+            if (std::optional<Point> p = sample_path_point_at_distance_from_end(paths, wipe_length); p)
                 p_prev = *p;
             else
                 // Wipe move cannot be calculated, the loop is not long enough. This should not happen due to the longer_than() test above.

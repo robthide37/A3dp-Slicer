@@ -8,7 +8,7 @@
 #include "libslic3r.h"
 #include "ExtrusionEntity.hpp"
 #include "BoundingBox.hpp"
-
+//note: not used anymore
 namespace Slic3r {
 
 enum ExtrusionSimulationType

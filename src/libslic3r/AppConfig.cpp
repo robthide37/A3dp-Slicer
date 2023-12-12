@@ -341,10 +341,10 @@ void AppConfig::set_defaults()
             }
         }
         catch (const std::ifstream::failure& err) {
-            trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()).c_str());
+            BOOST_LOG_TRIVIAL(error) << "The color file cannot be loaded. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
         }
         catch (const std::runtime_error& err) {
-            trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()).c_str());
+            BOOST_LOG_TRIVIAL(error) << "Failed loading the color file. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
         }
 
         if (get("color_dark").empty())
@@ -558,10 +558,10 @@ void AppConfig::set_defaults()
             }
         }
         catch (const std::ifstream::failure& err) {
-            trace(1, (std::string("The splashscreen file cannot be loaded. Reason: ") + err.what(), path_colors.string()).c_str());
+            BOOST_LOG_TRIVIAL(error) << "The splashscreen file cannot be loaded. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
         }
         catch (const std::runtime_error& err) {
-            trace(1, (std::string("Failed loading the splashscreen file. Reason: ") + err.what(), path_colors.string()).c_str());
+            BOOST_LOG_TRIVIAL(error) << "Failed loading the splashscreen file. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
         }
         m_default_splashscreen = { key2splashscreen["splash_screen_editor"] , key2splashscreen["splash_screen_gcodeviewer"] };
 
@@ -625,10 +625,10 @@ void AppConfig::set_defaults()
         }
     }
     catch (const std::ifstream::failure& err) {
-        trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()).c_str());
+        BOOST_LOG_TRIVIAL(error) << "The color file cannot be loaded. (2) Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
     }
     catch (const std::runtime_error& err) {
-        trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()).c_str());
+        BOOST_LOG_TRIVIAL(error) << "Failed (2) loading the color file. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
     }
 
 
@@ -667,10 +667,10 @@ void AppConfig::init_ui_layout() {
                         name_2_version_description_path[name] = LayoutEntry(name, description, entry.path(), version);
                     }
                     catch (const std::ifstream::failure& err) {
-                        trace(1, (std::string("The layout file " + version_path.string() + " cannot be loaded. Reason: ") + err.what()).c_str());
+                        BOOST_LOG_TRIVIAL(error) << "The layout file " << version_path.string() << " cannot be loaded. Reason: " << err.what();
                     }
                     catch (const std::runtime_error& err) {
-                        trace(1, (std::string("Failed loading the " + version_path.string() + " file. Reason: ") + err.what()).c_str());
+                        BOOST_LOG_TRIVIAL(error) << "Failed loading the " << version_path.string() << " file. Reason: " << err.what();
                     }
                 }
             }
@@ -1189,12 +1189,12 @@ bool AppConfig::set_mouse_device(const std::string& name, double translation_spe
     src["rotation_deadzone"]    = float_to_string_decimal_point(rotation_deadzone);
     src["zoom_speed"]           = float_to_string_decimal_point(zoom_speed);
     src["swap_yz"]              = swap_yz ? "1" : "0";
-    it->second["invert_x"] = invert_x ? "1" : "0";
-    it->second["invert_y"] = invert_y ? "1" : "0";
-    it->second["invert_z"] = invert_z ? "1" : "0";
-    it->second["invert_yaw"] = invert_yaw ? "1" : "0";
-    it->second["invert_pitch"] = invert_pitch ? "1" : "0";
-    it->second["invert_roll"] = invert_roll ? "1" : "0";
+    src["invert_x"]             = invert_x ? "1" : "0";
+    src["invert_y"]             = invert_y ? "1" : "0";
+    src["invert_z"]             = invert_z ? "1" : "0";
+    src["invert_yaw"]           = invert_yaw ? "1" : "0";
+    src["invert_pitch"]         = invert_pitch ? "1" : "0";
+    src["invert_roll"]          = invert_roll ? "1" : "0";
 
     if (src != dst) {
         dst = std::move(src);

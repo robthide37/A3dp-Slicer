@@ -7,7 +7,7 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
                                                           const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
                                                           const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines)
 {
-    std::vector<ExtendedPoint>           extended_points = estimate_points_properties<true, true, true, true>(path.polyline.points,
+    std::vector<ExtendedPoint>           extended_points = estimate_points_properties<true, true, true, true>(path.polyline.to_polyline().points,
                                                                                                     unscaled_prev_layer, path.width());
     std::vector<std::pair<float, float>> calculated_distances(extended_points.size());
 
@@ -101,8 +101,8 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
                                                                      const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines)
 {
     ExtrusionEntityCollection result{};
-    result.no_sort = ecc->no_sort;
-    for (const auto *e : ecc->entities) {
+    result.set_can_sort_reverse(ecc->can_sort(), ecc->can_reverse());
+    for (const auto *e : ecc->entities()) {
         if (auto *col = dynamic_cast<const ExtrusionEntityCollection *>(e)) {
             result.append(calculate_and_split_overhanging_extrusions(col, unscaled_prev_layer, prev_layer_curled_lines));
         } else if (auto *loop = dynamic_cast<const ExtrusionLoop *>(e)) {
@@ -121,11 +121,11 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
                 new_mp.paths.insert(new_mp.paths.end(), paths.begin(), paths.end());
             }
             result.append(new_mp);
-        } else if (auto *op = dynamic_cast<const ExtrusionPathOriented *>(e)) {
-            auto paths = calculate_and_split_overhanging_extrusions(*op, unscaled_prev_layer, prev_layer_curled_lines);
-            for (const ExtrusionPath &p : paths) {
-                result.append(ExtrusionPathOriented(p.polyline, p.attributes()));
-            }
+        //} else if (auto *op = dynamic_cast<const ExtrusionPathOriented *>(e)) {
+        //    auto paths = calculate_and_split_overhanging_extrusions(*op, unscaled_prev_layer, prev_layer_curled_lines);
+        //    for (const ExtrusionPath &p : paths) {
+        //        result.append(ExtrusionPathOriented(p.polyline, p.attributes()));
+        //    }
         } else if (auto *p = dynamic_cast<const ExtrusionPath *>(e)) {
             auto paths = calculate_and_split_overhanging_extrusions(*p, unscaled_prev_layer, prev_layer_curled_lines);
             result.append(paths);

@@ -177,7 +177,7 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
         ext_lines.junctions = std::move(out);
 }
 
-ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const PerimeterGenerator::Parameters &params,
+ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Parameters &params,
     const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls, int count_since_overhang /*= 0*/) const
 {
     // loops is an arrayref of ::Loop objects
@@ -302,7 +302,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Peri
             bool has_overhang = false;
             if (params.config.overhangs_speed_enforce.value > 0) {
                 for (const ExtrusionPath& path : eloop->paths) {
-                    if (path.role() == erOverhangPerimeter) {
+                    if (path.role() == ExtrusionRole::OverhangPerimeter) {
                         has_overhang = true;
                         break;
                     }
@@ -310,7 +310,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Peri
                 if (has_overhang || params.config.overhangs_speed_enforce.value > count_since_overhang) {
                     //enforce
                     for (ExtrusionPath& path : eloop->paths) {
-                        if (path.role() == erPerimeter || path.role() == erExternalPerimeter) {
+                        if (path.role() == ExtrusionRole::Perimeter || path.role() == ExtrusionRole::ExternalPerimeter) {
                             path.set_role(erOverhangPerimeter);
                         }
                     }
@@ -1080,7 +1080,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const PerimeterGener
     if (!big_flow.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : big_flow) {
             for (auto&& path : Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                    erOverhangPerimeter,
+                    ExtrusionRole::OverhangPerimeter,
                     is_external ? this->ext_perimeter_flow : this->perimeter_flow,
                     std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)),
                     (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
@@ -1541,7 +1541,7 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
                     ExPolygons gap = shrinked.empty() ? offset_ex(prev, overhang_flow.scaled_spacing() * 0.5) : to_expolygons(shrinked);
 
                     for (const ExPolygon &ep : gap) {
-                        ep.medial_axis(0.75 * overhang_flow.scaled_width(), 3.0 * overhang_flow.scaled_spacing(), &fills);
+                        ep.medial_axis(0.75 * overhang_flow.scaled_width(), 3.0 * overhang_flow.scaled_spacing(), fills);
                     }
                     if (!fills.empty()) {
                         fills = intersection_pl(fills, shrinked_overhang_to_cover);
@@ -2932,7 +2932,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &param
                 } else {
                     peri_entities.append(Geometry::thin_variable_width(
                         thin_walls_thickpolys, 
-                        erThinWall, 
+                        ExtrusionRole::ThinWall, 
                         this->ext_perimeter_flow, 
                         std::max(ext_perimeter_width / 4, scale_t(params.print_config.resolution)),
                         false));
@@ -2978,13 +2978,13 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &param
                     //reverse only not-thin wall
                     ExtrusionEntityCollection coll2;
                     for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if ( (loop->is_loop() && loop->role() != erThinWall)) {
+                        if ( (loop->is_loop() && loop->role() != ExtrusionRole::ThinWall)) {
                             coll2.append(*loop);
                         }
                     }
                     coll2.reverse();
                     for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if (!((loop->is_loop() && loop->role() != erThinWall))) {
+                        if (!((loop->is_loop() && loop->role() != ExtrusionRole::ThinWall))) {
                             coll2.append(*loop);
                         }
                     }
@@ -2995,13 +2995,13 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &param
                     //reverse only not-hole perimeters
                     ExtrusionEntityCollection coll2;
                     for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if ((loop->is_loop() && loop->role() != erThinWall) && !(((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0) {
+                        if ((loop->is_loop() && loop->role() != ExtrusionRole::ThinWall) && !(((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0) {
                             coll2.append(*loop);
                         }
                     }
                     coll2.reverse();
                     for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if (!((loop->is_loop() && loop->role() != erThinWall) && !(((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0)) {
+                        if (!((loop->is_loop() && loop->role() != ExtrusionRole::ThinWall) && !(((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0)) {
                             coll2.append(*loop);
                         }
                     }
@@ -3013,13 +3013,13 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &param
                 //reverse the hole, and put them in first place.
                 ExtrusionEntityCollection coll2;
                 for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                    if ((loop->is_loop() && loop->role() != erThinWall) && (((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0) {
+                    if ((loop->is_loop() && loop->role() != ExtrusionRole::ThinWall) && (((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0) {
                         coll2.append(*loop);
                     }
                 }
                 coll2.reverse();
                 for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                    if (!((loop->is_loop() && loop->role() != erThinWall) && (((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0)) {
+                    if (!((loop->is_loop() && loop->role() != ExtrusionRole::ThinWall) && (((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0)) {
                         coll2.append(*loop);
                     }
                 }
@@ -3130,7 +3130,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &param
         if (!polylines.empty()) {
             this->gap_fill->append(Geometry::thin_variable_width(
                 polylines,
-                erGapFill, 
+                ExtrusionRole::GapFill, 
                 this->solid_infill_flow, 
                 scale_t(params.print_config.resolution_internal),
                 true));
@@ -3317,7 +3317,7 @@ void PerimeterGenerator::_merge_thin_walls(const PerimeterGenerator::Parameters 
         ExtrusionLoop *current_loop = nullptr;
         virtual void use(ExtrusionPath &path) override {
             //don't consider other thin walls.
-            if (path.role() == erThinWall) return;
+            if (path.role() == ExtrusionRole::ThinWall) return;
             //for each segment
             Lines lines = path.polyline.lines();
             for (size_t idx_line = 0; idx_line < lines.size(); idx_line++) {
@@ -3388,7 +3388,7 @@ void PerimeterGenerator::_merge_thin_walls(const PerimeterGenerator::Parameters 
             if (!searcher.search_result.from_start)
                 tw.reverse();
             //get the point
-            Point point = tw.front().projection_onto(searcher.search_result.line);
+            Point point = tw.front().projection_onto(searcher.search_result.line.a, searcher.search_result.line.b);
             //we have to create 3 paths: 1: thinwall extusion, 2: thinwall return, 3: end of the path
             //create new path : end of the path
             Polyline poly_after;
@@ -3404,7 +3404,7 @@ void PerimeterGenerator::_merge_thin_walls(const PerimeterGenerator::Parameters 
                 ExtrusionPath(poly_after, *searcher.search_result.path));
             //create thin wall path exttrusion
             ExtrusionEntityCollection tws;
-            tws.append(Geometry::thin_variable_width({ tw }, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)), false));
+            tws.append(Geometry::thin_variable_width({ tw }, ExtrusionRole::ThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)), false));
             assert(!tws.entities().empty());
             ChangeFlow change_flow;
             if (tws.entities().size() == 1 && tws.entities()[0]->is_loop()) {
@@ -3450,7 +3450,7 @@ void PerimeterGenerator::_merge_thin_walls(const PerimeterGenerator::Parameters 
     }
 
     //now add thinwalls that have no anchor (make them reversable)
-    extrusions.append(Geometry::thin_variable_width(not_added, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)), true));
+    extrusions.append(Geometry::thin_variable_width(not_added, ExtrusionRole::ThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)), true));
 }
 
 PerimeterIntersectionPoint
@@ -3466,7 +3466,7 @@ PerimeterGenerator::_get_nearest_point(const PerimeterGeneratorLoops &children, 
             //if (myPolylines.paths[idx_poly].extruder_id == (unsigned int)-1) continue;
             if (myPolylines.paths[idx_poly].length() < dist_cut + perimeter_flow.scaled_width()/20) continue;
 
-            if ((myPolylines.paths[idx_poly].role() == erExternalPerimeter || child.is_external() )
+            if ((myPolylines.paths[idx_poly].role() == ExtrusionRole::ExternalPerimeter || child.is_external() )
                 && (params.object_config.seam_position.value != SeamPosition::spRandom && params.object_config.seam_position.value != SeamPosition::spAllRandom)) {
                 //first, try to find 2 point near enough
                 for (size_t idx_point = 0; idx_point < myPolylines.paths[idx_poly].polyline.size(); idx_point++) {
@@ -3596,7 +3596,7 @@ PerimeterGenerator::_extrude_and_cut_loop(const PerimeterGeneratorLoop &loop, co
             Polyline poly_point;
             poly_point.append(poly_to_use.centroid());
             single_point.paths.emplace_back(
-                loop.is_external() ? erExternalPerimeter : erPerimeter,
+                loop.is_external() ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter,
                 (double)(loop.is_external() ? this->ext_mm3_per_mm() : this->mm3_per_mm()),
                 (float)(loop.is_external() ? this->ext_perimeter_flow.width() : this->perimeter_flow.width()),
                 (float)(this->layer->height),
@@ -3635,7 +3635,7 @@ PerimeterGenerator::_extrude_and_cut_loop(const PerimeterGeneratorLoop &loop, co
 
         ExtrusionRole role;
         ExtrusionLoopRole loop_role;
-        role = is_external ? erExternalPerimeter : erPerimeter;
+        role = is_external ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter;
         if (loop.is_internal_contour()) {
             // Note that we set loop role to ContourInternalPerimeter
             // also when loop is both internal and external (i.e.
@@ -3909,15 +3909,15 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
             }
 
             //now add extrusionPAths to connect the two loops
-            ExtrusionPaths travel_path_begin;// (ExtrusionRole::erTravel, 0, outer_start->width, outer_start->height);
+            ExtrusionPaths travel_path_begin;// ( ExtrusionRole::Travel, 0, outer_start->width, outer_start->height);
             //travel_path_begin.extruder_id = -1;
-            ExtrusionPaths travel_path_end;// (ExtrusionRole::erTravel, 0, outer_end->width, outer_end->height);
+            ExtrusionPaths travel_path_end;// ( ExtrusionRole::Travel, 0, outer_end->width, outer_end->height);
             //travel_path_end.extruder_id = -1;
             double dist_travel = outer_start->polyline.back().distance_to(inner_start->polyline.front());
             if (dist_travel > max_width_extrusion*1.5 && params.config.fill_density.value > 0) {
-                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
-                travel_path_begin.emplace_back(ExtrusionRole::erTravel, 0, outer_start->width/10, outer_start->height, false);
-                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
+                travel_path_begin.emplace_back( ExtrusionRole::Perimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
+                travel_path_begin.emplace_back( ExtrusionRole::Travel, 0, outer_start->width/10, outer_start->height, false);
+                travel_path_begin.emplace_back( ExtrusionRole::Perimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
                 //travel_path_begin[0].extruder_id = -1;
                 //travel_path_begin[1].extruder_id = -1;
                 //travel_path_begin[2].extruder_id = -1;
@@ -3945,16 +3945,16 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
                     // the path is a bit too long, reduce the extrusion flow.
                     flow_mult = max_width_extrusion / dist_travel;
                 }
-                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm * flow_mult, (float)(outer_start->width * flow_mult), outer_start->height, false);
+                travel_path_begin.emplace_back( ExtrusionRole::Perimeter, outer_start->mm3_per_mm * flow_mult, (float)(outer_start->width * flow_mult), outer_start->height, false);
                 //travel_path_begin[0].extruder_id = -1;
                 travel_path_begin[0].polyline.append(outer_start->polyline.back());
                 travel_path_begin[0].polyline.append(inner_start->polyline.front());
             }
             dist_travel = inner_end->polyline.back().distance_to(outer_end->polyline.front());
             if (dist_travel > max_width_extrusion*1.5 && params.config.fill_density.value > 0) {
-                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
-                travel_path_end.emplace_back(ExtrusionRole::erTravel, 0, outer_end->width/10, outer_end->height, false);
-                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
+                travel_path_end.emplace_back( ExtrusionRole::Perimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
+                travel_path_end.emplace_back( ExtrusionRole::Travel, 0, outer_end->width/10, outer_end->height, false);
+                travel_path_end.emplace_back( ExtrusionRole::Perimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
                 //travel_path_end[0].extruder_id = -1;
                 //travel_path_end[1].extruder_id = -1;
                 //travel_path_end[2].extruder_id = -1;
@@ -3982,7 +3982,7 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
                     // the path is a bit too long, reduce the extrusion flow.
                     flow_mult = max_width_extrusion / dist_travel;
                 }
-                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm * flow_mult, (float)(outer_end->width * flow_mult), outer_end->height, false);
+                travel_path_end.emplace_back( ExtrusionRole::Perimeter, outer_end->mm3_per_mm * flow_mult, (float)(outer_end->width * flow_mult), outer_end->height, false);
                 //travel_path_end[0].extruder_id = -1;
                 travel_path_end[0].polyline.append(inner_end->polyline.back());
                 travel_path_end[0].polyline.append(outer_end->polyline.front());

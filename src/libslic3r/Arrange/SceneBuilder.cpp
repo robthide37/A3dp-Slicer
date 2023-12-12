@@ -20,11 +20,16 @@ coord_t get_skirt_inset(const Print &fffprint)
 {
     float skirt_inset = 0.f;
 
-    if (fffprint.has_skirt()) {
-        float skirtflow = fffprint.objects().empty()
-                              ? 0
-                              : fffprint.skirt_flow().width();
-        skirt_inset = fffprint.config().skirts.value * skirtflow
+    if (!fffprint.objects().empty() && fffprint.has_skirt()) {
+        float max_skirt_width = 0;
+        float max_skirt_spacing = 0;
+        for (unsigned int extruder_id : fffprint.object_extruders()) {
+            Flow   flow = fffprint.skirt_flow(extruder_id);
+            max_skirt_width = std::max(max_skirt_width, flow.width());
+            max_skirt_spacing = std::max(max_skirt_spacing, flow.spacing());
+        }
+        skirt_inset = (fffprint.config().skirts.value-1) * max_skirt_spacing
+                      + max_skirt_width
                       + fffprint.config().skirt_distance.value;
     }
 
@@ -33,11 +38,9 @@ coord_t get_skirt_inset(const Print &fffprint)
 
 coord_t brim_offset(const PrintObject &po)
 {
-    const BrimType brim_type       = po.config().brim_type.value;
     const float    brim_separation = po.config().brim_separation.getFloat();
     const float    brim_width      = po.config().brim_width.getFloat();
-    const bool     has_outer_brim  = brim_type == BrimType::btOuterOnly ||
-                                brim_type == BrimType::btOuterAndInner;
+    const bool     has_outer_brim  = po.config().brim_width.value > 0;
 
     // How wide is the brim? (in scaled units)
     return has_outer_brim ? scaled(brim_width + brim_separation) : 0;
@@ -323,16 +326,16 @@ const int GridStriderVBedHandler::Cols =
 const int GridStriderVBedHandler::HalfCols = Cols / 2;
 const int GridStriderVBedHandler::Offset = HalfCols + Cols * HalfCols;
 
-Vec2i GridStriderVBedHandler::raw2grid(int bed_idx) const
+Vec2i32 GridStriderVBedHandler::raw2grid(int bed_idx) const
 {
     bed_idx += Offset;
 
-    Vec2i ret{bed_idx % Cols - HalfCols, bed_idx / Cols - HalfCols};
+    Vec2i32 ret{bed_idx % Cols - HalfCols, bed_idx / Cols - HalfCols};
 
     return ret;
 }
 
-int GridStriderVBedHandler::grid2raw(const Vec2i &crd) const
+int GridStriderVBedHandler::grid2raw(const Vec2i32 &crd) const
 {
     // Overlapping virtual beds will happen if the crd values exceed limits
     assert((crd.x() < HalfCols - 1 && crd.x() >= -HalfCols) &&
@@ -343,14 +346,14 @@ int GridStriderVBedHandler::grid2raw(const Vec2i &crd) const
 
 int GridStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
 {
-    Vec2i crd = {m_xstrider.get_bed_index(obj), m_ystrider.get_bed_index(obj)};
+    Vec2i32 crd = {m_xstrider.get_bed_index(obj), m_ystrider.get_bed_index(obj)};
 
     return grid2raw(crd);
 }
 
 bool GridStriderVBedHandler::assign_bed(VBedPlaceable &inst, int bed_idx)
 {
-    Vec2i crd = raw2grid(bed_idx);
+    Vec2i32 crd = raw2grid(bed_idx);
 
     bool retx = m_xstrider.assign_bed(inst, crd.x());
     bool rety = m_ystrider.assign_bed(inst, crd.y());
@@ -360,7 +363,7 @@ bool GridStriderVBedHandler::assign_bed(VBedPlaceable &inst, int bed_idx)
 
 Transform3d GridStriderVBedHandler::get_physical_bed_trafo(int bed_idx) const
 {
-    Vec2i crd = raw2grid(bed_idx);
+    Vec2i32 crd = raw2grid(bed_idx);
 
     Transform3d ret = m_xstrider.get_physical_bed_trafo(crd.x()) *
                       m_ystrider.get_physical_bed_trafo(crd.y());

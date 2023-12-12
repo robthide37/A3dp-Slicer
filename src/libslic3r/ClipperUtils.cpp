@@ -895,7 +895,6 @@ Slic3r::ExPolygons union_ex(const Slic3r::ExPolygons & expolygons1, const Slic3r
 #define CLIPPER_OFFSET_SCALE_ROUNDING_DELTA ((1 << (CLIPPER_OFFSET_POWER_OF_2 - 1)) - 1)
 void scaleClipperPolygons(ClipperLib::Paths& polygons)
 {
-    CLIPPERUTILS_PROFILE_FUNC();
     for (ClipperLib::Paths::iterator it = polygons.begin(); it != polygons.end(); ++it)
         for (ClipperLib::Path::iterator pit = (*it).begin(); pit != (*it).end(); ++pit) {
             pit->x() <<= CLIPPER_OFFSET_POWER_OF_2;
@@ -985,7 +984,6 @@ Polylines _clipper_pl_open(ClipperLib::ClipType clipType, PathsProvider1 &&subje
 
 void scaleClipperPolygons(ClipperLib_Z::Paths& polygons)
 {
-    CLIPPERUTILS_PROFILE_FUNC();
     for (ClipperLib_Z::Paths::iterator it = polygons.begin(); it != polygons.end(); ++it)
         for (ClipperLib_Z::Path::iterator pit = (*it).begin(); pit != (*it).end(); ++pit) {
             pit->x() <<= CLIPPER_OFFSET_POWER_OF_2;
@@ -1136,7 +1134,7 @@ ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Paths& subjects, const Cl
                             assert(std::prev(it) == subject.begin());
                             prev = Point(subject.front().x(), subject.front().y());
                         }
-                        Point projected_pt = pt.projection_onto(Line(prev, curr));
+                        Point projected_pt;
                         if (double dist_sqr = line_alg::distance_to_squared(Line(prev, curr), pt, &projected_pt); dist_sqr < dist_sqr_min) {
                             dist_sqr_min = dist_sqr;
                             projected_pt_min = projected_pt;

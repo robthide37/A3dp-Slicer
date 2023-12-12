@@ -26,7 +26,7 @@ class JPSPathFinder
 
     const coord_t resolution = scaled(1.5);
     Pixel         pixelize(const Point &p) { return p / resolution; }
-    Point         unpixelize(const Pixel &p) { return p * resolution; }
+    Point         unpixelize(const Pixel &p) { return p * double(resolution); }
 
 public:
     JPSPathFinder() = default;

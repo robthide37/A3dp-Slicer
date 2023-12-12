@@ -59,11 +59,6 @@
 
 namespace Slic3r {
 
-enum class ArcFittingType {
-    Disabled,
-    EmitCenter
-};
-
 enum CompleteObjectSort {
     cosObject, 
     cosZ, 
@@ -999,6 +994,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionStrings,             end_filament_gcode))
     ((ConfigOptionFloat,               extra_loading_move))
     ((ConfigOptionPercents,            extruder_fan_offset))
+    ((ConfigOptionPoints,              extruder_offset))
     ((ConfigOptionFloats,              extruder_temperature_offset))
     ((ConfigOptionString,              extrusion_axis))
     ((ConfigOptionFloats,              extrusion_multiplier))
@@ -1067,7 +1063,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBools,               travel_ramping_lift))
     ((ConfigOptionFloats,              travel_max_lift))
     ((ConfigOptionFloats,              travel_slope))
-    ((ConfigOptionBools,               travel_lift_before_obstacle))    ((ConfigOptionPercents,            retract_before_wipe))
+    ((ConfigOptionBools,               travel_lift_before_obstacle))
+    ((ConfigOptionPercents,            retract_before_wipe))
     ((ConfigOptionFloats,              retract_length))
     ((ConfigOptionFloats,              retract_length_toolchange))
     ((ConfigOptionFloats,              retract_lift))
@@ -1166,7 +1163,6 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,                extruder_clearance_height))
     ((ConfigOptionFloat,                extruder_clearance_radius))
     ((ConfigOptionStrings,              extruder_colour))
-    ((ConfigOptionPoints,               extruder_offset))
     ((ConfigOptionBools,                fan_always_on))
     ((ConfigOptionFloats,               fan_below_layer_time))
     ((ConfigOptionStrings,              filament_colour))
@@ -1180,7 +1176,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloatOrPercent,       first_layer_infill_speed))
     ((ConfigOptionFloat,                first_layer_min_speed))
     ((ConfigOptionInts,                 first_layer_temperature))
-    ((ConfigOptionIntsNullable,       idle_temperature))
+    ((ConfigOptionIntsNullable,         idle_temperature))
     ((ConfigOptionInts,                 full_fan_speed_layer))
     ((ConfigOptionFloatOrPercent,       gap_fill_acceleration))
     ((ConfigOptionInts,                 gap_fill_fan_speed))
@@ -1233,7 +1229,6 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloatsOrPercents,     seam_gap_external))
     ((ConfigOptionInt,                  skirts))
     ((ConfigOptionFloats,               slowdown_below_layer_time))
-    ((ConfigOptionFloat,              solid_infill_acceleration))
     ((ConfigOptionBool,                 spiral_vase))
     ((ConfigOptionFloatOrPercent,       solid_infill_acceleration))
     ((ConfigOptionInts,                 solid_infill_fan_speed))
@@ -1267,10 +1262,10 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,                wipe_tower_width))
     ((ConfigOptionFloat,                wipe_tower_per_color_wipe))
     ((ConfigOptionFloat,                wipe_tower_rotation_angle))
-    ((ConfigOptionFloat,              wipe_tower_cone_angle))
-    ((ConfigOptionPercent,            wipe_tower_extra_spacing))
+    ((ConfigOptionFloat,                wipe_tower_cone_angle))
+    ((ConfigOptionPercent,              wipe_tower_extra_spacing))
     ((ConfigOptionFloat,                wipe_tower_bridging))
-    ((ConfigOptionInt,                wipe_tower_extruder))
+    ((ConfigOptionInt,                  wipe_tower_extruder))
     ((ConfigOptionFloats,               wiping_volumes_matrix))
     ((ConfigOptionFloats,               wiping_volumes_extruders))
     ((ConfigOptionFloat,                z_offset))

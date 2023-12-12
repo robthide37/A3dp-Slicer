@@ -92,6 +92,7 @@ Polylines Fill::fill_surface(const Surface *surface, const FillParams &params) c
     Polylines polylines_out;
     for (ExPolygon &expoly : expp)
         _fill_surface_single(params, surface->thickness_layers, _infill_direction(surface), std::move(expoly), polylines_out);
+    assert(get_spacing() >= 0);
     return polylines_out;
 }
 
@@ -197,7 +198,9 @@ double Fill::compute_unscaled_volume_to_fill(const Surface* surface, const FillP
     return polyline_volume;
 }
 
-void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const {
+void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const
+{
+    assert(get_spacing() >= 0);
     //add overlap & call fill_surface
     try {
         if (params.use_arachne) {
@@ -253,12 +256,12 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 public:
                     ApplyFlow(double mult_flow) : mult_flow(mult_flow) {}
                     virtual void use(ExtrusionPath& path) override {
-                        path.mm3_per_mm *= mult_flow;
-                        path.width *= mult_flow;
+                        path.attributes_mutable().mm3_per_mm *= mult_flow;
+                        path.attributes_mutable().width *= mult_flow;
                     }
                     virtual void use(ExtrusionPath3D& path3D) override {
-                        path3D.mm3_per_mm *= mult_flow;
-                        path3D.width *= mult_flow;
+                        path3D.attributes_mutable().mm3_per_mm *= mult_flow;
+                        path3D.attributes_mutable().width *= mult_flow;
                     }
                 } flow_multiplier(mult_flow);
                 all_new_paths->visit(flow_multiplier);
@@ -314,12 +317,12 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
             //get the role
             ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
             /// push the path
-            extrusion_entities_append_paths(
-                eec->set_entities(), std::move(simple_polylines),
-                good_role,
-                params.flow.mm3_per_mm()* params.flow_mult * mult_flow,
-                (float)(params.flow.width()* params.flow_mult * mult_flow),
-                (float)params.flow.height());
+            extrusion_entities_append_paths(eec->set_entities(), std::move(simple_polylines),
+                                            ExtrusionAttributes{good_role,
+                                                                ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult * mult_flow,
+                                                                              (float) (params.flow.width() * params.flow_mult * mult_flow),
+                                                                              (float) params.flow.height()}},
+                                            true);
         }
     } catch (InfillFailedException&) {
     }
@@ -330,6 +333,7 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
 
 coord_t Fill::_line_spacing_for_density(float density) const
 {
+    assert(get_spacing() >= 0);
     return scale_t(this->get_spacing() / density);
 }
 
@@ -357,7 +361,7 @@ Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, Ext
             Geometry::MedialAxis{ ex, params.flow.scaled_width() * 2, params.flow.scaled_width() / 5, coord_t(params.flow.height()) }.build(polylines_gapfill);
         }
     }
-    if (!polylines_gapfill.empty() && !is_bridge(params.role)) {
+    if (!polylines_gapfill.empty() && !params.role.is_bridge()) {
         //test
 #ifdef _DEBUG
         for (ThickPolyline poly : polylines_gapfill) {
@@ -369,9 +373,9 @@ Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, Ext
         }
 #endif
 
-        ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines_gapfill, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
+        ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines_gapfill, ExtrusionRole::GapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
         ////set role if needed
-        //if (params.role != erSolidInfill) {
+        //if (params.role != ExtrusionRole::SolidInfill) {
         //    ExtrusionSetRole set_good_role(params.role);
         //    for(ExtrusionEntity *ptr : gap_fill_entities)
         //        ptr->visit(set_good_role);
@@ -648,7 +652,7 @@ Points getFrontier(Polylines& polylines, const Point& p1, const Point& p2, const
 void connect_infill(const Polylines& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params) {
 
     //TODO: fallback to the quick & dirty old algorithm when n(points) is too high.
-    Polylines polylines_frontier = to_polylines(((Polygons)boundary));
+    Polylines polylines_frontier = to_polylines(to_polygons(boundary));
 
     Polylines polylines_blocker;
     coord_t clip_size = scale_(spacing) * 2;
@@ -3699,10 +3703,10 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
             extrusion_entities_append_paths(
                 eec_peri->set_entities(),
                 polylines_peri,
-                good_role,
-                params.flow.mm3_per_mm() * params.flow_mult,
-                params.flow.width() * params.flow_mult,
-                params.flow.height());
+                ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult,
+                                                             params.flow.width() * params.flow_mult,
+                                                             params.flow.height()}},
+                true);
 
             // === extrude infill ===
             //50% overlap with the new perimeter
@@ -3721,12 +3725,11 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
                     ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
                     /// push the path
                     extrusion_entities_append_paths(
-                        eec_infill->set_entities(),
-                        polys_infill,
-                        good_role,
-                        params.flow.mm3_per_mm() * params.flow_mult,
-                        params.flow.width() * params.flow_mult,
-                        params.flow.height());
+                        eec_infill->set_entities(), polys_infill,
+                                                    ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult,
+                                                                                                 params.flow.width() * params.flow_mult,
+                                                                                                 params.flow.height()}},
+                                                    true);
                 }
             }
         }

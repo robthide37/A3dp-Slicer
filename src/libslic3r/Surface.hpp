@@ -71,14 +71,14 @@ public:
     SurfaceType     surface_type;
     ExPolygon       expolygon;
     double          thickness        { -1 };  // in mm
-    unsigned short  thickness_layers {  1 };  // in layers
+    uint16_t        thickness_layers{1_u}; // in layers
     double          bridge_angle     { -1. }; // in radians, ccw, 0 = East, only 0+ (negative means undefined)
-    unsigned short  extra_perimeters {  0 };
+    uint16_t        extra_perimeters{0_u};
     //for dense infill
-    uint16_t        maxNbSolidLayersOnTop { -1 };
-    uint16_t        priority              {  0 };
+    uint16_t        maxNbSolidLayersOnTop { uint16_t(-1) };
+    uint16_t        priority              {  0_u };
     
-    Surface(const Slic3r::Surface &rhs) :
+    Surface(const Surface &rhs) :
         surface_type(rhs.surface_type), expolygon(rhs.expolygon),
             thickness(rhs.thickness), thickness_layers(rhs.thickness_layers), 
             bridge_angle(rhs.bridge_angle), extra_perimeters(rhs.extra_perimeters),
@@ -177,21 +177,6 @@ inline Polygons to_polygons(const Surfaces &src)
     return polygons;
 }
 
-inline Polygons to_polygons(const SurfacesPtr &src)
-{
-    size_t num = 0;
-    for (SurfacesPtr::const_iterator it = src.begin(); it != src.end(); ++it)
-        num += (*it)->expolygon.holes.size() + 1;
-    Polygons polygons;
-    polygons.reserve(num);
-    for (SurfacesPtr::const_iterator it = src.begin(); it != src.end(); ++it) {
-        polygons.emplace_back((*it)->expolygon.contour);
-        for (Polygons::const_iterator ith = (*it)->expolygon.holes.begin(); ith != (*it)->expolygon.holes.end(); ++ith)
-            polygons.emplace_back(*ith);
-    }
-    return polygons;
-}
-
 inline Polygons to_polygons(const SurfacesConstPtr &src)
 {
     size_t num = 0;
@@ -223,15 +208,6 @@ inline ExPolygons to_expolygons(Surfaces &&src)
 	for (auto it = src.begin(); it != src.end(); ++it)
         expolygons.emplace_back(ExPolygon(std::move(it->expolygon)));
     src.clear();
-    return expolygons;
-}
-
-inline ExPolygons to_expolygons(const SurfacesPtr &src)
-{
-    ExPolygons expolygons;
-    expolygons.reserve(src.size());
-    for (SurfacesPtr::const_iterator it = src.begin(); it != src.end(); ++it)
-        expolygons.emplace_back((*it)->expolygon);
     return expolygons;
 }
 
@@ -367,6 +343,6 @@ extern void export_surface_type_legend_to_svg(SVG &svg, const Point &pos);
 extern Point export_surface_type_legend_to_svg_box_size();
 extern bool export_to_svg(const char *path, const Surfaces &surfaces, const float transparency = 1.f);
 
-}
+} //namespace Slic3r
 
 #endif

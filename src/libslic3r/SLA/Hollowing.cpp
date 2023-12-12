@@ -595,7 +595,7 @@ struct FaceHash {
         return ret;
     }
 
-    static std::string facekey(const Vec3i &face, const std::vector<Vec3f> &vertices)
+    static std::string facekey(const Vec3i32 &face, const std::vector<Vec3f> &vertices)
     {
         // Scale to integer to avoid floating points
         std::array<Vec<3, int64_t>, 3> pts = {

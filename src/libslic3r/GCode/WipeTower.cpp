@@ -723,10 +723,10 @@ void WipeTower::set_extruder(size_t idx)
     m_filpar.push_back(FilamentParameters());
 
     m_filpar[idx].material = m_config->filament_type.get_at(idx);
-    if (config.wipe_tower_extruder == 0) {
+    if (m_config->wipe_tower_extruder == 0) {
         m_filpar[idx].is_soluble = m_config->filament_soluble.get_at(idx);
     } else {
-        m_filpar[idx].is_soluble = (idx != size_t(config.wipe_tower_extruder - 1));
+        m_filpar[idx].is_soluble = (idx != size_t(m_config->wipe_tower_extruder - 1));
     }
     m_filpar[idx].temperature = m_config->temperature.get_at(idx);
     m_filpar[idx].first_layer_temperature = m_config->first_layer_temperature.get_at(idx);
@@ -781,9 +781,9 @@ void WipeTower::set_extruder(size_t idx)
         // and the same time step has to be used when the ramming is performed.
     } else {
         // We will use the same variables internally, but the correspondence to the configuration options will be different.
-        float vol  = config.filament_multitool_ramming_volume.get_at(idx);
-        float flow = config.filament_multitool_ramming_flow.get_at(idx);
-        m_filpar[idx].multitool_ramming = config.filament_multitool_ramming.get_at(idx);
+        float vol  = m_config->filament_multitool_ramming_volume.get_at(idx);
+        float flow = m_config->filament_multitool_ramming_flow.get_at(idx);
+        m_filpar[idx].multitool_ramming = m_config->filament_multitool_ramming.get_at(idx);
         m_filpar[idx].ramming_line_width_multiplicator = 2.;
         m_filpar[idx].ramming_step_multiplicator = 1.;
 
@@ -1204,10 +1204,11 @@ void WipeTower::toolchange_Unload(
         }
     }
 
-    // let's wait is necessary:
-    writer.wait(m_filpar[m_current_tool].delay);
-    // we should be at the beginning of the cooling tube again - let's move to parking position:
-    writer.retract(-m_cooling_tube_length/2.f+m_parking_pos_retraction-m_cooling_tube_retraction, 2000);
+    if (m_semm) {
+        // let's wait is necessary:
+        writer.wait(m_filpar[m_current_tool].delay);
+        // we should be at the beginning of the cooling tube again - let's move to parking position:
+        writer.retract(-m_cooling_tube_length / 2.f + m_parking_pos_retraction - m_cooling_tube_retraction, 2000);
     }
 
 	// this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
@@ -1335,7 +1336,7 @@ void WipeTower::toolchange_Wipe(
     }
     float target_speed = m_speed;
     if (is_first_layer() && m_first_layer_speed > 0)
-        target_speed = m_first_layer_speed
+        target_speed = m_first_layer_speed;
     if (target_speed <= 0)
         target_speed = m_infill_speed;
     target_speed = std::min(max_speed, target_speed * 60.f);
@@ -1413,7 +1414,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
 	float speed_factor = 1.f;
     float feedrate = m_speed;
     if (first_layer && m_first_layer_speed > 0)
-        feedrate = m_first_layer_speed
+        feedrate = m_first_layer_speed;
     if (feedrate <= 0)
         feedrate = m_infill_speed;
     feedrate *= 60.f;
@@ -1545,11 +1546,11 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
                 ExPolygon& bottom_expoly = infill_areas.front().contour.points.front().y() < infill_areas.back().contour.points.front().y() ? infill_areas[0] : infill_areas[1];
                 std::unique_ptr<Fill> filler(Fill::new_from_type(ipMonotonicLines));
                 filler->angle = Geometry::deg2rad(45.f);
-                filler->spacing = spacing;
                 FillParams params;
                 params.density = 1.f;
-                Surface surface(stBottom, bottom_expoly);
+                Surface surface(stPosBottom | stDensSolid, bottom_expoly);
                 filler->bounding_box = get_extents(bottom_expoly);
+                filler->init_spacing(spacing, params);
                 polylines = filler->fill_surface(&surface, params);
                 if (! polylines.empty()) {
                     if (polylines.front().points.front().x() > polylines.back().points.back().x()) {

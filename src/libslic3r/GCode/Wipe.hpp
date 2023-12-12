@@ -1,11 +1,14 @@
 #ifndef slic3r_GCode_Wipe_hpp_
 #define slic3r_GCode_Wipe_hpp_
 
-#include "SmoothPath.hpp"
+// #include "SmoothPath.hpp"
 
 #include "../Geometry/ArcWelder.hpp"
 #include "../Point.hpp"
 #include "../PrintConfig.hpp"
+#include "../ExtrusionEntity.hpp"
+
+#include "GCodeWriter.hpp"
 
 #include <cassert>
 #include <optional>
@@ -22,7 +25,7 @@ public:
 
     Wipe() = default;
 
-    void            init(const PrintConfig &config, const std::vector<unsigned int> &extruders);
+    void            init(const PrintConfig &config, const GCodeWriter &writer, const std::vector<unsigned int> &extruders);
     void            enable(double wipe_len_max) { m_enabled = true; m_wipe_len_max = wipe_len_max; }
     void            disable() { m_enabled = false; }
     bool            enabled() const { return m_enabled; }
@@ -42,7 +45,7 @@ public:
         if (this->enabled() && path.size() > 1)
             m_path = std::move(path);
     }
-    void            set_path(SmoothPath &&path, bool reversed);
+    void            set_path(const ExtrusionPaths &paths, bool reversed);
     void            offset_path(const Point &v) { m_offset += v; }
 
     std::string     wipe(GCodeGenerator &gcodegen, bool toolchange);
@@ -52,8 +55,8 @@ public:
     static double   calc_wipe_speed(const GCodeWriter &writer);
     // Reduce retraction length a bit to avoid effective retraction speed to be greater than the configured one
     // due to rounding (TODO: test and/or better math for this).
-    static double   calc_xy_to_e_ratio(const GCodeConfig &config, unsigned int extruder_id) 
-        { return 0.95 * floor(config.retract_speed.get_at(extruder_id) + 0.5) / calc_wipe_speed(config); }
+    static double calc_xy_to_e_ratio(const GCodeWriter &writer, unsigned int extruder_id) 
+        { return 0.95 * floor(writer.gcode_config().retract_speed.get_at(extruder_id) + 0.5) / calc_wipe_speed(writer); }
 
 private:
     bool    m_enabled{ false };
@@ -65,7 +68,7 @@ private:
 };
 
 // Make a little move inwards before leaving loop.
-std::optional<Point> wipe_hide_seam(const SmoothPath &path, bool is_hole, double wipe_length);
+std::optional<Point> wipe_hide_seam(const ExtrusionPaths &paths, bool is_hole, double wipe_length);
 
 } // namespace GCode
 } // namespace Slic3r

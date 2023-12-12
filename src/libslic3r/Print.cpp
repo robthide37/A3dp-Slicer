@@ -452,6 +452,15 @@ std::set<uint16_t> Print::object_extruders(const PrintObjectPtrs &objects) const
             region.collect_object_printing_extruders(*object->print(), extruders);
     return extruders;
 }
+std::set<uint16_t> Print::object_extruders() const
+{
+    std::set<uint16_t> extruders;
+    std::vector<unsigned char> region_used(m_print_regions.size(), false);
+    for (const PrintObject *object : m_objects)
+        for (const PrintRegion& region : object->all_regions())
+            region.collect_object_printing_extruders(*object->print(), extruders);
+    return extruders;
+}
 
 // returns 0-based indices of used extruders
 std::set<uint16_t> Print::support_material_extruders() const
@@ -498,8 +507,7 @@ std::set<uint16_t> Print::extruders() const
     // append its extruder into the list too.
     if (has_wipe_tower() && config().wipe_tower_extruder != 0 && extruders.size() > 1) {
         assert(config().wipe_tower_extruder > 0 && config().wipe_tower_extruder < int(config().nozzle_diameter.size()));
-        extruders.emplace_back(config().wipe_tower_extruder - 1); // the config value is 1-based
-        sort_remove_duplicates(extruders);
+        extruders.insert(uint16_t(config().wipe_tower_extruder.value - 1)); // the config value is 1-based
     }
 
     return extruders;
@@ -533,7 +541,7 @@ std::vector<ObjectID> Print::print_object_ids() const
 
 bool Print::has_infinite_skirt() const
 {
-    return (m_config.draft_shield == dsEnabled && m_config.skirts > 0)/* || (m_config.ooze_prevention && this->extruders().size() > 1)*/;
+    return (m_config.draft_shield.value == dsEnabled && m_config.skirts > 0)/* || (m_config.ooze_prevention && this->extruders().size() > 1)*/;
 }
 
 bool Print::has_skirt() const
@@ -681,10 +689,10 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
     std::set<uint16_t> extruders = this->extruders();
 
     if (warnings) {
-        for (size_t a=0; a<extruders.size(); ++a)
-            for (size_t b=a+1; b<extruders.size(); ++b)
-                if (std::abs(m_config.bed_temperature.get_at(extruders[a]) - m_config.bed_temperature.get_at(extruders[b])) > 15
-                 || std::abs(m_config.first_layer_bed_temperature.get_at(extruders[a]) - m_config.first_layer_bed_temperature.get_at(extruders[b])) > 15) {
+        for (auto it_a = extruders.begin(); it_a != extruders.end() ;++it_a)
+            for (auto it_b = std::next(it_a); it_b != extruders.end() ;++it_b)
+                if (std::abs(m_config.bed_temperature.get_at(*it_a) - m_config.bed_temperature.get_at(*it_b)) > 15
+                 || std::abs(m_config.first_layer_bed_temperature.get_at(*it_a) - m_config.first_layer_bed_temperature.get_at(*it_b)) > 15) {
                     warnings->emplace_back("_BED_TEMPS_DIFFER");
                     goto DONE;
                 }
@@ -895,7 +903,7 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
                                      "(both support_material_extruder and support_material_interface_extruder need to be set to 0).") };
                     }
                 }
-                if (object->config().support_material_style == smsOrganic) {
+                if (object->config().support_material_style.value == smsOrganic) {
                     float extrusion_width = std::min(
                         support_material_flow(object).width(),
                         support_material_interface_flow(object).width());
@@ -1043,20 +1051,24 @@ BoundingBox Print::total_bounding_box() const
     if (this->has_skirt()) {
         int skirts = m_config.skirts.value + m_config.skirt_brim.value;
         if (skirts == 0 && this->has_infinite_skirt()) skirts = 1;
-        Flow skirt_flow = this->skirt_flow();
+        double max_skirt_width = 0;
+        double max_skirt_spacing = 0;
+        for (unsigned int extruder_id : this->object_extruders()) {
+            Flow   flow = this->skirt_flow(extruder_id);
+            max_skirt_width = std::max(max_skirt_width, flow.width());
+            max_skirt_spacing = std::max(max_skirt_spacing, flow.spacing());
+        }
         if (m_config.skirt_distance_from_brim)
             extra += m_config.brim_width.value
                 + m_config.skirt_distance.value
-                + skirts * skirt_flow.spacing()
-                + skirt_flow.width / 2;
+                + skirts * max_skirt_spacing
+                + max_skirt_width / 2;
         else
-            extra = std::max(
-                extra,
-                m_config.brim_width.value
-                    + m_config.skirt_distance.value
-                    + skirts * skirt_flow.spacing()
-                    + skirt_flow.width/2
-            );
+            extra += std::max(
+                m_config.brim_width.value,
+                m_config.skirt_distance.value
+                    + skirts * max_skirt_spacing
+                    + max_skirt_width / 2);
     }
     
     if (extra > 0)
@@ -1353,7 +1365,7 @@ void Print::process()
     //simplify / make arc fitting
     {
         const bool spiral_mode = config().spiral_vase;
-        const bool enable_arc_fitting = config().arc_fitting && !spiral_mode;
+        const bool enable_arc_fitting = config().arc_fitting.value != ArcFittingType::Disabled && !spiral_mode;
         if (enable_arc_fitting) {
             this->set_status(80, L("Creating arcs"));
         } else {
@@ -1378,12 +1390,12 @@ void Print::process()
                 [this, &visitor, scaled_resolution, &arc_fitting_tolerance, &atomic_count](const tbb::blocked_range<size_t>& range) {
                     size_t path_idx = range.begin();
                     for (; path_idx < range.end() && path_idx < visitor.paths.size(); ++path_idx) {
-                        visitor.paths[path_idx]->simplify(scaled_resolution, true, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width)));
+                        visitor.paths[path_idx]->simplify(scaled_resolution, config().arc_fitting.value, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width())));
                         int nb_items_done = (++atomic_count);
                         this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
                     }
                     for (; path_idx < range.end() && path_idx - visitor.paths.size() < visitor.paths3D.size(); ++path_idx) {
-                        visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, true, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width)));
+                        visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, config().arc_fitting.value, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width())));
                         int nb_items_done = (++atomic_count);
                         this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
                     }
@@ -1471,10 +1483,12 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             if (!object->support_layers().empty() && object->support_layers().front()->print_z == object->m_layers[0]->print_z) {
                 Points support_points;
                 for (const ExtrusionEntity* extrusion_entity : object->support_layers().front()->support_fills.entities()) {
-                    PolylinesOrArcs polys;
+                    ArcPolylines polys;
                     extrusion_entity->collect_polylines(polys);
-                    for (const PolylineOrArc& polyline : polys)
-                        append(support_points, polyline.get_points());
+                    for (const ArcPolyline &polyline : polys) {
+                        assert(!polyline.has_arc());
+                        append(support_points, polyline.to_polyline().points);
+                    }
                 }
                 Polygon hull_support = Slic3r::Geometry::convex_hull(support_points);
                 for (const Polygon& poly : offset(hull_support, scale_(object->config().brim_width)))
@@ -1522,7 +1536,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             Flow   flow = this->skirt_flow(extruder_id);
             double mm3_per_mm = flow.mm3_per_mm();
             extruders.push_back(extruder_id);
-            extruders_e_per_mm.push_back(Extruder((unsigned int)extruder_id, &m_config).e_per_mm(mm3_per_mm));
+            extruders_e_per_mm.push_back(Extruder((unsigned int)extruder_id, m_config).e_per_mm(mm3_per_mm));
         }
     }
 
@@ -1578,7 +1592,9 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
         );
         eloop.paths.back().polyline = loop.split_at_first_point();
         //we make it clowkwise, but as it will be reversed, it will be ccw
-        eloop.make_clockwise();
+        //eloop.make_clockwise();
+        if(!eloop.is_clockwise())
+            eloop.reverse();
         if(!first_layer_only)
             out.append(eloop);
         if(out_first_layer)
@@ -1865,7 +1881,7 @@ const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt, double nozzle_
         float unscaled_brim_width = m_config.wipe_tower_brim_width.get_abs_value(nozzle_diameter);
         // use min layer height, as it's what wil disctate the wipe tower width.
         // FIXME: get layer height from layers instead of config.
-        float layer_height = std::min(m_config.layer_height, get_first_layer_height());
+        float layer_height = std::min(default_object_config().layer_height.value, get_first_layer_height());
 
         const_cast<Print*>(this)->m_wipe_tower_data.depth = (maximum/layer_height)/width;
         const_cast<Print*>(this)->m_wipe_tower_data.height = -1.f; // unknown yet
@@ -1932,7 +1948,7 @@ void Print::_make_wipe_tower()
 
     // Set the extruder & material properties at the wipe tower object.
     for (size_t i = 0; i < m_config.nozzle_diameter.size(); ++ i)
-        wipe_tower.set_extruder(i, m_config);
+        wipe_tower.set_extruder(i);
 
     m_wipe_tower_data.priming = Slic3r::make_unique<std::vector<WipeTower::ToolChangeResult>>(
         wipe_tower.prime((float)get_first_layer_height(), m_wipe_tower_data.tool_ordering.all_extruders(), false));
@@ -2033,7 +2049,7 @@ void Print::_make_wipe_tower()
     m_wipe_tower_data.used_filament = wipe_tower.get_used_filament();
     m_wipe_tower_data.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
     m_wipe_tower_data.width = wipe_tower.width();
-    m_wipe_tower_data.first_layer_height = config().first_layer_height;
+    m_wipe_tower_data.first_layer_height = get_first_layer_height();
     m_wipe_tower_data.cone_angle = config().wipe_tower_cone_angle;
 }
 

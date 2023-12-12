@@ -250,11 +250,20 @@ ExPolygon::remove_point_too_near(const coord_t tolerance) {
     }
 }
 
-void ExPolygon::medial_axis(double min_width, double max_width, Polylines* polylines) const
+void ExPolygon::medial_axis(double min_width, double max_width, ThickPolylines &polylines) const
 {
     ThickPolylines tp;
     Geometry::MedialAxis{ *this, coord_t(max_width), coord_t(min_width), coord_t(max_width / 2.0) }.build(tp);
-    polylines->insert(polylines->end(), tp.begin(), tp.end());
+    polylines.insert(polylines.end(), tp.begin(), tp.end());
+}
+
+void ExPolygon::medial_axis(double min_width, double max_width, Polylines &polylines) const
+{
+    ThickPolylines tp;
+    this->medial_axis(min_width, max_width, tp);
+    polylines.reserve(polylines.size() + tp.size());
+    for (auto &pl : tp)
+        polylines.emplace_back(pl.points);
 }
 
 Lines ExPolygon::lines() const
@@ -361,11 +370,17 @@ bool has_duplicate_points(const ExPolygons &expolys)
 #else
     // Detect duplicates by inserting into an ankerl::unordered_dense hash set, which is is around 1/4 faster than qsort.
     struct PointHash {
-        uint64_t operator()(const Point &p) const noexcept {
+        uint64_t operator()(const Point &p) const noexcept
+        {
+#ifdef COORD_64B
+            return ankerl::unordered_dense::detail::wyhash::hash(p.x()) 
+                + ankerl::unordered_dense::detail::wyhash::hash(p.y());
+#else
             uint64_t h;
             static_assert(sizeof(h) == sizeof(p));
             memcpy(&h, &p, sizeof(p));
             return ankerl::unordered_dense::detail::wyhash::hash(h);
+#endif
         }
     };
     ankerl::unordered_dense::set<Point, PointHash> allpts;

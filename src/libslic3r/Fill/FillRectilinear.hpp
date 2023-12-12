@@ -70,7 +70,7 @@ class FillMonotonicLines : public FillRectilinear
 public:
     Fill* clone() const override { return new FillMonotonicLines(*this); }
     ~FillMonotonicLines() override = default;
-    Polylines fill_surface(const Surface *surface, const FillParams &params) override;
+    Polylines fill_surface(const Surface *surface, const FillParams &params) const override;
     bool no_sort() const override { return true; }
 };
 

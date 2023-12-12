@@ -573,7 +573,6 @@ private:
     
     // The archive object which collects the raster images after slicing
     std::unique_ptr<SLAArchiveWriter>     m_archiver;
-    std::shared_ptr<SLAArchive>    m_printer_ref;
     
     // Estimated print time, material consumed.
     SLAPrintStatistics              m_print_statistics;

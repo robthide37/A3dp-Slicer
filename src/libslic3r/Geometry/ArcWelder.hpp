@@ -363,6 +363,7 @@ size_t arc_discretization_steps(const FloatType radius, const FloatType angle, c
 // Discretize arc given the radius, orientation and maximum deviation from the arc.
 // Returned polygon starts with p1, ends with p2 and it is discretized to guarantee the maximum deviation.
 Points arc_discretize(const Point &p1, const Point &p2, const double radius, const bool ccw, const double deviation);
+Points arc_discretize(const Point &p1, const Point &p2, const double radius, const bool ccw, const size_t num_steps);
 
 // Variance of the arc fit of points <begin, end).
 // First and last points of <begin, end) are expected to fit the arc exactly.
@@ -375,10 +376,10 @@ double arc_fit_max_deviation(const Point &start_point, const Point &end_point, c
     const Points::const_iterator begin, const Points::const_iterator end);
 
 // 1.2m diameter, maximum given by coord_t
-static_assert(sizeof(coord_t) == 4);
-static constexpr const double default_scaled_max_radius = scaled<double>(600.);
+//static_assert(sizeof(coord_t) == 4); // disabled, but keep the 1.2m max diameter, as it's enough I think.
+static constexpr const coordf_t default_scaled_max_radius = scaled(600.);
 // 0.05mm
-static constexpr const double default_scaled_resolution = scaled<double>(0.05);
+static constexpr const coordf_t default_scaled_resolution = scaled(0.05);
 // 5 percent
 static constexpr const double default_arc_length_percent_tolerance = 0.05;
 

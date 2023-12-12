@@ -148,6 +148,33 @@ int nearest_point_index(const Points &points, const Point &pt)
     return idx;
 }
 
+// TODO: replace by line_alg::distance_to_squared(Line(prev, it->point), point, &proj)
+Point Point::projection_onto(const Point &line_a, const Point &line_b) const
+{
+    if (line_a == line_b)
+        return line_a;
+
+    /*
+        (Ported from VisiLibity by Karl J. Obermeyer)
+        The projection of point_temp onto the line determined by
+        line_segment_temp can be represented as an affine combination
+        expressed in the form projection of
+        Point = theta*line_segment_temp.first + (1.0-theta)*line_segment_temp.second.
+        If theta is outside the interval [0,1], then one of the Line_Segment's endpoints
+        must be closest to calling Point.
+    */
+    double lx    = (double) (line_b(0) - line_a(0));
+    double ly    = (double) (line_b(1) - line_a(1));
+    double theta = ((double) (line_b(0) - (*this) (0)) * lx + (double) (line_b(1) - (*this) (1)) * ly) /
+                   (sqr<double>(lx) + sqr<double>(ly));
+
+    if (0.0 <= theta && theta <= 1.0)
+        return (theta * line_a.cast<coordf_t>() + (1.0 - theta) * line_b.cast<coordf_t>()).cast<coord_t>();
+
+    // Else pick closest endpoint.
+    return ((line_a - *this).cast<double>().squaredNorm() < (line_b - *this).cast<double>().squaredNorm()) ? line_a : line_b;
+}
+
 /// This method create a new point on the line defined by this and p2.
 /// The new point is place at position defined by |p2-this| * percent, starting from this
 /// \param percent the proportion of the segment length to place the point

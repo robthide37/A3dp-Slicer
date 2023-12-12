@@ -16,6 +16,7 @@ namespace Slic3r {
 // GCodeExtrusionRole is to be serialized into G-code and deserialized by G-code viewer,
 GCodeExtrusionRole extrusion_role_to_gcode_extrusion_role(ExtrusionRole role)
 {
+    assert(role != ExtrusionRole::Mixed);
     if (role == ExtrusionRole::None)                return GCodeExtrusionRole::None;
     if (role.is_perimeter()) {
         return role.is_bridge() ? GCodeExtrusionRole::OverhangPerimeter :
@@ -26,11 +27,14 @@ GCodeExtrusionRole extrusion_role_to_gcode_extrusion_role(ExtrusionRole role)
     if (role == ExtrusionRole::TopSolidInfill)      return GCodeExtrusionRole::TopSolidInfill;
     if (role == ExtrusionRole::Ironing)             return GCodeExtrusionRole::Ironing;
     if (role == ExtrusionRole::BridgeInfill)        return GCodeExtrusionRole::BridgeInfill;
+    if (role == ExtrusionRole::InternalBridgeInfill)return GCodeExtrusionRole::InternalBridgeInfill;
+    if (role == ExtrusionRole::ThinWall)            return GCodeExtrusionRole::ThinWall;
     if (role == ExtrusionRole::GapFill)             return GCodeExtrusionRole::GapFill;
     if (role == ExtrusionRole::Skirt)               return GCodeExtrusionRole::Skirt;
     if (role == ExtrusionRole::SupportMaterial)     return GCodeExtrusionRole::SupportMaterial;
     if (role == ExtrusionRole::SupportMaterialInterface) return GCodeExtrusionRole::SupportMaterialInterface;
     if (role == ExtrusionRole::WipeTower)           return GCodeExtrusionRole::WipeTower;
+    if (role == ExtrusionRole::Milling)             return GCodeExtrusionRole::Milling;
     assert(false);
     return GCodeExtrusionRole::None;
 }
@@ -47,12 +51,16 @@ std::string gcode_extrusion_role_to_string(GCodeExtrusionRole role)
         case GCodeExtrusionRole::TopSolidInfill               : return L("Top solid infill");
         case GCodeExtrusionRole::Ironing                      : return L("Ironing");
         case GCodeExtrusionRole::BridgeInfill                 : return L("Bridge infill");
+        case GCodeExtrusionRole::InternalBridgeInfill         : return L("Internal bridge infill");
+        case GCodeExtrusionRole::ThinWall                     : return L("Thin wall");
         case GCodeExtrusionRole::GapFill                      : return L("Gap fill");
         case GCodeExtrusionRole::Skirt                        : return L("Skirt/Brim");
         case GCodeExtrusionRole::SupportMaterial              : return L("Support material");
         case GCodeExtrusionRole::SupportMaterialInterface     : return L("Support material interface");
         case GCodeExtrusionRole::WipeTower                    : return L("Wipe tower");
+        case GCodeExtrusionRole::Milling                      : return L("Milling");
         case GCodeExtrusionRole::Custom                       : return L("Custom");
+        case GCodeExtrusionRole::Travel                       : return L("Travel");
         default                             : assert(false);
     }
     return {};
@@ -76,6 +84,10 @@ GCodeExtrusionRole string_to_gcode_extrusion_role(const std::string_view role)
         return GCodeExtrusionRole::Ironing;
     else if (role == L("Bridge infill"))
         return GCodeExtrusionRole::BridgeInfill;
+    else if (role == L("Internal bridge infill"))
+        return GCodeExtrusionRole::InternalBridgeInfill;
+    else if (role == L("Thin wall"))
+        return GCodeExtrusionRole::ThinWall;
     else if (role == L("Gap fill"))
         return GCodeExtrusionRole::GapFill;
     else if (role == L("Skirt") || role == L("Skirt/Brim")) // "Skirt" is for backward compatibility with 2.3.1 and earlier
@@ -86,10 +98,15 @@ GCodeExtrusionRole string_to_gcode_extrusion_role(const std::string_view role)
         return GCodeExtrusionRole::SupportMaterialInterface;
     else if (role == L("Wipe tower"))
         return GCodeExtrusionRole::WipeTower;
+    else if (role == L("Milling"))
+        return GCodeExtrusionRole::Milling;
     else if (role == L("Custom"))
         return GCodeExtrusionRole::Custom;
+    else if (role == L("Trabel"))
+        return GCodeExtrusionRole::Travel;
     else
-        return GCodeExtrusionRole::None;
+        assert(false);
+    return GCodeExtrusionRole::None;
 }
 
 }

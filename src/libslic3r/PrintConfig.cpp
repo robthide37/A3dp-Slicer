@@ -330,7 +330,7 @@ static const t_config_enum_values s_keys_map_LabelObjectsStyle = {
     { "disabled",  int(LabelObjectsStyle::Disabled)  },
     { "octoprint", int(LabelObjectsStyle::Octoprint) },
     { "firmware",  int(LabelObjectsStyle::Firmware)  },
-    { "both",      int(LabelObjectsStyle::OctoprintAndFirmware)},
+    { "both",      int(LabelObjectsStyle::Both)},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(LabelObjectsStyle)
 

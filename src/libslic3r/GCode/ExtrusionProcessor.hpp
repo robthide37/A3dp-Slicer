@@ -238,8 +238,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
                         }
                     }
                 }
-
-                float new_curvature = angle(current.position - back_position, front_position - current.position) / window_size;
+                float new_curvature = angle_ccw(current.position - back_position, front_position - current.position) / window_size;
                 if (abs(current.curvature) < abs(new_curvature)) {
                     current.curvature = new_curvature;
                 }

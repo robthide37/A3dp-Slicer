@@ -13,29 +13,29 @@ namespace Slic3r {
 
 template<class T>
 class PointGrid {
-    Vec3i m_size;
+    Vec3i32 m_size;
     std::vector<Vec<3, T>> m_data;
     const int XY;
 
 public:
-    explicit PointGrid(std::vector<Vec<3, T>> data, const Vec3i &size)
+    explicit PointGrid(std::vector<Vec<3, T>> data, const Vec3i32 &size)
         : m_data(std::move(data)), m_size{size}, XY{m_size.x() * m_size.y()}
     {}
 
     const Vec<3, T> & get(size_t idx) const { return m_data[idx]; }
-    const Vec<3, T> & get(const Vec3i &coord) const
+    const Vec<3, T> & get(const Vec3i32 &coord) const
     {
         return m_data[get_idx(coord)];
     }
 
-    size_t get_idx(const Vec3i &coord) const
+    size_t get_idx(const Vec3i32 &coord) const
     {
         size_t ret = coord.z() * XY + coord.y() * m_size.x() + coord.x();
 
         return ret;
     }
 
-    Vec3i get_coord(size_t idx) const {
+    Vec3i32 get_coord(size_t idx) const {
         int iz = idx / XY;
         int iy = (idx / m_size.x()) % m_size.y();
         int ix = idx % m_size.x();
@@ -53,7 +53,7 @@ PointGrid<CoordT> point_grid(Ex                                      policy,
                              const BoundingBox3Base<Vec<3, CoordT>> &bounds,
                              const Vec<3, CoordT>                   &stride)
 {
-    Vec3i numpts = Vec3i::Zero();
+    Vec3i32 numpts = Vec3i32::Zero();
 
     for (int n = 0; n < 3; ++n)
         numpts(n) = (bounds.max(n) - bounds.min(n)) / stride(n);

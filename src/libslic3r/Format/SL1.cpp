@@ -413,7 +413,7 @@ std::vector<ExPolygons> extract_slices_from_sla_archive(
 ConfigSubstitutions SL1Reader::read(std::vector<ExPolygons> &slices,
                                     DynamicPrintConfig      &profile_out)
 {
-    Vec2i windowsize;
+    Vec2i32 windowsize;
 
     switch(m_quality)
     {

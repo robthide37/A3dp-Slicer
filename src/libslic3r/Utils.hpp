@@ -13,6 +13,7 @@
 #include <system_error>
 #include <cmath>
 
+#include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 
 #include "libslic3r.h"

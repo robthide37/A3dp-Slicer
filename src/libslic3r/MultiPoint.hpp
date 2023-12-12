@@ -150,7 +150,7 @@ public:
     void scale(double factor);
     void scale(double factor_x, double factor_y);
     void translate(double x, double y) { this->translate(Point(coord_t(x), coord_t(y))); }
-    void translate(const Point &vector);
+    void translate(const Vector &vector);
     void rotate(double angle) { this->rotate(cos(angle), sin(angle)); }
     void rotate(double cos_angle, double sin_angle);
     void rotate(double angle, const Point &center);
@@ -169,7 +169,7 @@ public:
     int  find_point(const Point &point) const;
     // Return index of the closest point to point closer than scaled_epsilon.
     // Return -1 if no such point exists.
-    int  find_point(const Point &point, const double scaled_epsilon) const;
+    int  find_point(const Point &point, const coordf_t scaled_epsilon) const;
     int  closest_point_index(const Point &point) const {
         int idx = -1;
         if (! this->points.empty()) {

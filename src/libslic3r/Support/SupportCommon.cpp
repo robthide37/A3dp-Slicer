@@ -1262,9 +1262,8 @@ static void modulate_extrusion_by_overlapping_layers(
     {
         Polylines &polylines = path_fragments.back().polylines;
         for (const ExtrusionEntity *ee : flatten_extrusions_in_out.entities()) {
-            for (PolylineOrArc &polyline : ee->as_polylines()) {
-                // TODO check if move() is possible (it was, but now that it's a PolylineOrArc and not a Polyline...)
-                polylines.emplace_back(polyline.as_polyline());
+            for (ArcPolyline &polyline : ee->as_polylines()) {
+                polylines.emplace_back(polyline.to_polyline());
             }
             path_ends.emplace_back(std::pair<Point, Point>(polylines.back().points.front(), polylines.back().points.back()));
         }

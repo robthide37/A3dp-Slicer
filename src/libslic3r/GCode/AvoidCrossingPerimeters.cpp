@@ -558,7 +558,7 @@ bool find_point_on_boundary(Point& pt_to_move, const AvoidCrossingPerimeters::Bo
                     }
                     if(std::sqrt(dist2) > max_dist)
                         for (const Polygon& poly : to_polygons(bound.second)) {
-                            Point test_point = pt_to_move.projection_onto(poly);
+                            Point         test_point = poly.point_projection(pt_to_move);
                             coordf_t dist2_test = test_point.distance_to_square(pt_to_move);
                             if (dist2_test < dist2) {
                                 dist2 = dist2_test;
@@ -832,7 +832,7 @@ static bool need_wipe(const GCodeGenerator           &gcodegen,
                       const Polyline                 &result_travel,
                       const size_t                    intersection_count)
 {
-    bool z_lift_enabled = gcodegen.config().travel_max_lift.get_at(gcodegen.writer().extruder()->id()) > 0.;
+    bool z_lift_enabled = gcodegen.config().travel_max_lift.get_at(gcodegen.writer().tool()->id()) > 0.;
     bool wipe_needed    = false;
 
     // If the original unmodified path doesn't have any intersection with boundary, then it is entirely inside the object otherwise is entirely
@@ -1276,9 +1276,11 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCodeGenerator &gcodegen, cons
     Vec2d startf = start.cast<double>();
     Vec2d endf   = end  .cast<double>();
 
-    bool is_support_layer = dynamic_cast<const SupportLayer *>(gcodegen.layer()) != nullptr;
+    const ExPolygons &lslices           = gcodegen.layer()->lslices;
+    const float       perimeter_spacing = get_perimeter_spacing(*gcodegen.layer());
+    bool              is_support_layer  = dynamic_cast<const SupportLayer *>(gcodegen.layer()) != nullptr;
     if (!use_external && (is_support_layer || (!m_lslices_offset.empty() 
-         /* already done by the caller && !any_expolygon_contains(m_lslices_offset, m_lslices_offset_bboxes, m_grid_lslices_offset, travel))*/)) {
+         /* already done by the caller && !any_expolygon_contains(m_lslices_offset, m_lslices_offset_bboxes, m_grid_lslices_offset, travel)*/))) {
         // Initialize m_internal only when it is necessary.
         if (m_internal.boundaries.empty()) {
             std::vector<std::pair<ExPolygon, ExPolygons>> boundary_growth;
@@ -1295,7 +1297,8 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCodeGenerator &gcodegen, cons
                     // then intersect to be sure it don't stick out of the initial poly
                     missing_parts = intersection_ex(ExPolygons{ origin }, offset_ex(missing_parts, perimeter_spacing * 1.1f));
                     // offset to second peri (-first) where possible, then union and reduce to the first.
-                    second_peri = offset_ex(union_ex(missing_parts, offset_ex(origin, -perimeter_spacing * 0.9f)), -perimeter_spacing * .6f);
+                    append(missing_parts, offset_ex(origin, -perimeter_spacing * 0.9f));
+                    second_peri = offset_ex(union_ex(missing_parts), -perimeter_spacing * .6f);
                 } else if (second_peri.size() == 0) {
                     // try again with the first perimeter (should be 0.5, but even with overlapping peri, it's almost never a 50% overlap, so it's better that way)
                     second_peri = offset_ex(origin, -perimeter_spacing * .6f);

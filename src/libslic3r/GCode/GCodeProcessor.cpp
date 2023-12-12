@@ -2817,10 +2817,10 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
             m_height = m_forced_height;
         } else if (m_forced_width > 0.0f) {
             m_width = m_forced_width;
-            if (m_extrusion_role == erExternalPerimeter)
+            if (m_extrusion_role == ExtrusionRole::ExternalPerimeter)
                 // cross section: rectangle
                 m_height = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_width));
-            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone || m_extrusion_role == erTravel)
+            else if (is_bridge(m_extrusion_role) || m_extrusion_role == ExtrusionRole::None || m_extrusion_role == ExtrusionRole::Travel)
                 // cross section: circle
                 m_height = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
             else

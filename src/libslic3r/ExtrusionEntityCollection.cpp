@@ -126,22 +126,21 @@ ExtrusionEntityCollection ExtrusionEntityCollection::flatten(bool preserve_order
 
 }
 
-void ExtrusionEntityCollection::flatten(bool preserve_ordering = false, ExtrusionEntityCollection& out) const
+void ExtrusionEntityCollection::flatten(bool preserve_ordering, ExtrusionEntityCollection& out) const
 {
-    if ((!coll.can_sort() || !this->to_fill.can_sort()) && preserve_ordering) {
-        out.push_back(this->flatten(preserve_ordering))
+    if (!this->can_sort()  && preserve_ordering) {
+        out.append(this->flatten(preserve_ordering));
     }else{
-        FlatenEntities(preserve_ordering) flattener;
+        FlatenEntities flattener(preserve_ordering);
         flattener.use(*this);
         //tranfert owner of entities.
-        out.entities.insert(out.entities.begin(), flattener.get().entities.begin(), flattener.get().entities.end());
-        flattener.set().entities.clear();
+        out.m_entities.insert(out.m_entities.begin(), flattener.get().entities().begin(), flattener.get().entities().end());
+        flattener.set().m_entities.clear();
     }
 }
 
 void FlatenEntities::use(const ExtrusionEntityCollection &coll) {
     if ((!coll.can_sort() || !this->to_fill.can_sort()) && preserve_ordering) {
-        ExtrusionEntityCollection copy{pattern.can_sort(), pattern.can_reverse()};
         FlatenEntities unsortable(coll, preserve_ordering);
         for (const ExtrusionEntity* entity : coll.entities()) {
             entity->visit(unsortable);

@@ -277,18 +277,18 @@ ColorRGB opposite(const ColorRGB& color)
 
 	Randomizer rnd;
 	if (s < 0.8) {
-		s = rand_val(0.8, 1.0);
+        s = rnd.random_float(0.8, 1.0);
 	} else if (s > 0.85) {
-		s = rand_val(0.65, 0.85);
+        s = rnd.random_float(0.65, 0.85);
 	} else {
-		s = rand_val(0.65, 1.0);
+        s = rnd.random_float(0.65, 1.0);
 	}
 	if (v < 0.8) {
-		v = rand_val(0.8, 1.0);
+        v = rnd.random_float(0.8, 1.0);
 	} else if (v > 0.85) {
-		v = rand_val(0.65, 0.85);
+        v = rnd.random_float(0.65, 0.85);
 	} else {
-		v = rand_val(0.65, 1.0);
+        v = rnd.random_float(0.65, 1.0);
 	}
 
 	float r, g, b;

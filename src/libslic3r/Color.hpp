@@ -180,7 +180,7 @@ inline Vec3f value_to_rgbf(float minimum, float maximum, float value)
 }
 
 // Color mapping of a value into RGB false colors.
-inline Vec3i value_to_rgbi(float minimum, float maximum, float value)
+inline Vec3i32 value_to_rgbi(float minimum, float maximum, float value)
 {
     return (value_to_rgbf(minimum, maximum, value) * 255).cast<int>();
 }

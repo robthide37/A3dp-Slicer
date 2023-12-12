@@ -89,7 +89,7 @@ void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRo
     if (polygon.is_valid()) {
         //default to ccw
         polygon.make_counter_clockwise();
-        ExtrusionPath path(good_role, flow, width, height, false);
+        ExtrusionPath path(ExtrusionAttributes{good_role, ExtrusionFlow{flow, float(width), float(height)}}, false);
         path.polyline.append(std::move(polygon.points));
         path.polyline.append(path.polyline.front());
         storage.append(ExtrusionLoop{ std::move(path) });
@@ -358,7 +358,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //            //do gapfill locally
                 //            leafs[idx_leaf]->append(
                 //                Geometry::variable_width(
-                //                    poly, erGapFill, 
+                //                    poly, ExtrusionRole::GapFill, 
                 //                    params.flow, 
                 //                    scale_t(params.config->get_computed_value("resolution_internal")), 
                 //                    params.flow.scaled_width() / 10)
@@ -370,11 +370,11 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //    }
                 //    //goto_next_polyline:
                 //}
-                if (!polylines.empty() && !is_bridge(good_role)) {
-                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
+                if (!polylines.empty() && !good_role.is_bridge()) {
+                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, ExtrusionRole::GapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
                     if (!gap_fill_entities.empty()) {
                         //set role if needed
-                        if (good_role != erSolidInfill) {
+                        if (good_role != ExtrusionRole::SolidInfill) {
                             ExtrusionSetRole set_good_role(good_role);
                             for (ExtrusionEntity* ptr : gap_fill_entities)
                                 ptr->visit(set_good_role);
@@ -412,7 +412,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
             }
         }
         FillParams params2{ params };
-        params2.role = erGapFill;
+        params2.role = ExtrusionRole::GapFill;
 
         do_gap_fill(intersection_ex(gapfill_areas, no_overlap_expolygons), params2, out);
     }
@@ -458,7 +458,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
             if (extrusion->is_closed)
                 thick_polyline.start_at_index(nearest_point_index(thick_polyline.points, last_pos));
             thick_polylines_out.emplace_back(std::move(thick_polyline));
-            last_pos = thick_polylines_out.back().last_point();
+            last_pos = thick_polylines_out.back().back();
         }
 
         // clip the paths to prevent the extruder from getting exactly on the first point of the loop
