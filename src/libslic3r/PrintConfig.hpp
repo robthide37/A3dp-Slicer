@@ -1117,6 +1117,14 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                       material_correction_y))
     ((ConfigOptionFloat,                       material_correction_z))
     ((ConfigOptionEnum<SLAMaterialSpeed>,      material_print_speed))
+    ((ConfigOptionFloatNullable,               material_ow_support_pillar_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_pillar_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_front_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_front_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_penetration))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_penetration))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_width))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_width))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(

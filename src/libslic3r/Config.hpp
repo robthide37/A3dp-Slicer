@@ -61,9 +61,9 @@ namespace Slic3r {
         template<class Archive> void serialize(Archive& ar) { ar(this->value); ar(this->percent); }
     };
 
-    inline bool operator==(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value == r.value && l.percent == r.percent; }
-    inline bool operator!=(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return !(l == r); }
-    inline bool operator< (const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value < r.value || (l.value == r.value && int(l.percent) < int(r.percent)); }
+    inline bool operator==(const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return l.value == r.value && l.percent == r.percent; }
+    inline bool operator!=(const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return !(l == r); }
+    inline bool operator< (const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return l.value < r.value || (l.value == r.value && int(l.percent) < int(r.percent)); }
 }
 
 namespace std {
@@ -320,6 +320,54 @@ public:
 typedef ConfigOption*       ConfigOptionPtr;
 typedef const ConfigOption* ConfigOptionConstPtr;
 
+// Nill value will be defined in specializations
+template<class T, class En = void> struct NilValueTempl
+{
+    using NilType = T;
+    static_assert(always_false<T>::value, "Type has no well defined nil value");
+};
+
+template<class T> struct NilValueTempl<T, std::enable_if_t<std::is_integral_v<T>, void>> {
+    using NilType = T;
+    static constexpr auto value = std::numeric_limits<T>::max();
+};
+
+template<> struct NilValueTempl<bool> : public NilValueTempl<int>{};
+
+// For enums the nil is the max value of the underlying type.
+template<class T>
+struct NilValueTempl<T, std::enable_if_t<std::is_enum_v<T>, void>>
+{
+    using NilType = T;
+    static constexpr auto value = static_cast<T>(std::numeric_limits<std::underlying_type_t<T>>::max());
+};
+
+template<class T> struct NilValueTempl<T, std::enable_if_t<std::is_floating_point_v<T>, void>> {
+    using NilType = T;
+    static constexpr auto value = std::numeric_limits<T>::quiet_NaN();
+};
+
+template<>
+struct NilValueTempl<FloatOrPercent> : public NilValueTempl<double> {};
+
+template<> struct NilValueTempl<std::string> {
+    using NilType = const char *;
+
+    static constexpr const char* value = "";
+};
+
+template<int N, class T> struct NilValueTempl<Vec<N, T>> {
+    using NilType = Vec<N, T>;
+    // No constexpr for Vec<N, T>
+    static inline const Vec<N, T> value = Vec<N, T>::Ones() * NilValueTempl<remove_cvref_t<T>>::value;
+};
+
+template<class T> using NilType = typename NilValueTempl<remove_cvref_t<T>>::NilType;
+
+// Define shortcut as a function instead of a static const var so that it can be constexpr
+// even if the NilValueTempl::value is not constexpr.
+template<class T> static constexpr NilType<T> NilValue() noexcept { return NilValueTempl<remove_cvref_t<T>>::value; }
+
 // Value of a single valued option (bool, int, float, string, point, enum)
 template <class T, bool NULLABLE = false>
 class ConfigOptionSingle : public ConfigOption {
@@ -357,12 +405,12 @@ public:
             throw ConfigurationError("Cannot override a nullable ConfigOption.");
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionVector.overriden_by() applied to different types.");
-        auto rhs_vec = static_cast<const ConfigOptionSingle*>(rhs);
+        auto rhs_co = static_cast<const ConfigOptionSingle*>(rhs);
         if (! rhs->nullable())
             // Overridding a non-nullable object with another non-nullable object.
-            return this->value != rhs_vec->value;
+            return this->value != rhs_co->value;
 
-        return false;
+        return !rhs_co->is_nil() && rhs_co->value != this->value;
     }
     // Apply an override option, possibly a nullable one.
     bool apply_override(const ConfigOption *rhs) override {
@@ -370,14 +418,19 @@ public:
             throw ConfigurationError("Cannot override a nullable ConfigOption.");
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionVector.apply_override() applied to different types.");
-        auto rhs_vec = static_cast<const ConfigOptionSingle*>(rhs);
+        auto rhs_co = static_cast<const ConfigOptionSingle*>(rhs);
         if (! rhs->nullable()) {
             // Overridding a non-nullable object with another non-nullable object.
-            if (this->value != rhs_vec->value) {
-                this->value = rhs_vec->value;
+            if (this->value != rhs_co->value) {
+                this->value = rhs_co->value;
                 return true;
             }
             return false;
+        }
+
+        if (!rhs_co->is_nil() && rhs_co->value != this->value) {
+            this->value = rhs_co->value;
+            return true;
         }
 
         return false;
@@ -385,12 +438,17 @@ public:
 
     bool nullable() const override { return NULLABLE; }
 
-    static T nil_value() { return std::numeric_limits<T>::min(); }
+    static constexpr NilType<T> nil_value() { return NilValue<T>(); }
 
     // A scalar is nil, or all values of a vector are nil.
     bool is_nil() const override
     {
-        return this->value == nil_value();
+        bool ret = false;
+
+        if constexpr (NULLABLE)
+            ret = this->value == nil_value();
+
+        return ret;
     }
 
 private:
@@ -636,7 +694,18 @@ public:
     std::string serialize() const override
     {
         std::ostringstream ss;
-        ss << this->value;
+        double v = this->value;
+
+        if (std::isfinite(v))
+            ss << v;
+        else if (std::isnan(v)) {
+            if (NULLABLE)
+                ss << "nil";
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            throw ConfigurationError("Serializing invalid number");
+
         return ss.str();
     }
     
@@ -644,7 +713,16 @@ public:
     {
         UNUSED(append);
         std::istringstream iss(str);
-        iss >> this->value;
+
+        if (str == "nil") {
+            if (NULLABLE)
+                this->value = this->nil_value();
+            else
+                throw ConfigurationError("Deserializing nil into a non-nullable object");
+        } else {
+            iss >> this->value;
+        }
+
         return !iss.fail();
     }
 
@@ -652,6 +730,11 @@ public:
     {   
         this->set(opt);
         return *this;
+    }
+
+    bool is_nil() const override
+    {
+        return std::isnan(this->value);
     }
 
 private:
@@ -805,7 +888,14 @@ public:
     std::string serialize() const override 
     {
         std::ostringstream ss;
-        ss << this->value;
+        if (this->value == this->nil_value()) {
+            if (NULLABLE)
+                ss << "nil";
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            ss << this->value;
+
         return ss.str();
     }
     
@@ -813,7 +903,16 @@ public:
     {
         UNUSED(append);
         std::istringstream iss(str);
-        iss >> this->value;
+
+        if (str == "nil") {
+            if (NULLABLE)
+                this->value = this->nil_value();
+            else
+                throw ConfigurationError("Deserializing nil into a non-nullable object");
+        } else {
+            iss >> this->value;
+        }
+
         return !iss.fail();
     }
 

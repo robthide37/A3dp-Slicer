@@ -5581,24 +5581,24 @@ void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp op
     if (optgroup->title == "Support head" || optgroup->title == "Support pillar") {
         for (auto& prefix : { "", "branching" }) {
             std::string opt_key = preprefix + prefix + key;
-            is_checked &= !m_config->option(opt_key)->is_nil();
+            is_checked = !m_config->option(opt_key)->is_nil();
             opt_keys.push_back(opt_key);
         }
     }
     else if (key == "relative_correction") {
         for (auto& axis : { "x", "y", "z" }) {
             std::string opt_key = preprefix + key + "_" + char(axis[0]);
-            is_checked &= !m_config->option(opt_key)->is_nil();
+            is_checked = !m_config->option(opt_key)->is_nil();
             opt_keys.push_back(opt_key);
         }
     }
     else {
         std::string opt_key = preprefix + key;
-        is_checked &= !m_config->option(opt_key)->is_nil();
+        is_checked = !m_config->option(opt_key)->is_nil();
         opt_keys.push_back(opt_key);
     }
 
-//    m_overrides_options[key]->Enable(is_checked);
+    // m_overrides_options[key]->Enable(is_checked);
 
     CheckBox::SetValue(m_overrides_options[key], is_checked);
 
@@ -5622,22 +5622,25 @@ void TabSLAMaterial::update_material_overrides_page()
         }
 
         for (const std::string& key : keys) {
-            update_line_with_near_label_widget(*optgroup, key, false);
-            continue;
+            update_line_with_near_label_widget(*optgroup, key);
+            // // update_line_with_near_label_widget(*optgroup, key, false);
 
-            bool is_checked{ true };
+            // const static std::string preprefix = "material_ow_";
 
-            const static std::string preprefix = "material_ow_";
-            if (title == "Support head" || title == "Support pillar") {
-                for (auto& prefix : { "", "branching" })
-                    update_line_with_near_label_widget(*optgroup, preprefix + prefix + key, is_checked);
-            }
-            else if (key == "relative_correction") {
-                for (auto& axis : { "x", "y", "z" })
-                    update_line_with_near_label_widget(*optgroup, preprefix + key + "_" + char(axis[0]), is_checked);
-            }
-            else
-                update_line_with_near_label_widget(*optgroup, preprefix + key, is_checked);
+            // if (title == "Support head" || title == "Support pillar") {
+
+            //     for (auto& prefix : { "", "branching" }) {
+            //         update_line_with_near_label_widget(*optgroup, preprefix + prefix + key);
+            //     }
+            // }
+            // else if (key == "relative_correction") {
+            //     for (auto& axis : { "x", "y", "z" }) {
+            //         update_line_with_near_label_widget(*optgroup, preprefix + key + "_" + char(axis[0]));
+            //     }
+            // }
+            // else {
+            //     update_line_with_near_label_widget(*optgroup, preprefix + key);
+            // }
         }
     }
 }

@@ -203,14 +203,24 @@ std::vector<ObjectID> SLAPrint::print_object_ids() const
     return out;
 }
 
-static t_config_option_keys print_config_diffs(const SLAPrintObjectConfig     &current_config,
+static t_config_option_keys print_config_diffs(const StaticPrintConfig     &current_config,
                                                const DynamicPrintConfig &new_full_config,
                                                DynamicPrintConfig       &material_overrides)
 {
     using namespace std::string_view_literals;
 
     static const constexpr StaticSet overriden_keys = {
-        "support_pillar_diameter"sv
+        "support_head_front_diameter"sv,
+        "support_head_penetration"sv,
+        "support_head_width"sv,
+        "support_pillar_diameter"sv,
+        "branchingsupport_head_front_diameter"sv,
+        "branchingsupport_head_penetration"sv,
+        "branchingsupport_head_width"sv,
+        "branchingsupport_pillar_diameter"sv,
+        "support_points_density_relative"sv,
+        "relative_correction"sv,
+        "elefant_foot_compensation"sv,
     };
 
     static constexpr auto material_ow_prefix = "material_ow_";
@@ -260,11 +270,14 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
     config.option("printer_settings_id",          true);
     config.option("physical_printer_settings_id", true);
     // Collect changes to print config.
+    DynamicPrintConfig mat_overrides;
     t_config_option_keys print_diff    = m_print_config.diff(config);
-    t_config_option_keys printer_diff  = m_printer_config.diff(config);
+    t_config_option_keys printer_diff  = print_config_diffs(m_printer_config, config, mat_overrides);
     t_config_option_keys material_diff = m_material_config.diff(config);
-    t_config_option_keys object_diff   = m_default_object_config.diff(config);
+    t_config_option_keys object_diff   = print_config_diffs(m_default_object_config, config, mat_overrides);
     t_config_option_keys placeholder_parser_diff = m_placeholder_parser.config_diff(config);
+
+    config.apply(mat_overrides, true);
 
     // Do not use the ApplyStatus as we will use the max function when updating apply_status.
     unsigned int apply_status = APPLY_STATUS_UNCHANGED;
@@ -838,17 +851,17 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "bottle_volume"sv,
         "bottle_weight"sv,
         "material_density"sv,
-//        "material_ow_support_pillar_diameter"sv,
-//        "material_ow_support_head_front_diameter"sv,
-//        "material_ow_support_head_penetration"sv,
-//        "material_ow_support_head_width"sv,
-//        "material_ow_branchingsupport_pillar_diameter"sv,
-//        "material_ow_branchingsupport_head_front_diameter"sv,
-//        "material_ow_branchingsupport_head_penetration"sv,
-//        "material_ow_branchingsupport_head_width"sv,
-//        "material_ow_elefant_foot_compensation"sv,
-//        "material_ow_support_points_density_relative"sv,
-//        "material_ow_relative_correction"sv
+        "material_ow_support_pillar_diameter"sv,
+        "material_ow_support_head_front_diameter"sv,
+        "material_ow_support_head_penetration"sv,
+        "material_ow_support_head_width"sv,
+        "material_ow_branchingsupport_pillar_diameter"sv,
+        "material_ow_branchingsupport_head_front_diameter"sv,
+        "material_ow_branchingsupport_head_penetration"sv,
+        "material_ow_branchingsupport_head_width"sv,
+        "material_ow_elefant_foot_compensation"sv,
+        "material_ow_support_points_density_relative"sv,
+        "material_ow_relative_correction"sv
     };
 
     std::vector<SLAPrintStep> steps;
