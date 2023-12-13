@@ -778,8 +778,10 @@ namespace DoExport {
                 print_statistics.total_used_filament += used_filament;
                 print_statistics.total_extruded_volume += extruded_volume;
                 print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
+                print_statistics.total_wipe_tower_filament_weight += has_wipe_tower ? (extruded_volume - extruder.extruded_volume()) * extruder.filament_density() * 0.001 : 0.;
                 print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
             }
+
             if (!export_binary_data) {
                 filament_stats_string_out += out_filament_used_mm.first;
                 filament_stats_string_out += "\n" + out_filament_used_cm3.first;
@@ -868,7 +870,7 @@ static inline GCode::SmoothPathCache smooth_path_interpolate_global(const Print&
 
 void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
-    const bool export_to_binary_gcode = print.full_print_config().option<ConfigOptionBool>("gcode_binary")->value;
+    const bool export_to_binary_gcode = print.full_print_config().option<ConfigOptionBool>("binary_gcode")->value;
     // if exporting gcode in binary format: 
     // we generate here the data to be passed to the post-processor, who is responsible to export them to file 
     // 1) generate the thumbnails
@@ -1367,6 +1369,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         file.write("\n");
         file.write_format(PrintStatistics::TotalFilamentUsedGValueMask.c_str(), print.m_print_statistics.total_weight);
         file.write_format(PrintStatistics::TotalFilamentCostValueMask.c_str(), print.m_print_statistics.total_cost);
+        file.write_format(PrintStatistics::TotalFilamentUsedWipeTowerValueMask.c_str(), print.m_print_statistics.total_wipe_tower_filament_weight);
         if (print.m_print_statistics.total_toolchanges > 0)
             file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());
@@ -2669,15 +2672,17 @@ std::string GCodeGenerator::change_layer(
 
     const std::string comment{"move to next layer (" + std::to_string(m_layer_index) + ")"};
 
-    bool helical_layer_change{
+    bool do_helical_layer_change{
         !spiral_vase_enabled
         && print_z > previous_layer_z
+        && EXTRUDER_CONFIG(retract_layer_change)
+        && EXTRUDER_CONFIG(retract_length) > 0
         && EXTRUDER_CONFIG(travel_ramping_lift)
         && EXTRUDER_CONFIG(travel_slope) > 0 && EXTRUDER_CONFIG(travel_slope) < 90
     };
 
     const std::optional<std::string> helix_gcode{
-        helical_layer_change ?
+        do_helical_layer_change ?
         this->get_helical_layer_change_gcode(
             m_config.z_offset.value + previous_layer_z,
             m_config.z_offset.value + print_z,

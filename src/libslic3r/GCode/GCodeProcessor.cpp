@@ -572,8 +572,8 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 {
     m_parser.apply_config(config);
 
-    m_binarizer.set_enabled(config.gcode_binary);
-    m_result.is_binary_file = config.gcode_binary;
+    m_binarizer.set_enabled(config.binary_gcode);
+    m_result.is_binary_file = config.binary_gcode;
 
     m_producer = EProducer::PrusaSlicer;
     m_flavor = config.gcode_flavor;
@@ -3695,6 +3695,8 @@ void GCodeProcessor::post_process()
         filament_total_cost += filament_cost[id];
     }
 
+    double total_g_wipe_tower = m_print->print_statistics().total_wipe_tower_filament_weight;
+
     if (m_binarizer.is_enabled()) {
         // update print metadata
         auto stringify = [](const std::vector<double>& values) {
@@ -3715,11 +3717,13 @@ void GCodeProcessor::post_process()
         binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::FilamentCost, stringify(filament_cost));
         binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentUsedG, stringify({ filament_total_g }));
         binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentCost, stringify({ filament_total_cost }));
+        binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentUsedWipeTower, stringify({ total_g_wipe_tower }));
 
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedMm, stringify(filament_mm)); // duplicated into print metadata
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedG, stringify(filament_g));   // duplicated into print metadata
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentCost, stringify(filament_cost));   // duplicated into print metadata
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedCm3, stringify(filament_cm3)); // duplicated into print metadata
+        binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentUsedWipeTower, stringify({ total_g_wipe_tower })); // duplicated into print metadata
 
         for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
             const TimeMachine& machine = m_time_processor.machines[i];
