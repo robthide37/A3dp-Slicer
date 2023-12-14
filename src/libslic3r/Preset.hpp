@@ -126,10 +126,21 @@ public:
         TYPE_SLA_MATERIAL = TYPE_SLA | TYPE_MATERIAL,
         TYPE_TECHNOLOGY = TYPE_FFF | TYPE_SLA,
 
+        TYPE_FREQUENT     = 1 << 5,
+        TYPE_FREQUENT_FFF = TYPE_FFF | TYPE_FREQUENT,
+        TYPE_FREQUENT_SLA = TYPE_SLA | TYPE_FREQUENT,
         // This type is here to support PresetConfigSubstitutions for physical printers, however it does not belong to the Preset class,
         // PhysicalPrinter class is used instead.
-        TYPE_PHYSICAL_PRINTER = 1 << 5,
+        TYPE_PHYSICAL_PRINTER = 1 << 6,
     };
+    static inline PrinterTechnology get_tech(Type type)
+    {
+        if ((type & TYPE_FFF) == TYPE_FFF)
+            return PrinterTechnology::ptFFF;
+        if ((type & TYPE_FFF) == TYPE_SLA)
+            return PrinterTechnology::ptSLA;
+        return PrinterTechnology::ptUnknown;
+    }
     static std::string type_name(Type t);
 
     Type                type        = TYPE_INVALID;

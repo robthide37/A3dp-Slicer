@@ -603,6 +603,15 @@ void OptionsGroup::update_script_presets(bool init) {
         }
     }
 }
+bool ConfigOptionsGroup::has_option_def(const std::string &opt_key)
+{
+    return this->m_options.find(opt_key) != this->m_options.end();
+}
+const Option *ConfigOptionsGroup::get_option_def(const std::string &opt_key)
+{
+    auto it = this->m_options.find(opt_key);
+    return it == m_options.end() ? nullptr : &it->second;
+}
 
 bool ConfigOptionsGroup::has_option(const std::string& opt_key, int opt_index /*= -1*/)
 {
@@ -614,17 +623,17 @@ bool ConfigOptionsGroup::has_option(const std::string& opt_key, int opt_index /*
     return m_opt_map.find(opt_id) != m_opt_map.end();
 }
 
-Option ConfigOptionsGroup::get_option(const std::string& opt_key, int opt_index /*= -1*/)
+Option ConfigOptionsGroup::create_option_from_def(const std::string &opt_key, int opt_index /*= -1*/)
 {
-	if (!m_config->has(opt_key)) {
-		std::cerr << "No " << opt_key << " in ConfigOptionsGroup config.\n";
-	}
+    if (!m_config->has(opt_key)) {
+        std::cerr << "No " << opt_key << " in ConfigOptionsGroup config.\n";
+    }
 
-	std::string opt_id = opt_index == -1 ? opt_key : opt_key + "#" + std::to_string(opt_index);
-	std::pair<std::string, int> pair(opt_key, opt_index);
-	m_opt_map.emplace(opt_id, pair);
+    std::string                 opt_id = opt_index == -1 ? opt_key : opt_key + "#" + std::to_string(opt_index);
+    std::pair<std::string, int> pair(opt_key, opt_index);
+    m_opt_map.emplace(opt_id, pair);
 
-	return Option(*m_config->def()->get(opt_key), opt_id);
+    return Option(*m_config->def()->get(opt_key), opt_id);
 }
 
 void ConfigOptionsGroup::register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index /*= -1*/, bool reset)

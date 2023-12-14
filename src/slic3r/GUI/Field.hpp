@@ -102,12 +102,15 @@ public:
 	// This is used to avoid recursive invocation of the field change/update by wxWidgets.
     bool			m_disable_change_event {false};
     bool			m_is_modified_value {false};
-	bool			m_is_nonsys_value {true};
+    bool            m_is_nonsys_value{true};
 
     /// Copy of ConfigOption for deduction purposes
     const ConfigOptionDef			m_opt {ConfigOptionDef()};
 	const t_config_option_key		m_opt_id;//! {""};
 	int								m_opt_idx = 0;
+
+	// for saving state
+    bool                            m_is_enable{true};
 
 	double							opt_height{ 0.0 };
 	bool							parent_is_custom_ctrl{ false };
@@ -127,7 +130,11 @@ public:
     virtual void		disable() = 0;
 
 	/// Fires the enable or disable function, based on the input.
-    inline void			toggle(bool en) { en ? enable() : disable(); }
+    inline void			toggle(bool en) {
+		m_is_enable = en;
+		en ? enable() : disable();
+	}
+    inline bool is_enabled() const { return m_is_enable; }
 
 	virtual wxString	get_tooltip_text(const wxString& default_string);
 	// hack via richtooltip that are also hacked

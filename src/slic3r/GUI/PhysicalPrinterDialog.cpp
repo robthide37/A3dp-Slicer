@@ -396,7 +396,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     };
 
     // Set a wider width for a better alignment
-    Option option = m_optgroup->get_option("print_host");
+    Option option    = m_optgroup->create_option_from_def("print_host");
     option.opt.width = Field::def_width_wider();
     Line host_line = m_optgroup->create_single_option_line(option);
     host_line.append_widget(printhost_browse);
@@ -405,11 +405,11 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
 
     m_optgroup->append_single_option_line("printhost_authorization_type");
 
-    option = m_optgroup->get_option("printhost_apikey");
+    option           = m_optgroup->create_option_from_def("printhost_apikey");
     option.opt.width = Field::def_width_wider();
     m_optgroup->append_single_option_line(option);
 
-    option = m_optgroup->get_option("printhost_port");
+    option           = m_optgroup->create_option_from_def("printhost_port");
     option.opt.width = Field::def_width_wider();
     Line port_line = m_optgroup->create_single_option_line(option);
     port_line.append_widget(print_host_printers);
@@ -427,7 +427,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_optgroup->append_single_option_line(option);
     }
 
-    option = m_optgroup->get_option("printhost_client_cert");
+    option = m_optgroup->create_option_from_def("printhost_client_cert");
     option.opt.width = Field::def_width_wider();
     Line client_cert_line = m_optgroup->create_single_option_line(option);
 
@@ -466,14 +466,14 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     };
     m_optgroup->append_line(clientcert_hint);
 
-    option = m_optgroup->get_option("printhost_client_cert_password");
+    option           = m_optgroup->create_option_from_def("printhost_client_cert_password");
     option.opt.width = Field::def_width_wider();
     m_optgroup->append_single_option_line(option);
 
     const auto ca_file_hint = _u8L("HTTPS CA file is optional. It is only needed if you use HTTPS with a self-signed certificate.");
 
     if (Http::ca_file_supported()) {
-        option = m_optgroup->get_option("printhost_cafile");
+        option           = m_optgroup->create_option_from_def("printhost_cafile");
         option.opt.width = Field::def_width_wider();
         Line cafile_line = m_optgroup->create_single_option_line(option);
 
@@ -525,13 +525,13 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     }
 
     for (const std::string& opt_key : std::vector<std::string>{ "printhost_user", "printhost_password" }) {        
-        option = m_optgroup->get_option(opt_key);
+        option           = m_optgroup->create_option_from_def(opt_key);
         option.opt.width = Field::def_width_wider();
         m_optgroup->append_single_option_line(option);
     }
 
 #ifdef WIN32
-    option = m_optgroup->get_option("printhost_ssl_ignore_revoke");
+    option           = m_optgroup->create_option_from_def("printhost_ssl_ignore_revoke");
     option.opt.width = Field::def_width_wider();
     m_optgroup->append_single_option_line(option);
 #endif

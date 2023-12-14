@@ -388,14 +388,14 @@ void FreqChangedParams::init()
     };
     
     std::vector<PageShp> pages;
-    if(tab_print  != nullptr) pages = tab_print->create_pages("freq_fff.ui");
+    if(tab_print  != nullptr) pages = tab_print->create_pages("freq_fff.ui", -1, Preset::Type::TYPE_FREQUENT_FFF);
     if (!pages.empty()) {
         m_og->set_config(config);
         m_og->hide_labels();
         m_og->m_on_change = Tab::set_or_add(m_og->m_on_change, [tab_print, this](t_config_option_key opt_key, boost::any value)
         //m_og->m_on_change = [tab_print, this](t_config_option_key opt_key, boost::any value)
             {
-                Option opt = this->m_og->get_option(opt_key);
+                Option opt = this->m_og->create_option_from_def(opt_key);
                 if (!opt.opt.is_script) {
                     tab_print->update_dirty();
                     tab_print->reload_config();
@@ -470,14 +470,14 @@ void FreqChangedParams::init()
     // Frequently changed parameters for SLA_technology
     tab_print = wxGetApp().get_tab(Preset::TYPE_SLA_PRINT);
     pages.clear();
-    if (tab_print != nullptr) pages = tab_print->create_pages("freq_sla.ui");
+    if (tab_print != nullptr) pages = tab_print->create_pages("freq_sla.ui", -1, Preset::Type::TYPE_FREQUENT_SLA);
     if (!pages.empty()) {
         std::shared_ptr<ConfigOptionsGroup> m_og_sla = m_og_other[ptSLA] = std::make_shared<ConfigOptionsGroup>(m_parent, "");
         m_og_sla->set_config(config);
         m_og_sla->hide_labels();
         m_og_sla->m_on_change = Tab::set_or_add(m_og_sla->m_on_change, [tab_print, this](t_config_option_key opt_key, boost::any value)
             {
-                Option opt = this->m_og_other[ptSLA]->get_option(opt_key);
+                Option opt = this->m_og_other[ptSLA]->create_option_from_def(opt_key);
                 if (!opt.opt.is_script) {
                     tab_print->update_dirty();
                     tab_print->reload_config();
