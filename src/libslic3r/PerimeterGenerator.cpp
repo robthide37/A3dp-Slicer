@@ -354,8 +354,10 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
         }
     }
 
-    if (ExtrusionEntityCollection extrusion_coll = _traverse_extrusions(ordered_extrusions); !extrusion_coll.empty())
+    if (ExtrusionEntityCollection extrusion_coll = _traverse_extrusions(ordered_extrusions); !extrusion_coll.empty()) {
+        extrusion_coll.set_can_sort_reverse(false, false);
         this->loops->append(extrusion_coll);
+    }
 
     ExPolygons    infill_contour = union_ex(wallToolPaths.getInnerContour());
     const coord_t spacing = (perimeters.size() == 1) ? ext_perimeter_spacing2 : perimeter_spacing;
@@ -2562,7 +2564,6 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
             }
             assert(thin_walls.empty());
             ExtrusionEntityCollection children = this->_traverse_loops(loop.children, thin_walls, has_overhang ? 1 : count_since_overhang < 0 ? -1 : (count_since_overhang+1));
-            coll_out.set_entities().reserve(coll_out.entities().size() + children.entities().size() + 1);
             coll[idx.first] = nullptr;
             if (loop.is_contour) {
                 //note: this->layer->id() % 2 == 1 already taken into account in the is_steep_overhang compute (to save time).
@@ -2570,15 +2571,39 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
                     eloop->make_clockwise();
                 else
                     eloop->make_counter_clockwise();
-                coll_out.append(std::move(children.entities()));
-                coll_out.append(*eloop);
+                //ensure that our children are printed before us
+                if (!children.empty()) {
+                    ExtrusionEntityCollection print_child_beforeplz;
+                    print_child_beforeplz.set_can_sort_reverse(false, false);
+                    if (children.entities().size() > 1) {
+                        print_child_beforeplz.append(children);
+                    } else {
+                        print_child_beforeplz.append(std::move(children.entities()));
+                    }
+                    print_child_beforeplz.append(*eloop);
+                    coll_out.append(std::move(print_child_beforeplz));
+                } else {
+                    coll_out.append(*eloop);
+                }
             } else {
                 if (loop.is_steep_overhang && this->layer->id() % 2 == 1)
                     eloop->make_counter_clockwise();
                 else
                     eloop->make_clockwise();
-                coll_out.append(*eloop);
-                coll_out.append(std::move(children.entities()));
+                // ensure that our children are printed after us
+                if (!children.empty()) {
+                    ExtrusionEntityCollection print_child_beforeplz;
+                    print_child_beforeplz.set_can_sort_reverse(false, false);
+                    print_child_beforeplz.append(*eloop);
+                    if (children.entities().size() > 1) {
+                        print_child_beforeplz.append(children);
+                    } else {
+                        print_child_beforeplz.append(std::move(children.entities()));
+                    }
+                    coll_out.append(std::move(print_child_beforeplz));
+                } else {
+                    coll_out.append(*eloop);
+                }
             }
         }
     }
@@ -2974,7 +2999,7 @@ PerimeterGenerator::_get_nearest_point(const PerimeterGeneratorLoops &children, 
 
             if ((myPolylines.paths[idx_poly].role() == erExternalPerimeter || child.is_external() )
                 && (this->object_config->seam_position.value != SeamPosition::spRandom && this->object_config->seam_position.value != SeamPosition::spAllRandom)) {
-                //first, try to find 2 point near enough
+                //first, try to find 2 point near enough //TODO: use seam placer or at least an equivalent.
                 for (size_t idx_point = 0; idx_point < myPolylines.paths[idx_poly].polyline.size(); idx_point++) {
                     const Point &p = myPolylines.paths[idx_poly].polyline.get_points()[idx_point];
                     const Point &nearest_p = *child.polygon.closest_point(p);

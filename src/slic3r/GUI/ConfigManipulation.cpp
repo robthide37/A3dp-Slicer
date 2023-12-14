@@ -86,6 +86,9 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         && config->opt_bool("overhangs_reverse") == false
         && config->opt_bool("gap_fill_last") == false
         && config->opt_int("solid_over_perimeters") == 0
+        && config->option("seam_notch_all")->getFloat() == 0
+        && config->option("seam_notch_inner")->getFloat() == 0
+        && config->option("seam_notch_outer")->getFloat() == 0
         )) {
         wxString msg_text = _(L("The Spiral Vase mode requires:\n"
             "- no top solid layers\n"
@@ -98,7 +101,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             "- unchecked 'dense infill'\n"
             "- unchecked 'extra perimeters'"
             "- unchecked 'gap fill after last perimeter'"
-            "- disabled  'no solid fill over X perimeters'"));
+            "- disabled  'no solid fill over X perimeters'"
+            "- disabled 'seam notch'"));
         if (is_global_config)
             msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable Spiral Vase?"));
         MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Spiral Vase")),
@@ -137,6 +141,12 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("gap_fill_last", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("solid_over_perimeters"))
                 new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
+            else if (this->local_config->get().optptr("seam_notch_all"))
+                new_conf.set_key_value("seam_notch_all", new ConfigOptionFloatOrPercent(0, false));
+            else if (this->local_config->get().optptr("seam_notch_inner"))
+                new_conf.set_key_value("seam_notch_all", new ConfigOptionFloatOrPercent(0, false));
+            else if (this->local_config->get().optptr("seam_notch_outer"))
+                new_conf.set_key_value("seam_notch_all", new ConfigOptionFloatOrPercent(0, false));
             this->local_config->apply_only(new_conf, this->local_config->keys(), true);
         } else if (answer == wxID_YES) {
             new_conf.set_key_value("top_solid_layers", new ConfigOptionInt(0));
@@ -153,6 +163,9 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
             new_conf.set_key_value("gap_fill_last", new ConfigOptionBool(false));
             new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
+            new_conf.set_key_value("seam_notch_all", new ConfigOptionFloatOrPercent(0, false));
+            new_conf.set_key_value("seam_notch_inner", new ConfigOptionFloatOrPercent(0, false));
+            new_conf.set_key_value("seam_notch_outer", new ConfigOptionFloatOrPercent(0, false));
             fill_density = 0;
             support = false;
         } else {
@@ -327,7 +340,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         "external_perimeters_first", "external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing","external_perimeter_extrusion_change_odd_layers",
         "overhangs","perimeter_speed",
         "seam_position", "small_perimeter_speed", "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
-        "perimeter_generator"})
+        "perimeter_generator", "seam_notch_all", "seam_notch_inner", "seam_notch_outer"})
         toggle_field(el, have_perimeters);
 
     bool has_spiral_vase = have_perimeters && config->opt_bool("spiral_vase");
@@ -360,6 +373,11 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_perimeters && config->option<ConfigOptionEnum<SeamPosition>>("seam_position")->value == SeamPosition::spCost);
 
     toggle_field("perimeter_loop_seam", config->opt_bool("perimeter_loop"));
+
+    bool have_notch = have_perimeters && (config->option("seam_notch_all")->getFloat() != 0 ||
+                                          config->option("seam_notch_inner")->getFloat() != 0 ||
+                                          config->option("seam_notch_outer")->getFloat() != 0);
+    toggle_field("seam_notch_angle", have_notch);
 
     bool have_gap_fill = !have_arachne;
     toggle_field("gap_fill_enabled", have_gap_fill);

@@ -134,7 +134,7 @@ public:
     void        refresh();
 	Field*		get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
 	bool		set_value(const t_config_option_key& opt_key, const boost::any& value);
-	ConfigOptionsGroupShp	new_optgroup(const wxString& title, bool no_title = false, bool is_tab_opt = true);
+	ConfigOptionsGroupShp	new_optgroup(const wxString& title, bool no_title = false, bool is_tab_opt = true, Preset::Type type_override = Preset::Type::TYPE_INVALID);
 	const ConfigOptionsGroupShp	get_optgroup(const wxString& title) const;
 
 	bool		set_item_colour(const wxColour *clr) {
@@ -405,7 +405,7 @@ public:
 	Field*			get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
 	std::pair<OG_CustomCtrl*, bool*> get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index = -1);
 
-    Field*          get_field(Page*& selected_page, const t_config_option_key &opt_key, int opt_index = -1);
+    Field*          get_field(Page*& selected_page, const t_config_option_key &opt_key, int opt_index = -1) const;
 	void			toggle_option(const std::string& opt_key, bool toggle, int opt_index = -1);
 	wxSizer*		description_line_widget(wxWindow* parent, ogStaticText** StaticText, wxString text = wxEmptyString);
 	bool			current_preset_is_dirty() const;
@@ -429,7 +429,8 @@ public:
 	static bool validate_custom_gcode(const wxString& title, const std::string& gcode);
     bool        validate_custom_gcodes_was_shown{ false };
 
-	std::vector<PageShp> create_pages(std::string setting_type_name, int idx = -1);
+	// create a setting page from ui file. type_override is used by frequent settings.
+	std::vector<PageShp> create_pages(std::string setting_type_name, int idx = -1, Preset::Type type_override = Preset::Type::TYPE_INVALID);
 	static t_change set_or_add(t_change previous, t_change toadd);
 protected:
 	void			create_line_with_widget(ConfigOptionsGroup* optgroup, const std::string& opt_key, const std::string& path, widget_t widget);

@@ -515,11 +515,52 @@ void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode
 
     for (auto i : input_values)
         append_options(i.config, i.type);
+
+    for (Option &opt : script_options) {
+        if (Preset::get_tech(opt.type))
+            options.insert(options.end(), opt);
+    }
+    
     sort_options();
 
     search(search_line, true);
 }
 
+void OptionsSearcher::append_script_option(const ConfigOptionDef &opt,
+                                           Preset::Type       preset_type,
+                                           int16_t            idx)
+{
+    wxString label = opt.full_label;
+    if (label.IsEmpty())
+        label = opt.label;
+    if (label.IsEmpty())
+        return;
+    wxString tooltip = opt.tooltip;
+    wxString tooltip_lc = tooltip;
+    tooltip_lc.LowerCase();
+
+    std::string             key = get_key(opt.opt_key, preset_type);
+    const GroupAndCategory &gc  = get_group_and_category(key, opt.mode);
+    if (gc.group.IsEmpty() && gc.category.IsEmpty())
+        return; // have to do ConfigOptionGroup::register_to_search
+
+    script_options.emplace_back(Search::Option{
+        boost::nowide::widen(opt.opt_key),
+        preset_type,
+        idx,
+        opt.mode,
+        label.ToStdWstring(),
+        _(label).ToStdWstring(),
+        gc.group.ToStdWstring(),
+        _(gc.group).ToStdWstring(),
+        gc.category.ToStdWstring(),
+        _(gc.category).ToStdWstring(),
+        tooltip.ToStdWstring(),
+        _(tooltip).ToStdWstring(),
+        tooltip_lc.ToStdWstring(),
+        _(tooltip_lc).ToStdWstring(),
+    });
+}
 const Option& OptionsSearcher::get_option(size_t pos_in_filter) const
 {
     assert(pos_in_filter != size_t(-1) && found[pos_in_filter].option_idx != size_t(-1));

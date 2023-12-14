@@ -586,6 +586,15 @@ void as_ask_for_refresh()
     current_script->request_refresh();
 }
 
+bool as_is_enabled(std::string &key)
+{
+    Page *selected_page;
+    Field *f = current_script->tab()->get_field(selected_page, key, -1);
+    if (!f)
+        return true;
+    return f->is_enabled();
+}
+
 //function to reset a field
 void as_back_initial_value(std::string& key) {
     current_script->add_to_reset(key);
@@ -672,6 +681,7 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", WRAP_FN(as_back_initial_value), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void back_custom_initial_value(int, string &in)", WRAP_FN(as_back_custom_initial_value), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()", WRAP_FN(as_ask_for_refresh), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool is_enabled(string &in)", WRAP_FN(as_is_enabled), AngelScript::asCALL_GENERIC);
 
 #else
             m_script_engine.get()->RegisterGlobalFunction("void print(string &in)",     AngelScript::asFUNCTION(as_print),          AngelScript::asCALL_CDECL);
@@ -702,6 +712,7 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)",    AngelScript::asFUNCTION(as_back_initial_value), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void back_custom_initial_value(int, string &in)",    AngelScript::asFUNCTION(as_back_custom_initial_value), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()",                 AngelScript::asFUNCTION(as_ask_for_refresh),    AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("bool is_enabled(string &in)",                        AngelScript::asFUNCTION(as_is_enabled), AngelScript::asCALL_CDECL);
 #endif
         }
 
@@ -1084,6 +1095,26 @@ void ScriptContainer::refresh(const ConfigOptionDef& def, boost::any value)
     it = std::find(m_currently_reset.begin(), m_currently_reset.end(), def.opt_key);
     if (it != m_currently_reset.end())
         m_currently_reset.erase(it);
+}
+
+ bool ScriptContainer::call_script_function_is_enable(const ConfigOptionDef &def)
+{
+    std::string                     func_name = ("bool " + def.opt_key + "_is_enabled()");
+    AngelScript::asIScriptFunction *func      = m_script_module->GetFunctionByDecl(func_name.c_str());
+    if (func == nullptr) {
+        // default true
+        return true;
+    }
+    AngelScript::asIScriptContext *ctx = m_script_engine->CreateContext();
+    if (ctx == nullptr) {
+        BOOST_LOG_TRIVIAL(error) << "Error, can't create script context for function '" << func_name << "'";
+        return true;
+    }
+    ctx->Prepare(func);
+    // exec
+    /*int res = */ ctx->Execute();
+    uint8_t ret = ctx->GetReturnByte();
+    return ret != 0;
 }
 
 //TODO find a way to use the depends_on to add the same lock & points as real configoption in the gui

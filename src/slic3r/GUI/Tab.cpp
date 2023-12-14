@@ -194,11 +194,11 @@ void Tab::create_preset_tab()
 #endif //__WXOSX__
 
     // preset chooser
-    m_presets_choice = new TabPresetComboBox(panel, m_type);
+    m_presets_choice = new TabPresetComboBox(panel, type());
     m_presets_choice->set_selection_changed_function([this](int selection) {
         if (!m_presets_choice->selection_is_changed_according_to_physical_printers())
         {
-            if (m_type == Preset::TYPE_PRINTER && !m_presets_choice->is_selected_physical_printer())
+            if (type() == Preset::TYPE_PRINTER && !m_presets_choice->is_selected_physical_printer())
                 m_preset_bundle->physical_printers.unselect_printer();
 
             // select preset
@@ -217,7 +217,7 @@ void Tab::create_preset_tab()
     add_scaled_button(panel, &m_btn_save_preset, "save");
     add_scaled_button(panel, &m_btn_save_preset_as, "save_as");
     add_scaled_button(panel, &m_btn_delete_preset, "cross");
-    if (m_type == Preset::Type::TYPE_PRINTER)
+    if (type() == Preset::Type::TYPE_PRINTER)
         add_scaled_button(panel, &m_btn_edit_ph_printer, "cog");
 
     m_show_incompatible_presets = false;
@@ -609,7 +609,7 @@ void Tab::update_label_colours()
         auto title = m_treectrl->GetItemText(cur_item);
         for (auto page : m_pages)
         {
-            if (translate_category(page->title(), m_type) != title)
+            if (translate_category(page->title(), type()) != title)
                 continue;
 
             const wxColor *clr = !page->m_is_nonsys_values ? &m_sys_label_clr :
@@ -757,10 +757,10 @@ void Tab::update_changed_ui()
     if (m_postpone_update_ui)
         return;
 
-    const bool deep_compare = (m_type == Slic3r::Preset::TYPE_PRINTER || m_type == Slic3r::Preset::TYPE_SLA_MATERIAL);
+    const bool deep_compare = (type() == Slic3r::Preset::TYPE_PRINTER || type() == Slic3r::Preset::TYPE_SLA_MATERIAL);
     auto dirty_options = m_presets->current_dirty_options(deep_compare);
     auto nonsys_options = m_presets->current_different_from_parent_options(deep_compare);
-    if (m_type == Preset::TYPE_PRINTER && static_cast<TabPrinter*>(this)->m_printer_technology == ptFFF) {
+    if (type() == Preset::TYPE_PRINTER && static_cast<TabPrinter*>(this)->m_printer_technology == ptFFF) {
         TabPrinter* tab = static_cast<TabPrinter*>(this);
         if (tab->m_initial_extruders_count != tab->m_extruders_count)
             dirty_options.emplace_back("extruders_count");
@@ -912,7 +912,7 @@ void Tab::update_changed_tree_ui()
         auto title = m_treectrl->GetItemText(cur_item);
         for (auto page : m_pages)
         {
-            if (translate_category(page->title(), m_type) != title)
+            if (translate_category(page->title(), type()) != title)
                 continue;
             bool sys_page = true;
             bool modified_page = false;
@@ -922,15 +922,15 @@ void Tab::update_changed_tree_ui()
                     get_sys_and_mod_flags(opt_key, sys_page, modified_page);
                 }
             }
-            if (m_type == Preset::TYPE_FFF_FILAMENT && page->title() == "Advanced") {
+            if (type() == Preset::TYPE_FFF_FILAMENT && page->title() == "Advanced") {
                 get_sys_and_mod_flags("filament_ramming_parameters", sys_page, modified_page);
             }
             if (page->title() == "Dependencies") {
-                if (m_type == Slic3r::Preset::TYPE_PRINTER) {
+                if (type() == Slic3r::Preset::TYPE_PRINTER) {
                     sys_page = m_presets->get_selected_preset_parent() != nullptr;
                     modified_page = false;
                 } else {
-                    if (m_type == Slic3r::Preset::TYPE_FFF_FILAMENT || m_type == Slic3r::Preset::TYPE_SLA_MATERIAL)
+                    if (type() == Slic3r::Preset::TYPE_FFF_FILAMENT || type() == Slic3r::Preset::TYPE_SLA_MATERIAL)
                         get_sys_and_mod_flags("compatible_prints", sys_page, modified_page);
                     get_sys_and_mod_flags("compatible_printers", sys_page, modified_page);
                 }
@@ -1016,7 +1016,7 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
         }
         if (group->title == "Profile dependencies") {
             // "compatible_printers" option doesn't exists in Printer Settimgs Tab
-            if (m_type != Preset::TYPE_PRINTER && (m_options_list["compatible_printers"] & os) == 0) {
+            if (type() != Preset::TYPE_PRINTER && (m_options_list["compatible_printers"] & os) == 0) {
                 to_sys ? group->back_to_sys_value("compatible_printers") : group->back_to_initial_value("compatible_printers");
                 load_key_value("compatible_printers", true/*some value*/, true);
 
@@ -1025,7 +1025,7 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
                 is_empty ? m_compatible_printers.btn->Disable() : m_compatible_printers.btn->Enable();
             }
             // "compatible_prints" option exists only in Filament Settimgs and Materials Tabs
-            if ((m_type == Preset::TYPE_FFF_FILAMENT || m_type == Preset::TYPE_SLA_MATERIAL) && (m_options_list["compatible_prints"] & os) == 0) {
+            if ((type() == Preset::TYPE_FFF_FILAMENT || type() == Preset::TYPE_SLA_MATERIAL) && (m_options_list["compatible_prints"] & os) == 0) {
                 to_sys ? group->back_to_sys_value("compatible_prints") : group->back_to_initial_value("compatible_prints");
                 load_key_value("compatible_prints", true/*some value*/, true);
 
@@ -1122,7 +1122,7 @@ void Tab::update_visibility()
         page->update_visibility(m_mode, page.get() == m_active_page);
     rebuild_page_tree();
 
-    if (m_type == Preset::TYPE_SLA_PRINT || m_type == Preset::TYPE_FFF_PRINT)
+    if (type() == Preset::TYPE_SLA_PRINT || type() == Preset::TYPE_FFF_PRINT)
         update_description_lines();
 
     Layout();
@@ -1225,7 +1225,7 @@ std::pair<OG_CustomCtrl*, bool*> Tab::get_custom_ctrl_with_blinking_ptr(const t_
     return ret;
 }
 
-Field* Tab::get_field(Page*& selected_page, const t_config_option_key& opt_key, int opt_index/* = -1*/)
+Field* Tab::get_field(Page*& selected_page, const t_config_option_key& opt_key, int opt_index/* = -1*/) const
 {
     Field* field = nullptr;
     for (auto page : m_pages) {
@@ -1410,7 +1410,7 @@ void Tab::update_wiping_button_visibility() {
 
 void Tab::activate_option(const std::string& opt_key, const wxString& category)
 {
-    wxString page_title = translate_category(category, m_type);
+    wxString page_title = translate_category(category, type());
 
     auto cur_item = m_treectrl->GetFirstVisibleItem();
     if (!cur_item)
@@ -1468,7 +1468,7 @@ void Tab::apply_config_from_cache()
 {
     bool was_applied = false;
     // check and apply extruders count for printer preset
-    if (m_type == Preset::TYPE_PRINTER)
+    if (type() == Preset::TYPE_PRINTER)
         was_applied = static_cast<TabPrinter*>(this)->apply_extruder_cnt_from_cache();
 
     if (!m_cache_config.empty()) {
@@ -1494,7 +1494,7 @@ void Tab::on_presets_changed()
         return;
 
     // Instead of PostEvent (EVT_TAB_PRESETS_CHANGED) just call update_presets
-    wxGetApp().plater()->sidebar().update_presets(m_type);
+    wxGetApp().plater()->sidebar().update_presets(type());
 
     // Printer selected at the Printer tab, update "compatible" marks at the print and filament selectors.
     for (auto t: m_dependent_tabs)
@@ -1590,9 +1590,9 @@ void Tab::update_preset_description_line()
     if (parent && parent->vendor)
     {
         description_line += "\n\n" + _(L("Additional information:")) + "\n";
-        description_line += "\t" + _(L("vendor")) + ": " + (m_type == Slic3r::Preset::TYPE_PRINTER ? "\n\t\t" : "") + parent->vendor->name +
+        description_line += "\t" + _(L("vendor")) + ": " + (type() == Slic3r::Preset::TYPE_PRINTER ? "\n\t\t" : "") + parent->vendor->name +
                             ", ver: " + parent->vendor->config_version.to_string();
-        if (m_type == Slic3r::Preset::TYPE_PRINTER) {
+        if (type() == Slic3r::Preset::TYPE_PRINTER) {
             const std::string &printer_model = preset.config.opt_string("printer_model");
             if (! printer_model.empty())
                 description_line += "\n\n\t" + _(L("printer model")) + ": \n\t\t" + printer_model;
@@ -1677,7 +1677,7 @@ t_change Tab::set_or_add(t_change previous, t_change toadd) {
     };
 }
 
-std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_name, int idx_page)
+std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_name, int idx_page, Preset::Type type_override)
 {
     //search for the file
     const boost::filesystem::path ui_layout_file = Slic3r::GUI::get_app_config()->layout_config_path() / setting_type_name;
@@ -1686,6 +1686,10 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
         return {};
     } else
         Slic3r::slic3r_log->info("settings gui") << "create settings  " << setting_type_name << "\n";
+
+    if (type_override == Preset::Type::TYPE_INVALID) {
+        type_override = this->type();
+    }
 
     bool no_page_yet = true;
 #ifdef __WXMSW__
@@ -1791,7 +1795,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     no_search = true;
             }
             
-            current_group = current_page->new_optgroup(_(params.back()), no_title, !no_search);
+            current_group = current_page->new_optgroup(_(params.back()), no_title, !no_search, type_override);
             for (int i = 1; i < params.size() - 1; i++) {
                 if (boost::starts_with(params[i], "title_width$")) {
                     current_group->title_width = atoi(params[i].substr(12, params[i].size() - 12).c_str());
@@ -2007,7 +2011,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
 
             Option option = is_script ? 
                 Option(ConfigOptionDef{}, setting_id) : 
-                current_group->get_option(setting_id, id);
+                current_group->create_option_from_def(setting_id, id);
             if (is_script) {
                 option.opt.opt_key = setting_id;
                 option.opt.label = setting_id;
@@ -2087,9 +2091,11 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 else if (boost::starts_with(params[i], "label$"))
                 {
                     // store current label into full_label if no full_label to prevent rpoblem in the rest of the gui (all empty).
-                    if (option.opt.full_label.empty())
+                    if (option.opt.full_label.empty() && !is_script)
                         option.opt.full_label = option.opt.label;
                     option.opt.label = (params[i].substr(6, params[i].size() - 6));
+                    if (is_script && option.opt.full_label.empty()) 
+                        option.opt.full_label = option.opt.label;
                     need_to_notified_search = true;
                 }
                 else if (boost::starts_with(params[i], "label_width$")) {
@@ -2224,6 +2230,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             if (is_script) {
                 //register on tab to get the icons
                 this->m_options_script[option.opt.opt_key] = 0;
+                //register for research
+                wxGetApp().sidebar().get_searcher().append_script_option(option.opt, type_override, id);
             }
 
             if (!in_line) {
@@ -2595,6 +2603,22 @@ void TabPrint::toggle_options()
     if (!m_active_page) return;
 
     m_config_manipulation.toggle_print_fff_options(m_config);
+
+    // toogle scripted fields
+    // TODO: shouldn't work with arrays. fix it
+    if (m_active_page)
+        for (auto [key, id] : this->m_options_script) {
+            for (const ConfigOptionsGroupShp &optgrp : m_active_page->m_optgroups) {
+                if (optgrp) {
+                    const Option *opt = optgrp->get_option_def(key);
+                    if (opt && opt->opt.is_script && opt->script) {
+                        Field *field = optgrp->get_field(key);
+                        if (field)
+                            field->toggle(opt->script->call_script_function_is_enable(opt->opt));
+                    }
+                }
+            }
+        }
 }
 
 void TabPrint::update()
@@ -3581,7 +3605,7 @@ void Tab::load_current_preset()
     update_btns_enabling();
 
     update();
-    if (m_type == Slic3r::Preset::TYPE_PRINTER) {
+    if (type() == Slic3r::Preset::TYPE_PRINTER) {
         // For the printer profile, generate the extruder pages.
         if (preset.printer_technology() == ptFFF)
             on_preset_loaded();
@@ -3595,7 +3619,7 @@ void Tab::load_current_preset()
 
 
     // apply duplicate_distance for print preset
-    if (m_type == Preset::TYPE_FFF_PRINT || m_type == Preset::TYPE_SLA_PRINT) {
+    if (type() == Preset::TYPE_FFF_PRINT || type() == Preset::TYPE_SLA_PRINT) {
         wxGetApp().mainframe->plater()->canvas3D()->set_arrange_settings(m_presets->get_edited_preset().config, m_presets->get_edited_preset().printer_technology());
     }
 
@@ -3616,7 +3640,7 @@ void Tab::load_current_preset()
 
         // update show/hide tabs
         //merill note: this is a bit of anti-inheritance pattern
-        if (m_type == Slic3r::Preset::TYPE_PRINTER) {
+        if (type() == Slic3r::Preset::TYPE_PRINTER) {
             const PrinterTechnology printer_technology = m_presets->get_edited_preset().printer_technology();
             const PrinterTechnology old_printer_technology = static_cast<TabPrinter*>(this)->m_printer_technology;
             if (printer_technology != old_printer_technology)
@@ -3687,11 +3711,11 @@ void Tab::load_current_preset()
         }
         else {
             on_presets_changed();
-            if ((m_type & Preset::TYPE_PRINT1) != 0)
+            if ((type() & Preset::TYPE_PRINT1) != 0)
                 update_frequently_changed_parameters();
 
             //update width/spacing links
-            if (m_type == Preset::TYPE_FFF_PRINT) {
+            if (type() == Preset::TYPE_FFF_PRINT) {
                 //verify that spacings are set
                 if (m_config && !m_config->update_phony({
                         &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
@@ -3734,9 +3758,9 @@ void Tab::rebuild_page_tree()
     {
         if (!p->get_show())
             continue;
-        auto itemId = m_treectrl->AppendItem(rootItem, translate_category(p->title(), m_type), p->iconID());
+        auto itemId = m_treectrl->AppendItem(rootItem, translate_category(p->title(), type()), p->iconID());
         m_treectrl->SetItemTextColour(itemId, p->get_item_colour());
-        if (translate_category(p->title(), m_type) == selected)
+        if (translate_category(p->title(), type()) == selected)
             item = itemId;
         }
     if (!item) {
@@ -3756,7 +3780,7 @@ void Tab::update_btns_enabling()
     // we can save any preset taht is not default/system and is modified.
     m_btn_save_preset->Enable(!preset.is_default && !preset.is_system && preset.is_dirty && !preset.name.empty());
     // we can delete any preset from the physical printer and any user preset
-    m_btn_delete_preset->Enable((m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
+    m_btn_delete_preset->Enable((type() == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
                               || (!preset.is_default && !preset.is_system));
 
     if (m_btn_edit_ph_printer)
@@ -3881,7 +3905,7 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
     }
 
     if (canceled) {
-        if (m_type == Preset::TYPE_PRINTER) {
+        if (type() == Preset::TYPE_PRINTER) {
             if (!last_selected_ph_printer_name.empty() &&
                 m_presets->get_edited_preset().name == PhysicalPrinter::get_preset_name(last_selected_ph_printer_name)) {
                 // If preset selection was canceled and previously was selected physical printer, we should select it back
@@ -3956,7 +3980,7 @@ bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr
 {
     if (presets == nullptr) presets = m_presets;
 
-    UnsavedChangesDialog dlg(m_type, presets, new_printer_name);
+    UnsavedChangesDialog dlg(type(), presets, new_printer_name);
     if (wxGetApp().app_config->get("default_action_on_select_preset") == "none" && dlg.ShowModal() == wxID_CANCEL)
         return false;
 
@@ -3965,7 +3989,7 @@ bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr
         const std::vector<std::string>& unselected_options = dlg.get_unselected_options(presets->type());
         const std::string& name = dlg.get_preset_name();
 
-        if (m_type == presets->type()) // save changes for the current preset from this tab
+        if (type() == presets->type()) // save changes for the current preset from this tab
         {
             // revert unselected options to the old values
             presets->get_edited_preset().config.apply_only(presets->get_selected_preset().config, unselected_options);
@@ -3985,9 +4009,9 @@ bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr
     else if (dlg.transfer_changes()) // move selected changes
     {
         std::vector<std::string> selected_options = dlg.get_selected_options();
-        if (m_type == presets->type()) // move changes for the current preset from this tab
+        if (type() == presets->type()) // move changes for the current preset from this tab
         {
-            if (m_type == Preset::TYPE_PRINTER) {
+            if (type() == Preset::TYPE_PRINTER) {
                 auto it = std::find(selected_options.begin(), selected_options.end(), "extruders_count");
                 if (it != selected_options.end()) {
                     // erase "extruders_count" option from the list
@@ -4064,7 +4088,7 @@ bool Tab::tree_sel_change_delayed()
     const auto sel_item = m_treectrl->GetSelection();
     const auto selection = sel_item ? m_treectrl->GetItemText(sel_item) : "";
     for (auto p : m_pages)
-        if (translate_category(p->title(), m_type) == selection)
+        if (translate_category(p->title(), type()) == selection)
         {
             page = p.get();
             m_is_nonsys_values = page->m_is_nonsys_values;
@@ -4123,7 +4147,7 @@ void Tab::OnKeyDown(wxKeyEvent& event)
 
 void Tab::compare_preset()
 {
-    wxGetApp().mainframe->diff_dialog.show(m_type);
+    wxGetApp().mainframe->diff_dialog.show(type());
 }
 
 // Save the current preset into file.
@@ -4139,7 +4163,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 //!	m_treectrl->OnSetFocus();
 
     if (name.empty()) {
-        SavePresetDialog dlg(m_parent, m_type, detach ? _u8L("Detached") : "");
+        SavePresetDialog dlg(m_parent, type(), detach ? _u8L("Detached") : "");
         auto result = dlg.ShowModal();
         // OK => ADD, APPLY => RENAME
         if (result != wxID_OK && result != wxID_APPLY)
@@ -4148,14 +4172,14 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     }
 
     // Print bed has to be updated, when printer preset is detached from the system preset
-    if (detach && m_type == Preset::TYPE_PRINTER)
+    if (detach && type() == Preset::TYPE_PRINTER)
         m_config->opt_string("printer_model", true) = "";
 
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     m_presets->save_current_preset(name, detach);
 
     // Print bed has to be updated, when printer preset is detached from the system preset
-    if (detach && m_type == Preset::TYPE_PRINTER)
+    if (detach && type() == Preset::TYPE_PRINTER)
         wxGetApp().mainframe->on_config_changed(m_config);
 
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
@@ -4168,9 +4192,9 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     // If current profile is saved, "delete preset" button have to be enabled
     update_btns_enabling();
 
-    if (m_type == Preset::TYPE_PRINTER)
+    if (type() == Preset::TYPE_PRINTER)
         static_cast<TabPrinter*>(this)->m_initial_extruders_count = static_cast<TabPrinter*>(this)->m_extruders_count;
-    if (m_type == Preset::TYPE_PRINTER)
+    if (type() == Preset::TYPE_PRINTER)
         static_cast<TabPrinter*>(this)->m_initial_milling_count = static_cast<TabPrinter*>(this)->m_milling_count;
 
     // Parent preset is "default" after detaching, so we should to update UI values, related on parent preset  
@@ -4182,14 +4206,14 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     /* If filament preset is saved for multi-material printer preset, 
      * there are cases when filament comboboxs are updated for old (non-modified) colors, 
      * but in full_config a filament_colors option aren't.*/
-    if (m_type == Preset::TYPE_FFF_FILAMENT && wxGetApp().extruders_edited_cnt() > 1)
+    if (type() == Preset::TYPE_FFF_FILAMENT && wxGetApp().extruders_edited_cnt() > 1)
         wxGetApp().plater()->force_filament_colors_update();
 
     {
         // Profile compatiblity is updated first when the profile is saved.
         // Update profile selection combo boxes at the depending tabs to reflect modifications in profile compatibility.
         std::vector<Preset::Type> dependent;
-        switch (m_type) {
+        switch (type()) {
         case Preset::TYPE_FFF_PRINT:
             dependent = { Preset::TYPE_FFF_FILAMENT };
             break;
@@ -4210,7 +4234,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     }
 
     // update preset comboboxes in DiffPresetDlg
-    wxGetApp().mainframe->diff_dialog.update_presets(m_type);
+    wxGetApp().mainframe->diff_dialog.update_presets(type());
 
     //when "Detach from system preset" makes the btton disappear after click on it and detaching of the profile from system profile
     if (detach)
@@ -4240,7 +4264,7 @@ void Tab::delete_preset()
     }
     else
     {
-        if (m_type == Preset::TYPE_PRINTER && !physical_printers.empty())
+        if (type() == Preset::TYPE_PRINTER && !physical_printers.empty())
         {
             // Check preset for delete in physical printers
             // Ask a customer about next action, if there is a printer with just one preset and this preset is equal to delete
@@ -4293,7 +4317,7 @@ void Tab::delete_preset()
     }
 
     // delete selected preset from printers and printer, if it's needed
-    if (m_type == Preset::TYPE_PRINTER && !physical_printers.empty())
+    if (type() == Preset::TYPE_PRINTER && !physical_printers.empty())
         physical_printers.delete_preset_from_printers(current_preset.name);
 
     // Select will handle of the preset dependencies, of saving & closing the depending profiles, and
@@ -4323,7 +4347,7 @@ void Tab::update_ui_from_settings()
     // Show the 'show / hide presets' button only for the print and filament tabs, and only if enabled
     // in application preferences.
     m_show_btn_incompatible_presets = wxGetApp().app_config->get("show_incompatible_presets")[0] == '1' ? true : false;
-    bool show = m_show_btn_incompatible_presets && m_type != Slic3r::Preset::TYPE_PRINTER;
+    bool show = m_show_btn_incompatible_presets && type() != Slic3r::Preset::TYPE_PRINTER;
     Layout();
     show ? m_btn_hide_incompatible_presets->Show() :  m_btn_hide_incompatible_presets->Hide();
     // If the 'show / hide presets' button is hidden, hide the incompatible presets.
@@ -4750,8 +4774,8 @@ wxSizer* TabPrinter::create_bed_shape_widget(wxWindow* parent)
     {
         Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
         const Search::GroupAndCategory& gc = searcher.get_group_and_category(std::to_string(int(Preset::Type::TYPE_PRINTER)) + ";" + "bed_shape", ConfigOptionMode::comNone);
-        searcher.add_key("bed_custom_texture", m_type, gc.group, gc.category, *m_config->def()->get("bed_custom_texture"));
-        searcher.add_key("bed_custom_model", m_type, gc.group, gc.category, *m_config->def()->get("bed_custom_model"));
+        searcher.add_key("bed_custom_texture", type(), gc.group, gc.category, *m_config->def()->get("bed_custom_texture"));
+        searcher.add_key("bed_custom_model", type(), gc.group, gc.category, *m_config->def()->get("bed_custom_model"));
     }
 
     return sizer;
@@ -5066,7 +5090,7 @@ bool Page::set_value(const t_config_option_key& opt_key, const boost::any& value
 }
 
 // package Slic3r::GUI::Tab::Page;
-ConfigOptionsGroupShp Page::new_optgroup(const wxString& title, bool no_title /*= false*/, bool is_tab_opt /*= true*/)
+ConfigOptionsGroupShp Page::new_optgroup(const wxString& title, bool no_title /*= false*/, bool is_tab_opt /*= true*/, Preset::Type type_override /* INVALID*/)
 {
     //! config_ have to be "right"
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(m_parent, title, m_config, is_tab_opt);
@@ -5079,7 +5103,8 @@ ConfigOptionsGroupShp Page::new_optgroup(const wxString& title, bool no_title /*
 #else
     auto tab = parent()->GetParent();// GetParent();
 #endif
-    optgroup->set_config_category_and_type(m_title, static_cast<Tab*>(tab)->type());
+    optgroup->set_config_category_and_type(m_title, 
+        type_override == Preset::Type::TYPE_INVALID ? static_cast<Tab*>(tab)->type() : type_override);
     optgroup->m_on_change = [tab](t_config_option_key opt_key, boost::any value) {
         //! This function will be called from OptionGroup.
         //! Using of CallAfter is redundant.
@@ -5259,7 +5284,7 @@ ConfigManipulation Tab::get_config_manipulation()
         return toggle_option(opt_key, toggle, opt_index);
     };
 
-    auto cb_value_change = [this](const std::string& opt_key, const boost::any& value) {
+    auto cb_value_change = [this](const std::string &opt_key, const boost::any &value) {
         return on_value_change(opt_key, value);
     };
 
