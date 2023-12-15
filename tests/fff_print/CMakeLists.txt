@@ -17,13 +17,14 @@ add_executable(${_TEST_NAME}_tests
 	test_gcode_layer_changes.cpp
 	test_gcodefindreplace.cpp
 	test_gcodewriter.cpp
-    test_retraction.cpp
+    test_layers.cpp
 	test_model.cpp
 	test_multi.cpp
 	test_perimeters.cpp
 	test_print.cpp
 	test_printgcode.cpp
 	test_printobject.cpp
+    test_retraction.cpp
 	test_shells.cpp
 	test_skirt_brim.cpp
 	test_support_material.cpp
