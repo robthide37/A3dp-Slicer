@@ -13,9 +13,7 @@
 using namespace Slic3r;
 using namespace Test;
 
-void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfig& config) {
-    std::string gcode = Slic3r::Test::slice(meshes, config);
-
+void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfig& config, const unsigned duplicate) {
     constexpr std::size_t tools_count = 4;
     std::size_t tool = 0;
     std::array<unsigned, tools_count> toolchange_count{0}; // Track first usages so that we don't expect retract_length_toolchange when extruders are used for the first time
@@ -26,6 +24,10 @@ void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfi
     bool changed_tool = false;
     bool wait_for_toolchange = false;
 
+    Print print;
+    Model model;
+    Test::init_print({TestMesh::cube_20x20x20}, print, model, config, false, duplicate);
+    std::string gcode = Test::gcode(print);
 
 	GCodeReader parser;
     parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
@@ -114,24 +116,24 @@ void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfi
     });
 }
 
-void test_slicing(std::initializer_list<TestMesh> meshes, DynamicPrintConfig& config) {
+void test_slicing(std::initializer_list<TestMesh> meshes, DynamicPrintConfig& config, const unsigned duplicate = 1) {
     SECTION("Retraction") {
-        check_gcode(meshes, config);
+        check_gcode(meshes, config, duplicate);
     }
 
     SECTION("Restart extra length") {
         config.set_deserialize_strict({{ "retract_restart_extra", "1" }});
-        check_gcode(meshes, config);
+        check_gcode(meshes, config, duplicate);
     }
 
     SECTION("Negative restart extra length") {
         config.set_deserialize_strict({{ "retract_restart_extra", "-1" }});
-        check_gcode(meshes, config);
+        check_gcode(meshes, config, duplicate);
     }
 
     SECTION("Retract_lift") {
         config.set_deserialize_strict({{ "retract_lift", "1,2" }});
-        check_gcode(meshes, config);
+        check_gcode(meshes, config, duplicate);
     }
 
 }
@@ -149,10 +151,10 @@ TEST_CASE("Slicing with retraction and lifing", "[retraction]") {
     });
 
     SECTION("Standard run") {
-        //test_slicing({TestMesh::cube_20x20x20}, config);
+        test_slicing({TestMesh::cube_20x20x20}, config);
     }
     SECTION("With duplicate cube") {
-        //test_slicing({TestMesh::cube_20x20x20, TestMesh::cube_20x20x20}, config);
+        test_slicing({TestMesh::cube_20x20x20}, config, 2);
     }
     SECTION("Dual extruder with multiple skirt layers") {
         config.set_deserialize_strict({
@@ -258,8 +260,12 @@ TEST_CASE("Firmware retraction when length is 0", "[retraction]") {
 }
 
 std::vector<double> get_lift_layers(const DynamicPrintConfig& config) {
+    Print print;
+    Model model;
+    Test::init_print({TestMesh::cube_20x20x20}, print, model, config, false, 2);
+    std::string gcode = Test::gcode(print);
+
     std::vector<double> result;
-    const std::string gcode = Slic3r::Test::slice({TestMesh::cube_20x20x20}, config);
 	GCodeReader parser;
     parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
         if (line.cmd_is("G1") && line.dist_Z(self) < 0) {
