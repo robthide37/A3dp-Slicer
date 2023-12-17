@@ -154,9 +154,54 @@ protected:
 	// Color of TreeCtrlItem. The wxColour will be updated only if the new wxColour pointer differs from the currently rendered one.
 	const wxColour*		m_item_color;
 };
-
-
 using PageShp = std::shared_ptr<Page>;
+
+
+
+// VectorManager Manager - helper for manipulation of a vector field
+// TODO resolce current issues:
+//  - it needs to have the growable line under a normal line, as it needs the full_length to be able to layout new items.
+//     ideally, i want everythign in the same line.
+//  - it misseds the rest buttons & gui things on the first line
+//  - the second line will pop at the end of the group, not when it's inserted at the creation.
+//  - line_full_width or something is creating a vertical gap, to remove.
+class VectorManager
+{
+    std::string         m_opt_key;
+    ConfigOptionType    m_opt_type;
+    DynamicPrintConfig *m_config{nullptr};
+    PageShp             m_page{nullptr};
+    wxWindow *          m_parent{nullptr};
+    wxSizer *        m_grid_sizer{nullptr};
+    wxSizer *        m_extra_test{nullptr};
+
+    int                   m_em{10};
+    std::function<void()> m_cb_edited{nullptr};
+
+    bool is_compatibile_with_ui();
+
+public:
+    VectorManager()  = default;
+    ~VectorManager() = default;
+
+    wxSizer *   init(DynamicPrintConfig *config, wxWindow *parent, PageShp page, const std::string &opt_key);
+    void        pop_back();
+    void        push_back(const std::string &plain_value = std::string());
+    void        update_from_config();
+    void        clear();
+    void        edit_value(int                opt_pos, // option position in vector
+                           const std::string &value);
+    void        set_cb_edited(std::function<void()> cb_edited) { m_cb_edited = cb_edited; }
+    void        call_ui_update()
+    {
+        if (m_cb_edited)
+            m_cb_edited();
+    }
+    bool  is_empty_vector();
+    bool  is_active() { return m_grid_sizer; }
+    Page *get_page() { return m_page.get(); }
+};
+
 class Tab: public wxPanel
 {
 	wxBookCtrlBase*			m_parent;
@@ -309,6 +354,7 @@ protected:
 
 	DynamicPrintConfig 	m_cache_config;
 
+    std::vector<std::shared_ptr<VectorManager>> m_vector_managers;
 
 	bool				m_page_switch_running = false;
 	bool				m_page_switch_planned = false;

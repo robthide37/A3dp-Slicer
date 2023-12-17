@@ -2596,6 +2596,12 @@ void TabPrint::update_description_lines()
         if (m_del_all_substitutions_btn)
             m_del_all_substitutions_btn->Show(!m_subst_manager.is_empty_substitutions());
     }
+    // update vector managers
+    for (std::shared_ptr<VectorManager> manager : m_vector_managers) {
+        if (m_active_page && manager->is_active() && manager->get_page() && manager->get_page() == m_active_page) {
+            manager->update_from_config();
+        }
+    }
 }
 
 void TabPrint::toggle_options()
@@ -4736,6 +4742,226 @@ wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
 
     parent->GetParent()->Layout();
     return grid_sizer;
+}
+
+// vectormanager
+wxSizer *VectorManager::init(DynamicPrintConfig *config, wxWindow *parent, PageShp page, const std::string &opt_key)
+{
+    m_opt_key       = opt_key;
+    m_opt_type      = config->get_option_def(opt_key)->type;
+    m_config        = config;
+    m_parent        = parent;
+    m_page          = page;
+    m_grid_sizer    = new wxBoxSizer(wxHORIZONTAL);
+    m_em            = em_unit(parent);
+    // use a wxFlexGridSizer in-between to let some free space at the right and not force the input to grow to full width
+    wxFlexGridSizer *line_sizer = new wxFlexGridSizer(2, 1, 0);
+    line_sizer->SetFlexibleDirection(wxHORIZONTAL);
+    line_sizer->AddGrowableCol(1);
+    //wxSizer *line_sizer = new wxBoxSizer(wxHORIZONTAL);
+    line_sizer->Add(m_grid_sizer);
+    //line_sizer->AddStretchSpacer();
+    return line_sizer;
+}
+
+bool VectorManager::is_compatibile_with_ui()
+{
+    const std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+    if (int(values.size()) != m_grid_sizer->GetItemCount()) {
+        ErrorDialog(m_parent,
+                    std::string("Invalid compatibility between UI and BE: ") + std::to_string(values.size()) +
+                        std::string("=!=") + std::to_string(m_grid_sizer->GetItemCount()),
+                    false)
+            .ShowModal();
+        return false;
+    }
+    return true;
+};
+
+// delete substitution_id from substitutions
+void VectorManager::pop_back()
+{
+    if (m_grid_sizer->IsEmpty()) {
+        return;
+    }
+
+    // delete substitution
+    std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+    values.pop_back();
+
+    call_ui_update();
+
+    // update grid_sizer
+    // note: grid-> Remove(size-1) isn't enough to destroy the extra entry, also need to destroy it. clear(true) + update is easier
+    m_grid_sizer->Clear(true);
+    update_from_config();
+}
+
+// Add substitution line
+void VectorManager::push_back(const std::string &str_value)
+{
+    bool call_after_layout = false;
+
+    std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+
+    if (str_value == "") {
+        // create new substitution
+        // it have to be added to config too
+        values.push_back(0);
+
+        call_after_layout = true;
+    }
+
+    const size_t idx_value = m_grid_sizer->GetItemCount();
+
+    wxTextCtrl *editor = new wxTextCtrl(m_parent, wxID_ANY, str_value == "" ? "0" : str_value, wxDefaultPosition,
+                                       wxSize(4 * m_em, wxDefaultCoord),
+                                     wxTE_PROCESS_ENTER
+#ifdef _WIN32
+                                         | wxBORDER_SIMPLE
+#endif
+    );
+
+    editor->SetFont(wxGetApp().normal_font());
+    wxGetApp().UpdateDarkUI(editor);
+
+    editor->Bind(wxEVT_TEXT_ENTER, [this, editor, idx_value](wxEvent &e) {
+#if !defined(__WXGTK__)
+         e.Skip();
+#endif // __WXGTK__
+        edit_value(idx_value, into_u8(editor->GetValue()));
+    });
+
+    editor->Bind(wxEVT_KILL_FOCUS, [this, editor, idx_value](wxEvent &e) {
+        e.Skip();
+        edit_value(idx_value, into_u8(editor->GetValue()));
+    });
+    m_grid_sizer->Add(editor);
+    if (call_after_layout) {
+        m_parent->GetParent()->Layout();
+        call_ui_update();
+    }
+}
+
+void VectorManager::update_from_config()
+{
+    if (!m_grid_sizer->IsEmpty())
+        m_grid_sizer->Clear(true);
+    //while (m_grid_sizer->GetItemCount() > 2) { m_grid_sizer->Remove(m_grid_sizer->GetItemCount() - 1); }
+
+    switch (m_opt_type) {
+    case coBools: {
+        std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(values[i]?"true":"false");
+        break;
+    }
+    case coInts: {
+        std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(std::to_string(values[i]));
+        break;
+    }
+    case coFloats: {
+        std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(to_string_nozero(values[i], 6));
+        break;
+    }
+    case coPercents: {
+        std::vector<double> &values = m_config->option<ConfigOptionPercents>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(to_string_nozero(values[i], 6));
+        break;
+    }
+    case coFloatsOrPercents: {
+        std::vector<FloatOrPercent> &values = m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(to_string_nozero(values[i].value, 6) + (values[i].percent?"%":""));
+        break;
+    }
+    case coPoints: {
+        assert(false); // todo
+        break;
+    }
+    }
+
+    m_parent->GetParent()->Layout();
+}
+
+void VectorManager::clear()
+{
+    ((ConfigOptionVectorBase*)m_config->option(m_opt_key))->clear();
+    call_ui_update();
+
+    if (!m_grid_sizer->IsEmpty())
+        m_grid_sizer->Clear(true);
+    //while (m_grid_sizer->GetItemCount() > 2) { m_grid_sizer->Remove(m_grid_sizer->GetItemCount() - 1); }
+
+    m_parent->GetParent()->Layout();
+}
+
+void VectorManager::edit_value(int idx_value, const std::string &str_value)
+{
+    if (!is_compatibile_with_ui())
+        return;
+    switch (m_opt_type) {
+    case coBools: {
+        std::vector<uint8_t> &values = m_config->option<ConfigOptionBools>(m_opt_key)->values;
+        std::string        lower  = str_value;
+        boost::to_lower(lower);
+        bool is_val       = str_value == "1" || lower == "true";
+        values[idx_value] = is_val;
+        break;
+    }
+    case coInts: {
+        std::vector<int32_t> &values  = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        int32_t               int_val = (int32_t) string_to_double_decimal_point(str_value);
+        values[idx_value]             = int_val;
+        break;
+    }
+    case coFloats: {
+        std::vector<double> &values    = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+        double               float_val = string_to_double_decimal_point(str_value);
+        values[idx_value]              = float_val;
+        break;
+    }
+    case coPercents: {
+        std::vector<double> &values    = m_config->option<ConfigOptionPercents>(m_opt_key)->values;
+        double               float_val = string_to_double_decimal_point(str_value);
+        values[idx_value]              = float_val;
+        break;
+    }
+    case coFloatsOrPercents: {
+        std::vector<FloatOrPercent> &values = m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->values;
+        std::string                  trimed = str_value;
+        boost::trim(trimed);
+        bool   has_percent = !trimed.empty() && trimed.back() == '%';
+        double float_val = string_to_double_decimal_point(has_percent ? trimed.substr(0, trimed.size() - 1) : trimed);
+        values[idx_value] = FloatOrPercent{float_val, has_percent};
+        break;
+    }
+    case coPoints: {
+        assert(false);  // todo
+        break;
+    }
+    }
+    call_ui_update();
+}
+
+bool VectorManager::is_empty_vector()
+{
+    return((ConfigOptionVectorBase*)m_config->option(m_opt_key))->size() == 0;
 }
 
 // Return a callback to create a TabPrinter widget to edit bed shape

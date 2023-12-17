@@ -434,7 +434,7 @@ void OptionsGroup::activate_line(Line& line)
                 sizer_tmp->Add(opt.side_widget(this->ctrl_parent())/*!.target<wxWindow>()*/, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 1);    //! requires verification
             }
 
-            if (opt.opt_id != option_set.back().opt_id) //! istead of (opt != option_set.back())
+            if (opt.opt_id != option_set.back().opt_id) //! instead of (opt != option_set.back())
             m_options_mode.back()[opt.opt.mode].push_back(sizer_tmp->GetItemCount());
                 sizer_tmp->AddSpacer(6);
         }
