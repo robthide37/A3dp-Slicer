@@ -28,6 +28,8 @@ struct SurfaceFillParams : FillParams
 //    double        overlap = 0.;
     // Angle as provided by the region config, in radians.
     float           angle = 0.f;
+    // If the region config allow, it's possible to rotate 90deg in odd layers
+    bool            can_angle_cross =true;
     // Non-negative for a bridge.
     float           bridge_angle = 0.f;
     BridgeType      bridge_type = BridgeType::btFromNozzle;
@@ -52,6 +54,7 @@ struct SurfaceFillParams : FillParams
         RETURN_COMPARE_NON_EQUAL(spacing);
 //        RETURN_COMPARE_NON_EQUAL(overlap);
         RETURN_COMPARE_NON_EQUAL(angle);
+        RETURN_COMPARE_NON_EQUAL(can_angle_cross);
         RETURN_COMPARE_NON_EQUAL(density);
         RETURN_COMPARE_NON_EQUAL(monotonic);
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, connection);
@@ -73,6 +76,7 @@ struct SurfaceFillParams : FillParams
                 this->spacing               == rhs.spacing          &&
 //                this->overlap               == rhs.overlap          &&
                 this->angle                 == rhs.angle            &&
+                this->can_angle_cross        == rhs.can_angle_cross   &&
                 this->bridge_type           == rhs.bridge_type      &&
                 this->density               == rhs.density          &&
                 this->monotonic             == rhs.monotonic        &&
@@ -95,6 +99,23 @@ struct SurfaceFill {
     ExPolygons           expolygons;
     SurfaceFillParams    params;
 };
+
+float compute_fill_angle(const PrintRegionConfig &region_config, size_t layer_id)
+{
+    float angle = 0;
+    if (!region_config.fill_angle_template.empty()) {
+        // fill pattern: replace fill angle
+        size_t idx   = layer_id % region_config.fill_angle_template.values.size();
+        angle = region_config.fill_angle_template.values[idx];
+    } else {
+        angle = region_config.fill_angle.value;
+    }
+    angle += region_config.fill_angle_increment.value * layer_id;
+    // make compute in degre, then normalize and convert into rad.
+    angle = float(Geometry::deg2rad(angle));
+    
+    return angle;
+}
 
 std::vector<SurfaceFill> group_fills(const Layer &layer)
 {
@@ -184,12 +205,8 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 }
                 params.fill_exactly = region_config.enforce_full_fill_volume.getBool();
                 params.bridge_angle = float(surface.bridge_angle);
-                if (is_denser) {
-                    params.angle = 0;
-                } else {
-                    params.angle = float(Geometry::deg2rad(region_config.fill_angle.value));
-                    params.angle += float(PI * (region_config.fill_angle_increment.value * layerm.layer()->id()) / 180.f);
-                }
+                params.angle         = (is_denser) ? 0 : compute_fill_angle(region_config, layerm.layer()->id());
+                params.can_angle_cross = region_config.fill_angle_cross;
 		        params.anchor_length = std::min(params.anchor_length, params.anchor_length_max);
 
                 //adjust flow (to over-extrude when needed)
@@ -368,7 +385,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 params.pattern  = layerm.region().config().solid_fill_pattern.value;
                 params.density  = 100.f;
                 params.role     = erInternalInfill;
-                params.angle    = float(Geometry::deg2rad(layerm.region().config().fill_angle.value));
+                params.angle    = compute_fill_angle(layerm.region().config(), layerm.layer()->id());
                 //FIXME FLOW decide what to use
                 //params.flow = layerm.flow(frSolidInfill);
                 // calculate the actual flow we'll be using for this infill
@@ -479,6 +496,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->layer_id = this->id();
         f->z        = this->print_z;
         f->angle    = surface_fill.params.angle;
+        f->can_angle_cross   = surface_fill.params.can_angle_cross;
         f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
 
         if (surface_fill.params.pattern == ipLightning)
@@ -770,7 +788,9 @@ void Layer::make_ironing()
                 ironing_params.line_spacing = config.ironing_spacing;
                 ironing_params.height         = default_layer_height * 0.01 * config.ironing_flowrate;
                 ironing_params.speed         = config.ironing_speed;
-                ironing_params.angle         = config.ironing_angle <0 ? config.fill_angle * M_PI / 180. : config.ironing_angle * M_PI / 180.;
+                ironing_params.angle         = config.ironing_angle <0 ?
+                    compute_fill_angle(config, layerm->layer()->id()) :
+                    float(Geometry::deg2rad(config.ironing_angle.value));
                 ironing_params.layerm         = layerm;
                 by_extruder.emplace_back(ironing_params);
             }

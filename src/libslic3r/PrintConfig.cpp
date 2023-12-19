@@ -2260,6 +2260,13 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(45));
 
+    def             = this->add("fill_angle_cross", coBool);
+    def->label      = L("Alternate Fill Angle");
+    def->category   = OptionCategory::infill;
+    def->tooltip    = L("It's better for some infill like rectilinear to rotate 90° each layer. If this settign is deactivated, they won't do that anymore.");
+    def->mode       = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("fill_angle_increment", coFloat);
     def->label = L("Fill");
     def->full_label = L("Fill angle increment");
@@ -2272,6 +2279,22 @@ void PrintConfigDef::init_fff_params()
     def->max = 360;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def             = this->add("fill_angle_template", coFloats);
+    def->label      = L("Fill angle pattern");
+    def->full_label = L("Fill angle pattern");
+    def->category   = OptionCategory::infill;
+    def->tooltip    = L("This define the succetion of infill angle. When defined, it replaces the fill_angle"
+        ", and there won't be any extra 90° for each layer added, but the fill_angle_increment will still be used."
+        " The first layer start with the first angle. If a new pattern is used in a modifier"
+        ", it will choose the layer angle from the pattern as if it has started from the first layer."
+        "Empty this settings to disable and recover the old behavior.");
+    def->sidetext   = L("°");
+    def->min        = 0;
+    def->max        = 360;
+    def->full_width = true;
+    def->mode       = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloats{});
 
     def = this->add("fill_density", coPercent);
     def->gui_type = ConfigOptionDef::GUIType::f_enum_open;

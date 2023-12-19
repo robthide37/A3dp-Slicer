@@ -2,6 +2,7 @@
 #define slic3r_FillGyroid_hpp_
 
 #include "../libslic3r.h"
+#include "../Geometry.hpp"
 
 #include "FillBase.hpp"
 
@@ -13,10 +14,6 @@ public:
     FillGyroid() {}
     Fill* clone() const override { return new FillGyroid(*this); }
 
-    // Correction applied to regular infill angle to maximize printing
-    // speed in default configuration (degrees)
-    static constexpr float CorrectionAngle = -45.;
-
     // Density adjustment to have a good %of weight.
     static constexpr double DensityAdjust = 2.44;
 
@@ -25,6 +22,10 @@ public:
 
 
 protected:
+    // Correction applied to regular infill angle to maximize printing
+    // speed in default configuration (45 degrees)
+    float _layer_angle(size_t idx) const override { return this->can_angle_cross ? float(Geometry::deg2rad(-45.)) : 0.f; }
+
     void _fill_surface_single(
         const FillParams                &params, 
         unsigned int                     thickness_layers,
