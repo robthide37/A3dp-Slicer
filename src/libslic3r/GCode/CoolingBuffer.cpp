@@ -565,8 +565,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_EXTRUDETYPE_") && sline.size() > 14) {
             //set the extrusiontype
             line.type |= CoolingLine::Type(sline[14] - 'A') | CoolingLine::Type::TYPE_EXTRUDE_START;
-            assert(CoolingLine::to_extrusion_role(uint32_t(line.type)) != 0);
-            if (CoolingLine::to_extrusion_role(uint32_t(line.type)) == 0) {
+            assert(CoolingLine::to_extrusion_role(uint32_t(sline[14] - 'A')) != 0);
+            if (CoolingLine::to_extrusion_role(uint32_t(sline[14] - 'A')) == 0) {
                 line.type |= ExtrusionRole::erCustom;
             }
         } else if (boost::starts_with(sline, "G4 ")) {
@@ -994,8 +994,12 @@ std::string CoolingBuffer::apply_layer_cooldown(
             fan_need_set = true;
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             assert(extrude_tree.size() > 0);
-            extrude_tree.pop_back();
-            fan_need_set = true;
+            if (extrude_tree.size() > 0) {
+                new_gcode.append(std::string(";TYPE_EXTRUDE remove type ") +
+                                 ExtrusionEntity::role_to_string(extrude_tree.back()) + std::string("\n"));
+                extrude_tree.pop_back();
+                fan_need_set = true;
+            }
         } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_ADJUSTABLE_MAYBE | CoolingLine::TYPE_WIPE | CoolingLine::TYPE_HAS_F)) {
 
             // Find the start of a comment, or roll to the end of line.
