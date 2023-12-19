@@ -2945,7 +2945,7 @@ namespace Slic3r {
                                         log << "\n";
                                     }
                                     if (config.option(opt_key) != nullptr && config.option(opt_key)->type() == ConfigOptionType::coEnum) {
-                                        log << "enum : " << config.option(opt_key)->getInt();
+                                        log << "enum : " << config.option(opt_key)->get_int();
                                         log << "\n";
                                         const ConfigOptionDef* def = nullptr;
                                         try {
@@ -2960,7 +2960,7 @@ namespace Slic3r {
                                         }
                                     }
                                     if (config.option(opt_key) != nullptr && config.option(opt_key)->type() == ConfigOptionType::coInt) {
-                                        log << "int : " << config.option(opt_key)->getInt();
+                                        log << "int : " << config.option(opt_key)->get_int();
                                         log << "\n";
                                     }
                                     log.close();
@@ -3171,9 +3171,9 @@ namespace Slic3r {
                             }
                             if (obj->config.option(key) != nullptr && obj->config.option(key)->type() == ConfigOptionType::coEnum) {
                                 try{
-                                    log << "raw_int_value : " << obj->config.option(key)->getInt() << "\n";
+                                    log << "raw_int_value : " << obj->config.option(key)->get_int() << "\n";
                                 } catch (std::exception ex) {}
-                                log << "enum : " << obj->config.option(key)->getInt();
+                                log << "enum : " << obj->config.option(key)->get_int();
                                 log << "\n";
                                 const ConfigOptionDef* def = nullptr;
                                 try {
@@ -3188,7 +3188,7 @@ namespace Slic3r {
                                 }
                             }
                             if (obj->config.option(key) != nullptr && obj->config.option(key)->type() == ConfigOptionType::coInt) {
-                                log << "int : " << obj->config.option(key)->getInt();
+                                log << "int : " << obj->config.option(key)->get_int();
                                 log << "\n";
                             }
                             log.close();
@@ -3279,9 +3279,9 @@ namespace Slic3r {
                                         }
                                         if (volume->config.option(key) != nullptr && volume->config.option(key)->type() == ConfigOptionType::coEnum) {
                                             try{
-                                                log << "raw_int_value : " << volume->config.option(key)->getInt() << "\n";
+                                                log << "raw_int_value : " << volume->config.option(key)->get_int() << "\n";
                                             } catch (std::exception ex) {}
-                                            log << "enum : " << volume->config.option(key)->getInt();
+                                            log << "enum : " << volume->config.option(key)->get_int();
                                             log << "\n";
                                             const ConfigOptionDef* def = nullptr;
                                             try {
@@ -3296,7 +3296,7 @@ namespace Slic3r {
                                             }
                                         }
                                         if (volume->config.option(key) != nullptr && volume->config.option(key)->type() == ConfigOptionType::coInt) {
-                                            log << "int : " << volume->config.option(key)->getInt();
+                                            log << "int : " << volume->config.option(key)->get_int();
                                             log << "\n";
                                         }
                                         log.close();

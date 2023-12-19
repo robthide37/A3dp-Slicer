@@ -86,9 +86,9 @@ bool as_get_bool(std::string& key)
         throw NoDefinitionException("error, can't find bool option " + key);
     if (opt->is_vector()) {
         const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
-        return vector->getFloat(0) != 0;
+        return vector->get_float(0) != 0;
     } else {
-        return opt->getBool();
+        return opt->get_bool();
     }
 }
 void as_set_bool(std::string& key, bool b)
@@ -113,9 +113,9 @@ int32_t as_get_int(std::string& key)
         throw NoDefinitionException("error, can't find int option " + key);
     if (opt->is_vector()) {
         const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
-        return (int32_t)vector->getFloat(0);
+        return (int32_t)vector->get_float(0);
     } else {
-        return (int32_t)(opt->getInt());
+        return (int32_t)(opt->get_int());
     }
 }
 void as_set_int(std::string& key, int val)
@@ -149,7 +149,7 @@ void as_set_int(std::string& key, int val)
         //    }
         //    if (value >= 0 && value < def->enum_values.size()) {
                 ConfigOption* copy = result.second->clone();
-                copy->setInt(val);
+                copy->set_enum_int(val);
                 conf.set_key_value(key, copy);
         //        return;
         //    }
@@ -164,9 +164,9 @@ float as_get_float(std::string& key)
         throw NoDefinitionException("error, can't find float option " + key);
     if (opt->is_vector()) {
         const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
-        return (float)vector->getFloat(0);
+        return (float)vector->get_float(0);
     } else {
-        return (float)(opt->getFloat());
+        return (float)(opt->get_float());
     }
 }
 
@@ -187,7 +187,7 @@ void as_set_float(std::string& key, float f_val)
 
     DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
     if (result.second->type() == ConfigOptionType::coFloat) {
-        double old_value = result.second->getFloat();
+        double old_value = result.second->get_float();
         double new_val = round(f_val);
         // only update if difference is significant
         if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
@@ -207,7 +207,7 @@ void as_set_float(std::string& key, float f_val)
     } else if (result.second->type() == ConfigOptionType::coPercent) {
         double percent_f = floor(f_val * 100000. + 0.5) / 1000.;
         // only update if difference is significant
-        double old_value = result.second->getFloat();
+        double old_value = result.second->get_float();
         if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
             percent_f = old_value;
         conf.set_key_value(key, new ConfigOptionPercent(percent_f));
@@ -226,7 +226,7 @@ void as_set_float(std::string& key, float f_val)
         double new_val = round(f_val);
         if (!static_cast<const ConfigOptionFloatOrPercent*>(result.second)->percent) {
             // only update if difference is significant
-            double old_value = result.second->getFloat();
+            double old_value = result.second->get_float();
             if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
                 new_val = old_value;
         }
@@ -263,7 +263,7 @@ void as_set_percent(std::string& key, float f_val)
     DynamicPrintConfig& conf = current_script->to_update()[result.first->type()];
     if (result.second->type() == ConfigOptionType::coFloat) {
         // only update if difference is significant
-        double old_value = result.second->getFloat() * 100;
+        double old_value = result.second->get_float() * 100;
         if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
             percent_f = old_value; // don't return int these check, as it can escpae a refresh of the scripted widget
         conf.set_key_value(key, new ConfigOptionFloat(percent_f / 100.));
@@ -279,7 +279,7 @@ void as_set_percent(std::string& key, float f_val)
         conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coPercent) {
         // only update if difference is significant
-        double old_value = get_coll(key).second->getFloat();
+        double old_value = get_coll(key).second->get_float();
         if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
             percent_f = old_value;
         conf.set_key_value(key, new ConfigOptionPercent(percent_f));
@@ -296,7 +296,7 @@ void as_set_percent(std::string& key, float f_val)
     } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
         if (static_cast<const ConfigOptionFloatOrPercent*>(result.second)->percent) {
             // only update if difference is significant
-            double old_value = result.second->getFloat();
+            double old_value = result.second->get_float();
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
                 percent_f = old_value;
         }
@@ -346,7 +346,7 @@ void as_set_string(std::string& key, std::string& val)
         for (; idx < def->enum_values.size() && def->enum_values[idx] != val; idx++) {}
         if (idx >= 0 && idx < def->enum_values.size()) {
             ConfigOption* copy = result.second->clone();
-            copy->setInt(idx);
+            copy->set_enum_int(idx);
             conf.set_key_value(key, copy);
         }
     }
@@ -868,7 +868,7 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     for (const auto& data : to_update) {
         Tab* tab = wxGetApp().get_tab(data.first);
         for (auto opt_key : data.second.keys()) {
-            tab->on_value_change(opt_key, data.second.option(opt_key)->getAny());
+            tab->on_value_change(opt_key, data.second.option(opt_key)->get_any());
         }
     }
     // refresh the field if needed
@@ -923,7 +923,7 @@ bool ScriptContainer::call_script_function_reset(const ConfigOptionDef& def)
     for (const auto& data : to_update) {
         Tab* tab = wxGetApp().get_tab(data.first);
         for (auto opt_key : data.second.keys()) {
-            tab->on_value_change(opt_key, data.second.option(opt_key)->getAny());
+            tab->on_value_change(opt_key, data.second.option(opt_key)->get_any());
         }
     }
     // refresh the field if needed

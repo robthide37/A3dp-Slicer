@@ -253,7 +253,7 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         DynamicPrintConfig new_print_config = *print_config; //make a copy
         new_print_config.set_key_value("complete_objects", new ConfigOptionBool(true));
         //if skirt, use only one
-        if (print_config->option<ConfigOptionInt>("skirts")->getInt() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->getInt() > 0) {
+        if (print_config->option<ConfigOptionInt>("skirts")->get_int() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->get_int() > 0) {
             new_print_config.set_key_value("complete_objects_one_skirt", new ConfigOptionBool(true));
         }
         this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);

@@ -1885,15 +1885,15 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         DynamicPrintConfig new_conf = *m_config;
 
                         if (opt_key == "bottle_volume") {
-                            double new_bottle_weight = boost::any_cast<double>(value) / (new_conf.option("material_density")->getFloat() * 1000);
+                            double new_bottle_weight = boost::any_cast<double>(value) / (new_conf.option("material_density")->get_float() * 1000);
                             new_conf.set_key_value("bottle_weight", new ConfigOptionFloat(new_bottle_weight));
                         }
                         if (opt_key == "bottle_weight") {
-                            double new_bottle_volume = boost::any_cast<double>(value)*(new_conf.option("material_density")->getFloat() * 1000);
+                            double new_bottle_volume = boost::any_cast<double>(value)*(new_conf.option("material_density")->get_float() * 1000);
                             new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
                         }
                         if (opt_key == "material_density") {
-                            double new_bottle_volume = new_conf.option("bottle_weight")->getFloat() * boost::any_cast<double>(value) * 1000;
+                            double new_bottle_volume = new_conf.option("bottle_weight")->get_float() * boost::any_cast<double>(value) * 1000;
                             new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
                         }
 
@@ -2732,7 +2732,7 @@ void TabPrint::update()
     {
         const Preset& selected_preset = m_preset_bundle->fff_prints.get_selected_preset();
         bool is_user_and_saved_preset = !selected_preset.is_system && !selected_preset.is_dirty;
-        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && m_config->option("overhangs_width_speed")->getFloat() == 0;
+        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && m_config->option("overhangs_width_speed")->get_float() == 0;
         m_config_manipulation.initialize_support_material_overhangs_queried(is_user_and_saved_preset && support_material_overhangs_queried);
     }
 

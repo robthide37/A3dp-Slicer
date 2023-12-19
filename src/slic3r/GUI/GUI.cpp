@@ -206,7 +206,7 @@ void change_opt_value(DynamicConfig& config, const t_config_option_key& opt_key,
 			break;
 		case coEnum:{
 			ConfigOption* opt = opt_def->default_value.get()->clone();
-			opt->setInt(boost::any_cast<int32_t>(value)); // we transport an int convertion of the enum in the boost anycast.
+			opt->set_enum_int(boost::any_cast<int32_t>(value)); // we transport an int convertion of the enum in the boost anycast.
 			BOOST_LOG_TRIVIAL(debug) << "Set enum "<< opt_key << " as int " << boost::any_cast<int>(value) << "  into enum " << opt->serialize();
 			config.set_key_value(opt_key, opt);
 			}
@@ -293,7 +293,7 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 		{
 			const std::vector<std::string>& labels = def->enum_labels;
 			const std::vector<std::string>& values = def->enum_values;
-			int val = conf_substitution.new_value->getInt();
+			int val = conf_substitution.new_value->get_int();
 
 			bool is_infill = def->opt_key == "top_fill_pattern"	   ||
 							 def->opt_key == "bottom_fill_pattern" ||
@@ -321,7 +321,7 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 			break;
 		}
 		case coBool:
-			new_val = conf_substitution.new_value->getBool() ? "true" : "false";
+			new_val = conf_substitution.new_value->get_bool() ? "true" : "false";
 			break;
 		case coBools:
 			if (conf_substitution.new_value->nullable())

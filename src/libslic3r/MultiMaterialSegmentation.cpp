@@ -1691,7 +1691,7 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
     std::vector<EdgeGrid::Grid>           edge_grids(num_layers);
     const ConstLayerPtrsAdaptor           layers = print_object.layers();
     std::vector<ExPolygons>               input_expolygons(num_layers);
-    coord_t                               resolution = scale_t(print_object.config().option("resolution")->getFloat());
+    coord_t                               resolution = scale_t(print_object.config().option("resolution")->get_float());
 
     throw_on_cancel_callback();
 

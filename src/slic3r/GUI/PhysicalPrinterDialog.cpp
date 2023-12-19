@@ -691,7 +691,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
     else if ((printer_change && !all_presets_are_from_mk3_family) || (!all_presets_are_from_mk3_family && m_config->option<ConfigOptionEnum<PrintHostType>>("host_type")->value == htPrusaLink))
         set_to_choice_and_config(htOctoPrint);
     else
-        choice->set_value(m_config->option("host_type")->getInt());
+        choice->set_value(m_config->option("host_type")->get_int());
     had_all_mk3 = all_presets_are_from_mk3_family;
 }
 

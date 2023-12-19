@@ -395,11 +395,11 @@ public:
     virtual ConfigOption*       clone() const = 0;
     // Set a value from a ConfigOption. The two options should be compatible.
     virtual void                set(const ConfigOption *option) = 0;
-    virtual int32_t             getInt()        const { throw BadOptionTypeException("Calling ConfigOption::getInt on a non-int ConfigOption"); }
-    virtual double              getFloat()      const { throw BadOptionTypeException("Calling ConfigOption::getFloat on a non-float ConfigOption"); }
-    virtual bool                getBool()       const { throw BadOptionTypeException("Calling ConfigOption::getBool on a non-boolean ConfigOption");  }
-    virtual void                setInt(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::setInt on a non-int ConfigOption"); }
-    virtual boost::any          getAny()       const { throw BadOptionTypeException("Calling ConfigOption::getBool on a non-boolean ConfigOption"); }
+    virtual int32_t             get_int()        const { throw BadOptionTypeException("Calling ConfigOption::get_int on a non-int ConfigOption"); }
+    virtual double              get_float()      const { throw BadOptionTypeException("Calling ConfigOption::get_float on a non-float ConfigOption"); }
+    virtual bool                get_bool()       const { throw BadOptionTypeException("Calling ConfigOption::get_bool on a non-boolean ConfigOption");  }
+    virtual void                set_enum_int(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::set_enum_int on a non-enum ConfigOption"); }
+    virtual boost::any          get_any()       const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }
     virtual size_t              hash()          const throw() = 0;
@@ -440,7 +440,7 @@ public:
     explicit ConfigOptionSingle(T value) : value(value) {}
     explicit ConfigOptionSingle(T value, bool phony) : ConfigOption(phony), value(value) {}
     operator T() const { return this->value; }
-    virtual boost::any getAny() const { return boost::any(value); }
+    boost::any get_any() const override { return boost::any(value); }
     
     void set(const ConfigOption *rhs) override
     {
@@ -500,7 +500,7 @@ public:
         if (is_extruder_size) this->flags |= FCO_EXTRUDER_ARRAY; else this->flags &= uint8_t(0xFF ^ FCO_EXTRUDER_ARRAY);
         return this;
     }
-    virtual double getFloat(int idx) const { throw BadOptionTypeException("Calling ConfigOption::getFloat(idx) on a non-numeric arrray ConfigOptionVectorBase"); }
+    virtual double get_float(int idx) const { throw BadOptionTypeException("Calling ConfigOption::getFloat(idx) on a non-numeric arrray ConfigOptionVectorBase"); }
 
     // We just overloaded and hid two base class virtual methods.
     // Let's show it was intentional (warnings).
@@ -598,7 +598,7 @@ public:
     }
 
     T& get_at(size_t i) { return const_cast<T&>(std::as_const(*this).get_at(i)); }
-    virtual boost::any getAny() const { return boost::any(values); }
+    virtual boost::any get_any() const { return boost::any(values); }
 
     // Resize this vector by duplicating the /*last*/first value.
     // If the current vector is empty, the default value is used instead.
@@ -722,7 +722,7 @@ public:
 
     static ConfigOptionType static_type() { return coFloat; }
     ConfigOptionType        type()      const override { return static_type(); }
-    double                  getFloat()  const override { return this->value; }
+    double                  get_float() const override { return this->value; }
     ConfigOption*           clone()     const override { return new ConfigOptionFloat(*this); }
     bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionFloat &rhs) const throw() { return this->value <  rhs.value; }
@@ -782,7 +782,7 @@ public:
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (! std::isnan(v)) return false; return true; }
     bool 					is_nil(size_t idx) const override { return idx < values.size() ? std::isnan(this->values[idx]) : values.empty() ? std::isnan(this->default_value) : std::isnan(this->values.front()); }
-    virtual double          getFloat(int idx) const override { return values[idx]; }
+    double                  get_float(int idx) const override { return values[idx]; }
 
     std::string serialize() const override
     {
@@ -890,8 +890,7 @@ public:
     
     static ConfigOptionType static_type() { return coInt; }
     ConfigOptionType        type()   const override { return static_type(); }
-    int32_t                  getInt() const override { return this->value; }
-    void                    setInt(int32_t val) override { this->value = val; }
+    int32_t                 get_int() const override { return this->value; }
     ConfigOption*           clone()  const override { return new ConfigOptionInt(*this); }
     bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->value == rhs.value; }
     
@@ -945,7 +944,7 @@ public:
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
     bool 					is_nil(size_t idx) const override { return idx < values.size() ? this->values[idx] == nil_value() : values.empty() ? this->default_value == nil_value() : this->values.front() == nil_value(); }
-    virtual double          getFloat(int idx) const override { return values[idx]; }
+    double                  get_float(int idx) const override { return values[idx]; }
 
     std::string serialize() const override
     {
@@ -1549,7 +1548,7 @@ public:
     
     static ConfigOptionType static_type() { return coBool; }
     ConfigOptionType        type()      const override { return static_type(); }
-    bool                    getBool()   const override { return this->value; }
+    bool                    get_bool()  const override { return this->value; }
     ConfigOption*           clone()     const override { return new ConfigOptionBool(*this); }
     ConfigOptionBool&       operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionBool &rhs) const throw() { return this->value == rhs.value; }
@@ -1603,7 +1602,7 @@ public:
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
     bool 					is_nil(size_t idx) const override { return idx < values.size() ? this->values[idx] == nil_value() : values.empty() ? this->default_value == nil_value() :  this->values.front() == nil_value(); }
-    virtual double          getFloat(int idx) const override { return values[idx] ? 1 : 0; }
+    double                  get_float(int idx) const override { return values[idx] ? 1 : 0; }
 
     bool& get_at(size_t i) {
         assert(! this->values.empty());
@@ -1707,22 +1706,22 @@ public:
     ConfigOptionEnum<T>&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionEnum<T> &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionEnum<T> &rhs) const throw() { return int(this->value) < int(rhs.value); }
-    int32_t                 getInt() const override { return (int32_t)this->value; }
-    void                    setInt(int val) override { this->value = T(val); }
+    int32_t                 get_int() const override { return (int32_t)this->value; }
+    void                    set_enum_int(int32_t val) override { this->value = T(val); }
 
     bool operator==(const ConfigOption &rhs) const override
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnum<T>: Comparing incompatible types");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        return this->value == (T)rhs.getInt();
+        return this->value == (T)rhs.get_int();
     }
 
     void set(const ConfigOption *rhs) override {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionEnum<T>: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        this->value = (T)rhs->getInt();
+        this->value = (T)rhs->get_int();
         this->flags = rhs->flags;
     }
 
@@ -1786,14 +1785,15 @@ public:
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnumGeneric: Comparing incompatible types");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        return this->value == rhs.getInt();
+        return this->value == rhs.get_int();
     }
 
+    void set_enum_int(int32_t val) override { this->value = val; }
     void set(const ConfigOption *rhs) override {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionEnumGeneric: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        this->value = rhs->getInt();
+        this->value = rhs->get_int();
         this->flags = rhs->flags;
     }
 
@@ -2391,6 +2391,7 @@ public:
     // Be careful, as this method does not test the existence of opt_key in this->def().
     bool                    set_key_value(const std::string &opt_key, ConfigOption *opt)
     {
+        assert(opt != nullptr);
         auto it = this->options.find(opt_key);
         if (it == this->options.end()) {
             this->options[opt_key].reset(opt);
@@ -2424,9 +2425,9 @@ public:
     int32_t              opt_int(const t_config_option_key &opt_key, unsigned int idx) const     { return dynamic_cast<const ConfigOptionInts*>(this->option(opt_key))->get_at(idx); }
 
     // In ConfigManipulation::toggle_print_fff_options, it is called on option with type ConfigOptionEnumGeneric* and also ConfigOptionEnum*.
-    // Thus the virtual method getInt() is used to retrieve the enum value.
+    // Thus the virtual method get_int() is used to retrieve the enum value.
     template<typename ENUM>
-    ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->getInt()); }
+    ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->get_int()); }
 
     bool                opt_bool(const t_config_option_key &opt_key) const                      { return this->option<ConfigOptionBool>(opt_key)->value != 0; }
     bool                opt_bool(const t_config_option_key &opt_key, unsigned int idx) const    { return this->option<ConfigOptionBools>(opt_key)->get_at(idx) != 0; }

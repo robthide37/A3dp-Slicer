@@ -7963,7 +7963,7 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         } else if ("monotonicgapfill" == value) {
             value = "monotonic";
         }
-        if (all_conf.has("fill_angle_increment") && ((int(all_conf.option("fill_angle_increment")->getFloat())-90)%180) == 0 && "rectilinear" == value
+        if (all_conf.has("fill_angle_increment") && ((int(all_conf.option("fill_angle_increment")->get_float())-90)%180) == 0 && "rectilinear" == value
             && ("fill_pattern" == opt_key || "top_fill_pattern" == opt_key)) {
             value = "alignedrectilinear";
         }
@@ -8126,10 +8126,10 @@ PrinterTechnology printer_technology(const ConfigBase& cfg)
     if (opt) return opt->value;
 
     const ConfigOptionBool* export_opt = cfg.option<ConfigOptionBool>("export_sla");
-    if (export_opt && export_opt->getBool()) return ptSLA;
+    if (export_opt && export_opt->get_bool()) return ptSLA;
 
     export_opt = cfg.option<ConfigOptionBool>("export_gcode");
-    if (export_opt && export_opt->getBool()) return ptFFF;
+    if (export_opt && export_opt->get_bool()) return ptFFF;
 
     return ptUnknown;
 }
@@ -8185,7 +8185,7 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
     double base_dist = 0;
     //std::cout << "START min_object_distance =>" << base_dist << "\n";
     const ConfigOptionBool* co_opt = config->option<ConfigOptionBool>("complete_objects");
-    if (config->option("parallel_objects_step")->getFloat() > 0 || co_opt && co_opt->value) {
+    if (config->option("parallel_objects_step")->get_float() > 0 || co_opt && co_opt->value) {
         double skirt_dist = 0;
         try {
             std::vector<double> vals = dynamic_cast<const ConfigOptionFloats*>(config->option("nozzle_diameter"))->values;
@@ -8195,7 +8195,7 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
             // min object distance is max(duplicate_distance, clearance_radius)
             // /2 becasue we only count the grawing for the current object
             //add 1 as safety offset.
-            double extruder_clearance_radius = config->option("extruder_clearance_radius")->getFloat() / 2;
+            double extruder_clearance_radius = config->option("extruder_clearance_radius")->get_float() / 2;
             if (extruder_clearance_radius > base_dist) {
                 base_dist = extruder_clearance_radius;
             }
@@ -8204,15 +8204,15 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
             //ideally, we should use print::first_layer_height()
             const double first_layer_height = dynamic_cast<const ConfigOptionFloatOrPercent*>(config->option("first_layer_height"))->get_abs_value(max_nozzle_diam);
             //add the skirt
-            int skirts = config->option("skirts")->getInt();
+            int skirts = config->option("skirts")->get_int();
             if (skirts > 0 && ref_height == 0)
-                skirts += config->option("skirt_brim")->getInt();
-            if (skirts > 0 && config->option("skirt_height")->getInt() >= 1 && !config->option("complete_objects_one_skirt")->getBool()) {
+                skirts += config->option("skirt_brim")->get_int();
+            if (skirts > 0 && config->option("skirt_height")->get_int() >= 1 && !config->option("complete_objects_one_skirt")->get_bool()) {
                 float overlap_ratio = 1;
                 //can't know the extruder, so we settle on the worst: 100%
                 //if (config->option<ConfigOptionPercents>("filament_max_overlap")) overlap_ratio = config->get_computed_value("filament_max_overlap");
                 if (ref_height == 0) {
-                    skirt_dist = config->option("skirt_distance")->getFloat();
+                    skirt_dist = config->option("skirt_distance")->get_float();
                     Flow skirt_flow = Flow::new_from_config_width(
                         frPerimeter,
                         *Flow::extrusion_width_option("skirt", *config),
@@ -8227,9 +8227,9 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
                     //set to 0 becasue it's incorporated into the base_dist, so we don't want to be added in to it again.
                     skirt_dist = 0;
                 } else {
-                    double skirt_height = ((double)config->option("skirt_height")->getInt() - 1) * config->get_computed_value("layer_height") + first_layer_height;
+                    double skirt_height = ((double)config->option("skirt_height")->get_int() - 1) * config->get_computed_value("layer_height") + first_layer_height;
                     if (ref_height <= skirt_height) {
-                        skirt_dist = config->option("skirt_distance")->getFloat();
+                        skirt_dist = config->option("skirt_distance")->get_float();
                         Flow skirt_flow = Flow::new_from_config_width(
                             frPerimeter,
                             *Flow::extrusion_width_option("skirt", *config),
@@ -8255,13 +8255,13 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
 void DynamicPrintConfig::normalize_fdm()
 {
     if (this->has("extruder")) {
-        int extruder = this->option("extruder")->getInt();
+        int extruder = this->option("extruder")->get_int();
         this->erase("extruder");
         if (extruder != 0) {
             if (!this->has("infill_extruder"))
-                this->option("infill_extruder", true)->setInt(extruder);
+                this->option<ConfigOptionInt>("infill_extruder", true)->value = (extruder);
             if (!this->has("perimeter_extruder"))
-                this->option("perimeter_extruder", true)->setInt(extruder);
+                this->option<ConfigOptionInt>("perimeter_extruder", true)->value = (extruder);
             // Don't propagate the current extruder to support.
             // For non-soluble supports, the default "0" extruder means to use the active extruder,
             // for soluble supports one certainly does not want to set the extruder to non-soluble.
@@ -8275,7 +8275,7 @@ void DynamicPrintConfig::normalize_fdm()
         this->erase("first_layer_extruder");
 
     if (!this->has("solid_infill_extruder") && this->has("infill_extruder"))
-        this->option("solid_infill_extruder", true)->setInt(this->option("infill_extruder")->getInt());
+        this->option<ConfigOptionInt>("solid_infill_extruder", true)->value = (this->option("infill_extruder")->get_int());
 
     if (this->has("spiral_vase") && this->opt<ConfigOptionBool>("spiral_vase", true)->value) {
         {

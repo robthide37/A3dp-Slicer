@@ -727,7 +727,7 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
                         ConfigOption* conf_opt = initial_conf.option(dep_key)->clone();
                         // update the field
                         tab->set_value(dep_key, get_config_value(initial_conf, dep_key));
-                        tab->on_value_change(dep_key, conf_opt->getAny());
+                        tab->on_value_change(dep_key, conf_opt->get_any());
                     }
                 }
             }
@@ -1103,7 +1103,7 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicConfig& config, con
 		ret = config.opt_int(opt_key, idx);
 		break;
 	case coEnum:
-        ret = config.option(opt_key)->getInt();
+        ret = config.option(opt_key)->get_int();
 		break;
     case coPoint:
         ret = config.option<ConfigOptionPoint>(opt_key)->value;

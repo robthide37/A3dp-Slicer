@@ -844,26 +844,26 @@ void Preview::update_layers_slider_mode()
         if (!objects.empty())
         {
             const int extruder = objects[0]->config.has("extruder") ?
-                                 objects[0]->config.option("extruder")->getInt() : 0;
+                                 objects[0]->config.option("extruder")->get_int() : 0;
 
             auto is_one_extruder_printed_model = [objects, extruder]()
             {
                 for (ModelObject* object : objects)
                 {
                     if (object->config.has("extruder") &&
-                        object->config.option("extruder")->getInt() != extruder)
+                        object->config.option("extruder")->get_int() != extruder)
                         return false;
 
                     for (ModelVolume* volume : object->volumes)
                         if ((volume->config.has("extruder") && 
-                            volume->config.option("extruder")->getInt() != 0 && // extruder isn't default
-                            volume->config.option("extruder")->getInt() != extruder) ||
+                            volume->config.option("extruder")->get_int() != 0 && // extruder isn't default
+                            volume->config.option("extruder")->get_int() != extruder) ||
                             !volume->mmu_segmentation_facets.empty())
                             return false;
 
                     for (const auto& range : object->layer_config_ranges)
                         if (range.second.has("extruder") &&
-                            range.second.option("extruder")->getInt() != extruder)
+                            range.second.option("extruder")->get_int() != extruder)
                             return false;
                 }
                 return true;

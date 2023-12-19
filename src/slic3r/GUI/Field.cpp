@@ -651,14 +651,14 @@ void TextCtrl::BUILD() {
 	switch (m_opt.type) {
     case coFloatOrPercent:
     {
-        text_value = double_to_string(m_opt.default_value->getFloat(), m_opt.precision);
+        text_value = double_to_string(m_opt.default_value->get_float(), m_opt.precision);
         if (m_opt.get_default_value<ConfigOptionFloatOrPercent>()->percent)
             text_value += "%";
         break;
     }
 	case coPercent:
 	{
-		text_value = double_to_string(m_opt.default_value->getFloat(), m_opt.precision);
+		text_value = double_to_string(m_opt.default_value->get_float(), m_opt.precision);
 		text_value += "%";
 		break;
 	}
@@ -669,7 +669,7 @@ void TextCtrl::BUILD() {
 		double val = m_opt.type == coFloats ?
 			m_opt.get_default_value<ConfigOptionFloats>()->get_at(m_opt_idx) :
 			m_opt.type == coFloat ?
-				m_opt.default_value->getFloat() :
+				m_opt.default_value->get_float() :
 				m_opt.get_default_value<ConfigOptionPercents>()->get_at(m_opt_idx);
 		text_value = double_to_string(val, m_opt.precision);
 		break;
@@ -898,7 +898,7 @@ void CheckBox::BUILD() {
     if (m_opt.width >= 0) size.SetWidth(m_opt.width * m_em_unit);
 
     bool check_value = m_opt.type == coBool ?
-        m_opt.default_value->getBool() : m_opt.type == coBools ?
+        m_opt.default_value->get_bool() : m_opt.type == coBools ?
         m_opt.get_default_value<ConfigOptionBools>()->get_at(m_opt_idx) :
         false;
 
@@ -1055,7 +1055,7 @@ void SpinCtrl::BUILD() {
 
 	switch (m_opt.type) {
 	case coInt:
-		default_value = m_opt.default_value->getInt();
+		default_value = m_opt.default_value->get_int();
 		text_value = wxString::Format(_T("%i"), default_value);
 		break;
 	case coInts:
@@ -1357,17 +1357,17 @@ void Choice::set_selection()
     choice_ctrl* field = dynamic_cast<choice_ctrl*>(window);
 	switch (m_opt.type) {
 	case coEnum:{
-        field->SetSelection(m_opt.default_value->getInt());
+        field->SetSelection(m_opt.default_value->get_int());
 		break;
 	}
 	case coFloat:
 	case coPercent:	{
-		double val = m_opt.default_value->getFloat();
+		double val = m_opt.default_value->get_float();
 		text_value = val - int(val) == 0 ? wxString::Format(_T("%i"), int(val)) : wxNumberFormatter::ToString(val, 1);
 		break;
 	}
 	case coInt:{
-		text_value = wxString::Format(_T("%i"), int(m_opt.default_value->getInt()));
+		text_value = wxString::Format(_T("%i"), int(m_opt.default_value->get_int()));
 		break;
 	}
 	case coStrings:{
@@ -1375,7 +1375,7 @@ void Choice::set_selection()
 		break;
 	}
 	case coFloatOrPercent: {
-		text_value = double_to_string(m_opt.default_value->getFloat(), m_opt.precision);
+		text_value = double_to_string(m_opt.default_value->get_float(), m_opt.precision);
 		if (m_opt.get_default_value<ConfigOptionFloatOrPercent>()->percent)
 			text_value += "%";
 		break;
@@ -1529,7 +1529,7 @@ void Choice::convert_to_enum_value(int32_t ret_enum) {
         m_value = value;
     }
     else
-        m_value = m_opt.default_value.get()->getInt();
+        m_value = m_opt.default_value.get()->get_int();
 }
 
 //Please don't use that on Enum fields it will just break everything
