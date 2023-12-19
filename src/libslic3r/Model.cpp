@@ -1752,9 +1752,9 @@ int ModelVolume::extruder_id() const
     int extruder_id = -1;
     if (this->is_model_part()) {
         const ConfigOption *opt = this->config.option("extruder");
-        if ((opt == nullptr) || (opt->getInt() == 0))
+        if ((opt == nullptr) || (opt->get_int() == 0))
             opt = this->object->config.option("extruder");
-        extruder_id = (opt == nullptr) ? 0 : opt->getInt();
+        extruder_id = (opt == nullptr) ? 0 : opt->get_int();
     }
     return extruder_id;
 }

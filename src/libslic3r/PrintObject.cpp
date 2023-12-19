@@ -1297,7 +1297,7 @@ bool PrintObject::invalidate_state_by_config_options(
 
         for (const PrintRegion* region : this->m_print->print_regions_mutable()) {
             //count how many surface there are on each one
-            if (region->config().infill_dense.getBool() && region->config().fill_density < 40) {
+            if (region->config().infill_dense.get_bool() && region->config().fill_density < 40) {
                 std::vector<LayerRegion*> layeridx2lregion;
                 std::vector<Surfaces> new_surfaces; //surface store, as you can't modify them when working in //
                 // store the LayerRegion on which we are working
@@ -2541,12 +2541,12 @@ static constexpr const std::initializer_list<const std::string_view> keys_extrud
         // 2) Copy the rest of the values.
         for (auto it = in.cbegin(); it != in.cend(); ++it)
         if (it->first != key_extruder)
-            if (ConfigOption* my_opt = out.option(it->first, false); my_opt != nullptr) {
+            if (ConfigOptionInt *my_opt = out.option<ConfigOptionInt>(it->first, false); my_opt != nullptr) {
                 if (one_of(it->first, keys_extruders)) {
                     // Ignore "default" extruders.
-                    int extruder = static_cast<const ConfigOptionInt*>(it->second.get())->value;
+                    int extruder = it->second->get_int();
                     if (extruder > 0)
-                        my_opt->setInt(extruder);
+                        my_opt->value = (extruder);
                 } else
                     my_opt->set(it->second.get());
             }

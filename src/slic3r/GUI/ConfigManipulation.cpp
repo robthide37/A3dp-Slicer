@@ -86,9 +86,9 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         && config->opt_bool("overhangs_reverse") == false
         && config->opt_bool("gap_fill_last") == false
         && config->opt_int("solid_over_perimeters") == 0
-        && config->option("seam_notch_all")->getFloat() == 0
-        && config->option("seam_notch_inner")->getFloat() == 0
-        && config->option("seam_notch_outer")->getFloat() == 0
+        && config->option("seam_notch_all")->get_float() == 0
+        && config->option("seam_notch_inner")->get_float() == 0
+        && config->option("seam_notch_outer")->get_float() == 0
         )) {
         wxString msg_text = _(L("The Spiral Vase mode requires:\n"
             "- no top solid layers\n"
@@ -363,7 +363,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("overhangs_reverse_threshold", have_perimeters && config->opt_bool("overhangs_reverse"));
     toggle_field("overhangs_speed_enforce", have_perimeters && !config->opt_bool("perimeter_loop"));
     toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top") && !have_arachne);
-    toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->getFloat() != 0 && !have_arachne);
+    toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->get_float() != 0 && !have_arachne);
     bool have_thin_wall = !have_arachne && have_perimeters;
     toggle_field("thin_walls", have_thin_wall);
     for (auto el : { "thin_walls_min_width", "thin_walls_overlap", "thin_walls_merge" })
@@ -374,9 +374,9 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     toggle_field("perimeter_loop_seam", config->opt_bool("perimeter_loop"));
 
-    bool have_notch = have_perimeters && (config->option("seam_notch_all")->getFloat() != 0 ||
-                                          config->option("seam_notch_inner")->getFloat() != 0 ||
-                                          config->option("seam_notch_outer")->getFloat() != 0);
+    bool have_notch = have_perimeters && (config->option("seam_notch_all")->get_float() != 0 ||
+                                          config->option("seam_notch_inner")->get_float() != 0 ||
+                                          config->option("seam_notch_outer")->get_float() != 0);
     toggle_field("seam_notch_angle", have_notch);
 
     bool have_gap_fill = !have_arachne;
@@ -434,7 +434,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     //speed
     for (auto el : { "small_perimeter_min_length", "small_perimeter_max_length" })
-        toggle_field(el, config->option("small_perimeter_speed")->getFloat() > 0);
+        toggle_field(el, config->option("small_perimeter_speed")->get_float() > 0);
 
     bool has_ironing_pattern = config->opt_enum<InfillPattern>("top_fill_pattern") == InfillPattern::ipSmooth
         || config->opt_enum<InfillPattern>("bottom_fill_pattern") == InfillPattern::ipSmooth
@@ -511,14 +511,14 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_raft);
 
     //for default_extrusion_width/spacing, you need to ahve at least an extrusion_width with 0
-    bool have_default_width = config->option("first_layer_extrusion_width")->getFloat() == 0 ||
-        (config->option("perimeter_extrusion_width")->getFloat() == 0 && (have_perimeters || have_brim)) ||
-        (config->option("external_perimeter_extrusion_width")->getFloat() == 0 && have_perimeters) ||
-        (config->option("infill_extrusion_width")->getFloat() == 0 && (have_infill || has_solid_infill)) ||
-        (config->option("solid_infill_extrusion_width")->getFloat() == 0 && has_solid_infill) ||
-        (config->option("top_infill_extrusion_width")->getFloat() == 0 && has_top_solid_infill) ||
-        (config->option("support_material_extrusion_width")->getFloat() == 0 && have_support_material) ||
-        (config->option("skirt_extrusion_width")->getFloat() == 0 && have_skirt);
+    bool have_default_width = config->option("first_layer_extrusion_width")->get_float() == 0 ||
+        (config->option("perimeter_extrusion_width")->get_float() == 0 && (have_perimeters || have_brim)) ||
+        (config->option("external_perimeter_extrusion_width")->get_float() == 0 && have_perimeters) ||
+        (config->option("infill_extrusion_width")->get_float() == 0 && (have_infill || has_solid_infill)) ||
+        (config->option("solid_infill_extrusion_width")->get_float() == 0 && has_solid_infill) ||
+        (config->option("top_infill_extrusion_width")->get_float() == 0 && has_top_solid_infill) ||
+        (config->option("support_material_extrusion_width")->get_float() == 0 && have_support_material) ||
+        (config->option("skirt_extrusion_width")->get_float() == 0 && have_skirt);
     toggle_field("extrusion_width", have_default_width);
     toggle_field("extrusion_spacing", have_default_width);
 

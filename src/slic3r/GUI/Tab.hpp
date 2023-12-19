@@ -359,11 +359,11 @@ protected:
 	bool				m_page_switch_running = false;
 	bool				m_page_switch_planned = false;
 
+	DynamicPrintConfig* m_config;
 public:
 	PresetBundle*		m_preset_bundle;
 	bool				m_show_btn_incompatible_presets = false;
 	PresetCollection*	m_presets = nullptr;
-	DynamicPrintConfig*	m_config;
 	ogStaticText*		m_parent_preset_description_line = nullptr;
 	ScalableButton*		m_detach_preset_btn	= nullptr;
 
