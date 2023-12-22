@@ -567,7 +567,7 @@ wxString file_wildcards(FileType file_type, const std::string &custom_extension)
     return file_wildcards(file_wildcards_by_type[file_type], custom_extension);
 }
 
-wxString sla_wildcards(const char *formatid)
+wxString sla_wildcards(const char *formatid, const std::string& custom_extension)
 {
     const ArchiveEntry *entry = get_archive_entry(formatid);
     wxString ret;
@@ -587,11 +587,11 @@ wxString sla_wildcards(const char *formatid)
             wc.file_extensions.emplace_back(ext);
         }
 
-        ret = file_wildcards(wc, {});
+        ret = file_wildcards(wc, custom_extension);
     }
 
     if (ret.empty())
-        ret = file_wildcards(FT_SL1);
+        ret = file_wildcards(FT_SL1, custom_extension);
 
     return ret;
 }
