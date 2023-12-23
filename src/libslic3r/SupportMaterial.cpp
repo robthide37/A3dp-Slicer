@@ -4285,7 +4285,6 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         size_t idx_layer_intermediate     = size_t(-1);
         size_t idx_layer_interface        = size_t(-1);
         size_t idx_layer_base_interface   = size_t(-1);
-        const InfillPattern fill_type_first_layer    = ipRectiWithPerimeter;
         std::unique_ptr<Fill> filler_interface       = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_fill_pattern));
         std::unique_ptr<Fill> filler_intermediate_interface = std::unique_ptr<Fill>(Fill::new_from_type(ipRectilinear));
         // Filler for the base interface (to be used for soluble interface / non soluble base, to produce non soluble interface layer below soluble interface layer).
@@ -4406,7 +4405,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 float supp_density = m_support_params.interface_density;
                 coordf_t filler_spacing;
                 //if first layer and solid first layer : draw concentric with 100% density
-                if (support_layer.id() == 0) {
+                if (support_layer.id() == 0 && layer_ex.layer->bottom_z <= 0) {
                     filler = filler_first_layer_ptr.get();
                     supp_density = float(this->m_object_config->raft_first_layer_density.get_abs_value(1.));
                     interface_flow = m_support_params.first_layer_flow;
