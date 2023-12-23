@@ -24,7 +24,6 @@
 #include "libslic3r/Utils.hpp"
 
 //#define DEBUG_FILES
-#pragma optimize("", off)
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
 #include <SVG.hpp>

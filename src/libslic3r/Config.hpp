@@ -1200,7 +1200,7 @@ public:
             if (&v != &this->values.front())
             	ss << ",";
 			this->serialize_single_value(ss, v);
-			if (! (std::isnan(v) || v == NIL_VALUE()))
+            if (!(std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
         }
         std::string str = ss.str();
@@ -1214,7 +1214,7 @@ public:
         for (const double v : this->values) {
             std::ostringstream ss;
 			this->serialize_single_value(ss, v);
-			if (! (std::isnan(v) || v == NIL_VALUE()))
+			if (!(std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
             vv.push_back(ss.str());
         }

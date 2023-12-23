@@ -385,12 +385,13 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
     };
     // first, easy convert-to one-string
     switch (opt.type) {
-    case coFloats:
+    case coFloats: {
         if (opt_idx < 0) {
             deserialize(ConfigOptionFloats{});
             break;
         }
-    case coPercents:
+    }
+    case coPercents: {
         if (opt_idx < 0) {
             deserialize(ConfigOptionPercents{});
             break;
@@ -400,23 +401,31 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
             has_nil    = true;
             break;
         }
+    }
     case coFloat:
-    case coPercent: text_value = double_to_string(boost::any_cast<double>(value), opt.precision); break;
-    case coStrings:
+    case coPercent: {
+        text_value = double_to_string(boost::any_cast<double>(value), opt.precision);
+        break;
+    }
+    case coStrings: {
         if (opt_idx < 0) {
-            //custom for strings, as we don't need the serialized form, the normal one with ';' in-between is enough
+            // custom for strings, as we don't need the serialized form, the normal one with ';' in-between is enough
             ConfigOptionStrings reader;
             reader.set_any(value, opt_idx);
             std::string good_str;
             for (std::string s : reader.values) good_str += s + ";";
-            if(!good_str.empty())
+            if (!good_str.empty())
                 good_str.pop_back();
             text_value = good_str;
             break;
         }
         // can't be nullable
-    case coString: text_value = boost::any_cast<std::string>(value); break;
-    case coFloatsOrPercents:
+    }
+    case coString: {
+        text_value = boost::any_cast<std::string>(value);
+        break;
+    }
+    case coFloatsOrPercents: {
         if (opt_idx < 0) {
             deserialize(ConfigOptionFloatsOrPercents{});
             break;
@@ -427,13 +436,15 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
             has_nil    = true;
             break;
         }
-    case coFloatOrPercent:
+    }
+    case coFloatOrPercent: {
         FloatOrPercent fl_or_per = boost::any_cast<FloatOrPercent>(value);
         text_value               = double_to_string(fl_or_per.value);
         if (fl_or_per.percent)
             text_value.append("%");
         break;
-    case coBools:
+    }
+    case coBools: {
         if (opt_idx < 0) {
             deserialize(ConfigOptionBools{});
         } else {
@@ -445,12 +456,14 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
             text_value = boost::any_cast<uint8_t>(value) != 0 ? "true" : "false";
         }
         break;
-    case coBool:
+    }
+    case coBool: {
         if (opt.is_script)
             text_value = boost::any_cast<uint8_t>(value) != 0 ? "true" : "false";
         else
             text_value = boost::any_cast<bool>(value) ? "true" : "false";
-    case coInts:
+    }
+    case coInts: {
         if (opt_idx < 0) {
             deserialize(ConfigOptionInts{});
             break;
@@ -460,14 +473,21 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
             has_nil    = true;
             break;
         }
-    case coInt: text_value = wxString::Format(_T("%i"), int(boost::any_cast<int>(value))); break;
+    }
+    case coInt: {
+        text_value = wxString::Format(_T("%i"), int(boost::any_cast<int>(value)));
+        break;
+    }
     case coPoints:
         if (opt_idx < 0) {
             deserialize(ConfigOptionPoints{});
             assert(text_value == get_points_string(boost::any_cast<std::vector<Vec2d>>(value)));
             break;
         }
-    case coPoint: text_value = get_points_string({boost::any_cast<Vec2d>(value)});
+    case coPoint: {
+        text_value = get_points_string({boost::any_cast<Vec2d>(value)});
+        break;
+    }
     }
     return {text_value, has_nil};
 }
@@ -2308,6 +2328,8 @@ boost::any &SliderCtrl::get_value()
     } else if (m_opt.type == coInt) {
         return m_value = int32_t(m_slider->GetValue() / m_scale);
     }
+    assert(false);
+    return m_value;
 }
 
 } // GUI
