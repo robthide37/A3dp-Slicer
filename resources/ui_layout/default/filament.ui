@@ -29,12 +29,7 @@ group:Print speed override
 
 page:Cooling:time
 group:Fan speed - default
-	setting:id$0:label$Run the fan at default speed when possible:fan_always_on
-	line:Disable fan for the first
-		setting:id$0:width$5:label$_:sidetext_width$7:disable_fan_first_layers
-		setting:id$0:width$5:label_width$12:full_fan_speed_layer
-	end_line
-	setting:id$0:min_fan_speed
+	setting:id$0:default_fan_speed
 	line:Perimeter fan speed
 		setting:id$0:label_width$12:label$Internal:perimeter_fan_speed
 		setting:id$0:label_width$12:label$External:external_perimeter_fan_speed
@@ -53,6 +48,10 @@ group:Fan speed - default
 		setting:id$0:label_width$12:label$Overhangs:overhangs_fan_speed
 	line:Gap fill fan speed
 		setting:id$0:label_width$12:label$Gap fill:gap_fill_fan_speed
+	line:Disable fan for the first
+		setting:id$0:width$5:label$_:sidetext_width$7:disable_fan_first_layers
+		setting:id$0:width$5:label_width$12:full_fan_speed_layer
+	end_line
 group:Short layer time - began to increase base fan speed
 	setting:id$0:fan_below_layer_time
 	setting:id$0:label$Max fan speed:max_fan_speed

@@ -747,10 +747,11 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_dip_insertion_speed",
         "filament_dip_extraction_speed",  //skinnydip params end
         "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", 
-        // cooling
-        "fan_always_on", 
-        "min_fan_speed",
-        "max_fan_speed", 
+        // "cooling",
+        // "fan_always_on", (now default_fan_speed)
+        // "min_fan_speed", (now fan_printer_min_speed)
+        "default_fan_speed",
+        "max_fan_speed",
         "bridge_fan_speed",
         "bridge_internal_fan_speed",
         "external_perimeter_fan_speed",
@@ -807,6 +808,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "fan_speedup_overhangs",
     "fan_speedup_time",
     "fan_percentage",
+    "fan_printer_min_speed",
     "gcode_filename_illegal_char",
     "gcode_flavor",
     "gcode_precision_xyz",

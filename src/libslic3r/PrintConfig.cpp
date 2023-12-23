@@ -728,7 +728,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Bridges fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during bridges and overhangs. It won't slow down the fan if it's currently running at a higher speed."
-        "\nSet to -1 to disable this override (Bridge will use default fan speed)."
+        "\nSet to -1 to disable this override (Bridges will use default fan speed)."
         "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
     def->sidetext = L("%");
     def->min = -1;
@@ -741,8 +741,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Infill bridges fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during all infill bridges. It won't slow down the fan if it's currently running at a higher speed."
-        "\nSet to 1 to follow default speed."
-        "\nSet to -1 to disable this override (internal bridges will use Bridges fan speed)."
+        "\nSet to -1 to disable this override (Internal bridges will use Bridges fan speed)."
         "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
     def->sidetext = L("%");
     def->min = -1;
@@ -1210,6 +1209,20 @@ void PrintConfigDef::init_fff_params()
                    "On selection of the current printer profile, this filament profile will be activated.");
     def->set_default_value(new ConfigOptionStrings());
     def->cli = ConfigOptionDef::nocli;
+
+    def           = this->add("default_fan_speed", coInts);
+    def->label    = L("Default fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip  = L(
+        "Default speed for the fan, to set the speed for features where there is no fan control. Useful for PLA and other low-temp filament."
+        "\nSet 0 to disable the fan by default. Useful for ABS and other high-temp filaments."
+        "\nSet -1 to disable. if disabled, the beahavior isn't defined yet. The goal is to avoid adding fan speed commands.");
+    def->mode               = comSimpleAE | comSuSi;
+    def->min                = -1;
+    def->max                = 100;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts({-1}));
+    def->aliases = { "min_fan_speed" }; // only if "fan_always_on"
 
     def = this->add("default_print_profile", coString);
     def->label = L("Default print profile");
@@ -1814,6 +1827,8 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false, false));
 
+#if 0
+    //not used anymore, to remove !! @DEPRECATED (replaces by default_fan_speed)
     def = this->add("fan_always_on", coBools);
     def->label = L("Keep fan always on");
     def->category = OptionCategory::cooling;
@@ -1822,6 +1837,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimpleAE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });
+#endif
 
     def = this->add("fan_below_layer_time", coFloats);
     def->label = L("Enable fan if layer print time is below");
@@ -3672,6 +3688,8 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
 
+#if 0
+    // replaced by fan_printer_min_speed, to remove !! @DEPRECATED
     def = this->add("min_fan_speed", coInts);
     def->label = L("Default fan speed");
     def->full_label = L("Default fan speed");
@@ -3683,6 +3701,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimpleAE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionInts{ 35 });
+#endif
 
     def = this->add("fan_percentage", coBool);
     def->label = L("Fan PWM from 0-100");
@@ -4240,6 +4259,17 @@ void PrintConfigDef::init_fff_params()
     def->height = 13;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionString{ "" });
+
+    def = this->add("fan_printer_min_speed", coInt);
+    def->label = L("Minimum fan speed");
+    def->full_label = L("Minimum fan speed");
+    def->category = OptionCategory::general;
+    def->tooltip = L("This setting represents the minimum fan speed (like minimum PWM) your fan needs to work.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comSimpleAE | comSuSi;
+    def->set_default_value(new ConfigOptionInt(35));
 
     def = this->add("printer_model", coString);
     def->label = L("Printer type");
@@ -6415,36 +6445,36 @@ void PrintConfigDef::init_fff_params()
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
         def = this->add_nullable(std::string("filament_") + opt_key, it_opt->second.type);
-        def->label         = it_opt->second.label;
+        def->label      = it_opt->second.label;
         def->full_label = it_opt->second.full_label;
-        def->tooltip     = it_opt->second.tooltip;
+        def->tooltip    = it_opt->second.tooltip;
         def->sidetext   = it_opt->second.sidetext;
-        def->mode          = it_opt->second.mode;
+        def->mode       = it_opt->second.mode;
         // create default value with the default value is taken from the default value of the config.
         // put a nil value as first entry.
         switch (def->type) {
         case coBools: {
             ConfigOptionBoolsNullable* opt = new ConfigOptionBoolsNullable(it_opt->second.default_value.get()->get_bool());
-            opt->values.push_back(ConfigOptionBoolsNullable::NIL_VALUE());
+            opt->set_at(ConfigOptionBoolsNullable::NIL_VALUE(), 0);
             def->set_default_value(opt);
             break;
         }
         case coFloats: {
             ConfigOptionFloatsNullable *opt = new ConfigOptionFloatsNullable(it_opt->second.default_value.get()->get_float());
-            opt->values.push_back(ConfigOptionFloatsNullable::NIL_VALUE());
+            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coPercents: {
             ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
-            opt->values.push_back(ConfigOptionPercentsNullable::NIL_VALUE());
+            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coFloatsOrPercents: {
             ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
                 static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
-            opt->values.push_back(ConfigOptionFloatsOrPercentsNullable::NIL_VALUE());
+            opt->set_at(ConfigOptionFloatsOrPercentsNullable::NIL_VALUE(), 0);
             def->set_default_value(opt);
             break;
         }
@@ -7639,6 +7669,16 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     if (boost::starts_with(opt_key, "thin_perimeters") && value == "1")
         value = "100%";
 
+    if ("fan_always_on" == opt_key) {
+        if (value != "1") {
+            //min_fan_speed is already converted to default_fan_speed, just has to deactivate it if not always_on
+            opt_key = "default_fan_speed"; // note: maybe this doesn't works, as default_fan_speed can also get its value from min_fan_speed
+            value = "0";
+        } else {
+            opt_key = "";
+        }
+    }
+
     //prusa
     if ("gcode_flavor" == opt_key) {
         if ("reprap" == value)
@@ -7711,6 +7751,11 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         value = "rectilinear";
         output["fill_angle_increment"] = "90";
     }
+    if ("fan_always_on" == opt_key) {
+        //min_fan_speed is already converted to default_fan_speed, just has to deactivate it if not always_on
+        if (value != "1")
+            output["default_fan_speed"] = "0";
+    }
 
     return output;
 }
@@ -7782,6 +7827,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "curve_smoothing_angle_convex",
 "curve_smoothing_cutoff_dist",
 "curve_smoothing_precision",
+//"default_fan_speed", used to convert to min_fan_speed & fan_always_on
 "default_speed",
 "enforce_full_fill_volume",
 "exact_last_layer_height",
@@ -7801,6 +7847,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "extrusion_spacing",
 "fan_kickstart",
 "fan_percentage",
+"fan_printer_min_speed",
 "fan_speedup_overhangs",
 "fan_speedup_time",
 "feature_gcode",
@@ -8118,6 +8165,16 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
     }
     if ("bed_custom_texture" == opt_key || "Bed custom texture" == opt_key) {
         value = Slic3r::find_full_path(value, value).generic_string();
+    }
+    if ("default_fan_speed" == opt_key) {
+        if (value == "0") {
+            opt_key = "min_fan_speed";
+            value = all_conf.option("fan_printer_min_speed")->get_float();
+            new_entries["fan_always_on"] = "0";
+        } else {
+            opt_key = "min_fan_speed";
+            new_entries["fan_always_on"] = "1";
+        }
     }
     return new_entries;
 }

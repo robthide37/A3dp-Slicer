@@ -1002,8 +1002,9 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              extruder_temperature_offset))
     ((ConfigOptionString,              extrusion_axis))
     ((ConfigOptionFloats,              extrusion_multiplier))
-    ((ConfigOptionBool,                fan_percentage))
     ((ConfigOptionFloat,               fan_kickstart))
+    ((ConfigOptionBool,                fan_percentage))
+    ((ConfigOptionInt,                 fan_printer_min_speed))
     ((ConfigOptionBool,                fan_speedup_overhangs))
     ((ConfigOptionFloat,               fan_speedup_time))
     ((ConfigOptionFloats,              filament_cost))
@@ -1050,7 +1051,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     //      r - regular expression
     //      i - case insensitive
     //      w - whole word
-    ((ConfigOptionStrings,             gcode_substitutions))    ((ConfigOptionString,              layer_gcode))
+    ((ConfigOptionStrings,             gcode_substitutions))
+    ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionString,              feature_gcode))
     ((ConfigOptionFloat,               max_gcode_per_second))
     ((ConfigOptionFloatOrPercent,      max_print_speed))
@@ -1148,6 +1150,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     //((ConfigOptionBools,                cooling))
     ((ConfigOptionFloatOrPercent,       default_acceleration))
     ((ConfigOptionInts,                 disable_fan_first_layers))
+    ((ConfigOptionInts,                 default_fan_speed))
     ((ConfigOptionEnum<DraftShield>,    draft_shield))
     ((ConfigOptionFloat,                duplicate_distance))
     ((ConfigOptionBool,                 enforce_retract_first_layer))
@@ -1157,7 +1160,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,                extruder_clearance_radius))
     ((ConfigOptionStrings,              extruder_colour))
     ((ConfigOptionPoints,               extruder_offset))
-    ((ConfigOptionBools,                fan_always_on))
+    //((ConfigOptionBools,                fan_always_on))
     ((ConfigOptionFloats,               fan_below_layer_time))
     ((ConfigOptionStrings,              filament_colour))
     ((ConfigOptionStrings,              filament_custom_variables))
@@ -1186,7 +1189,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionStrings,              milling_toolchange_start_gcode))
     //((ConfigOptionPoints,               milling_offset))
     //((ConfigOptionFloats,               milling_z_offset))
-    ((ConfigOptionInts,                 min_fan_speed))
+    //((ConfigOptionInts,                 min_fan_speed)) // now fan_printer_min_speed
     ((ConfigOptionFloatsOrPercents,     min_layer_height))
     ((ConfigOptionFloats,               min_print_speed))
     ((ConfigOptionFloat,                min_skirt_length))

@@ -857,14 +857,24 @@ std::string CoolingBuffer::apply_layer_cooldown(
     int fan_speeds[ExtrusionRole::erCount];
     int default_fan_speed[ExtrusionRole::erCount];
 #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
-    int min_fan_speed = EXTRUDER_CONFIG(min_fan_speed);
+    const int min_fan_speed             = m_config.fan_printer_min_speed;
+    assert(min_fan_speed >= 0);
+    int initial_default_fan_speed = EXTRUDER_CONFIG(default_fan_speed);
+    //if default_fan_speed activated, be sure it's at least the mins
+    if (initial_default_fan_speed > 0 && initial_default_fan_speed < min_fan_speed)
+        initial_default_fan_speed = min_fan_speed;
+    // 0 was deprecated, replaced by 1: allow 1 to still be 0 (and it's now deprecated)
+    if (initial_default_fan_speed == 1)
+        initial_default_fan_speed = 0;
+    //initialise the speed array
     for (int i = 0; i < ExtrusionRole::erCount; i++) {
         fan_control[i] = false;
         fan_speeds[i] = 0;
-        default_fan_speed[i] = min_fan_speed;
+        default_fan_speed[i] = initial_default_fan_speed;
         // 0 was deprecated, replaced by 1: allow 1 to still be 0 (and it's now deprecated)
         if (default_fan_speed[i] == 1) default_fan_speed[i] = 0;
     }
+    //set the fan controls
     default_fan_speed[ExtrusionRole::erBridgeInfill] = EXTRUDER_CONFIG(bridge_fan_speed);
     default_fan_speed[ExtrusionRole::erInternalBridgeInfill] = EXTRUDER_CONFIG(bridge_internal_fan_speed);
     default_fan_speed[ExtrusionRole::erTopSolidInfill] = EXTRUDER_CONFIG(top_fan_speed);
@@ -878,8 +888,17 @@ std::string CoolingBuffer::apply_layer_cooldown(
     default_fan_speed[ExtrusionRole::erInternalInfill] = EXTRUDER_CONFIG(infill_fan_speed);
     default_fan_speed[ExtrusionRole::erOverhangPerimeter] = EXTRUDER_CONFIG(overhangs_fan_speed);
     default_fan_speed[ExtrusionRole::erGapFill] = EXTRUDER_CONFIG(gap_fill_fan_speed);
+    // if default is enabled, it takes over the settings that are disabled.
+    if (initial_default_fan_speed >= 0) {
+        for (int i = 0; i < ExtrusionRole::erCount; i++) {
+            // this setting is disbaled. As default is not, it will use the default value
+            if (default_fan_speed[i] < 0) {
+                default_fan_speed[i] = initial_default_fan_speed;
+            }
+        }
+    }
     auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, 
-            &fan_control, &fan_speeds, &default_fan_speed, &min_fan_speed]()
+            &fan_control, &fan_speeds, &default_fan_speed, initial_default_fan_speed, min_fan_speed]()
     {
         int disable_fan_first_layers = EXTRUDER_CONFIG(disable_fan_first_layers);
         // Is the fan speed ramp enabled?
@@ -891,8 +910,8 @@ std::string CoolingBuffer::apply_layer_cooldown(
             for (int i = 0; i < ExtrusionRole::erCount; i++) {
                 fan_speeds[i] = default_fan_speed[i];
             }
-            //if not always on, the default is "no fan" and not the min.
-            if (!EXTRUDER_CONFIG(fan_always_on)) {
+            //fan_speeds[0] carry the current default value. ensure it's not negative.
+            if (initial_default_fan_speed <= 0) {
                 fan_speeds[0] = 0;
             }
             if (layer_time < slowdown_below_layer_time && fan_below_layer_time > 0) {
@@ -925,13 +944,19 @@ std::string CoolingBuffer::apply_layer_cooldown(
                     fan_speeds[idx] = std::clamp(int(float(fan_speeds[idx]) * factor + 0.01f), 0, 255);
                 }
             }
-            //only activate fan control if the fan speed is higher than default
-            fan_control[0] = true;
+            //only activate fan control if the fan speed is higher than min
+            fan_control[0] = fan_speeds[0] >= 0;
             for (size_t i = 1; i < ExtrusionRole::erCount; i++) {
-                fan_control[i] = fan_speeds[i] >= 0 && fan_speeds[i] > fan_speeds[0];
+                fan_control[i] = fan_speeds[i] >= 0;
             }
 
-            // if bridge_internal_fan is disabled, it takes the value of bridge_fan_control
+            // if bridge_fan is disabled, it takes the value of default_fan
+            if (!fan_control[ExtrusionRole::erBridgeInfill] && fan_control[0]) {
+                fan_control[ExtrusionRole::erBridgeInfill] = true;
+                fan_speeds[ExtrusionRole::erBridgeInfill] = fan_speeds[0];
+            }
+
+            // if bridge_internal_fan is disabled, it takes the value of bridge_fan
             if (!fan_control[ExtrusionRole::erInternalBridgeInfill] && fan_control[ExtrusionRole::erBridgeInfill]) {
                 fan_control[ExtrusionRole::erInternalBridgeInfill] = true;
                 fan_speeds[ExtrusionRole::erInternalBridgeInfill] = fan_speeds[ExtrusionRole::erBridgeInfill];
@@ -957,7 +982,13 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 fan_speeds[i] = 0;
             }
         }
-        if (fan_speeds[0] != m_fan_speed) {
+        // apply min fan speed, after the eventual speedup.
+        for (int i = 1; i < ExtrusionRole::erCount; i++) {
+            if (fan_control[i] && fan_speeds[i] > 0) {
+                fan_speeds[i] = std::max(fan_speeds[i], min_fan_speed);
+            }
+        }
+        if (fan_speeds[0] != m_fan_speed && fan_control[0]) {
             m_fan_speed = fan_speeds[0];
             new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed,
                                               EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
@@ -968,7 +999,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
     std::vector<ExtrusionRole> extrude_tree;
     const char         *pos               = gcode.c_str();
     int                 current_feedrate  = 0;
-    int                 stored_fan_speed = m_fan_speed;
+    int                 stored_fan_speed  = m_fan_speed < 0 ? 0 : m_fan_speed;
     change_extruder_set_fan();
     for (const CoolingLine *line : lines) {
         const char *line_start  = gcode.c_str() + line->line_start;
@@ -986,7 +1017,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 new_gcode.append(line_start, line_end - line_start);
             }
         } else if (line->type & CoolingLine::TYPE_STORE_FOR_WT) {
-            stored_fan_speed = m_fan_speed;
+            stored_fan_speed = m_fan_speed < 0 ? 0 : m_fan_speed;
         } else if (line->type & CoolingLine::TYPE_RESTORE_AFTER_WT) {
             new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, stored_fan_speed,
                                               EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
@@ -1099,10 +1130,10 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 }
             }
             if (!fan_set) {
-                //return to default
-                new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed,
-                                                  EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
-                                                  "set default fan");
+                // return to default
+                new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed < 0 ? 0 : m_fan_speed,
+                                                    EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                                    "set default fan");
             }
             fan_need_set = false;
         }

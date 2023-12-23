@@ -2944,7 +2944,7 @@ void TabFilament::update_description_lines()
         return;
 
     if (std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "cooling") != m_active_page->descriptions.end() && m_cooling_description_line)
-        m_cooling_description_line->SetText(from_u8(PresetHints::cooling_description(m_presets->get_edited_preset())));
+        m_cooling_description_line->SetText(from_u8(PresetHints::cooling_description(m_presets->get_edited_preset(), m_preset_bundle->printers.get_edited_preset())));
     if (std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "volumetric_speed") != m_active_page->descriptions.end() && m_volumetric_speed_description_line)
         this->update_volumetric_flow_preset_hints();
 }
@@ -2956,12 +2956,12 @@ void TabFilament::toggle_options()
 
     if ( std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "cooling") != m_active_page->descriptions.end())
     {
-        bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
+        // bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
 
         //get_field("max_fan_speed")->toggle(m_config->opt_float("fan_below_layer_time", 0) > 0);
-        Field* min_print_speed_field = get_field("min_print_speed");
-        if (min_print_speed_field)
-            min_print_speed_field->toggle(m_config->opt_float("slowdown_below_layer_time", 0) > 0);
+        // Field* min_print_speed_field = get_field("min_print_speed");
+        // if (min_print_speed_field)
+            // min_print_speed_field->toggle(m_config->opt_float("slowdown_below_layer_time", 0) > 0);
 
         // hidden 'cooling', it's now deactivated.
              //for (auto el : { "min_fan_speed", "disable_fan_first_layers" })
