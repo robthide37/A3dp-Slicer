@@ -37,6 +37,8 @@ namespace Search {
 static char marker_by_type(Preset::Type type, PrinterTechnology pt)
 {
     switch(type) {
+    case Preset::TYPE_FREQUENT_FFF:
+    case Preset::TYPE_FREQUENT_SLA:
     case Preset::TYPE_FFF_PRINT:
     case Preset::TYPE_SLA_PRINT:
         return ImGui::PrintIconMarker;
@@ -47,7 +49,7 @@ static char marker_by_type(Preset::Type type, PrinterTechnology pt)
     case Preset::TYPE_PRINTER:
         return pt == ptSLA ? ImGui::PrinterSlaIconMarker : ImGui::PrinterIconMarker;
     default:
-        return ' ';
+        return ImGui::PrintIconMarker;
 	}
 }
 
@@ -994,9 +996,11 @@ void SearchListModel::Clear()
 void SearchListModel::Prepend(const std::string& label)
 {
     const char icon_c = label.at(0);
-    int icon_idx = icon_idxs.at(icon_c);
-    wxString str = from_u8(label).Remove(0, 1);
+    wxString   str    = from_u8(label).Remove(0, 1);
 
+    int        icon_idx = 0; 
+    if(icon_c < icon_idxs.size())
+        icon_idx = icon_idxs.at(icon_c);
     m_values.emplace_back(str, icon_idx);
 
     RowPrepended();
