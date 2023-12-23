@@ -820,7 +820,7 @@ void Tab::init_options_list()
 template<class T>
 void add_correct_opts_to_options_list(const std::string &opt_key, std::map<std::string, int>& map, Tab *tab, const int& value)
 {
-    T *opt_cur = static_cast<T*>(tab->m_config->option(opt_key));
+    T *opt_cur = static_cast<T*>(tab->get_config()->option(opt_key));
     for (size_t i = 0; i < opt_cur->values.size(); i++)
         map.emplace(opt_key + "#" + std::to_string(i), value);
 }
@@ -1253,7 +1253,8 @@ void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index/*
 // and value can be some random value because in this case it will not been used
 void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bool saved_value /*= false*/)
 {
-    if (!saved_value) change_opt_value(*m_config, opt_key, value);
+    if (!saved_value)
+        m_config->option(opt_key)->set_any(value, -1); // change_opt_value(*m_config, opt_key, value);
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
         // Don't select another profile if this profile happens to become incompatible.
@@ -1328,7 +1329,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     // update unscripted freq params
     Field* field = og_freq_chng_params->get_field(opt_key);
     if (field) {
-        boost::any val = og_freq_chng_params->get_config_value(*m_config, opt_key);
+        boost::any val = m_config->option(opt_key)->get_any(field->m_opt_idx);
         field->set_value(val, false);
     }
 
@@ -1885,15 +1886,15 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         DynamicPrintConfig new_conf = *m_config;
 
                         if (opt_key == "bottle_volume") {
-                            double new_bottle_weight = boost::any_cast<double>(value) / (new_conf.option("material_density")->getFloat() * 1000);
+                            double new_bottle_weight = boost::any_cast<double>(value) / (new_conf.option("material_density")->get_float() * 1000);
                             new_conf.set_key_value("bottle_weight", new ConfigOptionFloat(new_bottle_weight));
                         }
                         if (opt_key == "bottle_weight") {
-                            double new_bottle_volume = boost::any_cast<double>(value)*(new_conf.option("material_density")->getFloat() * 1000);
+                            double new_bottle_volume = boost::any_cast<double>(value)*(new_conf.option("material_density")->get_float() * 1000);
                             new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
                         }
                         if (opt_key == "material_density") {
-                            double new_bottle_volume = new_conf.option("bottle_weight")->getFloat() * boost::any_cast<double>(value) * 1000;
+                            double new_bottle_volume = new_conf.option("bottle_weight")->get_float() * boost::any_cast<double>(value) * 1000;
                             new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
                         }
 
@@ -1960,7 +1961,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
         }
         else if (boost::starts_with(full_line, "end_line"))
         {
-            if (!current_line.get_options().empty()) {
+            if (in_line  && !current_line.get_options().empty()) {
                 current_group->append_line(current_line);
                 if (logs) Slic3r::slic3r_log->info("settings gui") << "add line\n";
             }
@@ -2247,226 +2248,34 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 current_line.append_option(option);
             }
             if (logs) Slic3r::slic3r_log->info("settings gui") << "create setting " << setting_id <<"  with label "<< option.opt.label << "and height "<< option.opt.height<<" fw:"<< option.opt.full_width << "\n";
-        }
-        else if (boost::starts_with(full_line, "height")) {
+        } else if (boost::starts_with(full_line, "height")) {
             std::string arg = "";
             if (full_line.size() > 6 && full_line.find(":") != std::string::npos)
                 arg = full_line.substr(full_line.find(":") + 1, full_line.size() - 1 - full_line.find(":"));
             while (arg.size() > 1 && (arg.back() == ' ' || arg.back() == '\t')) arg = arg.substr(0, arg.size() - 1);
             height = atoi(arg.c_str());
-        }
-        else if (boost::starts_with(full_line, "recommended_thin_wall_thickness_description")) {
-            TabPrint* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrint*>(this)) == nullptr) continue;
-            current_line = { "", "" };
-            current_line.full_width = 1;
-            current_line.widget = [this, tab](wxWindow* parent) {
-                return description_line_widget(parent, &(tab->m_recommended_thin_wall_thickness_description_line));
-            };
-            current_group->append_line(current_line);
-            current_page->descriptions.push_back("wall_thickness");
-        }
-        else if (boost::starts_with(full_line, "recommended_extrusion_width_description")) {
-            TabPrint* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrint*>(this)) == nullptr) continue;
-            current_line = { "", "" };
-            current_line.full_width = 1;
-            current_line.widget = [this, tab](wxWindow* parent) {
-                //return description_line_widget(parent, &(tab->m_recommended_extrusion_width_description_line));
-
-                auto sizer = new wxBoxSizer(wxVERTICAL);
-                wxCollapsiblePane* collpane = new wxCollapsiblePane(parent, wxID_ANY, _L("Help / Details:"));
-                wxGetApp().UpdateDarkUI(collpane);
-                // add the pane with a zero proportion value to the 'sz' sizer which contains it
-                sizer->Add(collpane, 0, wxGROW | wxALL, 5);
-                // now add a test label in the collapsible pane using a sizer to layout it:
-                wxWindow* win = collpane->GetPane();
-                collpane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [tab](wxEvent&) {
-                    tab->Layout();
-                });
-
-                const wxBitmap& bmp_width = create_scaled_bitmap("explanation_width", this, 80);
-                wxStaticBitmap* image_width = new wxStaticBitmap(win, wxID_ANY, bmp_width);
-                const wxBitmap& bmp_spacing = create_scaled_bitmap("explanation_spacing", this, 80);
-                wxStaticBitmap* image_spacing = new wxStaticBitmap(win, wxID_ANY, bmp_spacing);
-                auto sizerV = new wxBoxSizer(wxVERTICAL);
-                auto sizerH2 = new wxBoxSizer(wxHORIZONTAL);
-                auto sizerH3 = new wxBoxSizer(wxHORIZONTAL);
-                sizerH2->Add(image_width, 1, 0, 0);
-                sizerH2->Add(image_spacing, 1, 0, 0);
-                sizerV->Add(sizerH2);
-                ogStaticText* text = new ogStaticText(win, _L("If the perimeter overlap is set at 100%, the yellow areas should be filled by the overlap.\nIf overlap is at 0%, width = spacing."));
-                text->SetFont(wxGetApp().normal_font());
-                sizerH3->Add(text, 1, wxEXPAND | wxALL, 0);
-                sizerV->Add(sizerH3);
-
-                win->SetSizer(sizerV);
-
-                sizerV->SetSizeHints(win);
-                collpane->Collapse(true);
-
-                return sizer;
-            };
-            current_group->append_line(current_line);
-            current_page->descriptions.push_back("extrusion_width");
-        }
-        else if (boost::starts_with(full_line, "top_bottom_shell_thickness_explanation")) {
-            TabPrint* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrint*>(this)) == nullptr) continue;
-            current_line = { "", "" };
-            current_line.full_width = 1;
-            current_line.widget = [this, tab](wxWindow* parent) {
-                return description_line_widget(parent, &(tab->m_top_bottom_shell_thickness_explanation));
-            };
-            current_group->append_line(current_line);
-            current_page->descriptions.push_back("top_bottom_shell");
-        }
-        else if (boost::starts_with(full_line, "parent_preset_description")) {
-            build_preset_description_line(current_group.get());
-        } else if (boost::starts_with(full_line, "cooling_description")) {
-            TabFilament* tab = nullptr;
-            if ((tab = dynamic_cast<TabFilament*>(this)) == nullptr) continue;
-            current_line = Line{ "", "" };
-            current_line.full_width = 1;
-            current_line.widget = [this, tab](wxWindow* parent) {
-                return description_line_widget(parent, &(tab->m_cooling_description_line));
-            };
-            current_group->append_line(current_line);
-            current_page->descriptions.push_back("cooling");
-        } else if (boost::starts_with(full_line, "volumetric_speed_description")) {
-            TabFilament* tab = nullptr;
-            if ((tab = dynamic_cast<TabFilament*>(this)) == nullptr) continue;
-            current_line = Line{ "", "" };
-            current_line.full_width = 1;
-            current_line.widget = [this, tab](wxWindow* parent) {
-                return description_line_widget(parent, &(tab->m_volumetric_speed_description_line));
-            };
-            current_group->append_line(current_line);
-            current_page->descriptions.push_back("volumetric_speed");
-        } else if(boost::starts_with(full_line, "support_object_elevation_description")) {
-            TabSLAPrint* tab = nullptr;
-            if ((tab = dynamic_cast<TabSLAPrint*>(this)) == nullptr) continue;
-            Line line{ "", "" };
-            line.full_width = 1;
-            line.widget = [this, tab](wxWindow* parent) {
-                return description_line_widget(parent, &(tab->m_support_object_elevation_description_line));
-            };
-            current_group->append_line(line);
-            current_page->descriptions.push_back("support_object_elevation");
-        } else if (boost::starts_with(full_line, "print_host_upload_description")) {
-            TabPrinter* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
-            wxString description_line_text = wxString::Format(_L(""
-                "Note: All parameters from this group are moved to the Physical Printer settings (see changelog).\n\n"
-                "A new Physical Printer profile is created by clicking on the \"cog\" icon right of the Printer profiles combo box, "
-                "by selecting the \"Add physical printer\" item in the Printer combo box. The Physical Printer profile editor opens "
-                "also when clicking on the \"cog\" icon in the Printer settings tab. The Physical Printer profiles are being stored "
-                "into %s/physical_printer directory."), SLIC3R_APP_KEY);
-
-            current_line = { "", "" };
-            current_line.full_width = 1;
-            current_line.widget = [tab, description_line_text](wxWindow* parent) {
-                return tab->description_line_widget(parent, tab->m_presets->get_selected_preset().printer_technology() == ptFFF ?
-                    &tab->m_fff_print_host_upload_description_line : &tab->m_sla_print_host_upload_description_line,
-                    description_line_text);
-            };
-            current_group->append_line(current_line);
-            current_page->descriptions.push_back("print_host_upload");
-        } else if(boost::starts_with(full_line, "post_process_explanation")) {
-            TabPrint* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrint*>(this)) == nullptr) continue;
-            Line line{ "", "" };
-            line.full_width = 1;
-            line.widget = [this, tab](wxWindow* parent) {
-                return description_line_widget(parent, &(tab->m_post_process_explanation));
-            };
-            current_group->append_line(line);
-            current_page->descriptions.push_back("post_process_explanation");
-        } else if (boost::starts_with(full_line, "filament_ramming_parameters")) {
-            Line thisline = current_group->create_single_option_line("filament_ramming_parameters");// { _(L("Ramming")), "" };
-            thisline.widget = [this](wxWindow* parent) {
-                auto ramming_dialog_btn = new wxButton(parent, wxID_ANY, _(L("Ramming settings")) + dots, wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-                ramming_dialog_btn->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-                wxGetApp().UpdateDarkUI(ramming_dialog_btn);
-                auto sizer = new wxBoxSizer(wxHORIZONTAL);
-                sizer->Add(ramming_dialog_btn);
-
-                ramming_dialog_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent& e)
-                {
-                    RammingDialog dlg(this, (m_config->option<ConfigOptionStrings>("filament_ramming_parameters"))->get_at(0));
-                    if (dlg.ShowModal() == wxID_OK)
-                        (m_config->option<ConfigOptionStrings>("filament_ramming_parameters"))->get_at(0) = dlg.get_parameters();
-                }));
-                return sizer;
-            };
-            current_group->append_line(thisline);
-        } else if (boost::starts_with(full_line, "filament_overrides_page")) {
-            TabFilament* tab = nullptr;
-            if ((tab = dynamic_cast<TabFilament*>(this)) == nullptr) continue;
-            pages.push_back(tab->create_filament_overrides_page());
-        } else if (full_line == "unregular_pages") {
-            TabPrinter* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
-            tab->m_unregular_page_pos = pages.size();
-        } else if (full_line == "bed_shape") {
-            TabPrinter* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
-            create_line_with_widget(current_group.get(), "bed_shape",
-                "custom-svg-and-png-bed-textures_124612", [tab](wxWindow* parent) {
-                    return 	tab->create_bed_shape_widget(parent);
-                });
-        } else if(full_line == "freq_purging_volumes") {
-            //hack (see FreqChangedParams::init() in plater.cpp)
+        } else if (full_line == "freq_purging_volumes") {
+            // hack (see FreqChangedParams::init() in plater.cpp)
             current_line.label_tooltip = full_line;
-        } else if (full_line == "gcode_substitutions") {
-            TabPrint* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrint*>(this)) == nullptr) continue;
-            create_line_with_widget(current_group.get(), "gcode_substitutions", "g-code-substitutions_301694", [tab](wxWindow* parent) {
-                return tab->create_manage_substitution_widget(parent);
-            });
-            current_line = { "", "" };
-            current_line.full_width = 1;
-            current_line.widget = [this, tab](wxWindow* parent) {
-                return tab->create_substitutions_widget(parent);
-            };
-            current_group->append_line(current_line);
-            current_page->descriptions.push_back("substitutions_widget");
-        } else if (full_line == "extruders_count") {
-            ConfigOptionDef def;
-            def.type = coInt,
-                def.set_default_value(new ConfigOptionInt(1));
-            def.label = L("Extruders");
-            def.tooltip = L("Number of extruders of the printer.");
-            def.min = 1;
-            def.max = 256;
-            def.mode = comAdvancedE | comPrusa;
-            Option option(def, "extruders_count");
-            current_group->append_single_option_line(option);
-        } else if (full_line == "milling_count") {
-            ConfigOptionDef def;
-            def.type = coInt,
-                def.set_default_value(new ConfigOptionInt(0));
-            def.label = L("Milling cutters");
-            def.tooltip = L("Number of milling heads.");
-            def.min = 0;
-            def.mode = comAdvancedE | comSuSi;
-            Option option(def, "milling_count");
-            current_group->append_single_option_line(option);
         } else if (full_line == "update_nozzle_diameter") {
-            current_group->m_on_change = set_or_add(current_group->m_on_change, [this, idx_page](const t_config_option_key& opt_key, boost::any value)
-            {
-                TabPrinter* tab = nullptr;
-                if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) return;
-                if (m_config->opt_bool("single_extruder_multi_material") && tab->m_extruders_count > 1 && opt_key.find("nozzle_diameter") != std::string::npos)
-                {
+            current_group
+                ->m_on_change = set_or_add(current_group->m_on_change, [this,
+                                                                        idx_page](const t_config_option_key &opt_key,
+                                                                                  boost::any                 value) {
+                TabPrinter *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
+                    return;
+                if (m_config->opt_bool("single_extruder_multi_material") && tab->m_extruders_count > 1 &&
+                    opt_key.find("nozzle_diameter") != std::string::npos) {
                     SuppressBackgroundProcessingUpdate sbpu;
-                    const double new_nd = boost::any_cast<double>(value);
-                    std::vector<double> nozzle_diameters = static_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"))->values;
+                    const double                       new_nd = boost::any_cast<double>(value);
+                    std::vector<double>                nozzle_diameters =
+                        static_cast<const ConfigOptionFloats *>(m_config->option("nozzle_diameter"))->values;
 
                     // if value was changed
-                    if (fabs(nozzle_diameters[idx_page == 0 ? 1 : 0] - new_nd) > EPSILON)
-                    {
-                        const wxString msg_text = _L("This is a single extruder multimaterial printer, diameters of all extruders "
+                    if (fabs(nozzle_diameters[idx_page == 0 ? 1 : 0] - new_nd) > EPSILON) {
+                        const wxString msg_text = _L(
+                            "This is a single extruder multimaterial printer, diameters of all extruders "
                             "will be set to the new value. Do you want to proceed?");
                         wxMessageDialog dialog(parent(), msg_text, _L("Nozzle diameter"), wxICON_WARNING | wxYES_NO);
 
@@ -2480,43 +2289,323 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         } else
                             nozzle_diameters[idx_page] = nozzle_diameters[idx_page == 0 ? 1 : 0];
 
-                        new_conf.set_key_value("nozzle_diameter", (new ConfigOptionFloats(nozzle_diameters))->set_is_extruder_size(true));
+                        new_conf.set_key_value("nozzle_diameter",
+                                               (new ConfigOptionFloats(nozzle_diameters))->set_is_extruder_size(true));
                         load_config(new_conf);
                     }
                 }
 
                 update();
             });
-        }else if(full_line == "reset_to_filament_color") {
-            TabPrinter* tab = nullptr;
-            if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
-            widget_t reset_to_filament_color = [this, idx_page, tab](wxWindow* parent) -> wxBoxSizer* {
-                tab->m_reset_to_filament_color = new ScalableButton(parent, wxID_ANY, "undo", _L("Reset to Filament Color"),
-                    wxDefaultSize, wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT, true);
-                ScalableButton* btn = tab->m_reset_to_filament_color;
-                btn->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-                btn->SetSize(btn->GetBestSize());
-                wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
-                sizer->Add(btn);
+        } else {
+            // no in-line command detected, to be safe we will close the current line if any.
+            if (in_line) {
+                current_group->append_line(current_line);
+                if (logs)
+                    Slic3r::slic3r_log->info("settings gui") << "add line\n";
+                in_line = false;
+            }
+            //now find next command
+            if (boost::starts_with(full_line, "recommended_thin_wall_thickness_description")) {
+                TabPrint *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrint *>(this)) == nullptr)
+                    continue;
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    return description_line_widget(parent, &(tab->m_recommended_thin_wall_thickness_description_line));
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("wall_thickness");
+            } else if (boost::starts_with(full_line, "recommended_extrusion_width_description")) {
+                TabPrint *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrint *>(this)) == nullptr)
+                    continue;
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    // return description_line_widget(parent, &(tab->m_recommended_extrusion_width_description_line));
 
-                btn->Bind(wxEVT_BUTTON, [this, idx_page](wxCommandEvent& e)
-                {
-                    std::vector<std::string> colors = static_cast<const ConfigOptionStrings*>(m_config->option("extruder_colour"))->values;
-                    colors[idx_page] = "";
+                    auto               sizer    = new wxBoxSizer(wxVERTICAL);
+                    wxCollapsiblePane *collpane = new wxCollapsiblePane(parent, wxID_ANY, _L("Help / Details:"));
+                    wxGetApp().UpdateDarkUI(collpane);
+                    // add the pane with a zero proportion value to the 'sz' sizer which contains it
+                    sizer->Add(collpane, 0, wxGROW | wxALL, 5);
+                    // now add a test label in the collapsible pane using a sizer to layout it:
+                    wxWindow *win = collpane->GetPane();
+                    collpane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [tab](wxEvent &) { tab->Layout(); });
 
-                    DynamicPrintConfig new_conf = *m_config;
-                    new_conf.set_key_value("extruder_colour", (new ConfigOptionStrings(colors))->set_is_extruder_size(true));
-                    load_config(new_conf);
+                    const wxBitmap &bmp_width     = create_scaled_bitmap("explanation_width", this, 80);
+                    wxStaticBitmap *image_width   = new wxStaticBitmap(win, wxID_ANY, bmp_width);
+                    const wxBitmap &bmp_spacing   = create_scaled_bitmap("explanation_spacing", this, 80);
+                    wxStaticBitmap *image_spacing = new wxStaticBitmap(win, wxID_ANY, bmp_spacing);
+                    auto            sizerV        = new wxBoxSizer(wxVERTICAL);
+                    auto            sizerH2       = new wxBoxSizer(wxHORIZONTAL);
+                    auto            sizerH3       = new wxBoxSizer(wxHORIZONTAL);
+                    sizerH2->Add(image_width, 1, 0, 0);
+                    sizerH2->Add(image_spacing, 1, 0, 0);
+                    sizerV->Add(sizerH2);
+                    ogStaticText *text =
+                        new ogStaticText(win, _L("If the perimeter overlap is set at 100%, the yellow areas should "
+                                                 "be filled by the overlap.\nIf overlap is at 0%, width = spacing."));
+                    text->SetFont(wxGetApp().normal_font());
+                    sizerH3->Add(text, 1, wxEXPAND | wxALL, 0);
+                    sizerV->Add(sizerH3);
 
+                    win->SetSizer(sizerV);
+
+                    sizerV->SetSizeHints(win);
+                    collpane->Collapse(true);
+
+                    return sizer;
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("extrusion_width");
+            } else if (boost::starts_with(full_line, "top_bottom_shell_thickness_explanation")) {
+                TabPrint *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrint *>(this)) == nullptr)
+                    continue;
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    return description_line_widget(parent, &(tab->m_top_bottom_shell_thickness_explanation));
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("top_bottom_shell");
+            } else if (boost::starts_with(full_line, "parent_preset_description")) {
+                build_preset_description_line(current_group.get());
+            } else if (boost::starts_with(full_line, "cooling_description")) {
+                TabFilament *tab = nullptr;
+                if ((tab = dynamic_cast<TabFilament *>(this)) == nullptr)
+                    continue;
+                current_line            = Line{"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    return description_line_widget(parent, &(tab->m_cooling_description_line));
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("cooling");
+            } else if (boost::starts_with(full_line, "volumetric_speed_description")) {
+                TabFilament *tab = nullptr;
+                if ((tab = dynamic_cast<TabFilament *>(this)) == nullptr)
+                    continue;
+                current_line            = Line{"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    return description_line_widget(parent, &(tab->m_volumetric_speed_description_line));
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("volumetric_speed");
+            } else if (boost::starts_with(full_line, "support_object_elevation_description")) {
+                TabSLAPrint *tab = nullptr;
+                if ((tab = dynamic_cast<TabSLAPrint *>(this)) == nullptr)
+                    continue;
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    return description_line_widget(parent, &(tab->m_support_object_elevation_description_line));
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("support_object_elevation");
+            } else if (boost::starts_with(full_line, "print_host_upload_description")) {
+                TabPrinter *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
+                    continue;
+                wxString description_line_text =
+                    wxString::Format(_L(""
+                                        "Note: All parameters from this group are moved to the Physical Printer "
+                                        "settings (see changelog).\n\n"
+                                        "A new Physical Printer profile is created by clicking on the \"cog\" icon "
+                                        "right of the Printer profiles combo box, "
+                                        "by selecting the \"Add physical printer\" item in the Printer combo box. "
+                                        "The Physical Printer profile editor opens "
+                                        "also when clicking on the \"cog\" icon in the Printer settings tab. The "
+                                        "Physical Printer profiles are being stored "
+                                        "into %s/physical_printer directory."),
+                                     SLIC3R_APP_KEY);
+
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [tab, description_line_text](wxWindow *parent) {
+                    return tab->description_line_widget(parent,
+                                                        tab->m_presets->get_selected_preset().printer_technology() ==
+                                                                ptFFF ?
+                                                                &tab->m_fff_print_host_upload_description_line :
+                                                                &tab->m_sla_print_host_upload_description_line,
+                                                        description_line_text);
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("print_host_upload");
+            } else if (boost::starts_with(full_line, "post_process_explanation")) {
+                TabPrint *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrint *>(this)) == nullptr)
+                    continue;
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    return description_line_widget(parent, &(tab->m_post_process_explanation));
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("post_process_explanation");
+            } else if (boost::starts_with(full_line, "filament_ramming_parameters")) {
+                Line thisline = current_group->create_single_option_line(
+                    "filament_ramming_parameters"); // { _(L("Ramming")), "" };
+                thisline.widget = [this](wxWindow *parent) {
+                    auto ramming_dialog_btn = new wxButton(parent, wxID_ANY, _(L("Ramming settings")) + dots,
+                                                           wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+                    ramming_dialog_btn->SetFont(Slic3r::GUI::wxGetApp().normal_font());
+                    wxGetApp().UpdateDarkUI(ramming_dialog_btn);
+                    auto sizer = new wxBoxSizer(wxHORIZONTAL);
+                    sizer->Add(ramming_dialog_btn);
+
+                    ramming_dialog_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent &e) {
+                                                 RammingDialog dlg(this, (m_config->option<ConfigOptionStrings>(
+                                                                              "filament_ramming_parameters"))
+                                                                             ->get_at(0));
+                                                 if (dlg.ShowModal() == wxID_OK)
+                                                     (m_config->option<ConfigOptionStrings>(
+                                                          "filament_ramming_parameters"))
+                                                         ->get_at(0) = dlg.get_parameters();
+                                             }));
+                    return sizer;
+                };
+                current_group->append_line(thisline);
+            } else if (full_line == "bed_shape") {
+                TabPrinter *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
+                    continue;
+                create_line_with_widget(current_group.get(), "bed_shape", "custom-svg-and-png-bed-textures_124612",
+                                        [tab](wxWindow *parent) { return tab->create_bed_shape_widget(parent); });
+            } else if (boost::starts_with(full_line, "vector_line:")) {
+                // extract setting name
+                std::string opt_key = full_line.substr(12);
+                // create the line
+                std::shared_ptr<VectorManager> manager = std::make_shared<VectorManager>();
+                this->m_vector_managers.push_back(manager);
+                manager->set_cb_edited([this]() {
                     update_dirty();
-                    update();
+                    wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
                 });
+                current_line            = current_group->create_single_option_line(opt_key);
+                current_line.label_path = "";
+                current_line.widget     = [this, manager, current_page, opt_key](wxWindow *parent) {
+                    auto create_btn = [parent](ScalableButton **btn, const wxString &label,
+                                               const std::string &icon_name) {
+                        *btn = new ScalableButton(parent, wxID_ANY, icon_name, " " + label + " ", wxDefaultSize,
+                                                  wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT, true);
+                        (*btn)->SetFont(wxGetApp().normal_font());
+                        (*btn)->SetSize((*btn)->GetBestSize());
+                    };
+                    ScalableButton *add_btn;
+                    create_btn(&add_btn, _L("Add"), "add_copies");
+                    add_btn->Bind(wxEVT_BUTTON, [manager](wxCommandEvent e) { manager->push_back(""); });
+                    ScalableButton *del_btn;
+                    create_btn(&del_btn, _L("Delete"), "cross");
+                    del_btn->Bind(wxEVT_BUTTON, [manager](wxCommandEvent e) { manager->pop_back(); });
+                    wxSizer *line_sizer = new wxBoxSizer(wxHORIZONTAL);
+                    line_sizer->Add(add_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
+                    line_sizer->Add(del_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit(parent));
+                    parent->GetParent()->Layout();
+                    return line_sizer;
+                };
 
-                return sizer;
-            };
-            current_line = current_group->create_single_option_line("extruder_colour", "", idx_page);
-            current_line.append_widget(reset_to_filament_color);
-            current_group->append_line(current_line);
+                m_colored_Label_colors[opt_key] = m_default_label_clr;
+                current_line.full_Label_color   = &m_colored_Label_colors[opt_key];
+                current_group->append_line(current_line);
+
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, manager, current_page, opt_key](wxWindow *parent) {
+                    auto sizer = manager->init(this->m_config, parent, current_page, opt_key);
+                    return sizer;
+                };
+                current_group->append_line(current_line);
+            } else if (full_line == "gcode_substitutions") {
+                TabPrint *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrint *>(this)) == nullptr)
+                    continue;
+                create_line_with_widget(current_group.get(), "gcode_substitutions", "g-code-substitutions_301694",
+                                        [tab](wxWindow *parent) {
+                                            return tab->create_manage_substitution_widget(parent);
+                                        });
+                current_line            = {"", ""};
+                current_line.full_width = 1;
+                current_line.widget     = [this, tab](wxWindow *parent) {
+                    return tab->create_substitutions_widget(parent);
+                };
+                current_group->append_line(current_line);
+                current_page->descriptions.push_back("substitutions_widget");
+            } else if (full_line == "extruders_count") {
+                ConfigOptionDef def;
+                def.type    = coInt, def.set_default_value(new ConfigOptionInt(1));
+                def.label   = L("Extruders");
+                def.tooltip = L("Number of extruders of the printer.");
+                def.min     = 1;
+                def.max     = 256;
+                def.mode    = comAdvancedE | comPrusa;
+                Option option(def, "extruders_count");
+                current_group->append_single_option_line(option);
+            } else if (full_line == "milling_count") {
+                ConfigOptionDef def;
+                def.type    = coInt, def.set_default_value(new ConfigOptionInt(0));
+                def.label   = L("Milling cutters");
+                def.tooltip = L("Number of milling heads.");
+                def.min     = 0;
+                def.mode    = comAdvancedE | comSuSi;
+                Option option(def, "milling_count");
+                current_group->append_single_option_line(option);
+            } else if (full_line == "reset_to_filament_color") {
+                TabPrinter *tab = nullptr;
+                if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
+                    continue;
+                widget_t reset_to_filament_color = [this, idx_page, tab](wxWindow *parent) -> wxBoxSizer * {
+                    tab->m_reset_to_filament_color = new ScalableButton(parent, wxID_ANY, "undo",
+                                                                        _L("Reset to Filament Color"), wxDefaultSize,
+                                                                        wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT,
+                                                                        true);
+                    ScalableButton *btn            = tab->m_reset_to_filament_color;
+                    btn->SetFont(Slic3r::GUI::wxGetApp().normal_font());
+                    btn->SetSize(btn->GetBestSize());
+                    wxBoxSizer *sizer = new wxBoxSizer(wxHORIZONTAL);
+                    sizer->Add(btn);
+
+                    btn->Bind(wxEVT_BUTTON, [this, idx_page](wxCommandEvent &e) {
+                        std::vector<std::string> colors =
+                            static_cast<const ConfigOptionStrings *>(m_config->option("extruder_colour"))->values;
+                        colors[idx_page] = "";
+
+                        DynamicPrintConfig new_conf = *m_config;
+                        new_conf.set_key_value("extruder_colour",
+                                               (new ConfigOptionStrings(colors))->set_is_extruder_size(true));
+                        load_config(new_conf);
+
+                        update_dirty();
+                        update();
+                    });
+
+                    return sizer;
+                };
+                current_line = current_group->create_single_option_line("extruder_colour", "", idx_page);
+                current_line.append_widget(reset_to_filament_color);
+                current_group->append_line(current_line);
+            } else {
+                //these will need a new page
+                // I don't think it's needed to do special things for theses.
+                if (boost::starts_with(full_line, "filament_overrides_page"))
+                {
+                    TabFilament *tab = nullptr;
+                    if ((tab = dynamic_cast<TabFilament *>(this)) == nullptr)
+                        continue;
+                    pages.push_back(tab->create_filament_overrides_page());
+                }
+                else if (full_line == "unregular_pages")
+                {
+                    TabPrinter *tab = nullptr;
+                    if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
+                        continue;
+                    tab->m_unregular_page_pos = pages.size();
+                } 
+            }
         }
     }
 
@@ -2596,6 +2685,12 @@ void TabPrint::update_description_lines()
         if (m_del_all_substitutions_btn)
             m_del_all_substitutions_btn->Show(!m_subst_manager.is_empty_substitutions());
     }
+    // update vector managers
+    for (std::shared_ptr<VectorManager> manager : m_vector_managers) {
+        if (m_active_page && manager->is_active() && manager->get_page() && manager->get_page() == m_active_page) {
+            manager->update_from_config();
+        }
+    }
 }
 
 void TabPrint::toggle_options()
@@ -2638,7 +2733,7 @@ void TabPrint::update()
     {
         const Preset& selected_preset = m_preset_bundle->fff_prints.get_selected_preset();
         bool is_user_and_saved_preset = !selected_preset.is_system && !selected_preset.is_dirty;
-        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && m_config->option("overhangs_width_speed")->getFloat() == 0;
+        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && m_config->option("overhangs_width_speed")->get_float() == 0;
         m_config_manipulation.initialize_support_material_overhangs_queried(is_user_and_saved_preset && support_material_overhangs_queried);
     }
 
@@ -2706,11 +2801,11 @@ PageShp TabFilament::create_filament_overrides_page()
     {
         Line line {"",""};
         if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
-            Option opt = optgroup->get_option_and_register(opt_key);
+            Option opt = optgroup->get_option_and_register(opt_key, 0);
             opt.opt.label = opt.opt.get_full_label();
             line = optgroup->create_single_option_line(opt);
         } else {
-            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key));
+            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key, 0));
         }
 
         line.near_label_widget = [this, optgroup, opt_key, opt_index](wxWindow* parent) {
@@ -2849,7 +2944,7 @@ void TabFilament::update_description_lines()
         return;
 
     if (std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "cooling") != m_active_page->descriptions.end() && m_cooling_description_line)
-        m_cooling_description_line->SetText(from_u8(PresetHints::cooling_description(m_presets->get_edited_preset())));
+        m_cooling_description_line->SetText(from_u8(PresetHints::cooling_description(m_presets->get_edited_preset(), m_preset_bundle->printers.get_edited_preset())));
     if (std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "volumetric_speed") != m_active_page->descriptions.end() && m_volumetric_speed_description_line)
         this->update_volumetric_flow_preset_hints();
 }
@@ -2861,12 +2956,12 @@ void TabFilament::toggle_options()
 
     if ( std::find(m_active_page->descriptions.begin(), m_active_page->descriptions.end(), "cooling") != m_active_page->descriptions.end())
     {
-        bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
+        // bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
 
         //get_field("max_fan_speed")->toggle(m_config->opt_float("fan_below_layer_time", 0) > 0);
-        Field* min_print_speed_field = get_field("min_print_speed");
-        if (min_print_speed_field)
-            min_print_speed_field->toggle(m_config->opt_float("slowdown_below_layer_time", 0) > 0);
+        // Field* min_print_speed_field = get_field("min_print_speed");
+        // if (min_print_speed_field)
+            // min_print_speed_field->toggle(m_config->opt_float("slowdown_below_layer_time", 0) > 0);
 
         // hidden 'cooling', it's now deactivated.
              //for (auto el : { "min_fan_speed", "disable_fan_first_layers" })
@@ -4736,6 +4831,226 @@ wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
 
     parent->GetParent()->Layout();
     return grid_sizer;
+}
+
+// vectormanager
+wxSizer *VectorManager::init(DynamicPrintConfig *config, wxWindow *parent, PageShp page, const std::string &opt_key)
+{
+    m_opt_key       = opt_key;
+    m_opt_type      = config->get_option_def(opt_key)->type;
+    m_config        = config;
+    m_parent        = parent;
+    m_page          = page;
+    m_grid_sizer    = new wxBoxSizer(wxHORIZONTAL);
+    m_em            = em_unit(parent);
+    // use a wxFlexGridSizer in-between to let some free space at the right and not force the input to grow to full width
+    wxFlexGridSizer *line_sizer = new wxFlexGridSizer(2, 1, 0);
+    line_sizer->SetFlexibleDirection(wxHORIZONTAL);
+    line_sizer->AddGrowableCol(1);
+    //wxSizer *line_sizer = new wxBoxSizer(wxHORIZONTAL);
+    line_sizer->Add(m_grid_sizer);
+    //line_sizer->AddStretchSpacer();
+    return line_sizer;
+}
+
+bool VectorManager::is_compatibile_with_ui()
+{
+    const std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+    if (int(values.size()) != m_grid_sizer->GetItemCount()) {
+        ErrorDialog(m_parent,
+                    std::string("Invalid compatibility between UI and BE: ") + std::to_string(values.size()) +
+                        std::string("=!=") + std::to_string(m_grid_sizer->GetItemCount()),
+                    false)
+            .ShowModal();
+        return false;
+    }
+    return true;
+};
+
+// delete substitution_id from substitutions
+void VectorManager::pop_back()
+{
+    if (m_grid_sizer->IsEmpty()) {
+        return;
+    }
+
+    // delete substitution
+    std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+    values.pop_back();
+
+    call_ui_update();
+
+    // update grid_sizer
+    // note: grid-> Remove(size-1) isn't enough to destroy the extra entry, also need to destroy it. clear(true) + update is easier
+    m_grid_sizer->Clear(true);
+    update_from_config();
+}
+
+// Add substitution line
+void VectorManager::push_back(const std::string &str_value)
+{
+    bool call_after_layout = false;
+
+    std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+
+    if (str_value == "") {
+        // create new substitution
+        // it have to be added to config too
+        values.push_back(0);
+
+        call_after_layout = true;
+    }
+
+    const size_t idx_value = m_grid_sizer->GetItemCount();
+
+    wxTextCtrl *editor = new wxTextCtrl(m_parent, wxID_ANY, str_value == "" ? "0" : str_value, wxDefaultPosition,
+                                       wxSize(4 * m_em, wxDefaultCoord),
+                                     wxTE_PROCESS_ENTER
+#ifdef _WIN32
+                                         | wxBORDER_SIMPLE
+#endif
+    );
+
+    editor->SetFont(wxGetApp().normal_font());
+    wxGetApp().UpdateDarkUI(editor);
+
+    editor->Bind(wxEVT_TEXT_ENTER, [this, editor, idx_value](wxEvent &e) {
+#if !defined(__WXGTK__)
+         e.Skip();
+#endif // __WXGTK__
+        edit_value(idx_value, into_u8(editor->GetValue()));
+    });
+
+    editor->Bind(wxEVT_KILL_FOCUS, [this, editor, idx_value](wxEvent &e) {
+        e.Skip();
+        edit_value(idx_value, into_u8(editor->GetValue()));
+    });
+    m_grid_sizer->Add(editor);
+    if (call_after_layout) {
+        m_parent->GetParent()->Layout();
+        call_ui_update();
+    }
+}
+
+void VectorManager::update_from_config()
+{
+    if (!m_grid_sizer->IsEmpty())
+        m_grid_sizer->Clear(true);
+    //while (m_grid_sizer->GetItemCount() > 2) { m_grid_sizer->Remove(m_grid_sizer->GetItemCount() - 1); }
+
+    switch (m_opt_type) {
+    case coBools: {
+        std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(values[i]?"true":"false");
+        break;
+    }
+    case coInts: {
+        std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(std::to_string(values[i]));
+        break;
+    }
+    case coFloats: {
+        std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(to_string_nozero(values[i], 6));
+        break;
+    }
+    case coPercents: {
+        std::vector<double> &values = m_config->option<ConfigOptionPercents>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(to_string_nozero(values[i], 6));
+        break;
+    }
+    case coFloatsOrPercents: {
+        std::vector<FloatOrPercent> &values = m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->values;
+        if (values.empty())
+            clear();
+        else
+            for (size_t i = 0; i < values.size(); i++) push_back(to_string_nozero(values[i].value, 6) + (values[i].percent?"%":""));
+        break;
+    }
+    case coPoints: {
+        assert(false); // todo
+        break;
+    }
+    }
+
+    m_parent->GetParent()->Layout();
+}
+
+void VectorManager::clear()
+{
+    ((ConfigOptionVectorBase*)m_config->option(m_opt_key))->clear();
+    call_ui_update();
+
+    if (!m_grid_sizer->IsEmpty())
+        m_grid_sizer->Clear(true);
+    //while (m_grid_sizer->GetItemCount() > 2) { m_grid_sizer->Remove(m_grid_sizer->GetItemCount() - 1); }
+
+    m_parent->GetParent()->Layout();
+}
+
+void VectorManager::edit_value(int idx_value, const std::string &str_value)
+{
+    if (!is_compatibile_with_ui())
+        return;
+    switch (m_opt_type) {
+    case coBools: {
+        std::vector<uint8_t> &values = m_config->option<ConfigOptionBools>(m_opt_key)->values;
+        std::string        lower  = str_value;
+        boost::to_lower(lower);
+        bool is_val       = str_value == "1" || lower == "true";
+        values[idx_value] = is_val;
+        break;
+    }
+    case coInts: {
+        std::vector<int32_t> &values  = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        int32_t               int_val = (int32_t) string_to_double_decimal_point(str_value);
+        values[idx_value]             = int_val;
+        break;
+    }
+    case coFloats: {
+        std::vector<double> &values    = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+        double               float_val = string_to_double_decimal_point(str_value);
+        values[idx_value]              = float_val;
+        break;
+    }
+    case coPercents: {
+        std::vector<double> &values    = m_config->option<ConfigOptionPercents>(m_opt_key)->values;
+        double               float_val = string_to_double_decimal_point(str_value);
+        values[idx_value]              = float_val;
+        break;
+    }
+    case coFloatsOrPercents: {
+        std::vector<FloatOrPercent> &values = m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->values;
+        std::string                  trimed = str_value;
+        boost::trim(trimed);
+        bool   has_percent = !trimed.empty() && trimed.back() == '%';
+        double float_val = string_to_double_decimal_point(has_percent ? trimed.substr(0, trimed.size() - 1) : trimed);
+        values[idx_value] = FloatOrPercent{float_val, has_percent};
+        break;
+    }
+    case coPoints: {
+        assert(false);  // todo
+        break;
+    }
+    }
+    call_ui_update();
+}
+
+bool VectorManager::is_empty_vector()
+{
+    return((ConfigOptionVectorBase*)m_config->option(m_opt_key))->size() == 0;
 }
 
 // Return a callback to create a TabPrinter widget to edit bed shape

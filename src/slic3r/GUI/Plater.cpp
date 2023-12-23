@@ -1281,11 +1281,11 @@ void Sidebar::update_sliced_info_sizer()
             wxString str_total_cost = "N/A";
 
             DynamicPrintConfig* cfg = wxGetApp().get_tab(Preset::TYPE_SLA_MATERIAL)->get_config();
-            if (cfg->option("bottle_cost")->getFloat() > 0.0 &&
-                cfg->option("bottle_volume")->getFloat() > 0.0)
+            if (cfg->option("bottle_cost")->get_float() > 0.0 &&
+                cfg->option("bottle_volume")->get_float() > 0.0)
             {
-                double material_cost = cfg->option("bottle_cost")->getFloat() / 
-                                       cfg->option("bottle_volume")->getFloat();
+                double material_cost = cfg->option("bottle_cost")->get_float() / 
+                                       cfg->option("bottle_volume")->get_float();
                 str_total_cost = wxString::Format("%.3f", material_cost*(ps.objects_used_material + ps.support_used_material) / 1000);                
             }
             p->sliced_info->SetTextAndShow(siCost, str_total_cost, "Cost");

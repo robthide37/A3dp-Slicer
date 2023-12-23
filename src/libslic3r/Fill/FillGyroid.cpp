@@ -149,7 +149,7 @@ void FillGyroid::_fill_surface_single(
     ExPolygon                        expolygon, 
     Polylines                       &polylines_out) const
 {
-    float infill_angle = float(this->angle + (CorrectionAngle * 2 * M_PI) / 360.f);
+    float infill_angle = direction.first;
     if(std::abs(infill_angle) >= EPSILON)
         expolygon.rotate(-infill_angle);
 

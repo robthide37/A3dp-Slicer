@@ -376,7 +376,6 @@ void PrintConfigDef::init_common_params()
     def->mode = comExpert | comPrusa;
     def->min = 0;
     def->max = 2048;
-    //def->gui_type = ConfigOptionDef::GUIType::one_string; // i prefer two boxes
     def->set_default_value(new ConfigOptionPoints{ std::initializer_list<Vec2d>{ Vec2d(0,0), Vec2d(0,0) } });
 
     def = this->add("thumbnails_color", coString);
@@ -729,7 +728,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Bridges fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during bridges and overhangs. It won't slow down the fan if it's currently running at a higher speed."
-        "\nSet to -1 to disable this override (Bridge will use default fan speed)."
+        "\nSet to -1 to disable this override (Bridges will use default fan speed)."
         "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
     def->sidetext = L("%");
     def->min = -1;
@@ -742,8 +741,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Infill bridges fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during all infill bridges. It won't slow down the fan if it's currently running at a higher speed."
-        "\nSet to 1 to follow default speed."
-        "\nSet to -1 to disable this override (internal bridges will use Bridges fan speed)."
+        "\nSet to -1 to disable this override (Internal bridges will use Bridges fan speed)."
         "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
     def->sidetext = L("%");
     def->min = -1;
@@ -1211,6 +1209,20 @@ void PrintConfigDef::init_fff_params()
                    "On selection of the current printer profile, this filament profile will be activated.");
     def->set_default_value(new ConfigOptionStrings());
     def->cli = ConfigOptionDef::nocli;
+
+    def           = this->add("default_fan_speed", coInts);
+    def->label    = L("Default fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip  = L(
+        "Default speed for the fan, to set the speed for features where there is no fan control. Useful for PLA and other low-temp filament."
+        "\nSet 0 to disable the fan by default. Useful for ABS and other high-temp filaments."
+        "\nSet -1 to disable. if disabled, the beahavior isn't defined yet. The goal is to avoid adding fan speed commands.");
+    def->mode               = comSimpleAE | comSuSi;
+    def->min                = -1;
+    def->max                = 100;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts({-1}));
+    def->aliases = { "min_fan_speed" }; // only if "fan_always_on"
 
     def = this->add("default_print_profile", coString);
     def->label = L("Default print profile");
@@ -1815,6 +1827,8 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false, false));
 
+#if 0
+    //not used anymore, to remove !! @DEPRECATED (replaces by default_fan_speed)
     def = this->add("fan_always_on", coBools);
     def->label = L("Keep fan always on");
     def->category = OptionCategory::cooling;
@@ -1823,6 +1837,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimpleAE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });
+#endif
 
     def = this->add("fan_below_layer_time", coFloats);
     def->label = L("Enable fan if layer print time is below");
@@ -2260,6 +2275,13 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(45));
 
+    def             = this->add("fill_angle_cross", coBool);
+    def->label      = L("Alternate Fill Angle");
+    def->category   = OptionCategory::infill;
+    def->tooltip    = L("It's better for some infill like rectilinear to rotate 90° each layer. If this settign is deactivated, they won't do that anymore.");
+    def->mode       = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("fill_angle_increment", coFloat);
     def->label = L("Fill");
     def->full_label = L("Fill angle increment");
@@ -2272,6 +2294,22 @@ void PrintConfigDef::init_fff_params()
     def->max = 360;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def             = this->add("fill_angle_template", coFloats);
+    def->label      = L("Fill angle pattern");
+    def->full_label = L("Fill angle pattern");
+    def->category   = OptionCategory::infill;
+    def->tooltip    = L("This define the succetion of infill angle. When defined, it replaces the fill_angle"
+        ", and there won't be any extra 90° for each layer added, but the fill_angle_increment will still be used."
+        " The first layer start with the first angle. If a new pattern is used in a modifier"
+        ", it will choose the layer angle from the pattern as if it has started from the first layer."
+        "Empty this settings to disable and recover the old behavior.");
+    def->sidetext   = L("°");
+    def->min        = 0;
+    def->max        = 360;
+    def->full_width = true;
+    def->mode       = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloats(0.));
 
     def = this->add("fill_density", coPercent);
     def->gui_type = ConfigOptionDef::GUIType::f_enum_open;
@@ -3650,6 +3688,8 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
 
+#if 0
+    // replaced by fan_printer_min_speed, to remove !! @DEPRECATED
     def = this->add("min_fan_speed", coInts);
     def->label = L("Default fan speed");
     def->full_label = L("Default fan speed");
@@ -3661,6 +3701,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimpleAE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionInts{ 35 });
+#endif
 
     def = this->add("fan_percentage", coBool);
     def->label = L("Fan PWM from 0-100");
@@ -4095,7 +4136,7 @@ void PrintConfigDef::init_fff_params()
                      "\nset 0 to disable");
     def->sidetext = L("mm or %");
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(false, 0));
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("perimeter_fan_speed", coInts);
     def->label = L("Internal Perimeter fan speed");
@@ -4194,7 +4235,6 @@ void PrintConfigDef::init_fff_params()
                    "and they can access the Slic3r config settings by reading environment variables."
                    "\nThe script, if passed as a relative path, will also be searched from the slic3r directory, "
                    "the slic3r configuration directory and the user directory.");
-    def->gui_flags = "serialized";
     def->multiline = true;
     def->full_width = true;
     def->height = 6;
@@ -4219,6 +4259,17 @@ void PrintConfigDef::init_fff_params()
     def->height = 13;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionString{ "" });
+
+    def = this->add("fan_printer_min_speed", coInt);
+    def->label = L("Minimum fan speed");
+    def->full_label = L("Minimum fan speed");
+    def->category = OptionCategory::general;
+    def->tooltip = L("This setting represents the minimum fan speed (like minimum PWM) your fan needs to work.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comSimpleAE | comSuSi;
+    def->set_default_value(new ConfigOptionInt(35));
 
     def = this->add("printer_model", coString);
     def->label = L("Printer type");
@@ -6394,16 +6445,39 @@ void PrintConfigDef::init_fff_params()
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
         def = this->add_nullable(std::string("filament_") + opt_key, it_opt->second.type);
-        def->label         = it_opt->second.label;
+        def->label      = it_opt->second.label;
         def->full_label = it_opt->second.full_label;
-        def->tooltip     = it_opt->second.tooltip;
+        def->tooltip    = it_opt->second.tooltip;
         def->sidetext   = it_opt->second.sidetext;
         def->mode       = it_opt->second.mode;
+        // create default value with the default value is taken from the default value of the config.
+        // put a nil value as first entry.
         switch (def->type) {
-        case coFloats   : def->set_default_value(new ConfigOptionFloatsNullable  (static_cast<const ConfigOptionFloats*  >(it_opt->second.default_value.get())->values)); break;
-        case coPercents : def->set_default_value(new ConfigOptionPercentsNullable(static_cast<const ConfigOptionPercents*>(it_opt->second.default_value.get())->values)); break;
-        case coFloatsOrPercents : def->set_default_value(new ConfigOptionFloatsOrPercentsNullable(static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->values)); break;
-        case coBools    : def->set_default_value(new ConfigOptionBoolsNullable   (static_cast<const ConfigOptionBools*   >(it_opt->second.default_value.get())->values)); break;
+        case coBools: {
+            ConfigOptionBoolsNullable* opt = new ConfigOptionBoolsNullable(it_opt->second.default_value.get()->get_bool());
+            opt->set_at(ConfigOptionBoolsNullable::NIL_VALUE(), 0);
+            def->set_default_value(opt);
+            break;
+        }
+        case coFloats: {
+            ConfigOptionFloatsNullable *opt = new ConfigOptionFloatsNullable(it_opt->second.default_value.get()->get_float());
+            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
+            def->set_default_value(opt);
+            break;
+        }
+        case coPercents: {
+            ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
+            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
+            def->set_default_value(opt);
+            break;
+        }
+        case coFloatsOrPercents: {
+            ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
+                static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
+            opt->set_at(ConfigOptionFloatsOrPercentsNullable::NIL_VALUE(), 0);
+            def->set_default_value(opt);
+            break;
+        }
         default: assert(false);
         }
     }
@@ -7595,6 +7669,16 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     if (boost::starts_with(opt_key, "thin_perimeters") && value == "1")
         value = "100%";
 
+    if ("fan_always_on" == opt_key) {
+        if (value != "1") {
+            //min_fan_speed is already converted to default_fan_speed, just has to deactivate it if not always_on
+            opt_key = "default_fan_speed"; // note: maybe this doesn't works, as default_fan_speed can also get its value from min_fan_speed
+            value = "0";
+        } else {
+            opt_key = "";
+        }
+    }
+
     //prusa
     if ("gcode_flavor" == opt_key) {
         if ("reprap" == value)
@@ -7667,6 +7751,11 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         value = "rectilinear";
         output["fill_angle_increment"] = "90";
     }
+    if ("fan_always_on" == opt_key) {
+        //min_fan_speed is already converted to default_fan_speed, just has to deactivate it if not always_on
+        if (value != "1")
+            output["default_fan_speed"] = "0";
+    }
 
     return output;
 }
@@ -7738,6 +7827,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "curve_smoothing_angle_convex",
 "curve_smoothing_cutoff_dist",
 "curve_smoothing_precision",
+//"default_fan_speed", used to convert to min_fan_speed & fan_always_on
 "default_speed",
 "enforce_full_fill_volume",
 "exact_last_layer_height",
@@ -7757,6 +7847,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "extrusion_spacing",
 "fan_kickstart",
 "fan_percentage",
+"fan_printer_min_speed",
 "fan_speedup_overhangs",
 "fan_speedup_time",
 "feature_gcode",
@@ -7940,7 +8031,7 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         } else if ("monotonicgapfill" == value) {
             value = "monotonic";
         }
-        if (all_conf.has("fill_angle_increment") && ((int(all_conf.option("fill_angle_increment")->getFloat())-90)%180) == 0 && "rectilinear" == value
+        if (all_conf.has("fill_angle_increment") && ((int(all_conf.option("fill_angle_increment")->get_float())-90)%180) == 0 && "rectilinear" == value
             && ("fill_pattern" == opt_key || "top_fill_pattern" == opt_key)) {
             value = "alignedrectilinear";
         }
@@ -8075,6 +8166,16 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
     if ("bed_custom_texture" == opt_key || "Bed custom texture" == opt_key) {
         value = Slic3r::find_full_path(value, value).generic_string();
     }
+    if ("default_fan_speed" == opt_key) {
+        if (value == "0") {
+            opt_key = "min_fan_speed";
+            value = all_conf.option("fan_printer_min_speed")->get_float();
+            new_entries["fan_always_on"] = "0";
+        } else {
+            opt_key = "min_fan_speed";
+            new_entries["fan_always_on"] = "1";
+        }
+    }
     return new_entries;
 }
 
@@ -8103,10 +8204,10 @@ PrinterTechnology printer_technology(const ConfigBase& cfg)
     if (opt) return opt->value;
 
     const ConfigOptionBool* export_opt = cfg.option<ConfigOptionBool>("export_sla");
-    if (export_opt && export_opt->getBool()) return ptSLA;
+    if (export_opt && export_opt->get_bool()) return ptSLA;
 
     export_opt = cfg.option<ConfigOptionBool>("export_gcode");
-    if (export_opt && export_opt->getBool()) return ptFFF;
+    if (export_opt && export_opt->get_bool()) return ptFFF;
 
     return ptUnknown;
 }
@@ -8162,7 +8263,7 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
     double base_dist = 0;
     //std::cout << "START min_object_distance =>" << base_dist << "\n";
     const ConfigOptionBool* co_opt = config->option<ConfigOptionBool>("complete_objects");
-    if (config->option("parallel_objects_step")->getFloat() > 0 || co_opt && co_opt->value) {
+    if (config->option("parallel_objects_step")->get_float() > 0 || co_opt && co_opt->value) {
         double skirt_dist = 0;
         try {
             std::vector<double> vals = dynamic_cast<const ConfigOptionFloats*>(config->option("nozzle_diameter"))->values;
@@ -8172,7 +8273,7 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
             // min object distance is max(duplicate_distance, clearance_radius)
             // /2 becasue we only count the grawing for the current object
             //add 1 as safety offset.
-            double extruder_clearance_radius = config->option("extruder_clearance_radius")->getFloat() / 2;
+            double extruder_clearance_radius = config->option("extruder_clearance_radius")->get_float() / 2;
             if (extruder_clearance_radius > base_dist) {
                 base_dist = extruder_clearance_radius;
             }
@@ -8181,15 +8282,15 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
             //ideally, we should use print::first_layer_height()
             const double first_layer_height = dynamic_cast<const ConfigOptionFloatOrPercent*>(config->option("first_layer_height"))->get_abs_value(max_nozzle_diam);
             //add the skirt
-            int skirts = config->option("skirts")->getInt();
+            int skirts = config->option("skirts")->get_int();
             if (skirts > 0 && ref_height == 0)
-                skirts += config->option("skirt_brim")->getInt();
-            if (skirts > 0 && config->option("skirt_height")->getInt() >= 1 && !config->option("complete_objects_one_skirt")->getBool()) {
+                skirts += config->option("skirt_brim")->get_int();
+            if (skirts > 0 && config->option("skirt_height")->get_int() >= 1 && !config->option("complete_objects_one_skirt")->get_bool()) {
                 float overlap_ratio = 1;
                 //can't know the extruder, so we settle on the worst: 100%
                 //if (config->option<ConfigOptionPercents>("filament_max_overlap")) overlap_ratio = config->get_computed_value("filament_max_overlap");
                 if (ref_height == 0) {
-                    skirt_dist = config->option("skirt_distance")->getFloat();
+                    skirt_dist = config->option("skirt_distance")->get_float();
                     Flow skirt_flow = Flow::new_from_config_width(
                         frPerimeter,
                         *Flow::extrusion_width_option("skirt", *config),
@@ -8204,9 +8305,9 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
                     //set to 0 becasue it's incorporated into the base_dist, so we don't want to be added in to it again.
                     skirt_dist = 0;
                 } else {
-                    double skirt_height = ((double)config->option("skirt_height")->getInt() - 1) * config->get_computed_value("layer_height") + first_layer_height;
+                    double skirt_height = ((double)config->option("skirt_height")->get_int() - 1) * config->get_computed_value("layer_height") + first_layer_height;
                     if (ref_height <= skirt_height) {
-                        skirt_dist = config->option("skirt_distance")->getFloat();
+                        skirt_dist = config->option("skirt_distance")->get_float();
                         Flow skirt_flow = Flow::new_from_config_width(
                             frPerimeter,
                             *Flow::extrusion_width_option("skirt", *config),
@@ -8232,13 +8333,13 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
 void DynamicPrintConfig::normalize_fdm()
 {
     if (this->has("extruder")) {
-        int extruder = this->option("extruder")->getInt();
+        int extruder = this->option("extruder")->get_int();
         this->erase("extruder");
         if (extruder != 0) {
             if (!this->has("infill_extruder"))
-                this->option("infill_extruder", true)->setInt(extruder);
+                this->option<ConfigOptionInt>("infill_extruder", true)->value = (extruder);
             if (!this->has("perimeter_extruder"))
-                this->option("perimeter_extruder", true)->setInt(extruder);
+                this->option<ConfigOptionInt>("perimeter_extruder", true)->value = (extruder);
             // Don't propagate the current extruder to support.
             // For non-soluble supports, the default "0" extruder means to use the active extruder,
             // for soluble supports one certainly does not want to set the extruder to non-soluble.
@@ -8252,7 +8353,7 @@ void DynamicPrintConfig::normalize_fdm()
         this->erase("first_layer_extruder");
 
     if (!this->has("solid_infill_extruder") && this->has("infill_extruder"))
-        this->option("solid_infill_extruder", true)->setInt(this->option("infill_extruder")->getInt());
+        this->option<ConfigOptionInt>("solid_infill_extruder", true)->value = (this->option("infill_extruder")->get_int());
 
     if (this->has("spiral_vase") && this->opt<ConfigOptionBool>("spiral_vase", true)->value) {
         {
