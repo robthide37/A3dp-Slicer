@@ -1451,9 +1451,20 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 if (print.config().gcode_flavor.value == gcfKlipper) {
                     Polygon poly = print_object->model_object()->convex_hull_2d(
                         print_instance.model_instance->get_matrix());
-                    poly.douglas_peucker(0.1);
+                    Polygon poly_old = poly;
+                    coord_t simplify_size = scale_t(0.1);
+                    // simplify as long as there is too many points
+                    while (poly.size() > 20 && simplify_size < 100) {
+                        poly_old = poly;
+                        poly.douglas_peucker(simplify_size);
+                        simplify_size *= 2;
+                    }
+                    //if gone too far, get the previous one.
+                    if (poly.size() < 10) {
+                        poly = poly_old;
+                    }
 
-                    const boost::format format_point("[%f,%f]");
+                    const boost::format format_point("[%.2f,%.2f]");
                     std::string s_poly;
                     for (const Point& point : poly.points)
                         s_poly += (boost::format(format_point) % unscaled(point.x()) % unscaled(point.y())).str() + ",";
