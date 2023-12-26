@@ -36,21 +36,18 @@ namespace Search {
 
 static char marker_by_type(Preset::Type type, PrinterTechnology pt)
 {
-    switch(type) {
-    case Preset::TYPE_FREQUENT_FFF:
-    case Preset::TYPE_FREQUENT_SLA:
-    case Preset::TYPE_FFF_PRINT:
-    case Preset::TYPE_SLA_PRINT:
-        return ImGui::PrintIconMarker;
-    case Preset::TYPE_FFF_FILAMENT:
+    if (Preset::TYPE_FFF_FILAMENT == type) {
         return ImGui::FilamentIconMarker;
-    case Preset::TYPE_SLA_MATERIAL:
+    } else if (Preset::TYPE_SLA_MATERIAL == type) {
         return ImGui::MaterialIconMarker;
-    case Preset::TYPE_PRINTER:
+    } else if ((Preset::TYPE_PRINTER & type) == Preset::TYPE_PRINTER) {
         return pt == ptSLA ? ImGui::PrinterSlaIconMarker : ImGui::PrinterIconMarker;
-    default:
+    } else if ((Preset::TYPE_PRINT1 & type) == Preset::TYPE_PRINT1 ||
+               (Preset::TYPE_FREQUENT & type) == Preset::TYPE_FREQUENT) {
         return ImGui::PrintIconMarker;
-	}
+    }
+    assert(false);
+    return ImGui::PrintIconMarker;
 }
 
 std::string Option::opt_key_with_idx() const
