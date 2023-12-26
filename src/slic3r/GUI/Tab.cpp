@@ -2484,6 +2484,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 this->m_vector_managers.push_back(manager);
                 manager->set_cb_edited([this]() {
                     update_dirty();
+                    toggle_options();
                     wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
                 });
                 current_line            = current_group->create_single_option_line(opt_key);

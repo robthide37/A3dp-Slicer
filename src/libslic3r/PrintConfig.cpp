@@ -2302,9 +2302,9 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloat(0));
 
-    def             = this->add("fill_angle_template", coFloats);
-    def->label      = L("Fill angle pattern");
-    def->full_label = L("Fill angle pattern");
+    def             = this->add("fill_angle_template", coFloats);   
+    def->label      = L("Fill angle template");
+    def->full_label = L("Fill angle template");
     def->category   = OptionCategory::infill;
     def->tooltip    = L("This define the succetion of infill angle. When defined, it replaces the fill_angle"
         ", and there won't be any extra 90° for each layer added, but the fill_angle_increment will still be used."
