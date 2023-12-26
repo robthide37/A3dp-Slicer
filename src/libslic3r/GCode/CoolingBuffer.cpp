@@ -45,6 +45,7 @@ void CoolingBuffer::reset(const Vec3d &position)
 struct CoolingLine
 {
     enum Type : uint32_t {
+        TYPE_NONE               = 0,
         //first 5 bits are for the extrusiontype (not a flag)
 
         TYPE_SET_TOOL           = 1 << 7,
@@ -401,6 +402,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
     // Index of an existing CoolingLine of the current adjustment, which holds the feedrate setting command
     // for a sequence of extrusion moves.
     size_t            active_speed_modifier = size_t(-1);
+    // type to add to each next G1 (just for adjustable for now)
+    size_t            current_stamp = CoolingLine::TYPE_NONE;
 
     for (; *line_start != 0; line_start = line_end) 
     {
@@ -460,10 +463,13 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             if (wipe)
                 line.type |= CoolingLine::TYPE_WIPE;
             if (boost::contains(sline, ";_EXTRUDE_SET_SPEED") && ! wipe) {
-                line.type |= CoolingLine::TYPE_ADJUSTABLE;
                 active_speed_modifier = adjustment->lines.size();
-                if (boost::contains(sline, ";_EXTRUDE_SET_SPEED_MAYBE"))
+                line.type |= CoolingLine::TYPE_ADJUSTABLE;
+                current_stamp |= CoolingLine::TYPE_ADJUSTABLE;
+                if (boost::contains(sline, ";_EXTRUDE_SET_SPEED_MAYBE")) {
                     line.type |= CoolingLine::TYPE_ADJUSTABLE_MAYBE;
+                    current_stamp |= CoolingLine::TYPE_ADJUSTABLE_MAYBE;
+                }
             }
             if ((line.type & CoolingLine::TYPE_G92) == 0) {
                 // G0 or G1. Calculate the duration.
@@ -494,6 +500,12 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     line.length = std::abs(dif[3]);
                 }
                 line.feedrate = new_pos[4];
+                if (line.feedrate > 0.f && line.length > 0.f) {
+                    assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0);
+                    // there can be no active_speed_modifier in custom gcode. 
+                    assert(active_speed_modifier != size_t(-1) || current_stamp == CoolingLine::TYPE_NONE);
+                    line.type |= current_stamp;
+                }
                 assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0 || line.feedrate > 0.f);
                 if (line.length > 0) {
                     assert(line.feedrate > 0);
@@ -546,6 +558,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 }
             }
             active_speed_modifier = size_t(-1);
+            current_stamp         = CoolingLine::TYPE_NONE;
         } else if (boost::starts_with(sline, ";_TOOLCHANGE")) {
             //not using m_toolchange_prefix anymore because there is no use case for it, there is always a _TOOLCHANGE for when a fan change is needed.
             int prefix = 13;
