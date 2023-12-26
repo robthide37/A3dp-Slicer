@@ -187,6 +187,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "thumbnails_custom_color",
         "thumbnails_end_file",
         "thumbnails_format",
+        "thumbnails_tag_format",
         "thumbnails_with_bed",
         "time_estimation_compensation",
         "time_cost",
