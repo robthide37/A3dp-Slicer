@@ -307,7 +307,7 @@ void PhysicalPrinterDialog::update_printers()
             boost::any any_string_type = std::string("");
             auto value_idx = std::find(slugs.begin(), slugs.end(), m_config->opt<ConfigOptionString>("printhost_port")->value);
             if ((val.empty() || (any_string_type.type() == val.type() && boost::any_cast<std::string>(val) == "")) && !slugs.empty() && value_idx == slugs.end()) {
-                m_config->option("printhost_port")->set_any(slugs[0]); // change_opt_value(*m_config, "printhost_port", slugs[0]);
+                change_opt_value(*m_config, "printhost_port", slugs[0]);
                 choice->set_value(slugs[0], false);
             } else if (value_idx != slugs.end()) {
                 choice->set_value(m_config->option<ConfigOptionString>("printhost_port")->value, false);
@@ -325,7 +325,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         if(opt_key == "printhost_client_cert_enabled")
             this->m_show_cert_fields = boost::any_cast<bool>(value);
         if (!this->m_show_cert_fields && !m_config->opt_string("printhost_client_cert").empty()) {
-            m_config->option("printhost_client_cert")->set_any(std::string("")); //change_opt_value(*m_config, "printhost_client_cert", std::string(""));
+            change_opt_value(*m_config, "printhost_client_cert", std::string(""));
             //change_opt_value(*m_config, "printhost_client_cert_password", "");
             m_config->set_deserialize_strict("printhost_client_cert_password", "");
         }
@@ -691,7 +691,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
     else if ((printer_change && !all_presets_are_from_mk3_family) || (!all_presets_are_from_mk3_family && m_config->option<ConfigOptionEnum<PrintHostType>>("host_type")->value == htPrusaLink))
         set_to_choice_and_config(htOctoPrint);
     else
-        choice->set_value(m_config->option("host_type")->get_int());
+        choice->set_value(m_config->option("host_type")->getInt());
     had_all_mk3 = all_presets_are_from_mk3_family;
 }
 

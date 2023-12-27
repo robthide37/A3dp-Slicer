@@ -279,8 +279,8 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
         assert(extruders_min_height->values.size() == extruders_max_height->values.size());
         assert(extruders_min_height->values.size() == nozzle_diameter->values.size());
         for (size_t idx_extruder = 0; idx_extruder < extruders_min_height->values.size(); ++idx_extruder) {
-            min_height = std::min(min_height, float(extruders_min_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
-            max_height = std::max(max_height, float(extruders_max_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
+            min_height = std::min(min_height, float(extruders_min_height->get_abs_value(idx_extruder, nozzle_diameter->getFloat(idx_extruder))));
+            max_height = std::max(max_height, float(extruders_max_height->get_abs_value(idx_extruder, nozzle_diameter->getFloat(idx_extruder))));
         }
         min_height = check_z_step(min_height, z_step);
         max_height = check_z_step(max_height, z_step);

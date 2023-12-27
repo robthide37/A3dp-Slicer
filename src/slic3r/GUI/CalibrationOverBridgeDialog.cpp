@@ -93,8 +93,8 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     bool has_to_arrange = false;
     const ConfigOptionFloat* extruder_clearance_radius = print_config->option<ConfigOptionFloat>("extruder_clearance_radius");
     const ConfigOptionPoints* bed_shape = printer_config->option<ConfigOptionPoints>("bed_shape");
-    const float brim_width = print_config->option<ConfigOptionFloat>("brim_width")->get_float();
-    const float skirt_width = print_config->option("skirts")->get_int() == 0 ? 0 : print_config->option("skirt_distance")->get_float() + print_config->option("skirts")->get_int() * nozzle_diameter * 2;
+    const float brim_width = print_config->option<ConfigOptionFloat>("brim_width")->getFloat();
+    const float skirt_width = print_config->option("skirts")->getInt() == 0 ? 0 : print_config->option("skirt_distance")->getFloat() + print_config->option("skirts")->getInt() * nozzle_diameter * 2;
     Vec2d bed_size = BoundingBoxf(bed_shape->values).size();
     Vec2d bed_min = BoundingBoxf(bed_shape->values).min;
     float offsetx = 3 + 30 * xyz_scale + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
@@ -114,8 +114,7 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     DynamicPrintConfig new_print_config = *print_config; //make a copy
     new_print_config.set_key_value("complete_objects", new ConfigOptionBool(true));
     //if skirt, use only one
-    if (print_config->option<ConfigOptionInt>("skirts")->get_int() > 0 &&
-        print_config->option<ConfigOptionInt>("skirt_height")->get_int() > 0) {
+    if (print_config->option<ConfigOptionInt>("skirts")->getInt() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->getInt() > 0) {
         new_print_config.set_key_value("complete_objects_one_skirt", new ConfigOptionBool(true));
     }
 

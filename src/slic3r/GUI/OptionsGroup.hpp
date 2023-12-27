@@ -309,10 +309,9 @@ public:
     void        msw_rescale();
     void        sys_color_changed();
     void        refresh();
-	//call optionconfig->get_any()
-	//boost::any	config_value(const std::string& opt_key, int opt_index, bool deserialize);
+	boost::any	config_value(const std::string& opt_key, int opt_index, bool deserialize);
 	// return option value from config 
-	//boost::any	get_config_value(const DynamicConfig& config, const std::string& opt_key, int opt_index = -1);
+	boost::any	get_config_value(const DynamicConfig& config, const std::string& opt_key, int opt_index = -1);
 	Field*		get_fieldc(const t_config_option_key& opt_key, int opt_index);
 	std::pair<OG_CustomCtrl*, bool*>	get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index/* = -1*/);
 

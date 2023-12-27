@@ -320,7 +320,7 @@ ConfigOption* ConfigOptionDef::create_default_option() const
     if (this->default_value)
         return (this->default_value->type() == coEnum) ?
             // Special case: For a DynamicConfig, convert a templated enum to a generic enum.
-            new ConfigOptionEnumGeneric(this->enum_keys_map, this->default_value->get_int()) :
+            new ConfigOptionEnumGeneric(this->enum_keys_map, this->default_value->getInt()) :
             this->default_value->clone();
     return this->create_empty_option();
 }
@@ -781,12 +781,12 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
             if (extruder_id < 0) {
                 const ConfigOption* opt_extruder_id = nullptr;
                 if ((opt_extruder_id = this->option("extruder")) == nullptr)
-                    if ((opt_extruder_id = this->option("current_extruder")) == nullptr ||
-                        opt_extruder_id->get_int() < 0 || opt_extruder_id->get_int() >= vector_opt->size()) {
+                    if ((opt_extruder_id = this->option("current_extruder")) == nullptr
+                        || opt_extruder_id->getInt() < 0 || opt_extruder_id->getInt() >= vector_opt->size()) {
                         std::stringstream ss; ss << "ConfigBase::get_abs_value(): " << opt_key << " need to has the extuder id to get the right value, but it's not available";
                         throw ConfigurationError(ss.str());
                     }
-                extruder_id = opt_extruder_id->get_int();
+                extruder_id = opt_extruder_id->getInt();
                 idx = extruder_id;
             }
         } else {
@@ -797,7 +797,7 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
         }
         if (idx >= 0) {
             if (raw_opt->type() == coFloats || raw_opt->type() == coInts || raw_opt->type() == coBools)
-                return vector_opt->get_float(idx);
+                return vector_opt->getFloat(idx);
             if (raw_opt->type() == coFloatsOrPercents) {
                 const ConfigOptionFloatsOrPercents* opt_fl_per = static_cast<const ConfigOptionFloatsOrPercents*>(raw_opt);
                 if (!opt_fl_per->values[idx].percent)

@@ -637,16 +637,14 @@ std::string GCodeWriter::retract(bool before_wipe)
         return this->_retract(
             factor * config_region->print_retract_length,
             factor * m_tool->retract_restart_extra(),
-            std::nullopt,
+            NAN,
             "retract"
         );
     }
-    auto rect_length = m_tool->retract_length();
-    auto rect_length2 = m_tool->retract_restart_extra();
     return this->_retract(
         factor * m_tool->retract_length(),
         factor * m_tool->retract_restart_extra(),
-        std::nullopt,
+        NAN,
         "retract"
     );
 }
@@ -657,13 +655,13 @@ std::string GCodeWriter::retract_for_toolchange(bool before_wipe)
     assert(factor >= 0. && factor <= 1. + EPSILON);
     return this->_retract(
         factor * m_tool->retract_length_toolchange(),
-        std::nullopt,
+        NAN,
         factor * m_tool->retract_restart_extra_toolchange(),
         "retract for toolchange"
     );
 }
 
-std::string GCodeWriter::_retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange, const std::string &comment)
+std::string GCodeWriter::_retract(double length, double restart_extra, double restart_extra_toolchange, const std::string &comment)
 {
     std::ostringstream gcode;
     
@@ -677,17 +675,9 @@ std::string GCodeWriter::_retract(double length, std::optional<double> restart_e
     if (this->config.use_volumetric_e) {
         double d = m_tool->filament_diameter();
         double area = d * d * PI/4;
-        assert(length * area < std::numeric_limits<int32_t>::max());
-        assert(length * area > 0);
-        assert(!restart_extra || *restart_extra * area < std::numeric_limits<int32_t>::max());
-        assert(!restart_extra || *restart_extra * area > -std::numeric_limits<int32_t>::max());
-        assert(!restart_extra_toolchange || *restart_extra_toolchange * area < std::numeric_limits<int32_t>::max());
-        assert(!restart_extra_toolchange || *restart_extra_toolchange * area > -std::numeric_limits<int32_t>::max());
         length = length * area;
-        if(restart_extra)
-            restart_extra = *restart_extra * area;
-        if(restart_extra_toolchange)
-            restart_extra_toolchange = *restart_extra_toolchange * area;
+        restart_extra = restart_extra * area;
+        restart_extra_toolchange = restart_extra_toolchange * area;
     }
     
     double dE = m_tool->retract(length, restart_extra, restart_extra_toolchange);

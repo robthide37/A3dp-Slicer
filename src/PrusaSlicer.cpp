@@ -237,8 +237,8 @@ int CLI::run(int argc, char **argv)
         
         // The default bed shape should reflect the default display parameters
         // and not the fff defaults.
-        double w                          = sla_print_config.display_width.get_float();
-        double h                          = sla_print_config.display_height.get_float();
+        double w = sla_print_config.display_width.getFloat();
+        double h = sla_print_config.display_height.getFloat();
         sla_print_config.bed_shape.values = { Vec2d(0, 0), Vec2d(w, 0), Vec2d(w, h), Vec2d(0, h) };
         
         sla_print_config.apply(m_print_config, true);

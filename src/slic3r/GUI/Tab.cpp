@@ -820,7 +820,7 @@ void Tab::init_options_list()
 template<class T>
 void add_correct_opts_to_options_list(const std::string &opt_key, std::map<std::string, int>& map, Tab *tab, const int& value)
 {
-    T *opt_cur = static_cast<T*>(tab->get_config()->option(opt_key));
+    T *opt_cur = static_cast<T*>(tab->m_config->option(opt_key));
     for (size_t i = 0; i < opt_cur->values.size(); i++)
         map.emplace(opt_key + "#" + std::to_string(i), value);
 }
@@ -1253,8 +1253,7 @@ void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index/*
 // and value can be some random value because in this case it will not been used
 void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bool saved_value /*= false*/)
 {
-    if (!saved_value)
-        m_config->option(opt_key)->set_any(value, -1); // change_opt_value(*m_config, opt_key, value);
+    if (!saved_value) change_opt_value(*m_config, opt_key, value);
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
         // Don't select another profile if this profile happens to become incompatible.
@@ -1329,7 +1328,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     // update unscripted freq params
     Field* field = og_freq_chng_params->get_field(opt_key);
     if (field) {
-        boost::any val = m_config->option(opt_key)->get_any(field->m_opt_idx);
+        boost::any val = og_freq_chng_params->get_config_value(*m_config, opt_key);
         field->set_value(val, false);
     }
 
@@ -1886,15 +1885,15 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         DynamicPrintConfig new_conf = *m_config;
 
                         if (opt_key == "bottle_volume") {
-                            double new_bottle_weight = boost::any_cast<double>(value) / (new_conf.option("material_density")->get_float() * 1000);
+                            double new_bottle_weight = boost::any_cast<double>(value) / (new_conf.option("material_density")->getFloat() * 1000);
                             new_conf.set_key_value("bottle_weight", new ConfigOptionFloat(new_bottle_weight));
                         }
                         if (opt_key == "bottle_weight") {
-                            double new_bottle_volume = boost::any_cast<double>(value)*(new_conf.option("material_density")->get_float() * 1000);
+                            double new_bottle_volume = boost::any_cast<double>(value)*(new_conf.option("material_density")->getFloat() * 1000);
                             new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
                         }
                         if (opt_key == "material_density") {
-                            double new_bottle_volume = new_conf.option("bottle_weight")->get_float() * boost::any_cast<double>(value) * 1000;
+                            double new_bottle_volume = new_conf.option("bottle_weight")->getFloat() * boost::any_cast<double>(value) * 1000;
                             new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
                         }
 
@@ -2733,7 +2732,7 @@ void TabPrint::update()
     {
         const Preset& selected_preset = m_preset_bundle->fff_prints.get_selected_preset();
         bool is_user_and_saved_preset = !selected_preset.is_system && !selected_preset.is_dirty;
-        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && m_config->option("overhangs_width_speed")->get_float() == 0;
+        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && m_config->option("overhangs_width_speed")->getFloat() == 0;
         m_config_manipulation.initialize_support_material_overhangs_queried(is_user_and_saved_preset && support_material_overhangs_queried);
     }
 
@@ -2801,11 +2800,11 @@ PageShp TabFilament::create_filament_overrides_page()
     {
         Line line {"",""};
         if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
-            Option opt = optgroup->get_option_and_register(opt_key, 0);
+            Option opt = optgroup->get_option_and_register(opt_key);
             opt.opt.label = opt.opt.get_full_label();
             line = optgroup->create_single_option_line(opt);
         } else {
-            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key, 0));
+            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key));
         }
 
         line.near_label_widget = [this, optgroup, opt_key, opt_index](wxWindow* parent) {

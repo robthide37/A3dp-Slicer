@@ -170,7 +170,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         params.pattern = region_config.bridge_fill_pattern.value;
                         params.connection = region_config.infill_connection_bridge.value;
                     }
-                    if (region_config.infill_dense.get_bool()
+                    if (region_config.infill_dense.getBool()
                         && region_config.fill_density < 40
                         && surface.maxNbSolidLayersOnTop == 1) {
                         params.density = 0.42f;
@@ -203,7 +203,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         params.role = erSolidInfill;
                     }
                 }
-                params.fill_exactly = region_config.enforce_full_fill_volume.get_bool();
+                params.fill_exactly = region_config.enforce_full_fill_volume.getBool();
                 params.bridge_angle = float(surface.bridge_angle);
                 params.angle         = (is_denser) ? 0 : compute_fill_angle(region_config, layerm.layer()->id());
                 params.can_angle_cross = region_config.fill_angle_cross;
