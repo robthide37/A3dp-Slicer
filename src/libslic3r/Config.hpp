@@ -81,6 +81,7 @@ extern bool         unescape_strings_cstyle(const std::string &str, std::vector<
 
 extern std::string  escape_ampersand(const std::string& str);
 
+constexpr char NIL_STR_VALUE[] = "nil";
 
 enum class OptionCategory : int
 {
@@ -773,23 +774,27 @@ public:
     }
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
-    // Special "nil" value to be stored into the vector if this->supports_nil().
-    static double 			nil_value() { return std::numeric_limits<double>::quiet_NaN(); }
     // A scalar is nil, or all values of a vector are nil.
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (double v : this->values)
-                if (!std::isnan(v))
+                if (!std::isnan(v) && v != NIL_VALUE())
                     return false;
             return true;
         } else {
-            return idx < values.size() ? std::isnan(this->values[idx]) :
-                   values.empty()      ? std::isnan(this->default_value) :
-                                         std::isnan(this->values.front());
+            return idx < values.size() ? (std::isnan(this->values[idx]) || NIL_VALUE() == this->values[idx]) :
+                   values.empty()      ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
+                                         (std::isnan(this->values.front()) || NIL_VALUE() == this->values.front());
         }
     }
     double                  get_float(size_t idx = 0) const override { return get_at(idx); }
+
+    static inline bool is_nil(const boost::any &to_check) {
+        return std::isnan(boost::any_cast<double>(to_check)) || boost::any_cast<double>(to_check) == NIL_VALUE();
+    }
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -822,9 +827,9 @@ public:
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
-        	if (item_str == "nil") {
+        	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-        			this->values.push_back(nil_value());
+        			this->values.push_back(NIL_VALUE());
         		else
         			throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
@@ -844,12 +849,15 @@ public:
     }
 
 protected:
+    // Special "nil" value to be stored into the vector if this->supports_nil().
+    //please use is_nil & create_nil, to better support nan
+    static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
 	void serialize_single_value(std::ostringstream &ss, const double v) const {
         	if (std::isfinite(v))
 	            ss << v;
-	        else if (std::isnan(v)) {
+	        else if (std::isnan(v) || v == NIL_VALUE()) {
         		if (NULLABLE)
-        			ss << "nil";
+        			ss << NIL_STR_VALUE;
         		else
                     throw ConfigurationError("Serializing NaN");
         	} else
@@ -860,7 +868,8 @@ protected:
     		if (v1.size() != v2.size())
     			return false;
     		for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-	    		if (! ((std::isnan(*it1) && std::isnan(*it2)) || *it1 == *it2))
+                if (!(((std::isnan(*it1) || *it1 == NIL_VALUE()) && (std::isnan(*it2) || *it2 == NIL_VALUE())) ||
+                      *it1 == *it2))
 	    			return false;
     		return true;
     	} else
@@ -870,8 +879,8 @@ protected:
     static bool vectors_lower(const std::vector<double> &v1, const std::vector<double> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(*it1));
-                auto null2 = int(std::isnan(*it2));
+                auto null1 = int(std::isnan(*it1) || *it1 == NIL_VALUE());
+                auto null2 = int(std::isnan(*it2) || *it2 == NIL_VALUE());
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -948,19 +957,19 @@ public:
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
-    static int32_t			nil_value() { return std::numeric_limits<int32_t>::max(); }
+    static int32_t			NIL_VALUE() { return std::numeric_limits<int32_t>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (int32_t v : this->values)
-                if (v != nil_value())
+                if (v != NIL_VALUE())
                     return false;
             return true;
         } else {
-            return idx < values.size() ? nil_value() == this->values[idx] :
-                   values.empty()      ? nil_value() == this->default_value :
-                                         nil_value() == this->values.front();
+            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
+                   values.empty()      ? NIL_VALUE() == this->default_value :
+                                         NIL_VALUE() == this->values.front();
         }
     }
     int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
@@ -997,9 +1006,9 @@ public:
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
-        	if (item_str == "nil") {
+        	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-        			this->values.push_back(nil_value());
+        			this->values.push_back(NIL_VALUE());
         		else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
@@ -1014,9 +1023,9 @@ public:
 
 private:
 	void serialize_single_value(std::ostringstream &ss, const int32_t v) const {
-			if (v == nil_value()) {
+			if (v == NIL_VALUE()) {
         		if (NULLABLE)
-        			ss << "nil";
+        			ss << NIL_STR_VALUE;
         		else
                     throw ConfigurationError("Serializing NaN");
         	} else
@@ -1166,7 +1175,7 @@ public:
             if (&v != &this->values.front())
             	ss << ",";
 			this->serialize_single_value(ss, v);
-			if (! std::isnan(v))
+			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
         }
         std::string str = ss.str();
@@ -1180,7 +1189,7 @@ public:
         for (const double v : this->values) {
             std::ostringstream ss;
 			this->serialize_single_value(ss, v);
-			if (! std::isnan(v))
+			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
             vv.push_back(ss.str());
         }
@@ -1283,20 +1292,18 @@ public:
 
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool                    nullable() const override { return NULLABLE; }
-    // Special "nil" value to be stored into the vector if this->supports_nil().
-    static FloatOrPercent   nil_value() { return { std::numeric_limits<double>::quiet_NaN(), false }; }
     // A scalar is nil, or all values of a vector are nil.
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (const FloatOrPercent &v : this->values)
-                if (! std::isnan(v.value))
+                if (! std::isnan(v.value) || v != NIL_VALUE())
                     return false;
             return true;
         } else {
-            return idx < values.size() ? std::isnan(this->values[idx].value) :
-                   values.empty()      ? std::isnan(this->default_value.value) :
-                                         std::isnan(this->values.front().value);
+            return idx < values.size() ? (std::isnan(this->values[idx].value) || NIL_VALUE() == this->values[idx]) :
+                   values.empty()      ? (std::isnan(this->default_value.value) || NIL_VALUE() == this->default_value) :
+                                         (std::isnan(this->values.front().value) || NIL_VALUE() == this->values.front());
         }
     }
     double                  get_abs_value(size_t i, double ratio_over) const {
@@ -1306,6 +1313,12 @@ public:
         return data.value;
     }
     double                  get_float(size_t idx = 0) const override { return get_abs_value(idx, 1.); }
+
+    static inline bool is_nil(const boost::any &to_check) {
+        return std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value;
+    }
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -1338,9 +1351,9 @@ public:
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
             boost::trim(item_str);
-            if (item_str == "nil") {
+            if (item_str == NIL_STR_VALUE) {
                 if (NULLABLE)
-                    this->values.push_back(nil_value());
+                    this->values.push_back(NIL_VALUE());
                 else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
             } else {
@@ -1361,14 +1374,17 @@ public:
     }
 
 protected:
+    // Special "nil" value to be stored into the vector if this->supports_nil().
+    static FloatOrPercent   NIL_VALUE() { return FloatOrPercent{ std::numeric_limits<double>::max(), false }; }
+
     void serialize_single_value(std::ostringstream &ss, const FloatOrPercent &v) const {
             if (std::isfinite(v.value)) {
                 ss << v.value;
                 if (v.percent)
                     ss << "%";
-            } else if (std::isnan(v.value)) {
+            } else if (std::isnan(v.value) || v.value == NIL_VALUE().value) {
                 if (NULLABLE)
-                    ss << "nil";
+                    ss << NIL_STR_VALUE;
                 else
                     throw ConfigurationError("Serializing NaN");
             } else
@@ -1379,7 +1395,9 @@ protected:
             if (v1.size() != v2.size())
                 return false;
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-                if (! ((std::isnan(it1->value) && std::isnan(it2->value)) || *it1 == *it2))
+                if (!(((std::isnan(it1->value) || it1->value == NIL_VALUE().value) &&
+                       (std::isnan(it2->value) || it2->value == NIL_VALUE().value)) ||
+                      *it1 == *it2))
                     return false;
             return true;
         } else
@@ -1389,8 +1407,8 @@ protected:
     static bool vectors_lower(const std::vector<FloatOrPercent> &v1, const std::vector<FloatOrPercent> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(it1->value));
-                auto null2 = int(std::isnan(it2->value));
+                auto null1 = int(std::isnan(it1->value) || it1->value == NIL_VALUE().value);
+                auto null2 = int(std::isnan(it2->value) || it2->value == NIL_VALUE().value);
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -1633,19 +1651,19 @@ public:
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
-    static unsigned char	nil_value() { return std::numeric_limits<unsigned char>::max(); }
+    static unsigned char	NIL_VALUE() { return std::numeric_limits<unsigned char>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (uint8_t v : this->values)
-                if (v != nil_value())
+                if (v != NIL_VALUE())
                     return false;
             return true;
         } else {
-            return idx < values.size() ? nil_value() == this->values[idx] :
-                   values.empty()      ? nil_value() == this->default_value :
-                                         nil_value() == this->values.front();
+            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
+                   values.empty()      ? NIL_VALUE() == this->default_value :
+                                         NIL_VALUE() == this->values.front();
         }
     }
     bool                    get_bool(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }
@@ -1684,9 +1702,9 @@ public:
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
         	unsigned char new_value = 0;
-        	if (item_str == "nil") {
+        	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-                    new_value = nil_value();
+                    new_value = NIL_VALUE();
         		else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else if (item_str == "1") {
@@ -1710,9 +1728,9 @@ public:
 
 protected:
 	void serialize_single_value(std::ostringstream &ss, const unsigned char v) const {
-        	if (v == nil_value()) {
+        	if (v == NIL_VALUE()) {
         		if (NULLABLE)
-        			ss << "nil";
+        			ss << NIL_STR_VALUE;
         		else
                     throw ConfigurationError("Serializing NaN");
         	} else

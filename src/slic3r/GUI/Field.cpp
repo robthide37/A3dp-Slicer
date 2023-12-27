@@ -378,7 +378,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
         else
         {
             if (is_na_value)
-                val = ConfigOptionFloatsNullable::nil_value();
+                val = boost::any_cast<double>(ConfigOptionFloatsNullable::create_nil());
             else if (!str.ToDouble(&val))
             {
                 if (!check_value) {
@@ -474,7 +474,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 str.Replace("m", "", true);
 
                 if (m_opt.nullable && str == na_value()) {
-                    val = ConfigOptionFloatsNullable::nil_value();
+                    val = boost::any_cast<double>(ConfigOptionFloatsNullable::create_nil());
                     str = "nan";
                 } else if (!str.ToDouble(&val)) {
                     if (!check_value) {
@@ -790,8 +790,8 @@ bool TextCtrl::value_was_changed()
     case coPercents:
     case coFloats:
     case coFloat: {
-        if (m_opt.nullable && std::isnan(boost::any_cast<double>(m_value)) &&
-                              std::isnan(boost::any_cast<double>(val)))
+        if (m_opt.nullable && ConfigOptionFloatsNullable::is_nil(m_value) &&
+                              ConfigOptionFloatsNullable::is_nil(val))
             return false;
         return boost::any_cast<double>(m_value) != boost::any_cast<double>(val);
     }
@@ -972,7 +972,7 @@ void CheckBox::set_value(const boost::any& value, bool change_event)
 {
     m_disable_change_event = !change_event;
     if (m_opt.nullable) {
-        m_is_na_val = boost::any_cast<unsigned char>(value) == ConfigOptionBoolsNullable::nil_value();
+        m_is_na_val = boost::any_cast<unsigned char>(value) == ConfigOptionBoolsNullable::NIL_VALUE();
         if (!m_is_na_val)
             m_last_meaningful_value = value;
         set_widget_value(m_is_na_val ? false : boost::any_cast<unsigned char>(value) != 0);
@@ -1023,7 +1023,7 @@ boost::any& CheckBox::get_value()
 	if (m_opt.type == coBool)
 		m_value = static_cast<bool>(value);
 	else
-		m_value = m_is_na_val ? ConfigOptionBoolsNullable::nil_value() : static_cast<unsigned char>(value);
+		m_value = m_is_na_val ? ConfigOptionBoolsNullable::NIL_VALUE() : static_cast<unsigned char>(value);
  	return m_value;
 }
 
