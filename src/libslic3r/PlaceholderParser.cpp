@@ -939,7 +939,7 @@ namespace client
             case coFloat:   output.set_d(opt.opt->get_float());   break;
             case coInt:     output.set_i(opt.opt->get_int());     break;
             case coString:  output.set_s(static_cast<const ConfigOptionString*>(opt.opt)->value); break;
-            case coPercent: output.set_d(opt.opt->get_float()); break;
+            case coPercent: output.set_d(opt.opt->get_float());   break;
             case coPoint:   output.set_s(opt.opt->serialize());  break;
             case coBool:    output.set_b(opt.opt->get_bool());    break;
             case coFloatOrPercent:
@@ -969,7 +969,7 @@ namespace client
                         v *= val;
                         break;
             //        	if (opt_parent->type() == coFloat || opt_parent->type() == coFloatOrPercent) {
-			        	//	v *= opt_parent->getFloat();
+			        	//	v *= opt_parent->get_float();
 			        	//	if (opt_parent->type() == coFloat || ! static_cast<const ConfigOptionFloatOrPercent*>(opt_parent)->percent)
 			        	//		break;
 			        	//	v *= 0.01; // percent to ratio
@@ -985,7 +985,7 @@ namespace client
             case coInts:
                 opt_def = print_config_def.get(opt_key);
                 if (opt_def->is_vector_extruder) {
-                    output.set_i(int(((ConfigOptionVectorBase *) opt.opt)->get_float(int(ctx->current_extruder_id))));
+                    output.set_i(int(((ConfigOptionVectorBase*)opt.opt)->get_float(int(ctx->current_extruder_id))));
                     break;
                 } else
                     ctx->throw_exception("Unknown scalar variable type", opt.it_range);
@@ -993,7 +993,7 @@ namespace client
             case coPercents:
                 vector_opt = static_cast<const ConfigOptionVectorBase*>(opt.opt);
                 if (vector_opt->is_extruder_size()) {
-                    output.set_d(((ConfigOptionVectorBase *) opt.opt)->get_float(int(ctx->current_extruder_id)));
+                    output.set_d(((ConfigOptionVectorBase*)opt.opt)->get_float(int(ctx->current_extruder_id)));
                     break;
                 } else
                     ctx->throw_exception("Unknown scalar variable type", opt.it_range);

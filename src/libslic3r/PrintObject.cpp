@@ -2541,12 +2541,13 @@ static constexpr const std::initializer_list<const std::string_view> keys_extrud
         // 2) Copy the rest of the values.
         for (auto it = in.cbegin(); it != in.cend(); ++it)
         if (it->first != key_extruder)
-            if (ConfigOptionInt *my_opt = out.option<ConfigOptionInt>(it->first, false); my_opt != nullptr) {
+            if (ConfigOption* my_opt = out.option(it->first, false); my_opt != nullptr) {
                 if (one_of(it->first, keys_extruders)) {
+                    assert(dynamic_cast<ConfigOptionInt*>(my_opt));
                     // Ignore "default" extruders.
-                    int extruder = it->second->get_int();
+                    int extruder = static_cast<const ConfigOptionInt*>(it->second.get())->value;
                     if (extruder > 0)
-                        my_opt->value = (extruder);
+                        static_cast<ConfigOptionInt *>(my_opt)->value = (extruder);
                 } else
                     my_opt->set(it->second.get());
             }

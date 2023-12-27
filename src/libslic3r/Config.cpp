@@ -781,8 +781,8 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
             if (extruder_id < 0) {
                 const ConfigOption* opt_extruder_id = nullptr;
                 if ((opt_extruder_id = this->option("extruder")) == nullptr)
-                    if ((opt_extruder_id = this->option("current_extruder")) == nullptr ||
-                        opt_extruder_id->get_int() < 0 || opt_extruder_id->get_int() >= vector_opt->size()) {
+                    if ((opt_extruder_id = this->option("current_extruder")) == nullptr
+                        || opt_extruder_id->get_int() < 0 || opt_extruder_id->get_int() >= vector_opt->size()) {
                         std::stringstream ss; ss << "ConfigBase::get_abs_value(): " << opt_key << " need to has the extuder id to get the right value, but it's not available";
                         throw ConfigurationError(ss.str());
                     }

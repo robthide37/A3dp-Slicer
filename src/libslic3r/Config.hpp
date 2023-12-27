@@ -396,12 +396,12 @@ public:
     virtual ConfigOption*       clone() const = 0;
     // Set a value from a ConfigOption. The two options should be compatible.
     virtual void                set(const ConfigOption *option) = 0;
-    virtual int32_t             get_int(int idx = 0)        const { throw BadOptionTypeException("Calling ConfigOption::get_int on a non-int ConfigOption"); }
-    virtual double              get_float(int idx = 0)      const { throw BadOptionTypeException("Calling ConfigOption::get_float on a non-float ConfigOption"); }
-    virtual bool                get_bool(int idx = 0)       const { throw BadOptionTypeException("Calling ConfigOption::get_bool on a non-boolean ConfigOption");  }
+    virtual int32_t             get_int(size_t idx = 0)        const { throw BadOptionTypeException("Calling ConfigOption::get_int on a non-int ConfigOption"); }
+    virtual double              get_float(size_t idx = 0)      const { throw BadOptionTypeException("Calling ConfigOption::get_float on a non-float ConfigOption"); }
+    virtual bool                get_bool(size_t idx = 0)       const { throw BadOptionTypeException("Calling ConfigOption::get_bool on a non-boolean ConfigOption");  }
     virtual void                set_enum_int(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::set_enum_int on a non-enum ConfigOption"); }
-    virtual boost::any          get_any(int idx = 0)       const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
-    virtual void                set_any(boost::any, int idx = -1) { throw BadOptionTypeException("Calling ConfigOption::set_any on a raw ConfigOption"); }
+    virtual boost::any          get_any(int32_t idx = -1)       const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
+    virtual void                set_any(boost::any, int32_t idx = -1) { throw BadOptionTypeException("Calling ConfigOption::set_any on a raw ConfigOption"); }
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }
     virtual size_t              hash()          const throw() = 0;
@@ -410,7 +410,7 @@ public:
     // If this option is nullable, then it may have its value or values set to nil.
     virtual bool 				nullable()		const { return false; }
     // A scalar is nil, or all values of a vector are nil if idx < 0.
-    virtual bool                is_nil(int idx = -1) const { return false; }
+    virtual bool                is_nil(int32_t idx = -1) const { return false; }
     bool                        is_phony()      const { return (flags & FCO_PHONY) != 0; }
     void                        set_phony(bool phony) { if (phony) this->flags |= FCO_PHONY; else this->flags &= uint8_t(0xFF ^ FCO_PHONY); }
     // Is this option overridden by another option?
@@ -442,8 +442,8 @@ public:
     explicit ConfigOptionSingle(T value) : value(value) {}
     explicit ConfigOptionSingle(T value, bool phony) : ConfigOption(phony), value(value) {}
     operator T() const { return this->value; }
-    boost::any get_any(int idx = 0) const override { return boost::any(value); }
-    void       set_any(boost::any anyval, int idx = -1) override { value = boost::any_cast<T>(anyval); }
+    boost::any get_any(int32_t idx = -1) const override { return boost::any(value); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override { value = boost::any_cast<T>(anyval); }
     
     void set(const ConfigOption *rhs) override
     {
@@ -517,7 +517,8 @@ protected:
 };
 
 // Value of a vector valued option (bools, ints, floats, strings, points), template
-template<class T> class ConfigOptionVector : public ConfigOptionVectorBase
+template <class T>
+class ConfigOptionVector : public ConfigOptionVectorBase
 {
 private:
     void set_default_from_values() {
@@ -607,8 +608,8 @@ public:
     }
 
     T& get_at(size_t i) { return const_cast<T&>(std::as_const(*this).get_at(i)); }
-    boost::any get_any(int idx) const override { return idx < 0 ? boost::any(values) : boost::any(get_at(idx)); }
-    void       set_any(boost::any anyval, int idx = -1) override
+    boost::any get_any(int32_t idx = -1) const override { return idx < 0 ? boost::any(values) : boost::any(get_at(idx)); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override
     { 
        if (idx < 0)
             values = boost::any_cast<std::vector<T>>(anyval);
@@ -739,7 +740,7 @@ public:
 
     static ConfigOptionType static_type() { return coFloat; }
     ConfigOptionType        type()      const override { return static_type(); }
-    double                  get_float(int idx = 0) const override { return this->value; }
+    double                  get_float(size_t idx = 0) const override { return this->value; }
     ConfigOption*           clone()     const override { return new ConfigOptionFloat(*this); }
     bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionFloat &rhs) const throw() { return this->value <  rhs.value; }
@@ -794,9 +795,8 @@ public:
     }
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
-    double                  get_float(int idx = 0) const override { return get_at(idx); }
-
-    bool is_nil(int idx = 0) const override
+    // A scalar is nil, or all values of a vector are nil.
+    bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (double v : this->values)
@@ -809,16 +809,13 @@ public:
                                          (std::isnan(this->values.front()) || NIL_VALUE() == this->values.front());
         }
     }
+    double                  get_float(size_t idx = 0) const override { return get_at(idx); }
 
-    static inline bool is_nil(const boost::any &to_check)
-    {
+    static inline bool is_nil(const boost::any &to_check) {
         return std::isnan(boost::any_cast<double>(to_check)) || boost::any_cast<double>(to_check) == NIL_VALUE();
     }
     // don't use it to compare, use is_nil() to check.
-    static inline boost::any create_nil()
-    {
-        return boost::any(NIL_VALUE());
-    }
+    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -874,9 +871,8 @@ public:
 
 protected:
     // Special "nil" value to be stored into the vector if this->supports_nil().
-    // try to not use nan. It's a weird value, and other types don't use it.
-    static double NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); } // std::numeric_limits<double>::max(); } 
-
+    //please use is_nil & create_nil, to better support nan
+    static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
 	void serialize_single_value(std::ostringstream &ss, const double v) const {
         	if (std::isfinite(v))
 	            ss << v;
@@ -931,8 +927,8 @@ public:
     
     static ConfigOptionType static_type() { return coInt; }
     ConfigOptionType        type()   const override { return static_type(); }
-    int32_t                 get_int(int idx = 0) const override { return this->value; }
-    double                  get_float(int idx = 0) const override { return this->value; }
+    int32_t                 get_int(size_t idx = 0) const override { return this->value; }
+    double                  get_float(size_t idx = 0) const override { return this->value; }
     ConfigOption*           clone()  const override { return new ConfigOptionInt(*this); }
     bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->value == rhs.value; }
     
@@ -983,10 +979,8 @@ public:
     bool                    nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
     static int32_t          NIL_VALUE() { return std::numeric_limits<int32_t>::max(); }
-    int32_t                 get_int(int idx= 0) const override { return get_at(idx); }
-    double                  get_float(int idx = 0) const override { return get_at(idx); }
-
-    bool is_nil(int idx = 0) const override
+    // A scalar is nil, or all values of a vector are nil.
+    bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (int32_t v : this->values)
@@ -999,6 +993,8 @@ public:
                                          NIL_VALUE() == this->values.front();
         }
     }
+    int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
+    double                  get_float(size_t idx = 0) const override { return get_at(idx); }
 
     std::string serialize() const override
     {
@@ -1111,7 +1107,7 @@ public:
     ConfigOptionStrings&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionStrings &rhs) const throw() { return this->values == rhs.values; }
     bool                    operator< (const ConfigOptionStrings &rhs) const throw() { return this->values <  rhs.values; }
-    bool                    is_nil(int) const override { return false; }
+    bool                    is_nil(int32_t idx = 0) const override { return false; }
 
     std::string serialize() const override
     {
@@ -1200,7 +1196,7 @@ public:
             if (&v != &this->values.front())
             	ss << ",";
 			this->serialize_single_value(ss, v);
-            if (!(std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
         }
         std::string str = ss.str();
@@ -1214,7 +1210,7 @@ public:
         for (const double v : this->values) {
             std::ostringstream ss;
 			this->serialize_single_value(ss, v);
-			if (!(std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
             vv.push_back(ss.str());
         }
@@ -1248,30 +1244,22 @@ public:
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionFloatOrPercent: Comparing incompatible types");
-        assert(dynamic_cast<const ConfigOptionFloatOrPercent *>(&rhs));
-        return *this == *static_cast<const ConfigOptionFloatOrPercent *>(&rhs);
+        assert(dynamic_cast<const ConfigOptionFloatOrPercent*>(&rhs));
+        return *this == *static_cast<const ConfigOptionFloatOrPercent*>(&rhs);
     }
     bool operator==(const ConfigOptionFloatOrPercent &rhs) const throw()
-    {
-        return this->value == rhs.value && this->percent == rhs.percent;
-    }
-    size_t hash() const throw() override
-    {
-        size_t seed = std::hash<double>{}(this->value);
-        return this->percent ? seed ^ 0x9e3779b9 : seed;
-    }
-    bool operator<(const ConfigOptionFloatOrPercent &rhs) const throw()
-    {
-        return this->value < rhs.value || (this->value == rhs.value && int(this->percent) < int(rhs.percent));
-    }
+        { return this->value == rhs.value && this->percent == rhs.percent; }
+    size_t                      hash() const throw() override 
+        { size_t seed = std::hash<double>{}(this->value); return this->percent ? seed ^ 0x9e3779b9 : seed; }
+    bool                        operator< (const ConfigOptionFloatOrPercent &rhs) const throw() 
+        { return this->value < rhs.value || (this->value == rhs.value && int(this->percent) < int(rhs.percent)); }
 
-    double get_abs_value(double ratio_over) const
-    {
-        return this->percent ? (ratio_over * this->value / 100) : this->value;
-    }
+    double                      get_abs_value(double ratio_over) const 
+        { return this->percent ? (ratio_over * this->value / 100) : this->value; }
+    double                      get_float(size_t idx = 0) const override { return get_abs_value(1.); }
     // special case for get/set any: use a FloatOrPercent like for FloatsOrPercents, to have the is_percent
-    boost::any get_any(int idx = 0) const override { return boost::any(FloatOrPercent{value, percent}); }
-    void       set_any(boost::any anyval, int idx = -1) override
+    boost::any get_any(int32_t idx = 0) const override { return boost::any(FloatOrPercent{value, percent}); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override
     {
         auto fl_or_per = boost::any_cast<FloatOrPercent>(anyval);
         this->value    = fl_or_per.value;
@@ -1333,28 +1321,33 @@ public:
 
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool                    nullable() const override { return NULLABLE; }
-    // Special "nil" value to be stored into the vector if this->supports_nil().
-    static FloatOrPercent   NIL_VALUE() { return FloatOrPercent{ std::numeric_limits<double>::max(), false }; }
+    // A scalar is nil, or all values of a vector are nil.
+    bool is_nil(int32_t idx = -1) const override
+    {
+        if (idx < 0) {
+            for (const FloatOrPercent &v : this->values)
+                if (! std::isnan(v.value) || v != NIL_VALUE())
+                    return false;
+            return true;
+        } else {
+            return idx < values.size() ? (std::isnan(this->values[idx].value) || NIL_VALUE() == this->values[idx]) :
+                   values.empty()      ? (std::isnan(this->default_value.value) || NIL_VALUE() == this->default_value) :
+                                         (std::isnan(this->values.front().value) || NIL_VALUE() == this->values.front());
+        }
+    }
     double                  get_abs_value(size_t i, double ratio_over) const {
         if (this->is_nil(i)) return 0;
         const FloatOrPercent& data = this->get_at(i);
         if (data.percent) return ratio_over * data.value / 100;
         return data.value;
     }
+    double                  get_float(size_t idx = 0) const override { return get_abs_value(idx, 1.); }
 
-    bool is_nil(int idx = 0) const override
-    {
-        if (idx < 0) {
-            for (const FloatOrPercent &v : this->values)
-                if (v != NIL_VALUE())
-                    return false;
-            return true;
-        } else {
-            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
-                   values.empty()      ? NIL_VALUE() == this->default_value :
-                                         NIL_VALUE() == this->values.front();
-        }
+    static inline bool is_nil(const boost::any &to_check) {
+        return std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value;
     }
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -1410,6 +1403,9 @@ public:
     }
 
 protected:
+    // Special "nil" value to be stored into the vector if this->supports_nil().
+    static FloatOrPercent   NIL_VALUE() { return FloatOrPercent{ std::numeric_limits<double>::max(), false }; }
+
     void serialize_single_value(std::ostringstream &ss, const FloatOrPercent &v) const {
             if (std::isfinite(v.value)) {
                 ss << v.value;
@@ -1523,7 +1519,7 @@ public:
     bool                    operator==(const ConfigOptionPoints &rhs) const throw() { return this->values == rhs.values; }
     bool                    operator< (const ConfigOptionPoints &rhs) const throw() 
         { return std::lexicographical_compare(this->values.begin(), this->values.end(), rhs.values.begin(), rhs.values.end(), [](const auto &l, const auto &r){ return l < r; }); }
-    bool                    is_nil(int) const override { return false; }
+    bool                    is_nil(int32_t idx = 0) const override { return false; }
 
     std::string serialize() const override
     {
@@ -1632,9 +1628,9 @@ public:
     
     static ConfigOptionType static_type() { return coBool; }
     ConfigOptionType        type()      const override { return static_type(); }
-    bool                    get_bool(int idx = 0) const override { return this->value; }
-    int32_t                 get_int(int idx = 0) const override { return this->value?1:0; }
-    double                  get_float(int idx = 0) const override { return this->value?1.:0.; }
+    bool                    get_bool(size_t idx = 0) const override { return this->value; }
+    int32_t                 get_int(size_t idx = 0) const override { return this->value ? 1 : 0; }
+    double                  get_float(size_t idx = 0) const override { return this->value ? 1. : 0.; }
     ConfigOption*           clone()     const override { return new ConfigOptionBool(*this); }
     ConfigOptionBool&       operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionBool &rhs) const throw() { return this->value == rhs.value; }
@@ -1686,27 +1682,8 @@ public:
     bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
     static unsigned char    NIL_VALUE() { return std::numeric_limits<unsigned char>::max(); }
-    bool                    get_bool(int idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }
-    int32_t                 get_int(int idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0 ? 1 : 0; }
-    double                  get_float(int idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0 ? 1. : 0.; }
-
-    // I commented it, it shouldn't do anything wrong, as if(uint) == if(uint!=0)
-    //bool& get_at(size_t i) {
-    //    assert(! this->values.empty());
-    //    if (this->values.empty()) {
-    //        values.push_back(default_value);
-    //    }
-    //    return *reinterpret_cast<bool*>(&((i < this->values.size()) ? this->values[i] : this->values.front()));
-    //}
-
-    //FIXME this smells, the parent class has the method declared returning (unsigned char&).
-    // I commented it, it shouldn't do anything wrong, as if(uint) == if(uint!=0)
-    // Please use get_bool(i)
-    //bool get_at(size_t i) const { 
-    //    return ((i < this->values.size()) ? this->values[i] : (this->values.empty() ? default_value != 0 : this->values.front() != 0));
-    //}
-
-    bool is_nil(int idx = 0) const override
+    // A scalar is nil, or all values of a vector are nil.
+    bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (uint8_t v : this->values)
@@ -1719,6 +1696,9 @@ public:
                                          NIL_VALUE() == this->values.front();
         }
     }
+    bool                    get_bool(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }
+    int32_t                 get_int(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0 ? 1 : 0; }
+    double                  get_float(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0 ? 1. : 0.; }
 
     std::string serialize() const override
     {
@@ -1814,11 +1794,11 @@ public:
     ConfigOptionEnum<T>&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionEnum<T> &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionEnum<T> &rhs) const throw() { return int(this->value) < int(rhs.value); }
-    int32_t                 get_int(int idx = 0) const override { return (int32_t)this->value; }
+    int32_t                 get_int(size_t idx = 0) const override { return int32_t(this->value); }
     void                    set_enum_int(int32_t val) override { this->value = T(val); }
     // special case for get/set any: use a int like for ConfigOptionEnumGeneric, to simplify
-    boost::any get_any(int idx = 0) const override { return boost::any(get_int(idx)); }
-    void       set_any(boost::any anyval, int idx = -1) override { set_enum_int(boost::any_cast<int32_t>(anyval)); }
+    boost::any get_any(int32_t idx = -1) const override { return boost::any(get_int()); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override { set_enum_int(boost::any_cast<int32_t>(anyval)); }
 
     bool operator==(const ConfigOption &rhs) const override
     {
@@ -2580,6 +2560,5 @@ protected:
 };
 
 }
-
 
 #endif

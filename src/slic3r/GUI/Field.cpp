@@ -105,7 +105,6 @@ std::pair<bool, bool> get_strings_points(const wxString &str, double min, double
     return {invalid_val, out_of_range_val};
 }
 
-
 Field::~Field()
 {
 	if (m_on_kill_focus)
@@ -430,8 +429,7 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
             deserialize(ConfigOptionFloatsOrPercents{});
             break;
         }
-        if (opt.nullable &&
-            boost::any_cast<FloatOrPercent>(value) == ConfigOptionFloatsOrPercentsNullable::NIL_VALUE()) {
+        if (opt.nullable && ConfigOptionFloatsOrPercentsNullable::is_nil(value)) {
             text_value = na_value();
             has_nil    = true;
             break;
@@ -732,7 +730,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
                 str.Replace("m", "", true);
 
                 if (m_opt.nullable && str == NIL_STR_VALUE) {
-                    m_value = ConfigOptionFloatsOrPercentsNullable::NIL_VALUE();
+                    m_value = ConfigOptionFloatsOrPercentsNullable::create_nil();
                     break;
                 } else if (!str.ToDouble(&val)) {
                     if (!check_value) {
@@ -740,7 +738,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
                         break;
                     }
                     show_error(m_parent, _(L("Invalid numeric input.")));
-                    set_value(FloatOrPercent{val, is_percent}, true);
+                    set_any_value(FloatOrPercent{val, is_percent}, true);
                 } else {
                     //convert m_value into str to compare
                     FloatOrPercent val_from_m_value = m_value.empty() ? FloatOrPercent{0, false} :
@@ -758,7 +756,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
                         show_error(m_parent, _(L("Input value is out of range")));
                         if (m_opt.min > val)
                             val = m_opt.min;
-                        set_value(FloatOrPercent{val, is_percent}, true);
+                        set_any_value(FloatOrPercent{val, is_percent}, true);
                     } else if (m_value.empty() || str != str_from_m_value) {
                         // empty of not equal -> need check
                         bool not_ok = (m_opt.sidetext.rfind("mm/s") != std::string::npos && val > m_opt.max);
@@ -806,10 +804,10 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
                                 str += "%";
                                 is_percent             = true;
                                 m_last_validated_value = str;
-                                set_value(FloatOrPercent{val, is_percent}, false /*true*/);
+                                set_any_value(FloatOrPercent{val, is_percent}, false /*true*/);
                                 str = m_last_validated_value;
                             } else
-                                set_value(FloatOrPercent{val, is_percent}, false); // it's no needed but can be helpful, when inputted value
+                                set_any_value(FloatOrPercent{val, is_percent}, false); // it's no needed but can be helpful, when inputted value
                                                          // contained "," instead of "."
                             m_last_validated_value = str;
                         }
@@ -919,7 +917,7 @@ void TextCtrl::BUILD() {
         assert(m_opt.default_value->is_vector());
         m_last_meaningful_value = any_to_wxstring(static_cast<const ConfigOptionVectorBase*>(m_opt.default_value.get())->get_default_value(), m_opt, m_opt_idx).first;
     } else {
-        m_last_meaningful_value = text_value;
+    m_last_meaningful_value = text_value;
     }
     assert(m_last_meaningful_value != na_value());
 
@@ -1034,7 +1032,7 @@ bool TextCtrl::value_was_changed()
             double old_val = boost::any_cast<double>(val);
             if ((std::isnan(new_val) || ConfigOptionFloats::is_nil(m_value)) &&
                 (std::isnan(old_val) || ConfigOptionFloats::is_nil(val)))
-                return false;
+            return false;
         }
     case coPercent:
     case coFloat: {
@@ -1053,10 +1051,7 @@ bool TextCtrl::value_was_changed()
                    boost::any_cast<std::vector<FloatOrPercent>>(val);
         }
         if (m_opt.nullable) {
-            FloatOrPercent new_val = boost::any_cast<FloatOrPercent>(m_value);
-            FloatOrPercent old_val = boost::any_cast<FloatOrPercent>(val);
-            if ((std::isnan(new_val.value) || new_val == ConfigOptionFloatsOrPercents::NIL_VALUE()) &&
-                (std::isnan(old_val.value) || old_val == ConfigOptionFloatsOrPercents::NIL_VALUE()))
+            if (ConfigOptionFloatsOrPercents::is_nil(m_value) &&ConfigOptionFloatsOrPercents::is_nil(val))
                 return false;
         }
     case coFloatOrPercent:
@@ -1102,7 +1097,7 @@ void TextCtrl::propagate_value()
         m_last_meaningful_value = dynamic_cast<wxTextCtrl *>(window)->GetValue();
 }
 
-void TextCtrl::set_value(const boost::any& value, bool change_event/* = false*/) {
+void TextCtrl::set_any_value(const boost::any& value, bool change_event/* = false*/) {
     //can be:
     //case coFloat:
     //case coFloats:
@@ -1232,7 +1227,7 @@ void CheckBox::BUILD() {
 
     //set value (need the window for the set_value)
     if (m_opt.is_script && !m_opt.default_script_value.empty())
-        set_value(m_opt.default_script_value, false);
+        set_any_value(m_opt.default_script_value, false);
     else
         set_widget_value(check_value);
 
@@ -1261,7 +1256,7 @@ void CheckBox::set_widget_value(bool new_val)
 #endif
 }
 
-void CheckBox::set_value(const boost::any &value, bool change_event)
+void CheckBox::set_any_value(const boost::any &value, bool change_event)
 {
     //can be coBool and coBools (with idx)
     m_disable_change_event = !change_event;
@@ -1322,7 +1317,7 @@ boost::any& CheckBox::get_value()
 	if (m_opt.type == coBool)
 		m_value = static_cast<bool>(value);
 	else
-        m_value = m_is_na_val ? ConfigOptionBoolsNullable::NIL_VALUE() : static_cast<unsigned char>(value);
+		m_value = m_is_na_val ? ConfigOptionBoolsNullable::NIL_VALUE() : static_cast<unsigned char>(value);
  	return m_value;
 }
 
@@ -1738,7 +1733,7 @@ int32_t Choice::idx_from_enum_value(int32_t val) {
         return 0;
 }
 
-void Choice::set_value(const boost::any &value, bool change_event)
+void Choice::set_any_value(const boost::any &value, bool change_event)
 {
     // can be
     // GUIType::select_open
@@ -1758,7 +1753,7 @@ void Choice::set_value(const boost::any &value, bool change_event)
 	case coPercent:
 	case coFloatOrPercent:
 	case coString:
-    case coStrings: {
+	case coStrings: {
         auto [/*wxString*/ text_value, /*bool*/ has_nil] = any_to_wxstring(value, m_opt, m_opt_idx);
 
         size_t idx = 0;
@@ -2009,7 +2004,7 @@ void ColourPicker::set_undef_value(wxColourPickerCtrl* field)
     btn->SetBitmapLabel(bmp);
 }
 
-void ColourPicker::set_value(const boost::any &value, bool change_event)
+void ColourPicker::set_any_value(const boost::any &value, bool change_event)
 {
     // can be ConfigOptionDef::GUIType::color
     m_disable_change_event = !change_event;
@@ -2184,7 +2179,7 @@ void PointCtrl::set_vec2d_value(const Vec2d& value, bool change_event)
 	m_disable_change_event = false;
 }
 
-void PointCtrl::set_value(const boost::any &value, bool change_event)
+void PointCtrl::set_any_value(const boost::any &value, bool change_event)
 {
     // can be coPoint and coPoints (with idx)
     assert(m_opt.type == coPoint || (m_opt.type == coPoints && m_opt_idx >= 0));
@@ -2198,7 +2193,7 @@ boost::any& PointCtrl::get_value()
 	if (!x_textctrl->GetValue().ToDouble(&x) ||
 		!y_textctrl->GetValue().ToDouble(&y))
 	{
-        set_value(m_value.empty() ? Vec2d(0.0, 0.0) : m_value, true);
+        set_any_value(m_value.empty() ? Vec2d(0.0, 0.0) : m_value, true);
         show_error(m_parent, _L("Invalid numeric input."));
 	}
 	else
@@ -2301,7 +2296,7 @@ void SliderCtrl::BUILD()
 	m_sizer = dynamic_cast<wxSizer*>(temp);
 }
 
-void SliderCtrl::set_value(const boost::any &value, bool change_event)
+void SliderCtrl::set_any_value(const boost::any &value, bool change_event)
 {
     // only with ConfigOptionDef::GUIType::slider: & coFloat or coInt
     assert(m_opt.gui_type == ConfigOptionDef::GUIType::slider && (m_opt.type == coFloat || m_opt.type == coInt));
@@ -2331,6 +2326,7 @@ boost::any &SliderCtrl::get_value()
     assert(false);
     return m_value;
 }
+
 
 } // GUI
 } // Slic3r

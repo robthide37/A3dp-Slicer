@@ -1311,7 +1311,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
                     if (field) {
                         boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
-                            field->set_value(script_val, false);
+                            field->set_any_value(script_val, false);
                     }
                 }
                 { // also check freq changed params
@@ -1319,7 +1319,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
                     if (field) {
                         boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
-                            field->set_value(script_val, false);
+                            field->set_any_value(script_val, false);
                     }
                 }
             }
@@ -1330,7 +1330,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     Field* field = og_freq_chng_params->get_field(opt_key);
     if (field) {
         boost::any val = m_config->option(opt_key)->get_any(field->m_opt_idx);
-        field->set_value(val, false);
+        field->set_any_value(val, false);
     }
 
 

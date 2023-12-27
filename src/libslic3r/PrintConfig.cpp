@@ -6467,14 +6467,14 @@ void PrintConfigDef::init_fff_params()
         }
         case coPercents: {
             ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
-            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
+            opt->set_any(ConfigOptionPercentsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coFloatsOrPercents: {
             ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
                 static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
-            opt->set_at(ConfigOptionFloatsOrPercentsNullable::NIL_VALUE(), 0);
+            opt->set_any(ConfigOptionFloatsOrPercentsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
