@@ -321,8 +321,10 @@ protected:
 		osInitPhony = 8,
 		osCurrentPhony = 16,
 	};
-	std::map<std::string, int>	m_options_list;
-	std::map<std::string, int>	m_options_script;
+	// map<opt_key, pair<idx, OptStatus>>
+    std::map<std::string, std::pair<int, int /*OptStatus*/>> m_options_list;
+    // map<opt_key, OptStatus> (script can't be vector)
+    std::map<std::string, int /*OptStatus*/> m_options_script;
     std::vector<std::string>    m_options_dirty;
 	int							m_opt_status_value = 0;
 
@@ -550,6 +552,7 @@ public:
 	void		toggle_options() override;
 	void		update() override;
 	void		clear_pages() override;
+	void		init_options_list() override;
 	PrinterTechnology get_printer_technology() const override { return ptFFF; }
 };
 
