@@ -376,7 +376,6 @@ void PrintConfigDef::init_common_params()
     def->mode = comExpert | comPrusa;
     def->min = 0;
     def->max = 2048;
-    //def->gui_type = ConfigOptionDef::GUIType::one_string; // i prefer two boxes
     def->set_default_value(new ConfigOptionPoints{ std::initializer_list<Vec2d>{ Vec2d(0,0), Vec2d(0,0) } });
 
     def = this->add("thumbnails_color", coString);
@@ -4217,7 +4216,6 @@ void PrintConfigDef::init_fff_params()
                    "and they can access the Slic3r config settings by reading environment variables."
                    "\nThe script, if passed as a relative path, will also be searched from the slic3r directory, "
                    "the slic3r configuration directory and the user directory.");
-    def->gui_flags = "serialized";
     def->multiline = true;
     def->full_width = true;
     def->height = 6;
@@ -6433,20 +6431,20 @@ void PrintConfigDef::init_fff_params()
         }
         case coFloats: {
             ConfigOptionFloatsNullable *opt = new ConfigOptionFloatsNullable(it_opt->second.default_value.get()->get_float());
-            opt->values.push_back(boost::any_cast<double>(ConfigOptionFloatsNullable::create_nil()));
+            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coPercents: {
             ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
-            opt->values.push_back(boost::any_cast<double>(ConfigOptionPercentsNullable::create_nil()));
+            opt->set_any(ConfigOptionPercentsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coFloatsOrPercents: {
             ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
                 static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
-            opt->values.push_back(boost::any_cast<FloatOrPercent>(ConfigOptionFloatsOrPercentsNullable::create_nil()));
+            opt->set_any(ConfigOptionFloatsOrPercentsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }

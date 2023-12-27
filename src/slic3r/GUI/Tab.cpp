@@ -1253,7 +1253,8 @@ void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index/*
 // and value can be some random value because in this case it will not been used
 void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bool saved_value /*= false*/)
 {
-    if (!saved_value) change_opt_value(*m_config, opt_key, value);
+    if (!saved_value)
+        m_config->option(opt_key)->set_any(value, -1); // change_opt_value(*m_config, opt_key, value);
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
         // Don't select another profile if this profile happens to become incompatible.
@@ -1310,7 +1311,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
                     if (field) {
                         boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
-                            field->set_value(script_val, false);
+                            field->set_any_value(script_val, false);
                     }
                 }
                 { // also check freq changed params
@@ -1318,7 +1319,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
                     if (field) {
                         boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
-                            field->set_value(script_val, false);
+                            field->set_any_value(script_val, false);
                     }
                 }
             }
@@ -1328,8 +1329,8 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     // update unscripted freq params
     Field* field = og_freq_chng_params->get_field(opt_key);
     if (field) {
-        boost::any val = og_freq_chng_params->get_config_value(*m_config, opt_key);
-        field->set_value(val, false);
+        boost::any val = m_config->option(opt_key)->get_any(field->m_opt_idx);
+        field->set_any_value(val, false);
     }
 
 
@@ -2800,11 +2801,11 @@ PageShp TabFilament::create_filament_overrides_page()
     {
         Line line {"",""};
         if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
-            Option opt = optgroup->get_option_and_register(opt_key);
+            Option opt = optgroup->get_option_and_register(opt_key, 0);
             opt.opt.label = opt.opt.get_full_label();
             line = optgroup->create_single_option_line(opt);
         } else {
-            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key));
+            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key, 0));
         }
 
         line.near_label_widget = [this, optgroup, opt_key, opt_index](wxWindow* parent) {

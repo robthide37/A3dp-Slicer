@@ -401,6 +401,7 @@ public:
     virtual bool                get_bool(size_t idx = 0)       const { throw BadOptionTypeException("Calling ConfigOption::get_bool on a non-boolean ConfigOption");  }
     virtual void                set_enum_int(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::set_enum_int on a non-enum ConfigOption"); }
     virtual boost::any          get_any(int32_t idx = -1)       const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
+    virtual void                set_any(boost::any, int32_t idx = -1) { throw BadOptionTypeException("Calling ConfigOption::set_any on a raw ConfigOption"); }
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }
     virtual size_t              hash()          const throw() = 0;
@@ -441,7 +442,8 @@ public:
     explicit ConfigOptionSingle(T value) : value(value) {}
     explicit ConfigOptionSingle(T value, bool phony) : ConfigOption(phony), value(value) {}
     operator T() const { return this->value; }
-    boost::any get_any(int32_t idx = 0) const override { return boost::any(value); }
+    boost::any get_any(int32_t idx = -1) const override { return boost::any(value); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override { value = boost::any_cast<T>(anyval); }
     
     void set(const ConfigOption *rhs) override
     {
@@ -607,6 +609,13 @@ public:
 
     T& get_at(size_t i) { return const_cast<T&>(std::as_const(*this).get_at(i)); }
     boost::any get_any(int32_t idx = -1) const override { return idx < 0 ? boost::any(values) : boost::any(get_at(idx)); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override
+    { 
+       if (idx < 0)
+            values = boost::any_cast<std::vector<T>>(anyval);
+        else
+            set_at(boost::any_cast<T>(anyval), idx);
+    }
 
     // Resize this vector by duplicating the /*last*/first or default value.
     // If the current vector is empty, the default value is used instead.
@@ -1248,6 +1257,14 @@ public:
     double                      get_abs_value(double ratio_over) const 
         { return this->percent ? (ratio_over * this->value / 100) : this->value; }
     double                      get_float(size_t idx = 0) const override { return get_abs_value(1.); }
+    // special case for get/set any: use a FloatOrPercent like for FloatsOrPercents, to have the is_percent
+    boost::any get_any(int32_t idx = 0) const override { return boost::any(FloatOrPercent{value, percent}); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override
+    {
+        auto fl_or_per = boost::any_cast<FloatOrPercent>(anyval);
+        this->value    = fl_or_per.value;
+        this->percent  = fl_or_per.percent;
+    }
 
     void set(const ConfigOption *rhs) override {
         if (rhs->type() != this->type())
@@ -1779,6 +1796,9 @@ public:
     bool                    operator< (const ConfigOptionEnum<T> &rhs) const throw() { return int(this->value) < int(rhs.value); }
     int32_t                 get_int(size_t idx = 0) const override { return int32_t(this->value); }
     void                    set_enum_int(int32_t val) override { this->value = T(val); }
+    // special case for get/set any: use a int like for ConfigOptionEnumGeneric, to simplify
+    boost::any get_any(int32_t idx = -1) const override { return boost::any(get_int()); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override { set_enum_int(boost::any_cast<int32_t>(anyval)); }
 
     bool operator==(const ConfigOption &rhs) const override
     {
@@ -1910,7 +1930,7 @@ public:
         // Static text
         legend,
         // Vector value, but edited as a single string.
-        one_string,
+        // one_string, // it's now the default for vector without any idx. If you want to edit the first value, set the idx to 0
     };
 
 	// Identifier of this option. It is stored here so that it is accessible through the by_serialization_key_ordinal map.

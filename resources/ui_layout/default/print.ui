@@ -202,6 +202,7 @@ group:sidetext_width$5:Infill angle
 		setting:label_width$6:width$5:label$increment:fill_angle_increment
 		setting:label_width$6:width$5:label$increment:fill_angle_cross
 	vector_line:fill_angle_template
+#	setting:fill_angle_template
 group:sidetext_width$5:Advanced
 	setting:solid_infill_every_layers
 	setting:solid_infill_below_area

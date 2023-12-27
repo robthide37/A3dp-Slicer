@@ -788,33 +788,35 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     ctx->Prepare(func);
     std::string str_arg;
     switch (def.type) {
-    case coBool:
-    case coBools: ctx->SetArgByte(0, boost::any_cast<bool>(value)); break;
+    case coBools: ctx->SetArgByte(0, boost::any_cast<uint8_t>(value)); break;
+    case coBool: ctx->SetArgByte(0, boost::any_cast<bool>(value)); break;
     case coInt:
-    case coInts: ctx->SetArgDWord(0, boost::any_cast<int>(value)); break;
+    case coInts: ctx->SetArgDWord(0, boost::any_cast<int32_t>(value)); break;
     case coPercent:
     case coPercents:
     case coFloat:
     case coFloats: ctx->SetArgFloat(0, (float)boost::any_cast<double>(value)); break;
     case coFloatOrPercent:
     case coFloatsOrPercents: {
-        std::string flOrPercent = boost::any_cast<std::string>(value);
-        float val = 0;
-        bool is_percent = false;
-        if (flOrPercent[flOrPercent.size() - 1] == '%') {
-            flOrPercent = flOrPercent.substr(0, flOrPercent.size() - 1);
-            val = std::stof(flOrPercent);
-            is_percent = true;
-        } else {
-            val = std::stof(flOrPercent);
-        }
-        ctx->SetArgDWord(0, boost::any_cast<float>((float)val));
-        ctx->SetArgByte(1, boost::any_cast<bool>(is_percent));
+        FloatOrPercent fl_percent = boost::any_cast<FloatOrPercent>(value);
+        ctx->SetArgDWord(0, boost::any_cast<float>((float) fl_percent.value));
+        ctx->SetArgByte(1, boost::any_cast<bool>(fl_percent.percent));
         break;
     }
     case coPoint:
-    case coPoints: { ctx->SetArgFloat(0, (float)boost::any_cast<double>(value)); ctx->SetArgFloat(1, (float)boost::any_cast<double>(value)); break; } //FIXME
-    case coPoint3: { ctx->SetArgFloat(0, (float)boost::any_cast<double>(value)); ctx->SetArgFloat(1, (float)boost::any_cast<double>(value)); ctx->SetArgFloat(2, (float)boost::any_cast<double>(value)); break; }
+    case coPoints: { 
+        Vec2d vec = boost::any_cast<Vec2d>(value);
+        ctx->SetArgFloat(0, (float) vec.x());
+        ctx->SetArgFloat(1, (float) vec.y());
+        break;
+    }
+    case coPoint3: { 
+        Vec3d vec = boost::any_cast<Vec3d>(value);
+        ctx->SetArgFloat(0, (float) vec.x());
+        ctx->SetArgFloat(1, (float) vec.y());
+        ctx->SetArgFloat(2, (float) vec.z());
+        break;
+    }
     case coString:
     case coStrings: {
         str_arg = boost::any_cast<std::string>(value);
@@ -875,7 +877,7 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     if (m_need_refresh && m_tab) {
         Field* f = m_tab->get_field(def.opt_key);
         if (f != nullptr) {
-            f->set_value(call_script_function_get_value(def), false);
+            f->set_any_value(call_script_function_get_value(def), false);
         }
     }
 }
@@ -930,7 +932,7 @@ bool ScriptContainer::call_script_function_reset(const ConfigOptionDef& def)
     if (m_need_refresh && m_tab) {
         Field* f = m_tab->get_field(def.opt_key);
         if (f != nullptr) {
-            f->set_value(call_script_function_get_value(def), false);
+            f->set_any_value(call_script_function_get_value(def), false);
         }
     }
     return true;
@@ -1028,55 +1030,71 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     int res = ctx->Execute();
     int32_t ret_int;
     float ret_float;
-    boost::any field_val;
     boost::any opt_val;
     switch (def.type) {
     case coBool:
-    case coBools: { ret_int = ctx->GetReturnDWord(); field_val = uint8_t(ret_int < 0 ? 2 : ret_int); opt_val = uint8_t((ret_int > 0)?1:0); break; } //CheckBox
+    case coBools: {
+        ret_int = ctx->GetReturnDWord();
+        opt_val = uint8_t(ret_int < 0 ? 2 : ret_int);
+        break;
+    }
     case coInt:
-    case coInts: { ret_int = ctx->GetReturnDWord(); field_val = int32_t(ret_int); opt_val = int(ret_int); break; } //SpinCtrl
+    case coInts: {
+        ret_int = ctx->GetReturnDWord();
+        opt_val = int32_t(ret_int);
+        break;
+    } // SpinCtrl
     case coString:
-    case coStrings: { field_val = from_u8(ret_str); opt_val = ret_str; break; } //TextCtrl
+    case coStrings: {
+        opt_val = ret_str;
+        break;
+    } // TextCtrl
     case coPercent:
-    case coPercents: ret_percent = true;
+    case coPercents:
     case coFloat:
-    case coFloats: opt_val = double(ctx->GetReturnFloat());
+    case coFloats: {
+        opt_val = double(ctx->GetReturnFloat());
+        break;
+    }
     case coFloatOrPercent:
     case coFloatsOrPercents:
     {
         ret_float = ctx->GetReturnFloat();
-        wxString ret_wstring = double_to_string(ret_float);
-        if (ret_percent)
-            ret_wstring += '%';
-        field_val = ret_wstring; //TextCtrl
-        if (opt_val.empty()) { opt_val = ret_wstring.ToStdString(); }
+        opt_val   = FloatOrPercent{ret_float, ret_percent};
         break;
     }
     case coPoint:
-    case coPoints: { ret_float = ctx->GetReturnFloat(); field_val = Vec2d{ ret_float, ret_float }; opt_val = double(ctx->GetReturnFloat()); break; } //FIXME PointCtrl
-    case coPoint3: { ret_float = ctx->GetReturnFloat(); field_val = Vec3d{ ret_float, ret_float, ret_float }; opt_val = double(ctx->GetReturnFloat());  break; }
+    case coPoints: {
+        double pt_x = ctx->GetReturnFloat();
+        opt_val     = Vec2d{pt_x, pt_x}; // FIXME
+        break;
+    } // FIXME PointCtrl
+    case coPoint3: {
+        double pt_x = ctx->GetReturnFloat();
+        opt_val     = Vec3d{pt_x, pt_x, pt_x};
+        break;
+    }
     case coEnum: { 
         ret_int = ctx->GetReturnDWord();
         if (ret_int >= 0 && ret_int < def.enum_values.size()) {
-            field_val = int32_t(ret_int);
+            opt_val = int32_t(ret_int);
         } else {
-            field_val = int32_t(0);
+            opt_val = int32_t(0);
             for (size_t i = 0; i < def.enum_values.size(); i++) {
                 if (ret_str == def.enum_values[i])
-                    field_val = int32_t(i);
+                    opt_val = int32_t(i);
             }
         }
-        opt_val = field_val;
         break; //Choice
     }
     }
     if (m_need_refresh) {
         refresh(def, opt_val);
     }
-    if (field_val.empty()) {
+    if (opt_val.empty()) {
         std::cout << "Error nullptr for script\n";
     }
-    return field_val;
+    return opt_val;
 }
 
 void ScriptContainer::refresh(const ConfigOptionDef& def, boost::any value)
