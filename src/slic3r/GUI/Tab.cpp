@@ -820,7 +820,7 @@ void Tab::init_options_list()
 template<class T>
 void add_correct_opts_to_options_list(const std::string &opt_key, std::map<std::string, int>& map, Tab *tab, const int& value)
 {
-    T *opt_cur = static_cast<T*>(tab->m_config->option(opt_key));
+    T *opt_cur = static_cast<T*>(tab->get_config()->option(opt_key));
     for (size_t i = 0; i < opt_cur->values.size(); i++)
         map.emplace(opt_key + "#" + std::to_string(i), value);
 }
