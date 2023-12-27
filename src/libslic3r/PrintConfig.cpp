@@ -2294,7 +2294,7 @@ void PrintConfigDef::init_fff_params()
     def->max        = 360;
     def->full_width = true;
     def->mode       = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloats{});
+    def->set_default_value(new ConfigOptionFloats(0.));
 
     def = this->add("fill_density", coPercent);
     def->gui_type = ConfigOptionDef::GUIType::f_enum_open;
@@ -6422,11 +6422,34 @@ void PrintConfigDef::init_fff_params()
         def->tooltip     = it_opt->second.tooltip;
         def->sidetext   = it_opt->second.sidetext;
         def->mode       = it_opt->second.mode;
+        // create default value with the default value is taken from the default value of the config.
+        // put a nil value as first entry.
         switch (def->type) {
-        case coFloats   : def->set_default_value(new ConfigOptionFloatsNullable  (static_cast<const ConfigOptionFloats*  >(it_opt->second.default_value.get())->values)); break;
-        case coPercents : def->set_default_value(new ConfigOptionPercentsNullable(static_cast<const ConfigOptionPercents*>(it_opt->second.default_value.get())->values)); break;
-        case coFloatsOrPercents : def->set_default_value(new ConfigOptionFloatsOrPercentsNullable(static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->values)); break;
-        case coBools    : def->set_default_value(new ConfigOptionBoolsNullable   (static_cast<const ConfigOptionBools*   >(it_opt->second.default_value.get())->values)); break;
+        case coBools: {
+            ConfigOptionBoolsNullable* opt = new ConfigOptionBoolsNullable(it_opt->second.default_value.get()->get_bool());
+            opt->values.push_back(ConfigOptionBoolsNullable::NIL_VALUE());
+            def->set_default_value(opt);
+            break;
+        }
+        case coFloats: {
+            ConfigOptionFloatsNullable *opt = new ConfigOptionFloatsNullable(it_opt->second.default_value.get()->get_float());
+            opt->values.push_back(boost::any_cast<double>(ConfigOptionFloatsNullable::create_nil()));
+            def->set_default_value(opt);
+            break;
+        }
+        case coPercents: {
+            ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
+            opt->values.push_back(boost::any_cast<double>(ConfigOptionPercentsNullable::create_nil()));
+            def->set_default_value(opt);
+            break;
+        }
+        case coFloatsOrPercents: {
+            ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
+                static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
+            opt->values.push_back(boost::any_cast<FloatOrPercent>(ConfigOptionFloatsOrPercentsNullable::create_nil()));
+            def->set_default_value(opt);
+            break;
+        }
         default: assert(false);
         }
     }

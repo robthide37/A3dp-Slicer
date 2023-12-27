@@ -488,6 +488,10 @@ public:
     virtual void resize(size_t n, const ConfigOption *opt_default = nullptr) = 0;
     // Clear the values vector.
     virtual void clear() = 0;
+    // get the stored default value for filling empty vector.
+    // If you use it, double check if you shouldn't instead use the ConfigOptionDef.defaultvalue, which is the default value of a setting.
+    // currently, it's used to try to have a meaningful value for a Field if the default value is Nil (and to avoid cloning the option, clear it, asking for an item)
+    virtual boost::any get_default_value() const = 0;
 
     // Get size of this vector.
     virtual size_t size()  const = 0;
@@ -514,15 +518,26 @@ protected:
 template <class T>
 class ConfigOptionVector : public ConfigOptionVectorBase
 {
+private:
+    void set_default_from_values() {
+        assert(!values.empty());
+        if (!values.empty())
+            default_value = values.front();
+    }
+
+protected:
+    // this default is used to fill this vector when resized. It's not the default of a setting, for it please use the
+    // ConfigOptionDef.
+    T default_value;
 public:
+    std::vector<T> values;
+
     ConfigOptionVector() {}
     explicit ConfigOptionVector(const T& default_val) : default_value(default_val) {}
-    explicit ConfigOptionVector(size_t n, const T& value) : values(n, value) {}
-    explicit ConfigOptionVector(std::initializer_list<T> il) : values(std::move(il)) {}
-    explicit ConfigOptionVector(const std::vector<T> &values) : values(values) {}
-    explicit ConfigOptionVector(std::vector<T> &&values) : values(std::move(values)) {}
-    std::vector<T> values;
-    T default_value;
+    explicit ConfigOptionVector(size_t n, const T &value) : values(n, value), default_value(value) {}
+    explicit ConfigOptionVector(std::initializer_list<T> il) : values(std::move(il)) { set_default_from_values(); }
+    explicit ConfigOptionVector(const std::vector<T> &values) : values(values) { set_default_from_values(); }
+    explicit ConfigOptionVector(std::vector<T> &&values) : values(std::move(values)) { set_default_from_values(); }
     
     void set(const ConfigOption *rhs) override
     {
@@ -558,12 +573,10 @@ public:
     // This function is useful to split values from multiple extrder / filament settings into separate configurations.
     void set_at(const ConfigOption *rhs, size_t i, size_t j) override
     {
-        // It is expected that the vector value has at least one value, which is the default, if not overwritten.
-        assert(! this->values.empty());
+        // Fill with default value up to the needed position
         if (this->values.size() <= i) {
             // Resize this vector, fill in the new vector fields with the copy of the first field.
-            T v = this->values.front();
-            this->values.resize(i + 1, v);
+            this->values.resize(i + 1, this->default_value);
         }
         if (rhs->type() == this->type()) {
             // Assign the first value of the rhs vector.
@@ -578,12 +591,10 @@ public:
     }
     void set_at(T val, size_t i)
     {
-        // It is expected that the vector value has at least one value, which is the default, if not overwritten.
-        assert(!this->values.empty());
+        // Fill with default value up to the needed position
         if (this->values.size() <= i) {
             // Resize this vector, fill in the new vector fields with the copy of the first field.
-            T v = this->values.front();
-            this->values.resize(i + 1, v);
+            this->values.resize(i + 1, this->default_value);
         }
         this->values[i] = val;
     }
@@ -597,13 +608,13 @@ public:
     T& get_at(size_t i) { return const_cast<T&>(std::as_const(*this).get_at(i)); }
     boost::any get_any(int32_t idx = -1) const override { return idx < 0 ? boost::any(values) : boost::any(get_at(idx)); }
 
-    // Resize this vector by duplicating the /*last*/first value.
+    // Resize this vector by duplicating the /*last*/first or default value.
     // If the current vector is empty, the default value is used instead.
     void resize(size_t n, const ConfigOption *opt_default = nullptr) override
     {
         assert(opt_default == nullptr || opt_default->is_vector());
 //        assert(opt_default == nullptr || dynamic_cast<ConfigOptionVector<T>>(opt_default));
-        assert(! this->values.empty() || opt_default != nullptr);
+       // assert(! this->values.empty() || opt_default != nullptr);
         if (n == 0)
             this->values.clear();
         else if (n < this->values.size())
@@ -614,12 +625,12 @@ public:
                     this->values.resize(n, this->default_value);
                 if (opt_default->type() != this->type())
                     throw ConfigurationError("ConfigOptionVector::resize(): Extending with an incompatible type.");
-                if(static_cast<const ConfigOptionVector<T>*>(opt_default)->values.empty())
-                    this->values.resize(n, this->default_value);
+                if(auto other = static_cast<const ConfigOptionVector<T>*>(opt_default); other->values.empty())
+                    this->values.resize(n, other->default_value);
                 else
-                    this->values.resize(n, static_cast<const ConfigOptionVector<T>*>(opt_default)->values.front());
+                    this->values.resize(n, other->values.front());
             } else {
-                // Resize by duplicating the last value.
+                // Resize by duplicating the /*last*/first value.
                 this->values.resize(n, this->values./*back*/front());
             }
         }
@@ -629,6 +640,10 @@ public:
     void   clear() override { this->values.clear(); }
     size_t size()  const override { return this->values.size(); }
     bool   empty() const override { return this->values.empty(); }
+    // get the stored default value for filling empty vector.
+    // If you use it, double check if you shouldn't instead use the ConfigOptionDef.defaultvalue, which is the default value of a setting.
+    // currently, it's used to try to have a meaningful value for a Field if the default value is Nil
+    boost::any get_default_value() const override { return boost::any(default_value); }
 
     bool operator==(const ConfigOption &rhs) const override
     {
@@ -695,10 +710,7 @@ public:
     		}
     	for (; i < rhs_vec->size(); ++ i)
     		if (! rhs_vec->is_nil(i)) {
-    			if (this->values.empty())
-    				this->values.resize(i + 1);
-    			else
-    				this->values.resize(i + 1, this->values.front());
+    			this->values.resize(i + 1, this->default_value);
     			this->values[i] = rhs_vec->values[i];
     			modified = true;
     		}
@@ -1636,6 +1648,7 @@ class ConfigOptionBoolsTempl : public ConfigOptionVector<unsigned char>
 {
 public:
     ConfigOptionBoolsTempl() : ConfigOptionVector<unsigned char>() {}
+    explicit ConfigOptionBoolsTempl(bool default_value) : ConfigOptionVector<unsigned char>(default_value) {}
     explicit ConfigOptionBoolsTempl(size_t n, bool value) : ConfigOptionVector<unsigned char>(n, (unsigned char)value) {}
     explicit ConfigOptionBoolsTempl(std::initializer_list<bool> il) { values.reserve(il.size()); for (bool b : il) values.emplace_back((unsigned char)b); }
 	explicit ConfigOptionBoolsTempl(std::initializer_list<unsigned char> il) { values.reserve(il.size()); for (unsigned char b : il) values.emplace_back(b); }
