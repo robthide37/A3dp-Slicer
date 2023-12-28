@@ -3532,7 +3532,8 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
             good_role,
             params.flow.mm3_per_mm() * params.flow_mult * flow_mult_exact_volume,
             params.flow.width() * params.flow_mult * float(flow_mult_exact_volume),
-            params.flow.height());
+            params.flow.height(),
+            !is_monotonic());
 
         coll_nosort->append(ExtrusionEntitiesPtr{ eec });
 

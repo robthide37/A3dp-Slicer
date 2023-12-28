@@ -211,7 +211,7 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                     good_role,
                     used_flow,
                     used_flow.scaled_width() / 8,
-                    true);
+                    !params.monotonic);
                 // compute the path of the nozzle -> extruded volume
                 for (const ExtrusionEntity* entity : entities) {
                     extruded_volume += entity->total_volume();
@@ -219,6 +219,8 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 //append (move so the pointers are reused, and won't need to be deleted)
                 all_new_paths->append(std::move(entities));
             }
+            if(params.monotonic)
+                all_new_paths->set_can_sort_reverse(false, false);
             thick_polylines.clear();
 
 
@@ -305,7 +307,8 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 good_role,
                 params.flow.mm3_per_mm()* params.flow_mult * mult_flow,
                 (float)(params.flow.width()* params.flow_mult * mult_flow),
-                (float)params.flow.height());
+                (float)params.flow.height(),
+                !params.monotonic);
         }
     } catch (InfillFailedException&) {
     }
