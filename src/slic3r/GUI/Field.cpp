@@ -1641,8 +1641,8 @@ void Choice::propagate_value()
         switch (m_opt.type) {
         case coFloatOrPercent:
         {
-            std::string old_val = !m_value.empty() ? boost::any_cast<std::string>(m_value) : "";
-            if (old_val == boost::any_cast<std::string>(get_value()))
+            FloatOrPercent old_val = !m_value.empty() ? boost::any_cast<FloatOrPercent>(m_value) : FloatOrPercent{};
+            if (old_val == boost::any_cast<FloatOrPercent>(get_value()))
                 return;
             break;
         }
@@ -1911,9 +1911,10 @@ boost::any& Choice::get_value()
             (ret_str != m_opt.enum_values[ret_enum] && ret_str != _(m_opt.enum_labels[ret_enum])))
 			// modifies ret_string!
             get_value_by_opt_type(ret_str);
-        else if (m_opt.type == coFloatOrPercent)
-            m_value = m_opt.enum_values[ret_enum];
-        else if (m_opt.type == coInt)
+        else if (m_opt.type == coFloatOrPercent) {
+            m_value = FloatOrPercent{string_to_double_decimal_point(m_opt.enum_values[ret_enum]),
+                                     (m_opt.enum_values[ret_enum].find('%') != std::string::npos)};
+        } else if (m_opt.type == coInt)
             m_value = atoi(m_opt.enum_values[ret_enum].c_str());
         else
             m_value = string_to_double_decimal_point(m_opt.enum_values[ret_enum]);
