@@ -5441,9 +5441,9 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
 
 void GCode::cooldown_marker_init() {
     if (_cooldown_marker_speed[ExtrusionRole::erExternalPerimeter].empty()) {
-        std::string allow_speed_change = ";CM_extrude_speed;_EXTRUDE_SET_SPEED";
+        std::string allow_speed_change = ";_EXTRUDE_SET_SPEED";
         //only change speed on external perimeter (and similar) speed if really necessary.
-        std::string maybe_allow_speed_change = ";CM_extrude_speed_external;_EXTRUDE_SET_SPEED_MAYBE";
+        std::string maybe_allow_speed_change = ";_EXTRUDE_SET_SPEED_MAYBE";
         _cooldown_marker_speed[erNone] = "";
         _cooldown_marker_speed[erPerimeter] = allow_speed_change;
         _cooldown_marker_speed[erExternalPerimeter] = maybe_allow_speed_change;

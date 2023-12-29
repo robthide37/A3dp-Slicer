@@ -405,6 +405,26 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
     // type to add to each next G1 (just for adjustable for now)
     size_t            current_stamp = CoolingLine::TYPE_NONE;
 
+    auto finalize_sm = [&](bool ignore_empty) {
+        if (active_speed_modifier != size_t(-1)) {
+            assert(active_speed_modifier < adjustment->lines.size());
+            CoolingLine &sm = adjustment->lines[active_speed_modifier];
+            // There should be at least some extrusion move inside the adjustment block.
+            // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
+            //FIXME: Pressure equalizer add EXTRUDE_SET_SPEED_TAG withotu removing the previous one at the line before.
+            assert(ignore_empty || sm.length > 0);
+            assert(ignore_empty || sm.time > 0);
+            if (sm.time <= 0) {
+                // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should
+                // not confuse firmware either. Prohibit time adjustment of a block of zero length extrusions by
+                // the cooling buffer.
+                sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
+                // But the start / end comment shall be removed.
+                sm.type |= CoolingLine::TYPE_ADJUSTABLE_EMPTY;
+            }
+        }
+    };
+
     for (; *line_start != 0; line_start = line_end) 
     {
         while (*line_end != '\n' && *line_end != 0)
@@ -462,7 +482,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             bool wipe               = boost::contains(sline, ";_WIPE");
             if (wipe)
                 line.type |= CoolingLine::TYPE_WIPE;
-            if (boost::contains(sline, ";_EXTRUDE_SET_SPEED") && ! wipe) {
+            if (boost::contains(sline, ";_EXTRUDE_SET_SPEED") && !wipe) {
+                finalize_sm(true);
                 active_speed_modifier = adjustment->lines.size();
                 line.type |= CoolingLine::TYPE_ADJUSTABLE;
                 current_stamp |= CoolingLine::TYPE_ADJUSTABLE;
@@ -542,21 +563,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_EXTRUDE_END")) {
             // Closing a block of non-zero length extrusion moves.
             line.type = CoolingLine::TYPE_EXTRUDE_END;
-            if (active_speed_modifier != size_t(-1)) {
-                assert(active_speed_modifier < adjustment->lines.size());
-                CoolingLine &sm = adjustment->lines[active_speed_modifier];
-                // There should be at least some extrusion move inside the adjustment block.
-                // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
-                assert(sm.length > 0);
-                assert(sm.time > 0);
-                if (sm.time <= 0) {
-                    // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should not confuse firmware either.
-                    // Prohibit time adjustment of a block of zero length extrusions by the cooling buffer.
-                    sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
-                    // But the start / end comment shall be removed.
-                    sm.type |= CoolingLine::TYPE_ADJUSTABLE_EMPTY;
-                }
-            }
+            finalize_sm(false);
             active_speed_modifier = size_t(-1);
             current_stamp         = CoolingLine::TYPE_NONE;
         } else if (boost::starts_with(sline, ";_TOOLCHANGE")) {
@@ -1042,8 +1049,6 @@ std::string CoolingBuffer::apply_layer_cooldown(
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             assert(extrude_tree.size() > 0);
             if (extrude_tree.size() > 0) {
-                new_gcode.append(std::string(";TYPE_EXTRUDE remove type ") +
-                                 ExtrusionEntity::role_to_string(extrude_tree.back()) + std::string("\n"));
                 extrude_tree.pop_back();
                 fan_need_set = true;
             }
