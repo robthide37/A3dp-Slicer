@@ -1190,8 +1190,9 @@ void Control::draw_ruler(wxDC& dc)
                         if (m_values[tick] < value)
                             break;
                     // short ticks from the last tick to the end of current sequence
-                    assert(! std::isnan(short_tick));
-                    draw_short_ticks(dc, short_tick, tick);
+                    //note: first sequence can be empty.
+                    if(!std::isnan(short_tick));
+                        draw_short_ticks(dc, short_tick, tick);
                     if (sequence < m_ruler.count() - 1) sequence++;
                 }
                 short_tick = tick;
@@ -1215,6 +1216,7 @@ void Control::draw_ruler(wxDC& dc)
                     prev_y_pos = pos;
                 }
 
+                assert(!std::isnan(short_tick));
                 draw_short_ticks(dc, short_tick, tick);
 
                 if (value == m_ruler.max_values[sequence]) {
@@ -1224,6 +1226,7 @@ void Control::draw_ruler(wxDC& dc)
                 }
             }
             // short ticks from the last tick to the end 
+            assert(!std::isnan(short_tick));
             draw_short_ticks(dc, short_tick, m_max_value);
         }
 
