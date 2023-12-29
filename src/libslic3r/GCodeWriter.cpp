@@ -297,10 +297,15 @@ uint32_t GCodeWriter::get_acceleration() const
 }
 
 std::string GCodeWriter::write_acceleration(){
-    if (m_current_acceleration == m_last_acceleration || m_current_acceleration == 0)
+    bool need_write_travel_accel = (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) &&
+                                   m_current_travel_acceleration != m_last_travel_acceleration;
+    bool need_write_main_accel = m_current_acceleration != m_last_acceleration &&
+                                 m_current_acceleration != 0;
+    if (!need_write_main_accel && !need_write_travel_accel)
         return "";
 
     m_last_acceleration = m_current_acceleration;
+    m_last_travel_acceleration = m_current_travel_acceleration;
 
     std::ostringstream gcode;
 	//try to set only printing acceleration, travel should be untouched if possible
