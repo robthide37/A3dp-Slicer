@@ -92,7 +92,7 @@ public:
     Vec3d       get_unlifted_position() const { return m_pos - Vec3d{0, 0, m_extra_lift + m_lifted}; }
 
     // To be called by the CoolingBuffer from another thread.
-    static std::string set_fan(const GCodeConfig& config, uint16_t extruder_idx, uint8_t speed);
+    static std::string set_fan(const GCodeConfig& config, uint16_t extruder_idx, uint8_t speed, const std::string comment = "");
     // To be called by the main thread. It always emits the G-code, it does remember the previous state to be able to reset after the wipe tower (but remove that when the wipe tower will be extrusions and not string).
     // Keeping the state is left to the CoolingBuffer, which runs asynchronously on another thread.
     std::string set_fan(uint8_t speed, uint16_t default_tool = 0);
@@ -111,6 +111,7 @@ private:
     double          m_last_pressure_advance;
     double          m_current_pressure_advance;
     uint32_t        m_last_acceleration;
+    uint32_t        m_last_travel_acceleration;
     uint32_t        m_current_acceleration;
     uint32_t        m_current_travel_acceleration;
     double          m_current_speed;
@@ -126,7 +127,7 @@ private:
     Vec3d           m_pos = Vec3d::Zero();
 
     std::string _travel_to_z(double z, const std::string &comment);
-    std::string _retract(double length, double restart_extra, double restart_extra_toolchange, const std::string &comment);
+    std::string _retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange, const std::string &comment);
 
 };
 

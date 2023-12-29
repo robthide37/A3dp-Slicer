@@ -320,8 +320,13 @@ uint32_t GCodeWriter::get_acceleration() const
 
 std::string GCodeWriter::write_acceleration(){
     std::ostringstream gcode;
-    if (m_current_acceleration != m_last_acceleration && m_current_acceleration != 0) {
+    bool need_write_travel_accel = (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) &&
+                                   m_current_travel_acceleration != m_last_travel_acceleration;
+    bool need_write_main_accel = m_current_acceleration != m_last_acceleration &&
+                                 m_current_acceleration != 0;
+    if (need_write_travel_accel || need_write_main_accel) {
         m_last_acceleration = m_current_acceleration;
+        m_last_travel_acceleration = m_current_travel_acceleration;
 
         //try to set only printing acceleration, travel should be untouched if possible
         if (FLAVOR_IS(gcfRepetier)) {
@@ -659,14 +664,16 @@ std::string GCodeWriter::retract(bool before_wipe)
         return this->_retract(
             factor * m_region_config->print_retract_length,
             factor * m_tool->retract_restart_extra(),
-            NAN,
+            std::nullopt,
             "retract"
         );
     }
+    auto rect_length = m_tool->retract_length();
+    auto rect_length2 = m_tool->retract_restart_extra();
     return this->_retract(
         factor * m_tool->retract_length(),
         factor * m_tool->retract_restart_extra(),
-        NAN,
+        std::nullopt,
         "retract"
     );
 }
@@ -677,13 +684,13 @@ std::string GCodeWriter::retract_for_toolchange(bool before_wipe)
     assert(factor >= 0. && factor <= 1. + EPSILON);
     return this->_retract(
         factor * m_tool->retract_length_toolchange(),
-        NAN,
+        std::nullopt,
         factor * m_tool->retract_restart_extra_toolchange(),
         "retract for toolchange"
     );
 }
 
-std::string GCodeWriter::_retract(double length, double restart_extra, double restart_extra_toolchange, const std::string &comment)
+std::string GCodeWriter::_retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange, const std::string &comment)
 {
     std::ostringstream gcode;
     
@@ -697,9 +704,17 @@ std::string GCodeWriter::_retract(double length, double restart_extra, double re
     if (this->m_config.use_volumetric_e) {
         double d = m_tool->filament_diameter();
         double area = d * d * PI/4;
+        assert(length * area < std::numeric_limits<int32_t>::max());
+        assert(length * area > 0);
+        assert(!restart_extra || *restart_extra * area < std::numeric_limits<int32_t>::max());
+        assert(!restart_extra || *restart_extra * area > -std::numeric_limits<int32_t>::max());
+        assert(!restart_extra_toolchange || *restart_extra_toolchange * area < std::numeric_limits<int32_t>::max());
+        assert(!restart_extra_toolchange || *restart_extra_toolchange * area > -std::numeric_limits<int32_t>::max());
         length = length * area;
-        restart_extra = restart_extra * area;
-        restart_extra_toolchange = restart_extra_toolchange * area;
+        if(restart_extra)
+            restart_extra = *restart_extra * area;
+        if(restart_extra_toolchange)
+            restart_extra_toolchange = *restart_extra_toolchange * area;
     }
     
     double dE = m_tool->retract(length, restart_extra, restart_extra_toolchange);
@@ -821,7 +836,7 @@ std::string GCodeWriter::unlift()
     return gcode;
 }
 
-std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_idx, uint8_t speed)
+std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_idx, uint8_t speed, const std::string comment/*=""*/)
 {
 
     std::ostringstream gcode;
@@ -870,6 +885,7 @@ std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_id
             if (config.gcode_comments.value) gcode << " ; enable fan";
             gcode << "\n";
         }
+        if (gcode_comments) gcode << " ; " << (comment.empty() ? "enable fan" : comment);
     }
     return gcode.str();
 }

@@ -514,7 +514,9 @@ static std::vector<std::string> s_Preset_print_options {
         "ironing_spacing",
         "ironing_angle",
         "fill_angle",
+        "fill_angle_cross",
         "fill_angle_increment",
+        "fill_angle_template",
         "bridge_angle",
         "solid_infill_below_area",
         "only_retract_when_crossing_perimeters", "enforce_retract_first_layer",
@@ -773,10 +775,11 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_top_solid_infill_pa",
         "filament_travel_pa", //pa end
         "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", 
-        // cooling
-        "fan_always_on", 
-        "min_fan_speed",
-        "max_fan_speed", 
+        // "cooling",
+        // "fan_always_on", (now default_fan_speed)
+        // "min_fan_speed", (now fan_printer_min_speed)
+        "default_fan_speed",
+        "max_fan_speed",
         "bridge_fan_speed",
         "bridge_internal_fan_speed",
         "external_perimeter_fan_speed",
@@ -833,6 +836,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "fan_speedup_overhangs",
     "fan_speedup_time",
     "fan_percentage",
+    "fan_printer_min_speed",
     "gcode_filename_illegal_char",
     "gcode_flavor",
     "gcode_precision_xyz",
@@ -873,6 +877,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "thumbnails_custom_color",
     "thumbnails_end_file",
     "thumbnails_format",
+    "thumbnails_tag_format",
     "thumbnails_with_bed",
     "wipe_advanced",
     "wipe_advanced_nozzle_melted_volume",
@@ -984,6 +989,7 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "thumbnails_color",
     "thumbnails_custom_color",
     "thumbnails_with_bed",
+    "thumbnails_tag_format",
     "thumbnails_with_support",
 };
 

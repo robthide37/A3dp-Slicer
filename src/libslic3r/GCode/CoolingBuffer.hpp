@@ -50,10 +50,9 @@ private:
     std::vector<unsigned int>   m_extruder_ids;
     // Highest of m_extruder_ids plus 1.
     uint16_t                    m_num_extruders { 0 };
-    const std::string           m_toolchange_prefix;
     // Referencs GCode::m_config, which is FullPrintConfig. While the PrintObjectConfig slice of FullPrintConfig is being modified,
     // the PrintConfig slice of FullPrintConfig is constant, thus no thread synchronization is required.
-    const PrintConfig          &m_config;
+    const FullPrintConfig      &m_config;
     uint16_t                    m_current_extruder;
     uint16_t                    m_previous_extruder;
 

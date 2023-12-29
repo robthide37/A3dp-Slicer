@@ -193,14 +193,19 @@ group:Reducing printing time
 		setting:tags$Advanced$Expert$SuSi:sidetext_width$0:label$_:infill_dense
 		setting:width$20:infill_dense_algo
 	end_line
-group:sidetext_width$5:Advanced
-	setting:solid_infill_every_layers
-	setting:solid_infill_below_area
+group:sidetext_width$5:Infill angle
 	line:Angle
 		setting:label_width$8:width$5:fill_angle
 		setting:label_width$6:width$5:bridge_angle
-		setting:label_width$6:width$5:label$increment:fill_angle_increment
 	end_line
+	line:Modifiers
+		setting:label_width$6:width$5:label$increment:fill_angle_increment
+		setting:label_width$6:width$5:label$increment:fill_angle_cross
+	vector_line:fill_angle_template
+#	setting:fill_angle_template
+group:sidetext_width$5:Advanced
+	setting:solid_infill_every_layers
+	setting:solid_infill_below_area
 	line:Anchor solid infill by X mm
 		setting:label_width$8:width$5:external_infill_margin
 		setting:label_width$6:width$5:bridged_infill_margin

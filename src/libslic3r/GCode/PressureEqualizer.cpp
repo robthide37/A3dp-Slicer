@@ -17,7 +17,7 @@ namespace Slic3r {
 static const std::string EXTRUSION_ROLE_TAG = ";_EXTRUSION_ROLE:";
 static const std::string EXTRUDE_END_TAG = ";_EXTRUDE_END";
 static const std::string EXTRUDE_SET_SPEED_TAG = ";_EXTRUDE_SET_SPEED";
-static const std::string EXTERNAL_PERIMETER_TAG = ";_EXTERNAL_PERIMETER";
+//static const std::string EXTERNAL_PERIMETER_TAG = ";_EXTERNAL_PERIMETER";
 
 // Maximum segment length to split a long segment if the initial and the final flow rate differ.
 // Smaller value means a smoother transition between two different flow rates.
@@ -685,7 +685,7 @@ inline bool is_just_line_with_extrude_set_speed_tag(const std::string &line)
             break;
         else
             return false;
-} 
+    } 
     parse_float(p_line, line_end - p_line);
     eatws(p_line);
     p_line += EXTRUDE_SET_SPEED_TAG.length();
@@ -700,16 +700,19 @@ void PressureEqualizer::push_line_to_output(const size_t line_idx, const float n
                                                       output_buffer.begin() + int(this->output_buffer_length) + 1);
         if (is_just_line_with_extrude_set_speed_tag(prev_line_str))
             this->output_buffer_length = this->output_buffer_prev_length; // Remove the last line because it only sets the speed for an empty block of g-code lines, so it is useless.
-        else
-            push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true);
-    } else
-        push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true);
+        //else
+            //push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true); // you don't need to extrude_end a EXTRUDE_SET_SPEED_TAG anymore, only for _EXTRUDETYPE_
+    } else {
+        std::cout<<"\n";
+    }
+    //else push_to_output(EXTRUDE_END_TAG.data(), EXTRUDE_END_TAG.length(), true); // you don't need to extrude_end a EXTRUDE_SET_SPEED_TAG anymore, only for _EXTRUDETYPE_
 
     GCodeG1Formatter feedrate_formatter(m_gcode_precision_xyz, m_gcode_precision_e);
     feedrate_formatter.emit_f(new_feedrate);
     feedrate_formatter.emit_string(std::string(EXTRUDE_SET_SPEED_TAG.data(), EXTRUDE_SET_SPEED_TAG.length()));
-    if (line.extrusion_role == erExternalPerimeter)
-        feedrate_formatter.emit_string(std::string(EXTERNAL_PERIMETER_TAG.data(), EXTERNAL_PERIMETER_TAG.length()));
+    //you don't need to re-emit that. and now it's _EXTRUDETYPE_{code} anyway
+    //if (line.extrusion_role == erExternalPerimeter)
+    //    feedrate_formatter.emit_string(std::string(EXTERNAL_PERIMETER_TAG.data(), EXTERNAL_PERIMETER_TAG.length()));
     push_to_output(feedrate_formatter);
 
     GCodeG1Formatter extrusion_formatter(m_gcode_precision_xyz, m_gcode_precision_e);
