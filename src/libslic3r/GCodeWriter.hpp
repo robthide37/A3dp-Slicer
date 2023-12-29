@@ -100,6 +100,7 @@ private:
     bool            m_single_extruder_multi_material;
     Tool*           m_tool;
     uint32_t        m_last_acceleration;
+    uint32_t        m_last_travel_acceleration;
     uint32_t        m_current_acceleration;
     uint32_t        m_current_travel_acceleration;
     double          m_current_speed;
