@@ -3118,7 +3118,12 @@ wxString GUI_App::current_language_code_safe() const
 
 void GUI_App::open_web_page_localized(const std::string &http_address)
 {
-    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe(), nullptr, false);
+    wxString lng_param = wxString("lng=") + this->current_language_code_safe();
+
+    // Check if http_address already contains a query parameter
+    size_t query_pos = http_address.find('?');
+    open_browser_with_warning_dialog(wxString(http_address) + wxString(query_pos == std::string::npos ? "?" : "&") + lng_param,
+                                     nullptr, false);
 }
 
 // If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have a part(s).
