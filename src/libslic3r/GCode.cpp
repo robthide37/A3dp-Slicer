@@ -2930,6 +2930,7 @@ LayerResult GCode::process_layer(
     m_last_layer_z = static_cast<float>(print_z);
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
     m_last_height = height;
+    m_last_too_small.polyline.clear();
 
     // Set new layer - this will change Z and force a retraction if retract_layer_change is enabled.
     coordf_t previous_print_z = m_layer != nullptr ? m_layer->print_z : 0;
@@ -3215,6 +3216,7 @@ LayerResult GCode::process_layer(
                 }
                 gcode += this->extrude_loop(loop, "");
             }
+            m_last_too_small.polyline.clear();
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
             if (first_layer && loops.first == 0)
@@ -3232,6 +3234,7 @@ LayerResult GCode::process_layer(
                 set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
                 gcode += this->extrude_entity(*brim_entity, "Brim");
             }
+            m_last_too_small.polyline.clear();
             m_brim_done = true;
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point.
@@ -3253,6 +3256,7 @@ LayerResult GCode::process_layer(
                 else
                     for (const ExtrusionEntity *ee : print_object->skirt().entities())
                         gcode += this->extrude_entity(*ee, "");
+                m_last_too_small.polyline.clear();
             }
         }
         //extrude object-only brim (for sequential)
@@ -3267,6 +3271,7 @@ LayerResult GCode::process_layer(
                     gcode += this->extrude_entity(*ee, "brim");
                 m_avoid_crossing_perimeters.use_external_mp(false);
                 m_avoid_crossing_perimeters.disable_once();
+                m_last_too_small.polyline.clear();
             }
             
         }
@@ -3393,6 +3398,14 @@ LayerResult GCode::process_layer(
                     gcode += this->extrude_perimeters(print, by_region_specific);
                     gcode += this->extrude_infill(print, by_region_specific, false);
                     gcode += this->extrude_ironing(print, by_region_specific);
+
+                    //clear any leftover
+                    if(!m_last_too_small.empty()){
+                        // finish extrude the little thing that was left before us and incompatible with our next extrusion.
+                        ExtrusionPath to_finish = m_last_too_small;
+                        gcode += this->_extrude(m_last_too_small, m_last_description, m_last_speed_mm_per_sec);
+                        m_last_too_small.polyline.clear();
+                    }
                 }
                 // Don't set m_gcode_label_objects_end if you don't had to write the m_gcode_label_objects_start.
                 if (m_gcode_label_objects_start != "") {
@@ -5939,6 +5952,25 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
     }
     //if needed, write the gcode_label_objects_end then gcode_label_objects_start
     _add_object_change_labels(gcode);
+
+    //if needed, remove points to avoid surcharging the printer.
+    {
+        const coordf_t scaled_min_length         = scale_d(this->config().min_length.value);
+        const double   max_gcode_per_second      = this->config().max_gcode_per_second.value;
+        double         current_scaled_min_length = scaled_min_length;
+        if (max_gcode_per_second > 0) {
+            current_scaled_min_length = std::max(current_scaled_min_length, 
+                scale_t(m_config.get_computed_value("travel_speed")) / max_gcode_per_second);
+        }
+        if (current_scaled_min_length > 0) {
+            // it's an alternative to simplifed_path.simplify(scale_(this->config().min_length)); with more enphasis on
+            // the segment length that on the feature detail. because tolerance = min_length /10, douglas_peucker will
+            // erase more points if angles are shallower than 6° and then the '_plus' will kick in to keep a bit more. if
+            // angles are all bigger than 6°, then the douglas_peucker will do all the work.
+            // NOTE: okay to use set_points() as i have checked against the absence of arc.
+            travel.points = MultiPoint::_douglas_peucker_plus(travel.points, current_scaled_min_length / 10, current_scaled_min_length);
+        }
+    }
 
     return travel;
 }
