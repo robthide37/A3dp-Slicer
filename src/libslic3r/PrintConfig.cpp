@@ -4238,8 +4238,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Post-processing scripts");
     def->category = OptionCategory::customgcode;
     def->tooltip = L("If you want to process the output G-code through custom scripts, "
-                   "just list their absolute paths here. Separate multiple scripts with a semicolon. "
-                   "Scripts will be passed the absolute path to the G-code file as the first argument, "
+                   "just list their absolute paths here."
+                   "\nSeparate multiple scripts with a semicolon or a line return.\n!! please use '\;' here if you want a not-line-separation ';'!!"
+                   "\nScripts will be passed the absolute path to the G-code file as the first argument, "
                    "and they can access the Slic3r config settings by reading environment variables."
                    "\nThe script, if passed as a relative path, will also be searched from the slic3r directory, "
                    "the slic3r configuration directory and the user directory.");

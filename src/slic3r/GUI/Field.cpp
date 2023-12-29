@@ -409,10 +409,23 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
     case coStrings: {
         if (opt_idx < 0) {
             // custom for strings, as we don't need the serialized form, the normal one with ';' in-between is enough
+            // (use '\n' for multi-line opt)
             ConfigOptionStrings reader;
             reader.set_any(value, opt_idx);
             std::string good_str;
-            for (std::string s : reader.values) good_str += s + ";";
+            for (std::string &s : reader.values) {
+                //ensure the separator isn't inside, not escaped.
+                if (s.find((opt.multiline ? '\n' : ';')) != std::string::npos) {
+                    if (opt.multiline) {
+                        //if multiline, all \n are escaped (again)
+                        boost::replace_all(s, "\\n", "\\\\n");
+                        boost::replace_all(s, "\n", "\\n");
+                    }
+                    // all ";" are escaped
+                    boost::replace_all(s, ";","\\;");
+                }
+                good_str.append(s).append((opt.multiline ? "\n" : ";"));
+            }
             if (!good_str.empty())
                 good_str.pop_back();
             text_value = good_str;
@@ -654,17 +667,36 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
     }
     case coStrings:
         if (m_opt_idx < 0) {
-            ConfigOptionStrings reader;
             //don't remove spaces and things like that
-            try {
-                reader.deserialize(str.ToStdString());
-            } catch (std::exception) {}
+            //don't use reader.deserialize(str.ToStdString()); as the current string isn't escaped.
+            std::string              str_to_split = str.ToStdString();
+            std::vector<std::string> strings;
+            // ensure no in-string ';' to not mess up the split
+            boost::replace_all(str_to_split, "\\;", "@$@");
+            //split
+            boost::split(strings, str_to_split, boost::is_any_of("\n;"));
+            //restore extra ';' and '\n'
+            for (std::string &line : strings) {
+                boost::replace_all(line, "@$@", ";");
+                if (this->m_opt.multiline) {
+                    boost::replace_all(line, "\\n", "\n");
+                    boost::replace_all(line, "\\\n", "\\n");
+                }
+            }
+            // recreate field string
             std::string good_str;
-            for (std::string s : reader.values) good_str += s + ";";
+            for (std::string s : strings) {
+                boost::replace_all(s, ";", "\\;");
+                if (this->m_opt.multiline) {
+                    boost::replace_all(s, "\\n", "\n");
+                    boost::replace_all(s, "\\\n", "\\n");
+                }
+                good_str += s + (this->m_opt.multiline ? "\n" : ";");
+            }
             if (!good_str.empty())
                 good_str.pop_back();
-            need_update = (str.ToStdString() != good_str);
-            m_value     = reader.values;
+            need_update = (str.ToStdString() != good_str); // mostly true, even when not needed
+            m_value     = strings;
             break;
         }
     case coString: m_value = std::string(str.ToUTF8().data()); break;
