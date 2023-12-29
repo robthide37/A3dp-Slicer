@@ -885,7 +885,8 @@ std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_id
             if (config.gcode_comments.value) gcode << " ; enable fan";
             gcode << "\n";
         }
-        if (gcode_comments) gcode << " ; " << (comment.empty() ? "enable fan" : comment);
+        if (config.gcode_comments.value)
+            gcode << " ; " << (comment.empty() ? "enable fan" : comment);
     }
     return gcode.str();
 }
