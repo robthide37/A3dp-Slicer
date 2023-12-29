@@ -45,6 +45,7 @@ void CoolingBuffer::reset(const Vec3d &position)
 struct CoolingLine
 {
     enum Type : uint32_t {
+        TYPE_NONE               = 0,
         //first 5 bits are for the extrusiontype (not a flag)
 
         TYPE_SET_TOOL           = 1 << 7,
@@ -401,6 +402,28 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
     // Index of an existing CoolingLine of the current adjustment, which holds the feedrate setting command
     // for a sequence of extrusion moves.
     size_t            active_speed_modifier = size_t(-1);
+    // type to add to each next G1 (just for adjustable for now)
+    size_t            current_stamp = CoolingLine::TYPE_NONE;
+
+    auto finalize_sm = [&](bool ignore_empty) {
+        if (active_speed_modifier != size_t(-1)) {
+            assert(active_speed_modifier < adjustment->lines.size());
+            CoolingLine &sm = adjustment->lines[active_speed_modifier];
+            // There should be at least some extrusion move inside the adjustment block.
+            // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
+            //FIXME: Pressure equalizer add EXTRUDE_SET_SPEED_TAG withotu removing the previous one at the line before.
+            assert(ignore_empty || sm.length > 0);
+            assert(ignore_empty || sm.time > 0);
+            if (sm.time <= 0) {
+                // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should
+                // not confuse firmware either. Prohibit time adjustment of a block of zero length extrusions by
+                // the cooling buffer.
+                sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
+                // But the start / end comment shall be removed.
+                sm.type |= CoolingLine::TYPE_ADJUSTABLE_EMPTY;
+            }
+        }
+    };
 
     for (; *line_start != 0; line_start = line_end) 
     {
@@ -459,11 +482,15 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             bool wipe               = boost::contains(sline, ";_WIPE");
             if (wipe)
                 line.type |= CoolingLine::TYPE_WIPE;
-            if (boost::contains(sline, ";_EXTRUDE_SET_SPEED") && ! wipe) {
-                line.type |= CoolingLine::TYPE_ADJUSTABLE;
+            if (boost::contains(sline, ";_EXTRUDE_SET_SPEED") && !wipe) {
+                finalize_sm(true);
                 active_speed_modifier = adjustment->lines.size();
-                if (boost::contains(sline, ";_EXTRUDE_SET_SPEED_MAYBE"))
+                line.type |= CoolingLine::TYPE_ADJUSTABLE;
+                current_stamp |= CoolingLine::TYPE_ADJUSTABLE;
+                if (boost::contains(sline, ";_EXTRUDE_SET_SPEED_MAYBE")) {
                     line.type |= CoolingLine::TYPE_ADJUSTABLE_MAYBE;
+                    current_stamp |= CoolingLine::TYPE_ADJUSTABLE_MAYBE;
+                }
             }
             if ((line.type & CoolingLine::TYPE_G92) == 0) {
                 // G0 or G1. Calculate the duration.
@@ -494,6 +521,12 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     line.length = std::abs(dif[3]);
                 }
                 line.feedrate = new_pos[4];
+                if (line.feedrate > 0.f && line.length > 0.f) {
+                    assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0);
+                    // there can be no active_speed_modifier in custom gcode. 
+                    assert(active_speed_modifier != size_t(-1) || current_stamp == CoolingLine::TYPE_NONE);
+                    line.type |= current_stamp;
+                }
                 assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0 || line.feedrate > 0.f);
                 if (line.length > 0) {
                     assert(line.feedrate > 0);
@@ -530,22 +563,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_EXTRUDE_END")) {
             // Closing a block of non-zero length extrusion moves.
             line.type = CoolingLine::TYPE_EXTRUDE_END;
-            if (active_speed_modifier != size_t(-1)) {
-                assert(active_speed_modifier < adjustment->lines.size());
-                CoolingLine &sm = adjustment->lines[active_speed_modifier];
-                // There should be at least some extrusion move inside the adjustment block.
-                // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
-                assert(sm.length > 0);
-                assert(sm.time > 0);
-                if (sm.time <= 0) {
-                    // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should not confuse firmware either.
-                    // Prohibit time adjustment of a block of zero length extrusions by the cooling buffer.
-                    sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
-                    // But the start / end comment shall be removed.
-                    sm.type |= CoolingLine::TYPE_ADJUSTABLE_EMPTY;
-                }
-            }
+            finalize_sm(false);
             active_speed_modifier = size_t(-1);
+            current_stamp         = CoolingLine::TYPE_NONE;
         } else if (boost::starts_with(sline, ";_TOOLCHANGE")) {
             //not using m_toolchange_prefix anymore because there is no use case for it, there is always a _TOOLCHANGE for when a fan change is needed.
             int prefix = 13;
@@ -1029,8 +1049,6 @@ std::string CoolingBuffer::apply_layer_cooldown(
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             assert(extrude_tree.size() > 0);
             if (extrude_tree.size() > 0) {
-                new_gcode.append(std::string(";TYPE_EXTRUDE remove type ") +
-                                 ExtrusionEntity::role_to_string(extrude_tree.back()) + std::string("\n"));
                 extrude_tree.pop_back();
                 fan_need_set = true;
             }

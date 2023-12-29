@@ -1377,13 +1377,15 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     const ConfigOptionBool* thumbnails_end_file = print.full_print_config().option<ConfigOptionBool>("thumbnails_end_file");
     if(!thumbnails_end_file || !thumbnails_end_file->value) {
         const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+        const ConfigOptionBool* thumbnails_tag_with_format = print.full_print_config().option<ConfigOptionBool>("thumbnails_tag_format");
         const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
         // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
         // If "thumbnails_format" is not defined, export to PNG.
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-            thumbnails_with_bed == nullptr ? false : thumbnails_with_bed->value,
+            thumbnails_with_bed ? thumbnails_with_bed->value : false,
             thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+            thumbnails_tag_with_format ? thumbnails_tag_with_format->value : false,
             [&file](const char* sz) { file.write(sz); },
             [&print]() { print.throw_if_canceled(); });
     }
@@ -2085,13 +2087,15 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     //print thumbnails at the end instead of the start if requested
     if (thumbnails_end_file && thumbnails_end_file->value) {
         const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+        const ConfigOptionBool* thumbnails_tag_with_format = print.full_print_config().option<ConfigOptionBool>("thumbnails_tag_format");
         const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
         // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
         // If "thumbnails_format" is not defined, export to PNG.
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, 
             print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-            thumbnails_with_bed==nullptr? false:thumbnails_with_bed->value,
+            thumbnails_with_bed ? thumbnails_with_bed->value : false,
             thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+            thumbnails_tag_with_format ? thumbnails_tag_with_format->value: false,
             [&file](const char* sz) { file.write(sz); },
             [&print]() { print.throw_if_canceled(); });
     }
@@ -5436,10 +5440,10 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
 
 
 void GCode::cooldown_marker_init() {
-    if (!_cooldown_marker_speed[ExtrusionRole::erExternalPerimeter].empty()) {
-        std::string allow_speed_change = ";CM_extrude_speed;_EXTRUDE_SET_SPEED";
+    if (_cooldown_marker_speed[ExtrusionRole::erExternalPerimeter].empty()) {
+        std::string allow_speed_change = ";_EXTRUDE_SET_SPEED";
         //only change speed on external perimeter (and similar) speed if really necessary.
-        std::string maybe_allow_speed_change = ";CM_extrude_speed_external;_EXTRUDE_SET_SPEED_MAYBE";
+        std::string maybe_allow_speed_change = ";_EXTRUDE_SET_SPEED_MAYBE";
         _cooldown_marker_speed[erNone] = "";
         _cooldown_marker_speed[erPerimeter] = allow_speed_change;
         _cooldown_marker_speed[erExternalPerimeter] = maybe_allow_speed_change;

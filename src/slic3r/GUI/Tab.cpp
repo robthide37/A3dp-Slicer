@@ -569,25 +569,27 @@ void Tab::update_label_colours()
     m_phony_label_clr = wxGetApp().get_label_clr_phony();
 
     //update options "decoration"
-    for (const std::pair<std::string, int> &opt : m_options_list)
-    {
+    for (const auto &opt : m_options_list) {
+        const std::string &opt_key    = opt.first;
+        const int &        opt_idx    = opt.second.first;
+        const int &        opt_status = opt.second.second;
         const wxColour *color = &m_sys_label_clr;
 
         // value isn't equal to system value
-        if ((opt.second & osSystemValue) == 0) {
+        if ((opt_status & osSystemValue) == 0) {
             // value is equal to last saved
-            if ((opt.second & osInitValue) != 0)
+            if ((opt_status & osInitValue) != 0)
                 color = &m_default_label_clr;
             // value is modified
             else
                 color = &m_modified_label_clr;
         }
-        if ((opt.second & osCurrentPhony) != 0)
+        if ((opt_status & osCurrentPhony) != 0)
             color = &m_phony_label_clr;
         else {
-            if ((opt.second & osInitPhony) != 0)
+            if ((opt_status & osInitPhony) != 0)
                 color = &m_modified_label_clr;
-            else if ((opt.second & osSystemPhony) != 0)
+            else if ((opt_status & osSystemPhony) != 0)
                 color = &m_default_label_clr;
         }
 
@@ -631,12 +633,14 @@ void Tab::decorate()
     {
         Field*          field = nullptr;
         wxColour*   colored_label_clr = nullptr;
-
+        const std::string &opt_key           = opt.first;
+        const int &        opt_idx           = opt.second.first;
+        const int &        opt_status        = opt.second.second;
         if (OptionsGroup::is_option_without_field(opt.first))
             colored_label_clr = (m_colored_Label_colors.find(opt.first) == m_colored_Label_colors.end()) ? nullptr : &m_colored_Label_colors.at(opt.first);
 
         if (!colored_label_clr) {
-            field = get_field(opt.first);
+            field = get_field(opt_key, opt_idx);
             if (!field)
                 continue;
         }
@@ -652,18 +656,18 @@ void Tab::decorate()
         const wxString* tt      = &m_tt_value_revert;
 
         // value isn't equal to system value
-        if ((opt.second & osSystemValue) == 0) {
+        if ((opt_status & osSystemValue) == 0) {
             is_nonsys_value = true;
             sys_icon = m_bmp_non_system;
             sys_tt = m_tt_non_system;
             // value is equal to last saved
-            if ((opt.second & osInitValue) != 0)
+            if ((opt_status & osInitValue) != 0)
                 color = &m_default_label_clr;
             // value is modified
             else
                 color = &m_modified_label_clr;
         }
-        if ((opt.second & osInitValue) != 0)
+        if ((opt_status & osInitValue) != 0)
         {
             is_modified_value = false;
             icon = &m_bmp_white_bullet;
@@ -671,12 +675,12 @@ void Tab::decorate()
         }
 
         //color for phony things
-        if ((opt.second & osCurrentPhony) != 0)
+        if ((opt_status & osCurrentPhony) != 0)
             color = &m_phony_label_clr;
         else {
-            if ((opt.second & osInitPhony) != 0)
+            if ((opt_status & osInitPhony) != 0)
                 color = &m_modified_label_clr;
-            else if ((opt.second & osSystemPhony) != 0)
+            else if ((opt_status & osSystemPhony) != 0)
                 color = &m_default_label_clr;
         }
 
@@ -714,8 +718,8 @@ void Tab::decorate()
         for (const std::string &dep : field->m_opt.depends_on) {
             const auto& it = m_options_list.find(dep);
             if (it != m_options_list.end()) {
-                is_not_sys |= ((it->second & osSystemValue) == 0);
-                is_not_initial |= ((it->second & osInitValue) == 0);
+                is_not_sys |= ((it->second.second & osSystemValue) == 0);
+                is_not_initial |= ((it->second.second & osInitValue) == 0);
             }
         }
 
@@ -773,7 +777,7 @@ void Tab::update_changed_ui()
     }
 
     for (auto& it : m_options_list)
-        it.second = m_opt_status_value;
+        it.second.second = m_opt_status_value;
 
     dirty_options.insert(dirty_options.end(), m_options_dirty.begin(), m_options_dirty.end());
     m_options_dirty.clear();
@@ -784,21 +788,21 @@ void Tab::update_changed_ui()
     for (auto& opt_key : m_presets->get_edited_preset().config.keys()) {
         if (edited_preset.config.option(opt_key)->is_phony())
             //ensure that osCurrentPhony is in the bitmask 
-            m_options_list[opt_key] |= osCurrentPhony;
+            m_options_list[opt_key].second |= osCurrentPhony;
         if (selected_preset.config.option(opt_key) && selected_preset.config.option(opt_key)->is_phony())
-            m_options_list[opt_key] |= osInitPhony;
+            m_options_list[opt_key].second |= osInitPhony;
         if (system_preset && system_preset->config.option(opt_key) && system_preset->config.option(opt_key)->is_phony())
-            m_options_list[opt_key] |= osSystemPhony;
+            m_options_list[opt_key].second |= osSystemPhony;
     }
 
     //don't let option that were phony be resetable.
     for (auto opt_key : dirty_options)
-        if( (m_options_list[opt_key] & osInitPhony) == 0)
+        if ((m_options_list[opt_key].second & osInitPhony) == 0)
             //ensure that osInitValue is not in the bitmask 
-            m_options_list[opt_key] &= ~osInitValue;
+            m_options_list[opt_key].second &= ~osInitValue;
     for (auto opt_key : nonsys_options)
-        if ((m_options_list[opt_key] & osSystemPhony) == 0)
-            m_options_list[opt_key] &= ~osSystemValue;
+        if ((m_options_list[opt_key].second & osSystemPhony) == 0)
+            m_options_list[opt_key].second &= ~osSystemValue;
 
     decorate();
 
@@ -814,15 +818,15 @@ void Tab::init_options_list()
         m_options_list.clear();
 
     for (const std::string& opt_key : m_config->keys())
-        m_options_list.emplace(opt_key, m_opt_status_value);
+        m_options_list.emplace(opt_key, std::pair<int,int>(-1, m_opt_status_value));
 }
 
 template<class T>
-void add_correct_opts_to_options_list(const std::string &opt_key, std::map<std::string, int>& map, Tab *tab, const int& value)
+void add_correct_opts_to_options_list(const std::string &opt_key, std::map<std::string, std::pair<int,int>>& map, Tab *tab, const int& value)
 {
     T *opt_cur = static_cast<T*>(tab->get_config()->option(opt_key));
     for (size_t i = 0; i < opt_cur->values.size(); i++)
-        map.emplace(opt_key + "#" + std::to_string(i), value);
+        map.emplace(opt_key /* + "#" + std::to_string(i)*/, std::pair<int, int>{i, value});
 }
 
 void TabPrinter::init_options_list()
@@ -833,7 +837,7 @@ void TabPrinter::init_options_list()
     for (const std::string& opt_key : m_config->keys())
     {
         if (opt_key == "bed_shape") {
-            m_options_list.emplace(opt_key, m_opt_status_value);
+            m_options_list.emplace(opt_key, std::pair<int, int>{-1, m_opt_status_value});
             continue;
         }
         switch (m_config->option(opt_key)->type())
@@ -845,11 +849,11 @@ void TabPrinter::init_options_list()
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        default:		m_options_list.emplace(opt_key, m_opt_status_value);		break;
+        default: m_options_list.emplace(opt_key, std::pair<int,int>{-1, m_opt_status_value}); break;
         }
     }
     if (m_printer_technology == ptFFF)
-        m_options_list.emplace("extruders_count", m_opt_status_value);
+        m_options_list.emplace("extruders_count", std::pair<int, int>{-1, m_opt_status_value});
 }
 
 void TabPrinter::msw_rescale()
@@ -862,6 +866,15 @@ void TabPrinter::msw_rescale()
     Layout();
 }
 
+void TabFilament::init_options_list()
+{
+    if (!m_options_list.empty())
+        m_options_list.clear();
+
+    for (const std::string &opt_key : m_config->keys())
+        m_options_list.emplace(opt_key, std::pair<int, int>(0, m_opt_status_value));
+}
+
 void TabSLAMaterial::init_options_list()
 {
     if (!m_options_list.empty())
@@ -870,7 +883,7 @@ void TabSLAMaterial::init_options_list()
     for (const std::string& opt_key : m_config->keys())
     {
         if (opt_key == "compatible_prints" || opt_key == "compatible_printers") {
-            m_options_list.emplace(opt_key, m_opt_status_value);
+            m_options_list.emplace(opt_key, std::pair<int, int>{0, m_opt_status_value});
             continue;
         }
         switch (m_config->option(opt_key)->type())
@@ -882,7 +895,7 @@ void TabSLAMaterial::init_options_list()
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
-        default:		m_options_list.emplace(opt_key, m_opt_status_value);		break;
+        default:		m_options_list.emplace(opt_key, std::pair<int,int>{0, m_opt_status_value});		break;
         }
     }
 }
@@ -893,8 +906,8 @@ void Tab::get_sys_and_mod_flags(const std::string& opt_key, bool& sys_page, bool
     if (opt == m_options_list.end()) 
         return;
 
-    if (sys_page) sys_page = (opt->second & osSystemValue) != 0;
-    modified_page |= (opt->second & osInitValue) == 0;
+    if (sys_page) sys_page = (opt->second.second & osSystemValue) != 0;
+    modified_page |= (opt->second.second & osInitValue) == 0;
 }
 
 void Tab::update_changed_tree_ui()
@@ -995,28 +1008,28 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
 
     for (auto group : m_active_page->m_optgroups) {
         if (group->title == "Capabilities") {
-            if ((m_options_list["extruders_count"] & os) == 0)
+            if ((m_options_list["extruders_count"].second & os) == 0)
                 to_sys ? group->back_to_sys_value("extruders_count") : group->back_to_initial_value("extruders_count");
         }
         if (group->title == "Size and coordinates") {
-            if ((m_options_list["bed_shape"] & os) == 0) {
+            if ((m_options_list["bed_shape"].second & os) == 0) {
                 to_sys ? group->back_to_sys_value("bed_shape") : group->back_to_initial_value("bed_shape");
                 load_key_value("bed_shape", true/*some value*/, true);
             }
         }
         if (group->title == "Toolchange parameters with single extruder MM printers") {
-            if ((m_options_list["filament_ramming_parameters"] & os) == 0)
+            if ((m_options_list["filament_ramming_parameters"].second & os) == 0)
                 to_sys ? group->back_to_sys_value("filament_ramming_parameters") : group->back_to_initial_value("filament_ramming_parameters");
         }
         if (group->title == "G-code Substitutions") {
-            if ((m_options_list["gcode_substitutions"] & os) == 0) {
+            if ((m_options_list["gcode_substitutions"].second & os) == 0) {
                 to_sys ? group->back_to_sys_value("gcode_substitutions") : group->back_to_initial_value("gcode_substitutions");
                 load_key_value("gcode_substitutions", true/*some value*/, true);
             }
         }
         if (group->title == "Profile dependencies") {
             // "compatible_printers" option doesn't exists in Printer Settimgs Tab
-            if (type() != Preset::TYPE_PRINTER && (m_options_list["compatible_printers"] & os) == 0) {
+            if (type() != Preset::TYPE_PRINTER && (m_options_list["compatible_printers"].second & os) == 0) {
                 to_sys ? group->back_to_sys_value("compatible_printers") : group->back_to_initial_value("compatible_printers");
                 load_key_value("compatible_printers", true/*some value*/, true);
 
@@ -1025,7 +1038,8 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
                 is_empty ? m_compatible_printers.btn->Disable() : m_compatible_printers.btn->Enable();
             }
             // "compatible_prints" option exists only in Filament Settimgs and Materials Tabs
-            if ((type() == Preset::TYPE_FFF_FILAMENT || type() == Preset::TYPE_SLA_MATERIAL) && (m_options_list["compatible_prints"] & os) == 0) {
+            if ((type() == Preset::TYPE_FFF_FILAMENT || type() == Preset::TYPE_SLA_MATERIAL) &&
+                (m_options_list["compatible_prints"].second & os) == 0) {
                 to_sys ? group->back_to_sys_value("compatible_prints") : group->back_to_initial_value("compatible_prints");
                 load_key_value("compatible_prints", true/*some value*/, true);
 
@@ -1036,7 +1050,7 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
         }
         for (const auto &kvp : group->opt_map()) {
             const std::string& opt_key = kvp.first;
-            if ((m_options_list[opt_key] & os) == 0)
+            if ((m_options_list[opt_key].second & os) == 0)
                 to_sys ? group->back_to_sys_value(opt_key) : group->back_to_initial_value(opt_key);
         }
     }
@@ -1311,7 +1325,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
                     if (field) {
                         boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
-                            field->set_value(script_val, false);
+                            field->set_any_value(script_val, false);
                     }
                 }
                 { // also check freq changed params
@@ -1319,7 +1333,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
                     if (field) {
                         boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
-                            field->set_value(script_val, false);
+                            field->set_any_value(script_val, false);
                     }
                 }
             }
@@ -1330,7 +1344,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     Field* field = og_freq_chng_params->get_field(opt_key);
     if (field) {
         boost::any val = m_config->option(opt_key)->get_any(field->m_opt_idx);
-        field->set_value(val, false);
+        field->set_any_value(val, false);
     }
 
 
@@ -2484,6 +2498,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 this->m_vector_managers.push_back(manager);
                 manager->set_cb_edited([this]() {
                     update_dirty();
+                    toggle_options();
                     wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
                 });
                 current_line            = current_group->create_single_option_line(opt_key);

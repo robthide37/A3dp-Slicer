@@ -1108,7 +1108,7 @@ void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, do
 
     int pow = -2;
     int step = 0;
-    auto end_it = std::find(values.begin() + 1, values.end(), values.front());
+    auto end_it = std::find(values.begin() + 2, values.end(), values.front());
 
     while (pow < 3) {
         for (int istep : {1, 2, 5}) {
@@ -1119,11 +1119,11 @@ void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, do
                 break;
             int tick = val_it - values.begin();
 
-                // find next tick with istep
-                val *= 2;
-                val_it = std::lower_bound(values.begin(), end_it, val - epsilon());
-                // count of short ticks between ticks
-                int short_ticks_cnt = val_it == values.end() ? tick : val_it - values.begin() - tick;
+            // find next tick with istep
+            val *= 2;
+            val_it = std::lower_bound(values.begin(), end_it, val - epsilon());
+            // count of short ticks between ticks
+            int short_ticks_cnt = val_it == values.end() ? tick : val_it - values.begin() - tick;
 
             if (lround(short_ticks_cnt * scroll_step) > pixels_per_sm) {
                 step = istep;
@@ -1156,12 +1156,13 @@ void Control::draw_ruler(wxDC& dc)
     wxColour old_clr = dc.GetTextForeground();
     dc.SetTextForeground(GREY_PEN.GetColour());
 
-    if (m_ruler.long_step < 0)
+    if (m_ruler.long_step < 0) {
         for (size_t tick = 1; tick < m_values.size(); tick++) {
             wxCoord pos = get_position_from_value(tick);
             draw_ticks_pair(dc, pos, mid, 5);
             draw_tick_text(dc, wxPoint(mid, pos), tick);
-        } else {
+        }
+    } else {
             auto draw_short_ticks = [this, mid](wxDC& dc, double& current_tick, int max_tick) {
                 while (current_tick < max_tick) {
                     wxCoord pos = get_position_from_value(lround(current_tick));
@@ -1189,8 +1190,9 @@ void Control::draw_ruler(wxDC& dc)
                         if (m_values[tick] < value)
                             break;
                     // short ticks from the last tick to the end of current sequence
-                    assert(! std::isnan(short_tick));
-                    draw_short_ticks(dc, short_tick, tick);
+                    //note: first sequence can be empty.
+                    if(!std::isnan(short_tick));
+                        draw_short_ticks(dc, short_tick, tick);
                     if (sequence < m_ruler.count() - 1) sequence++;
                 }
                 short_tick = tick;
@@ -1214,6 +1216,7 @@ void Control::draw_ruler(wxDC& dc)
                     prev_y_pos = pos;
                 }
 
+                assert(!std::isnan(short_tick));
                 draw_short_ticks(dc, short_tick, tick);
 
                 if (value == m_ruler.max_values[sequence]) {
@@ -1223,6 +1226,7 @@ void Control::draw_ruler(wxDC& dc)
                 }
             }
             // short ticks from the last tick to the end 
+            assert(!std::isnan(short_tick));
             draw_short_ticks(dc, short_tick, m_max_value);
         }
 

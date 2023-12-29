@@ -293,7 +293,7 @@ static const t_config_enum_values s_keys_map_GCodeThumbnailsFormat = {
     { "PNG", int(GCodeThumbnailsFormat::PNG) },
     { "JPG", int(GCodeThumbnailsFormat::JPG) },
     { "QOI", int(GCodeThumbnailsFormat::QOI) },
-    { "BIQU", int(GCodeThumbnailsFormat::BIQU) }
+    { "BIQU",int(GCodeThumbnailsFormat::BIQU) },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(GCodeThumbnailsFormat)
 
@@ -421,6 +421,13 @@ void PrintConfigDef::init_common_params()
     def->enum_labels.push_back("QOI");
     def->enum_labels.push_back("Biqu");
     def->set_default_value(new ConfigOptionEnum<GCodeThumbnailsFormat>(GCodeThumbnailsFormat::PNG));
+
+    def          = this->add("thumbnails_tag_format", coBool);
+    def->label   = L("Write the thumbnail type in gcode.");
+    def->tooltip = L("instead of writing 'thumbnails' as tag in the gcode, it will write 'thumbnails_PNG', thumbnails_JPG', 'thumbnail_QOI', etc.."
+        "\n Some firmware needs it to know how to decode the thumbnail, some others don't support it.");
+    def->mode    = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("thumbnails_with_support", coBool);
     def->label = L("Support on thumbnail");
@@ -1452,7 +1459,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Default");
     def->full_label = L("Default infill margin");
     def->category = OptionCategory::infill;
-    def->tooltip = L("This parameter grows the top/bottom/solid layers by the specified mm to anchor them into the sparse infill and support the perimeters above. Put 0 to deactivate it. Can be a % of the width of the perimeters.");
+    def->tooltip = L("This parameter grows the top/bottom/solid layers by the specified mm to anchor them into the sparse infill and support the perimeters above."
+        " Put 0 to deactivate it. Can be a % of the width of the perimeters.");
     def->sidetext = L("mm or %");
     def->ratio_over = "perimeter_extrusion_width";
     def->min = 0;
@@ -2295,9 +2303,9 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloat(0));
 
-    def             = this->add("fill_angle_template", coFloats);
-    def->label      = L("Fill angle pattern");
-    def->full_label = L("Fill angle pattern");
+    def             = this->add("fill_angle_template", coFloats);   
+    def->label      = L("Fill angle template");
+    def->full_label = L("Fill angle template");
     def->category   = OptionCategory::infill;
     def->tooltip    = L("This define the succetion of infill angle. When defined, it replaces the fill_angle"
         ", and there won't be any extra 90° for each layer added, but the fill_angle_increment will still be used."
@@ -4230,8 +4238,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Post-processing scripts");
     def->category = OptionCategory::customgcode;
     def->tooltip = L("If you want to process the output G-code through custom scripts, "
-                   "just list their absolute paths here. Separate multiple scripts with a semicolon. "
-                   "Scripts will be passed the absolute path to the G-code file as the first argument, "
+                   "just list their absolute paths here."
+                   "\nSeparate multiple scripts with a semicolon or a line return.\n!! please use '\;' here if you want a not-line-separation ';'!!"
+                   "\nScripts will be passed the absolute path to the G-code file as the first argument, "
                    "and they can access the Slic3r config settings by reading environment variables."
                    "\nThe script, if passed as a relative path, will also be searched from the slic3r directory, "
                    "the slic3r configuration directory and the user directory.");
@@ -6467,14 +6476,14 @@ void PrintConfigDef::init_fff_params()
         }
         case coPercents: {
             ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
-            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
+            opt->set_any(ConfigOptionPercentsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coFloatsOrPercents: {
             ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
                 static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
-            opt->set_at(ConfigOptionFloatsOrPercentsNullable::NIL_VALUE(), 0);
+            opt->set_any(ConfigOptionFloatsOrPercentsNullable::create_nil(), 0);
             def->set_default_value(opt);
             break;
         }
@@ -7756,6 +7765,11 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         if (value != "1")
             output["default_fan_speed"] = "0";
     }
+    if ("thumbnails_format" == opt_key) {
+        // by default, no thumbnails_tag_format for png output
+        if (value == "PNG")
+            output["thumbnails_tag_format"] = "0";
+    }
 
     return output;
 }
@@ -7989,6 +8003,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "thumbnails_color",
 "thumbnails_custom_color",
 "thumbnails_end_file",
+"thumbnails_tag_format",
 "thumbnails_with_bed",
 "thumbnails_with_support",
 "time_cost",

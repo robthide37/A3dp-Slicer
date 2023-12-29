@@ -50,6 +50,12 @@ class FillMonotonic : public FillRectilinear
 public:
     Fill* clone() const override { return new FillMonotonic(*this); }
     ~FillMonotonic() override = default;
+    //apply monotonic
+    void fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const override {
+        FillParams monotonic_params = params;
+        monotonic_params.monotonic = true;
+        FillRectilinear::fill_surface_extrusion(surface, monotonic_params, out);
+    }
     Polylines fill_surface(const Surface* surface, const FillParams& params) const override;
     bool no_sort() const override { return true; }
 };

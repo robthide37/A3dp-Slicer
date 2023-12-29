@@ -357,12 +357,12 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         "thin_perimeters", "overhangs_reverse", "perimeter_round_corners"})
         toggle_field(el, have_perimeters && !have_arachne);
 
-    toggle_field("only_one_perimeter_top", have_perimeters); // with arachne, it will only do it for the last layer
+    toggle_field("only_one_perimeter_top", have_perimeters);
     toggle_field("only_one_perimeter_first_layer", config->opt_int("perimeters") > 1);
     toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0);
     toggle_field("overhangs_reverse_threshold", have_perimeters && config->opt_bool("overhangs_reverse"));
     toggle_field("overhangs_speed_enforce", have_perimeters && !config->opt_bool("perimeter_loop"));
-    toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top") && !have_arachne);
+    toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top"));
     toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->get_float() != 0 && !have_arachne);
     bool have_thin_wall = !have_arachne && have_perimeters;
     toggle_field("thin_walls", have_thin_wall);
@@ -427,7 +427,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
                     "infill_extrusion_spacing", "infill_extrusion_change_odd_layers", "infill_speed" })
         toggle_field(el, have_infill || has_solid_infill);
         
-    toggle_field("fill_angle", (have_infill || has_solid_infill) && ((ConfigOptionVectorBase*)config->option("fill_angle_template"))->size() != 0);
+    toggle_field("fill_angle", (have_infill || has_solid_infill) && ((ConfigOptionVectorBase*)config->option("fill_angle_template"))->size() == 0);
 
     toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill);
     toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill);

@@ -658,7 +658,7 @@ void PreferencesDialog::build(size_t selected_tab)
 	if (is_editor) {
 		// set Field for notify_release to its value to activate the object
 		boost::any val = s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release"));
-		m_optgroups_gui.back()->get_field("notify_release")->set_value(val, false);
+        m_optgroups_gui.back()->get_field("notify_release")->set_any_value(val, false);
 	}
 
 	//create layout options
