@@ -1686,7 +1686,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             //remove too small gaps that are too hard to fill.
             //ie one that are smaller than an extrusion with width of min and a length of max.
             if (expoly.area() > minarea) {
-                ExPolygons expoly_after_shrink_test = offset_ex(ExPolygons{ expoly }, double(-min * 0.5));
+                const coordf_t offset_test = min * 0.5;
+                ExPolygons expoly_after_shrink_test = offset_ex(ExPolygons{expoly}, -offset_test);
                 //if the shrink split the area in multipe bits
                 if (expoly_after_shrink_test.size() > 1) {
                     //remove too small bits
@@ -1695,7 +1696,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                             expoly_after_shrink_test.erase(expoly_after_shrink_test.begin() + exp_idx);
                             exp_idx--;
                         } else {
-                            ExPolygons wider = offset_ex(ExPolygons{ expoly_after_shrink_test[exp_idx] }, min * 0.5);
+                            ExPolygons wider = offset_ex(ExPolygons{ expoly_after_shrink_test[exp_idx] }, offset_test);
                             if (wider.empty() || wider[0].area() < minarea) {
                                 expoly_after_shrink_test.erase(expoly_after_shrink_test.begin() + exp_idx);
                                 exp_idx--;
@@ -1703,14 +1704,15 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         }
                     }
                     //maybe some areas are a just bit too thin, try with just a little more offset to remove them.
-                    ExPolygons expoly_after_shrink_test2 = offset_ex(ExPolygons{ expoly }, double(-min * 0.8));
+                    const coordf_t offset_test_2 = min * 0.8;
+                    ExPolygons expoly_after_shrink_test2 = offset_ex(ExPolygons{expoly}, -offset_test_2);
                     for (int exp_idx = 0; exp_idx < expoly_after_shrink_test2.size(); exp_idx++) {
                         if (expoly_after_shrink_test2[exp_idx].area() < (SCALED_EPSILON * SCALED_EPSILON * 4)) {
                             expoly_after_shrink_test2.erase(expoly_after_shrink_test2.begin() + exp_idx);
                             exp_idx--;
 
                         } else {
-                            ExPolygons wider = offset_ex(ExPolygons{ expoly_after_shrink_test2[exp_idx] }, min * 0.5);
+                            ExPolygons wider = offset_ex(ExPolygons{ expoly_after_shrink_test2[exp_idx] }, offset_test_2);
                             if (wider.empty() || wider[0].area() < minarea) {
                                 expoly_after_shrink_test2.erase(expoly_after_shrink_test2.begin() + exp_idx);
                                 exp_idx--;
@@ -1719,15 +1721,15 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                     }
                     //it's better if there are significantly less extrusions
                     if (expoly_after_shrink_test.size() / 1.42 > expoly_after_shrink_test2.size()) {
-                        expoly_after_shrink_test2 = offset_ex(expoly_after_shrink_test2, double(min * 0.8));
+                        expoly_after_shrink_test2 = offset_ex(expoly_after_shrink_test2, offset_test_2);
                         //insert with move instead of copy
                         std::move(expoly_after_shrink_test2.begin(), expoly_after_shrink_test2.end(), std::back_inserter(gaps_ex));
                     } else {
-                        expoly_after_shrink_test = offset_ex(expoly_after_shrink_test, double(min * 0.8));
+                        expoly_after_shrink_test = offset_ex(expoly_after_shrink_test, offset_test);
                         std::move(expoly_after_shrink_test.begin(), expoly_after_shrink_test.end(), std::back_inserter(gaps_ex));
                     }
                 } else {
-                    expoly_after_shrink_test = offset_ex(expoly_after_shrink_test, double(min * 0.8));
+                    expoly_after_shrink_test = offset_ex(expoly_after_shrink_test, offset_test);
                     std::move(expoly_after_shrink_test.begin(), expoly_after_shrink_test.end(), std::back_inserter(gaps_ex));
                 }
             }
