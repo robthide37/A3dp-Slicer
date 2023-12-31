@@ -259,6 +259,45 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
         this->layer->height, *this->object_config, *this->print_config);
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
+#if _DEBUG
+    for (auto periemter : perimeters) {
+        for (Arachne::ExtrusionLine &extrusion : periemter) {
+            if (extrusion.isZeroLength())
+                continue;
+            for (Slic3r::Arachne::ExtrusionJunction &junction : extrusion.junctions) {
+                Point pt = junction.p;
+                assert(unscaled(pt.x()) < 10000 && unscaled(pt.x()) > -10000);
+                assert(unscaled(pt.y()) < 10000 && unscaled(pt.y()) > -10000);
+            }
+        }
+    }
+#endif
+    // hack to fix points that go to the moon. https://github.com/supermerill/SuperSlicer/issues/4032
+    // get max dist possible
+    BoundingBox bb;
+    for (ExPolygon &expo : last) bb.merge(expo.contour.points);
+    const coordf_t max_dist = bb.min.distance_to_square(bb.max);
+    //detect astray points and delete them
+    for (Arachne::VariableWidthLines &perimeter : perimeters) {
+        for (auto it_extrusion = perimeter.begin(); it_extrusion != perimeter.end();) {
+            Point last_point = bb.min;
+            for (auto it_junction = it_extrusion->junctions.begin(); it_junction != it_extrusion->junctions.end();) {
+                coordf_t dist = it_junction->p.distance_to_square(last_point);
+                if (dist > max_dist) {
+                    it_junction = it_extrusion->junctions.erase(it_junction);
+                } else {
+                    last_point = it_junction->p;
+                    ++it_junction;
+                }
+            }
+            if (it_extrusion->junctions.size() < 2) {
+                it_extrusion = perimeter.erase(it_extrusion);
+            } else {
+                ++it_extrusion;
+            }
+        }
+    }
+
     // only_one_perimeter_top, from orca
     if (!out_shell.empty()) {
         // Combine outer shells
