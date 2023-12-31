@@ -3149,7 +3149,7 @@ void PrintConfigDef::init_fff_params()
                      "\nThis could be combined with extra permeters on odd layers."
                      "\nWorks as absolute spacing or a % of the spacing."
                      "\nset 0 to disable");
-    def->sidetext = L("mm of %");
+    def->sidetext = L("mm or %");
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(false, 0));
 

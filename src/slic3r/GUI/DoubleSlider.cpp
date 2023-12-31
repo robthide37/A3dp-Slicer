@@ -1191,7 +1191,7 @@ void Control::draw_ruler(wxDC& dc)
                             break;
                     // short ticks from the last tick to the end of current sequence
                     //note: first sequence can be empty.
-                    if(!std::isnan(short_tick));
+                    if(!std::isnan(short_tick))
                         draw_short_ticks(dc, short_tick, tick);
                     if (sequence < m_ruler.count() - 1) sequence++;
                 }

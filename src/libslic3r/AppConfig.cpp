@@ -662,6 +662,7 @@ void AppConfig::init_ui_layout() {
     } else {
         get_versions(data_dir_path, datadir_map);
     }
+    // TODO test the version of the datadir_map layout to see if compatible
 
 
     //copy all resources that aren't in datadir or newer
@@ -669,47 +670,8 @@ void AppConfig::init_ui_layout() {
     bool find_current = false;
     std::string error_message;
     for (const auto& layout : resources_map) {
-        auto it_datadir_layout = datadir_map.find(layout.first);
-        if (it_datadir_layout != datadir_map.end()) {
-            // compare version
-            if (it_datadir_layout->second.version < layout.second.version) {
-                //erase and copy
-                for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(it_datadir_layout->second.path)) {
-                    boost::filesystem::remove_all(file.path());
-                }
-                for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
-                    if (copy_file_inner(file.path(), it_datadir_layout->second.path / file.path().filename(), error_message))
-                        throw FileIOError(error_message);
-                }
-                //update for saving
-                it_datadir_layout->second.version = layout.second.version;
-                it_datadir_layout->second.description = layout.second.description;
-            } else if (it_datadir_layout->second.version == layout.second.version) {
-                //if same verison, only erase files more recent
-                //this is useful when there is many rapid changes, to test modifications.
-                for (boost::filesystem::directory_entry& resources_file : boost::filesystem::directory_iterator(layout.second.path)) {
-                    boost::filesystem::path datadir_path = it_datadir_layout->second.path / resources_file.path().filename();
-                    std::time_t resources_last_mod = boost::filesystem::last_write_time(resources_file.path());
-                    std::time_t datadir_last_mod = boost::filesystem::last_write_time(datadir_path);
-                    if (datadir_last_mod < resources_last_mod) {
-                        boost::filesystem::remove_all(datadir_path);
-                        if (copy_file_inner(resources_file.path(), datadir_path, error_message))
-                            throw FileIOError(error_message);
-                    }
-                }
-
-            }
-        } else {
-            // Doesn't exists, copy
-            boost::filesystem::create_directory(data_dir_path / layout.second.path.filename());
-            for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
-                if (copy_file_inner(file.path(), data_dir_path / layout.second.path.filename() / file.path().filename(), error_message))
-                    throw FileIOError(error_message);
-            }
-            //update for saving
-            datadir_map[layout.first] = layout.second;
-            datadir_map[layout.first].path = data_dir_path / layout.second.path.filename();
-        }
+        // don't use the datadir version, the one in my resources is the one adapated to my version.
+        datadir_map[layout.first] = layout.second;
     }
 
     //save installed
