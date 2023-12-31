@@ -2581,8 +2581,9 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                 // the dialog needs to be destroyed before the call to recreate_GUI()
                 // or sometimes the application crashes into wxDialogBase() destructor
                 // so we put it into an inner scope
-            PreferencesDialog dlg(mainframe);
-            dlg.ShowModal();
+                PreferencesDialog dlg(mainframe);
+              try{
+                dlg.ShowModal();
                 app_layout_changed = dlg.settings_layout_changed();
                 if (dlg.seq_top_layer_only_changed())
                     this->plater_->refresh_print();
@@ -2603,6 +2604,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                         associate_gcode_files();
                 }
 #endif // _WIN32
+              } catch (std::exception e) {}
             }
             if (app_layout_changed) {
                 // hide full main_sizer for mainFrame

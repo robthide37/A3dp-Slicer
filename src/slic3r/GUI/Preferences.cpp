@@ -7,6 +7,7 @@
 #include "libslic3r/AppConfig.hpp"
 
 #include <wx/notebook.h>
+#include <wx/scrolwin.h>
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
@@ -49,7 +50,7 @@ namespace GUI {
 
 PreferencesDialog::PreferencesDialog(wxWindow* parent, int selected_tab, const std::string& highlight_opt_key) :
     DPIDialog(parent, wxID_ANY, _L("Preferences"), wxDefaultPosition, 
-              wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+              wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER )
 {
 #ifdef __WXOSX__
     isOSX = true;
@@ -58,16 +59,18 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent, int selected_tab, const s
 	if (!highlight_opt_key.empty())
 		init_highlighter(highlight_opt_key);
 }
-
 static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
 {
-	wxPanel* tab = new wxPanel(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL);
+    //set inside a scrollable panel
+    wxScrolledWindow *tab = new wxScrolledWindow(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                                                 wxBK_LEFT | wxTAB_TRAVERSAL | wxVSCROLL);
 	tabs->AddPage(tab, title);
 	tab->SetFont(wxGetApp().normal_font());
 
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 	sizer->SetSizeHints(tab);
 	tab->SetSizer(sizer);
+    tab->SetScrollRate(0, 5);
 
 	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(tab);
 	optgroup->title_width = 40;
@@ -880,6 +883,7 @@ void PreferencesDialog::build(size_t selected_tab)
 
 	SetSizer(sizer);
 	sizer->SetSizeHints(this);
+    this->layout();
 	this->CenterOnParent();
 }
 
@@ -1053,10 +1057,41 @@ void PreferencesDialog::on_dpi_changed(const wxRect &suggested_rect)
 
 void PreferencesDialog::layout()
 {
-    const int em = em_unit();
-
+    const int em        = em_unit();
     SetMinSize(wxSize(47 * em, 28 * em));
-    Fit();
+
+    // Fit(); is SetSize(GetBestSize) but GetBestSize doesn't work for scroll pane. we need GetBestVirtualSize over all scroll panes
+    wxSize best_size = this->GetBestSize();
+    // Get ScrollPanels for each tab
+    assert(!this->GetChildren().empty());
+    assert(!this->GetChildren().front()->GetChildren().empty());
+    if(this->GetChildren().empty() || this->GetChildren().front()->GetChildren().empty()) return;
+    std::vector<wxPanel*> panels;
+    for (auto c : this->GetChildren().front()->GetChildren()) {
+        if (wxPanel *panel = dynamic_cast<wxPanel *>(c); panel)
+            panels.push_back(panel);
+    }
+
+    if (!panels.empty()) {
+        // get a size where all tabs fit into
+        wxSize biggest_virtual_size = panels.front()->GetBestVirtualSize();
+        for (wxPanel *tab : panels) {
+            wxSize current_size    = tab->GetBestVirtualSize();
+            biggest_virtual_size.x = std::max(biggest_virtual_size.x, current_size.x);
+            biggest_virtual_size.y = std::max(biggest_virtual_size.y, current_size.y);
+        }
+        best_size = biggest_virtual_size;
+        //best_size += tab_inset;
+    }
+    // add space for buttons and insets of the main panel 
+    best_size += wxSize(3 * em, 12 * em);
+    // also reduce size to fit in screen if needed
+    wxDisplay display(wxDisplay::GetFromWindow(this));
+    wxRect    screen = display.GetClientArea();
+    best_size.x      = std::min(best_size.x, screen.width);
+    best_size.y      = std::min(best_size.y, screen.height);
+    // apply
+    SetSize(best_size);
 
     Refresh();
 }
