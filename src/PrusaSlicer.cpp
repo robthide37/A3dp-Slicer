@@ -130,12 +130,6 @@ int CLI::run(int argc, char **argv)
             // On Unix systems, the prusa-slicer binary may be symlinked to give the application a different meaning.
             boost::algorithm::iends_with(boost::filesystem::path(argv[0]).filename().string(), "gcodeviewer");
 #endif // _WIN32
-#if ENABLE_GL_CORE_PROFILE
-    std::pair<int, int>              opengl_version = { 0, 0 };
-#if ENABLE_OPENGL_DEBUG_OPTION
-    bool                             opengl_debug = false;
-#endif // ENABLE_OPENGL_DEBUG_OPTION
-#endif // ENABLE_GL_CORE_PROFILE
 
     const std::vector<std::string>              &load_configs		      = m_config.option<ConfigOptionStrings>("load", true)->values;
     const ForwardCompatibilitySubstitutionRule   config_substitution_rule = m_config.option<ConfigOptionEnum<ForwardCompatibilitySubstitutionRule>>("config_compatibility", true)->value;
@@ -174,7 +168,13 @@ int CLI::run(int argc, char **argv)
         m_print_config.apply(config);
     }
 
+#ifdef SLIC3R_GUI
 #if ENABLE_GL_CORE_PROFILE
+    std::pair<int, int>              opengl_version = { 0, 0 };
+#if ENABLE_OPENGL_DEBUG_OPTION
+    bool                             opengl_debug = false;
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+
     // search for special keys into command line parameters
     auto it = std::find(m_actions.begin(), m_actions.end(), "gcodeviewer");
     if (it != m_actions.end()) {
@@ -222,6 +222,17 @@ int CLI::run(int argc, char **argv)
         }
     }
 #endif // ENABLE_GL_CORE_PROFILE
+#else // SLIC3R_GUI
+    // If there is no GUI, we shall ignore the parameters. Remove them from the list.
+    for (const std::string& s : { "opengl-version", "opengl-debug", "gcodeviewer" }) {
+        auto it = std::find(m_actions.cbegin(), m_actions.cend(), s);
+        if (it != m_actions.end()) {
+            boost::nowide::cerr << "Parameter '" << s << "' is ignored, this PrusaSlicer build is CLI only." << std::endl;
+            m_actions.erase(it);
+        }
+    }
+#endif
+
 
     // Read input file(s) if any.
     for (const std::string& file : m_input_files)
