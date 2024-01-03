@@ -2,6 +2,45 @@
 
 namespace Slic3r::GCode::Impl::Travels {
 
+ElevatedTravelFormula::ElevatedTravelFormula(const ElevatedTravelParams &params)
+    : smoothing_from(params.slope_end - params.blend_width / 2.0)
+    , smoothing_to(params.slope_end + params.blend_width / 2.0)
+    , blend_width(params.blend_width)
+    , lift_height(params.lift_height)
+    , slope_end(params.slope_end) {
+    if (smoothing_from < 0) {
+        smoothing_from = params.slope_end;
+        smoothing_to = params.slope_end;
+    }
+}
+
+double parabola(const double x, const double a, const double b, const double c) {
+    return a * x * x + b * x + c;
+}
+
+double ElevatedTravelFormula::slope_function(double distance_from_start) const {
+    if (distance_from_start < this->slope_end) {
+        const double lift_percent = distance_from_start / this->slope_end;
+        return lift_percent * this->lift_height;
+    } else {
+        return this->lift_height;
+    }
+}
+
+double ElevatedTravelFormula::operator()(const double distance_from_start) const {
+    if (distance_from_start > this->smoothing_from && distance_from_start < this->smoothing_to) {
+        const double slope = this->lift_height / this->slope_end;
+
+        // This is a part of a parabola going over a specific
+        // range and with specific end slopes.
+        const double a = -slope / 2.0 / this->blend_width;
+        const double b = slope * this->smoothing_to / this->blend_width;
+        const double c = this->lift_height + a * boost::math::pow<2>(this->smoothing_to);
+        return parabola(distance_from_start, a, b, c);
+    }
+    return slope_function(distance_from_start);
+}
+
 Points3 generate_flat_travel(tcb::span<const Point> xy_path, const float elevation) {
     Points3 result;
     result.reserve(xy_path.size() - 1);
@@ -51,26 +90,6 @@ std::vector<DistancedPoint> slice_xy_path(
     }
     return result;
 }
-
-struct ElevatedTravelParams
-{
-    double lift_height{};
-    double slope_end{};
-};
-
-struct ElevatedTravelFormula
-{
-    double operator()(double distance_from_start) const {
-        if (distance_from_start < this->params.slope_end) {
-            const double lift_percent = distance_from_start / this->params.slope_end;
-            return lift_percent * this->params.lift_height;
-        } else {
-            return this->params.lift_height;
-        }
-    }
-
-    ElevatedTravelParams params{};
-};
 
 Points3 generate_elevated_travel(
     const tcb::span<const Point> xy_path,
@@ -136,8 +155,64 @@ std::optional<double> get_obstacle_adjusted_slope_end(
     return *first_obstacle_distance;
 }
 
+struct SmoothingParams
+{
+    double blend_width{};
+    unsigned points_count{1};
+};
+
+SmoothingParams get_smoothing_params(
+    const double lift_height,
+    const double slope_end,
+    unsigned extruder_id,
+    const double travel_length,
+    const FullPrintConfig &config
+) {
+    if (config.gcode_flavor != gcfMarlinFirmware)
+        // Smoothing is supported only on Marlin.
+        return {0, 1};
+
+    const double slope = lift_height / slope_end;
+    const double max_machine_z_velocity = config.machine_max_feedrate_z.get_at(extruder_id);
+    const double max_xy_velocity =
+        Vec2d{
+            config.machine_max_feedrate_x.get_at(extruder_id),
+            config.machine_max_feedrate_y.get_at(extruder_id)}
+            .norm();
+
+    const double xy_acceleration = config.machine_max_acceleration_travel.get_at(extruder_id);
+
+    const double xy_acceleration_time = max_xy_velocity / xy_acceleration;
+    const double xy_acceleration_distance = 1.0 / 2.0 * xy_acceleration *
+        boost::math::pow<2>(xy_acceleration_time);
+
+    if (travel_length < xy_acceleration_distance) {
+        return {0, 1};
+    }
+
+    const double max_z_velocity = std::min(max_xy_velocity * slope, max_machine_z_velocity);
+    const double deceleration_time = max_z_velocity /
+        config.machine_max_acceleration_z.get_at(extruder_id);
+    const double deceleration_xy_distance = deceleration_time * max_xy_velocity;
+
+    const double blend_width = slope_end > deceleration_xy_distance / 2.0 ? deceleration_xy_distance :
+                                                                          slope_end * 2.0;
+
+    const unsigned points_count = blend_width > 0 ?
+        std::ceil(max_z_velocity / config.machine_max_jerk_z.get_at(extruder_id)) :
+        1;
+
+    if (blend_width <= 0     // When there is no blend with, there is no need for smoothing.
+        || points_count > 6  // That would be way to many points. Do not do it at all.
+        || points_count <= 0 // Always return at least one point.
+    )
+        return {0, 1};
+
+    return {blend_width, points_count};
+}
+
 ElevatedTravelParams get_elevated_traval_params(
-    const Lines &xy_path,
+    const Polyline &xy_path,
     const FullPrintConfig &config,
     const unsigned extruder_id,
     const std::optional<AABBTreeLines::LinesDistancer<Linef>> &previous_layer_distancer
@@ -146,6 +221,7 @@ ElevatedTravelParams get_elevated_traval_params(
     if (!config.travel_ramping_lift.get_at(extruder_id)) {
         elevation_params.slope_end = 0;
         elevation_params.lift_height = config.retract_lift.get_at(extruder_id);
+        elevation_params.blend_width = 0;
         return elevation_params;
     }
     elevation_params.lift_height = config.travel_max_lift.get_at(extruder_id);
@@ -160,13 +236,43 @@ ElevatedTravelParams get_elevated_traval_params(
     }
 
     std::optional<double> obstacle_adjusted_slope_end{
-        get_obstacle_adjusted_slope_end(xy_path, previous_layer_distancer)};
+        get_obstacle_adjusted_slope_end(xy_path.lines(), previous_layer_distancer)};
 
     if (obstacle_adjusted_slope_end && obstacle_adjusted_slope_end < elevation_params.slope_end) {
         elevation_params.slope_end = *obstacle_adjusted_slope_end;
     }
 
+    SmoothingParams smoothing_params{get_smoothing_params(
+        elevation_params.lift_height, elevation_params.slope_end, extruder_id,
+        unscaled(xy_path.length()), config
+    )};
+
+    elevation_params.blend_width = smoothing_params.blend_width;
+    elevation_params.parabola_points_count = smoothing_params.points_count;
     return elevation_params;
+}
+
+/**
+ * @brief Generate regulary spaced points on 1 axis. Includes both from and to.
+ *
+ * If count is 1, the point is in the middle of the range.
+ */
+std::vector<double> linspace(const double from, const double to, const unsigned count) {
+    if (count == 0) {
+        return {};
+    }
+    std::vector<double> result;
+    result.reserve(count);
+    if (count == 1) {
+        result.emplace_back((from + to) / 2.0);
+        return result;
+    }
+    const double step = (to - from) / count;
+    for (unsigned i = 0; i < count - 1; ++i) {
+        result.emplace_back(from + i * step);
+    }
+    result.emplace_back(to); // Make sure the last value is exactly equal to the value of "to".
+    return result;
 }
 
 Points3 generate_travel_to_extrusion(
@@ -184,15 +290,20 @@ Points3 generate_travel_to_extrusion(
         return generate_flat_travel(xy_path.points, initial_elevation);
     }
 
-    Lines global_xy_path;
-    for (const Line &line : xy_path.lines()) {
-        global_xy_path.emplace_back(line.a + xy_path_coord_origin, line.b + xy_path_coord_origin);
+    Points global_xy_path;
+    for (const Point &point : xy_path.points) {
+        global_xy_path.emplace_back(point + xy_path_coord_origin);
     }
 
-    ElevatedTravelParams elevation_params{
-        get_elevated_traval_params(global_xy_path, config, extruder_id, previous_layer_distancer)};
+    ElevatedTravelParams elevation_params{get_elevated_traval_params(
+        Polyline{std::move(global_xy_path)}, config, extruder_id, previous_layer_distancer
+    )};
 
-    const std::vector<double> ensure_points_at_distances{elevation_params.slope_end};
+    const std::vector<double> ensure_points_at_distances = linspace(
+        elevation_params.slope_end - elevation_params.blend_width / 2.0,
+        elevation_params.slope_end + elevation_params.blend_width / 2.0,
+        elevation_params.parabola_points_count
+    );
 
     Points3 result{generate_elevated_travel(
         xy_path.points, ensure_points_at_distances, initial_elevation,

@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 #include <libslic3r/GCode/Travels.hpp>
 #include <libslic3r/ExPolygon.hpp>
+#include <boost/math/special_functions/pow.hpp>
 
 using namespace Slic3r;
 using namespace Slic3r::GCode::Impl::Travels;
@@ -179,3 +180,21 @@ TEST_CASE("Get first crossed line distance", "[GCode]") {
     CHECK_FALSE(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer));
 }
 
+
+TEST_CASE("Elevated travel formula", "[GCode]") {
+    const double lift_height{10};
+    const double slope_end{10};
+    const double blend_width{10};
+    const ElevatedTravelParams params{lift_height, slope_end, blend_width};
+
+    ElevatedTravelFormula f{params};
+
+    const double distance = slope_end - blend_width / 2;
+    const double slope = (f(distance) - f(0)) / distance;
+    // At the begining it has given slope.
+    CHECK(slope == lift_height / slope_end);
+    // At the end it is flat.
+    CHECK(f(slope_end + blend_width / 2) == f(slope_end + blend_width));
+    // Should be smoothed.
+    CHECK(f(slope_end) < lift_height);
+}

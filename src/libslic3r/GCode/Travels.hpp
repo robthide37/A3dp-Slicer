@@ -11,16 +11,57 @@
 #include <functional>
 #include <optional>
 
+#include <boost/math/special_functions/pow.hpp>
+
 #include "libslic3r/Line.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/AABBTreeLines.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r::GCode::Impl::Travels {
+/**
+ * @brief A point on a curve with a distance from start.
+ */
 struct DistancedPoint
 {
     Point point;
     double distance_from_start;
+};
+
+struct ElevatedTravelParams
+{
+    /** Maximal value of nozzle lift. */
+    double lift_height{};
+
+    /** Distance from travel to the middle of the smoothing parabola. */
+    double slope_end{};
+
+    /** Width of the smoothing parabola */
+    double blend_width{};
+
+    /** How many points should be used to approximate the parabola */
+    unsigned parabola_points_count{};
+};
+
+/**
+ * @brief A mathematical formula for a smooth function.
+ *
+ * It starts lineary increasing than there is a parabola part and
+ * at the end it is flat.
+ */
+struct ElevatedTravelFormula
+{
+    ElevatedTravelFormula(const ElevatedTravelParams &params);
+    double operator()(const double distance_from_start) const;
+
+private:
+    double slope_function(double distance_from_start) const;
+
+    double smoothing_from;
+    double smoothing_to;
+    double blend_width;
+    double lift_height;
+    double slope_end;
 };
 
 /**
