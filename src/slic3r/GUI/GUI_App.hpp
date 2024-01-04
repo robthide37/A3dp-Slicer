@@ -404,7 +404,6 @@ private:
 
     bool                    m_datadir_redefined { false }; 
     bool                    m_wifi_config_dialog_shown { false };
-    bool                    m_wifi_config_dialog_was_declined { false };
 };
 
 DECLARE_APP(GUI_App)
