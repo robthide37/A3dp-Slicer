@@ -5880,6 +5880,7 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
     bool could_be_wipe_disabled       = false;
     // Save state of use_external_mp_once for the case that will be needed to call twice m_avoid_crossing_perimeters.travel_to.
     const bool used_external_mp_once  = m_avoid_crossing_perimeters.used_external_mp_once();
+    const bool used_disabled_once  = m_avoid_crossing_perimeters.disabled_once();
 
     //can use the avoid crossing algo?
     bool can_avoid_cross_peri = m_config.avoid_crossing_perimeters
@@ -5913,9 +5914,11 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
             //if (could_be_wipe_disabled) {
             //    m_wipe.reset_path();
             //} else {
+            //check if it cross hull
                 auto result = diff_pl(Polylines{ travel }, to_polygons(m_layer->lslices));
-                if (result.empty())
+                if (result.empty()) {
                     m_wipe.reset_path();
+                }
             //}
         }
 
@@ -5935,6 +5938,9 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
                  // If in the previous call of m_avoid_crossing_perimeters.travel_to was use_external_mp_once set to true restore this value for next call.
                 if (used_external_mp_once)
                     m_avoid_crossing_perimeters.use_external_mp_once();
+                if (used_disabled_once)
+                    m_avoid_crossing_perimeters.disable_once();
+
                 // Because of it, it is necessary to redo the thing
                 travel = m_avoid_crossing_perimeters.travel_to(*this, point);
                 updated_first_pos = true;

@@ -64,6 +64,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "avoid_crossing_perimeters",
         "avoid_crossing_perimeters_max_detour",
         "avoid_crossing_not_first_layer",
+        "avoid_crossing_top",
         "bed_shape",
         "bed_temperature",
         "chamber_temperature",

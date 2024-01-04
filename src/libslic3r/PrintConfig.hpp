@@ -790,6 +790,7 @@ PRINT_CONFIG_CLASS_DEFINE(
 PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
+    ((ConfigOptionBool,                 avoid_crossing_top))
     ((ConfigOptionFloat,                bridge_angle))
     ((ConfigOptionEnum<InfillPattern>,  bridge_fill_pattern))
     ((ConfigOptionEnum<BridgeType>,     bridge_type))

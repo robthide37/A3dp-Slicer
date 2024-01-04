@@ -610,7 +610,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Optimize travel moves in order to minimize the crossing of perimeters. "
         "This is mostly useful with Bowden extruders which suffer from oozing. "
         "This feature slows down both the print and the G-code generation.");
-    def->mode = comExpert | comPrusa;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("avoid_crossing_not_first_layer", coBool);
@@ -618,7 +618,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Don't avoid crossing on 1st layer");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Disable 'Avoid crossing perimeters' for the first layer.");
-    def->mode = comExpert | comSuSi;
+    def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("avoid_crossing_perimeters_max_detour", coFloatOrPercent);
@@ -632,6 +632,13 @@ void PrintConfigDef::init_fff_params()
     def->max_literal = { 1000, false };
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0., false));
+
+    def = this->add("avoid_crossing_top", coBool);
+    def->label = L("Avoid top surface for travels");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("When using 'Avoid crossing perimeters', consider the top surfaces as a void, to avoid travelling over them if possible.");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("bed_temperature", coInts);
     def->label = L("Other layers");
@@ -7817,6 +7824,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "arc_fitting",
 "arc_fitting_tolerance",
 "avoid_crossing_not_first_layer",
+"avoid_crossing_top",
 "bridge_fill_pattern",
 "bridge_internal_acceleration",
 "bridge_internal_fan_speed",

@@ -1051,7 +1051,8 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "min_bead_width") {
                 steps.emplace_back(posSlice);
             } else if (
-                opt_key == "bridge_speed"
+                opt_key == "avoid_crossing_top"
+                || opt_key == "bridge_speed"
                 || opt_key == "bridge_speed_internal"
                 || opt_key == "external_perimeter_speed"
                 || opt_key == "external_perimeters_vase"

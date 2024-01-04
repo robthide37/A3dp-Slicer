@@ -368,7 +368,7 @@ static void export_travel_to_svg(const Polygons                  &boundary,
     coordf_t      stroke_width = scale_(0.05);
     BoundingBox   bbox         = get_extents(boundary);
     ::Slic3r::SVG svg(path, bbox);
-    svg.draw_outline(boundary, "green", stroke_width);
+    svg.draw(to_polylines(boundary), "green", stroke_width);
     svg.draw(original_travel, "blue", stroke_width);
     svg.draw(result_travel, "red", stroke_width);
     svg.draw(original_travel.a, "black", stroke_width);
@@ -524,10 +524,9 @@ static float get_perimeter_spacing_external(const Layer &layer)
 }
 
 bool is_in_internal_boundary(const AvoidCrossingPerimeters::Boundary& boundary, const Point& pt) {
-    for (const std::pair<ExPolygon, ExPolygons>& bound : boundary.boundary_growth)
-        for (const ExPolygon& poly : bound.second)
-            if (poly.contains(pt))
-                return true;
+    for (const std::pair<ExPolygon, ExPolygon>& bound : boundary.boundary_growth)
+        if (bound.second.contains(pt))
+            return true;
     return false;
 }
 
@@ -540,7 +539,7 @@ bool find_point_on_boundary(Point& pt_to_move, const AvoidCrossingPerimeters::Bo
         if (pt_closest.contour_idx == size_t(-1)) {
             //manual search on edges
             bool found = false;
-            for (const std::pair<ExPolygon, ExPolygons>& bound : boundary.boundary_growth)
+            for (const std::pair<ExPolygon, ExPolygon>& bound : boundary.boundary_growth)
                 if (bound.first.contains(pt_to_move)) {
                     coordf_t dist2 = std::numeric_limits<coordf_t>::max();
                     for (const Polygon& poly : to_polygons(bound.second)) {
@@ -597,20 +596,6 @@ static size_t avoid_perimeters_inner(const AvoidCrossingPerimeters::Boundary &bo
     if(extrusion_spacing > 0)
         if (!find_point_on_boundary(start, boundary, (extrusion_spacing * 3)/2) || !find_point_on_boundary(end, boundary, (extrusion_spacing * 3) / 2)) {
             BOOST_LOG_TRIVIAL(info) << "Fail to find a point in the contour for avoid_perimeter.";
-            //{
-            //    static int isazfn = 0;
-            //    std::stringstream stri;
-            //    stri << "avoid_peri_initbad_" << isazfn++ << ".svg";
-            //    SVG svg(stri.str());
-            //    for (auto elt : boundary.boundary_growth)
-            //        svg.draw((elt.first), "grey");
-            //    for (auto elt : boundary.boundary_growth)
-            //        svg.draw((elt.second), "pink");
-            //    //svg.draw((boundary.boundaries), "pink");
-            //    svg.draw((Line{ start,end }), "red");
-            //    svg.draw((Line{ real_start,real_end }), "green");
-            //    svg.Close();
-            //}
             result_out = { {start,-1}, {end,-1} };
             return 0;
         }
@@ -632,7 +617,6 @@ static size_t avoid_perimeters_inner(const AvoidCrossingPerimeters::Boundary &bo
         const float search_radius = 2.f * get_perimeter_spacing(layer);
         // When the offset is too big, then original travel doesn't have to cross created boundaries.
         // These cases are fixed by calling extend_for_closest_lines.
-//TODO: check if it isn't detrimental to changes for going around second perimeter...
         intersections             = extend_for_closest_lines(intersections, boundary, start, end, search_radius);
     }
 
@@ -1047,13 +1031,17 @@ static std::vector<float> contour_distance(const EdgeGrid::Grid     &grid,
 
 // Polygon offset which ensures that if a polygon breaks up into several separate parts, the original polygon will be used in these places.
 // ExPolygons are handled one by one so returned ExPolygons could intersect.
-static ExPolygons inner_offset(const ExPolygons &ex_polygons, double offset)
+static std::vector<std::pair<ExPolygon, ExPolygon>> inner_offset(const ExPolygons &ex_polygons, double offset)
 {
     const std::vector<double> min_contour_width_values = {offset / 2., offset, 2. * offset + SCALED_EPSILON};
-    ExPolygons                ex_poly_result           = ex_polygons;
-    resample_expolygons(ex_poly_result, offset / 2, scaled<double>(0.5));
+    std::vector<std::pair<ExPolygon, ExPolygon>> ex_poly_result;
+    for (const ExPolygon &expo : ex_polygons) {
+        ex_poly_result.emplace_back(expo, expo);
+        resample_expolygon(ex_poly_result.back().second, offset / 2, scaled<double>(0.5));
+    }
 
-    for (ExPolygon &ex_poly : ex_poly_result) {
+    for (std::pair<ExPolygon,ExPolygon> &old_2_new : ex_poly_result) {
+        ExPolygon &ex_poly = old_2_new.second;
         BoundingBox bbox(get_extents(ex_poly));
         bbox.offset(SCALED_EPSILON);
 
@@ -1122,34 +1110,47 @@ static ExPolygons inner_offset(const ExPolygons &ex_polygons, double offset)
 //#define INCLUDE_SUPPORTS_IN_BOUNDARY
 
 // called by AvoidCrossingPerimeters::travel_to()
-static ExPolygons get_boundary(const Layer &layer)
+static ExPolygons get_boundary(const Layer &layer, std::vector<std::pair<ExPolygon, ExPolygon>> &slice_2_boundary)
 {
     const float perimeter_spacing = get_perimeter_spacing(layer);
     const float perimeter_offset  = perimeter_spacing / 2.f;
     auto const *support_layer     = dynamic_cast<const SupportLayer *>(&layer);
-    ExPolygons  boundary          = union_ex(inner_offset(layer.lslices, 1.5 * perimeter_spacing));
+    ExPolygons  boundary;
+    auto old_2_new_expolygons     = inner_offset(layer.lslices, 1.5 * perimeter_spacing);
+    for (const std::pair<ExPolygon, ExPolygon> &old_2_new_expoly : old_2_new_expolygons) {
+        boundary.push_back(old_2_new_expoly.second);
+        slice_2_boundary.push_back(std::move(old_2_new_expoly));
+    }
+    boundary = union_ex(boundary);
     if(support_layer) {
 #ifdef INCLUDE_SUPPORTS_IN_BOUNDARY
         append(boundary, inner_offset(support_layer->support_islands.expolygons, 1.5 * perimeter_spacing));
 #endif
         auto *layer_below = layer.object()->get_first_layer_bellow_printz(layer.print_z, EPSILON);
-        if (layer_below) //why?
-            append(boundary, inner_offset(layer_below->lslices, 1.5 * perimeter_spacing));
+        if (layer_below) { // why?
+            auto old_2_new_expolygons_supp = inner_offset(layer_below->lslices, 1.5 * perimeter_spacing);
+            for (std::pair<ExPolygon, ExPolygon> &old_2_new_supp : old_2_new_expolygons_supp) {
+                boundary.push_back(old_2_new_supp.second);
+                slice_2_boundary.push_back(std::move(old_2_new_supp));
+            }
+        }
         // After calling inner_offset it is necessary to call union_ex because of the possibility of intersection ExPolygons
         boundary = union_ex(boundary);
     }
     // Collect all top layers that will not be crossed.
     size_t      polygons_count    = 0;
     for (const LayerRegion *layer_region : layer.regions())
-        for (const Surface &surface : layer_region->fill_surfaces.surfaces)
-            if (surface.has_pos_top()) ++polygons_count;
+        if(layer_region->region().config().avoid_crossing_top)
+            for (const Surface &surface : layer_region->fill_surfaces.surfaces)
+                if (surface.has_pos_top()) ++polygons_count;
 
     if (polygons_count > 0) {
         ExPolygons top_layer_polygons;
         top_layer_polygons.reserve(polygons_count);
         for (const LayerRegion *layer_region : layer.regions())
-            for (const Surface &surface : layer_region->fill_surfaces.surfaces)
-                if (surface.has_pos_top()) top_layer_polygons.emplace_back(surface.expolygon);
+            if(layer_region->region().config().avoid_crossing_top)
+                for (const Surface &surface : layer_region->fill_surfaces.surfaces)
+                    if (surface.has_pos_top()) top_layer_polygons.emplace_back(surface.expolygon);
 
         top_layer_polygons = union_ex(top_layer_polygons);
         return diff_ex(boundary, offset_ex(top_layer_polygons, -perimeter_offset));
@@ -1262,30 +1263,9 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCode &gcodegen, const Point &
         )) {
         // Initialize m_internal only when it is necessary.
         if (m_internal.boundaries.empty()) {
-            std::vector<std::pair<ExPolygon, ExPolygons>> boundary_growth;
-            //create better slice (on second perimeter instead of the first)
-            ExPolygons expoly_boundary;
-            //as we are going to reduce, do it expoli per expoli
-            for (const ExPolygon& origin : lslices) {
-                ExPolygons second_peri = offset_ex(origin, -perimeter_spacing * 1.5f);
-                //there is a collapse! try to add missing parts
-                if (second_peri.size() > 1) {
-                    // get the bits that are collapsed
-                    ExPolygons missing_parts = diff_ex(ExPolygons{ origin }, offset_ex(second_peri, perimeter_spacing * 1.51f), ApplySafetyOffset::Yes);
-                    //have to grow a bit to be able to fit inside the reduced thing
-                    // then intersect to be sure it don't stick out of the initial poly
-                    missing_parts = intersection_ex(ExPolygons{ origin }, offset_ex(missing_parts, perimeter_spacing * 1.1f));
-                    // offset to second peri (-first) where possible, then union and reduce to the first.
-                    second_peri = offset_ex(union_ex(missing_parts, offset_ex(origin, -perimeter_spacing * 0.9f)), -perimeter_spacing * .6f);
-                } else if (second_peri.size() == 0) {
-                    // try again with the first perimeter (should be 0.5, but even with overlapping peri, it's almost never a 50% overlap, so it's better that way)
-                    second_peri = offset_ex(origin, -perimeter_spacing * .6f);
-                }
-                append(expoly_boundary, second_peri);
-                boundary_growth.push_back({ origin, second_peri });
-            }
-            init_boundary(&m_internal, to_polygons(expoly_boundary));
-            m_internal.boundary_growth = boundary_growth;
+            std::vector<std::pair<ExPolygon, ExPolygon>> boundary_growth;
+            init_boundary(&m_internal, to_polygons(get_boundary(*gcodegen.layer(), boundary_growth)));
+            m_internal.boundary_growth = std::move(boundary_growth);
         }
 
         // Trim the travel line by the bounding box.

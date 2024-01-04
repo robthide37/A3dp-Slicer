@@ -44,7 +44,7 @@ public:
         // Used for detection of intersection between line and any polygon from boundaries
         EdgeGrid::Grid                  grid;
         //used to move the point inside the boundary
-        std::vector<std::pair<ExPolygon, ExPolygons>> boundary_growth;
+        std::vector<std::pair<ExPolygon, ExPolygon>> boundary_growth;
 
         void clear()
         {
