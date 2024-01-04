@@ -1294,7 +1294,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
 
     //apply print config to m_config and m_writer, so we don't have to use print.config() instead
     // (and mostly to make m_writer.preamble() works)
-    this->apply_print_config(print.config());
+    this->apply_print_configs(print);
 
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
@@ -2888,6 +2888,7 @@ LayerResult GCode::process_layer(
     uint16_t         first_extruder_id = layer_tools.extruders.front();
 
     // Initialize config with the 1st object to be printed at this layer.
+    m_config.apply(print.default_region_config(), true);
     m_config.apply(layer.object()->config(), true);
 
     // Check whether it is possible to apply the spiral vase logic for this layer.
@@ -3197,6 +3198,8 @@ LayerResult GCode::process_layer(
             set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
 
         if (auto loops_it = skirt_loops_per_extruder.find(extruder_id); loops_it != skirt_loops_per_extruder.end()) {
+            //global skirt & brim use the global settings.
+            m_config.apply(print.default_object_config(), true);
             // before going to and from a global skirt, please ensure you are a a safe height
             set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
             const std::pair<size_t, size_t> loops = loops_it->second;
@@ -3227,6 +3230,8 @@ LayerResult GCode::process_layer(
 
         // Extrude brim with the extruder of the 1st region.
         if (! m_brim_done) {
+            //global skirt & brim use the global settings.
+            m_config.apply(print.default_object_config(), true);
             this->set_origin(0., 0.);
             m_avoid_crossing_perimeters.use_external_mp();
             for (const ExtrusionEntity* brim_entity : print.brim().entities()) {
@@ -3248,6 +3253,8 @@ LayerResult GCode::process_layer(
             && extruder_id == layer_tools.extruders.front()) {
 
             const PrintObject *print_object = layers.front().object();
+            //object skirt & brim use the object settings.
+            m_config.apply(print_object->config(), true);
             this->set_origin(unscale(print_object->instances()[single_object_instance_idx].shift));
             if (this->m_layer != nullptr && (this->m_layer->id() < m_config.skirt_height || print.has_infinite_skirt() )) {
                 if(first_layer && print.skirt_first_layer())
@@ -3264,6 +3271,8 @@ LayerResult GCode::process_layer(
             && extruder_id == layer_tools.extruders.front()) {
 
             const PrintObject* print_object = layers.front().object();
+            //object skirt & brim use the object settings.
+            m_config.apply(print_object->config(), true);
             this->set_origin(unscale(print_object->instances()[single_object_instance_idx].shift));
             if (this->m_layer != nullptr && this->m_layer->id() == 0) {
                 m_avoid_crossing_perimeters.use_external_mp(true);
@@ -3291,6 +3300,8 @@ LayerResult GCode::process_layer(
             bool first_object = true;
             for (InstanceToPrint &instance_to_print : instances_to_print) {
                 const LayerToPrint &layer_to_print = layers[instance_to_print.layer_id];
+                m_config.apply(instance_to_print.print_object.config(), true);
+
                 // To control print speed of the 1st object layer printed over raft interface.
                 bool object_layer_over_raft = layer_to_print.object_layer && layer_to_print.object_layer->id() > 0 && 
                     instance_to_print.print_object.slicing_parameters().raft_layers() == layer_to_print.object_layer->id();
@@ -3310,7 +3321,6 @@ LayerResult GCode::process_layer(
                                                instance_id + "_copy_" +
                                                instance_copy;
 
-                m_config.apply(instance_to_print.print_object.config(), true);
                 m_layer = layer_to_print.layer();
                 m_object_layer_over_raft = object_layer_over_raft;
                 m_print_object_instance_id = static_cast<uint16_t>(instance_to_print.instance_id);
@@ -3545,11 +3555,15 @@ LayerResult GCode::process_layer(
     return result;
 }
 
-void GCode::apply_print_config(const PrintConfig &print_config)
+void GCode::apply_print_configs(const Print&print)
 {
-    m_writer.apply_print_config(print_config);
-    m_config.apply(print_config);
-    m_scaled_gcode_resolution = scaled<double>(print_config.gcode_resolution.value);
+    //apply also default region & object, just in case, as they won't be applied since the first extrusion on a region / the first layer process on an object
+    m_writer.apply_print_config(print.config());
+    m_writer.apply_print_region_config(print.default_region_config());
+    m_config.apply(print.config());
+    m_config.apply(print.default_object_config());
+    m_config.apply(print.default_region_config());
+    m_scaled_gcode_resolution = scale_d(print.config().gcode_resolution.value);
 }
 
 void GCode::append_full_config(const Print &print, std::string &str)
