@@ -3142,7 +3142,7 @@ std::string GCodeGenerator::_extrude(
     gcode += m_writer.set_speed(F, "", cooling_marker_setspeed_comments);
     if (dynamic_speed_and_fan_speed.second >= 0)
         gcode += ";_SET_FAN_SPEED" + std::to_string(int(dynamic_speed_and_fan_speed.second)) + "\n";
-    double path_length = 0.;
+
     std::string comment;
     if (m_config.gcode_comments) {
         comment = description;
@@ -3176,16 +3176,13 @@ std::string GCodeGenerator::_extrude(
             }
             if (radius == 0) {
                 // Extrude line segment.
-                if (const double line_length = (p - prev).norm(); line_length > 0) {
-                    path_length += line_length;
+                if (const double line_length = (p - prev).norm(); line_length > 0)
                     gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
-                }
             } else {
                 double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
                 assert(angle > 0);
                 const double line_length = angle * std::abs(radius);
-                path_length += line_length;
-                const double dE = e_per_mm * line_length;
+                const double dE          = e_per_mm * line_length;
                 assert(dE > 0);
                 gcode += m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
             }
