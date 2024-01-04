@@ -24,6 +24,8 @@
 #endif //__linux__
 
 namespace {
+
+#ifdef _WIN32
 bool ptree_get_value(const boost::property_tree::ptree& pt, const std::string& target, std::string& result)
 {
     // Check if the current node has the target element
@@ -41,7 +43,7 @@ bool ptree_get_value(const boost::property_tree::ptree& pt, const std::string& t
 
     return false;  // Element not found in this subtree
 }
-#ifdef _WIN32
+
 // Fill SSID map. Implementation from Raspberry Pi imager and Win32 Api examples.
 // https://github.com/raspberrypi/rpi-imager/blob/qml/src/windows/winwlancredentials.cpp
 // https://learn.microsoft.com/en-us/windows/win32/api/wlanapi/nf-wlanapi-wlangetavailablenetworklist

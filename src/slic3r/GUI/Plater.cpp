@@ -5633,7 +5633,7 @@ void Plater::convert_gcode_to_ascii()
         if (res == EResult::InvalidMagicNumber) {
             in_file.close();
             out_file.close();
-            boost::filesystem::copy_file(input_path, output_path, boost::filesystem::copy_option::overwrite_if_exists);
+            boost::filesystem::copy_file(input_path, output_path, boost::filesystem::copy_options::overwrite_existing);
         }
         else if (res != EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting G-code file"), wxICON_INFORMATION | wxOK);
@@ -5712,7 +5712,7 @@ void Plater::convert_gcode_to_binary()
         if (res == EResult::AlreadyBinarized) {
             in_file.close();
             out_file.close();
-            boost::filesystem::copy_file(input_path, output_path, boost::filesystem::copy_option::overwrite_if_exists);
+            boost::filesystem::copy_file(input_path, output_path, boost::filesystem::copy_options::overwrite_existing);
         }
         else if (res != EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting G-code file"), wxICON_INFORMATION | wxOK);
@@ -5945,7 +5945,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                             std::replace(name.begin(), name.end(), '\\', '/');
                             // rename if file exists
                             std::string filename = path.filename().string();
-                            std::string extension = boost::filesystem::extension(path);
+                            std::string extension = path.extension().string();
                             std::string just_filename = filename.substr(0, filename.size() - extension.size());
                             std::string final_filename = just_filename;
 

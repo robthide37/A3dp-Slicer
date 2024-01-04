@@ -200,7 +200,8 @@ public:
     }
 
     void emit_string(const std::string_view s) {
-        strncpy(ptr_err.ptr, s.data(), s.size());
+        // Be aware that std::string_view::data() returns a pointer to a buffer that is not necessarily null-terminated.
+        memcpy(ptr_err.ptr, s.data(), s.size());
         ptr_err.ptr += s.size();
     }
 
