@@ -192,7 +192,7 @@ void WifiConfigDialog::rescan_networks(bool select)
     std::string current = m_wifi_scanner->get_current_ssid();
     const auto& map = m_wifi_scanner->get_map();
     m_ssid_combo->Clear();
-    for (const auto pair : map) {
+    for (const auto &pair : map) {
         m_ssid_combo->Append(pair.first);
         // select ssid of current network (if connected)
         if (current == pair.first)
