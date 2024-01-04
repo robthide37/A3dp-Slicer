@@ -2,6 +2,7 @@
 
 #include "BridgeDetector.hpp"
 #include "ClipperUtils.hpp"
+#include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "Geometry.hpp"
 #include "ShortestPath.hpp"
@@ -37,18 +38,6 @@
 #endif
 
 namespace Slic3r {
-#if _DEBUG
-struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
-    virtual void default_use(const ExtrusionEntity& entity) override {};
-    virtual void use(const ExtrusionLoop& loop) override {
-        for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
-            assert(it->polyline.size() >= 2);
-            assert(std::prev(it)->polyline.back() == it->polyline.front());
-        }
-        assert(loop.paths.front().first_point() == loop.paths.back().last_point());
-    }
-};
-#endif
 PerimeterGeneratorLoops get_all_Childs(PerimeterGeneratorLoop loop) {
     PerimeterGeneratorLoops ret;
     for (PerimeterGeneratorLoop &child : loop.children) {
@@ -3067,9 +3056,21 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
             searcher.search_result.path->polyline.set_points().erase(
                 searcher.search_result.path->polyline.set_points().begin() + searcher.search_result.idx_line + 1,
                 searcher.search_result.path->polyline.set_points().end());
-            searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.append(point);
-            searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + 1 + searcher.search_result.idx_path, 
-                ExtrusionPath(poly_after, *searcher.search_result.path));
+            if (searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.empty() ||
+                !searcher.search_result.loop->paths[searcher.search_result.idx_path] .polyline.back().coincides_with_epsilon(point))
+                searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.append(point);
+            if (searcher.search_result.loop->paths[searcher.search_result.idx_path].size() < 2 ||
+                searcher.search_result.loop->paths[searcher.search_result.idx_path].length() < SCALED_EPSILON) {
+                //if too small, replace
+                poly_after.points.front() = searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.front();
+                searcher.search_result.loop->paths[searcher.search_result.idx_path] = ExtrusionPath(poly_after, *searcher.search_result.path);
+            }else{
+                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + 1 + searcher.search_result.idx_path, 
+                    ExtrusionPath(poly_after, *searcher.search_result.path));
+            }
+            assert(searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.size() > 1);
+            assert(poly_after.size() > 1);
+            
             //create thin wall path exttrusion
             ExtrusionEntityCollection tws;
             tws.append(Geometry::thin_variable_width({ tw }, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)), false));
@@ -3119,6 +3120,9 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
 
     //now add thinwalls that have no anchor (make them reversable)
     extrusions.append(Geometry::thin_variable_width(not_added, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)), true));
+#if _DEBUG
+        extrusions.visit(LoopAssertVisitor{});
+#endif
 }
 
 PerimeterIntersectionPoint

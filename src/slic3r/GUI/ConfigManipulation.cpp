@@ -390,6 +390,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, config->option<ConfigOptionEnum<FuzzySkinType>>("fuzzy_skin")->value != FuzzySkinType::None);
 
     toggle_field("avoid_crossing_not_first_layer", config->opt_bool("avoid_crossing_perimeters"));
+    toggle_field("avoid_crossing_top", config->opt_bool("avoid_crossing_perimeters"));
 
     bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;
     // infill_extruder uses the same logic as in Print::extruders()

@@ -64,6 +64,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "avoid_crossing_perimeters",
         "avoid_crossing_perimeters_max_detour",
         "avoid_crossing_not_first_layer",
+        "avoid_crossing_top",
         "bed_shape",
         "bed_temperature",
         "chamber_temperature",
@@ -1271,6 +1272,14 @@ void Print::process()
             );
         }
     }
+    
+#if _DEBUG
+    for (PrintObject* obj : m_objects) {
+        for (auto &l : obj->m_layers) {
+            for (auto &reg : l->regions()) { reg->perimeters.visit(LoopAssertVisitor{}); }
+        }
+    }
+#endif
 
     m_timestamp_last_change = std::time(0);
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
