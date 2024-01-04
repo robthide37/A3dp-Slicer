@@ -1271,6 +1271,14 @@ void Print::process()
             );
         }
     }
+    
+#if _DEBUG
+    for (PrintObject* obj : m_objects) {
+        for (auto &l : obj->m_layers) {
+            for (auto &reg : l->regions()) { reg->perimeters.visit(LoopAssertVisitor{}); }
+        }
+    }
+#endif
 
     m_timestamp_last_change = std::time(0);
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();

@@ -700,6 +700,23 @@ public:
     }
 };
 
+    
+#if _DEBUG
+struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
+    virtual void default_use(const ExtrusionEntity& entity) override {};
+    virtual void use(const ExtrusionLoop& loop) override {
+        for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
+            assert(it->polyline.size() >= 2);
+            assert(std::prev(it)->polyline.back() == it->polyline.front());
+        }
+        for (auto it = loop.paths.begin(); it != loop.paths.end(); ++it) {
+            assert(it->length() > SCALED_EPSILON);
+        }
+        assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+    }
+};
+#endif
+
 }
 
 #endif
