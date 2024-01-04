@@ -110,6 +110,7 @@ TEST_CASE("Config apply dynamic to static", "[Config]") {
     config2->apply(config, true);
 
     CHECK(config2->opt_int("perimeters") == 2);
+    delete config2;
 }
 
 TEST_CASE("Config apply static to dynamic", "[Config]") {
@@ -118,11 +119,13 @@ TEST_CASE("Config apply static to dynamic", "[Config]") {
 
     DynamicPrintConfig config2;
     config2.apply(*config, true);
+    delete config;
 
     CHECK(
         config2.opt_int("perimeters") ==
         DynamicPrintConfig::full_print_config().opt_int("perimeters")
     );
+
 }
 
 TEST_CASE("Config apply dynamic to dynamic", "[Config]") {
@@ -144,6 +147,7 @@ TEST_CASE("Get abs value on percent", "[Config]") {
     config->set_deserialize_strict("solid_infill_speed", "60");
     config->set_deserialize_strict("top_solid_infill_speed", "10%");
     CHECK(config->get_abs_value("top_solid_infill_speed") == 6);
+    delete config;
 }
 
 TEST_CASE("No interference between DynamicConfig objects", "[Config]") {
