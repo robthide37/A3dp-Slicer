@@ -2785,8 +2785,10 @@ bool ConfigWizard::priv::on_bnt_finish()
      * than last changes wouldn't be updated for filaments/materials.
      * SO, do that before check_and_install_missing_materials()
      */
-    page_filaments->check_and_update_presets();
-    page_sla_materials->check_and_update_presets();
+    if (page_filaments)
+        page_filaments->check_and_update_presets();
+    if (page_sla_materials)
+        page_sla_materials->check_and_update_presets();
     
 	// there's no need to check that filament is selected if we have only custom printer
     if (custom_printer_selected && !any_fff_selected && !any_sla_selected) return true;
