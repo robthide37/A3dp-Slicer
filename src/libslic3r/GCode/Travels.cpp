@@ -43,8 +43,8 @@ double ElevatedTravelFormula::operator()(const double distance_from_start) const
 
 Points3 generate_flat_travel(tcb::span<const Point> xy_path, const float elevation) {
     Points3 result;
-    result.reserve(xy_path.size() - 1);
-    for (const Point &point : xy_path.subspan(1)) {
+    result.reserve(xy_path.size());
+    for (const Point &point : xy_path) {
         result.emplace_back(point.x(), point.y(), scaled(elevation));
     }
     return result;
@@ -140,21 +140,6 @@ std::optional<double> get_first_crossed_line_distance(
     return {};
 }
 
-std::optional<double> get_obstacle_adjusted_slope_end(
-    const Lines &xy_path,
-    const std::optional<AABBTreeLines::LinesDistancer<Linef>> &previous_layer_distancer
-) {
-    if (!previous_layer_distancer) {
-        return std::nullopt;
-    }
-    std::optional<double> first_obstacle_distance =
-        get_first_crossed_line_distance(xy_path, *previous_layer_distancer);
-    if (!first_obstacle_distance) {
-        return std::nullopt;
-    }
-    return *first_obstacle_distance;
-}
-
 struct SmoothingParams
 {
     double blend_width{};
@@ -212,7 +197,7 @@ SmoothingParams get_smoothing_params(
 }
 
 ElevatedTravelParams get_elevated_traval_params(
-    const Polyline &xy_path,
+    const Polyline& xy_path,
     const FullPrintConfig &config,
     const unsigned extruder_id,
     const std::optional<AABBTreeLines::LinesDistancer<Linef>> &previous_layer_distancer
@@ -236,7 +221,10 @@ ElevatedTravelParams get_elevated_traval_params(
     }
 
     std::optional<double> obstacle_adjusted_slope_end{
-        get_obstacle_adjusted_slope_end(xy_path.lines(), previous_layer_distancer)};
+        previous_layer_distancer ?
+        get_first_crossed_line_distance(xy_path.lines(), *previous_layer_distancer) :
+        std::nullopt
+    };
 
     if (obstacle_adjusted_slope_end && obstacle_adjusted_slope_end < elevation_params.slope_end) {
         elevation_params.slope_end = *obstacle_adjusted_slope_end;
@@ -252,11 +240,6 @@ ElevatedTravelParams get_elevated_traval_params(
     return elevation_params;
 }
 
-/**
- * @brief Generate regulary spaced points on 1 axis. Includes both from and to.
- *
- * If count is 1, the point is in the middle of the range.
- */
 std::vector<double> linspace(const double from, const double to, const unsigned count) {
     if (count == 0) {
         return {};

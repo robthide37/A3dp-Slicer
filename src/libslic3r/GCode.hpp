@@ -127,11 +127,25 @@ public:
     const Point&    last_pos() const { return m_last_pos; }
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset.
     template<typename Derived>
-    Vec2d           point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
-        static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "GCodeGenerator::point_to_gcode(): first parameter is not a 2D vector");
-        return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin 
-            - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+    Eigen::Matrix<double, Derived::SizeAtCompileTime, 1, Eigen::DontAlign> point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
+        static_assert(
+            Derived::IsVectorAtCompileTime,
+            "GCodeGenerator::point_to_gcode(): first parameter is not a vector"
+        );
+        static_assert(
+            int(Derived::SizeAtCompileTime) == 2 || int(Derived::SizeAtCompileTime) == 3,
+            "GCodeGenerator::point_to_gcode(): first parameter is not a 2D or 3D vector"
+        );
+
+        if constexpr (Derived::SizeAtCompileTime == 2) {
+            return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
+                - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+        } else {
+            const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
+            return to_3d(gcode_point_xy, unscaled(point.z()));
+        }
     }
+
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
     template<typename Derived>
     Vec2d           point_to_gcode_quantized(const Eigen::MatrixBase<Derived> &point) const {
@@ -216,6 +230,9 @@ private:
     static ObjectsLayerToPrint         		                     collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, ObjectsLayerToPrint>> collect_layers_to_print(const Print &print);
 
+    /** @brief Generates ramping travel gcode for layer change. */
+    std::string get_layer_change_gcode(const Vec3d& from, const Vec3d& to, const unsigned extruder_id);
+
     LayerResult process_layer(
         const Print                     &print,
         // Set of object & print layers of the same PrintObject and with the same print_z.
@@ -253,15 +270,9 @@ private:
     bool            last_pos_defined() const { return m_last_pos_defined; }
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
-    std::optional<std::string> get_helical_layer_change_gcode(
-        const coordf_t previous_layer_z,
-        const coordf_t print_z,
-        const std::string& comment
-    );
     std::string change_layer(
         coordf_t previous_layer_z,
-        coordf_t print_z,
-        const bool spiral_vase_enabled
+        coordf_t print_z
     );
     std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
     std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
@@ -412,7 +423,10 @@ private:
 
     Point                               m_last_pos;
     bool                                m_last_pos_defined;
-
+    std::optional<Vec3d>                m_previous_layer_last_position;
+    // This needs to be populated during the layer processing!
+    std::optional<Vec3d>                m_current_layer_first_position;
+    std::optional<unsigned>             m_layer_change_extruder_id;
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
     std::unique_ptr<GCodeFindReplace>   m_find_replace;

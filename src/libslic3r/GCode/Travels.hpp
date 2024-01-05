@@ -90,6 +90,20 @@ std::vector<DistancedPoint> slice_xy_path(
 );
 
 /**
+ * @brief Generate regulary spaced points on 1 axis. Includes both from and to.
+ *
+ * If count is 1, the point is in the middle of the range.
+ */
+std::vector<double> linspace(const double from, const double to, const unsigned count);
+
+ElevatedTravelParams get_elevated_traval_params(
+    const Polyline& xy_path,
+    const FullPrintConfig &config,
+    const unsigned extruder_id,
+    const std::optional<AABBTreeLines::LinesDistancer<Linef>> &previous_layer_distancer = std::nullopt
+);
+
+/**
  * @brief Simply return the xy_path with z coord set to elevation.
  */
 Points3 generate_flat_travel(tcb::span<const Point> xy_path, const float elevation);

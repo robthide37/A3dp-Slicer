@@ -192,6 +192,7 @@ namespace Slic3r {
             Height,
             Width,
             Layer_Change,
+            Layer_Change_Travel,
             Color_Change,
             Pause_Print,
             Custom_Code,
