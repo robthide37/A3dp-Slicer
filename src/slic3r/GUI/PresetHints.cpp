@@ -170,9 +170,10 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
             surface_list += ",";
             surface_list += _L("Perimeter overhangs");
         }
-        
-        out += format_wxstr(_L("but for %1% where the speed-up phase is skipped."), surface_list.substr(1));
-        has_disable = true;
+        if (surface_list.size() > 2) {
+            out += format_wxstr(_L("but for %1% where the speed-up phase is skipped."), surface_list.substr(1));
+            has_disable = true;
+        }
     }
     if(has_disable)
         out += ".";
