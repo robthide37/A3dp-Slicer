@@ -73,10 +73,6 @@ const std::string& data_dir();
 // so the user knows where to search for the debugging output.
 std::string debug_out_path(const char *name, ...);
 
-// A special type for strings encoded in the local Windows 8-bit code page.
-// This type is only needed for Perl bindings to relay to Perl that the string is raw, not UTF-8 encoded.
-typedef std::string local_encoded_string;
-
 // Returns next utf8 sequence length. =number of bytes in string, that creates together one utf-8 character. 
 // Starting at pos. ASCII characters returns 1. Works also if pos is in the middle of the sequence.
 extern size_t get_utf8_sequence_length(const std::string& text, size_t pos = 0);

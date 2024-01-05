@@ -639,10 +639,6 @@ public:
     // If zero, then the print is empty and the print shall not be executed.
     unsigned int                num_object_instances() const;
 
-    // For Perl bindings. 
-    PrintObjectPtrs&            objects_mutable() { return m_objects; }
-    PrintRegionPtrs&            print_regions_mutable() { return m_print_regions; }
-
     const ExtrusionEntityCollection& skirt() const { return m_skirt; }
     const ExtrusionEntityCollection& brim() const { return m_brim; }
     // Convex hull of the 1st layer extrusions, for bed leveling and placing the initial purge line.

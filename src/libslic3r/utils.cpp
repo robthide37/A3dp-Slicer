@@ -123,15 +123,6 @@ unsigned get_logging_level()
     }
 }
 
-// Force set_logging_level(<=error) after loading of the DLL.
-// This is currently only needed if libslic3r is loaded as a shared library into Perl interpreter
-// to perform unit and integration tests.
-static struct RunOnInit {
-    RunOnInit() { 
-        set_logging_level(1);
-    }
-} g_RunOnInit;
-
 void disable_multi_threading()
 {
     // Disable parallelization to simplify debugging.
