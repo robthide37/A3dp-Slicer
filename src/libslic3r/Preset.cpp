@@ -2253,7 +2253,6 @@ size_t ExtruderFilaments::update_compatible_internal(const PresetWithVendorProfi
     const ConfigOption* opt = active_printer.preset.config.option("nozzle_diameter");
     if (opt)
         config.set_key_value("num_extruders", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
-    bool some_compatible = false;
 
     // Adjust printer preset config to the first extruder from m_extruder_id 
     Preset printer_preset_adjusted = active_printer.preset;
@@ -2281,7 +2280,6 @@ size_t ExtruderFilaments::update_compatible_internal(const PresetWithVendorProfi
         const PresetWithVendorProfile this_preset_with_vendor_profile = m_filaments->get_preset_with_vendor_profile(*preset);
         bool    was_compatible = extr_filament.is_compatible;
         extr_filament.is_compatible = is_compatible_with_printer(this_preset_with_vendor_profile, active_printer_adjusted, &config);
-        some_compatible |= extr_filament.is_compatible;
         if (active_print != nullptr)
             extr_filament.is_compatible &= is_compatible_with_print(this_preset_with_vendor_profile, *active_print, active_printer_adjusted);
         if (!extr_filament.is_compatible && is_selected &&

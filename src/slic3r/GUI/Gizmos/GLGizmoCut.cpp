@@ -3310,7 +3310,7 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
             for (int obj_idx : err_objects_idxs)
                 model_names.push_back(objects[obj_idx]->name);
 
-            auto fix_and_update_progress = [plater, model_names, &objects](const int obj_idx, int model_idx,
+            auto fix_and_update_progress = [model_names, &objects](const int obj_idx, int model_idx,
                 wxProgressDialog& progress_dlg,
                 std::vector<std::string>& succes_models,
                 std::vector<std::pair<std::string, std::string>>& failed_models) -> bool
