@@ -151,8 +151,6 @@ public:
     std::string     placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override = nullptr);
     bool            enable_cooling_markers() const { return m_enable_cooling_markers; }
 
-    // For Perl bindings, to be used exclusively by unit tests.
-    unsigned int    layer_count() const { return m_layer_count; }
     void            set_layer_count(unsigned int value) { m_layer_count = value; }
     void            apply_print_config(const PrintConfig &print_config);
 
