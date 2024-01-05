@@ -3705,7 +3705,7 @@ GuiCfg create_gui_configuration()
     int max_style_image_height = static_cast<int>(std::round(1.5 * input_height));
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
     cfg.face_name_size = Vec2i(cfg.input_width, line_height_with_spacing);
-    cfg.face_name_texture_offset_x = cfg.face_name_size.x() + space;
+    cfg.face_name_texture_offset_x = cfg.face_name_size.x() + style.WindowPadding.x + space;
     return cfg;
 }
 } // namespace
