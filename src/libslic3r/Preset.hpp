@@ -142,6 +142,7 @@ public:
         return PrinterTechnology::ptUnknown;
     }
     static std::string type_name(Type t);
+    static Type        type_from_name(std::string name);
 
     Type                type        = TYPE_INVALID;
 
