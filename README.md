@@ -19,10 +19,7 @@ the [documentation directory](doc/) for more information.
 
 ### What language is it written in?
 
-All user facing code is written in C++, and some legacy code as well as unit
-tests are written in Perl. Perl is not required for either development or use
-of PrusaSlicer.
-
+All user facing code is written in C++.
 The slicing core is the `libslic3r` library, which can be built and used in a standalone way.
 The command line interface is a thin wrapper over `libslic3r`.
 
