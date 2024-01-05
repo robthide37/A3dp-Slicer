@@ -88,7 +88,6 @@ set(SLIC3R_SOURCES
     ExtrusionSimulator.hpp
     FileParserError.hpp
     Fill/Fill.cpp
-    Fill/Fill.hpp
     Fill/Fill3DHoneycomb.cpp
     Fill/Fill3DHoneycomb.hpp
     Fill/FillAdaptive.cpp

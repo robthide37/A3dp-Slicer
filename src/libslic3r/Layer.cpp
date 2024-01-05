@@ -14,7 +14,6 @@
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "Print.hpp"
-#include "Fill/Fill.hpp"
 #include "ShortestPath.hpp"
 #include "SVG.hpp"
 #include "BoundingBox.hpp"
