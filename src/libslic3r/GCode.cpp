@@ -1213,7 +1213,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
                 m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
                 m_avoid_crossing_perimeters.use_external_mp_once();
                 file.write(this->retract_and_wipe());
-                file.write(this->travel_to(Point(0, 0), ExtrusionRole::None, "move to origin position for next object"));
+                file.write(this->travel_to(*this->last_position, Point(0, 0), ExtrusionRole::None, "move to origin position for next object"));
                 m_enable_cooling_markers = true;
                 // Disable motion planner when traveling to first object point.
                 m_avoid_crossing_perimeters.disable_once();
@@ -1636,7 +1636,7 @@ std::string GCodeGenerator::placeholder_parser_process(
         if (const std::vector<double> &pos = ppi.opt_position->values; ppi.position != pos) {
             // Update G-code writer.
             m_writer.update_position({ pos[0], pos[1], pos[2] });
-            this->set_last_pos(this->gcode_to_point({ pos[0], pos[1] }));
+            this->last_position = this->gcode_to_point({ pos[0], pos[1] });
         }
 
         for (const Extruder &e : m_writer.extruders()) {
@@ -2534,9 +2534,10 @@ void GCodeGenerator::process_layer_single_object(
                     init_layer_delayed();
                     m_config.apply(region.config());
                     const auto extrusion_name = ironing ? "ironing"sv : "infill"sv;
-                    for (const ExtrusionEntityReference &fill : chain_extrusion_references(temp_fill_extrusions, &m_last_pos))
+                    const Point* start_near = this->last_position ? &(*(this->last_position)) : nullptr;
+                    for (const ExtrusionEntityReference &fill : chain_extrusion_references(temp_fill_extrusions, start_near))
                         if (auto *eec = dynamic_cast<const ExtrusionEntityCollection*>(&fill.extrusion_entity()); eec) {
-                            for (const ExtrusionEntityReference &ee : chain_extrusion_references(*eec, &m_last_pos, fill.flipped()))
+                            for (const ExtrusionEntityReference &ee : chain_extrusion_references(*eec, start_near, fill.flipped()))
                                 gcode += this->extrude_entity(ee, smooth_path_cache, extrusion_name);
                         } else
                             gcode += this->extrude_entity(fill, smooth_path_cache, extrusion_name);
@@ -2658,7 +2659,7 @@ void GCodeGenerator::set_origin(const Vec2d &pointf)
 {
     // if origin increases (goes towards right), last_pos decreases because it goes towards left
     const auto offset = Point::new_scale(m_origin - pointf);
-    m_last_pos += offset;
+    *(this->last_position) += offset;
     m_wipe.offset_path(offset);
     m_origin = pointf;
 }
@@ -2693,8 +2694,8 @@ std::string GCodeGenerator::change_layer(
     new_position.z() = print_z;
     this->writer().update_position(new_position);
 
-    m_previous_layer_last_position = this->m_last_pos_defined ?
-        std::optional{to_3d(this->point_to_gcode(this->last_pos()), previous_layer_z)} :
+    m_previous_layer_last_position = this->last_position ?
+        std::optional{to_3d(this->point_to_gcode(*this->last_position), previous_layer_z)} :
         std::nullopt;
 
     gcode += GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change_Travel);
@@ -2724,10 +2725,10 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
 {
     // Extrude all loops CCW.
     bool  is_hole = loop_src.is_clockwise();
-    Point seam_point = this->last_pos();
+    Point seam_point = *this->last_position;
     if (! m_config.spiral_vase && comment_is_perimeter(description)) {
         assert(m_layer != nullptr);
-        seam_point = m_seam_placer.place_seam(m_layer, loop_src, m_config.external_perimeters_first, this->last_pos());
+        seam_point = m_seam_placer.place_seam(m_layer, loop_src, m_config.external_perimeters_first, *this->last_position);
     }
     // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
     // thus empty path segments will not be produced by G-code export.
@@ -2766,7 +2767,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
         if (std::optional<Point> pt = wipe_hide_seam(smooth_path, is_hole, scale_(EXTRUDER_CONFIG(nozzle_diameter))); pt) {
             // Generate the seam hiding travel move.
             gcode += m_writer.travel_to_xy(this->point_to_gcode(*pt), "move inwards before travel");
-            this->set_last_pos(*pt);
+            this->last_position = *pt;
         }
     }
 
@@ -2779,7 +2780,7 @@ std::string GCodeGenerator::extrude_skirt(
 {
     assert(loop_src.is_counter_clockwise());
     GCode::SmoothPath smooth_path = smooth_path_cache.resolve_or_fit_split_with_seam(
-        loop_src, false, m_scaled_resolution, this->last_pos(), scaled<double>(0.0015));
+        loop_src, false, m_scaled_resolution, *this->last_position, scaled<double>(0.0015));
 
     // Clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
@@ -2971,25 +2972,25 @@ std::string GCodeGenerator::_extrude(
         // Make the first travel just one G1.
         const Vec3crd point = to_3d(path.front().point, scaled(this->m_last_layer_z + this->m_config.z_offset.value));
         const Vec3d gcode_point = to_3d(this->point_to_gcode(point.head<2>()), unscaled(point.z()));
-        this->set_last_pos(path.front().point);
+        this->last_position = path.front().point;
         this->writer().update_position(gcode_point);
         gcode += this->writer().get_travel_to_xy_gcode(gcode_point.head<2>(), "move to first layer point");
         gcode += this->writer().get_travel_to_z_gcode(gcode_point.z(), "move to first layer point");
         m_current_layer_first_position = gcode_point;
     } else {
         // go to first point of extrusion path
-        if (!m_last_pos_defined) {
+        if (!this->last_position) {
             const double z = this->m_last_layer_z + this->m_config.z_offset.value;
             const std::string comment{"move to print after unknown position"};
             gcode += this->retract_and_wipe();
             gcode += this->m_writer.travel_to_xy(this->point_to_gcode(path.front().point), comment);
             gcode += this->m_writer.get_travel_to_z_gcode(z, comment);
-        } else if ( m_last_pos != path.front().point) {
+        } else if ( this->last_position != path.front().point) {
             std::string comment = "move to first ";
             comment += description;
             comment += description_bridge;
             comment += " point";
-            const std::string travel_gcode{this->travel_to(path.front().point, path_attr.role, comment)};
+            const std::string travel_gcode{this->travel_to(*this->last_position, path.front().point, path_attr.role, comment)};
             gcode += travel_gcode;
         }
     }
@@ -3213,7 +3214,7 @@ std::string GCodeGenerator::_extrude(
     if (dynamic_speed_and_fan_speed.second >= 0)
         gcode += ";_RESET_FAN_SPEED\n";
 
-    this->set_last_pos(path.back().point);
+    this->last_position = path.back().point;
     return gcode;
 }
 
@@ -3238,7 +3239,7 @@ std::string GCodeGenerator::generate_travel_gcode(
         const Vec3d gcode_point{this->point_to_gcode(point)};
 
         gcode += this->m_writer.travel_to_xyz(previous_point, gcode_point, comment);
-        this->set_last_pos(point.head<2>());
+        this->last_position = point.head<2>();
         previous_point = gcode_point;
     }
 
@@ -3331,18 +3332,16 @@ Polyline GCodeGenerator::generate_travel_xy_path(
 }
 
 // This method accepts &point in print coordinates.
-std::string GCodeGenerator::travel_to(const Point &point, ExtrusionRole role, std::string comment)
-{
-
-    const Point start_point = this->last_pos();
-
+std::string GCodeGenerator::travel_to(
+    const Point &start_point, const Point &end_point, ExtrusionRole role, const std::string &comment
+) {
     // check whether a straight travel move would need retraction
 
     bool could_be_wipe_disabled {false};
-    bool needs_retraction = this->needs_retraction(Polyline{start_point, point}, role);
+    bool needs_retraction = this->needs_retraction(Polyline{start_point, end_point}, role);
 
     Polyline xy_path{generate_travel_xy_path(
-        start_point, point, needs_retraction, could_be_wipe_disabled
+        start_point, end_point, needs_retraction, could_be_wipe_disabled
     )};
 
     needs_retraction = this->needs_retraction(xy_path, role);
@@ -3353,12 +3352,12 @@ std::string GCodeGenerator::travel_to(const Point &point, ExtrusionRole role, st
             m_wipe.reset_path();
         }
 
-        Point position_before_wipe{this->last_pos()};
+        Point position_before_wipe{*this->last_position};
         wipe_retract_gcode = this->retract_and_wipe();
 
-        if (this->last_pos() != position_before_wipe) {
+        if (*this->last_position != position_before_wipe) {
             xy_path = generate_travel_xy_path(
-                this->last_pos(), point, needs_retraction, could_be_wipe_disabled
+                *this->last_position, end_point, needs_retraction, could_be_wipe_disabled
             );
         }
     } else {
@@ -3522,7 +3521,7 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
         gcode += m_ooze_prevention.post_toolchange(*this);
 
     // The position is now known after the tool change.
-    this->m_last_pos_defined = false;
+    this->last_position = std::nullopt;
 
     return gcode;
 }

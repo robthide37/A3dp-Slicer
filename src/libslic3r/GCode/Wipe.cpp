@@ -164,7 +164,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             return done;
         };
         // Start with the current position, which may be different from the wipe path start in case of loop clipping.
-        Vec2d prev = gcodegen.point_to_gcode_quantized(gcodegen.last_pos());
+        Vec2d prev = gcodegen.point_to_gcode_quantized(*gcodegen.last_position);
         auto  it   = this->path().begin();
         Vec2d p    = gcodegen.point_to_gcode(it->point + m_offset);
         ++ it;
@@ -192,7 +192,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             // add tag for processor
             assert(p == GCodeFormatter::quantize(p));
             gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
-            gcodegen.set_last_pos(gcodegen.gcode_to_point(p));
+            gcodegen.last_position = gcodegen.gcode_to_point(p);
         }
     }
 

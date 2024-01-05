@@ -103,7 +103,6 @@ public:
         m_layer(nullptr),
         m_object_layer_over_raft(false),
         m_volumetric_speed(0),
-        m_last_pos_defined(false),
         m_last_extrusion_role(GCodeExtrusionRole::None),
         m_last_width(0.0f),
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -124,7 +123,6 @@ public:
     const Vec2d&    origin() const { return m_origin; }
     void            set_origin(const Vec2d &pointf);
     void            set_origin(const coordf_t x, const coordf_t y) { this->set_origin(Vec2d(x, y)); }
-    const Point&    last_pos() const { return m_last_pos; }
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset.
     template<typename Derived>
     Eigen::Matrix<double, Derived::SizeAtCompileTime, 1, Eigen::DontAlign> point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
@@ -185,6 +183,8 @@ public:
         coordf_t            print_z() const { return (object_layer != nullptr && support_layer != nullptr) ? 0.5 * (object_layer->print_z + support_layer->print_z) : this->layer()->print_z; }
     };
     using ObjectsLayerToPrint = std::vector<ObjectLayerToPrint>;
+
+    std::optional<Point> last_position;
 
 private:
     class GCodeOutputStream {
@@ -266,8 +266,6 @@ private:
         const GCode::SmoothPathCache            &smooth_path_cache_global,
         GCodeOutputStream                       &output_stream);
 
-    void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
-    bool            last_pos_defined() const { return m_last_pos_defined; }
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
     std::string change_layer(
@@ -332,7 +330,12 @@ private:
         const bool needs_retraction,
         bool& could_be_wipe_disabled
     );
-    std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
+    std::string travel_to(
+        const Point &start_point,
+        const Point &end_point,
+        ExtrusionRole role,
+        const std::string &comment
+    );
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
 
     std::string     retract_and_wipe(bool toolchange = false);
@@ -421,8 +424,6 @@ private:
     double                              m_last_mm3_per_mm;
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
-    Point                               m_last_pos;
-    bool                                m_last_pos_defined;
     std::optional<Vec3d>                m_previous_layer_last_position;
     // This needs to be populated during the layer processing!
     std::optional<Vec3d>                m_current_layer_first_position;
