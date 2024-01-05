@@ -3582,7 +3582,7 @@ GuiCfg create_gui_configuration()
     float space = line_height_with_spacing - line_height;
     const ImGuiStyle &style  = ImGui::GetStyle();
 
-    cfg.max_style_name_width = ImGui::CalcTextSize("Maximal font name, extended").x;
+    cfg.max_style_name_width = ImGui::CalcTextSize("Maximal style name..").x;
 
     cfg.icon_width = static_cast<unsigned int>(std::ceil(line_height));
     // make size pair number
@@ -3701,7 +3701,7 @@ GuiCfg create_gui_configuration()
         ImVec2(cfg.minimal_window_size_with_advance.x,
             cfg.minimal_window_size_with_advance.y + input_height);
 
-    int max_style_image_width = static_cast<int>(std::round(cfg.max_style_name_width/2 - 2 * style.FramePadding.x));
+    int max_style_image_width = static_cast<int>(std::round(cfg.max_style_name_width - 2 * style.FramePadding.x));
     int max_style_image_height = static_cast<int>(std::round(1.5 * input_height));
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
     cfg.face_name_size = Vec2i(cfg.input_width, line_height_with_spacing);
