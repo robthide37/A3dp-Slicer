@@ -170,7 +170,7 @@ indexed_triangle_set grid_to_mesh(const VoxelGrid &vgrid,
     ret.indices.reserve(triangles.size() + quads.size() * 2);
 
     for (auto &v : points) ret.vertices.emplace_back(to_vec3f(v) /*/ scale*/);
-    for (auto &v : triangles) ret.indices.emplace_back(to_vec3i32(v));
+    for (auto &v : triangles) ret.indices.emplace_back(to_vec3i(v));
     for (auto &quad : quads) {
         ret.indices.emplace_back(quad(2), quad(1), quad(0));
         ret.indices.emplace_back(quad(3), quad(2), quad(0));

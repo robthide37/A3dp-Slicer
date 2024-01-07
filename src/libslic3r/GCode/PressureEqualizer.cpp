@@ -13,7 +13,7 @@
 #include "../PrintConfig.hpp"
 #include "../LocalesUtils.hpp"
 #include "../GCode.hpp"
-#include "../GCodeWriter.hpp"
+#include "GCodeWriter.hpp"
 
 #include "fast_float/fast_float.h"
 

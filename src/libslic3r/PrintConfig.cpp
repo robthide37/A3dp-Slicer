@@ -63,7 +63,8 @@ static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values &
 
 static const t_config_enum_values s_keys_map_ArcFittingType {
     { "disabled",       int(ArcFittingType::Disabled) },
-    { "emit_center",    int(ArcFittingType::EmitCenter) }
+    { "bambu",          int(ArcFittingType::Bambu) },
+    { "emit_center",    int(ArcFittingType::EmitCenter) } // arwelder
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ArcFittingType)
 
@@ -85,8 +86,12 @@ static const t_config_enum_values s_keys_map_CompleteObjectSort {
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CompleteObjectSort)
 
 static const t_config_enum_values s_keys_map_OutputFormat {
-    {"mCWS", ofMaskedCWS},
     {"SL1", ofSL1},
+    {"SL1_SVG", ofSL1_SVG},
+    {"mCWS", ofMaskedCWS},
+    {"AnyMono", ofAnycubicMono},
+    {"AnyMonoX", ofAnycubicMonoX},
+    {"AnyMonoSE", ofAnycubicMonoSE},
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(OutputFormat)
 
@@ -628,7 +633,8 @@ void PrintConfigDef::init_fff_params()
                      "G-code resolution will be used as the fitting tolerance.");
     def->set_enum<ArcFittingType>({
         { "disabled",       "Disabled" },
-        { "emit_center",    "Enabled: G2/3 I J" }
+        { "emit_center",    "Enabled: G2/3 I J (ArcWelder)" }
+        { "bambu",       "Enabled: G2/3 I J (Bambu)" },
     });
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
@@ -7657,8 +7663,12 @@ void PrintConfigDef::init_sla_params()
     def->label = L("Output Format");
     def->tooltip = L("Select the output format for this printer.");
     def->set_enum<OutputFormat>({
-        { "mCWS",           L("Masked CWS") },
-        { "SL1",            L("Prusa SL1") },
+        {"SL1", L("Prusa SL1")},
+        {"SL1_SVG", L("Prusa SL1 with SVG")},
+        {"mCWS", L("Masked CWS")},
+        {"AnyMono", L("Anycubic Mono")},
+        {"AnyMonoX", L("Anycubic Mono X")},
+        {"AnyMonoSE", L("Anycubic Mono SE")},
     });
     def->mode = comAdvancedE | comSuSi; // output_format should be preconfigured in profiles;
     def->set_default_value(new ConfigOptionEnum<OutputFormat>(ofSL1));

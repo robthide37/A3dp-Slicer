@@ -1041,7 +1041,7 @@ void GCodeProcessor::reset()
     m_line_id = 0;
     m_last_line_id = 0;
     m_feedrate = 0.0f;
-    m_feed_multiply.reset();
+    m_feed_multiply.clear();
     m_width = 0.0f;
     m_height = 0.0f;
     m_forced_width = 0.0f;
@@ -1049,8 +1049,8 @@ void GCodeProcessor::reset()
     m_mm3_per_mm = 0.0f;
     m_fan_speed = 0.0f;
     m_z_offset = 0.0f;
-    m_speed_factor_override_percentage = {};
-    m_extrude_factor_override_percentage = {};
+    m_speed_factor_override_percentage.clear();
+    m_extrude_factor_override_percentage.clear();
 
     m_extrusion_role = GCodeExtrusionRole::None;
     m_extruder_id = 0;
@@ -1162,25 +1162,14 @@ void GCodeProcessor::process_ascii_file(const std::string& filename, std::functi
 
         // if the gcode was produced by this slicer,
         // extract the config from it
-        try {
-        if (m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3rPE || m_producer == EProducer::Slic3r || m_producer == EProducer::SuperSlicer) {
-            DynamicPrintConfig config;
-            config.apply(FullPrintConfig::defaults());
-            // Silently substitute unknown values by new ones for loading configurations from PrusaSlicer's own G-code.
-            // Showing substitution log or errors may make sense, but we are not really reading many values from the G-code config,
-            // thus a probability of incorrect substitution is low and the G-code viewer is a consumer-only anyways.
-            config.load_from_gcode_file(filename, ForwardCompatibilitySubstitutionRule::EnableSilent);
-            if (m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3rPE)
-                config.convert_from_prusa();
-            apply_config(config);
-        } else if (m_producer == EProducer::Simplify3D)
+      try {
+        if (m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3rPE) {
+            apply_config_prusaslicer(filename);
+        } else if (m_producer == EProducer::Simplify3D) {
             apply_config_simplify3d(filename);
-//        else if (m_producer == EProducer::SuperSlicer) // for/from prusaslicer
-//            apply_config_superslicer(filename);
-        } catch (Exception ex) {
-            m_producer = EProducer::Unknown;
-        }
-        else {
+        } else if (m_producer == EProducer::Slic3r || m_producer == EProducer::SuperSlicer) {
+            apply_config_superslicer(filename);
+        } else {
             m_result.extruder_colors = DEFAULT_EXTRUDER_COLORS;
 
             if (m_producer == EProducer::Simplify3D)
@@ -1193,6 +1182,9 @@ void GCodeProcessor::process_ascii_file(const std::string& filename, std::functi
             if (m_result.extruders_count == 0)
                 m_result.extruders_count = MIN_EXTRUDERS_COUNT;
         }
+      } catch (Exception ex) {
+          m_producer = EProducer::Unknown;
+      }
     }
 
     // process gcode
@@ -1498,7 +1490,7 @@ std::vector<std::pair<GCodeExtrusionRole, float>> GCodeProcessor::get_roles_time
     return ret;
 }
 
-ConfigSubstitutions load_from_superslicer_gcode_file(const std::string& filename, DynamicPrintConfig& config, ForwardCompatibilitySubstitutionRule compatibility_rule)
+ConfigSubstitutions load_from_slic3r_gcode_file(const std::string& filename, DynamicPrintConfig& config, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
     // for reference, see: ConfigBase::load_from_gcode_file()
 
@@ -1527,7 +1519,19 @@ void GCodeProcessor::apply_config_superslicer(const std::string& filename)
 {
     DynamicPrintConfig config;
     config.apply(FullPrintConfig::defaults());
-    load_from_superslicer_gcode_file(filename, config, ForwardCompatibilitySubstitutionRule::EnableSilent);
+    load_from_slic3r_gcode_file(filename, config, ForwardCompatibilitySubstitutionRule::EnableSilent);
+    apply_config(config);
+}
+
+void GCodeProcessor::apply_config_prusaslicer(const std::string& filename)
+{
+    DynamicPrintConfig config;
+    config.apply(FullPrintConfig::defaults());
+    // Silently substitute unknown values by new ones for loading configurations from PrusaSlicer's own G-code.
+    // Showing substitution log or errors may make sense, but we are not really reading many values from the G-code config,
+    // thus a probability of incorrect substitution is low and the G-code viewer is a consumer-only anyways.
+    load_from_slic3r_gcode_file(filename, config, ForwardCompatibilitySubstitutionRule::EnableSilent);
+    config.convert_from_prusa();
     apply_config(config);
 }
 
@@ -1756,7 +1760,7 @@ void GCodeProcessor::set_extruder_temp(float temp, size_t extruder_id) {
         }
     } else {
         assert(extruder_id < m_extruder_temps.size());
-        if (extruder_id < m_extruder_temps.size()
+        if (extruder_id < m_extruder_temps.size())
             m_extruder_temps[extruder_id] = temp;
     }
 }
@@ -2717,6 +2721,9 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     if (line.has_e()) g1_axes[E] = (double)line.e();
     std::optional<double> g1_feedrate = std::nullopt;
     if (line.has_f()) g1_feedrate = (double)line.f();
+    //reprap thingy, ignore
+    if (line.has('R') || line.has('H'))
+        return;
     process_G1(g1_axes, g1_feedrate);
 }
 
@@ -2741,9 +2748,8 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
         else if (delta_pos[X] != 0.0f || delta_pos[Y] != 0.0f || delta_pos[Z] != 0.0f)
             return EMoveType::Travel;
 
-        assert(type != EMoveType::Noop);
-
-        return type;
+        assert(false); // imo shouldn't happen
+        return EMoveType::Noop;
     };
 
     auto extract_absolute_position_on_axis = [&](Axis axis, std::optional<double> value, double area_filament_cross_section)
@@ -2765,10 +2771,6 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 
     ++m_g1_line_id;
 
-    //reprap thingy, ignore
-    if (line.has('R') || line.has('H'))
-        return;
-
     // enable processing of lines M201/M203/M204/M205
     m_time_processor.machine_envelope_processing_enabled = true;
 
@@ -2778,7 +2780,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
     }
 
     // updates feedrate from line, if present
-    if (feedrate.has_value())
+    if (feedrate.has_value()) {
         m_feedrate = (*feedrate) * MMMIN_TO_MMSEC;
         if (m_feed_multiply.size() > m_extruder_id)
             m_feedrate *= m_feed_multiply[m_extruder_id].current;
@@ -2794,7 +2796,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 
     float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
     if (m_extrude_multiply.size() > m_extruder_id)
-        volume_extruded_filament *= m_extrude_multiply[m_extruder_id].current;
+        volume_extruded_filament *= m_extrude_multiply[m_extruder_id];
 
     if (volume_extruded_filament != 0.)
         m_used_filaments.increase_caches(volume_extruded_filament, m_extruder_id, area_filament_cross_section * m_parking_position,
@@ -2817,10 +2819,12 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
             m_height = m_forced_height;
         } else if (m_forced_width > 0.0f) {
             m_width = m_forced_width;
-            if (m_extrusion_role == ExtrusionRole::ExternalPerimeter)
+            if (m_extrusion_role == GCodeExtrusionRole::ExternalPerimeter)
                 // cross section: rectangle
                 m_height = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_width));
-            else if (is_bridge(m_extrusion_role) || m_extrusion_role == ExtrusionRole::None || m_extrusion_role == ExtrusionRole::Travel)
+            else if (m_extrusion_role == GCodeExtrusionRole::OverhangPerimeter || m_extrusion_role == GCodeExtrusionRole::BridgeInfill ||
+                     m_extrusion_role == GCodeExtrusionRole::InternalBridgeInfill || m_extrusion_role == GCodeExtrusionRole::None ||
+                     m_extrusion_role == GCodeExtrusionRole::Travel)
                 // cross section: circle
                 m_height = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
             else
@@ -2866,7 +2870,9 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
             if (m_extrusion_role == GCodeExtrusionRole::ExternalPerimeter)
                 // cross section: rectangle
                 m_width = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_height));
-            else if (m_extrusion_role.is_bridge() || m_extrusion_role == GCodeExtrusionRole::None || m_extrusion_role == GCodeExtrusionRole::Travel)
+            else if (m_extrusion_role == GCodeExtrusionRole::OverhangPerimeter || m_extrusion_role == GCodeExtrusionRole::BridgeInfill ||
+                     m_extrusion_role == GCodeExtrusionRole::InternalBridgeInfill || m_extrusion_role == GCodeExtrusionRole::None ||
+                     m_extrusion_role == GCodeExtrusionRole::Travel)
                 // cross section: circle
                 m_width = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
             else
@@ -3193,7 +3199,10 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     // updates feedrate from line
     std::optional<float> feedrate;
     if (line.has_f())
-        feedrate = m_feed_multiply.current * line.f() * MMMIN_TO_MMSEC;
+        if (m_feed_multiply.size() > m_extruder_id)
+            feedrate = m_feed_multiply[m_extruder_id].current * line.f() * MMMIN_TO_MMSEC;
+        else
+            feedrate = line.f() * MMMIN_TO_MMSEC;
 
     // updates extrusion from line
     std::optional<float> extrusion;
@@ -3427,7 +3436,10 @@ void GCodeProcessor::process_G61(const GCodeReader::GCodeLine& line)
             modified = true;
         }
         if (line.has_f())
-            m_feedrate = m_feed_multiply.current * line.f();
+            if (m_feed_multiply.size() > m_extruder_id)
+                m_feedrate = m_feed_multiply[m_extruder_id].current * line.f();
+            else
+                m_feedrate = line.f();
 
         if (!modified)
             m_end_position = m_saved_position;
@@ -3720,7 +3732,7 @@ void GCodeProcessor::process_M220(const GCodeReader::GCodeLine& line)
 
     // get extruder id if any
 
-    uint16_t extruder_id = m_extruder_id
+    uint16_t extruder_id = m_extruder_id;
     {
         if (line.has_value('T', value_temp))
             extruder_id = std::min(uint16_t(1000), std::max(uint16_t(0), uint16_t(value_temp)));
@@ -3752,7 +3764,7 @@ void GCodeProcessor::process_M221(const GCodeReader::GCodeLine& line)
         value_s *= 0.01f;
         uint16_t extruder = std::min(uint16_t(1000), std::max(uint16_t(0), uint16_t(value_t)));
         while (m_extrude_multiply.size() <= extruder)
-            m_extrude_multiply.emplace_back(1.0f, 1.0f);
+            m_extrude_multiply.push_back(1.0f);
         m_extrude_multiply[extruder] = value_s;
         //not sure of what it does...
         for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
@@ -3859,6 +3871,7 @@ void GCodeProcessor::process_T(const std::string_view command)
                     BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange, maybe from a custom gcode (" << command << ").";
                 else
                    process_T(id);
+            }
         }
     }
 }
@@ -4361,6 +4374,7 @@ void GCodeProcessor::post_process()
     // gcode_line is in/out parameter, to reduce expensive memory allocation
     auto process_placeholders = [&](std::string& gcode_line) {
         bool processed = false;
+        unsigned int extra_lines_count = 0;
 
         // remove trailing '\n'
         auto line = std::string_view(gcode_line).substr(0, gcode_line.length() - 1);
@@ -4379,7 +4393,7 @@ void GCodeProcessor::post_process()
                                 (line == reserved_tag(ETags::First_Line_M73_Placeholder) && !machine.stop_times.empty()) 
                                     ? machine.stop_times.front().elapsed_time 
                                     : 0.f,
-                                extra_lines_count): 0));
+                                extra_lines_count));
                         processed = true;
                     }
                 }
@@ -4412,6 +4426,7 @@ void GCodeProcessor::post_process()
             }
         }
 
+        //return std::pair<bool, size_t>(processed, (extra_lines_count == 0) ? extra_lines_count : extra_lines_count - 1); prusa doesn't return the extra_lines_count anymore.
         return processed;
     };
 
@@ -4468,7 +4483,7 @@ void GCodeProcessor::post_process()
         // Lambdas, mostly for string formatting, all with an empty capture block.
         time_in_minutes, format_time_float, print_M73, time_in_last_minute,
         // Caches, to be modified
-        &g1_times_cache_it, &last_exported_main, &last_exported_stop,
+        &g1_times_cache_it,
         &export_lines]
         (const size_t g1_lines_counter) {
         if (m_time_processor.export_remaining_time_enabled) {
@@ -4511,10 +4526,11 @@ void GCodeProcessor::post_process()
                                 }
                             }
                         }
-                        export_line.append_line(print_M73(machine,
+                        unsigned int discarded_exported_lines_count;
+                        export_lines.append_line(print_M73(machine,
                             it->elapsed_time,
                             time_to_next_stop,
-                            exported_lines_count));
+                            discarded_exported_lines_count));
                     }
                 }
             }
@@ -4538,8 +4554,8 @@ void GCodeProcessor::post_process()
                     warning += gcode_line;
                     warning += _u8L("Generated M104 lines may be incorrect.");
                     BOOST_LOG_TRIVIAL(error) << warning;
-                    if (m_print != nullptr)
-                        m_print->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL, warning);
+                    if (m_status_monitor != nullptr)
+                        m_status_monitor->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL, warning);
                 }
             }
             export_lines.insert_lines(backtrace, cmd,

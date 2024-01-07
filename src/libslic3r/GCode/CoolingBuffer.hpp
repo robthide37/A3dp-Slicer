@@ -43,7 +43,7 @@ public:
 
 private:
 	CoolingBuffer& operator=(const CoolingBuffer&) = delete;
-    std::vector<PerExtruderAdjustments> parse_layer_gcode(const std::string &gcode, std::array<float, 5> &current_pos) const;
+    std::vector<PerExtruderAdjustments> parse_layer_gcode(const std::string &gcode, std::array<float, 7> &current_pos) const;
     float       calculate_layer_slowdown(std::vector<PerExtruderAdjustments> &per_extruder_adjustments);
     // Apply slow down over G-code lines stored in per_extruder_adjustments, enable fan if needed.
     // Returns the adjusted G-code.

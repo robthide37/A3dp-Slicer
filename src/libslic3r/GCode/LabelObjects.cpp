@@ -1,6 +1,7 @@
 #include "LabelObjects.hpp"
 
 #include "ClipperUtils.hpp"
+#include "Geometry\ConvexHull.hpp"
 #include "Model.hpp"
 #include "Print.hpp"
 #include "TriangleMeshSlicer.hpp"
@@ -70,7 +71,7 @@ void LabelObjects::init(const Print& print)
 
             // Now compose the name of the object and define whether indexing is 0 or 1-based.
             // name only composed of alphanumeric & '_'.
-            const std::string obj_name = boost::algorithm::replace_all_regex_copy(model_object->name, boost::regex("[^\\w]+"), std::string("_"));
+            const std::string obj_name = boost::regex_replace(model_object->name, boost::regex("[^\\w]+"), std::string("_"));
             std::string name = obj_name;
             if (m_label_objects_style == LabelObjectsStyle::Firmware) {
                 // use one-based indexing for objects and instances so indices match what we see in PrusaSlicer.
@@ -107,24 +108,24 @@ std::string LabelObjects::all_objects_header(BoundingBoxf3 &global_bounding_box,
     for (const auto& pi_and_label : m_label_data)
         label_data_sorted.emplace_back(pi_and_label);
     std::sort(label_data_sorted.begin(), label_data_sorted.end(), [](const auto& ld1, const auto& ld2) { return ld1.second.unique_id < ld2.second.unique_id; });
-
+    
+    char buffer[64];
     out += "\n";
     for (const auto& [print_instance, label] : label_data_sorted) {
         // create bounding box
-        BoundingBoxf3 bounding_box = print_instance->model_instance->get_object()->instance_bounding_box(print_instance.model_instance, false);
+        BoundingBoxf3 bounding_box = print_instance->model_instance->get_object()->instance_bounding_box(*print_instance->model_instance, false);
         if (global_bounding_box.size().norm() == 0) {
             global_bounding_box = bounding_box;
         } else {
             global_bounding_box.merge(bounding_box);
         }
-        char buffer[64];
         // create outline (polygon)
         Polygon outline = instance_outline(print_instance);
         assert(! outline.empty());
         outline.douglas_peucker(resolution); //0.1f (prusa: static 0.05f)
         Point center = outline.centroid();
         //update global outline
-        global_outline = convex_hull(Polygons{outline, global_outline});
+        global_outline = Geometry::convex_hull(Polygons{outline, global_outline});
         //use data for printing firmware-specific stuff.
         if ((m_label_objects_style == LabelObjectsStyle::Firmware || m_label_objects_style == LabelObjectsStyle::Both)
                 && m_flavor == gcfKlipper)  {
@@ -142,15 +143,15 @@ std::string LabelObjects::all_objects_header(BoundingBoxf3 &global_bounding_box,
         } else {
             if (m_flavor == gcfMarlinFirmware /*prusaFirmware*/) {
                 // really needed by someone? let it for prusa firmware.
-                out += start_object(*print_instance, includename::yes);
+                out += start_object(*print_instance, IncludeName::Yes);
                 out += stop_object(*print_instance);
             }
         }
         // add object json
-        out.append("; object:{\"name\":\"").append(label.unique_name).append("\")
-            .append(",\"id\":\"").append(label.unique_id).append("\")
-            .append(",\"object_id\":").append(label.unique_id)
-            .append(",\"copy\":").append(label.copy_id);
+        out.append("; object:{\"name\":\"").append(label.unique_name).append("\"")
+            .append(",\"id\":\"").append(std::to_string(label.unique_id)).append("\"")
+            .append(",\"object_id\":").append(std::to_string(label.unique_id))
+            .append(",\"copy\":").append(std::to_string(label.copy_id));
         std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f", unscale<float>(center[0]), unscale<float>(center[1]), 0.f);
         out.append(",\"object_center\":[").append(buffer).append("]");
         std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f",bounding_box.center().x(), bounding_box.center().y(), bounding_box.center().z());
@@ -164,29 +165,32 @@ std::string LabelObjects::all_objects_header(BoundingBoxf3 &global_bounding_box,
         }
         out.pop_back(); //remove last ','
         out += "]}\n";
-        );
-}
-    if (this->config().gcode_label_objects && (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware
-            || print.config().gcode_flavor.value == gcfRepRap)) {
+    }
+    if ( (m_label_objects_style == LabelObjectsStyle::Firmware || m_label_objects_style == LabelObjectsStyle::Both)  
+        && (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRap)) {
         out.append("; Total objects to print: ").append(std::to_string(m_label_data.size())).append("\n")
             .append("M486 T").append(std::to_string(m_label_data.size())).append("\n");
     }
     // add plater json
-    out.append("; plater:{");
-    Point global_center = global_outline.centroid();
-    std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f", global_center.x(), global_center.y(), 0.f);
-    out.append(",\"object_center\":[").append(buffer).append("]");
-    std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f", global_bounding_box.center().x(), global_bounding_box.center().y(), global_bounding_box.center().z());
-    out.append(",\"boundingbox_center\":[").append(buffer).append("]");
-    std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f", global_bounding_box.size().x(), global_bounding_box.size().y(), global_bounding_box.size().z());
-    out.append(",\"boundingbox_size\":[").append(buffer).append("]");
-    out.append(",\"outline\":[");
-    for (const Point& point : global_outline) {
-        std::snprintf(buffer, sizeof(buffer) - 1, "[%.3f,%.3f],", unscale<float>(point[0]), unscale<float>(point[1]));
-        out += buffer;
+    {
+        out.append("; plater:{");
+        Point global_center = global_outline.centroid();
+        std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f", unscaled(global_center.x()), unscaled(global_center.y()), 0.f);
+        out.append(",\"object_center\":[").append(buffer).append("]");
+        std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f", global_bounding_box.center().x(), global_bounding_box.center().y(),
+                      global_bounding_box.center().z());
+        out.append(",\"boundingbox_center\":[").append(buffer).append("]");
+        std::snprintf(buffer, sizeof(buffer) - 1, "%.3f,%.3f,%.3f", global_bounding_box.size().x(), global_bounding_box.size().y(),
+                      global_bounding_box.size().z());
+        out.append(",\"boundingbox_size\":[").append(buffer).append("]");
+        out.append(",\"outline\":[");
+        for (const Point &point : global_outline) {
+            std::snprintf(buffer, sizeof(buffer) - 1, "[%.3f,%.3f],", unscale<float>(point[0]), unscale<float>(point[1]));
+            out += buffer;
+        }
+        out.pop_back(); // remove last ','
+        out += "]}\n\n";
     }
-    out.pop_back(); //remove last ','
-    out += "]}\n\n";
     return out;
 }
 

@@ -25,7 +25,7 @@ public:
 
     Wipe() = default;
 
-    void            init(const PrintConfig &config, const GCodeWriter &writer, const std::vector<unsigned int> &extruders);
+    void            init(const PrintConfig &config, const GCodeWriter &writer, const std::vector<uint16_t> &extruders);
     void            enable(double wipe_len_max) { m_enabled = true; m_wipe_len_max = wipe_len_max; }
     void            disable() { m_enabled = false; }
     bool            enabled() const { return m_enabled; }

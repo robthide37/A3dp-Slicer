@@ -270,7 +270,7 @@ std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, 
         const Point &p0 = polygon.points[idx_prev];
         const Point &p1 = polygon.points[idx_curr];
         const Point &p2 = polygon.points[idx_next];
-        result[idx_curr] = float(angle(p1 - p0, p2 - p1));
+        result[idx_curr] = float(angle_ccw(p1 - p0, p2 - p1));
 
         // increase idx_curr by one
         float curr_distance = lengths[idx_curr];

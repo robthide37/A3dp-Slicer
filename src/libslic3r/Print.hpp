@@ -36,7 +36,6 @@
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/WipeTower.hpp"
 #include "GCode/ThumbnailData.hpp"
-#include "GCode/GCodeProcessor.hpp"
 #include "MultiMaterialSegmentation.hpp"
 
 #include "libslic3r.h"
@@ -52,6 +51,7 @@
 namespace Slic3r {
 
 class GCodeGenerator;
+struct GCodeProcessorResult;
 class Layer;
 class ModelObject;
 class Print;
@@ -273,7 +273,8 @@ private: // Prevents erroneous use by other classes.
 public:
     // Size of an object: XYZ in scaled coordinates. The size might not be quite snug in XY plane.
     const Vec3crd&               size() const			{ return m_size; }
-    const PrintObjectConfig&     config() const         { return m_config; }    
+    const PrintObjectConfig&     config() const         { return m_config; }
+    const PrintRegionConfig&     default_region_config(const PrintRegionConfig &from_print) const;
     auto                         layers() const         { return SpanOfConstPtrs<Layer>(const_cast<const Layer* const* const>(m_layers.data()), m_layers.size()); }
     auto                         support_layers() const { return SpanOfConstPtrs<SupportLayer>(const_cast<const SupportLayer* const* const>(m_support_layers.data()), m_support_layers.size()); }
     const Transform3d&           trafo() const          { return m_trafo; }
@@ -338,8 +339,8 @@ public:
     const SlicingParameters&                    slicing_parameters() const { return *m_slicing_params; }
     static std::shared_ptr<SlicingParameters>   slicing_parameters(const DynamicPrintConfig &full_config, const ModelObject &model_object, float object_max_z);
 
-    size_t                      num_printing_regions() const throw() { return m_shared_regions->all_regions.size(); }
-    const PrintRegion&          printing_region(size_t idx) const throw() { return *m_shared_regions->all_regions[idx].get(); }
+    size_t                      num_printing_regions() const throw() { assert(m_shared_regions); return m_shared_regions->all_regions.size(); }
+    const PrintRegion&          printing_region(size_t idx) const throw() { assert(m_shared_regions); return *m_shared_regions->all_regions[idx].get(); }
     //FIXME returing all possible regions before slicing, thus some of the regions may not be slicing at the end.
     std::vector<std::reference_wrapper<const PrintRegion>> all_regions() const;
     const PrintObjectRegions*   shared_regions() const throw() { return m_shared_regions; }
@@ -581,6 +582,22 @@ struct PrintStatistics
     static const std::string TotalFilamentCostValueMask;
 };
 
+struct ConflictResult
+{
+    std::string _objName1;
+    std::string _objName2;
+    double      _height;
+    const void* _obj1; // nullptr means wipe tower
+    const void* _obj2;
+    int         layer = -1;
+    ConflictResult(const std::string& objName1, const std::string& objName2, double height, const void* obj1, const void* obj2)
+        : _objName1(objName1), _objName2(objName2), _height(height), _obj1(obj1), _obj2(obj2)
+    {}
+    ConflictResult() = default;
+};
+
+using ConflictResultOpt = std::optional<ConflictResult>;
+
 class BrimLoop {
 public:
     BrimLoop(const Polygon& p) : lines(Polylines{ p.split_at_first_point() }), is_loop(true) {}
@@ -658,8 +675,9 @@ public:
     double              get_first_layer_height() const;
     double              get_object_first_layer_height(const PrintObject& object) const;
 
-    std::set<uint16_t>  object_extruders(const ConstPrintObjectPtrs& objects) const;
+    // get the extruders of these obejcts
     std::set<uint16_t>  object_extruders(const PrintObjectPtrs &objects) const;
+    // get all extruders from the list of objects in this print ( same as print.object_extruders(print.objects()) )
     std::set<uint16_t>  object_extruders() const;
     std::set<uint16_t>  support_material_extruders() const;
     std::set<uint16_t>  extruders() const;
@@ -809,7 +827,7 @@ private:
     // Allow PrintObject to access m_mutex and m_cancel_callback.
     friend class PrintObject;
 
-    ConflictResultOpt m_conflict_result;
+    std::optional<ConflictResult> m_conflict_result;
 };
 
 //for testing purpose (in printobject)

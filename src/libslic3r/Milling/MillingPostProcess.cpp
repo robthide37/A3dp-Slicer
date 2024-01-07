@@ -61,10 +61,10 @@ namespace Slic3r {
                     }
                 }
 
-                ExtrusionPath contour(erMilling);
-                contour.mm3_per_mm = 0;
-                contour.width = (float)this->print_config->milling_diameter.get_at(0);
-                contour.height = (float)layer->height;
+                ExtrusionPath contour({ExtrusionRole::Milling});
+                contour.attributes_mutable().mm3_per_mm = 0;
+                contour.attributes_mutable().width = (float)this->print_config->milling_diameter.get_at(0);
+                contour.attributes_mutable().height = (float)layer->height;
                 contour.polyline.append(best_polyline.points[first_point_extract_idx]);
                 for (int32_t idx = first_point_idx; idx < poly.points.size(); idx++) {
                     contour.polyline.append(poly.points[idx]);
@@ -86,14 +86,14 @@ namespace Slic3r {
             }
         }
         //default path, without safe-guard up-down.
-        ExtrusionPath contour(erMilling);
-        contour.polyline = poly.split_at_first_point();
+        ExtrusionPath contour({ExtrusionRole::Milling});
+        contour.polyline = ArcPolyline(poly.split_at_first_point());
         //do a second pass on the first segment
         if (contour.polyline.size() > 2)
-            contour.polyline.append(contour.polyline.get_points()[1]);
-        contour.mm3_per_mm = 0;
-        contour.width = (float)this->print_config->milling_diameter.get_at(0);
-        contour.height = (float)layer->height;
+            contour.polyline.append(contour.polyline.get_point(1));
+        contour.attributes_mutable().mm3_per_mm = 0;
+        contour.attributes_mutable().width = (float)this->print_config->milling_diameter.get_at(0);
+        contour.attributes_mutable().height = (float)layer->height;
         out_coll.append(std::move(contour));
         return;
 

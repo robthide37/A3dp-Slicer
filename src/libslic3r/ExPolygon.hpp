@@ -146,6 +146,14 @@ inline ExPolygons to_expolygon(const Polygons &other)
     return exs;
 }
 
+inline ExPolygons for_union(const ExPolygons &ex1, const ExPolygons &ex2)
+{
+    ExPolygons out = ex1;
+    append(out, ex2);
+    return out;
+}
+
+
 inline Lines to_lines(const ExPolygon &src) 
 {
     Lines lines;

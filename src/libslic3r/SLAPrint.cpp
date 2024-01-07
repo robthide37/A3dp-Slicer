@@ -260,7 +260,7 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
     m_default_object_config.apply_only(config, object_diff, true);
 
     if (!m_archiver || !printer_diff.empty())
-        m_archiver = SLAArchiveWriter::create(m_printer_config.sla_archive_format.value.c_str(), m_printer_config);
+        m_archiver = SLAArchiveWriter::create(m_printer_config.output_format.value, m_printer_config);
 
     struct ModelObjectStatus {
         enum Status {
@@ -518,7 +518,7 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
         if (new_objects)
             update_apply_status(false);
     }
-    
+
     if(m_objects.empty()) {
         m_printer_input = {};
         m_print_statistics = {};
@@ -539,7 +539,7 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
 std::string SLAPrint::output_filename(const std::string &filename_base) const
 {
     DynamicConfig config = this->finished() ? this->print_statistics().config() : this->print_statistics().placeholders();
-    std::string default_ext = get_default_extension(m_printer_config.sla_archive_format.value.c_str());
+    std::string default_ext = get_default_extension(m_printer_config.output_format.value.c_str());
     if (default_ext.empty())
         default_ext = "sl1";
 
@@ -611,7 +611,7 @@ void SLAPrint::export_print(const std::string &fname, const ThumbnailsList &thum
     if (m_archiver)
         m_archiver->export_print(fname, *this, thumbnails, projectname);
     else {
-        throw ExportError(format(_u8L("Unknown archive format: %s"), m_printer_config.sla_archive_format.value));
+        throw ExportError(format(_u8L("Unknown archive format: %i"), int(m_printer_config.output_format)));
     }
 }
 
@@ -773,7 +773,7 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "display_mirror_x",
         "display_mirror_y",
         "display_orientation",
-        "sla_archive_format",
+        "output_format",
         "sla_output_precision"
     };
 
@@ -782,7 +782,6 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "max_print_height",
         "printer_technology",
         "output_filename_format",
-        "output_format",
         "fast_tilt_time",
         "slow_tilt_time",
         "high_viscosity_tilt_time",

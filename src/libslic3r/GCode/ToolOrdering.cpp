@@ -68,11 +68,17 @@ uint16_t LayerTools::extruder(const ExtrusionEntityCollection &extrusions, const
 	assert(region.config().infill_extruder.value > 0);
 	assert(region.config().solid_infill_extruder.value > 0);
 	// 1 based extruder ID.
-	uint16_t extruder = ((this->extruder_override == 0) ?
-	    (extrusions.role().is_infill() ?
-	    	(extrusions.entities().front()->role().is_solid_infill() ? region.config().solid_infill_extruder : region.config().infill_extruder) :
-			region.config().perimeter_extruder.value) :
-		this->extruder_override;
+	uint16_t extruder;
+    if (this->extruder_override == 0)
+        if (extrusions.role().is_infill())
+            if (extrusions.entities().front()->role().is_solid_infill())
+                extruder = region.config().solid_infill_extruder;
+            else
+                region.config().infill_extruder;
+        else // !extrusions.role().is_infill()
+            region.config().perimeter_extruder.value;
+    else //this->extruder_override != 0
+        this->extruder_override;
 	return (extruder == 0) ? 0 : extruder - 1;
 }
 
@@ -157,7 +163,7 @@ ToolOrdering::ToolOrdering(const Print &print, uint16_t first_extruder, bool pri
 	// Do it only if all the objects were configured to be printed with a single extruder.
 	std::vector<std::pair<double, uint16_t>> per_layer_extruder_switches;
 	if (uint16_t num_extruders = uint16_t(print.config().nozzle_diameter.size());
-		num_extruders > 1 && print.object_extruders(print.objects().vector()).size() == 1 && // the current Print's configuration is CustomGCode::MultiAsSingle
+		num_extruders > 1 && print.object_extruders().size() == 1 && // the current Print's configuration is CustomGCode::MultiAsSingle
 		print.model().custom_gcode_per_print_z.mode == CustomGCode::MultiAsSingle) {
 		// Printing a single extruder platter on a printer with more than 1 extruder (or single-extruder multi-material).
 		// There may be custom per-layer tool changes available at the model.
@@ -282,7 +288,7 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
                 // fill represents infill extrusions of a single island.
                 const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
                 //FIXME: if first role is gapfill, please search deeper for another role
-                ExtrusionRole role = fill->entities.empty() ? ExtrusionRole::None : fill->entities.front()->role();
+                ExtrusionRole role = fill->entities().empty() ? ExtrusionRole::None : fill->entities().front()->role();
                 if (role.is_solid_infill())
                     has_solid_infill = true;
                 else if (role != ExtrusionRole::None)
@@ -588,7 +594,7 @@ void ToolOrdering::assign_custom_gcodes(const Print &print)
 	auto 						num_extruders = unsigned(print.config().nozzle_diameter.size());
 	CustomGCode::Mode 			mode          =
 		(num_extruders == 1) ? CustomGCode::SingleExtruder :
-		print.object_extruders(print.objects().vector()).size() == 1 ? CustomGCode::MultiAsSingle : CustomGCode::MultiExtruder;
+		print.object_extruders().size() == 1 ? CustomGCode::MultiAsSingle : CustomGCode::MultiExtruder;
 	CustomGCode::Mode           model_mode    = print.model().custom_gcode_per_print_z.mode;
 	std::vector<unsigned char> 	extruder_printing_above(num_extruders, false);
 	auto 						custom_gcode_it = custom_gcode_per_print_z.gcodes.rbegin();
@@ -689,7 +695,7 @@ void WipingExtrusions::set_extruder_override(const ExtrusionEntity* entity, size
 // Following function iterates through all extrusions on the layer, remembers those that could be used for wiping after toolchange
 // and returns volume that is left to be wiped on the wipe tower.
 // Switching from old_extruder to new_extruder, trying to wipe volume_to_wipe into not yet extruded extrusions, that may change material (overridable).
-float WipingExtrusions::mark_wiping_extrusions(const Print& print, const LayerTools &lt, unsigned int old_extruder, unsigned int new_extruder, float volume_to_wipe)
+float WipingExtrusions::mark_wiping_extrusions(const Print& print, const LayerTools &lt, uint16_t old_extruder, uint16_t new_extruder, float volume_to_wipe)
 {
     const float min_infill_volume = 0.f; // ignore infill with smaller volume than this
 
@@ -790,7 +796,6 @@ void WipingExtrusions::ensure_perimeters_infills_order(const Print& print, const
 	if (! m_something_overridable)
 		return;
 
-    const LayerTools& lt = *m_layer_tools;
     uint16_t first_nonsoluble_extruder = first_nonsoluble_extruder_on_layer(print.config(), lt);
     uint16_t last_nonsoluble_extruder = last_nonsoluble_extruder_on_layer(print.config(), lt);
 

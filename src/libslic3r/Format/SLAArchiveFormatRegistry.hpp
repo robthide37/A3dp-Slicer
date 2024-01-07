@@ -25,6 +25,8 @@ using ArchiveReaderFactory = std::function<
 >;
 
 struct ArchiveEntry {
+    OutputFormat format;
+
     // Main ID for the format, for internal unique identification
     const char *id;
 
@@ -41,15 +43,17 @@ struct ArchiveEntry {
     // Secondary, alias extensions
     std::vector<const char *> ext_aliases;
 
-    explicit ArchiveEntry(const char *formatid) : id{formatid} {}
+    explicit ArchiveEntry(OutputFormat format, const char *formatid) : format(format), id{formatid} {}
 
-    ArchiveEntry(const char *formatid,
+    ArchiveEntry(OutputFormat format,
+                 const char *formatid,
                  const char *description,
                  const char *extension,
                  std::initializer_list<const char *> extaliases,
                  const ArchiveWriterFactory &wrfn,
                  const ArchiveReaderFactory &rdfn)
-        : id{formatid}
+        : format(format)
+        , id{formatid}
         , desc{description}
         , ext{extension}
         , wrfactoryfn{wrfn}
@@ -65,12 +69,12 @@ struct ArchiveEntry {
 
 std::vector<std::string> get_extensions(const ArchiveEntry &entry);
 
-const std::set<ArchiveEntry>& registered_sla_archives();
+const std::map<OutputFormat, ArchiveEntry>& registered_sla_archives();
 
-const ArchiveEntry * get_archive_entry(const char *formatid);
-const char * get_default_extension(const char *formatid);
-ArchiveWriterFactory get_writer_factory(const char *formatid);
-ArchiveReaderFactory get_reader_factory(const char *formatid);
+const ArchiveEntry * get_archive_entry(OutputFormat formatid);
+const char * get_default_extension(OutputFormat formatid);
+ArchiveWriterFactory get_writer_factory(OutputFormat formatid);
+ArchiveReaderFactory get_reader_factory(OutputFormat formatid);
 
 } // namespace Slic3r
 

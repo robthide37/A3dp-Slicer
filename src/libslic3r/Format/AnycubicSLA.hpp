@@ -50,9 +50,9 @@ public:
                       const std::string    &projectname = "") override;
 };
 
-inline Slic3r::ArchiveEntry anycubic_sla_format_versioned(const char *fileformat, const char *desc, uint16_t version)
+inline Slic3r::ArchiveEntry anycubic_sla_format_versioned(OutputFormat format, const char *fileformat, const char *desc, uint16_t version)
 {
-    Slic3r::ArchiveEntry entry(fileformat);
+    Slic3r::ArchiveEntry entry(format, fileformat);
 
     entry.desc = desc;
     entry.ext  = fileformat;
@@ -61,9 +61,9 @@ inline Slic3r::ArchiveEntry anycubic_sla_format_versioned(const char *fileformat
     return entry;
 }
 
-inline Slic3r::ArchiveEntry anycubic_sla_format(const char *fileformat, const char *desc)
+inline Slic3r::ArchiveEntry anycubic_sla_format(OutputFormat format, const char *fileformat, const char *desc)
 {
-    return anycubic_sla_format_versioned(fileformat, desc, ANYCUBIC_SLA_FORMAT_VERSION_1);
+    return anycubic_sla_format_versioned(format, fileformat, desc, ANYCUBIC_SLA_FORMAT_VERSION_1);
 }
 
 } // namespace Slic3r::sla

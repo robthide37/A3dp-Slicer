@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "libslic3r/Config.hpp"
 #include "libslic3r/SLA/RasterBase.hpp"
 #include "libslic3r/Execution/ExecutionTBB.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
@@ -55,8 +56,7 @@ public:
                               const std::string    &projectname = "") = 0;
 
     // Factory method to create an archiver instance
-    static std::unique_ptr<SLAArchiveWriter> create(
-        const std::string &archtype, const SLAPrinterConfig &);
+    static std::unique_ptr<SLAArchiveWriter> create(OutputFormat archtype, const SLAPrinterConfig &);
 };
 
 } // namespace Slic3r

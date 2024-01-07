@@ -83,6 +83,7 @@ public:
     // in mm/s
     double      get_speed() const;
     std::string travel_to_xy(const Vec2d &point, const double speed = 0.0, const std::string_view comment = {});
+    std::string travel_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const bool is_ccw, const double speed, const std::string_view comment);
     std::string travel_to_xyz(const Vec3d &point, const double speed = 0.0, const std::string_view comment = {});
     std::string travel_to_z(double z, const std::string_view comment = {});
     bool        will_move_z(double z) const;
@@ -93,7 +94,8 @@ public:
     std::string retract_for_toolchange(bool before_wipe = false);
     std::string unretract();
     void        set_extra_lift(double extra_zlift) { this->m_extra_lift = extra_zlift; }
-    double      get_extra_lift() { return this->m_extra_lift; }
+    double      get_extra_lift() const { return this->m_extra_lift; }
+    double      get_lift() const { return this->m_lifted; } // for placeholder
     std::string lift(int layer_id);
     std::string unlift();
 
@@ -101,7 +103,7 @@ public:
     // Z coordinate of current position contains zhop. If zhop is applied (this->zhop() > 0),
     // then the print_z = this->get_position().z() - this->zhop().
     Vec3d       get_position() const { return m_pos; }
-    Vec3d       get_unlifted_position() const { return m_pos - Vec3d{0, 0, m_extra_lift + m_lifted}; }
+    Vec3d       get_unlifted_position() const { return m_pos - Vec3d{0, 0, m_lifted}; }
     // Update position of the print head based on the final position returned by a custom G-code block.
     // The new position Z coordinate contains the Z-hop.
     // GCodeWriter expects the custom script to NOT change print_z, only Z-hop, thus the print_z is maintained

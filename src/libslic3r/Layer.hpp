@@ -142,7 +142,7 @@ public:
     [[nodiscard]] const ExtrusionEntityCollection&  perimeters() const { return m_perimeters; }
 
     // collection of expolygons representing the milling path of the first milling cutter
-    ExtrusionEntityCollection   milling;
+    [[nodiscard]] const ExtrusionEntityCollection&  millings() const { return m_millings; }
 
     // ordered collection of extrusion paths to fill surfaces
     // (this collection contains only ExtrusionEntityCollection objects)
@@ -152,7 +152,7 @@ public:
     Flow     flow(FlowRole role) const;
     Flow     flow(FlowRole role, double layer_height) const;
     coordf_t bridging_height_avg() const;
-    Flow     bridging_flow(FlowRole role) const;
+    Flow     bridging_flow(FlowRole role, BridgeType force_type = BridgeType::btNone) const;
 
     void    slices_to_fill_surfaces_clipped(coord_t opening_offset);
     void    prepare_fill_surfaces();
@@ -246,7 +246,7 @@ private:
     ExtrusionEntityCollection   m_perimeters;
 
     // collection of expolygons representing the milling path of the first milling cutter
-    ExtrusionEntityCollection   m_milling;
+    ExtrusionEntityCollection   m_millings;
 
     // ordered collection of extrusion paths to fill surfaces
     // (this collection contains only ExtrusionEntityCollection objects)

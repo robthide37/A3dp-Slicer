@@ -330,27 +330,24 @@ inline PrinterTechnology operator&=(PrinterTechnology& a, PrinterTechnology b) {
     a = a & b; return a;
 }
 
-/// 
-enum OutputFormat : uint16_t
-{
-    ofMaskedCWS = 1 << 0,
-    ofSL1 = 1 << 1,
-    ofGCode = 1 << 2,
-    ofUnknown = 1 << 15
+// defined here isntead of PrintConfig to be more visible.
+enum OutputFormat : uint16_t {
+    ofUnknown = 0,
+    ofGCode   = 1,
+    ofSL1,
+    ofSL1_SVG,
+    ofMaskedCWS,
+    ofAnycubicMono,
+    ofAnycubicMonoX,
+    ofAnycubicMonoSE,
 };
 
-inline OutputFormat operator|(OutputFormat a, OutputFormat b) {
-    return static_cast<OutputFormat>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
-}
-inline OutputFormat operator&(OutputFormat a, OutputFormat b) {
-    return static_cast<OutputFormat>(static_cast<uint8_t>(a)& static_cast<uint8_t>(b));
-}
-inline OutputFormat operator|=(OutputFormat& a, OutputFormat b) {
-    a = a | b; return a;
-}
-inline OutputFormat operator&=(OutputFormat& a, OutputFormat b) {
-    a = a & b; return a;
-}
+enum class BridgeType : uint8_t {
+    btNone,
+    btFromNozzle,
+    btFromHeight,
+    btFromFlow,
+};
 
 enum ForwardCompatibilitySubstitutionRule
 {

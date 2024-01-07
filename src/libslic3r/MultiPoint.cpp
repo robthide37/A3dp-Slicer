@@ -158,9 +158,9 @@ Point MultiPoint::point_projection(const Point &point) const {
 /// <param name="tolerance"></param>
 /// <param name="min_length"></param>
 /// <returns></returns>
-std::vector<Point> MultiPoint::_douglas_peucker_plus(const std::vector<Point>& pts, const double tolerance, const double min_length)
+Points MultiPoint::douglas_peucker_plus(const Points& pts, const double tolerance, const double min_length)
 {
-    std::vector<Point> result_pts;
+    Points result_pts;
     std::vector<size_t> result_idx;
     const double tolerance_sq = tolerance * tolerance;
     if (!pts.empty()) {

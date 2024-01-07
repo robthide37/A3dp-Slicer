@@ -129,8 +129,6 @@ set(SLIC3R_SOURCES
     Flow.cpp
     Flow.hpp
     format.hpp
-    Format/Format.hpp
-    Format/Format.cpp
     Format/3mf.cpp
     Format/3mf.hpp
     Format/AMF.cpp
@@ -153,6 +151,8 @@ set(SLIC3R_SOURCES
     Format/SL1_SVG.cpp
     Format/AnycubicSLA.hpp
     Format/AnycubicSLA.cpp
+    Format/CWS.hpp
+    Format/CWS.cpp
     Format/STEP.hpp
     Format/STEP.cpp
     Format/SVG.hpp

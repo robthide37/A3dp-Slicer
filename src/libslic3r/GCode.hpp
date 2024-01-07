@@ -242,15 +242,14 @@ public:
     template<typename Derived>
     Vec2d           point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
         static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "GCodeGenerator::point_to_gcode(): first parameter is not a 2D vector");
-        return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin 
-            - m_writer.current_tool_offset();
+        return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin - m_writer.current_tool_offset();
     }
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
     template<typename Derived>
     Vec2d           point_to_gcode_quantized(const Eigen::MatrixBase<Derived> &point) const {
         static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "GCodeGenerator::point_to_gcode_quantized(): first parameter is not a 2D vector");
         Vec2d p = this->point_to_gcode(point);
-        return { m_writer.get_default_gcode_formatter().quantize_xyzf(p.x()), m_writer.get_default_gcode_formatter().quantize_xyzf(p.y()) };
+        return m_writer.get_default_gcode_formatter().quantize(p);
     }
     Vec3d           point_to_gcode(const Point &point, coord_t z_offset) const;
     Point           gcode_to_point(const Vec2d &point) const;
@@ -264,7 +263,6 @@ public:
     // inside the generated string and after the G-code export finishes.
     std::string     placeholder_parser_process(const std::string &name, const std::string &templ, uint16_t current_extruder_id, const DynamicConfig *config_override = nullptr);
     bool            enable_cooling_markers() const { return m_enable_cooling_markers; }
-    std::string     extrusion_role_to_string_for_parser(const ExtrusionRole &);
 
     // For Perl bindings, to be used exclusively by unit tests.
     unsigned int    layer_count() const { return m_layer_with_support_count; }
@@ -382,6 +380,7 @@ private:
     std::string      change_layer(double previous_layer_z, double print_z);
     std::string      visitor_gcode;
     bool             visitor_flipped; //TODO use instead of reverse() at extrude_entity
+    bool             visitor_in_use = false;
     std::string_view visitor_comment;
     double           visitor_speed;
     virtual void use(const ExtrusionPath &path) override { visitor_gcode += extrude_path(path, visitor_comment, visitor_speed); };
@@ -400,7 +399,7 @@ private:
 
     void            split_at_seam_pos(ExtrusionLoop &loop, bool was_clockwise);
     template <typename THING = ExtrusionEntity> // can be templated safely because private
-    void            add_wipe_points(const std::vector<THING>& paths);
+    void            add_wipe_points(const std::vector<THING>& paths, bool reverse = true);
     void            seam_notch(const ExtrusionLoop& original_loop, ExtrusionPaths& building_paths,
         ExtrusionPaths& notch_extrusion_start, ExtrusionPaths& notch_extrusion_end, bool is_hole_loop, bool is_full_loop_ccw);
 
@@ -443,26 +442,27 @@ private:
         // output
         std::string              &gcode, 
         const ExtrudeArgs        &args,
-        // Index of the extruder currently active.
-        const uint16_t            extruder_id,
         // and the object & support layer of the above.
         const ObjectLayerToPrint &layer_to_print);
-    void emit_milling_commands(std::string& gcode);
+    void emit_milling_commands(std::string& gcode, const ObjectsLayerToPrint& layers);
     
     // set the region config, and the overrides it contains.
     // if no m_region, then it will take the default region config from print_object
     // if no print_object, then it will take the default region config from print
-    void set_region_for_extrude(const Print &print, PrintObject *print_object, std::string &gcode);
+    void set_region_for_extrude(const Print &print, const PrintObject *print_object, std::string &gcode);
     void extrude_perimeters(const ExtrudeArgs &print_args, const LayerIsland &island, std::string &gcode);
     void extrude_infill(const ExtrudeArgs &print_args, const LayerIsland &island, bool is_infill_first, std::string &gcode);
     void extrude_ironing(const ExtrudeArgs &print_args, const LayerIsland &island, std::string &gcode);
-    
     void extrude_skirt(ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override, std::string &gcode, const std::string_view description);
     std::string     extrude_support(const ExtrusionEntityReferences &support_fills);
-    // std::string generate_travel_gcode(
-        // const Points3& travel,
-        // const std::string& comment
-    // );
+    bool            shall_print_this_extrusion_collection(const ExtrudeArgs &              print_args,
+                                                          const ExtrusionEntityCollection *eec,
+                                                          const PrintRegion &              region);
+    // for helical layer change for vase mode
+     std::string generate_travel_gcode(
+         const Points3& travel,
+         const std::string& comment
+     );
     // Polyline generate_travel_xy_path(
         // const Point& start,
         // const Point& end,
@@ -495,7 +495,7 @@ private:
 
     struct PlaceholderParserIntegration {
         void reset();
-        void init(const GCodeWriter &config);
+        void init(const PrintConfig &print_config, const GCodeWriter &config);
         void update_from_gcodewriter(const GCodeWriter &writer);
         void validate_output_vector_variables();
 

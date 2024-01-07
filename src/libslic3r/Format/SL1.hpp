@@ -12,7 +12,6 @@
 
 #include "libslic3r/Zipper.hpp"
 #include "libslic3r/PrintConfig.hpp"
-#include "libslic3r/Format/SLAArchive.hpp"
 
 namespace Slic3r {
 

@@ -58,7 +58,7 @@ Flow LayerRegion::bridging_flow(FlowRole role, BridgeType force_type) const
     // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
     float nozzle_diameter = float(print_object.print()->config().nozzle_diameter.get_at(region.extruder(role, *this->layer()->object()) - 1));
     double diameter = 0;
-    BridgeType bridge_type = force_type == BridgeType::None ? region_config.bridge_type : force_type;
+    BridgeType bridge_type = force_type == BridgeType::btNone ? region_config.bridge_type : force_type;
     if (bridge_type == BridgeType::btFromFlow ) {
         Flow reference_flow = flow(role);
         diameter = sqrt(4 * reference_flow.mm3_per_mm() / PI);
@@ -70,7 +70,7 @@ Flow LayerRegion::bridging_flow(FlowRole role, BridgeType force_type) const
         // Applies default bridge spacing.
         diameter =  nozzle_diameter;
     }
-    return Flow::bridging_flow(float(sqrt(force_type == BridgeType::None ? region_config.bridge_flow_ratio.get_abs_value(1.) : 0.95f) * diameter) , nozzle_diameter);
+    return Flow::bridging_flow(float(sqrt(force_type == BridgeType::btNone ? region_config.bridge_flow_ratio.get_abs_value(1.) : 0.95f) * diameter) , nozzle_diameter);
     /* else {
         // The same way as other slicers: Use normal extrusions. Apply bridge_flow_ratio while maintaining the original spacing.
         return this->flow(role).with_flow_ratio(region_config.bridge_flow_ratio, overlap_percent);
@@ -88,9 +88,9 @@ void LayerRegion::slices_to_fill_surfaces_clipped(coord_t opening_offset)
     }
     // Trim surfaces by the fill_boundaries.
     m_fill_surfaces.surfaces.clear();
-    for (auto const& [srf_type, expoly] entry : polygons_by_surface) {
+    for (auto const& [srf_type, expoly] : polygons_by_surface) {
         if (!expoly.empty())
-            for (ExPolygon& expoly_to_test : intersection_ex(expoly, this->fill_expolygons)) {
+            for (ExPolygon& expoly_to_test : intersection_ex(expoly, this->fill_expolygons())) {
                 if (!opening_ex({ expoly_to_test }, opening_offset).empty()) {
                     this->m_fill_surfaces.append({ expoly_to_test }, srf_type);
                 }
@@ -126,6 +126,7 @@ void LayerRegion::make_perimeters(
         (this->layer()->id() >= size_t(region_config.bottom_solid_layers.value) &&
          this->layer()->print_z >= region_config.bottom_solid_min_thickness - EPSILON);
 
+    //this is a factory, the content will be copied into the PerimeterGenerator
     PerimeterGenerator::Parameters params(
         this->layer(),
         this->flow(frPerimeter),
@@ -138,23 +139,38 @@ void LayerRegion::make_perimeters(
         spiral_vase,
         (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne) //use_arachne
     );
+    
+
+    // perimeter bonding set.
+    if (params.perimeter_flow.spacing_ratio() == 1
+        && params.ext_perimeter_flow.spacing_ratio() == 1
+        && params.config.external_perimeters_first
+        && params.object_config.perimeter_bonding.value > 0) {
+        params.infill_gap = (1 - params.object_config.perimeter_bonding.get_abs_value(1)) * params.get_ext_perimeter_spacing();
+        params.ext_perimeter_spacing2 -= params.infill_gap;
+    }
 
     const ExPolygons *lower_slices = this->layer()->lower_layer ? &this->layer()->lower_layer->lslices : nullptr;
-                                           
     const ExPolygons *upper_slices = this->layer()->upper_layer ? &this->layer()->upper_layer->lslices : nullptr;
+    
+    size_t perimeters_begin = m_perimeters.size();
+    size_t gap_fills_begin = m_thin_fills.size();
+    size_t fill_expolygons_begin = fill_expolygons.size();
 
-    PerimeterGenerator g{params};
+    PerimeterGenerator::PerimeterGenerator g{params};
     g.process(
         // input:
-        lower_slices, slices, upper_slices
+        lower_slices, &slices, upper_slices,
         // output:
-        m_perimeters,
-        m_thin_fills,
+            // Loops with the external thin walls
+        &m_perimeters,
+            // Gaps without the thin walls
+        &m_thin_fills,
+            // Infills without the gap fills
         fill_expolygons,
+            // mask for "no overlap" area
         m_fill_no_overlap_expolygons
     );
-
-    this->m_fill_no_overlap_expolygons = g.fill_no_overlap;
     
     perimeter_and_gapfill_ranges.emplace_back(
         ExtrusionRange{ perimeters_begin, uint32_t(m_perimeters.size()) }, 
@@ -170,7 +186,7 @@ void LayerRegion::make_milling_post_process(const SurfaceCollection& slices) {
         &this->layer()->object()->config(),
         &this->layer()->object()->print()->config()
     );
-    milling = mill.process(this->layer());
+    m_millings = mill.process(this->layer());
 }
 
 #if 1
@@ -209,7 +225,7 @@ Surfaces expand_bridges_detect_orientations(
     using namespace Slic3r::Algorithm;
 
     double thickness;
-    ExPolygons bridges_ex = fill_surfaces_extract_expolygons(surfaces, {stBottomBridge}, thickness);
+    ExPolygons bridges_ex = fill_surfaces_extract_expolygons(surfaces, {stPosBottom | stDensSolid | stModBridge}, thickness);
     if (bridges_ex.empty())
         return {};
 
@@ -337,7 +353,7 @@ Surfaces expand_bridges_detect_orientations(
     Surfaces out;
     {
         Polygons acc;
-        Surface templ{ stBottomBridge, {} };
+        Surface templ{ stPosBottom | stDensSolid | stModBridge, {} };
         std::sort(bridge_expansions.begin(), bridge_expansions.end(), [](auto &l, auto &r) {
             return l.src_id < r.src_id || (l.src_id == r.src_id && l.boundary_id < r.boundary_id);
         });
@@ -467,8 +483,8 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
 
     // Expand the top / bottom / bridge surfaces into the shell thickness solid infills.
     double     layer_thickness;
-    ExPolygons shells = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, { stInternalSolid }, layer_thickness));
-    ExPolygons sparse = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, { stInternal }, layer_thickness));
+    ExPolygons shells = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, { stPosInternal | stDensSolid }, layer_thickness));
+    ExPolygons sparse = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, { stPosInternal | stDensSparse }, layer_thickness));
 
     SurfaceCollection bridges;
     const auto expansion_params_into_sparse_infill = RegionExpansionParameters::build(expansion_min, expansion_step, max_nr_expansion_steps);
@@ -477,7 +493,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         const double custom_angle = this->region().config().bridge_angle.value;
         const auto   expansion_params_into_solid_infill  = RegionExpansionParameters::build(expansion_bottom_bridge, expansion_step, max_nr_expansion_steps);
         bridges.surfaces = custom_angle > 0 ?
-            expand_merge_surfaces(m_fill_surfaces.surfaces, stBottomBridge, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius, Geometry::deg2rad(custom_angle)) :
+            expand_merge_surfaces(m_fill_surfaces.surfaces, stPosBottom | stDensSolid | stModBridge, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius, Geometry::deg2rad(custom_angle)) :
             expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius);
         BOOST_LOG_TRIVIAL(trace) << "Processing external surface, detecting bridges - done";
 #if 0
@@ -488,10 +504,10 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
 #endif
     }
 
-    Surfaces    bottoms = expand_merge_surfaces(m_fill_surfaces.surfaces, stBottom, shells,
+    Surfaces    bottoms = expand_merge_surfaces(m_fill_surfaces.surfaces, stPosBottom | stDensSolid, shells,
         RegionExpansionParameters::build(expansion_bottom, expansion_step, max_nr_expansion_steps), 
         sparse, expansion_params_into_sparse_infill, closing_radius);
-    Surfaces    tops    = expand_merge_surfaces(m_fill_surfaces.surfaces, stTop, shells,
+    Surfaces    tops    = expand_merge_surfaces(m_fill_surfaces.surfaces, stPosTop | stDensSolid, shells,
         RegionExpansionParameters::build(expansion_top, expansion_step, max_nr_expansion_steps), 
         sparse, expansion_params_into_sparse_infill, closing_radius);
 
@@ -499,12 +515,12 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
     m_fill_surfaces.clear();
     reserve_more(m_fill_surfaces.surfaces, shells.size() + sparse.size() + bridges.size() + bottoms.size() + tops.size());
     {
-        Surface solid_templ(stInternalSolid, {});
+        Surface solid_templ(stPosInternal | stDensSolid, {});
         solid_templ.thickness = layer_thickness;
         m_fill_surfaces.append(std::move(shells), solid_templ);
     }
     {
-        Surface sparse_templ(stInternal, {});
+        Surface sparse_templ(stPosInternal | stDensSparse, {});
         sparse_templ.thickness = layer_thickness;
         m_fill_surfaces.append(std::move(sparse), sparse_templ);
     }
@@ -922,7 +938,6 @@ void LayerRegion::prepare_fill_surfaces()
         for (Surface &surface : m_fill_surfaces)
             if (surface.has_pos_bottom())
                 surface.surface_type = stPosInternal | stDensSparse;
-        }
     }
 
     // turn too small internal regions into solid regions according to the user setting
@@ -933,13 +948,13 @@ void LayerRegion::prepare_fill_surfaces()
             if (surface.has_fill_sparse() && surface.has_pos_internal() && surface.area() <= min_area)
                 surface.surface_type = stPosInternal | stDensSolid;
     }
-}
-
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
     export_region_slices_to_svg_debug("2_prepare_fill_surfaces-final");
     export_region_fill_surfaces_to_svg_debug("2_prepare_fill_surfaces-final");
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 }
+
+
 
 double LayerRegion::infill_area_threshold() const
 {
@@ -1027,16 +1042,19 @@ void LayerRegion::simplify_extrusion_entity()
 
     const PrintConfig& print_config = this->layer()->object()->print()->config();
     const bool spiral_mode = print_config.spiral_vase;
-    const bool enable_arc_fitting = print_config.arc_fitting && !spiral_mode;
+    ArcFittingType enable_arc_fitting = print_config.arc_fitting.value;
+    if (spiral_mode)
+        enable_arc_fitting = ArcFittingType::Disabled;
     coordf_t scaled_resolution = scale_d(print_config.resolution.value);
-    if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
-
+    if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting != ArcFittingType::Disabled ? SCALED_EPSILON * 2 : SCALED_EPSILON;
+    
+	//Ligne 652:     SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance)
     //call simplify for all paths
-    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting, &print_config.arc_fitting_tolerance };
-    this->perimeters.visit(visitor);
-    this->fills.visit(visitor);
-    this->ironings.visit(visitor);
-    this->milling.visit(visitor);
+    Slic3r::SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting, &print_config.arc_fitting_tolerance };
+    this->m_perimeters.visit(visitor);
+    this->m_fills.visit(visitor);
+    this->m_ironings.visit(visitor);
+    this->m_millings.visit(visitor);
 }
 
 }

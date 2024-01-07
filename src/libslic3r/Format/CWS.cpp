@@ -1,6 +1,13 @@
-#include "libslic3r/Format/CWS.hpp"
+///|/ Copyright (c) SuperSlicer Joseph Lenox <lenox.joseph@gmail.com>
+///|/
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
+///|/
+#include "CWS.hpp"
+
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Time.hpp"
+#include "libslic3r/Zipper.hpp"
 
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
@@ -41,6 +48,7 @@ std::string get_cfg_value(const DynamicPrintConfig &cfg, const std::string &key)
 /// Set up list of configuration options in the default slicing.
 void fill_iniconf(ConfMap &m, const SLAPrint &print)
 {
+    CNumericLocalesSetter locales_setter; // for to_string
     auto &cfg = print.full_print_config();
     m["layerHeight"]    = get_cfg_value(cfg, "layer_height");
     m["expTime"]        = get_cfg_value(cfg, "exposure_time");
@@ -100,14 +108,14 @@ void fill_slicerconf(ConfMap &m, const SLAPrint &print)
 
 } // namespace
 
-
-void MaskedCWSArchive::export_print(Zipper& zipper,
-                              const SLAPrint &print,
+void MaskedCWSArchive::export_print(const std::string     fname,
+                              const SLAPrint       &print,
+                              const ThumbnailsList &thumbnails,
                               const std::string &prjname)
 {
     std::string project =
         prjname.empty() ?
-            boost::filesystem::path(zipper.get_filename()).stem().string() :
+            boost::filesystem::path(fname).stem().string() :
             prjname;
     
     ConfMap iniconf, slicerconf;
@@ -116,8 +124,8 @@ void MaskedCWSArchive::export_print(Zipper& zipper,
     iniconf["jobDir"] = project;
 
     fill_slicerconf(slicerconf, print);
-
     try {
+        Zipper zipper(fname, Zipper::FAST_COMPRESSION);
         zipper.add_entry("default.slicing");
         zipper << to_ini(iniconf);
 

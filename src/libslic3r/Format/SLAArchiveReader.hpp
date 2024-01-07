@@ -48,7 +48,7 @@ public:
     // The first match is used.
     static std::unique_ptr<SLAArchiveReader> create(
         const std::string &fname,
-        const std::string &format_id,
+        OutputFormat       format_id,
         SLAImportQuality   quality = SLAImportQuality::Balanced,
         const ProgrFn     &progr   = [](int) { return false; });
 };

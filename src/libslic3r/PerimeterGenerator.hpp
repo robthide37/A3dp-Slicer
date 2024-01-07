@@ -51,13 +51,13 @@ struct Parameters
     coord_t       get_ext_perimeter_width() const { return ext_perimeter_width; }
     const coord_t ext_perimeter_spacing;
     coord_t       get_ext_perimeter_spacing() const { return ext_perimeter_spacing; }
-    const coord_t ext_perimeter_spacing2;
+    coord_t       ext_perimeter_spacing2;
     coord_t       get_ext_perimeter_spacing2() const { return ext_perimeter_spacing2; }
     const coord_t gap_fill_spacing;
     coord_t       get_gap_fill_spacing() const { return gap_fill_spacing; }
     const coord_t gap_fill_spacing_external;
     coord_t       get_gap_fill_spacing_external() const { return gap_fill_spacing_external; }
-    const coord_t infill_gap;
+    coord_t       infill_gap;
     coord_t       get_infill_gap() const { return infill_gap; }
     const coord_t solid_infill_spacing;
     coord_t       get_solid_infill_spacing() const { return solid_infill_spacing; }
@@ -198,7 +198,7 @@ public:
     const ExPolygons            *lower_slices;
     const SurfaceCollection     *slices;
     const ExPolygons            *upper_slices;
-    Parameters                   params;
+    Parameters             params;
     // Outputs:
     
     PerimeterGenerator(const Parameters &params) : params(params) {}
@@ -213,9 +213,9 @@ public:
             // Gaps without the thin walls
             ExtrusionEntityCollection *gap_fill,
             // Infills without the gap fills
-            SurfaceCollection *fill_surfaces,
+            ExPolygons &fill_surfaces,
             // mask for "no overlap" area
-            ExPolygons fill_no_overlap);
+            ExPolygons &fill_no_overlap);
 
     coord_t     get_resolution(size_t perimeter_id, bool is_overhang, const Surface* srf) const;
 
@@ -231,10 +231,10 @@ private:
     ExPolygons unmillable;
     coord_t mill_extra_size;
 
-    ProcessSurfaceResult process_classic(const Parameters &params, int& loop_number, const Surface& surface);
-    ProcessSurfaceResult process_arachne(const Parameters &params, int& loop_number, const Surface& surface);
+    ProcessSurfaceResult process_classic(const Parameters &params, int& loop_number, const Surface& surface, ExtrusionEntityCollection &loops);
+    ProcessSurfaceResult process_arachne(const Parameters &params, int& loop_number, const Surface& surface, ExtrusionEntityCollection &loops);
     
-    void        processs_no_bridge(Surfaces& all_surfaces);
+    void        processs_no_bridge(const Parameters params, Surfaces& all_surfaces, ExPolygons &fill_surfaces);
     ExtrusionPaths create_overhangs_classic(const Parameters &params,
         const Polyline& loop_polygons, const ExtrusionRole role, const bool is_external) const;
     // the bbox is here to accelerate the diffs, loop_polygons is inside it.

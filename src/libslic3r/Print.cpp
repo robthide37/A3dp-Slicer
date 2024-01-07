@@ -432,22 +432,13 @@ bool Print::is_step_done(PrintObjectStep step) const
     return true;
 }
 
-std::set<uint16_t> Print::object_extruders(const ConstPrintObjectPtrs& objects) const
-{
-    std::set<uint16_t> extruders;
-    std::vector<unsigned char> region_used(m_print_regions.size(), false);
-    for (const PrintObject* object : objects)
-        for (const PrintRegion& region : object->all_regions())
-            region.collect_object_printing_extruders(*object->print(), extruders);
-    return extruders;
-}
-
 // returns 0-based indices of used extruders
 std::set<uint16_t> Print::object_extruders(const PrintObjectPtrs &objects) const
 {
     std::set<uint16_t> extruders;
     std::vector<unsigned char> region_used(m_print_regions.size(), false);
     for (const PrintObject *object : objects)
+        if(object->
         for (const PrintRegion& region : object->all_regions())
             region.collect_object_printing_extruders(*object->print(), extruders);
     return extruders;

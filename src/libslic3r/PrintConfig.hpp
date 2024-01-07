@@ -114,12 +114,6 @@ enum AuthorizationType {
     atKeyPassword, atUserPassword
 };
 
-enum class BridgeType : uint8_t {
-    btFromNozzle,
-    btFromHeight,
-    btFromFlow,
-};
-
 enum class FuzzySkinType {
     None,
     External,
@@ -1526,7 +1520,6 @@ PRINT_CONFIG_CLASS_DEFINE(
 
     ((ConfigOptionEnum<PrinterTechnology>,      printer_technology))
     ((ConfigOptionEnum<OutputFormat>,           output_format))
-//    ((ConfigOptionString,                     sla_archive_format))
     ((ConfigOptionPoints,                       bed_shape))
     ((ConfigOptionFloat,                        max_print_height))
     ((ConfigOptionFloat,                        display_width))

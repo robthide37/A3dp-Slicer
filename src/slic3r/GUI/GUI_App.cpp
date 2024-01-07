@@ -585,7 +585,7 @@ wxString file_wildcards(FileType file_type, const std::string &custom_extension)
     return file_wildcards(file_wildcards_by_type[file_type], custom_extension);
 }
 
-wxString sla_wildcards(const char *formatid)
+wxString sla_wildcards(OutputFormat formatid)
 {
     const ArchiveEntry *entry = get_archive_entry(formatid);
     wxString ret;

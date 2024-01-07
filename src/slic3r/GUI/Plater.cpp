@@ -6952,7 +6952,7 @@ void Plater::export_gcode(bool prefer_removable)
             start_dir,
             from_path(default_output_file.filename()),
             printer_technology() == ptFFF ? GUI::file_wildcards(FT_GCODE, ext) :
-                                            GUI::sla_wildcards(p->sla_print.printer_config().sla_archive_format.value.c_str()),
+                                            GUI::sla_wildcards(p->sla_print.printer_config().output_format.value),
             wxFD_SAVE | (wxGetApp().app_config->get_show_overwrite_dialog() ? wxFD_OVERWRITE_PROMPT : 0)
         );
         if (dlg.ShowModal() == wxID_OK) {

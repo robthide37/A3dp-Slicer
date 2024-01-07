@@ -81,6 +81,7 @@ struct CoolingLine
         // G2 or G3: Arc interpolation
         TYPE_G2                 = 1 << 20,
         TYPE_G3                 = 1 << 21,
+        TYPE_G2G3  TODO: review it with prusa code: seems like G2 & G2 can be of 2 different types: XYR or XYIJ
         // Arc interpolation, counter-clockwise.
         TYPE_G2G3_CCW           = 1 << 22,
         // Arc interpolation, arc defined by IJ (offset of arc center from its start position).
@@ -93,8 +94,8 @@ struct CoolingLine
         // Custom fan speed (introduced for overhang fan speed)
         TYPE_SET_FAN_SPEED      = 1 << 26,
         TYPE_RESET_FAN_SPEED    = 1 << 27,    };
-    static inline ExtrusionRole to_extrusion_role(uint32_t type) {
-        return ExtrusionRole(uint8_t(type & 0x1F));
+    static inline GCodeExtrusionRole to_extrusion_role(uint32_t type) {
+        return GCodeExtrusionRole(uint8_t(type & 0x1F));
     }
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
@@ -499,7 +500,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             }
             if ((line.type & CoolingLine::TYPE_G92) == 0) {
                 // G0, G1, G2, G3. Calculate the duration.
-                assert((line.type & CoolingLine::TYPE_G0) != 0 + (line.type & CoolingLine::TYPE_G1) != 0 + (line.type & CoolingLine::TYPE_G2G3) != 0 == 1);
+                assert((line.type & CoolingLine::TYPE_G0) != 0 + (line.type & CoolingLine::TYPE_G1) != 0 + (line.type & CoolingLine::TYPE_G2G3_IJ) != 0 == 1);
                 if (m_config.use_relative_e_distances.value)
                     // Reset extruder accumulator.
                     current_pos[AxisIdx::E] = 0.f;
@@ -586,7 +587,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_TOOLCHANGE")) {
             //not using m_toolchange_prefix anymore because there is no use case for it, there is always a _TOOLCHANGE for when a fan change is needed.
             int prefix = 13;
-            //uint16_t new_extruder = (uint16_t)atoi(sline.c_str() + prefix);
+            uint16_t new_extruder = (uint16_t)atoi(sline.c_str() + 12);
             auto res = std::from_chars(sline.data() + prefix, sline.data() + sline.size(), new_extruder);
             if (res.ec != std::errc::invalid_argument) {
             // Only change extruder in case the number is meaningful. User could provide an out-of-range index through custom gcodes - those shall be ignored.
@@ -609,7 +610,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type |= CoolingLine::Type(sline[14] - 'A') | CoolingLine::Type::TYPE_EXTRUDE_START;
             assert(CoolingLine::to_extrusion_role(uint32_t(line.type)) != 0);
             if (CoolingLine::to_extrusion_role(uint32_t(line.type)) == 0) {
-                line.type |=  ExtrusionRole::Custom;
+                line.type |=  GCodeExtrusionRole::Custom;
             }
         } else if (boost::starts_with(sline, "G4 ")) {
             // Parse the wait time.
@@ -852,37 +853,37 @@ float CoolingBuffer::calculate_layer_slowdown(std::vector<PerExtruderAdjustments
 
 // list of fan that can be increased (erNone is the default) via fan_below_layer_time and slowdown_below_layer_time
 // the commented ones won't buldge even is the layer time is low.
-std::vector<uint8_t> etype_can_increase_fan = {
-     ExtrusionRole::None,
-     ExtrusionRole::BridgeInfill,
-     ExtrusionRole::InternalBridgeInfill,
-    // ExtrusionRole::TopSolidInfill,
-    // ExtrusionRole::Ironing,
-    // ExtrusionRole::SupportMaterialInterface,
-    // ExtrusionRole::SupportMaterial,
-     ExtrusionRole::ExternalPerimeter,
-     ExtrusionRole::ThinWall,
-     ExtrusionRole::Perimeter,
-     ExtrusionRole::SolidInfill,
-     ExtrusionRole::InternalInfill,
-     ExtrusionRole::OverhangPerimeter,
-     ExtrusionRole::GapFill };
+std::vector<GCodeExtrusionRole> etype_can_increase_fan = {
+     GCodeExtrusionRole::None,
+     GCodeExtrusionRole::BridgeInfill,
+     GCodeExtrusionRole::InternalBridgeInfill,
+    // GCodeExtrusionRole::TopSolidInfill,
+    // GCodeExtrusionRole::Ironing,
+    // GCodeExtrusionRole::SupportMaterialInterface,
+    // GCodeExtrusionRole::SupportMaterial,
+     GCodeExtrusionRole::ExternalPerimeter,
+     GCodeExtrusionRole::ThinWall,
+     GCodeExtrusionRole::Perimeter,
+     GCodeExtrusionRole::SolidInfill,
+     GCodeExtrusionRole::InternalInfill,
+     GCodeExtrusionRole::OverhangPerimeter,
+     GCodeExtrusionRole::GapFill };
 // list of fan that won't be reduced in the first layers by full_fan_speed_layer (after disable_fan_first_layers)
-std::vector<uint8_t> etype_can_ramp_up_fan = {
-     ExtrusionRole::None,
-    // ExtrusionRole::BridgeInfill,
-    // ExtrusionRole::InternalBridgeInfill,
-     ExtrusionRole::TopSolidInfill,
-     ExtrusionRole::Ironing,
-    // ExtrusionRole::SupportMaterialInterface,
-     ExtrusionRole::SupportMaterial,
-     ExtrusionRole::ExternalPerimeter,
-     ExtrusionRole::ThinWall,
-     ExtrusionRole::Perimeter,
-     ExtrusionRole::SolidInfill,
-     ExtrusionRole::InternalInfill,
-    // ExtrusionRole::OverhangPerimeter,
-     ExtrusionRole::GapFill };
+std::vector<GCodeExtrusionRole> etype_can_ramp_up_fan = {
+     GCodeExtrusionRole::None,
+    // GCodeExtrusionRole::BridgeInfill,
+    // GCodeExtrusionRole::InternalBridgeInfill,
+     GCodeExtrusionRole::TopSolidInfill,
+     GCodeExtrusionRole::Ironing,
+    // GCodeExtrusionRole::SupportMaterialInterface,
+     GCodeExtrusionRole::SupportMaterial,
+     GCodeExtrusionRole::ExternalPerimeter,
+     GCodeExtrusionRole::ThinWall,
+     GCodeExtrusionRole::Perimeter,
+     GCodeExtrusionRole::SolidInfill,
+     GCodeExtrusionRole::InternalInfill,
+    // GCodeExtrusionRole::OverhangPerimeter,
+     GCodeExtrusionRole::GapFill };
 
 // Apply slow down over G-code lines stored in per_extruder_adjustments, enable fan if needed.
 // Returns the adjusted G-code.
@@ -911,31 +912,31 @@ std::string CoolingBuffer::apply_layer_cooldown(
     // Second generate the adjusted G-code.
     std::string new_gcode;
     new_gcode.reserve(gcode.size() * 2);
-    bool fan_control[ ExtrusionRole::Count];
-    int fan_speeds[ ExtrusionRole::Count];
-    int default_fan_speed[ ExtrusionRole::Count];
+    bool fan_control[ uint8_t(GCodeExtrusionRole::Count)];
+    int fan_speeds[ uint8_t(GCodeExtrusionRole::Count)];
+    int default_fan_speed[ uint8_t(GCodeExtrusionRole::Count)];
 #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
     int min_fan_speed = EXTRUDER_CONFIG(min_fan_speed);
-    for (int i = 0; i <  ExtrusionRole::Count; i++) {
+    for (int i = 0; i < uint8_t(GCodeExtrusionRole::Count); i++) {
         fan_control[i] = false;
         fan_speeds[i] = 0;
         default_fan_speed[i] = min_fan_speed;
         // 0 was deprecated, replaced by 1: allow 1 to still be 0 (and it's now deprecated)
         if (default_fan_speed[i] == 1) default_fan_speed[i] = 0;
     }
-    default_fan_speed[ ExtrusionRole::BridgeInfill] = EXTRUDER_CONFIG(bridge_fan_speed);
-    default_fan_speed[ ExtrusionRole::InternalBridgeInfill] = EXTRUDER_CONFIG(bridge_internal_fan_speed);
-    default_fan_speed[ ExtrusionRole::TopSolidInfill] = EXTRUDER_CONFIG(top_fan_speed);
-    default_fan_speed[ ExtrusionRole::Ironing] = default_fan_speed[ ExtrusionRole::TopSolidInfill];
-    default_fan_speed[ ExtrusionRole::SupportMaterialInterface] = EXTRUDER_CONFIG(support_material_interface_fan_speed);
-    default_fan_speed[ ExtrusionRole::SupportMaterial] = EXTRUDER_CONFIG(support_material_fan_speed);
-    default_fan_speed[ ExtrusionRole::ExternalPerimeter] = EXTRUDER_CONFIG(external_perimeter_fan_speed);
-    default_fan_speed[ ExtrusionRole::ThinWall] = default_fan_speed[ ExtrusionRole::ExternalPerimeter];
-    default_fan_speed[ ExtrusionRole::Perimeter] = EXTRUDER_CONFIG(perimeter_fan_speed);
-    default_fan_speed[ ExtrusionRole::SolidInfill] = EXTRUDER_CONFIG(solid_infill_fan_speed);
-    default_fan_speed[ ExtrusionRole::InternalInfill] = EXTRUDER_CONFIG(infill_fan_speed);
-    default_fan_speed[ ExtrusionRole::OverhangPerimeter] = EXTRUDER_CONFIG(overhangs_fan_speed);
-    default_fan_speed[ ExtrusionRole::GapFill] = EXTRUDER_CONFIG(gap_fill_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::BridgeInfill)] = EXTRUDER_CONFIG(bridge_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = EXTRUDER_CONFIG(bridge_internal_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] = EXTRUDER_CONFIG(top_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::Ironing)] = default_fan_speed[ uint8_t(GCodeExtrusionRole::TopSolidInfill)];
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::SupportMaterialInterface)] = EXTRUDER_CONFIG(support_material_interface_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::SupportMaterial)] = EXTRUDER_CONFIG(support_material_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] = EXTRUDER_CONFIG(external_perimeter_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::ThinWall)] = default_fan_speed[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)];
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::Perimeter)] = EXTRUDER_CONFIG(perimeter_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::SolidInfill)] = EXTRUDER_CONFIG(solid_infill_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::InternalInfill)] = EXTRUDER_CONFIG(infill_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::OverhangPerimeter)] = EXTRUDER_CONFIG(overhangs_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::GapFill)] = EXTRUDER_CONFIG(gap_fill_fan_speed);
     auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, 
             &fan_control, &fan_speeds, &default_fan_speed, &min_fan_speed]()
     {
@@ -947,7 +948,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             int   max_fan_speed             = EXTRUDER_CONFIG(max_fan_speed);
             float slowdown_below_layer_time = float(EXTRUDER_CONFIG(slowdown_below_layer_time));
             float fan_below_layer_time      = float(EXTRUDER_CONFIG(fan_below_layer_time));
-            for (int i = 0; i <  ExtrusionRole::Count; i++) {
+            for (int i = 0; i <  GCodeExtrusionRole::Count; i++) {
                 fan_speeds[i] = default_fan_speed[i];
             }
             //if not always on, the default is "no fan" and not the min.
@@ -958,7 +959,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 // Layer time very short. Enable the fan to a full throttle.
                 //fan_speed_new = std::max(max_fan_speed, fan_speed_new);
                 for (size_t etype_idx = 0; etype_idx < etype_can_increase_fan.size(); etype_idx++) {
-                    uint16_t idx = etype_can_increase_fan[etype_idx];
+                    uint16_t idx = uint8_t(etype_can_increase_fan[etype_idx]);
                     fan_speeds[idx] = std::max(max_fan_speed, fan_speeds[idx]);
                 }
                 custom_fan_speed_limits.first = fan_speeds[0];
@@ -967,7 +968,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 assert(layer_time >= slowdown_below_layer_time);
                 double t = (layer_time - slowdown_below_layer_time) / (fan_below_layer_time - slowdown_below_layer_time);
                 for (size_t etype_idx = 0; etype_idx < etype_can_increase_fan.size(); etype_idx++) {
-                    uint16_t idx = etype_can_increase_fan[etype_idx];
+                    uint16_t idx = uint8_t(etype_can_increase_fan[etype_idx]);
                     if (fan_speeds[idx] < max_fan_speed) // don't reduce speed if max speed is lower.
                         fan_speeds[idx] = std::clamp(int(t * fan_speeds[idx] + (1. - t) * max_fan_speed + 0.5), 0, 255);
                 }
@@ -982,39 +983,39 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 // Ramp up the fan speed from disable_fan_first_layers to full_fan_speed_layer.
                 float factor = float(int(layer_id + 1) - disable_fan_first_layers) / float(full_fan_speed_layer - disable_fan_first_layers);
                 for (size_t etype_idx = 0; etype_idx < etype_can_ramp_up_fan.size(); etype_idx++) {
-                    uint16_t idx = etype_can_ramp_up_fan[etype_idx];
+                    uint16_t idx = uint8_t(etype_can_ramp_up_fan[etype_idx]);
                     fan_speeds[idx] = std::clamp(int(float(fan_speeds[idx]) * factor + 0.01f), 0, 255);
                 }
                 custom_fan_speed_limits.second = fan_speeds[0];
             }
             //only activate fan control if the fan speed is higher than default
             fan_control[0] = true;
-            for (size_t i = 1; i <  ExtrusionRole::Count; i++) {
+            for (size_t i = 1; i <  GCodeExtrusionRole::Count; i++) {
                 fan_control[i] = fan_speeds[i] >= 0 && fan_speeds[i] > fan_speeds[0];
             }
 
             // if bridge_internal_fan is disabled, it takes the value of bridge_fan_control
-            if (!fan_control[ ExtrusionRole::InternalBridgeInfill] && fan_control[ ExtrusionRole::BridgeInfill]) {
-                fan_control[ ExtrusionRole::InternalBridgeInfill] = true;
-                fan_speeds[ ExtrusionRole::InternalBridgeInfill] = fan_speeds[ ExtrusionRole::BridgeInfill];
+            if (!fan_control[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] && fan_control[ uint8_t(GCodeExtrusionRole::BridgeInfill)]) {
+                fan_control[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = true;
+                fan_speeds[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = fan_speeds[ uint8_t(GCodeExtrusionRole::BridgeInfill)];
             }
 
             // if external_perimeter_fan is disabled, it takes the value of perimeter_fan
-            if (!fan_control[ ExtrusionRole::ExternalPerimeter] && fan_control[ ExtrusionRole::Perimeter]) {
-                fan_control[ ExtrusionRole::ExternalPerimeter] = true;
-                fan_speeds[ ExtrusionRole::ExternalPerimeter] = fan_speeds[ ExtrusionRole::Perimeter];
+            if (!fan_control[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] && fan_control[ uint8_t(GCodeExtrusionRole::Perimeter)]) {
+                fan_control[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] = true;
+                fan_speeds[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] = fan_speeds[ uint8_t(GCodeExtrusionRole::Perimeter)];
             }
 
             // if top_fan is disabled, it takes the value of solid_fan
-            if (!fan_control[ ExtrusionRole::TopSolidInfill] && fan_control[ ExtrusionRole::SolidInfill]) {
-                fan_control[ ExtrusionRole::TopSolidInfill] = true;
-                fan_speeds[ ExtrusionRole::TopSolidInfill] = fan_speeds[ ExtrusionRole::SolidInfill];
+            if (!fan_control[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] && fan_control[ uint8_t(GCodeExtrusionRole::SolidInfill)]) {
+                fan_control[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] = true;
+                fan_speeds[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] = fan_speeds[ uint8_t(GCodeExtrusionRole::SolidInfill)];
             }
 
         } else { // fan disabled
             fan_control[0] = true;
             fan_speeds[0] = 0;
-            for (int i = 1; i <  ExtrusionRole::Count; i++) {
+            for (int i = 1; i < uint8_t(GCodeExtrusionRole::Count); i++) {
                 fan_control[i] = false;
                 fan_speeds[i] = 0;
             }
@@ -1031,7 +1032,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
         return custom_fan_speed_limits;
     };
     //set to know all fan modifiers that can be applied ( TYPE_BRIDGE_FAN_END, TYPE_TOP_FAN_START, TYPE_SUPP_INTER_FAN_START, TYPE_EXTERNAL_PERIMETER).
-    std::vector<ExtrusionRole> extrude_tree;
+    std::vector<GCodeExtrusionRole> extrude_tree;
     const char         *pos               = gcode.c_str();
     int                 current_feedrate  = 0;
     int                 stored_fan_speed = m_fan_speed;

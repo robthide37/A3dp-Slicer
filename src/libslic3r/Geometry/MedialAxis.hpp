@@ -79,7 +79,7 @@ public:
     /// create the polylines_out collection of variable-width polyline to extrude.
     void build(ThickPolylines& polylines_out);
     /// You shouldn't use this method as it doesn't give you the variable width. Can be useful for debugging.
-    void build(Polylines& polylines);
+    //void build(Polylines& polylines);
 
     /// optional parameter: anchor area in which the extrusion should extends into. Default : expolygon (no bound)
     MedialAxis& use_bounds(const ExPolygon& _bounds) { this->m_bounds = &_bounds; return *this; }

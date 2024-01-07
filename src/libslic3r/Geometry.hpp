@@ -473,8 +473,8 @@ public:
     void set_matrix(const Transform3d& transform) { m_matrix = transform; }
 
     Transformation operator * (const Transformation& other) const;
-    bool operator==(const Transformation& trsf) const;
-    bool operator!=(const Transformation& trsf) const { return !operator==(trsf); }
+    //bool operator==(const Transformation& trsf) const;
+    //bool operator!=(const Transformation& trsf) const { return !operator==(trsf); }
 
 private:
 	friend class cereal::access;

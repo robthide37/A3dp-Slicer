@@ -943,6 +943,14 @@ FillLightning::GeneratorPtr PrintObject::prepare_lightning_infill_data()
     return has_lightning_infill ? FillLightning::build_generator(std::as_const(*this), lightning_density, [this]() -> void { this->throw_if_canceled(); }) : FillLightning::GeneratorPtr();
 }
 
+const PrintRegionConfig &PrintObject::default_region_config(const PrintRegionConfig &from_print) const {
+    //TODO check if a regionconfig set in an object modifier go through
+    if (this->m_shared_regions && num_printing_regions() > 0) {
+        return printing_region(0).config();
+    }
+    return from_print;
+}
+
 void PrintObject::clear_layers()
 {
     for (Layer *l : m_layers)

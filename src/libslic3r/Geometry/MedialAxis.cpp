@@ -721,26 +721,26 @@ namespace Slic3r { namespace Geometry {
 //SUPERSLICER version
 
 
-void
-MedialAxis::build(Polylines& polylines)
-{
-    //TODO: special case for triangles
-    //  take the longest edge
-    //  take the opposite vertex and get the otho dist
-    //  move the longest edge by X% that dist (depends on angle? from 1/2 to 1/4? or always 1/3?) use move dist as width
-    //  clip it and then enlarge it into anchor
-    //  note: ensure that if anchor is over only one edge, it's not the one choosen.
-
-    //TODO: special case for quasi-rectangle
-    //  take longest (not-anchor if any) edge
-    //  get mid-dist for each adjascent edge
-    //  use these point to get the line, with the mid-dist as widths.
-    //  enlarge it into anchor
-
-    ThickPolylines tp;
-    this->build(tp);
-    polylines.insert(polylines.end(), tp.begin(), tp.end());
-}
+//void MedialAxis::build(Polylines& polylines)
+//{
+//    //TODO: special case for triangles
+//    //  take the longest edge
+//    //  take the opposite vertex and get the otho dist
+//    //  move the longest edge by X% that dist (depends on angle? from 1/2 to 1/4? or always 1/3?) use move dist as width
+//    //  clip it and then enlarge it into anchor
+//    //  note: ensure that if anchor is over only one edge, it's not the one choosen.
+//
+//    //TODO: special case for quasi-rectangle
+//    //  take longest (not-anchor if any) edge
+//    //  get mid-dist for each adjascent edge
+//    //  use these point to get the line, with the mid-dist as widths.
+//    //  enlarge it into anchor
+//
+//    ThickPolylines tps;
+//    this->build(tps);
+//    for(ThickPolyline &tp : tps)
+//        polylines.push_back(Polyline(tps.points));
+//}
 
 void
 MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylines* polylines)

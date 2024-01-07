@@ -280,6 +280,7 @@ class ArcPolyline
 {
 protected:
     Geometry::ArcWelder::Path m_path;
+    bool cache_valid = true; // cache
     bool m_only_strait = true; // cache
     //note: i don't keep the polyline, as it's easy to reconstruct from arc (to_polyline).
     // if it creates a big preformance problem, then add a cache here.
@@ -323,17 +324,24 @@ public:
     //works on points only (be careful)
     bool split_at_index(const size_t index, ArcPolyline &p1, ArcPolyline &p2) const;
     int  find_point(const Point &point, coordf_t epsilon) const;
+    void pop_front();
+    void pop_back();
 
 
     // Works on points & arc
     double                length() const { return Geometry::ArcWelder::path_length<double>(m_path); }
+    bool                  at_least_length(coordf_t length) const;
     std::pair<int, Point> foot_pt(const Point &pt) const;
     void                  split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const;
-    void                  clip_start(coordf_t dist) { Geometry::ArcWelder::clip_start(m_path, dist); }
-    void                  clip_end(coordf_t dist) { Geometry::ArcWelder::clip_end(m_path, dist); }
+    void                  split_at(coordf_t distance, ArcPolyline &p1, ArcPolyline &p2) const;
+    void                  clip_start(coordf_t dist);
+    void                  clip_end(coordf_t dist);
     Polyline              to_polyline(coord_t deviation = 0) const;
     void                  translate(const Vector &vector);
     void                  rotate(double angle); // to test for arc, but should be okay
+    Point                 get_point_from_begin(coord_t distance) const;
+    Point                 get_point_from_end(coord_t distance) const;
+    void                  set_front(Point &p);
 
     // douglas_peuker and create arc if with_fitting_arc (don't touch the current arcs, only try in-between)
     void simplify(coordf_t tolerance, ArcFittingType with_fitting_arc, double fit_tolerance);

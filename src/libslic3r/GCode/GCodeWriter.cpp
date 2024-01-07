@@ -465,8 +465,8 @@ double GCodeWriter::get_speed() const
 
 std::string GCodeWriter::travel_to_xy(const Vec2d &point, const double speed, const std::string_view comment)
 {
-    std::ostringstream gcode;
-    gcode << write_acceleration();
+    assert(std::abs(point.x()) < 120000.);
+    assert(std::abs(point.y()) < 120000.);
 
     double travel_speed = this->config.travel_speed.value;
     if ((speed > 0) & (speed < travel_speed))
@@ -477,6 +477,30 @@ std::string GCodeWriter::travel_to_xy(const Vec2d &point, const double speed, co
     
     GCodeG1Formatter w(this->get_default_gcode_formatter());
     w.emit_xy(point);
+    w.emit_f(travel_speed * 60);
+    w.emit_comment(this->config.gcode_comments, comment);
+    return write_acceleration() + w.string();
+}
+
+std::string GCodeWriter::travel_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const bool is_ccw, const double speed, const std::string_view comment)
+{
+    assert(std::abs(point.x()) < 120000.);
+    assert(std::abs(point.y()) < 120000.);
+    assert(std::abs(center_offset.x()) < 12000000.);
+    assert(std::abs(center_offset.y()) < 12000000.);
+    assert(std::abs(center_offset.x()) >= EPSILON * 10 || std::abs(center_offset.y()) >= EPSILON * 10);
+    
+
+    double travel_speed = this->config.travel_speed.value;
+    if ((speed > 0) & (speed < travel_speed))
+        travel_speed = speed;
+
+    m_pos.x()             = point.x();
+    m_pos.y()             = point.y();
+
+    GCodeG2G3Formatter w(this->config.gcode_precision_xyz.value, this->config.gcode_precision_e.value, is_ccw);
+    w.emit_xy(point);
+    w.emit_ij(center_offset);
     w.emit_f(travel_speed * 60);
     w.emit_comment(this->config.gcode_comments, comment);
     return write_acceleration() + w.string();

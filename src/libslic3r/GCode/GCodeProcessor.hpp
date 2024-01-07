@@ -7,6 +7,7 @@
 #ifndef slic3r_GCodeProcessor_hpp_
 #define slic3r_GCodeProcessor_hpp_
 
+#include "libslic3r/Print.hpp"
 #include "libslic3r/GCodeReader.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/ExtrusionRole.hpp"
@@ -25,7 +26,7 @@
 
 namespace Slic3r {
 
-  class Print;
+    //class StatusMonitor;
 
     enum class EMoveType : unsigned char
     {
@@ -95,22 +96,6 @@ namespace Slic3r {
             cost_per_extruder.clear();
         }
     };
-
-    struct ConflictResult
-    {
-        std::string _objName1;
-        std::string _objName2;
-        double      _height;
-        const void* _obj1; // nullptr means wipe tower
-        const void* _obj2;
-        int         layer = -1;
-        ConflictResult(const std::string& objName1, const std::string& objName2, double height, const void* obj1, const void* obj2)
-          : _objName1(objName1), _objName2(objName2), _height(height), _obj1(obj1), _obj2(obj2)
-        {}
-        ConflictResult() = default;
-    };
-
-    using ConflictResultOpt = std::optional<ConflictResult>;
 
     struct GCodeProcessorResult
     {
@@ -639,6 +624,8 @@ namespace Slic3r {
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
         bool m_single_extruder_multi_material;
+        std::vector<float> m_speed_factor_override_percentage; //M220
+        std::vector<float> m_extrude_factor_override_percentage; //M221
 
 
         enum class EProducer
@@ -662,7 +649,7 @@ namespace Slic3r {
         TimeProcessor m_time_processor;
         UsedFilaments m_used_filaments;
 
-        Print* m_print{ nullptr };
+        Print::StatusMonitor* m_status_monitor{ nullptr }; //dangerous
 
         GCodeProcessorResult m_result;
         static unsigned int s_result_id;
@@ -677,7 +664,7 @@ namespace Slic3r {
         GCodeProcessor();
 
         void apply_config(const PrintConfig& config);
-        void set_print(Print* print) { m_print = print; }
+        void set_status_monitor(Print::StatusMonitor* print) { m_status_monitor = print; }
         bgcode::binarize::BinaryData& get_binary_data() { return m_binarizer.get_binary_data(); }
         const bgcode::binarize::BinaryData& get_binary_data() const { return m_binarizer.get_binary_data(); }
 
@@ -718,6 +705,7 @@ namespace Slic3r {
 
     private:
         void apply_config(const DynamicPrintConfig& config);
+        void apply_config_prusaslicer(const std::string& filename);
         void apply_config_simplify3d(const std::string& filename);
         void apply_config_superslicer(const std::string& filename);
         void apply_config_kissslicer(const std::string& filename);
