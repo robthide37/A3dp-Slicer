@@ -1098,6 +1098,10 @@ void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, do
 {
     if (values.empty())
         return;
+    if (values.size() < 2) {
+        long_step = -1.0;
+        return;
+    }
     int DPI = GUI::get_dpi_for_window(win);
     int pixels_per_sm = lround((double)(DPI) * 5.0/25.4);
 
