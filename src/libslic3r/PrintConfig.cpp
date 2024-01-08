@@ -2293,7 +2293,7 @@ void PrintConfigDef::init_fff_params()
     def             = this->add("fill_angle_cross", coBool);
     def->label      = L("Alternate Fill Angle");
     def->category   = OptionCategory::infill;
-    def->tooltip    = L("It's better for some infill like rectilinear to rotate 90° each layer. If this settign is deactivated, they won't do that anymore.");
+    def->tooltip    = L("It's better for some infill like rectilinear to rotate 90° each layer. If this setting is deactivated, they won't do that anymore.");
     def->mode       = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(true));
 
@@ -4246,7 +4246,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::customgcode;
     def->tooltip = L("If you want to process the output G-code through custom scripts, "
                    "just list their absolute paths here."
-                   "\nSeparate multiple scripts with a semicolon or a line return.\n!! please use '\;' here if you want a not-line-separation ';'!!"
+                   "\nSeparate multiple scripts with a semicolon or a line return.\n!! please use '\\;' here if you want a not-line-separation ';'!!"
                    "\nScripts will be passed the absolute path to the G-code file as the first argument, "
                    "and they can access the Slic3r config settings by reading environment variables."
                    "\nThe script, if passed as a relative path, will also be searched from the slic3r directory, "
