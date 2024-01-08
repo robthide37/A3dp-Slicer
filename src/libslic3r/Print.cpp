@@ -52,7 +52,7 @@ void Print::clear()
 }
 
 // Called by Print::apply().
-// This method only accepts PrintConfig option keys.
+// This method only accepts PrintConfig option keys. Not PrintObjectConfig or PrintRegionConfig, go to PrintObject for these
 bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* new_config */, const std::vector<t_config_option_key> &opt_keys)
 {
     if (opt_keys.empty())
@@ -67,13 +67,14 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "avoid_crossing_top",
         "bed_shape",
         "bed_temperature",
-        "chamber_temperature",
         "before_layer_gcode",
         "between_objects_gcode",
         "bridge_acceleration",
         "bridge_internal_acceleration",
         "bridge_fan_speed",
         "bridge_internal_fan_speed",
+        "brim_acceleration",
+        "chamber_temperature",
         "colorprint_heights",
         "complete_objects_sort",
         "cooling",
@@ -230,16 +231,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         } else if (steps_ignore.find(opt_key) != steps_ignore.end()) {
             // These steps have no influence on the G-code whatsoever. Just ignore them.
         } else if (
-               opt_key == "brim_inside_holes"
-            || opt_key == "brim_width"
-            || opt_key == "brim_width_interior"
-            || opt_key == "brim_ears"
-            || opt_key == "brim_ears_detection_length"
-            || opt_key == "brim_ears_max_angle"
-            || opt_key == "brim_ears_pattern"
-            || opt_key == "brim_per_object"
-            || opt_key == "brim_separation"
-            || opt_key == "complete_objects_one_skirt"
+            opt_key == "complete_objects_one_skirt"
             || opt_key == "draft_shield"
             || opt_key == "min_skirt_length"
             || opt_key == "ooze_prevention"

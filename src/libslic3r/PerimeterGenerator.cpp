@@ -38,6 +38,25 @@
 #endif
 
 namespace Slic3r {
+
+//struct CollectionSimplifyVisitor : public ExtrusionVisitor
+//{
+//    ExtrusionEntityCollection *previous = nullptr;
+//    virtual void default_use(ExtrusionEntity& entity) override {};
+//    virtual void use(ExtrusionEntityCollection &coll) override
+//    {
+//        if (previous && coll.entities().size() == 1) {
+//            previous->append_move_from(coll);
+//        } else {
+//            ExtrusionEntityCollection *old_previous = previous;
+//            previous                                = &coll;
+//            for (size_t i = 0; i < coll.entities().size(); ++i) { coll.set_entities()[i]->visit(*this); }
+//            previous = old_previous;
+//        }
+//    }
+//};
+
+
 PerimeterGeneratorLoops get_all_Childs(PerimeterGeneratorLoop loop) {
     PerimeterGeneratorLoops ret;
     for (PerimeterGeneratorLoop &child : loop.children) {
@@ -348,8 +367,12 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
     std::unordered_map<const Arachne::ExtrusionLine*, size_t> map_extrusion_to_idx;
     for (size_t idx = 0; idx < all_extrusions.size(); idx++)
         map_extrusion_to_idx.emplace(all_extrusions[idx], idx);
-
-    auto extrusions_constrains = Arachne::WallToolPaths::getRegionOrder(all_extrusions, this->config->external_perimeters_first);
+    
+    //TODO: order extrusion for contour/hole separatly
+    bool reverse_order = this->config->external_perimeters_first
+        || (this->object_config->brim_width.value > 0 && this->layer->id() == 0)
+        || (this->object_config->brim_width_interior.value > 0 && this->layer->id() == 0);
+    auto extrusions_constrains = Arachne::WallToolPaths::getRegionOrder(all_extrusions, reverse_order);
     for (auto [before, after] : extrusions_constrains) {
         auto after_it = map_extrusion_to_idx.find(after);
         ++blocked[after_it->second];
@@ -1598,6 +1621,19 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
 #if _DEBUG
         peri_entities.visit(LoopAssertVisitor{});
 #endif
+        // remove the un-needed top collection if only one child.
+        //peri_entities.visit(CollectionSimplifyVisitor{});
+        if (peri_entities.entities().size() == 1) {
+            if (ExtrusionEntityCollection *coll_child = dynamic_cast<ExtrusionEntityCollection *>(
+                    peri_entities.set_entities().front());
+                coll_child != nullptr) {
+                peri_entities.set_can_sort_reverse(coll_child->can_sort(), coll_child->can_reverse());
+                peri_entities.append_move_from(*coll_child);
+                peri_entities.remove(0);
+            }
+        }
+
+
         //{
         //    static int aodfjiaqsdz = 0;
         //    std::stringstream stri;
@@ -1613,69 +1649,6 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
         //    svg.Close();
         //}
 
-
-        // if brim will be printed, reverse the order of perimeters so that
-        // we continue inwards after having finished the brim
-        // be careful to not print thin walls before perimeters (gapfill will be added after so don't worry for them)
-        // TODO: add test for perimeter order
-        const bool brim_first_layer = this->layer->id() == 0 && (this->object_config->brim_width.value > 0 || this->object_config->brim_width_interior.value > 0);
-        if (this->config->external_perimeters_first || brim_first_layer) {
-            if (this->config->external_perimeters_nothole.value || brim_first_layer) {
-                if (this->config->external_perimeters_hole.value || brim_first_layer) {
-                    //reverse only not-thin wall
-                    ExtrusionEntityCollection coll2;
-                    for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if ( (loop->is_loop() && loop->role() != erThinWall)) {
-                            coll2.append(*loop);
-                        }
-                    }
-                    coll2.reverse();
-                    for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if (!((loop->is_loop() && loop->role() != erThinWall))) {
-                            coll2.append(*loop);
-                        }
-                    }
-                    //note: this hacky thing is possible because coll2.entities contains in fact peri_entities's entities
-                    //if you does peri_entities = coll2, you'll delete peri_entities's entities() and then you have nothing.
-                    peri_entities = std::move(coll2);
-                } else {
-                    //reverse only not-hole perimeters
-                    ExtrusionEntityCollection coll2;
-                    for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if ((loop->is_loop() && loop->role() != erThinWall) && !(((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0) {
-                            coll2.append(*loop);
-                        }
-                    }
-                    coll2.reverse();
-                    for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                        if (!((loop->is_loop() && loop->role() != erThinWall) && !(((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0)) {
-                            coll2.append(*loop);
-                        }
-                    }
-                    //note: this hacky thing is possible because coll2.entities contains in fact entities's entities
-                    //if you does peri_entities = coll2, you'll delete peri_entities's entities and then you have nothing.
-                    peri_entities = std::move(coll2);
-                }
-            } else if (this->config->external_perimeters_hole.value) {
-                //reverse the hole, and put them in first place.
-                ExtrusionEntityCollection coll2;
-                for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                    if ((loop->is_loop() && loop->role() != erThinWall) && (((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0) {
-                        coll2.append(*loop);
-                    }
-                }
-                coll2.reverse();
-                for (const ExtrusionEntity* loop : peri_entities.entities()) {
-                    if (!((loop->is_loop() && loop->role() != erThinWall) && (((ExtrusionLoop*)loop)->loop_role() & ExtrusionLoopRole::elrHole) != 0)) {
-                        coll2.append(*loop);
-                    }
-                }
-                //note: this hacky thing is possible because coll2.entities contains in fact peri_entities's entities
-                //if you does peri_entities = coll2, you'll delete peri_entities's entities and then you have nothing.
-                peri_entities = std::move(coll2);
-            }
-
-        }
         // append perimeters for this slice as a collection
         if (!peri_entities.empty()) {
             //move it, to avoid to clone evrything and then delete it
@@ -2651,6 +2624,13 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
         if (idx.first >= loops.size())
             better_chain.push_back(idx);
     }
+    
+    // if brim will be printed, reverse the order of perimeters so that
+    // we continue inwards after having finished the brim
+    const bool reverse_contour  = (this->layer->id() == 0 && this->object_config->brim_width.value > 0) ||
+                           (this->config->external_perimeters_first.value && this->config->external_perimeters_nothole.value);
+    const bool reverse_hole = (this->layer->id() == 0 && this->object_config->brim_width_interior.value > 0) || 
+                           (this->config->external_perimeters_first.value && this->config->external_perimeters_hole.value);
 
     //move from coll to coll_out and getting children of each in the same time. (deep first)
     for (const std::pair<size_t, bool> &idx : better_chain) {
@@ -2691,9 +2671,10 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
             assert(thin_walls.empty());
             ExtrusionEntityCollection children = this->_traverse_loops(loop.children, thin_walls, has_overhang ? 1 : count_since_overhang < 0 ? -1 : (count_since_overhang+1));
             coll[idx.first] = nullptr;
-            if (loop.is_contour) {
+            if ((loop.is_contour && !reverse_contour) || (!loop.is_contour && reverse_hole)) {
                 //note: this->layer->id() % 2 == 1 already taken into account in the is_steep_overhang compute (to save time).
-                if (loop.is_steep_overhang && this->layer->id() % 2 == 1)
+                // if contour: reverse if steep_overhang & odd. if hole: the opposite
+                if ((loop.is_steep_overhang && this->layer->id() % 2 == 1) == loop.is_contour)
                     eloop->make_clockwise();
                 else
                     eloop->make_counter_clockwise();
@@ -2701,10 +2682,10 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
                 if (!children.empty()) {
                     ExtrusionEntityCollection print_child_beforeplz;
                     print_child_beforeplz.set_can_sort_reverse(false, false);
-                    if (children.entities().size() > 1) {
+                    if (children.entities().size() > 1 && (children.can_reverse() || children.can_sort())) {
                         print_child_beforeplz.append(children);
                     } else {
-                        print_child_beforeplz.append(std::move(children.entities()));
+                        print_child_beforeplz.append_move_from(children);
                     }
                     print_child_beforeplz.append(*eloop);
                     coll_out.append(std::move(print_child_beforeplz));
@@ -2712,7 +2693,8 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
                     coll_out.append(*eloop);
                 }
             } else {
-                if (loop.is_steep_overhang && this->layer->id() % 2 == 1)
+                // if hole: reverse if steep_overhang & odd. if contour: the opposite
+                if ((loop.is_steep_overhang && this->layer->id() % 2 == 1) != loop.is_contour)
                     eloop->make_counter_clockwise();
                 else
                     eloop->make_clockwise();
@@ -2721,10 +2703,10 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
                     ExtrusionEntityCollection print_child_beforeplz;
                     print_child_beforeplz.set_can_sort_reverse(false, false);
                     print_child_beforeplz.append(*eloop);
-                    if (children.entities().size() > 1) {
+                    if (children.entities().size() > 1 && (children.can_reverse() || children.can_sort())) {
                         print_child_beforeplz.append(children);
                     } else {
-                        print_child_beforeplz.append(std::move(children.entities()));
+                        print_child_beforeplz.append_move_from(children);
                     }
                     coll_out.append(std::move(print_child_beforeplz));
                 } else {
@@ -2778,7 +2760,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
             ClipperLib_Z::Path extrusion_path;
             extrusion_path.reserve(extrusion->size());
             for (const Arachne::ExtrusionJunction& ej : extrusion->junctions) {
-                //remove duplicate poitns from arachne
+                //remove duplicate points from arachne
                 if(extrusion_path.empty() || 
                     (ej.p.x() != extrusion_path.back().x() || ej.p.y() != extrusion_path.back().y()))
                     extrusion_path.emplace_back(ej.p.x(), ej.p.y(), ej.w);
@@ -3016,7 +2998,6 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
             current_loop = last_loop;
         }
         virtual void use(ExtrusionEntityCollection &collection) override {
-            collection.set_can_sort_reverse(true, true);
             //for each loop? (or other collections)
             for (ExtrusionEntity *entity : collection.entities())
                 entity->visit(*this);
