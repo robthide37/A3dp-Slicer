@@ -1249,7 +1249,12 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         // Prusa Multi-Material wipe tower.
         if (has_wipe_tower && ! layers_to_print.empty()) {
             m_wipe_tower = std::make_unique<GCode::WipeTowerIntegration>(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get());
-            file.write(m_writer.travel_to_z(first_layer_height + m_config.z_offset.value, "Move to the first layer height"));
+
+            // Set position for wipe tower generation.
+            Vec3d new_position = this->writer().get_position();
+            new_position.z() = first_layer_height + m_config.z_offset.value;
+            this->writer().update_position(new_position);
+
             if (print.config().single_extruder_multi_material_priming) {
                 file.write(m_wipe_tower->prime(*this));
                 // Verify, whether the print overaps the priming extrusions.
@@ -2195,7 +2200,7 @@ LayerResult GCodeGenerator::process_layer(
     m_current_layer_first_position = std::nullopt;
 
     // Set new layer - this will change Z and force a retraction if retract_layer_change is enabled.
-    if (! print.config().before_layer_gcode.value.empty()) {
+    if (!first_layer && ! print.config().before_layer_gcode.value.empty()) {
         DynamicConfig config;
         config.set_key_value("layer_num",   new ConfigOptionInt(m_layer_index + 1));
         config.set_key_value("layer_z",     new ConfigOptionFloat(print_z));
@@ -2210,7 +2215,7 @@ LayerResult GCodeGenerator::process_layer(
         m_travel_obstacle_tracker.init_layer(layer, layers);
 
     m_object_layer_over_raft = false;
-    if (! print.config().layer_gcode.value.empty()) {
+    if (!first_layer && ! print.config().layer_gcode.value.empty()) {
         DynamicConfig config;
         config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
         config.set_key_value("layer_z",   new ConfigOptionFloat(print_z));
@@ -2346,13 +2351,12 @@ LayerResult GCodeGenerator::process_layer(
         && EXTRUDER_CONFIG(travel_ramping_lift)
         && EXTRUDER_CONFIG(travel_slope) > 0 && EXTRUDER_CONFIG(travel_slope) < 90
     );
-    if (do_ramping_layer_change) {
+    if (first_layer) {
+        layer_change_gcode = ""; // Explicit for readability.
+    } else if (do_ramping_layer_change) {
         layer_change_gcode = this->get_layer_change_gcode(*m_previous_layer_last_position, *m_current_layer_first_position, *m_layer_change_extruder_id);
     } else {
-        if (!m_current_layer_first_position) {
-            throw std::runtime_error("Destination is required for layer change!");
-        }
-        layer_change_gcode = this->writer().get_travel_to_z_gcode(m_current_layer_first_position->z(), "simple layer change");
+        layer_change_gcode = this->writer().get_travel_to_z_gcode(m_config.z_offset.value + print_z, "simple layer change");
     }
 
     boost::algorithm::replace_first(gcode, tag, layer_change_gcode);
@@ -2675,7 +2679,7 @@ std::string GCodeGenerator::change_layer(
         gcode += this->retract_and_wipe();
 
     Vec3d new_position = this->writer().get_position();
-    new_position.z() = print_z;
+    new_position.z() = print_z + m_config.z_offset.value;
     this->writer().update_position(new_position);
 
     m_previous_layer_last_position = this->last_position ?

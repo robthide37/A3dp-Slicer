@@ -60,8 +60,8 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
         const Point xy_point = wipe_tower_point_to_object_point(gcodegen, start_pos);
         gcode += gcodegen.retract_and_wipe();
         gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
+        const std::string comment{"Travel to a Wipe Tower"};
         if (gcodegen.m_current_layer_first_position) {
-            const std::string comment{"Travel to a Wipe Tower"};
             if (gcodegen.last_position) {
                 gcode += gcodegen.travel_to(
                     *gcodegen.last_position, xy_point, ExtrusionRole::Mixed, comment
@@ -72,13 +72,13 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
             }
         } else {
             const Vec3crd point = to_3d(xy_point, scaled(z));
-            const Vec3d gcode_point = to_3d(gcodegen.point_to_gcode(point.head<2>()), z);
+            const Vec3d gcode_point = gcodegen.point_to_gcode(point);
             gcodegen.last_position = point.head<2>();
             gcodegen.writer().update_position(gcode_point);
             gcode += gcodegen.writer()
-                         .get_travel_to_xy_gcode(gcode_point.head<2>(), "move to first layer point");
+                         .get_travel_to_xy_gcode(gcode_point.head<2>(), comment);
             gcode += gcodegen.writer()
-                         .get_travel_to_z_gcode(gcode_point.z(), "move to first layer point");
+                         .get_travel_to_z_gcode(gcode_point.z(), comment);
             gcodegen.m_current_layer_first_position = gcode_point;
         }
         gcode += gcodegen.unretract();
