@@ -636,7 +636,10 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std
 std::string GCodeWriter::retract(bool before_wipe)
 {
     double factor = before_wipe ? m_tool->retract_before_wipe() : 1.;
-    assert(factor >= 0. && factor <= 1. + EPSILON);
+    assert((factor >= 0. || before_wipe) && factor <= 1. + EPSILON);
+    // if before_wipe but no retract_before_wipe, then no retract
+    if (factor == 0)
+        return "";
     //check for override
     if (config_region && config_region->print_retract_length >= 0) {
         return this->_retract(
@@ -646,8 +649,6 @@ std::string GCodeWriter::retract(bool before_wipe)
             "retract"
         );
     }
-    auto rect_length = m_tool->retract_length();
-    auto rect_length2 = m_tool->retract_restart_extra();
     return this->_retract(
         factor * m_tool->retract_length(),
         factor * m_tool->retract_restart_extra(),
