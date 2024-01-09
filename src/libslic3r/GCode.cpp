@@ -2641,7 +2641,9 @@ void GCodeGenerator::set_origin(const Vec2d &pointf)
 {
     // if origin increases (goes towards right), last_pos decreases because it goes towards left
     const auto offset = Point::new_scale(m_origin - pointf);
-    *(this->last_position) += offset;
+    if (last_position.has_value())
+        *(this->last_position) += offset;
+
     m_wipe.offset_path(offset);
     m_origin = pointf;
 }
