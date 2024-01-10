@@ -804,7 +804,19 @@ void PerimeterGenerator::process()
                 this->get_ext_perimeter_spacing() / 2 :
                 // two or more loops?
                 this->get_perimeter_spacing() / 2;
-            infill_peri_overlap = scale_t(this->config->get_abs_value("infill_overlap", unscale<coordf_t>(perimeter_spacing + solid_infill_spacing) / 2));
+            //infill_peri_overlap = scale_t(this->config->get_abs_value("infill_overlap", unscale<coordf_t>(perimeter_spacing + solid_infill_spacing) / 2));
+            //give the overlap size to let the infill do his overlap
+            //add overlap if at least one perimeter
+            coordf_t perimeter_spacing_for_encroach = 0;
+            if(this->config->perimeters == 1)
+                perimeter_spacing_for_encroach = this->ext_perimeter_flow.spacing();
+            else if(this->config->only_one_perimeter_top.value)
+                //note: use the min of the two to avoid overextrusion if only one perimeter top
+                // TODO: only do that if there is a top & a not-top surface
+                perimeter_spacing_for_encroach = std::min(this->perimeter_flow.spacing(), this->ext_perimeter_flow.spacing());
+            else //if(layerm->region().config().perimeters > 1)
+                perimeter_spacing_for_encroach = this->perimeter_flow.spacing();
+            infill_peri_overlap = scale_t(this->config->get_abs_value("infill_overlap", perimeter_spacing_for_encroach));
         }
 
         //remove gapfill from last
@@ -2609,21 +2621,25 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
 
     //little check: if you have external holes with only one extrusion and internal things, please draw the internal first, just in case it can help print the hole better.
     std::vector<std::pair<size_t, bool>> better_chain;
-    for (const std::pair<size_t, bool>& idx : chain) {
-        if(idx.first < loops.size())
-            if (!loops[idx.first].is_external() || (!loops[idx.first].is_contour && !loops[idx.first].children.empty()))
-                better_chain.push_back(idx);
+    {
+        std::vector<std::pair<size_t, bool>> alone_holes;
+        std::vector<std::pair<size_t, bool>> keep_ordering;
+        std::vector<std::pair<size_t, bool>> thin_walls;
+        for (const std::pair<size_t, bool> &idx : chain) {
+            if (idx.first < loops.size())
+                if (!loops[idx.first].is_external() ||
+                    (!loops[idx.first].is_contour && !loops[idx.first].children.empty()))
+                    alone_holes.push_back(idx);
+                else
+                    keep_ordering.push_back(idx);
+            else
+                thin_walls.push_back(idx);
+        }
+        append(better_chain, std::move(alone_holes));
+        append(better_chain, std::move(keep_ordering));
+        append(better_chain, std::move(thin_walls));
     }
-    for (const std::pair<size_t, bool>& idx : chain) {
-        if (idx.first < loops.size())
-            if (idx.first < loops.size() && loops[idx.first].is_external() && !(!loops[idx.first].is_contour && !loops[idx.first].children.empty()))
-                better_chain.push_back(idx);
-    }
-    //thin walls always last!
-    for (const std::pair<size_t, bool>& idx : chain) {
-        if (idx.first >= loops.size())
-            better_chain.push_back(idx);
-    }
+    assert(better_chain.size() == chain.size());
     
     // if brim will be printed, reverse the order of perimeters so that
     // we continue inwards after having finished the brim

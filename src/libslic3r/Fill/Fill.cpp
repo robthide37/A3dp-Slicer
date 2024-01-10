@@ -532,7 +532,14 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
         //give the overlap size to let the infill do his overlap
         //add overlap if at least one perimeter
-        const float perimeter_spacing = layerm->flow(frPerimeter).spacing();
+        float perimeter_spacing = 0;
+        if(layerm->region().config().perimeters == 1)
+            perimeter_spacing = layerm->flow(frExternalPerimeter).spacing();
+        else if(layerm->region().config().only_one_perimeter_top)
+            //note: use the min of the two to avoid overextrusion if only one perimeter top
+            perimeter_spacing = std::min(layerm->flow(frPerimeter).spacing(), layerm->flow(frExternalPerimeter).spacing());
+        else //if(layerm->region().config().perimeters > 1)
+            perimeter_spacing = layerm->flow(frPerimeter).spacing();
 
         // Used by the concentric infill pattern to clip the loops to create extrusion paths.
         f->loop_clipping = scale_t(layerm->region().config().get_computed_value("seam_gap", surface_fill.params.extruder - 1) * surface_fill.params.flow.nozzle_diameter());

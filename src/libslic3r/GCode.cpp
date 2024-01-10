@@ -3277,7 +3277,7 @@ LayerResult GCode::process_layer(
             if (this->m_layer != nullptr && this->m_layer->id() == 0) {
                 m_avoid_crossing_perimeters.use_external_mp(true);
                 for (const ExtrusionEntity* ee : print_object->brim().entities())
-                    gcode += this->extrude_entity(*ee, "brim");
+                    gcode += this->extrude_entity(*ee, "Brim");
                 m_avoid_crossing_perimeters.use_external_mp(false);
                 m_avoid_crossing_perimeters.disable_once();
                 m_last_too_small.polyline.clear();
@@ -3386,7 +3386,7 @@ LayerResult GCode::process_layer(
                         assert(instance_to_print.print_object.brim().entities()[instance_to_print.instance_id]->is_collection());
                         if (const ExtrusionEntityCollection* coll = dynamic_cast<const ExtrusionEntityCollection*>(instance_to_print.print_object.brim().entities()[instance_to_print.instance_id])) {
                             for (const ExtrusionEntity* ee : coll->entities())
-                                gcode += this->extrude_entity(*ee, "brim");
+                                gcode += this->extrude_entity(*ee, "Brim");
                         }
                         m_avoid_crossing_perimeters.use_external_mp(false);
                         m_avoid_crossing_perimeters.disable_once();

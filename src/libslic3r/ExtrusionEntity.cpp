@@ -378,29 +378,80 @@ ExtrusionRole ExtrusionEntity::string_to_role(const std::string_view role)
     else
         return erNone;
 }
+
+
+std::string role_to_code(ExtrusionRole role)
+{
+    switch (role) {
+        case erNone                         : return L("None");
+        case erPerimeter                    : return L("IPeri");
+        case erExternalPerimeter            : return L("EPeri");
+        case erOverhangPerimeter            : return L("OPeri");
+        case erInternalInfill               : return L("IFill");
+        case erSolidInfill                  : return L("SFill");
+        case erTopSolidInfill               : return L("TFill");
+        case erIroning                      : return L("Iron");
+        case erBridgeInfill                 : return L("EBridge");
+        case erInternalBridgeInfill         : return L("IBridge");
+        case erThinWall                     : return L("ThinW");
+        case erGapFill                      : return L("GFill");
+        case erSkirt                        : return L("Skirt");
+        case erSupportMaterial              : return L("Supp");
+        case erSupportMaterialInterface     : return L("SuppI");
+        case erWipeTower                    : return L("WTower");
+        case erMilling                      : return L("Mill");
+        case erCustom                       : return L("Custom");
+        case erMixed                        : return L("Mixed");
+        case erTravel                       : return L("Travel");
+        default                             : assert(false);
+    }
+
+    return "";
+}
+
+
+std::string looprole_to_code(ExtrusionLoopRole looprole)
+{
+    std::string code;
+    if(elrDefault == (looprole & elrDefault))
+        code += std::string("D");
+    if(elrInternal == (looprole & elrInternal))
+        code += std::string("Int");
+    if(elrSkirt == (looprole & elrSkirt))
+        code += std::string("Skirt");
+    if(elrHole == (looprole & elrHole))
+        code += std::string("Hole");
+    if(elrVase == (looprole & elrVase))
+        code += std::string("Vase");
+    if(elrFirstLoop == (looprole & elrFirstLoop))
+        code += std::string("First");
+
+    return code;
+}
+
 void ExtrusionPrinter::use(const ExtrusionPath &path) { 
-    ss << "ExtrusionPath:" << (uint16_t)path.role() << "{";
+    ss << (json?"\"":"") << "ExtrusionPath" << (path.can_reverse()?"":"Oriented") << (json?"_":":") << role_to_code(path.role()) << (json?"\":":"") << "[";
     for (int i = 0; i < path.polyline.size(); i++) {
         if (i != 0) ss << ",";
         double x = (mult * (path.polyline.get_points()[i].x()));
         double y = (mult * (path.polyline.get_points()[i].y()));
-        ss << std::fixed << "{"<<(trunc?(int)x:x) << "," << (trunc ? (int)y : y) <<"}";
+        ss << std::fixed << "["<<(trunc>0?(int(x*trunc))/double(trunc):x) << "," << (trunc>0?(int(y*trunc))/double(trunc):y) <<"]";
     }
-    ss << "}";
+    ss << "]";
 }
 void ExtrusionPrinter::use(const ExtrusionPath3D &path3D) {
-    ss << "ExtrusionPath3D:" << (uint16_t)path3D.role() << "{";
+    ss << (json?"\"":"") << "ExtrusionPath3D" << (path3D.can_reverse()?"":"Oriented") << (json?"_":":") << role_to_code(path3D.role()) << (json?"\":":"") << "[";
     for (int i = 0; i < path3D.polyline.size();i++){
         if (i != 0) ss << ",";
         double x = (mult * (path3D.polyline.get_points()[i].x()));
         double y = (mult * (path3D.polyline.get_points()[i].y()));
         double z = (path3D.z_offsets.size() > i ? mult * (path3D.z_offsets[i]) : -1);
-        ss << std::fixed << "{" << (trunc ? (int)x : x) << "," << (trunc ? (int)y : y) << "," << (trunc ? (int)z : z) << "}";
+        ss << std::fixed << "[" << (trunc>0?(int(x*trunc))/double(trunc):x) << "," << (trunc>0?(int(y*trunc))/double(trunc):y) << "," << (trunc>0?(int(z*trunc))/double(trunc):z) << "]";
     }
-    ss << "}";
+    ss << "]";
 }
 void ExtrusionPrinter::use(const ExtrusionMultiPath &multipath) {
-    ss << "ExtrusionMultiPath:" << (uint16_t)multipath.role() << "{";
+    ss << (json?"\"":"") << "ExtrusionMultiPath" << (multipath.can_reverse()?"":"Oriented") << (json?"_":":") << role_to_code(multipath.role()) << (json?"\":":"") << "{";
     for (int i = 0; i < multipath.paths.size(); i++) {
         if (i != 0) ss << ",";
         multipath.paths[i].visit(*this);
@@ -408,7 +459,7 @@ void ExtrusionPrinter::use(const ExtrusionMultiPath &multipath) {
     ss << "}";
 }
 void ExtrusionPrinter::use(const ExtrusionMultiPath3D &multipath3D) {
-    ss << "multipath3D:" << (uint16_t)multipath3D.role() << "{";
+    ss << (json?"\"":"") << "multipath3D" << (multipath3D.can_reverse()?"":"Oriented") << (json?"_":":") << role_to_code(multipath3D.role()) << (json?"\":":"") << "{";
     for (int i = 0; i < multipath3D.paths.size(); i++) {
         if (i != 0) ss << ",";
         multipath3D.paths[i].visit(*this);
@@ -416,7 +467,8 @@ void ExtrusionPrinter::use(const ExtrusionMultiPath3D &multipath3D) {
     ss << "}";
 }
 void ExtrusionPrinter::use(const ExtrusionLoop &loop) { 
-    ss << "ExtrusionLoop:" << (uint16_t)loop.role()<<":" <<(uint16_t)loop.loop_role()<<"{";
+    ss << (json?"\"":"") << "ExtrusionLoop" << (json?"_":":") << role_to_code(loop.role())<<"_" << looprole_to_code(loop.loop_role()) << (json?"\":":"") << "{";
+    if(!loop.can_reverse()) ss << (json?"\"":"") << "oriented" << (json?"\":":"=") << "true,";
     for (int i = 0; i < loop.paths.size(); i++) {
         if (i != 0) ss << ",";
         loop.paths[i].visit(*this);
@@ -424,12 +476,13 @@ void ExtrusionPrinter::use(const ExtrusionLoop &loop) {
     ss << "}";
 }
 void ExtrusionPrinter::use(const ExtrusionEntityCollection &collection) {
-    ss << "ExtrusionEntityCollection:" << (uint16_t)collection.role() << "{";
+    ss << (json?"\"":"") << "ExtrusionEntityCollection" << (json?"_":":") << role_to_code(collection.role()) << (json?"\":":"") << "{";
+    if(!collection.can_sort()) ss << (json?"\"":"") << "no_sort" << (json?"\":":"=") << "true,";
+    if(!collection.can_reverse()) ss << (json?"\"":"") << "oriented" << (json?"\":":"=") << "true,";
     for (int i = 0; i < collection.entities().size(); i++) {
         if (i != 0) ss << ",";
         collection.entities()[i]->visit(*this);
     }
-    if(!collection.can_sort()) ss<<", no_sort=true";
     ss << "}";
 }
 

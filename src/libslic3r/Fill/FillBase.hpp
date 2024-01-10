@@ -173,6 +173,7 @@ protected:
         ExPolygon                         /* expolygon */,
         Polylines                       & /* polylines_out */) const {
         BOOST_LOG_TRIVIAL(error)<<"Error, the fill isn't implemented";
+        assert(false);
     };
 
     // Used for concentric infill to generate ThickPolylines using Arachne.
@@ -182,6 +183,7 @@ protected:
                                       ExPolygon                      expolygon,
                                       ThickPolylines                &thick_polylines_out) const {
         BOOST_LOG_TRIVIAL(error) << "Error, the arachne fill isn't implemented";
+        assert(false);
     };
 
     virtual float _layer_angle(size_t idx) const { return can_angle_cross && (idx & 1) ? float(M_PI/2.) : 0; }

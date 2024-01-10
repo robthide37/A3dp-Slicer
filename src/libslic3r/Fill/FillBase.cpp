@@ -167,17 +167,7 @@ double Fill::compute_unscaled_volume_to_fill(const Surface* surface, const FillP
     } else {
         for (const ExPolygon& poly : intersection_ex(ExPolygons{ surface->expolygon }, this->no_overlap_expolygons)) {
             polyline_volume += params.flow.height() * unscaled(unscaled(poly.area()));
-            double perimeter_gap_usage = params.config->perimeter_overlap.get_abs_value(1);
-            // add external "perimeter gap"
-            //TODO: use filament_max_overlap to reduce it 
-            //double filament_max_overlap = params.config->get_computed_value("filament_max_overlap", params.extruder - 1);
-            double perimeter_round_gap = unscaled(poly.contour.length()) * params.flow.height() * (1 - 0.25 * PI) * 0.5;
-            // add holes "perimeter gaps"
-            double holes_gaps = 0;
-            for (auto hole = poly.holes.begin(); hole != poly.holes.end(); ++hole) {
-                holes_gaps += unscaled(hole->length()) * params.flow.height() * (1 - 0.25 * PI) * 0.5;
-            }
-            polyline_volume += (perimeter_round_gap + holes_gaps) * perimeter_gap_usage;
+            //note: the no_overlap_expolygons is already at spacing from the centerline of the perimeter.
         }
     }
     return polyline_volume;

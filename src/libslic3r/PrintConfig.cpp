@@ -7989,6 +7989,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "solid_infill_acceleration",
 "solid_infill_extrusion_spacing",
 "solid_infill_fan_speed",
+"solid_infill_overlap",
 "start_gcode_manual",
 "support_material_angle_height",
 "support_material_acceleration",

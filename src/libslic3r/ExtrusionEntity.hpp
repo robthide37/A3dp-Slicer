@@ -628,9 +628,10 @@ inline void extrusion_entities_append_loops_and_paths(ExtrusionEntitiesPtr &dst,
 class ExtrusionPrinter : public ExtrusionVisitorConst {
     std::stringstream ss;
     double mult;
-    bool trunc;
+    int trunc;
+    bool json;
 public:
-    ExtrusionPrinter(double mult = 0.0001, bool trunc = false) : mult(mult), trunc(trunc) { }
+    ExtrusionPrinter(double mult = 0.000001, int trunc = 0, bool json = false) : mult(mult), trunc(trunc), json(json) { }
     virtual void use(const ExtrusionPath& path) override;
     virtual void use(const ExtrusionPath3D& path3D) override;
     virtual void use(const ExtrusionMultiPath& multipath) override;

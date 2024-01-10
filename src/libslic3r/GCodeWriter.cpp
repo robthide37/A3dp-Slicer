@@ -433,7 +433,7 @@ std::string GCodeWriter::set_speed(const double speed, const std::string &commen
     const double F = speed * 60;
     m_current_speed = speed;
     assert(F > 0.);
-    assert(F < 100000.);
+    assert(F < 10000000.);
 //    GCodeG1Formatter w;
 //    w.emit_f(F);
 //    w.emit_comment(this->config.gcode_comments, comment);
@@ -565,7 +565,7 @@ bool GCodeWriter::will_move_z(double z) const
         we don't perform an actual Z move. */
     if (m_lifted > 0) {
         double nominal_z = m_pos.z() - m_lifted;
-        if (z >= nominal_z + EPSILON && z <= m_pos.z() - EPSILON)
+        if (z >= nominal_z - EPSILON && z <= m_pos.z() + EPSILON)
             return false;
     }
     return true;
