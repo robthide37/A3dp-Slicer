@@ -1624,7 +1624,7 @@ void DiffPresetDialog::create_edit_sizer()
 {
     // Add check box for the edit mode
     m_use_for_transfer = new wxCheckBox(this, wxID_ANY, _L("Transfer values from left to right"));
-    m_use_for_transfer->SetToolTip(_L("If enabled, this dialog can be used for transver selected values from left to right preset."));
+    m_use_for_transfer->SetToolTip(_L("If checked, this dialog can be used for transferring selected values from the preset on the left to the preset on the right."));
     m_use_for_transfer->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
         bool use = m_use_for_transfer->GetValue();
         m_tree->GetColumn(DiffModel::colToggle)->SetHidden(!use);
