@@ -311,23 +311,34 @@ std::string GCodeWriter::write_acceleration(){
 	//try to set only printing acceleration, travel should be untouched if possible
     if (FLAVOR_IS(gcfRepetier)) {
         // M201: Set max printing acceleration
-        gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
     } else if(FLAVOR_IS(gcfLerdge) || FLAVOR_IS(gcfSprinter)){
         // M204: Set printing acceleration
         // This is new MarlinFirmware with separated print/retraction/travel acceleration.
         // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
-        gcode << "M204 P" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M204 P" << m_current_acceleration;
     } else if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) {
         // M204: Set printing & travel acceleration
-        gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        if (m_current_acceleration > 0)
+            gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        else if(m_current_travel_acceleration > 0)
+            gcode << "M204 T" << m_current_travel_acceleration;
     } else { // gcfMarlinLegacy
         // M204: Set default acceleration
-        gcode << "M204 S" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M204 S" << m_current_acceleration;
     }
-    if (this->config.gcode_comments) gcode << " ; adjust acceleration";
-    gcode << "\n";
-    
-    return gcode.str();
+    //if at least something, add comment and line return
+    if (gcode.tellp() != std::streampos(0)) {
+        if (this->config.gcode_comments)
+            gcode << " ; adjust acceleration";
+        gcode << "\n";
+        return gcode.str();
+    }
+    assert(gcode.str().empty());
+    return "";
 }
 
 std::string GCodeWriter::reset_e(bool force)
