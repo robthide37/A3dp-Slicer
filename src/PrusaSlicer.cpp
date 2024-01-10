@@ -817,7 +817,13 @@ bool CLI::setup(int argc, char **argv)
         if (opt_loglevel != 0)
             set_logging_level(opt_loglevel->value);
     }
-    
+
+    {
+        const ConfigOptionInt *opt_threads = m_config.opt<ConfigOptionInt>("threads");
+        if (opt_threads != nullptr)
+            thread_count = opt_threads->value;
+    }
+
     //FIXME Validating at this stage most likely does not make sense, as the config is not fully initialized yet.
     std::string validity = m_config.validate();
 

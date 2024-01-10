@@ -5066,6 +5066,11 @@ CLIMiscConfigDef::CLIMiscConfigDef()
     def->label = L("Data directory");
     def->tooltip = L("Load and store settings at the given directory. This is useful for maintaining different profiles or including configurations from a network storage.");
 
+    def = this->add("threads", coInt);
+    def->label = L("Maximum number of threads");
+    def->tooltip = L("Sets the maximum number of threads the slicing process will use. If not defined, slic3r will decide.");
+    def->min = 1;
+
     def = this->add("loglevel", coInt);
     def->label = L("Logging level");
     def->tooltip = L("Sets logging sensitivity. 0:fatal, 1:error, 2:warning, 3:info, 4:debug, 5:trace\n"
