@@ -1326,7 +1326,7 @@ public:
     {
         if (idx < 0) {
             for (const FloatOrPercent &v : this->values)
-                if (! std::isnan(v.value) || v != NIL_VALUE())
+                if (!std::isnan(v.value) && v != NIL_VALUE())
                     return false;
             return true;
         } else {
