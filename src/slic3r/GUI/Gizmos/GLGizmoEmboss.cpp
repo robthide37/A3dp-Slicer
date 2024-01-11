@@ -2148,6 +2148,8 @@ void fix_transformation(const StyleManager::Style &from, const StyleManager::Sty
         float f_angle = f_angle_opt.value_or(.0f);
         float t_angle = t_angle_opt.value_or(.0f);
         do_local_z_rotate(canvas.get_selection(), t_angle - f_angle);
+        std::string no_snapshot;
+        canvas.do_rotate(no_snapshot);
     }
 
     // fix distance (Z move) when exists difference in styles
@@ -2157,6 +2159,8 @@ void fix_transformation(const StyleManager::Style &from, const StyleManager::Sty
         float f_move = f_move_opt.value_or(.0f);
         float t_move = t_move_opt.value_or(.0f);
         do_local_z_move(canvas.get_selection(), t_move - f_move);
+        std::string no_snapshot;
+        canvas.do_move(no_snapshot);
     }
 }
 } // namesapce
