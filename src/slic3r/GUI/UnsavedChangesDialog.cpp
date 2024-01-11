@@ -1140,7 +1140,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return _L("Undef");
     }
     case coFloat:
-        return double_to_string(config.opt_float(opt_key));
+        return double_to_string(config.option(opt_key)->getFloat());
     case coFloats: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionFloatsNullable>(opt_key);
