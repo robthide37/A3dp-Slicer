@@ -219,7 +219,9 @@ static t_config_option_keys print_config_diffs(const StaticPrintConfig     &curr
         "branchingsupport_head_width"sv,
         "branchingsupport_pillar_diameter"sv,
         "support_points_density_relative"sv,
-        "relative_correction"sv,
+        "relative_correction_x"sv,
+        "relative_correction_y"sv,
+        "relative_correction_z"sv,
         "elefant_foot_compensation"sv,
     };
 
