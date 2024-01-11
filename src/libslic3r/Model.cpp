@@ -425,18 +425,21 @@ bool Model::looks_like_multipart_object() const
 {
     if (this->objects.size() <= 1)
         return false;
-    double zmin = std::numeric_limits<double>::max();
+
+    BoundingBoxf3 tbb;
+
     for (const ModelObject *obj : this->objects) {
         if (obj->volumes.size() > 1 || obj->config.keys().size() > 1)
             return false;
-        for (const ModelVolume *vol : obj->volumes) {
-            double zmin_this = vol->mesh().bounding_box().min(2);
-            if (zmin == std::numeric_limits<double>::max())
-                zmin = zmin_this;
-            else if (std::abs(zmin - zmin_this) > EPSILON)
-                // The volumes don't share zmin.
-                return true;
-        }
+
+        BoundingBoxf3 bb_this = obj->volumes[0]->mesh().bounding_box();
+        BoundingBoxf3 tbb_this = obj->instances[0]->transform_bounding_box(bb_this);
+
+        if (!tbb.defined)
+            tbb = tbb_this;
+        else if (tbb.intersects(tbb_this) || tbb.shares_boundary(tbb_this))
+            // The volumes has intersects bounding boxes or share some boundary
+            return true;
     }
     return false;
 }
