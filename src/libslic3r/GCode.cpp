@@ -32,7 +32,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/beast/core/detail/base64.hpp>
-#include <boost/regex.hpp>
 
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/cstdio.hpp>
@@ -1426,6 +1425,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     }
     BoundingBoxf3 global_bounding_box;
     size_t nb_items = 0;
+    std::wregex pattern(L"[^\\w]+", std::regex_constants::ECMAScript);
     for (PrintObject *print_object : print.objects()) {
         this->m_ordered_objects.push_back(print_object);
         uint32_t copy_id = 0;
@@ -1471,9 +1471,14 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                     for (const Point& point : poly.points)
                         s_poly += (boost::format(format_point) % unscaled(point.x()) % unscaled(point.y())).str() + ",";
                     s_poly += (boost::format(format_point) % unscaled(poly.points.front().x()) % unscaled(poly.points.front().y())).str();
-
+                    //std::string good_name_without_space = boost::algorithm::replace_all_regex(print_object->model_object()->name, regex_space, std::string("_"));
+                    //std::locale::global(std::locale("en_US.UTF-8"));
+                    std::wstring wname = boost::nowide::widen(print_object->model_object()->name);
+                    std::wstring wname_without_space = std::regex_replace(wname, pattern, L"_");
+                    std::string name_without_space = boost::nowide::narrow(wname_without_space);
+                    raw_str_to_objectid_str[print_object->model_object()->name] = name_without_space;
                     file.write_format("EXCLUDE_OBJECT_DEFINE NAME=%s_id_%d_copy_%d CENTER=%f,%f POLYGON=[%s]\n",
-                        boost::algorithm::replace_all_regex_copy(print_object->model_object()->name, boost::regex("[^\\w]+"), std::string("_")).c_str(),
+                        name_without_space.c_str(),
                         this->m_ordered_objects.size() - 1, copy_id,
                         bounding_box.center().x(), bounding_box.center().y(),
                         s_poly.c_str()
@@ -2836,7 +2841,7 @@ namespace Skirt {
 } // namespace Skirt
 
 // Matches "G92 E0" with various forms of writing the zero and with an optional comment.
-boost::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
+std::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
 
 // In sequential mode, process_layer is called once per each object and its copy,
 // therefore layers will contain a single entry and single_object_instance_idx will point to the copy of the object.
@@ -2978,8 +2983,8 @@ LayerResult GCode::process_layer(
     }
 
     //put G92 E0 is relative extrusion
-    bool before_layer_gcode_resets_extruder = boost::regex_search(print.config().before_layer_gcode.value, regex_g92e0_gcode);
-    bool layer_gcode_resets_extruder = boost::regex_search(print.config().layer_gcode.value, regex_g92e0_gcode);
+    bool before_layer_gcode_resets_extruder = std::regex_search(print.config().before_layer_gcode.value, regex_g92e0_gcode);
+    bool layer_gcode_resets_extruder = std::regex_search(print.config().layer_gcode.value, regex_g92e0_gcode);
     if (m_config.use_relative_e_distances) {
         // See GH issues prusa#6336 #5073$
         if (!before_layer_gcode_resets_extruder && !layer_gcode_resets_extruder) {
@@ -3306,20 +3311,12 @@ LayerResult GCode::process_layer(
                 bool object_layer_over_raft = layer_to_print.object_layer && layer_to_print.object_layer->id() > 0 && 
                     instance_to_print.print_object.slicing_parameters().raft_layers() == layer_to_print.object_layer->id();
                 // Get data for gcode_label_objects
-                std::string instance_clean_name =
-                    boost::algorithm::replace_all_regex_copy(
-                        instance_to_print.print_object.model_object()->name,
-                        boost::regex("[^\\w]+"), std::string("_"));
-                std::string instance_id = std::to_string(
-                    std::find(this->m_ordered_objects.begin(),
-                              this->m_ordered_objects.end(),
-                              &instance_to_print.print_object) -
-                    this->m_ordered_objects.begin());
-                std::string instance_copy = std::to_string(
-                    instance_to_print.instance_id);
-                std::string instance_full_id = instance_clean_name + "_id_" +
-                                               instance_id + "_copy_" +
-                                               instance_copy;
+                std::string instance_id   = std::to_string(std::find(this->m_ordered_objects.begin(),
+                                                                   this->m_ordered_objects.end(),
+                                                                   &instance_to_print.print_object) -
+                                                         this->m_ordered_objects.begin());
+                std::string instance_copy = std::to_string(instance_to_print.instance_id);
+                std::string instance_full_id; // for klipper
 
                 m_layer = layer_to_print.layer();
                 m_object_layer_over_raft = object_layer_over_raft;
@@ -3344,6 +3341,17 @@ LayerResult GCode::process_layer(
                         instance_plater_id += instance_to_print.instance_id;
                         m_gcode_label_objects_start += std::string("M486 S") + std::to_string(instance_plater_id) + "\n";
                     } else if (print.config().gcode_flavor.value == gcfKlipper) {
+                        std::string instance_clean_name;
+                        if (auto found = raw_str_to_objectid_str.find(
+                                instance_to_print.print_object.model_object()->name);
+                            found != raw_str_to_objectid_str.end()) {
+                            instance_clean_name = found->second;
+                        } else {
+                            assert(false); // should already been done in EXCLUDE_OBJECT_DEFINE
+                            instance_clean_name = instance_to_print.print_object.model_object()->name;
+                        }
+                        instance_full_id = instance_clean_name + "_id_" + instance_id + "_copy_" +
+                                                       instance_copy;
                         m_gcode_label_objects_start +=
                             std::string("EXCLUDE_OBJECT_START NAME=") +
                             instance_full_id +
@@ -3430,6 +3438,7 @@ LayerResult GCode::process_layer(
                         m_gcode_label_objects_end += std::string("M486 S-1") +
                                                      "\n";
                     } else if (print.config().gcode_flavor.value == gcfKlipper) {
+                        assert(!instance_full_id.empty());
                         m_gcode_label_objects_end +=
                             std::string("EXCLUDE_OBJECT_END NAME=") +
                             instance_full_id +

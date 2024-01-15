@@ -491,6 +491,7 @@ private:
     std::string m_gcode_label_objects_start;
     std::string m_gcode_label_objects_end;
     void _add_object_change_labels(std::string &gcode);
+    std::map<std::string, std::string> raw_str_to_objectid_str;
 
     bool m_silent_time_estimator_enabled;
 
