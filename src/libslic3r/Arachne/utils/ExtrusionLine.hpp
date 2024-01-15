@@ -224,6 +224,10 @@ static inline Slic3r::ThickPolyline to_thick_polyline(const ClipperLib_Z::Path &
             out.points_width.emplace_back(it->z());
         }
     }
+    assert(out.points.front().x() == path.front().x());
+    assert(out.points.front().y() == path.front().y());
+    assert(out.points.back().x() == path.back().x());
+    assert(out.points.back().y() == path.back().y());
     return out;
 }
 

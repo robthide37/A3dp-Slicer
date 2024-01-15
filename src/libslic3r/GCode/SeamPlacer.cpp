@@ -431,6 +431,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
         const LayerRegion* current_layer_region;
         SeamPosition configured_seam_preference;
     public:
+        bool also_overhangs = false;
         PerimeterCopy(std::vector<const LayerRegion*>* regions_out, Polygons* polys, SeamPosition configured_seam)
             : corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polygons(polys) {
         }
@@ -441,9 +442,13 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
                 if (path.role() == ExtrusionRole::erExternalPerimeter) {
                     role = ExtrusionRole::erExternalPerimeter;
                 }
+                if (path.role() == ExtrusionRole::erOverhangPerimeter &&
+                    also_overhangs) { // TODO find a way to search for external overhangs only
+                    role = ExtrusionRole::erOverhangPerimeter;
+                }
             }
 
-            if (role == ExtrusionRole::erExternalPerimeter
+            if (role == ExtrusionRole::erExternalPerimeter || (role == ExtrusionRole::erOverhangPerimeter && also_overhangs)
                 || (is_perimeter(role) && configured_seam_preference == spAllRandom)) { //for random seam alignment, extract all perimeters
                 Points p;
                 loop.collect_points(p);
@@ -464,12 +469,20 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
             visitor.set_current_layer_region(layer_region);
             ex_entity->visit(visitor);
             if (polygons.empty()) {
-                Points p;
-                ex_entity->collect_points(p);
-                polygons.emplace_back(std::move(p));
-                corresponding_regions_out.push_back(layer_region);
-                //shouldn't happen
-                assert(false);
+                //can happen if the external is fully an overhang
+                visitor.also_overhangs = true;
+                ex_entity->visit(visitor);
+                visitor.also_overhangs = false;
+                if (polygons.empty()) {
+                    //shouldn't happen
+                    ex_entity->visit(visitor);
+                    assert(false);
+                    // what to do in this case?
+                    Points p;
+                    ex_entity->collect_points(p);
+                    polygons.emplace_back(std::move(p));
+                    corresponding_regions_out.push_back(layer_region);
+                }
             }
         }
     }
