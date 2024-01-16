@@ -60,17 +60,45 @@ struct SurfaceFillParams : FillParams
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, connection);
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, dont_adjust);
 
-        RETURN_COMPARE_NON_EQUAL(anchor_length);        RETURN_COMPARE_NON_EQUAL(fill_exactly);
+        RETURN_COMPARE_NON_EQUAL(anchor_length);
+        RETURN_COMPARE_NON_EQUAL(fill_exactly);
         RETURN_COMPARE_NON_EQUAL(flow.width());
         RETURN_COMPARE_NON_EQUAL(flow.height());
         RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter());
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, flow.bridge());
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, role);
         RETURN_COMPARE_NON_EQUAL_TYPED(int32_t, priority);
+        assert(this->config != nullptr);
+        assert(rhs.config != nullptr);
+        if (config != nullptr && rhs.config != nullptr) {
+            RETURN_COMPARE_NON_EQUAL(config->infill_speed);
+            RETURN_COMPARE_NON_EQUAL(config->solid_infill_speed);
+            RETURN_COMPARE_NON_EQUAL(config->top_solid_infill_speed);
+            RETURN_COMPARE_NON_EQUAL(config->ironing_speed);
+            RETURN_COMPARE_NON_EQUAL(config->default_speed);
+            RETURN_COMPARE_NON_EQUAL(config->bridge_speed);
+            RETURN_COMPARE_NON_EQUAL(config->bridge_speed_internal);
+            RETURN_COMPARE_NON_EQUAL(config->gap_fill_speed);
+        }
+        assert(*this == rhs);
         return false;
     }
 
     bool operator==(const SurfaceFillParams &rhs) const {
+        // first check speed via config
+        if ((config != nullptr) != (rhs.config != nullptr))
+            return false;
+        if(config != nullptr && (
+            config->infill_speed != rhs.config->infill_speed
+            || config->solid_infill_speed != rhs.config->solid_infill_speed
+            || config->top_solid_infill_speed != rhs.config->top_solid_infill_speed
+            || config->ironing_speed != rhs.config->ironing_speed
+            || config->default_speed != rhs.config->default_speed
+            || config->bridge_speed != rhs.config->bridge_speed
+            || config->bridge_speed_internal != rhs.config->bridge_speed_internal
+            || config->gap_fill_speed != rhs.config->gap_fill_speed))
+            return false;
+        // then check params
         return  this->extruder              == rhs.extruder         &&
                 this->pattern               == rhs.pattern          &&
                 this->spacing               == rhs.spacing          &&
