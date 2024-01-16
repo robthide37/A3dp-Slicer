@@ -389,9 +389,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "fuzzy_skin_thickness", "fuzzy_skin_point_dist" })
         toggle_field(el, config->option<ConfigOptionEnum<FuzzySkinType>>("fuzzy_skin")->value != FuzzySkinType::None);
 
-    toggle_field("avoid_crossing_not_first_layer", config->opt_bool("avoid_crossing_perimeters"));
-    toggle_field("avoid_crossing_top", config->opt_bool("avoid_crossing_perimeters"));
-
     bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;
     // infill_extruder uses the same logic as in Print::extruders()
     for (auto el : { "fill_pattern", "infill_connection", "infill_every_layers", "infill_only_where_needed",
@@ -549,6 +546,11 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
     toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
+    toggle_field("avoid_crossing_not_first_layer", have_avoid_crossing_perimeters);
+    toggle_field("avoid_crossing_top", have_avoid_crossing_perimeters);
+    
+    toggle_field("enforce_retract_first_layer", config->opt_bool("only_retract_when_crossing_perimeters"));
+
 
     for (auto el : { "fill_smooth_width", "fill_smooth_distribution" })
         toggle_field(el, (has_top_solid_infill && config->option<ConfigOptionEnum<InfillPattern>>("top_fill_pattern")->value == InfillPattern::ipSmooth)

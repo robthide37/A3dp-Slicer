@@ -425,7 +425,7 @@ void PrintConfigDef::init_common_params()
     def          = this->add("thumbnails_tag_format", coBool);
     def->label   = L("Write the thumbnail type in gcode.");
     def->tooltip = L("instead of writing 'thumbnails' as tag in the gcode, it will write 'thumbnails_PNG', thumbnails_JPG', 'thumbnail_QOI', etc.."
-        "\n Some firmware needs it to know how to decode the thumbnail, some others don't support it.");
+        "\n Some firmware need it to know how to decode the thumbnail, some others don't support it.");
     def->mode    = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -1524,11 +1524,11 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("external_perimeter_extrusion_change_odd_layers", coFloatOrPercent);
     def->label = L("External perimeters");
-    def->full_label = L("External perimeters spacing change on odd layers");
+    def->full_label = L("External perimeters spacing change on even layers");
     def->category = OptionCategory::width;
-    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+    def->tooltip = L("Change width on every even layer (and not on odd layers like the first one) for better overlap with adjacent layers and getting stringer shells. "
                      "Try values about +/- 0.1 with different sign for external and internal perimeters."
-                     "\nThis could be combined with extra permeters on odd layers."
+                     "\nThis could be combined with extra permeters on even layers."
                      "\nWorks as absolute spacing or a % of the spacing."
                      "\nset 0 to disable");
     def->sidetext = L("mm or %");
@@ -1661,10 +1661,10 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("extra_perimeters_odd_layers", coBool);
-    def->label = L("On odd layers");
-    def->full_label = L("Extra perimeter on odd layers");
+    def->label = L("On even layers");
+    def->full_label = L("Extra perimeter on even layers");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Add one perimeter every odd layer. With this, infill is taken into the sandwich"
+    def->tooltip = L("Add one perimeter every even layer (and not on odd layers like the first one). With this, infill is taken into the sandwich"
         " and you may be able to reduce drastically the infill/perimeter overlap setting. ");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
@@ -3149,11 +3149,11 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("infill_extrusion_change_odd_layers", coFloatOrPercent);
     def->label = L("Infill");
-    def->full_label = L("Infill spacing change on odd layers");
+    def->full_label = L("Infill spacing change on even layers");
     def->category = OptionCategory::width;
-    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+    def->tooltip = L("Change width on every even layer (and not on odd layers like the first one) for better overlap with adjacent layers and getting stringer shells. "
                      "Try values about +/- 0.1 with different sign."
-                     "\nThis could be combined with extra permeters on odd layers."
+                     "\nThis could be combined with extra permeters on even layers."
                      "\nWorks as absolute spacing or a % of the spacing."
                      "\nset 0 to disable");
     def->sidetext = L("mm or %");
@@ -4001,10 +4001,11 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(75, true));
 
     def = this->add("overhangs_reverse", coBool);
-    def->label = L("Reverse on odd");
+    def->label = L("Reverse on even");
     def->full_label = L("Overhang reversal");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Extrude perimeters that have a part over an overhang in the reverse direction on odd layers. This alternating pattern can drastically improve steep overhang."
+    def->tooltip = L("Extrude perimeters that have a part over an overhang in the reverse direction on even layers (and not on odd layers like the first one)."
+        " This alternating pattern can drastically improve steep overhang."
         "\n!! this is a very slow algorithm (it uses the same results as extra_perimeters_overhangs) !!");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
@@ -4142,11 +4143,11 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("perimeter_extrusion_change_odd_layers", coFloatOrPercent);
     def->label = L("Perimeters");
-    def->full_label = L("Perimeters spacing change on odd layers");
+    def->full_label = L("Perimeters spacing change on even layers");
     def->category = OptionCategory::width;
-    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+    def->tooltip = L("Change width on every even layer (and not on odd layers like the first one) for better overlap with adjacent layers and getting stringer shells. "
                      "Try values about +/- 0.1 with different sign for external and internal perimeters."
-                     "\nThis could be combined with extra permeters on odd layers."
+                     "\nThis could be combined with extra permeters on even layers."
                      "\nWorks as absolute spacing or a % of the spacing."
                      "\nset 0 to disable");
     def->sidetext = L("mm or %");
@@ -4968,11 +4969,11 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("solid_infill_extrusion_change_odd_layers", coFloatOrPercent);
     def->label = L("Infill");
-    def->full_label = L("Solid infill spacing change on odd layers");
+    def->full_label = L("Solid infill spacing change on even layers");
     def->category = OptionCategory::width;
-    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+    def->tooltip = L("Change width on every even layer (and not on odd layers like the first one) for better overlap with adjacent layers and getting stringer shells. "
         "Try values about +/- 0.1 with different sign."
-        "\nThis could be combined with extra permeters on odd layers."
+        "\nThis could be combined with extra permeters on even layers."
         "\nWorks as absolute spacing or a % of the spacing."
         "\nset 0 to disable");
     def->sidetext = L("mm or %");

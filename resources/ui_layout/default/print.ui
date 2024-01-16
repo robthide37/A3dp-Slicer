@@ -389,10 +389,10 @@ group:label_width$9:sidetext_width$8:Acceleration control (advanced)
 		setting:width$4:ironing_acceleration
 	line:Travel acceleration
 		setting:width$4:travel_acceleration
-		setting:width$4:travel_deceleration_use_target
+		setting:label_width$22:travel_deceleration_use_target
 	line:First layer acceleration
 		setting:width$4:first_layer_acceleration
-		setting:label_width$35:width$4:first_layer_acceleration_over_raft
+		setting:label_width$22:width$4:first_layer_acceleration_over_raft
 	end_line
 
 page:Width & Flow:width
@@ -408,22 +408,22 @@ group:Extrusion width
 	line:perimeter
 		setting:sidetext_width$10:label$width:perimeter_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:perimeter_extrusion_spacing
-        setting:sidetext_width$10:label_width$15:label$odd layers:perimeter_extrusion_change_odd_layers
+        setting:sidetext_width$10:label_width$15:label$even layers:perimeter_extrusion_change_odd_layers
 	end_line
 	line:external perimeter
 		setting:sidetext_width$10:label$width:external_perimeter_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$width&spacing combo:external_perimeter_extrusion_spacing
-		setting:sidetext_width$10:label_width$15:label$odd layers:external_perimeter_extrusion_change_odd_layers
+		setting:sidetext_width$10:label_width$15:label$even layers:external_perimeter_extrusion_change_odd_layers
 	end_line
 	line:infill
 		setting:sidetext_width$10:label$width:infill_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:infill_extrusion_spacing
-		setting:sidetext_width$10:label_width$15:label$odd layers:infill_extrusion_change_odd_layers
+		setting:sidetext_width$10:label_width$15:label$even layers:infill_extrusion_change_odd_layers
 	end_line
 	line:solid infill
 		setting:sidetext_width$10:label$width:solid_infill_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:solid_infill_extrusion_spacing
-		setting:sidetext_width$10:label_width$15:label$odd layers:solid_infill_extrusion_change_odd_layers
+		setting:sidetext_width$10:label_width$15:label$even layers:solid_infill_extrusion_change_odd_layers
 	end_line
 	line:top infill
 		setting:sidetext_width$10:label$width:top_infill_extrusion_width
