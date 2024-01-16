@@ -1538,7 +1538,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
             }
         }
     }
-    if (print.config().complete_objects.value) {
+    if (print.config().complete_objects.value || print.config().parallel_objects_step.value > 0) {
         // Order object instances for sequential print.
         if(print.config().complete_objects_sort.value == cosObject)
             print_object_instances_ordering = sort_object_instances_by_model_order(print);
@@ -1848,24 +1848,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 print.throw_if_canceled();
                 this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
                 if (finished_objects > 0) {
-                    // Move to the origin position for the copy we're going to print.
-                    // This happens before Z goes down to layer 0 again, so that no collision happens hopefully.
-                    m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
-                    m_avoid_crossing_perimeters.use_external_mp_once();
-                    set_extra_lift(m_last_layer_z, 0, print.config(), m_writer, initial_extruder_id);
-                    file.write(this->retract());
-                    std::string gcode;
-                    //go to origin of the next object (it's 0,0 because we shifted the origin to it)
-                    Polyline polyline = this->travel_to(gcode, Point(0, 0), erTravel);
-                    this->write_travel_to(gcode, polyline, "move to origin position for next object");
-                    file.write(gcode);
-                    m_enable_cooling_markers = true;
-                    // Disable motion planner when traveling to first object point.
-                    m_avoid_crossing_perimeters.disable_once();
-                    // Ff we are printing the bottom layer of an object, and we have already finished
-                    // another one, set first layer temperatures. This happens before the Z move
-                    // is triggered, so machine has more time to reach such temperatures.
-                    m_placeholder_parser.set("current_object_idx", int(finished_objects));
+                    _move_to_print_object(file, print, finished_objects, initial_extruder_id);
                     std::string between_objects_gcode = this->placeholder_parser_process("between_objects_gcode", print.config().between_objects_gcode.value, initial_extruder_id);
                     // Set first layer bed and extruder temperatures, don't wait for it to reach the temperature.
                     this->_print_first_layer_bed_temperature(file, print, between_objects_gcode, initial_extruder_id, false);
@@ -1894,57 +1877,50 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         } else {
             /////////////////////////////////////////////// begin parallel_objects_step
             if (print.config().parallel_objects_step > 0 && !has_wipe_tower) {
-
-                float range = print.config().parallel_objects_step + EPSILON;
-                print_object_instances_ordering = sort_object_instances_by_model_order(print);
-                std::vector<const PrintInstance*>::const_iterator prev_object = print_object_instances_ordering.begin();
-
-                bool first_layer = true;
-            proceed_layers:
+                double range = std::min(print.config().parallel_objects_step, print.config().extruder_clearance_height) + EPSILON;
+                print_object_instances_ordering = chain_print_object_instances(print);
+                bool first_layers = true;
 
                 for (coordf_t Rstart = 0, Rend = range;; Rstart += range, Rend += range) {
+                proceed_layers:
                     bool is_layers = false;
-                    print_object_instance_sequential_active = print_object_instances_ordering.begin();
+                    for (auto it_print_object_instance = print_object_instances_ordering.begin();
+                         it_print_object_instance != print_object_instances_ordering.end();
+                         ++it_print_object_instance) {
+                        std::vector<LayerToPrint> layers_to_print_range;
+                        const PrintObject &       object        = *(*it_print_object_instance)->print_object;
+                        std::vector<LayerToPrint> object_layers = collect_layers_to_print(object, status_monitor);
 
-                    for (size_t i = 0; i < print.objects().size(); ++i, ++print_object_instance_sequential_active) {
-                        std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> layers_to_print_range;
-                        {
-                            std::vector<LayerToPrint> object_layers = collect_layers_to_print(*print.objects()[i], status_monitor);
-                            int                       layer_num     = 0;
-                            for (LayerToPrint& ltp : object_layers) {
-                                layer_num++;
-                                if (!first_layer && layer_num == 1)
-                                    continue;
+                        for (const LayerToPrint &ltp : object_layers) {
+                            if (ltp.print_z() < Rstart || ltp.print_z() >= Rend)
+                                continue;
 
-                                if (ltp.print_z() >= Rstart && ltp.print_z() < Rend) {
-                                    std::pair<coordf_t, std::vector<LayerToPrint>> merged;
-                                    merged.first = ltp.print_z();
-                                    merged.second.push_back(std::move(ltp));
-                                    layers_to_print_range.emplace_back(merged);
-                                    if (first_layer)
-                                        break;
-                                }
-                            }
+                            if (!first_layers && ltp.layer()->id() == 0)
+                                continue;
+
+                            layers_to_print_range.push_back(ltp);
+                            if (first_layers)
+                                break;
                         }
 
-                        if (!layers_to_print_range.empty())
-                        {
-                            if (print_object_instance_sequential_active != prev_object) {
-                                this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
-                                std::string gcode;
-                                //go to origin of the next object (it's 0,0 because we shifted the origin to it)
-                                Polyline polyline = this->travel_to(gcode, Point(0, 0), erTravel);
-                                this->write_travel_to(gcode, polyline, "move to origin position for next object");
-                                file.write(gcode);
-                            }
-                            this->process_layers(print, status_monitor, tool_ordering, print_object_instances_ordering,
-                                                 layers_to_print_range, file);
-                            prev_object = print_object_instance_sequential_active;
+                        if (!layers_to_print_range.empty()) {
+                            this->set_origin(unscale((*it_print_object_instance)->shift));
+
+                            size_t finished_objects = 1 + (it_print_object_instance -
+                                                           print_object_instances_ordering.begin());
+                            if (finished_objects > 1)
+                                _move_to_print_object(file, print, finished_objects, initial_extruder_id);
+
+                            assert(!object.instances().empty());
+                            assert(*it_print_object_instance >= &*object.instances().begin() &&
+                                   *it_print_object_instance <= &*(object.instances().end()-1));
+                            this->process_layers(print, status_monitor, tool_ordering, layers_to_print_range,
+                                                 *it_print_object_instance - object.instances().data(), file);
                             is_layers = true;
                         }
                     }
-                    if (first_layer) {
-                        first_layer = false;
+                    if (first_layers) {
+                        first_layers = false;
                         goto proceed_layers;
                     }
                     if (!is_layers) {
@@ -2105,6 +2081,28 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
             [&print]() { print.throw_if_canceled(); });
     }
     print.throw_if_canceled();
+}
+
+void GCode::_move_to_print_object(GCodeOutputStream& file, const Print& print, size_t finished_objects, uint16_t initial_extruder_id)
+{
+    // Move to the origin position for the copy we're going to print.
+    // This happens before Z goes down to layer 0 again, so that no collision happens hopefully.
+    m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
+    m_avoid_crossing_perimeters.use_external_mp_once();
+    set_extra_lift(m_last_layer_z, 0, print.config(), m_writer, initial_extruder_id);
+    file.write(this->retract());
+    std::string gcode;
+    //go to origin of the next object (it's 0,0 because we shifted the origin to it)
+    Polyline polyline = this->travel_to(gcode, Point(0, 0), erTravel);
+    this->write_travel_to(gcode, polyline, "move to origin position for next object");
+    file.write(gcode);
+    m_enable_cooling_markers = true;
+    // Disable motion planner when traveling to first object point.
+    m_avoid_crossing_perimeters.disable_once();
+    // Ff we are printing the bottom layer of an object, and we have already finished
+    // another one, set first layer temperatures. This happens before the Z move
+    // is triggered, so machine has more time to reach such temperatures.
+    m_placeholder_parser.set("current_object_idx", int(finished_objects));
 }
 
 // For unknown reasons and in sporadic cases when GCode export is processing, some participating thread

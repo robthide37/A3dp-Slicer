@@ -245,7 +245,7 @@ private:
         GCode            &m_gcodegen;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);
-
+    void            _move_to_print_object(GCodeOutputStream& file, const Print& print, size_t finished_objects, uint16_t initial_extruder_id);
     void            _init_multiextruders(const Print& print, GCodeOutputStream& file, GCodeWriter& writer, const ToolOrdering& tool_ordering, const std::string& custom_gcode);
 
     static std::vector<LayerToPrint>                                   collect_layers_to_print(const PrintObject &object, Print::StatusMonitor &status_monitor);
