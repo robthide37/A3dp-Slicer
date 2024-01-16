@@ -2289,6 +2289,15 @@ bool GUI_App::load_language(wxString language, bool initial)
         {
 	    	// Allocating a temporary locale will switch the default wxTranslations to its internal wxTranslations instance.
 	    	wxLocale temp_locale;
+#ifdef __WXOSX__
+            // ysFIXME - temporary workaround till it isn't fixed in wxWidgets:
+            // Use English as an initial language, because of under OSX it try to load "inappropriate" language for wxLANGUAGE_DEFAULT.
+            // For example in our case it's trying to load "en_CZ" and as a result PrusaSlicer catch warning message.
+            // But wxWidgets guys work on it.
+            temp_locale.Init(wxLANGUAGE_ENGLISH);
+#else
+            temp_locale.Init();
+#endif // __WXOSX__
 	    	// Set the current translation's language to default, otherwise GetBestTranslation() may not work (see the wxWidgets source code).
 	    	wxTranslations::Get()->SetLanguage(wxLANGUAGE_DEFAULT);
 	    	// Let the wxFileTranslationsLoader enumerate all translation dictionaries for PrusaSlicer
