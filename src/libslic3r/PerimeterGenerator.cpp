@@ -253,7 +253,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
                 //    svg.draw(to_polylines(last), "brown");
                 //    svg.Close();
                 //}
-                loop_number = 0;
+                loop_number--;
             } else {
                 // Give up the outer shell because we don't have any meaningful top surface
                 out_shell.clear();
