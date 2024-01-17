@@ -147,6 +147,7 @@ TEST_CASE("Slicing with retraction and lifing", "[retraction]") {
         { "start_gcode", "" },  // To avoid dealing with the nozzle lift in start G-code
         { "retract_length", "1.5" },
         { "retract_before_travel", "3" },
+        { "retract_layer_change", "1" },
         { "only_retract_when_crossing_perimeters", 0 },
     });
 
