@@ -1095,7 +1095,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
 
     switch (opt->type) {
     case coInt:
-        return from_u8((boost::format("%1%") % config.opt_int(opt_key)).str());
+        return from_u8((boost::format("%1%") % config.option(opt_key)->getInt()).str());
     case coInts: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionIntsNullable>(opt_key);
