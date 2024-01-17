@@ -1252,7 +1252,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
 
             // Set position for wipe tower generation.
             Vec3d new_position = this->writer().get_position();
-            new_position.z() = first_layer_height + m_config.z_offset.value;
+            new_position.z() = first_layer_height;
             this->writer().update_position(new_position);
 
             if (print.config().single_extruder_multi_material_priming) {
@@ -2152,7 +2152,7 @@ LayerResult GCodeGenerator::process_layer(
         return result;
 
     // Extract 1st object_layer and support_layer of this set of layers with an equal print_z.
-    coordf_t             print_z       = layer.print_z;
+    coordf_t             print_z       = layer.print_z + m_config.z_offset.value;
     bool                 first_layer   = layer.id() == 0;
     unsigned int         first_extruder_id = layer_tools.extruders.front();
 
@@ -2356,7 +2356,7 @@ LayerResult GCodeGenerator::process_layer(
     } else if (do_ramping_layer_change) {
         layer_change_gcode = this->get_layer_change_gcode(*m_previous_layer_last_position, *m_current_layer_first_position, *m_layer_change_extruder_id);
     } else {
-        layer_change_gcode = this->writer().get_travel_to_z_gcode(m_config.z_offset.value + print_z, "simple layer change");
+        layer_change_gcode = this->writer().get_travel_to_z_gcode(print_z, "simple layer change");
     }
 
     boost::algorithm::replace_first(gcode, tag, layer_change_gcode);
@@ -2679,7 +2679,7 @@ std::string GCodeGenerator::change_layer(
         gcode += this->retract_and_wipe();
 
     Vec3d new_position = this->writer().get_position();
-    new_position.z() = print_z + m_config.z_offset.value;
+    new_position.z() = print_z;
     this->writer().update_position(new_position);
 
     m_previous_layer_last_position = this->last_position ?
@@ -2986,12 +2986,12 @@ std::string GCodeGenerator::_extrude(
     const std::string_view description_bridge = path_attr.role.is_bridge() ? " (bridge)"sv : ""sv;
 
     if (!m_current_layer_first_position) {
-        const Vec3crd point = to_3d(path.front().point, scaled(this->m_last_layer_z + this->m_config.z_offset.value));
+        const Vec3crd point = to_3d(path.front().point, scaled(this->m_last_layer_z));
         gcode += this->travel_to_first_position(point);
     } else {
         // go to first point of extrusion path
         if (!this->last_position) {
-            const double z = this->m_last_layer_z + this->m_config.z_offset.value;
+            const double z = this->m_last_layer_z;
             const std::string comment{"move to print after unknown position"};
             gcode += this->retract_and_wipe();
             gcode += this->m_writer.travel_to_xy(this->point_to_gcode(path.front().point), comment);
@@ -3380,7 +3380,7 @@ std::string GCodeGenerator::travel_to(
     const unsigned extruder_id = this->m_writer.extruder()->id();
     const double retract_length = this->m_config.retract_length.get_at(extruder_id);
     bool can_be_flat{!needs_retraction || retract_length == 0};
-    const double initial_elevation = this->m_last_layer_z + this->m_config.z_offset.value;
+    const double initial_elevation = this->m_last_layer_z;
 
     const double upper_limit = this->m_config.retract_lift_below.get_at(extruder_id);
     const double lower_limit = this->m_config.retract_lift_above.get_at(extruder_id);
