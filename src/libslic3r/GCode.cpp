@@ -855,6 +855,25 @@ namespace DoExport {
     }
 } // namespace DoExport
 
+
+void check_remaning_times(GCodeFlavor firmware, RemainingTimeType type, Print::StatusMonitor &monitor)
+{
+    if (type == RemainingTimeType::rtM73 || type == rtM73_M117 || type == rtM73_Quiet) {
+        if (!(firmware == gcfMarlinLegacy || firmware == gcfMarlinFirmware || firmware == gcfMakerWare ||
+                firmware == gcfKlipper || firmware == gcfRepRap))
+            monitor.active_step_add_warning(
+                PrintStateBase::WarningLevel::CRITICAL,
+                _(L("Your firmware doesn't allow to print the remaining times with M73.")));
+    }
+    if ((type == rtM117 || type == rtM73_M117)) {
+        if (!(firmware == gcfMarlinLegacy || firmware == gcfMarlinFirmware || firmware == gcfMakerWare ||
+                firmware == gcfKlipper || firmware == gcfRepRap || firmware == gcfRepetier ||
+                firmware == gcfSmoothie))
+            monitor.active_step_add_warning(
+                PrintStateBase::WarningLevel::CRITICAL,
+                _(L("Your firmware doesn't allow to print the remaining times with M117.")));
+    }
+}
 void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     PROFILE_CLEAR();
@@ -894,6 +913,9 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor, *this);
     if (! file.is_open())
         throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
+    
+    if(print->config().remaining_times)
+        check_remaning_times(print->config().gcode_flavor, print->config().remaining_times_type, monitor);
 
     try {
         m_placeholder_parser.reset();
@@ -2733,7 +2755,9 @@ std::string emit_custom_gcode_per_print_z(
                     cfg.set_key_value("color_change_extruder", new ConfigOptionInt(m600_extruder_before_layer));
                     gcode += gcodegen.placeholder_parser_process("pause_print_gcode", GCodeWriter::get_default_pause_gcode(print.config()), current_extruder_id, &cfg);
                     gcode += "\n";
-                    gcode += "M117 Change filament for Extruder " + std::to_string(m600_extruder_before_layer) + "\n";
+                    if (auto flavor = print.config().gcode_flavor.value; 
+                        flavor == gcfKlipper || flavor == gcfLerdge || flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy || flavor == gcfRepetier || flavor == gcfSmoothie || flavor == gcfRepRap)
+                        gcode += "M117 Change filament for Extruder " + std::to_string(m600_extruder_before_layer) + "\n";
                 }
                 else {
                     if (GCodeWriter::get_default_color_change_gcode(print.config()).empty()) {
@@ -2765,7 +2789,9 @@ std::string emit_custom_gcode_per_print_z(
                     gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Pause_Print) + "\n";
                     //! FIXME_in_fw show message during print pause
                     if (!pause_print_msg.empty())
-                        gcode += "M117 " + pause_print_msg + "\n";
+                        if (auto flavor = print.config().gcode_flavor.value; 
+                            flavor == gcfKlipper || flavor == gcfLerdge || flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy || flavor == gcfRepetier || flavor == gcfSmoothie || flavor == gcfRepRap)
+                            gcode += "M117 " + pause_print_msg + "\n";
                     gcode += gcodegen.placeholder_parser_process("pause_print_gcode", GCodeWriter::get_default_pause_gcode(print.config()), current_extruder_id);
                 } else {
                     // add tag for processor
