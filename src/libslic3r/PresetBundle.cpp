@@ -695,7 +695,8 @@ void PresetBundle::export_selections(AppConfig &config)
     //assert(this->printers.get_edited_preset().printer_technology() != ptFFF || extruders_filaments.size() > 1 || filaments.get_selected_preset().alias == extruders_filaments.front().get_selected_preset()->alias);
     config.clear_section("presets");
     config.set("presets", "print",        prints.get_selected_preset_name());
-    config.set("presets", "filament", extruders_filaments.front().get_selected_preset_name());
+    if (!extruders_filaments.empty()) // Tomas: To prevent crash with SLA overrides
+        config.set("presets", "filament", extruders_filaments.front().get_selected_preset_name());
     for (unsigned i = 1; i < extruders_filaments.size(); ++i) {
         char name[64];
         sprintf(name, "filament_%u", i);
