@@ -1266,7 +1266,7 @@ std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Pri
 
 // set standby temp for extruders
 // Parse the custom G-code, try to find T, and add it if not present
-void GCode::_init_multiextruders(const Print& print, GCodeOutputStream& file, GCodeWriter & writer, const ToolOrdering &tool_ordering, const std::string &custom_gcode )
+void GCode::_init_multiextruders(const Print& print, std::string& out, GCodeWriter & writer, const ToolOrdering &tool_ordering, const std::string &custom_gcode )
 {
 
     //set standby temp for reprap
@@ -1276,9 +1276,7 @@ void GCode::_init_multiextruders(const Print& print, GCodeOutputStream& file, GC
             if (standby_temp > 0) {
                 if (print.config().ooze_prevention.value)
                     standby_temp += print.config().standby_temperature_delta.value;
-                file.write_format("G10 P%d R%d ; sets the standby temperature\n",
-                    tool_id,
-                    standby_temp);
+                out.append("G10 P").append(std::to_string(tool_id)).append(" R").append(std::to_string(standby_temp)).append(" ; sets the standby temperature\n");
             }
         }
     }
@@ -1367,6 +1365,8 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         print.config().max_volumetric_extrusion_rate_slope_negative.value > 0)
         m_pressure_equalizer = make_unique<PressureEqualizer>(print.config());
     m_enable_extrusion_role_markers = (bool)m_pressure_equalizer;
+
+    std::string preamble_to_put_start_layer = "";
 
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
@@ -1722,21 +1722,22 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     std::string start_all_gcode = start_gcode + "\"n" + start_filament_gcode;
     // Set bed temperature if the start G-code does not contain any bed temp control G-codes.
     if((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && this->config().gcode_flavor != gcfKlipper && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_bed_temperature(file, print, start_all_gcode, initial_extruder_id, false);
+         this->_print_first_layer_bed_temperature(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, false);
 
     //init extruders
     if (!this->config().start_gcode_manual)
-        this->_init_multiextruders(print, file, m_writer, tool_ordering, start_gcode);
+        this->_init_multiextruders(print, preamble_to_put_start_layer, m_writer, tool_ordering, start_gcode);
 
     // Set extruder(s) temperature before and after start G-code.
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && (this->config().gcode_flavor != gcfKlipper || print.config().start_gcode.value.empty()) && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_extruder_temperatures(file, print, start_all_gcode, initial_extruder_id, false);
+        this->_print_first_layer_extruder_temperatures(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, false);
 
     // adds tag for processor
-    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
+    preamble_to_put_start_layer.append(";").append(GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role)).append(ExtrusionEntity::role_to_string(erCustom)).append("\n");
 
     // Write the custom start G-code
-    file.writeln(start_gcode);
+    preamble_to_put_start_layer.append(start_gcode).append("\n");
+
     m_last_pos_defined = false;
 
     //flush FanMover buffer to avoid modifying the start gcode if it's manual.
@@ -1755,13 +1756,14 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
 */
 
     // Disable fan.
-    if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().disable_fan_first_layers.get_at(initial_extruder_id))
-        file.write(m_writer.set_fan(uint8_t(0), initial_extruder_id));
+    if ((initial_extruder_id != (uint16_t) -1) && !this->config().start_gcode_manual && print.config().disable_fan_first_layers.get_at(initial_extruder_id)) {
+        preamble_to_put_start_layer.append(m_writer.set_fan(uint8_t(0), initial_extruder_id));
+    }
 
     print.throw_if_canceled();
 
     // Set other general things.
-    file.write(this->preamble());
+    preamble_to_put_start_layer.append(this->preamble());
 
     // Calculate wiping points if needed
     DoExport::init_ooze_prevention(print, m_ooze_prevention);
@@ -1802,17 +1804,17 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 // Set initial extruder only after custom start G-code.
                 // Ugly hack: Do not set the initial extruder if the extruder is primed using the MMU priming towers at the edge of the print bed.
                 if (!(has_wipe_tower && print.config().single_extruder_multi_material_priming)) {
-                    file.write(this->set_extruder(initial_extruder_id, 0.));
+                    preamble_to_put_start_layer.append(this->set_extruder(initial_extruder_id, 0.));
                 } else {
                     m_writer.toolchange(initial_extruder_id);
                 }
             } else {
                 // set writer to the tool as should be set in the start_gcode.
-                file.write(this->set_extruder(initial_extruder_id, 0., true));
+                preamble_to_put_start_layer.append(this->set_extruder(initial_extruder_id, 0., true));
             }
         } else {
             // if we are running a single-extruder setup, just set the extruder and "return nothing"
-            file.write(this->set_extruder(initial_extruder_id, 0.));
+            preamble_to_put_start_layer.append(this->set_extruder(initial_extruder_id, 0.));
         }
     } else {
         // the right tool should have been set by the user.
@@ -1824,9 +1826,9 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
 
     //write temps after custom gcodes to ensure the temperature are good. (after tool selection)
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_extruder_temperatures(file, print, start_all_gcode, initial_extruder_id, true);
+        this->_print_first_layer_extruder_temperatures(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, true);
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_bed_temperature(file, print, start_all_gcode, initial_extruder_id, true);
+        this->_print_first_layer_bed_temperature(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, true);
 
     // Do all objects for each layer.
     if (initial_extruder_id != (uint16_t)-1) {
@@ -1848,12 +1850,12 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 print.throw_if_canceled();
                 this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
                 if (finished_objects > 0) {
-                    _move_to_print_object(file, print, finished_objects, initial_extruder_id);
+                    _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
                     std::string between_objects_gcode = this->placeholder_parser_process("between_objects_gcode", print.config().between_objects_gcode.value, initial_extruder_id);
                     // Set first layer bed and extruder temperatures, don't wait for it to reach the temperature.
-                    this->_print_first_layer_bed_temperature(file, print, between_objects_gcode, initial_extruder_id, false);
-                    this->_print_first_layer_extruder_temperatures(file, print, between_objects_gcode, initial_extruder_id, false);
-                    file.writeln(between_objects_gcode);
+                    this->_print_first_layer_bed_temperature(preamble_to_put_start_layer, print, between_objects_gcode, initial_extruder_id, false);
+                    this->_print_first_layer_extruder_temperatures(preamble_to_put_start_layer, print, between_objects_gcode, initial_extruder_id, false);
+                    preamble_to_put_start_layer.append(between_objects_gcode).append("\n");
                 } else {
                     set_extra_lift(0, 0, print.config(), m_writer, initial_extruder_id);
                 }
@@ -1866,7 +1868,8 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
                 // and export G-code into file.
                 this->process_layers(print, status_monitor, tool_ordering, collect_layers_to_print(object, status_monitor),
-                                     *print_object_instance_sequential_active - object.instances().data(), file);
+                                     *print_object_instance_sequential_active - object.instances().data(),
+                                     preamble_to_put_start_layer, file);
                 ++finished_objects;
                 // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
                 // Reset it when starting another object from 1st layer.
@@ -1909,13 +1912,14 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                             size_t finished_objects = 1 + (it_print_object_instance -
                                                            print_object_instances_ordering.begin());
                             if (finished_objects > 1)
-                                _move_to_print_object(file, print, finished_objects, initial_extruder_id);
+                                _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
 
                             assert(!object.instances().empty());
                             assert(*it_print_object_instance >= &*object.instances().begin() &&
                                    *it_print_object_instance <= &*(object.instances().end()-1));
                             this->process_layers(print, status_monitor, tool_ordering, layers_to_print_range,
-                                                 *it_print_object_instance - object.instances().data(), file);
+                                                 *it_print_object_instance - object.instances().data(),
+                                                 preamble_to_put_start_layer, file);
                             is_layers = true;
                         }
                     }
@@ -1977,7 +1981,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
                 // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
                 // and export G-code into file.
-                this->process_layers(print, status_monitor, tool_ordering, print_object_instances_ordering, layers_to_print, file);
+                this->process_layers(print, status_monitor, tool_ordering, print_object_instances_ordering, layers_to_print, preamble_to_put_start_layer, file);
                 if (m_wipe_tower)
                     // Purge the extruder, pull out the active filament.
                     file.write(m_wipe_tower->finalize(*this));
@@ -2083,19 +2087,17 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     print.throw_if_canceled();
 }
 
-void GCode::_move_to_print_object(GCodeOutputStream& file, const Print& print, size_t finished_objects, uint16_t initial_extruder_id)
+void GCode::_move_to_print_object(std::string& gcode_out, const Print& print, size_t finished_objects, uint16_t initial_extruder_id)
 {
     // Move to the origin position for the copy we're going to print.
     // This happens before Z goes down to layer 0 again, so that no collision happens hopefully.
     m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
     m_avoid_crossing_perimeters.use_external_mp_once();
     set_extra_lift(m_last_layer_z, 0, print.config(), m_writer, initial_extruder_id);
-    file.write(this->retract());
-    std::string gcode;
+    gcode_out.append(this->retract());
     //go to origin of the next object (it's 0,0 because we shifted the origin to it)
-    Polyline polyline = this->travel_to(gcode, Point(0, 0), erTravel);
-    this->write_travel_to(gcode, polyline, "move to origin position for next object");
-    file.write(gcode);
+    Polyline polyline = this->travel_to(gcode_out, Point(0, 0), erTravel);
+    this->write_travel_to(gcode_out, polyline, "move to origin position for next object");
     m_enable_cooling_markers = true;
     // Disable motion planner when traveling to first object point.
     m_avoid_crossing_perimeters.disable_once();
@@ -2136,16 +2138,17 @@ private:
 // and export G-code into file.
 void GCode::process_layers(
     const Print                                                         &print,
-    Print::StatusMonitor                                                       &status_monitor,
+    Print::StatusMonitor                                                &status_monitor,
     const ToolOrdering                                                  &tool_ordering,
     const std::vector<const PrintInstance*>                             &print_object_instances_ordering,
     const std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>>   &layers_to_print,
+    std::string                                                         &preamble,
     GCodeOutputStream                                                   &output_stream)
 {
     // The pipeline is variable: The vase mode filter is optional.
     size_t layer_to_print_idx = 0;
     const auto generator = tbb::make_filter<void, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &status_monitor, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &layer_to_print_idx](tbb::flow_control& fc) -> LayerResult {
+        [this, &print, &status_monitor, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &layer_to_print_idx, &preamble](tbb::flow_control& fc) -> LayerResult {
             CNumericLocalesSetter locales_setter;
             if (layer_to_print_idx >= layers_to_print.size()) {
                 if ((!m_pressure_equalizer && layer_to_print_idx == layers_to_print.size()) || (m_pressure_equalizer && layer_to_print_idx == (layers_to_print.size() + 1))) {
@@ -2155,7 +2158,10 @@ void GCode::process_layers(
                     // Pressure equalizer need insert empty input. Because it returns one layer back.
                     // Insert NOP (no operation) layer;
                     ++layer_to_print_idx;
-                    return LayerResult::make_nop_layer_result();
+                    LayerResult result = LayerResult::make_nop_layer_result();
+                    result.gcode = preamble;
+                    preamble.clear();
+                    return result;
                 }
             } else {
                 const std::pair<coordf_t, std::vector<LayerToPrint>>& layer = layers_to_print[layer_to_print_idx++];
@@ -2163,8 +2169,12 @@ void GCode::process_layers(
                 if (m_wipe_tower && layer_tools.has_wipe_tower)
                     m_wipe_tower->next_layer();
                 print.throw_if_canceled();
-                return this->process_layer(print, status_monitor, layer.second, layer_tools, &layer == &layers_to_print.back(),
-                                           &print_object_instances_ordering, size_t(-1));
+                LayerResult result = this->process_layer(print, status_monitor, layer.second, layer_tools,
+                                                         &layer == &layers_to_print.back(),
+                                                         &print_object_instances_ordering, size_t(-1));
+                result.gcode = preamble + result.gcode;
+                preamble.clear();
+                return result;
             }
         });
     const auto spiral_vase = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
@@ -2243,16 +2253,17 @@ void GCode::process_layers(
 // and export G-code into file.
 void GCode::process_layers(
     const Print                             &print,
-    Print::StatusMonitor                           &status_monitor,
+    Print::StatusMonitor                    &status_monitor,
     const ToolOrdering                      &tool_ordering,
     std::vector<LayerToPrint>                layers_to_print,
     const size_t                             single_object_idx,
+    std::string                             &preamble,
     GCodeOutputStream                       &output_stream)
 {
     // The pipeline is variable: The vase mode filter is optional.
     size_t layer_to_print_idx = 0;
     const auto generator = tbb::make_filter<void, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &status_monitor, &tool_ordering, &layers_to_print, &layer_to_print_idx, single_object_idx](tbb::flow_control& fc) -> LayerResult {
+        [this, &print, &status_monitor, &tool_ordering, &layers_to_print, &layer_to_print_idx, single_object_idx, &preamble](tbb::flow_control& fc) -> LayerResult {
             if (layer_to_print_idx >= layers_to_print.size()) {
                 if ((!m_pressure_equalizer && layer_to_print_idx == layers_to_print.size()) || (m_pressure_equalizer && layer_to_print_idx == (layers_to_print.size() + 1))) {
                 fc.stop();
@@ -2261,12 +2272,21 @@ void GCode::process_layers(
                     // Pressure equalizer need insert empty input. Because it returns one layer back.
                     // Insert NOP (no operation) layer;
                     ++layer_to_print_idx;
-                    return LayerResult::make_nop_layer_result();
+                    LayerResult result = LayerResult::make_nop_layer_result();
+                    result.gcode = preamble;
+                    preamble.clear();
+                    return result;
                 }
             } else {
                 LayerToPrint &layer = layers_to_print[layer_to_print_idx ++];
                 print.throw_if_canceled();
-                return this->process_layer(print, status_monitor, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), &layer == &layers_to_print.back(), nullptr, single_object_idx);
+                LayerResult result = this->process_layer(print, status_monitor, {std::move(layer)},
+                                                         tool_ordering.tools_for_layer(layer.print_z()),
+                                                         &layer == &layers_to_print.back(), nullptr,
+                                                         single_object_idx);
+                result.gcode = preamble + result.gcode;
+                preamble.clear();
+                return result;
             }
         });
     const auto spiral_vase = tbb::make_filter<LayerResult, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
@@ -2524,7 +2544,7 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, const Print &print)
 // Only do that if the start G-code does not already contain any M-code controlling an extruder temperature.
 // M140 - Set Bed Temperature
 // M190 - Set Bed Temperature and Wait
-void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
+void GCode::_print_first_layer_bed_temperature(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
 {
     // Initial bed temperature based on the first extruder.
     int  temp = print.config().first_layer_bed_temperature.get_at(first_printing_extruder_id);
@@ -2539,7 +2559,7 @@ void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, const Pr
     // the custom start G-code emited these.
     std::string set_temp_gcode = m_writer.set_bed_temperature(temp, wait);
     if ( !temp_set_by_gcode)
-        file.write(set_temp_gcode);
+        out += (set_temp_gcode);
 }
 
 // Write 1st layer extruder temperatures into the G-code.
@@ -2547,7 +2567,7 @@ void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, const Pr
 // M104 - Set Extruder Temperature
 // M109 - Set Extruder Temperature and Wait
 // RepRapFirmware: G10 Sxx
-void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
+void GCode::_print_first_layer_extruder_temperatures(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
 {
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode     = -1;
@@ -2572,7 +2592,7 @@ void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, co
                 if (print.config().ooze_prevention.value)
                     temp += print.config().standby_temperature_delta.value;
                 if (temp > 0)
-                    file.write(m_writer.set_temperature(temp, false, tool.id()));
+                    out += (m_writer.set_temperature(temp, false, tool.id()));
             }
         }
         if (wait || print.config().single_extruder_multi_material.value) {
@@ -2581,7 +2601,7 @@ void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, co
             if (temp == 0)
                 temp = print.config().temperature.get_at(first_printing_extruder_id);
             if (temp > 0)
-                file.write(m_writer.set_temperature(temp, wait, first_printing_extruder_id));
+                out += (m_writer.set_temperature(temp, wait, first_printing_extruder_id));
         }
     }
 }
@@ -6242,7 +6262,7 @@ std::string GCode::set_extruder(uint16_t extruder_id, double print_z, bool no_to
             check_add_eol(gcode);
         }
         if (!no_toolchange) {
-            gcode+=toolchange(extruder_id, print_z);
+            gcode += toolchange(extruder_id, print_z);
         }else m_writer.toolchange(extruder_id);
         return gcode;
     }
