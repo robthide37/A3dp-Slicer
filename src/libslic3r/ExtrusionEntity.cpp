@@ -494,6 +494,14 @@ void ExtrusionLength::use(const ExtrusionEntityCollection& collection) {
     }
 }
 
+double ExtrusionVolume::get(const ExtrusionEntityCollection &coll) {
+    for (const ExtrusionEntity *entity : coll.entities()) entity->visit(*this);
+    return volume;
+}
+
+void ExtrusionModifyFlow::set(ExtrusionEntityCollection &coll) {
+    for (ExtrusionEntity *entity : coll.entities()) entity->visit(*this);
+}
 
 void ExtrusionVisitorRecursiveConst::use(const ExtrusionMultiPath& multipath) {
     for (const ExtrusionPath& path : multipath.paths) {

@@ -884,7 +884,7 @@ void PerimeterGenerator::process()
                 svg.draw(to_polylines(fill_no_overlap), "cyan");
                 svg.draw(to_polylines(not_filled_exp), "green");
                 svg.draw(to_polylines(last_no_gaps), "yellow");
-                svg.draw(to_polylines(offset_ex(fill_clip, ext_perimeter_spacing / 2)), "brown");
+                //svg.draw(to_polylines(offset_ex(surface_process_result.fill_clip, ext_perimeter_spacing / 2)), "brown");
                 svg.draw(to_polylines(top_infill_exp), "orange");
                 svg.Close();
             }*/

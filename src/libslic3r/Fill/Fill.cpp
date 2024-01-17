@@ -677,7 +677,29 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                 //make fill
                 while ((size_t)surface_fill.params.priority >= fills_by_priority.size())
                     fills_by_priority.push_back(new ExtrusionEntityCollection());
+#if _DEBUG
+                const size_t idx_start = fills_by_priority[(size_t)surface_fill.params.priority]->entities().size();
+#endif
                 f->fill_surface_extrusion(&surface_fill.surface, surface_fill.params, fills_by_priority[(size_t)surface_fill.params.priority]->set_entities());
+#if _DEBUG
+                //check no over or underextrusion if fill_exactly
+                if(surface_fill.params.fill_exactly && surface_fill.params.density == 1) {
+                    ExtrusionVolume compute_volume;
+                    ExtrusionVolume compute_volume_no_gap_fill(false);
+                    const size_t idx_end = fills_by_priority[(size_t)surface_fill.params.priority]->entities().size();
+                    //check that it doesn't overextrude
+                    for(size_t idx = idx_start; idx < idx_end; ++idx){
+                        fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume);
+                        fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume_no_gap_fill);
+                    }
+                    assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height);
+                    ExPolygons temp = intersection_ex(ExPolygons{surface_fill.surface.expolygon}, f->no_overlap_expolygons);
+                    double real_surface = 0;
+                    for(auto &t : temp) real_surface += t.area();
+                    assert(compute_volume.volume < unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 1.001);
+                    assert(compute_volume.volume > unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 0.999);
+                }
+#endif
             }
         }
     }
