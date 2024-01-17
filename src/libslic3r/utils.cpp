@@ -123,6 +123,14 @@ unsigned get_logging_level()
     }
 }
 
+// Force set_logging_level(<=error) after loading of the DLL.
+// This is used ot disable logging for unit and integration tests.
+static struct RunOnInit {
+    RunOnInit() {
+        set_logging_level(1);
+    }
+} g_RunOnInit;
+
 void enforce_thread_count(const std::size_t count)
 {
     // Disable parallelization to simplify debugging.
