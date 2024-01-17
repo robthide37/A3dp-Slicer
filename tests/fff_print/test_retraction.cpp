@@ -9,9 +9,12 @@
 
 #include "test_data.hpp"
 #include <regex>
+#include <fstream>
 
 using namespace Slic3r;
 using namespace Test;
+
+constexpr bool debug_files {false};
 
 void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfig& config, const unsigned duplicate) {
     constexpr std::size_t tools_count = 4;
@@ -183,6 +186,12 @@ TEST_CASE("Z moves", "[retraction]") {
     unsigned z_restores = 0;
 
     std::string gcode = Slic3r::Test::slice({TestMesh::cube_20x20x20}, config);
+
+    if constexpr(debug_files) {
+        std::ofstream file{"zmoves.gcode"};
+        file << gcode;
+    }
+
 	GCodeReader parser;
     parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
         if (line.retracting(self)) {
@@ -205,8 +214,8 @@ TEST_CASE("Z moves", "[retraction]") {
     CHECK(layer_changes_with_retraction == 0);
     INFO("no retractions");
     CHECK(retractions == 0);
-    INFO("no lift");
-    CHECK(z_restores == 0);
+    INFO("no lift other than for the first move");
+    CHECK(z_restores == 1);
 }
 
 TEST_CASE("Firmware retraction handling", "[retraction]") {

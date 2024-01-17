@@ -2957,11 +2957,25 @@ std::string GCodeGenerator::_extrude(
     const std::string_view description_bridge = path_attr.role.is_bridge() ? " (bridge)"sv : ""sv;
 
     if (!m_current_layer_first_position) {
-        // Make the first travel just one G1.
         const Vec3crd point = to_3d(path.front().point, scaled(this->m_last_layer_z + this->m_config.z_offset.value));
         const Vec3d gcode_point = to_3d(this->point_to_gcode(point.head<2>()), unscaled(point.z()));
+
+        if (!this->last_position) {
+            double lift{
+                EXTRUDER_CONFIG(travel_ramping_lift) ? EXTRUDER_CONFIG(travel_max_lift) :
+                                                       EXTRUDER_CONFIG(retract_lift)};
+            const double upper_limit = EXTRUDER_CONFIG(retract_lift_below);
+            const double lower_limit = EXTRUDER_CONFIG(retract_lift_above);
+            if ((lower_limit > 0 && gcode_point.z() < lower_limit) ||
+                (upper_limit > 0 && gcode_point.z() > upper_limit)) {
+                lift = 0.0;
+            }
+            gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + lift, "lift");
+        }
+
         this->last_position = path.front().point;
         this->writer().update_position(gcode_point);
+
         gcode += this->writer().get_travel_to_xy_gcode(gcode_point.head<2>(), "move to first layer point");
         gcode += this->writer().get_travel_to_z_gcode(gcode_point.z(), "move to first layer point");
         m_current_layer_first_position = gcode_point;
