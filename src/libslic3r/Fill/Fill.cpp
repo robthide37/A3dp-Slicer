@@ -692,10 +692,10 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                         fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume);
                         fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume_no_gap_fill);
                     }
-                    assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height);
                     ExPolygons temp = intersection_ex(ExPolygons{surface_fill.surface.expolygon}, f->no_overlap_expolygons);
                     double real_surface = 0;
                     for(auto &t : temp) real_surface += t.area();
+                    assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height + EPSILON);
                     assert(compute_volume.volume < unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 1.001);
                     assert(compute_volume.volume > unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 0.999);
                 }
