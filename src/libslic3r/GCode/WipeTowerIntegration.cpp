@@ -57,12 +57,30 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
                                          || is_ramming
                                          || will_go_down);       // don't dig into the print
     if (should_travel_to_tower) {
+        const Point xy_point = wipe_tower_point_to_object_point(gcodegen, start_pos);
         gcode += gcodegen.retract_and_wipe();
         gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
-        gcode += gcodegen.travel_to(
-            wipe_tower_point_to_object_point(gcodegen, start_pos),
-            ExtrusionRole::Mixed,
-            "Travel to a Wipe Tower");
+        const std::string comment{"Travel to a Wipe Tower"};
+        if (gcodegen.m_current_layer_first_position) {
+            if (gcodegen.last_position) {
+                gcode += gcodegen.travel_to(
+                    *gcodegen.last_position, xy_point, ExtrusionRole::Mixed, comment
+                );
+            } else {
+                gcode += gcodegen.writer().travel_to_xy(gcodegen.point_to_gcode(xy_point), comment);
+                gcode += gcodegen.writer().get_travel_to_z_gcode(z, comment);
+            }
+        } else {
+            const Vec3crd point = to_3d(xy_point, scaled(z));
+            const Vec3d gcode_point = gcodegen.point_to_gcode(point);
+            gcodegen.last_position = point.head<2>();
+            gcodegen.writer().update_position(gcode_point);
+            gcode += gcodegen.writer()
+                         .get_travel_to_xy_gcode(gcode_point.head<2>(), comment);
+            gcode += gcodegen.writer()
+                         .get_travel_to_z_gcode(gcode_point.z(), comment);
+            gcodegen.m_current_layer_first_position = gcode_point;
+        }
         gcode += gcodegen.unretract();
     } else {
         // When this is multiextruder printer without any ramming, we can just change
@@ -98,7 +116,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
 
     // A phony move to the end position at the wipe tower.
     gcodegen.writer().travel_to_xy(end_pos.cast<double>());
-    gcodegen.set_last_pos(wipe_tower_point_to_object_point(gcodegen, end_pos));
+    gcodegen.last_position = wipe_tower_point_to_object_point(gcodegen, end_pos);
     if (!is_approx(z, current_z)) {
         gcode += gcodegen.writer().retract();
         gcode += gcodegen.writer().travel_to_z(current_z, "Travel back up to the topmost object layer.");
@@ -247,7 +265,7 @@ std::string WipeTowerIntegration::finalize(GCodeGenerator &gcodegen)
     std::string gcode;
     if (std::abs(gcodegen.writer().get_position().z() - m_final_purge.print_z) > EPSILON)
         gcode += gcodegen.generate_travel_gcode(
-            {{gcodegen.last_pos().x(), gcodegen.last_pos().y(), scaled(m_final_purge.print_z)}},
+            {{gcodegen.last_position->x(), gcodegen.last_position->y(), scaled(m_final_purge.print_z)}},
             "move to safe place for purging"
         );
     gcode += append_tcr(gcodegen, m_final_purge, -1);

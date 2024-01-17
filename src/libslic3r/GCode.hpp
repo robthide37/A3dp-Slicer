@@ -38,8 +38,9 @@
 #include "GCode/WipeTowerIntegration.hpp"
 #include "GCode/SeamPlacer.hpp"
 #include "GCode/GCodeProcessor.hpp"
-#include "EdgeGrid.hpp"
 #include "GCode/ThumbnailData.hpp"
+#include "GCode/Travels.hpp"
+#include "EdgeGrid.hpp"
 #include "tcbspan/span.hpp"
 
 #include <memory>
@@ -89,6 +90,30 @@ struct LayerResult {
     static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
 };
 
+namespace GCode {
+// Object and support extrusions of the same PrintObject at the same print_z.
+// public, so that it could be accessed by free helper functions from GCode.cpp
+struct ObjectLayerToPrint
+{
+    ObjectLayerToPrint() : object_layer(nullptr), support_layer(nullptr) {}
+    const Layer* 		object_layer;
+    const SupportLayer* support_layer;
+    const Layer* 		layer()   const { return (object_layer != nullptr) ? object_layer : support_layer; }
+    const PrintObject* 	object()  const { return (this->layer() != nullptr) ? this->layer()->object() : nullptr; }
+    coordf_t            print_z() const { return (object_layer != nullptr && support_layer != nullptr) ? 0.5 * (object_layer->print_z + support_layer->print_z) : this->layer()->print_z; }
+};
+
+struct PrintObjectInstance
+{
+    const PrintObject *print_object = nullptr;
+    int                instance_idx = -1;
+
+    bool operator==(const PrintObjectInstance &other) const {return print_object == other.print_object && instance_idx == other.instance_idx; }
+    bool operator!=(const PrintObjectInstance &other) const { return *this == other; }
+};
+
+} // namespace GCode
+
 class GCodeGenerator {
 
 public:        
@@ -103,7 +128,6 @@ public:
         m_layer(nullptr),
         m_object_layer_over_raft(false),
         m_volumetric_speed(0),
-        m_last_pos_defined(false),
         m_last_extrusion_role(GCodeExtrusionRole::None),
         m_last_width(0.0f),
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -112,7 +136,7 @@ public:
         m_brim_done(false),
         m_second_layer_things_done(false),
         m_silent_time_estimator_enabled(false),
-        m_last_obj_copy(nullptr, Point(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max()))
+        m_current_instance({nullptr, -1})
         {}
     ~GCodeGenerator() = default;
 
@@ -124,14 +148,27 @@ public:
     const Vec2d&    origin() const { return m_origin; }
     void            set_origin(const Vec2d &pointf);
     void            set_origin(const coordf_t x, const coordf_t y) { this->set_origin(Vec2d(x, y)); }
-    const Point&    last_pos() const { return m_last_pos; }
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset.
     template<typename Derived>
-    Vec2d           point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
-        static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "GCodeGenerator::point_to_gcode(): first parameter is not a 2D vector");
-        return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin 
-            - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+    Eigen::Matrix<double, Derived::SizeAtCompileTime, 1, Eigen::DontAlign> point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
+        static_assert(
+            Derived::IsVectorAtCompileTime,
+            "GCodeGenerator::point_to_gcode(): first parameter is not a vector"
+        );
+        static_assert(
+            int(Derived::SizeAtCompileTime) == 2 || int(Derived::SizeAtCompileTime) == 3,
+            "GCodeGenerator::point_to_gcode(): first parameter is not a 2D or 3D vector"
+        );
+
+        if constexpr (Derived::SizeAtCompileTime == 2) {
+            return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
+                - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+        } else {
+            const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
+            return to_3d(gcode_point_xy, unscaled(point.z()));
+        }
     }
+
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
     template<typename Derived>
     Vec2d           point_to_gcode_quantized(const Eigen::MatrixBase<Derived> &point) const {
@@ -159,18 +196,10 @@ public:
     // translate full config into a list of <key, value> items
     static void encode_full_config(const Print& print, std::vector<std::pair<std::string, std::string>>& config);
 
-    // Object and support extrusions of the same PrintObject at the same print_z.
-    // public, so that it could be accessed by free helper functions from GCode.cpp
-    struct ObjectLayerToPrint
-    {
-        ObjectLayerToPrint() : object_layer(nullptr), support_layer(nullptr) {}
-        const Layer* 		object_layer;
-        const SupportLayer* support_layer;
-        const Layer* 		layer()   const { return (object_layer != nullptr) ? object_layer : support_layer; }
-        const PrintObject* 	object()  const { return (this->layer() != nullptr) ? this->layer()->object() : nullptr; }
-        coordf_t            print_z() const { return (object_layer != nullptr && support_layer != nullptr) ? 0.5 * (object_layer->print_z + support_layer->print_z) : this->layer()->print_z; }
-    };
-    using ObjectsLayerToPrint = std::vector<ObjectLayerToPrint>;
+    using ObjectLayerToPrint  = GCode::ObjectLayerToPrint;
+    using ObjectsLayerToPrint = std::vector<GCode::ObjectLayerToPrint>;
+
+    std::optional<Point> last_position;
 
 private:
     class GCodeOutputStream {
@@ -216,6 +245,9 @@ private:
     static ObjectsLayerToPrint         		                     collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, ObjectsLayerToPrint>> collect_layers_to_print(const Print &print);
 
+    /** @brief Generates ramping travel gcode for layer change. */
+    std::string get_layer_change_gcode(const Vec3d& from, const Vec3d& to, const unsigned extruder_id);
+
     LayerResult process_layer(
         const Print                     &print,
         // Set of object & print layers of the same PrintObject and with the same print_z.
@@ -249,19 +281,11 @@ private:
         const GCode::SmoothPathCache            &smooth_path_cache_global,
         GCodeOutputStream                       &output_stream);
 
-    void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
-    bool            last_pos_defined() const { return m_last_pos_defined; }
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
-    std::optional<std::string> get_helical_layer_change_gcode(
-        const coordf_t previous_layer_z,
-        const coordf_t print_z,
-        const std::string& comment
-    );
     std::string change_layer(
         coordf_t previous_layer_z,
-        coordf_t print_z,
-        const bool spiral_vase_enabled
+        coordf_t print_z
     );
     std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
     std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
@@ -321,7 +345,12 @@ private:
         const bool needs_retraction,
         bool& could_be_wipe_disabled
     );
-    std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
+    std::string travel_to(
+        const Point &start_point,
+        const Point &end_point,
+        ExtrusionRole role,
+        const std::string &comment
+    );
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
 
     std::string     retract_and_wipe(bool toolchange = false);
@@ -377,6 +406,7 @@ private:
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
     JPSPathFinder                       m_avoid_crossing_curled_overhangs;
     RetractWhenCrossingPerimeters       m_retract_when_crossing_perimeters;
+    GCode::TravelObstacleTracker        m_travel_obstacle_tracker;
     bool                                m_enable_loop_clipping;
     // If enabled, the G-code generator will put following comments at the ends
     // of the G-code lines: _EXTRUDE_SET_SPEED, _WIPE, _BRIDGE_FAN_START, _BRIDGE_FAN_END
@@ -396,7 +426,6 @@ private:
     // In non-sequential mode, all its copies will be printed.
     const Layer*                        m_layer;
     // m_layer is an object layer and it is being printed over raft surface.
-    std::optional<AABBTreeLines::LinesDistancer<Linef>> m_previous_layer_distancer;
     bool                                m_object_layer_over_raft;
     double                              m_volumetric_speed;
     // Support for the extrusion role markers. Which marker is active?
@@ -410,9 +439,10 @@ private:
     double                              m_last_mm3_per_mm;
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
-    Point                               m_last_pos;
-    bool                                m_last_pos_defined;
-
+    std::optional<Vec3d>                m_previous_layer_last_position;
+    // This needs to be populated during the layer processing!
+    std::optional<Vec3d>                m_current_layer_first_position;
+    std::optional<unsigned>             m_layer_change_extruder_id;
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
     std::unique_ptr<GCodeFindReplace>   m_find_replace;
@@ -425,8 +455,8 @@ private:
     bool                                m_brim_done;
     // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
     bool                                m_second_layer_things_done;
-    // Index of a last object copy extruded.
-    std::pair<const PrintObject*, Point> m_last_obj_copy;
+    // Pointer to currently exporting PrintObject and instance index.
+    GCode::PrintObjectInstance          m_current_instance;
 
     bool                                m_silent_time_estimator_enabled;
 

@@ -57,6 +57,7 @@ const std::vector<std::string> GCodeProcessor::Reserved_Tags = {
     "HEIGHT:",
     "WIDTH:",
     "LAYER_CHANGE",
+    "LAYER_CHANGE_TRAVEL",
     "COLOR_CHANGE",
     "PAUSE_PRINT",
     "CUSTOM_GCODE",

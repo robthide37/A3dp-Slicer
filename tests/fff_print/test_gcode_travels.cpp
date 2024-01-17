@@ -1,6 +1,8 @@
 #include <catch2/catch.hpp>
 #include <libslic3r/GCode/Travels.hpp>
 #include <libslic3r/ExPolygon.hpp>
+#include <libslic3r/GCode.hpp>
+#include <boost/math/special_functions/pow.hpp>
 
 using namespace Slic3r;
 using namespace Slic3r::GCode::Impl::Travels;
@@ -15,8 +17,8 @@ struct ApproxEqualsPoints : public Catch::MatcherBase<Points> {
             const Point& point = points[i];
             const Point& expected_point = this->expected[i];
             if (
-                std::abs(point.x() - expected_point.x()) > this->tolerance
-                || std::abs(point.y() - expected_point.y()) > this->tolerance
+                std::abs(point.x() - expected_point.x()) > int(this->tolerance)
+                || std::abs(point.y() - expected_point.y()) > int(this->tolerance)
             ) {
                 return false;
             }
@@ -116,10 +118,10 @@ TEST_CASE("Generate elevated travel", "[GCode]") {
     Points3 result{generate_elevated_travel(xy_path, ensure_points_at_distances, 2.0, [](double x){return 1 + x;})};
 
     CHECK(result == Points3{
-        scaled(Vec3f{0, 0, 3.0}),
-        scaled(Vec3f{0.2, 0, 3.2}),
-        scaled(Vec3f{0.5, 0, 3.5}),
-        scaled(Vec3f{1, 0, 4.0})
+        scaled(Vec3f{ 0.f, 0.f,  3.f}),
+        scaled(Vec3f{0.2f, 0.f, 3.2f}),
+        scaled(Vec3f{0.5f, 0.f, 3.5f}),
+        scaled(Vec3f{ 1.f, 0.f,  4.f})
     });
 }
 
@@ -161,21 +163,39 @@ TEST_CASE("Get first crossed line distance", "[GCode]") {
         scaled(Vec2f{0, 5}),
     }.lines()};
 
-    std::vector<Linef> lines;
+    std::vector<GCode::ObjectOrExtrusionLinef> lines;
     for (const ExPolygon& polygon : {square_with_hole, square_above}) {
         for (const Line& line : polygon.lines()) {
             lines.emplace_back(unscale(line.a), unscale(line.b));
         }
     }
     // Try different cases by skipping lines in the travel.
-    AABBTreeLines::LinesDistancer<Linef> distancer{std::move(lines)};
+    AABBTreeLines::LinesDistancer<GCode::ObjectOrExtrusionLinef> distancer{std::move(lines)};
 
-    CHECK(*get_first_crossed_line_distance(travel, distancer) == Approx(1));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(2), distancer) == Approx(0.5));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(4), distancer) == Approx(0.7));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(5), distancer) == Approx(1.6));
-    CHECK_FALSE(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer));
+    CHECK(get_first_crossed_line_distance(travel, distancer) == Approx(1));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(2), distancer) == Approx(0.5));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(4), distancer) == Approx(0.7));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(5), distancer) == Approx(1.6));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer) == std::numeric_limits<double>::max());
 }
 
+
+TEST_CASE("Elevated travel formula", "[GCode]") {
+    const double lift_height{10};
+    const double slope_end{10};
+    const double blend_width{10};
+    const ElevatedTravelParams params{lift_height, slope_end, blend_width};
+
+    ElevatedTravelFormula f{params};
+
+    const double distance = slope_end - blend_width / 2;
+    const double slope = (f(distance) - f(0)) / distance;
+    // At the begining it has given slope.
+    CHECK(slope == lift_height / slope_end);
+    // At the end it is flat.
+    CHECK(f(slope_end + blend_width / 2) == f(slope_end + blend_width));
+    // Should be smoothed.
+    CHECK(f(slope_end) < lift_height);
+}

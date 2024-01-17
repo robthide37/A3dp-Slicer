@@ -66,10 +66,23 @@ public:
     std::string toolchange_prefix() const;
     std::string toolchange(unsigned int extruder_id);
     std::string set_speed(double F, const std::string_view comment = {}, const std::string_view cooling_marker = {}) const;
+
+    std::string get_travel_to_xy_gcode(const Vec2d &point, const std::string_view comment) const;
     std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
     std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
-    std::string travel_to_xyz(const Vec3d &point, const std::string_view comment = {});
-    std::string get_travel_to_z_gcode(double z, const std::string_view comment);
+
+    /**
+     * @brief Return gcode with all three axis defined. Optionally adds feedrate.
+     *
+     * Feedrate is added the starting point "from" is specified.
+     *
+     * @param from Optional starting point of the travel.
+     * @param to Where to travel to.
+     * @param comment Description of the travel purpose.
+     */
+    std::string get_travel_to_xyz_gcode(const Vec3d &from, const Vec3d &to, const std::string_view comment) const;
+    std::string travel_to_xyz(const Vec3d &from, const Vec3d &to, const std::string_view comment = {});
+    std::string get_travel_to_z_gcode(double z, const std::string_view comment) const;
     std::string travel_to_z(double z, const std::string_view comment = {});
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
     std::string extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment);

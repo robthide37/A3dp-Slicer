@@ -446,7 +446,7 @@ inline void expolygons_rotate(ExPolygons &expolys, double angle)
         expoly.rotate(angle);
 }
 
-inline bool expolygons_contain(ExPolygons &expolys, const Point &pt, bool border_result = true)
+inline bool expolygons_contain(const ExPolygons &expolys, const Point &pt, bool border_result = true)
 {
     for (const ExPolygon &expoly : expolys)
         if (expoly.contains(pt, border_result))
