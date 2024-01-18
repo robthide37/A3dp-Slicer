@@ -1274,8 +1274,7 @@ void GLGizmoSVG::calculate_scale() {
 float GLGizmoSVG::get_scale_for_tolerance(){ 
     return std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)); }
 
-bool GLGizmoSVG::process()
-{
+bool GLGizmoSVG::process(bool make_snapshot) {
     // no volume is selected -> selection from right panel
     assert(m_volume != nullptr);
     if (m_volume == nullptr) 
@@ -1296,7 +1295,7 @@ bool GLGizmoSVG::process()
     EmbossShape shape = m_volume_shape; // copy
     auto base = std::make_unique<DataBase>(m_volume->name, m_job_cancel, std::move(shape));
     base->is_outside = m_volume->type() == ModelVolumeType::MODEL_PART;
-    DataUpdate data{std::move(base), m_volume_id};
+    DataUpdate data{std::move(base), m_volume_id, make_snapshot};
     return start_update_volume(std::move(data), *m_volume, m_parent.get_selection(), m_raycast_manager);    
 }
 
@@ -1690,6 +1689,8 @@ void GLGizmoSVG::draw_size()
     };
 
     std::optional<Vec3d> new_relative_scale;
+    bool make_snap = false;
+
     if (m_keep_ratio) {
         std::stringstream ss;
         ss << std::setprecision(2) << std::fixed << width << " x " << height << " " << (use_inch ? "in" : "mm");
@@ -1708,6 +1709,8 @@ void GLGizmoSVG::draw_size()
                 new_relative_scale = Vec3d(width_ratio, width_ratio, 1.);
             }
         }
+        if (m_imgui->get_last_slider_status().deactivated_after_edit)
+            make_snap = true; // only last change of slider make snap
     } else {
         ImGuiInputTextFlags flags = 0;
 
@@ -1727,6 +1730,7 @@ void GLGizmoSVG::draw_size()
             if (is_valid_scale_ratio(width_ratio)) {
                 m_scale_width = m_scale_width.value_or(1.f) * width_ratio;
                 new_relative_scale = Vec3d(width_ratio, 1., 1.);
+                make_snap = true;
             }
         }
         if (ImGui::IsItemHovered())
@@ -1740,6 +1744,7 @@ void GLGizmoSVG::draw_size()
             if (is_valid_scale_ratio(height_ratio)) {
                 m_scale_height = m_scale_height.value_or(1.f) * height_ratio;
                 new_relative_scale  = Vec3d(1., height_ratio, 1.);
+                make_snap = true;
             }
         }
         if (ImGui::IsItemHovered())
@@ -1761,6 +1766,7 @@ void GLGizmoSVG::draw_size()
     if (can_reset) {
         if (reset_button(m_icons)) {
             new_relative_scale = Vec3d(1./m_scale_width.value_or(1.f), 1./m_scale_height.value_or(1.f), 1.);
+            make_snap = true;
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Reset scale").c_str());
     }
@@ -1774,20 +1780,25 @@ void GLGizmoSVG::draw_size()
         };        
         selection_transform(selection, selection_scale_fnc);
 
-        m_parent.do_scale(L("Resize"));
+        std::string snap_name; // Empty mean do not store on undo/redo stack
+        m_parent.do_scale(snap_name);
         wxGetApp().obj_manipul()->set_dirty();
         // should be the almost same
         calculate_scale();
                 
-        NSVGimage *img = m_volume_shape.svg_file->image.get();
+        const NSVGimage *img = m_volume_shape.svg_file->image.get();
         assert(img != NULL);
         if (img != NULL){
             NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
             m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, params);
             m_volume_shape.final_shape = {}; // reset cache for final shape
-            process();        
+            if (!make_snap) // Be carefull: Last change may be without change of scale
+                process(false);
         }
     }
+
+    if (make_snap)
+        process(); // make undo/redo snap-shot
 }
 
 void GLGizmoSVG::draw_use_surface() 
