@@ -48,8 +48,8 @@ private:
     uint16_t m_currrent_extruder = 0;
 
     // variable for when you add a line (front of the buffer)
-    int m_front_buffer_fan_speed = 0;
-    int m_back_buffer_fan_speed = 0;
+    int m_front_buffer_fan_speed = 1;
+    int m_back_buffer_fan_speed = 1;
     BufferData m_current_kickstart{"",-1,0};
 
     //buffer

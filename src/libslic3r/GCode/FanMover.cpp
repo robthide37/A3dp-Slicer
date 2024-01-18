@@ -1,6 +1,7 @@
 #include "FanMover.hpp"
 
 #include "GCodeReader.hpp"
+#include "LocalesUtils.hpp"
 
 #include <iomanip>
 /*
@@ -66,16 +67,12 @@ float get_axis_value(const std::string& line, char axis)
 
 void change_axis_value(std::string& line, char axis, const float new_value, const int decimal_digits)
 {
-
-    std::ostringstream ss;
-    ss << std::fixed << std::setprecision(decimal_digits) << new_value;
-
     char match[3] = " X";
     match[1] = axis;
 
     size_t pos = line.find(match) + 2;
     size_t end = std::min(line.find(' ', pos + 1), line.find(';', pos + 1));
-    line = line.replace(pos, end - pos, ss.str());
+    line = line.replace(pos, end - pos, to_string_nozero(new_value, decimal_digits));
 }
 
 int16_t get_fan_speed(const std::string &line, GCodeFlavor flavor) {
@@ -213,7 +210,10 @@ void FanMover::_remove_slow_fan(int16_t min_speed, float past_sec) {
 
 std::string FanMover::_set_fan(int16_t speed) {
     const Tool* tool = m_writer.get_tool(m_currrent_extruder < 20 ? m_currrent_extruder : 0);
-    return GCodeWriter::set_fan(m_writer.config.gcode_flavor.value, m_writer.config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, m_writer.config.fan_percentage.value);
+    std::string str = GCodeWriter::set_fan(m_writer.config.gcode_flavor.value, m_writer.config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, m_writer.config.fan_percentage.value);
+    if(!str.empty() && str.back() == '\n')
+        return str.substr(0,str.size()-1);
+    return str;
 }
 
 
@@ -491,9 +491,11 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
             remove_from_buffer(m_buffer.begin());
         }
     }
+#if _DEBUG
     double sum = 0;
     for (auto& data : m_buffer) sum += data.time;
     assert( std::abs(m_buffer_time_size - sum) < 0.01);
+#endif
 }
 
 } // namespace Slic3r
