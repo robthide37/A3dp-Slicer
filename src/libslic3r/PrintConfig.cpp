@@ -2331,7 +2331,10 @@ void PrintConfigDef::init_fff_params()
     def->gui_flags = "show_value";
     def->label = L("Fill density");
     def->category = OptionCategory::infill;
-    def->tooltip = L("Density of internal infill, expressed in the range 0% - 100%.");
+    def->tooltip = L("Density of internal infill, expressed in the range 0% - 100%."
+        "\nSet 0 to remove any sparse infill."
+        "\nNote that using a value of 100% won't change the type of infill from sparse to solid."
+        " If you want only solid infill, you can set the 'Solid infill every X layers' (solid_infill_every_layers) to 1 instead.");
     def->sidetext = L("%");
     def->min = 0;
     def->max = 100;
@@ -2347,7 +2350,6 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("42");
     def->enum_values.push_back("55");
     def->enum_values.push_back("75");
-    def->enum_values.push_back("100");
     def->enum_labels.push_back("0");
     def->enum_labels.push_back("4");
     def->enum_labels.push_back("5.5");
@@ -2360,7 +2362,6 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back("42");
     def->enum_labels.push_back("55");
     def->enum_labels.push_back("75");
-    def->enum_labels.push_back("100");
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionPercent(18));
 
