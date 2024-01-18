@@ -361,6 +361,9 @@ void AppConfig::set_defaults()
             set("check_blacklisted_library", "1");
 #endif // _WIN32
 
+        if (get("compress_png_texture").empty())
+            set("compress_png_texture", "1");
+
         // remove old 'use_legacy_opengl' parameter from this config, if present
         if (!get("use_legacy_opengl").empty())
             erase("", "use_legacy_opengl");
