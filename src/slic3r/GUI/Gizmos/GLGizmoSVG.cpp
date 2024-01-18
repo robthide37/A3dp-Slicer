@@ -1498,8 +1498,9 @@ void GLGizmoSVG::draw_filename(){
             std::string new_path = choose_svg_file();
             if (!new_path.empty()) {
                 file_changed = true;
-                m_volume_shape.svg_file = {}; // clear data
-                m_volume_shape.svg_file->path = new_path;
+                EmbossShape::SvgFile svg_file_new;
+                svg_file_new.path = new_path;
+                m_volume_shape.svg_file = svg_file_new; // clear data
             }
         } else if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", _u8L("Change to another .svg file").c_str());
