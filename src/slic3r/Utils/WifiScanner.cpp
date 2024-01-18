@@ -12,9 +12,8 @@
 #include <objbase.h>
 #include <wtypes.h>
 
-// Need to link with Wlanapi.lib and Ole32.lib
-#pragma comment(lib, "wlanapi.lib")
-#pragma comment(lib, "ole32.lib")
+#include "libslic3r//Utils.hpp"
+
 #elif __APPLE_
 #include "WifiScannerMac.h"
 #endif 
@@ -49,17 +48,49 @@ bool ptree_get_value(const boost::property_tree::ptree& pt, const std::string& t
 // https://learn.microsoft.com/en-us/windows/win32/api/wlanapi/nf-wlanapi-wlangetavailablenetworklist
 void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid)
 {
+    HINSTANCE hWlanApi = LoadLibrary(L"wlanapi.dll");
+    if (hWlanApi == NULL)
+        return;
+    Slic3r::ScopeGuard guard([&hWlanApi] { FreeLibrary(hWlanApi); });
+    
+    using WlanOpenHandleFunc     = DWORD(WINAPI*)(DWORD, PVOID, PDWORD, PHANDLE);
+    using WlanEnumInterfacesFunc = DWORD(WINAPI*)(HANDLE, PVOID, PWLAN_INTERFACE_INFO_LIST*);
+    using WlanQueryInterfaceFunc = DWORD(WINAPI*)(HANDLE, const GUID*, WLAN_INTF_OPCODE, PVOID, PDWORD, PVOID*, PWLAN_OPCODE_VALUE_TYPE);
+    using WlanFreeMemoryFunc     = VOID(WINAPI* )(PVOID);
+    using WlanGetProfileFunc     = DWORD(WINAPI*)(HANDLE, const GUID*, LPCWSTR, PVOID, LPWSTR*, DWORD*, DWORD*);
+    using WlanGetProfileListFunc = DWORD(WINAPI*)(HANDLE, const GUID*, PVOID, PWLAN_PROFILE_INFO_LIST*);
+    using WlanGetAvailableNetworkListFunc = DWORD(WINAPI*)(HANDLE, const GUID*, DWORD, PVOID, PWLAN_AVAILABLE_NETWORK_LIST*);
+    using WlanCloseHandleFunc    = DWORD(WINAPI*)(HANDLE, PVOID);
+
+    WlanOpenHandleFunc wlanOpenHandleFunc         = reinterpret_cast<WlanOpenHandleFunc>(GetProcAddress(hWlanApi, "WlanOpenHandle"));
+    WlanEnumInterfacesFunc wlanEnumInterfacesFunc = reinterpret_cast<WlanEnumInterfacesFunc>(GetProcAddress(hWlanApi, "WlanEnumInterfaces"));
+    WlanQueryInterfaceFunc wlanQueryInterfaceFunc = reinterpret_cast<WlanQueryInterfaceFunc>(GetProcAddress(hWlanApi, "WlanQueryInterface"));
+    WlanFreeMemoryFunc wlanFreeMemoryFunc         = reinterpret_cast<WlanFreeMemoryFunc>(GetProcAddress(hWlanApi, "WlanFreeMemory"));
+    WlanGetProfileFunc wlanGetProfileFunc         = reinterpret_cast<WlanGetProfileFunc>(GetProcAddress(hWlanApi, "WlanGetProfile"));
+    WlanGetProfileListFunc wlanGetProfileListFunc = reinterpret_cast<WlanGetProfileListFunc>(GetProcAddress(hWlanApi, "WlanGetProfileList"));
+    WlanGetAvailableNetworkListFunc wlanGetAvailableNetworkListFunc = reinterpret_cast<WlanGetAvailableNetworkListFunc>(GetProcAddress(hWlanApi, "WlanGetAvailableNetworkList"));
+    WlanCloseHandleFunc wlanCloseHandleFunc       = reinterpret_cast<WlanCloseHandleFunc>(GetProcAddress(hWlanApi, "WlanCloseHandle"));
+
+    if (! wlanOpenHandleFunc || ! wlanEnumInterfacesFunc || ! wlanQueryInterfaceFunc || ! wlanFreeMemoryFunc
+     || ! wlanGetProfileFunc || ! wlanGetProfileListFunc || ! wlanGetAvailableNetworkListFunc || ! wlanCloseHandleFunc)
+        return;
+
+
     HANDLE handle;
     DWORD supported_version = 0;
     DWORD client_version = 2;
     PWLAN_INTERFACE_INFO_LIST interface_list = NULL;
 
-
-    if (WlanOpenHandle(client_version, NULL, &supported_version, &handle) != ERROR_SUCCESS)
+    
+    if (wlanOpenHandleFunc(client_version, NULL, &supported_version, &handle) != ERROR_SUCCESS)
         return;
 
-    if (WlanEnumInterfaces(handle, NULL, &interface_list) != ERROR_SUCCESS)
+    if (wlanEnumInterfacesFunc(handle, NULL, &interface_list) != ERROR_SUCCESS) {
+        // Touhle cestou funkce vrati bez toho, aby zavolala WlanCloseHandleFunc.
+        // I tady by stalo za uvahu pouziti ScopeGuard, ktery podobnou chybu vylouci
+        // a kod bude exception-safe (coz je tady asi jedno, ale obecne to jedno neni).
         return;
+    }
 
     for (DWORD i = 0; i < interface_list->dwNumberOfItems; i++)
     {
@@ -69,7 +100,7 @@ void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid
             DWORD connectInfoSize = sizeof(WLAN_CONNECTION_ATTRIBUTES);
             WLAN_OPCODE_VALUE_TYPE opCode = wlan_opcode_value_type_invalid;
 
-            if (WlanQueryInterface(handle, &interface_list->InterfaceInfo[i].InterfaceGuid,
+            if (wlanQueryInterfaceFunc(handle, &interface_list->InterfaceInfo[i].InterfaceGuid,
                 wlan_intf_opcode_current_connection, NULL,
                 &connectInfoSize, (PVOID*)&pConnectInfo, &opCode) == ERROR_SUCCESS && pConnectInfo && pConnectInfo->wlanAssociationAttributes.dot11Ssid.uSSIDLength)
             {
@@ -77,7 +108,7 @@ void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid
                     pConnectInfo->wlanAssociationAttributes.dot11Ssid.uSSIDLength);
             }
 
-            WlanFreeMemory(pConnectInfo);
+            wlanFreeMemoryFunc(pConnectInfo);
         }
 
         PWLAN_PROFILE_INFO_LIST profile_list = NULL;
@@ -90,7 +121,7 @@ void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid
         int iRet = StringFromGUID2(interface_info_entry->InterfaceGuid, (LPOLESTR)&guid,
             sizeof(guid) / sizeof(*guid));
 
-        if (WlanGetAvailableNetworkList(handle,
+        if (wlanGetAvailableNetworkListFunc(handle,
             &interface_info_entry->InterfaceGuid,
             0,
             NULL,
@@ -121,7 +152,7 @@ void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid
 
             wifi_map[ssid] = std::string();
 
-            if (WlanGetProfileList(handle, &interface_list->InterfaceInfo[i].InterfaceGuid,
+            if (wlanGetProfileListFunc(handle, &interface_list->InterfaceInfo[i].InterfaceGuid,
                 NULL, &profile_list) != ERROR_SUCCESS)
             {
                 continue;
@@ -140,7 +171,7 @@ void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid
                 if (s != ssid)
                     continue;
 
-                if ((ret = WlanGetProfile(handle, &interface_list->InterfaceInfo[i].InterfaceGuid, profile_list->ProfileInfo[k].strProfileName,
+                if ((ret = wlanGetProfileFunc(handle, &interface_list->InterfaceInfo[i].InterfaceGuid, profile_list->ProfileInfo[k].strProfileName,
                     NULL, &xmlstr, &flags, &access)) == ERROR_SUCCESS && xmlstr)
                 {
                     wxString xml(xmlstr);
@@ -160,20 +191,20 @@ void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid
                     if (ptree_get_value(pt, "keyMaterial", password))
                         wifi_map[ssid] = password;
 
-                    WlanFreeMemory(xmlstr);
+                    wlanFreeMemoryFunc(xmlstr);
                     break;
                 }
             }
 
             if (profile_list) {
-                WlanFreeMemory(profile_list);
+                wlanFreeMemoryFunc(profile_list);
             }
         }
     }
 
     if (interface_list)
-        WlanFreeMemory(interface_list);
-    WlanCloseHandle(handle, NULL);
+        wlanFreeMemoryFunc(interface_list);
+    wlanCloseHandleFunc(handle, NULL);
 }
 #elif __APPLE__
 void get_connected_ssid(std::string& connected_ssid)
