@@ -311,7 +311,9 @@ protected:
 	bool				m_show_incompatible_presets;
 
     ScriptContainer     m_script_exec;
-	std::unordered_map<std::string, std::vector<std::string>> deps_id_2_script_ids;
+	static inline std::unordered_map<std::string, std::vector<std::pair<Preset::Type, std::string>>> depsid_2_tabtype_scriptids;
+	//static void register_setting_dependency(Tab &tab_script, std::string opt_id, Preset::Type dep_type, std::string dependency_opt_id);
+	//static void emit_dependency(Tab &tab_opt_changed, std::string opt_changed);
 
     std::vector<Preset::Type>	m_dependent_tabs;
 	enum OptStatus {

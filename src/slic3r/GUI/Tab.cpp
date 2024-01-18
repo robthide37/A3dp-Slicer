@@ -495,7 +495,7 @@ Slic3r::GUI::PageShp Tab::create_options_page(const wxString& title, const std::
 wxString Tab::translate_category(const wxString& title, Preset::Type preset_type)
 {
     if (preset_type == Preset::TYPE_PRINTER && title.Contains("Extruder ")) {
-        return _("Extruder") + title.SubString(8, title.Last());
+        return _("Extruder") + title.SubString(strlen("Extruder"), title.Last());
     }
     return _(title);
 }
@@ -1315,23 +1315,35 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     PrinterTechnology pt = get_printer_technology();
     ConfigOptionsGroup* og_freq_chng_params = wxGetApp().sidebar().og_freq_chng_params(pt);
     
+    //create optid without index
+    //TODO remove this #idx embeeded inside and use a struct!
+    std::string opt_id = opt_key;
+    if(size_t pos = opt_id.find("#"); pos != std::string::npos)
+        opt_id = opt_id.substr(0, pos);
+
     // script presets
-    if (this->m_script_exec.is_intialized()) {
-        auto it = deps_id_2_script_ids.find(opt_key);
-        if (it != deps_id_2_script_ids.end()) {
-            for (const std::string& preset_id : it->second) {
-                for (PageShp page : m_pages) {
-                    Field* field = page->get_field(preset_id, -1);
+    auto it = Tab::depsid_2_tabtype_scriptids.find(opt_id);
+    if (it != Tab::depsid_2_tabtype_scriptids.end()) {
+        for (const std::pair<Preset::Type, std::string> &tabtype_presetid : it->second) {
+            Tab *script_tab;
+            if (this->type() == tabtype_presetid.first) {
+                script_tab = this;
+            } else {
+                script_tab = wxGetApp().get_tab(tabtype_presetid.first);
+            }
+            if (script_tab && script_tab->m_script_exec.is_intialized()) {
+                for (PageShp &page : script_tab->m_pages) {
+                    Field *field = page->get_field(tabtype_presetid.second, -1);
                     if (field) {
-                        boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
+                        boost::any script_val = script_tab->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
                             field->set_any_value(script_val, false);
                     }
                 }
-                { // also check freq changed params
-                    Field* field = og_freq_chng_params->get_field(preset_id);
+                if((script_tab->type() & Preset::Type::TYPE_PRINT1) != 0) { // also check freq changed params (print tab is in chrage of these ones)
+                    Field *field = og_freq_chng_params->get_field(tabtype_presetid.second);
                     if (field) {
-                        boost::any script_val = this->m_script_exec.call_script_function_get_value(field->m_opt);
+                        boost::any script_val = script_tab->m_script_exec.call_script_function_get_value(field->m_opt);
                         if (!script_val.empty())
                             field->set_any_value(script_val, false);
                     }
@@ -1813,15 +1825,15 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             current_group = current_page->new_optgroup(_(params.back()), no_title, !no_search, type_override);
             for (int i = 1; i < params.size() - 1; i++) {
                 if (boost::starts_with(params[i], "title_width$")) {
-                    current_group->title_width = atoi(params[i].substr(12, params[i].size() - 12).c_str());
+                    current_group->title_width = atoi(params[i].substr(strlen("title_width$")).c_str());
                 }
                 else if (params[i].find("label_width$") != std::string::npos)
                 {
-                    current_group->label_width = atoi(params[i].substr(12, params[i].size() - 12).c_str());
+                    current_group->label_width = atoi(params[i].substr(strlen("label_width$")).c_str());
                 }
                 else if (params[i].find("sidetext_width$") != std::string::npos)
                 {
-                    current_group->sidetext_width = atoi(params[i].substr(15, params[i].size() - 15).c_str());
+                    current_group->sidetext_width = atoi(params[i].substr(strlen("sidetext_width$")).c_str());
                 } else if (params[i] == "extruders_count_event") {
                     TabPrinter* tab = nullptr;
                     if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
@@ -1967,7 +1979,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             current_line = { _L(params.empty()?"":params.back().c_str()), wxString{""} };
             for (int i = 1; i < params.size() - 1; i++) {
                 if (boost::starts_with(params[i], "url$")) { // only on line
-                    current_line.label_path = params[i].substr(4, params[i].size() - 4);
+                    current_line.label_path = params[i].substr(strlen("url$"));
                 }
             }
             in_line = true;
@@ -2007,7 +2019,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             int id = -1;
             for (int i = 1; i < params.size() - 1; i++) {
                 if (boost::starts_with(params[i], "id$"))
-                    id = atoi(params[i].substr(3, params[i].size() - 3).c_str());
+                    id = atoi(params[i].substr(strlen("id$")).c_str());
                 else if (params[i] == "idx")
                     id = idx_page;
             }
@@ -2093,9 +2105,9 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         option.opt.mode |= it->second;
                     }
                 }
-                else if (params[i] == "full_label")
+                else if (params[i] == "full_label$")
                 {
-                    option.opt.full_label = (params[i].substr(11, params[i].size() - 11));
+                    option.opt.full_label = (params[i].substr(strlen("full_label$")));
                     need_to_notified_search = true;
                 }
                 else if (params[i] == "full_label")
@@ -2108,49 +2120,49 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     // store current label into full_label if no full_label to prevent rpoblem in the rest of the gui (all empty).
                     if (option.opt.full_label.empty() && !is_script)
                         option.opt.full_label = option.opt.label;
-                    option.opt.label = (params[i].substr(6, params[i].size() - 6));
+                    option.opt.label = (params[i].substr(strlen("label$")));
                     if (is_script && option.opt.full_label.empty()) 
                         option.opt.full_label = option.opt.label;
                     need_to_notified_search = true;
                 }
                 else if (boost::starts_with(params[i], "label_width$")) {
-                    option.opt.label_width = atoi(params[i].substr(12, params[i].size() - 12).c_str());
+                    option.opt.label_width = atoi(params[i].substr(strlen("label_width$")).c_str());
                 }
                 else if (boost::starts_with(params[i], "label_left")) {
                     option.opt.aligned_label_left = true;
                 }
                 else if (boost::starts_with(params[i], "sidetext$"))
                 {
-                    option.opt.sidetext = (params[i].substr(9, params[i].size() - 9));
+                    option.opt.sidetext = (params[i].substr(strlen("sidetext$")));
                 }
                 else if (boost::starts_with(params[i], "sidetext_width$"))
                 {
-                    option.opt.sidetext_width = atoi(params[i].substr(15, params[i].size() - 15).c_str());
+                    option.opt.sidetext_width = atoi(params[i].substr(strlen("sidetext_width$")).c_str());
                 }
                 else if (params[i] == "full_width") {
                     option.opt.full_width = true;
                 }
                 else if (boost::starts_with(params[i], "width$")) {
-                    option.opt.width = atoi(params[i].substr(6, params[i].size() - 6).c_str());
+                    option.opt.width = atoi(params[i].substr(strlen("width$")).c_str());
 #ifdef __WXGTK3__
                     option.opt.width += 4; // add width for the big [-][+] buttons
 #endif
                 }
                 else if (boost::starts_with(params[i], "height$")) {
-                    option.opt.height = atoi(params[i].substr(7, params[i].size() - 7).c_str());
+                    option.opt.height = atoi(params[i].substr(strlen("height$")).c_str());
                 }
                 else if (boost::starts_with(params[i], "precision$")) {
-                    option.opt.precision = atoi(params[i].substr(7, params[i].size() - 7).c_str());
+                    option.opt.precision = atoi(params[i].substr(strlen("precision$")).c_str());
                 }
                 else if (params[i] == "color") {
                     colored = true;
                 }
                 else if (boost::starts_with(params[i], "url$")) { // only on line
-                    label_path = params[i].substr(4, params[i].size() - 4);
+                    label_path = params[i].substr(strlen("url$"));
                 }
                 else if (boost::starts_with(params[i], "tooltip$"))
                 {
-                    option.opt.tooltip = (params[i].substr(8, params[i].size() - 8));
+                    option.opt.tooltip = (params[i].substr(strlen("tooltip$")));
                     boost::replace_all(option.opt.tooltip, "\\n", "\n");
                     boost::replace_all(option.opt.tooltip, "\\t", "\t");
                     boost::replace_all(option.opt.tooltip, "\\.", ":");
@@ -2160,9 +2172,11 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 else if (boost::starts_with(params[i], "max_literal$"))
                 {
                     if(params[i].back() == '%')
-                        option.opt.max_literal = { boost::lexical_cast<double>(params[i].substr(12, params[i].size() - 13).c_str()), true };
+                        option.opt.max_literal = { boost::lexical_cast<double>(
+                            params[i].substr(strlen("max_literal$"), params[i].size() - (strlen("max_literal$")+1)).c_str()), true };
                     else
-                        option.opt.max_literal = { boost::lexical_cast<double>(params[i].substr(12, params[i].size() - 12).c_str()), false };
+                        option.opt.max_literal = { boost::lexical_cast<double>(
+                            params[i].substr(strlen("max_literal$")).c_str()), false };
 
                 } else if (is_script) {
                     //be careful, "floatX" has to deteted before "float".
@@ -2230,7 +2244,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         std::vector<std::string> depends_str;
                         boost::split(depends_str, params[i], boost::is_any_of("$"));
                         for (size_t idx = 1; idx < depends_str.size(); ++idx) {
-                            this->deps_id_2_script_ids[depends_str[idx]].push_back(option.opt.opt_key);
+                            Tab::depsid_2_tabtype_scriptids[depends_str[idx]].emplace_back(this->type(), option.opt.opt_key);
                             option.opt.depends_on.push_back(depends_str[idx]);
                         }
                     }
@@ -2264,8 +2278,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             if (logs) Slic3r::slic3r_log->info("settings gui") << "create setting " << setting_id <<"  with label "<< option.opt.label << "and height "<< option.opt.height<<" fw:"<< option.opt.full_width << "\n";
         } else if (boost::starts_with(full_line, "height")) {
             std::string arg = "";
-            if (full_line.size() > 6 && full_line.find(":") != std::string::npos)
-                arg = full_line.substr(full_line.find(":") + 1, full_line.size() - 1 - full_line.find(":"));
+            if (size_t dblp_pos = full_line.find(":"); full_line.size() > 6 && dblp_pos != std::string::npos)
+                arg = full_line.substr(dblp_pos + 1, full_line.size() - 1 - dblp_pos);
             while (arg.size() > 1 && (arg.back() == ' ' || arg.back() == '\t')) arg = arg.substr(0, arg.size() - 1);
             height = atoi(arg.c_str());
         } else if (full_line == "freq_purging_volumes") {
@@ -2492,7 +2506,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                                         [tab](wxWindow *parent) { return tab->create_bed_shape_widget(parent); });
             } else if (boost::starts_with(full_line, "vector_line:")) {
                 // extract setting name
-                std::string opt_key = full_line.substr(12);
+                std::string opt_key = full_line.substr(strlen("vector_line:"));
                 // create the line
                 std::shared_ptr<VectorManager> manager = std::make_shared<VectorManager>();
                 this->m_vector_managers.push_back(manager);
