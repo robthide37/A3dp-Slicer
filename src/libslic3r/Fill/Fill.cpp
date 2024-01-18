@@ -60,17 +60,45 @@ struct SurfaceFillParams : FillParams
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, connection);
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, dont_adjust);
 
-        RETURN_COMPARE_NON_EQUAL(anchor_length);        RETURN_COMPARE_NON_EQUAL(fill_exactly);
+        RETURN_COMPARE_NON_EQUAL(anchor_length);
+        RETURN_COMPARE_NON_EQUAL(fill_exactly);
         RETURN_COMPARE_NON_EQUAL(flow.width());
         RETURN_COMPARE_NON_EQUAL(flow.height());
         RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter());
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, flow.bridge());
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, role);
         RETURN_COMPARE_NON_EQUAL_TYPED(int32_t, priority);
+        assert(this->config != nullptr);
+        assert(rhs.config != nullptr);
+        if (config != nullptr && rhs.config != nullptr) {
+            RETURN_COMPARE_NON_EQUAL(config->infill_speed);
+            RETURN_COMPARE_NON_EQUAL(config->solid_infill_speed);
+            RETURN_COMPARE_NON_EQUAL(config->top_solid_infill_speed);
+            RETURN_COMPARE_NON_EQUAL(config->ironing_speed);
+            RETURN_COMPARE_NON_EQUAL(config->default_speed);
+            RETURN_COMPARE_NON_EQUAL(config->bridge_speed);
+            RETURN_COMPARE_NON_EQUAL(config->bridge_speed_internal);
+            RETURN_COMPARE_NON_EQUAL(config->gap_fill_speed);
+        }
+        assert(*this == rhs);
         return false;
     }
 
     bool operator==(const SurfaceFillParams &rhs) const {
+        // first check speed via config
+        if ((config != nullptr) != (rhs.config != nullptr))
+            return false;
+        if(config != nullptr && (
+            config->infill_speed != rhs.config->infill_speed
+            || config->solid_infill_speed != rhs.config->solid_infill_speed
+            || config->top_solid_infill_speed != rhs.config->top_solid_infill_speed
+            || config->ironing_speed != rhs.config->ironing_speed
+            || config->default_speed != rhs.config->default_speed
+            || config->bridge_speed != rhs.config->bridge_speed
+            || config->bridge_speed_internal != rhs.config->bridge_speed_internal
+            || config->gap_fill_speed != rhs.config->gap_fill_speed))
+            return false;
+        // then check params
         return  this->extruder              == rhs.extruder         &&
                 this->pattern               == rhs.pattern          &&
                 this->spacing               == rhs.spacing          &&
@@ -532,7 +560,14 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
         //give the overlap size to let the infill do his overlap
         //add overlap if at least one perimeter
-        const float perimeter_spacing = layerm->flow(frPerimeter).spacing();
+        float perimeter_spacing = 0;
+        if(layerm->region().config().perimeters == 1)
+            perimeter_spacing = layerm->flow(frExternalPerimeter).spacing();
+        else if(layerm->region().config().only_one_perimeter_top)
+            //note: use the min of the two to avoid overextrusion if only one perimeter top
+            perimeter_spacing = std::min(layerm->flow(frPerimeter).spacing(), layerm->flow(frExternalPerimeter).spacing());
+        else //if(layerm->region().config().perimeters > 1)
+            perimeter_spacing = layerm->flow(frPerimeter).spacing();
 
         // Used by the concentric infill pattern to clip the loops to create extrusion paths.
         f->loop_clipping = scale_t(layerm->region().config().get_computed_value("seam_gap", surface_fill.params.extruder - 1) * surface_fill.params.flow.nozzle_diameter());
@@ -642,7 +677,29 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                 //make fill
                 while ((size_t)surface_fill.params.priority >= fills_by_priority.size())
                     fills_by_priority.push_back(new ExtrusionEntityCollection());
+#if _DEBUG
+                const size_t idx_start = fills_by_priority[(size_t)surface_fill.params.priority]->entities().size();
+#endif
                 f->fill_surface_extrusion(&surface_fill.surface, surface_fill.params, fills_by_priority[(size_t)surface_fill.params.priority]->set_entities());
+#if _DEBUG
+                //check no over or underextrusion if fill_exactly
+                if(surface_fill.params.fill_exactly && surface_fill.params.density == 1) {
+                    ExtrusionVolume compute_volume;
+                    ExtrusionVolume compute_volume_no_gap_fill(false);
+                    const size_t idx_end = fills_by_priority[(size_t)surface_fill.params.priority]->entities().size();
+                    //check that it doesn't overextrude
+                    for(size_t idx = idx_start; idx < idx_end; ++idx){
+                        fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume);
+                        fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume_no_gap_fill);
+                    }
+                    ExPolygons temp = intersection_ex(ExPolygons{surface_fill.surface.expolygon}, f->no_overlap_expolygons);
+                    double real_surface = 0;
+                    for(auto &t : temp) real_surface += t.area();
+                    assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height + EPSILON);
+                    assert(compute_volume.volume < unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 1.001);
+                    assert(compute_volume.volume > unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 0.999);
+                }
+#endif
             }
         }
     }

@@ -152,9 +152,6 @@ public:
     const TriangleMeshStats& stats() const { return m_stats; }
     
     indexed_triangle_set its;
-
-/// --- for tests  ----- ///
-    Pointf3s vertices();
     
 private:
     TriangleMeshStats m_stats;

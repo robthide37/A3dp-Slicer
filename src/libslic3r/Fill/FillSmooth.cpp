@@ -84,7 +84,7 @@ namespace Slic3r {
             }
             //get the flow
             float mult_flow = 1;
-            if (params.fill_exactly && idx == 0) {
+            if (params.fill_exactly) {
 
                 // compute the volume to extrude
                 double volume_to_occupy = compute_unscaled_volume_to_fill(&srf_to_fill, params);

@@ -245,8 +245,8 @@ private:
         GCode            &m_gcodegen;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);
-
-    void            _init_multiextruders(const Print& print, GCodeOutputStream& file, GCodeWriter& writer, const ToolOrdering& tool_ordering, const std::string& custom_gcode);
+    void            _move_to_print_object(std::string& gcode_out, const Print& print, size_t finished_objects, uint16_t initial_extruder_id);
+    void            _init_multiextruders(const Print& print, std::string& gcode_out, GCodeWriter& writer, const ToolOrdering& tool_ordering, const std::string& custom_gcode);
 
     static std::vector<LayerToPrint>                                   collect_layers_to_print(const PrintObject &object, Print::StatusMonitor &status_monitor);
     static std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> collect_layers_to_print(const Print &print, Print::StatusMonitor &status_monitor);
@@ -273,6 +273,7 @@ private:
         const ToolOrdering                                                  &tool_ordering,
         const std::vector<const PrintInstance*>                             &print_object_instances_ordering,
         const std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>>   &layers_to_print,
+        std::string                                                         &preamble,
         GCodeOutputStream                                                   &output_stream);
     // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
     // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
@@ -283,6 +284,7 @@ private:
         const ToolOrdering                      &tool_ordering,
         std::vector<LayerToPrint>                layers_to_print,
         const size_t                             single_object_idx,
+        std::string                             &preamble,
         GCodeOutputStream                       &output_stream);
 
     void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
@@ -491,6 +493,7 @@ private:
     std::string m_gcode_label_objects_start;
     std::string m_gcode_label_objects_end;
     void _add_object_change_labels(std::string &gcode);
+    std::map<std::string, std::string> raw_str_to_objectid_str;
 
     bool m_silent_time_estimator_enabled;
 
@@ -507,8 +510,8 @@ private:
     double_t    _compute_speed_mm_per_sec(const ExtrusionPath& path, double speed = -1);
     std::string _after_extrude(const ExtrusionPath &path);
     void print_machine_envelope(GCodeOutputStream &file, const Print &print);
-    void _print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
-    void _print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
+    void _print_first_layer_bed_temperature(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
+    void _print_first_layer_extruder_temperatures(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
     // On the first printing layer. This flag triggers first layer speeds.
     bool                                on_first_layer() const { return m_layer != nullptr && m_layer->id() == 0; }
     // To control print speed of 1st object layer over raft interface.

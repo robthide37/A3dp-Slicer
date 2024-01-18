@@ -345,13 +345,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool has_spiral_vase = have_perimeters && config->opt_bool("spiral_vase");
 
-    for (auto el : { "external_perimeters_vase", "external_perimeters_nothole", "external_perimeters_hole", "perimeter_bonding"})
-        toggle_field(el, config->opt_bool("external_perimeters_first"));
-
     bool have_arachne = have_perimeters && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
     for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "min_feature_size", "min_bead_width", "aaa" })
        toggle_field(el, have_arachne);
 
+    toggle_field("external_perimeters_vase", config->opt_bool("external_perimeters_first"));
+    for (auto el : { "external_perimeters_nothole", "external_perimeters_hole", "perimeter_bonding"})
+        toggle_field(el, config->opt_bool("external_perimeters_first") && !have_arachne);
 
     for (auto el : {"perimeter_loop", "extra_perimeters_overhangs", "no_perimeter_unsupported_algo",
         "thin_perimeters", "overhangs_reverse", "perimeter_round_corners"})
@@ -388,9 +388,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     for (auto el : { "fuzzy_skin_thickness", "fuzzy_skin_point_dist" })
         toggle_field(el, config->option<ConfigOptionEnum<FuzzySkinType>>("fuzzy_skin")->value != FuzzySkinType::None);
-
-    toggle_field("avoid_crossing_not_first_layer", config->opt_bool("avoid_crossing_perimeters"));
-    toggle_field("avoid_crossing_top", config->opt_bool("avoid_crossing_perimeters"));
 
     bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;
     // infill_extruder uses the same logic as in Print::extruders()
@@ -549,6 +546,11 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
     toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
+    toggle_field("avoid_crossing_not_first_layer", have_avoid_crossing_perimeters);
+    toggle_field("avoid_crossing_top", have_avoid_crossing_perimeters);
+    
+    toggle_field("enforce_retract_first_layer", config->opt_bool("only_retract_when_crossing_perimeters"));
+
 
     for (auto el : { "fill_smooth_width", "fill_smooth_distribution" })
         toggle_field(el, (has_top_solid_infill && config->option<ConfigOptionEnum<InfillPattern>>("top_fill_pattern")->value == InfillPattern::ipSmooth)

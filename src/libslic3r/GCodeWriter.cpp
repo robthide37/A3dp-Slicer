@@ -311,23 +311,34 @@ std::string GCodeWriter::write_acceleration(){
 	//try to set only printing acceleration, travel should be untouched if possible
     if (FLAVOR_IS(gcfRepetier)) {
         // M201: Set max printing acceleration
-        gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
     } else if(FLAVOR_IS(gcfLerdge) || FLAVOR_IS(gcfSprinter)){
         // M204: Set printing acceleration
         // This is new MarlinFirmware with separated print/retraction/travel acceleration.
         // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
-        gcode << "M204 P" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M204 P" << m_current_acceleration;
     } else if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) {
         // M204: Set printing & travel acceleration
-        gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        if (m_current_acceleration > 0)
+            gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        else if(m_current_travel_acceleration > 0)
+            gcode << "M204 T" << m_current_travel_acceleration;
     } else { // gcfMarlinLegacy
         // M204: Set default acceleration
-        gcode << "M204 S" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M204 S" << m_current_acceleration;
     }
-    if (this->config.gcode_comments) gcode << " ; adjust acceleration";
-    gcode << "\n";
-    
-    return gcode.str();
+    //if at least something, add comment and line return
+    if (gcode.tellp() != std::streampos(0)) {
+        if (this->config.gcode_comments)
+            gcode << " ; adjust acceleration";
+        gcode << "\n";
+        return gcode.str();
+    }
+    assert(gcode.str().empty());
+    return "";
 }
 
 std::string GCodeWriter::reset_e(bool force)
@@ -433,7 +444,7 @@ std::string GCodeWriter::set_speed(const double speed, const std::string &commen
     const double F = speed * 60;
     m_current_speed = speed;
     assert(F > 0.);
-    assert(F < 100000.);
+    assert(F < 10000000.);
 //    GCodeG1Formatter w;
 //    w.emit_f(F);
 //    w.emit_comment(this->config.gcode_comments, comment);
@@ -565,7 +576,7 @@ bool GCodeWriter::will_move_z(double z) const
         we don't perform an actual Z move. */
     if (m_lifted > 0) {
         double nominal_z = m_pos.z() - m_lifted;
-        if (z >= nominal_z + EPSILON && z <= m_pos.z() - EPSILON)
+        if (z >= nominal_z - EPSILON && z <= m_pos.z() + EPSILON)
             return false;
     }
     return true;
@@ -636,7 +647,10 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std
 std::string GCodeWriter::retract(bool before_wipe)
 {
     double factor = before_wipe ? m_tool->retract_before_wipe() : 1.;
-    assert(factor >= 0. && factor <= 1. + EPSILON);
+    assert((factor >= 0. || before_wipe) && factor <= 1. + EPSILON);
+    // if before_wipe but no retract_before_wipe, then no retract
+    if (factor == 0)
+        return "";
     //check for override
     if (config_region && config_region->print_retract_length >= 0) {
         return this->_retract(
@@ -646,8 +660,6 @@ std::string GCodeWriter::retract(bool before_wipe)
             "retract"
         );
     }
-    auto rect_length = m_tool->retract_length();
-    auto rect_length2 = m_tool->retract_restart_extra();
     return this->_retract(
         factor * m_tool->retract_length(),
         factor * m_tool->retract_restart_extra(),

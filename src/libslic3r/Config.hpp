@@ -1326,7 +1326,7 @@ public:
     {
         if (idx < 0) {
             for (const FloatOrPercent &v : this->values)
-                if (! std::isnan(v.value) || v != NIL_VALUE())
+                if (!(std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()))
                     return false;
             return true;
         } else {
@@ -1344,7 +1344,9 @@ public:
     double                  get_float(size_t idx = 0) const override { return get_abs_value(idx, 1.); }
 
     static inline bool is_nil(const boost::any &to_check) {
-        return std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value;
+        bool ok = std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value
+            || boost::any_cast<FloatOrPercent>(to_check).value > std::numeric_limits<float>::max();
+        return ok;
     }
     // don't use it to compare, use is_nil() to check.
     static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
@@ -1411,7 +1413,7 @@ protected:
                 ss << v.value;
                 if (v.percent)
                     ss << "%";
-            } else if (std::isnan(v.value) || v.value == NIL_VALUE().value) {
+            } else if (std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()) {
                 if (NULLABLE)
                     ss << NIL_STR_VALUE;
                 else
@@ -1424,8 +1426,8 @@ protected:
             if (v1.size() != v2.size())
                 return false;
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-                if (!(((std::isnan(it1->value) || it1->value == NIL_VALUE().value) &&
-                       (std::isnan(it2->value) || it2->value == NIL_VALUE().value)) ||
+                if (!(((std::isnan(it1->value) || it1->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max()) &&
+                       (std::isnan(it2->value) || it2->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max())) ||
                       *it1 == *it2))
                     return false;
             return true;
@@ -1436,8 +1438,8 @@ protected:
     static bool vectors_lower(const std::vector<FloatOrPercent> &v1, const std::vector<FloatOrPercent> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(it1->value) || it1->value == NIL_VALUE().value);
-                auto null2 = int(std::isnan(it2->value) || it2->value == NIL_VALUE().value);
+                auto null1 = int(std::isnan(it1->value) || it1->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max());
+                auto null2 = int(std::isnan(it2->value) || it2->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max());
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -2321,6 +2323,10 @@ public:
     bool set_deserialize_nothrow(const t_config_option_key &opt_key_src, const std::string &value_src, ConfigSubstitutionContext& substitutions, bool append = false);
 	// May throw BadOptionTypeException() if the operation fails.
     void set_deserialize(const t_config_option_key &opt_key, const std::string &str, ConfigSubstitutionContext& config_substitutions, bool append = false);
+    void set_deserialize(const t_config_option_key &opt_key, const std::string &str){ //for tests
+        ConfigSubstitutionContext no_context(ForwardCompatibilitySubstitutionRule::Disable);
+        set_deserialize(opt_key, str, no_context);
+    }
     void set_deserialize_strict(const t_config_option_key &opt_key, const std::string &str, bool append = false)
         { ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Disable }; this->set_deserialize(opt_key, str, ctxt, append); }
     struct SetDeserializeItem {

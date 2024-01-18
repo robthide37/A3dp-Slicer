@@ -1743,6 +1743,20 @@ std::string Preset::type_name(Type t) {
     }
 }
 
+Preset::Type Preset::type_from_name(std::string name) { 
+    if ("print" == name)
+        return Preset::TYPE_FFF_PRINT;
+    if ("filament" == name)
+        return Preset::TYPE_FFF_FILAMENT;
+    if ("sla_print" == name)
+        return Preset::TYPE_SLA_PRINT;
+    if ("sla_material" == name)
+        return Preset::TYPE_SLA_MATERIAL;
+    if ("printer" == name)
+        return Preset::TYPE_PRINTER;
+    return Preset::TYPE_INVALID;
+}
+
 std::string PresetCollection::section_name() const
 {
     return Preset::type_name(this->type());

@@ -50,7 +50,7 @@ group:Fan speed - default
 		setting:id$0:label_width$12:label$Gap fill:gap_fill_fan_speed
 	line:Disable fan for the first
 		setting:id$0:width$5:label$_:sidetext_width$7:disable_fan_first_layers
-		setting:id$0:width$5:label_width$12:full_fan_speed_layer
+		setting:id$0:width$5:label_width$18:full_fan_speed_layer
 	end_line
 group:Short layer time - began to increase base fan speed
 	setting:id$0:fan_below_layer_time

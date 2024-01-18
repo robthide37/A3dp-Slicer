@@ -628,9 +628,10 @@ inline void extrusion_entities_append_loops_and_paths(ExtrusionEntitiesPtr &dst,
 class ExtrusionPrinter : public ExtrusionVisitorConst {
     std::stringstream ss;
     double mult;
-    bool trunc;
+    int trunc;
+    bool json;
 public:
-    ExtrusionPrinter(double mult = 0.0001, bool trunc = false) : mult(mult), trunc(trunc) { }
+    ExtrusionPrinter(double mult = 0.000001, int trunc = 0, bool json = false) : mult(mult), trunc(trunc), json(json) { }
     virtual void use(const ExtrusionPath& path) override;
     virtual void use(const ExtrusionPath3D& path3D) override;
     virtual void use(const ExtrusionMultiPath& multipath) override;
@@ -645,7 +646,7 @@ public:
 };
 
 class ExtrusionLength : public ExtrusionVisitorConst {
-    double dist;
+    coordf_t dist;
 public:
     ExtrusionLength() : dist(0){ }
     virtual void default_use(const ExtrusionEntity& path) override;
@@ -698,6 +699,27 @@ public:
     virtual void use(ExtrusionPath3D& path3D) override {
         paths3D.push_back(&path3D);
     }
+};
+
+class ExtrusionVolume : public ExtrusionVisitorRecursiveConst {
+    bool _with_gap_fill = true;
+public:
+    double volume = 0; //unscaled
+    ExtrusionVolume(bool with_gap_fill = true) : _with_gap_fill(with_gap_fill) {}
+    void use(const ExtrusionPath &path) override {
+        if(path.role() == erGapFill && !_with_gap_fill) return;
+        volume += unscaled(path.length()) * path.mm3_per_mm; }
+    void use(const ExtrusionPath3D &path3D) override { volume += unscaled(path3D.length()) * path3D.mm3_per_mm; }
+    double get(const ExtrusionEntityCollection &coll);
+};
+
+class ExtrusionModifyFlow : public ExtrusionVisitorRecursive {
+    double _flow_mult = 1.;
+public:
+    ExtrusionModifyFlow(double flow_mult) : _flow_mult(flow_mult) {}
+    void use(ExtrusionPath &path) override { path.mm3_per_mm *= _flow_mult; path.width *= _flow_mult; }
+    void use(ExtrusionPath3D &path3D) override { path3D.mm3_per_mm *= _flow_mult; path3D.width *= _flow_mult; }
+    void set(ExtrusionEntityCollection &coll);
 };
 
     

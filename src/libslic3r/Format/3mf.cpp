@@ -2934,7 +2934,7 @@ namespace Slic3r {
                                 }
                             } else {
                                 std::string value = config.opt_serialize(opt_key);
-                                if (!value.empty()) {
+                                if (!value.empty() || opt_key.find("_pattern") == std::string::npos) {
                                     pt::ptree& opt_tree = range_tree.add("option", value);
                                     opt_tree.put("<xmlattr>.opt_key", opt_key);
                                 } else {
@@ -3160,7 +3160,7 @@ namespace Slic3r {
                 } else {
                     for (const std::string& key : obj->config.keys()) {
                         std::string value = obj->config.opt_serialize(key);
-                        if (!value.empty()) {
+                        if (!value.empty() || key.find("_pattern") == std::string::npos) {
                             stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                         } else {
                             std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
@@ -3268,7 +3268,7 @@ namespace Slic3r {
                                 for (const std::string& key : volume->config.keys()) {
                                     //stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
                                     std::string value = volume->config.opt_serialize(key);
-                                    if (!value.empty() && key.find("pattern") == std::string::npos) {
+                                    if (!value.empty() || key.find("_pattern") == std::string::npos) {
                                         stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                                     } else {
                                         std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);

@@ -2004,24 +2004,24 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 continue;
             }
 
-            if (setting_id == "compatible_printers") {
-                create_line_with_widget(current_group.get(), "compatible_printers", "", [this](wxWindow* parent) {
-                    return compatible_widget_create(parent, m_compatible_printers);
-                    });
-                continue;
-            } else if (setting_id == "compatible_prints") {
-                create_line_with_widget(current_group.get(), "compatible_prints", "", [this](wxWindow* parent) {
-                    return compatible_widget_create(parent, m_compatible_prints);
-                    });
-                continue;
-            }
-
             int id = -1;
             for (int i = 1; i < params.size() - 1; i++) {
                 if (boost::starts_with(params[i], "id$"))
                     id = atoi(params[i].substr(3, params[i].size() - 3).c_str());
                 else if (params[i] == "idx")
                     id = idx_page;
+            }
+
+            if (setting_id == "compatible_printers") {
+                create_line_with_widget(current_group.get(), "compatible_printers", "", [this, id](wxWindow* parent) {
+                    return compatible_widget_create(parent, m_compatible_printers, id);
+                    });
+                continue;
+            } else if (setting_id == "compatible_prints") {
+                create_line_with_widget(current_group.get(), "compatible_prints", "", [this, id](wxWindow* parent) {
+                    return compatible_widget_create(parent, m_compatible_prints, id);
+                    });
+                continue;
             }
 
             Option option = is_script ? 
@@ -4485,7 +4485,7 @@ void Tab::create_line_with_widget(ConfigOptionsGroup* optgroup, const std::strin
 }
 
 // Return a callback to create a Tab widget to mark the preferences as compatible / incompatible to the current printer.
-wxSizer* Tab::compatible_widget_create(wxWindow* parent, PresetDependencies &deps)
+wxSizer* Tab::compatible_widget_create(wxWindow* parent, PresetDependencies &deps, int setting_idx)
 {
     deps.checkbox = new wxCheckBox(parent, wxID_ANY, _(L("All")));
     deps.checkbox->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -4499,13 +4499,13 @@ wxSizer* Tab::compatible_widget_create(wxWindow* parent, PresetDependencies &dep
     sizer->Add((deps.checkbox), 0, wxALIGN_CENTER_VERTICAL);
     sizer->Add((deps.btn), 0, wxALIGN_CENTER_VERTICAL);
 
-    deps.checkbox->Bind(wxEVT_CHECKBOX, ([this, &deps](wxCommandEvent e)
+    deps.checkbox->Bind(wxEVT_CHECKBOX, ([this, &deps, setting_idx](wxCommandEvent e)
     {
         deps.btn->Enable(! deps.checkbox->GetValue());
         // All printers have been made compatible with this preset.
         if (deps.checkbox->GetValue())
             this->load_key_value(deps.key_list, std::vector<std::string> {});
-        this->get_field(deps.key_condition)->toggle(deps.checkbox->GetValue());
+        this->get_field(deps.key_condition, setting_idx)->toggle(deps.checkbox->GetValue());
         this->update_changed_ui();
     }) );
 

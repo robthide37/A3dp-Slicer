@@ -480,6 +480,13 @@ void PreferencesDialog::build(size_t selected_tab)
 	m_optgroup_camera->append_single_option_line(option);
 #endif // _WIN32 || __APPLE__
 
+	def.label = L("Compress png textures");
+	def.type = coBool;
+	def.tooltip = L("If your custom texture (in png format) is displayed black, then disable this option to remove the problematic optimisation.");
+	def.set_default_value(new ConfigOptionBool{ app_config->get("compress_png_texture") == "1" });
+	option = Option(def, "compress_png_texture");
+	m_optgroup_camera->append_single_option_line(option);
+
 	activate_options_tab(m_optgroup_camera);
 
 	// Add "GUI" tab

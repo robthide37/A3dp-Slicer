@@ -526,12 +526,12 @@ float Flow::rounded_rectangle_extrusion_spacing(float width, float height, float
 #endif
 }
 
-float Flow::rounded_rectangle_extrusion_width_from_spacing(float spacing, float height, float m_spacing_ratio)
+float Flow::rounded_rectangle_extrusion_width_from_spacing(float spacing, float height, float spacing_ratio)
 {
 #ifdef HAS_PERIMETER_LINE_OVERLAP
     return (spacing + PERIMETER_LINE_OVERLAP_FACTOR * height * (1. - 0.25 * PI) * spacing_ratio);
 #else
-    return float(spacing + height * (1. - 0.25 * PI) * m_spacing_ratio);
+    return float(spacing + height * (1. - 0.25 * PI) * spacing_ratio);
 #endif
 }
 

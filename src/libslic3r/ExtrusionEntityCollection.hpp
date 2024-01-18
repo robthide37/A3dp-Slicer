@@ -52,6 +52,11 @@ public:
         return *this;
     }
     ~ExtrusionEntityCollection() override { clear(); }
+    // move all entitites from src into this
+    void append_move_from(ExtrusionEntityCollection &src) {
+        m_entities.insert(m_entities.end(), src.m_entities.begin(), src.m_entities.end());
+        src.m_entities.clear();
+    }
 
     /// Operator to convert and flatten this collection to a single vector of ExtrusionPaths.
     explicit operator ExtrusionPaths() const;
