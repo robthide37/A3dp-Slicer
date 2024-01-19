@@ -184,18 +184,14 @@ int CLI::run(int argc, char **argv)
 
     it = std::find(m_actions.begin(), m_actions.end(), "opengl-version");
     if (it != m_actions.end()) {
-        std::string opengl_version_str = m_config.opt_string("opengl-version");
-        if (std::find(Slic3r::GUI::OpenGLVersions::core_str.begin(), Slic3r::GUI::OpenGLVersions::core_str.end(), opengl_version_str) == Slic3r::GUI::OpenGLVersions::core_str.end()) {
-            boost::nowide::cerr << "Required OpenGL version " << opengl_version_str << " is invalid. Must be greater than or equal to 3.2" << std::endl;
-            opengl_version_str.clear();
-        }
-
-        if (!opengl_version_str.empty()) {
-            std::vector<std::string> tokens;
-            boost::split(tokens, opengl_version_str, boost::is_any_of("."), boost::token_compress_on);
-            opengl_version.first = std::stoi(tokens[0].c_str());
-            opengl_version.second = std::stoi(tokens[1].c_str());
-        }
+        const Semver opengl_minimum = Semver(3,2,0);
+        const std::string opengl_version_str = m_config.opt_string("opengl-version");
+        boost::optional<Semver> semver = Semver::parse(opengl_version_str);
+        if (semver.has_value() && (*semver) >= opengl_minimum ) {
+            opengl_version.first = semver->maj();
+            opengl_version.second = semver->min();
+        } else
+            boost::nowide::cerr << "Required OpenGL version " << opengl_version_str << " is invalid. Must be greater than or equal to " << opengl_minimum.to_string() << std::endl;
         start_gui = true;
         m_actions.erase(it);
     }
