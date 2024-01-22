@@ -2712,11 +2712,11 @@ static constexpr const double min_gcode_segment_length = 0.002;
 std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed)
 {
     // Extrude all loops CCW.
-    bool  is_hole = loop_src.is_clockwise();
-    Point seam_point = *this->last_position;
-    if (! m_config.spiral_vase && comment_is_perimeter(description)) {
+    bool is_hole = loop_src.is_clockwise();
+    Point seam_point = this->last_position.has_value() ? *this->last_position : Point::Zero();
+    if (!m_config.spiral_vase && comment_is_perimeter(description)) {
         assert(m_layer != nullptr);
-        seam_point = m_seam_placer.place_seam(m_layer, loop_src, m_config.external_perimeters_first, *this->last_position);
+        seam_point = m_seam_placer.place_seam(m_layer, loop_src, m_config.external_perimeters_first, seam_point);
     }
     // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
     // thus empty path segments will not be produced by G-code export.
