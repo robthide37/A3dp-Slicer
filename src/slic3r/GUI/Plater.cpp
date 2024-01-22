@@ -2721,7 +2721,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 if (imperial_units)
                     // Convert even if the object is big.
                     convert_from_imperial_units(model, false);
-                else if (model.looks_like_saved_in_meters()) {
+                else if (!type_3mf && model.looks_like_saved_in_meters()) {
                     auto convert_model_if = [](Model& model, bool condition) {
                         if (condition)
                             //FIXME up-scale only the small parts?
@@ -2743,7 +2743,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     }
                     convert_model_if(model, answer_convert_from_meters == wxID_YES);
                 }
-                else if (model.looks_like_imperial_units()) {
+                else if (!type_3mf && model.looks_like_imperial_units()) {
                     auto convert_model_if = [convert_from_imperial_units](Model& model, bool condition) {
                         if (condition)
                             //FIXME up-scale only the small parts?
