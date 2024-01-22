@@ -351,7 +351,7 @@ public:
 	void		rename_preset();
 	void		delete_preset();
 	void		toggle_show_hide_incompatible();
-	void		update_show_hide_incompatible_button();
+	void		update_compatibility_ui();
 	void		update_ui_from_settings();
 	void		update_label_colours();
 	void		decorate();

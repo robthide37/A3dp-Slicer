@@ -988,7 +988,7 @@ void Tab::sys_color_changed()
     if (m_detach_preset_btn)
         m_detach_preset_btn->sys_color_changed();
 
-    update_show_hide_incompatible_button();
+    m_btn_hide_incompatible_presets->SetBitmap(*get_bmp_bundle(m_show_incompatible_presets ? "flag_red" : "flag_green"));
 
     // update icons for tree_ctrl
     wxVector <wxBitmapBundle> img_bundles;
@@ -4483,36 +4483,40 @@ void Tab::delete_preset()
 void Tab::toggle_show_hide_incompatible()
 {
     m_show_incompatible_presets = !m_show_incompatible_presets;
-    m_presets_choice->set_show_incompatible_presets(m_show_incompatible_presets);
-    update_show_hide_incompatible_button();
-    update_tab_ui();
+    update_compatibility_ui();
 }
 
-void Tab::update_show_hide_incompatible_button()
+void Tab::update_compatibility_ui()
 {
     m_btn_hide_incompatible_presets->SetBitmap(*get_bmp_bundle(m_show_incompatible_presets ? "flag_red" : "flag_green"));
     m_btn_hide_incompatible_presets->SetToolTip(m_show_incompatible_presets ?
         "Both compatible an incompatible presets are shown. Click to hide presets not compatible with the current printer." :
         "Only compatible presets are shown. Click to show both the presets compatible and not compatible with the current printer.");
+
+    m_presets_choice->set_show_incompatible_presets(m_show_incompatible_presets);
+    m_presets_choice->update();
 }
 
 void Tab::update_ui_from_settings()
 {
-    // Show the 'show / hide presets' button only for the print and filament tabs, and only if enabled
-    // in application preferences.
-    m_show_btn_incompatible_presets = wxGetApp().app_config->get("show_incompatible_presets")[0] == '1' ? true : false;
-    bool show = m_show_btn_incompatible_presets && m_type != Slic3r::Preset::TYPE_PRINTER;
+    // Show the 'show / hide presets' button only for the print and filament tabs
+    if (m_type == Slic3r::Preset::TYPE_PRINTER)
+        return;
+
+    // and only if enabled in application preferences.
+    bool show = wxGetApp().app_config->get_bool("show_incompatible_presets");
+    if (m_show_btn_incompatible_presets == show)
+        return;
+
+    m_show_btn_incompatible_presets = show;
+    m_btn_hide_incompatible_presets->Show(m_show_btn_incompatible_presets);
     Layout();
-    show ? m_btn_hide_incompatible_presets->Show() :  m_btn_hide_incompatible_presets->Hide();
-    // If the 'show / hide presets' button is hidden, hide the incompatible presets.
-    if (show) {
-        update_show_hide_incompatible_button();
-    }
+    
+    if (show)
+        update_compatibility_ui();
     else {
-        if (m_show_incompatible_presets) {
-            m_show_incompatible_presets = false;
-            update_tab_ui();
-        }
+        m_presets_choice->set_show_incompatible_presets(false);
+        m_presets_choice->update();
     }
 }
 
