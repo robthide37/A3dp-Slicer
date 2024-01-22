@@ -496,6 +496,7 @@ public:
     bool        set_active_extruder(int new_selected_extruder);
     void        invalidate_active_extruder() { m_active_extruder = -1; }
     void        update_extruder_combobox();
+    void        update_extruder_combobox_visibility();
     int         get_active_extruder() const { return m_active_extruder; }
 
 	const std::string&	get_custom_gcode(const t_config_option_key& opt_key) override;

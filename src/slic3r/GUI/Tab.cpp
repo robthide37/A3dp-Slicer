@@ -502,7 +502,7 @@ void Tab::OnActivate()
         update_btns_enabling();
         m_btn_hide_incompatible_presets->Show(m_show_btn_incompatible_presets && m_type != Slic3r::Preset::TYPE_PRINTER);
         if (TabFilament* tab = dynamic_cast<TabFilament*>(this))
-            tab->update_extruder_combobox();
+            tab->update_extruder_combobox_visibility();
 
         Layout();
     }
@@ -2104,14 +2104,15 @@ void TabFilament::create_extruder_combobox()
     m_h_buttons_sizer->Add(m_extruders_cb, 0, wxALIGN_CENTER_VERTICAL);
 }
 
+void TabFilament::update_extruder_combobox_visibility()
+{
+    const size_t extruder_cnt = static_cast<const ConfigOptionFloats*>(m_preset_bundle->printers.get_edited_preset().config.option("nozzle_diameter"))->values.size();
+    m_extruders_cb->Show(extruder_cnt > 1);
+}
+
 void TabFilament::update_extruder_combobox()
 {
-    if (!m_presets_choice->IsShown())
-        return; // it will be updated later, on OnActive()
-
     const size_t extruder_cnt = static_cast<const ConfigOptionFloats*>(m_preset_bundle->printers.get_edited_preset().config.option("nozzle_diameter"))->values.size();
-
-    m_extruders_cb->Show(extruder_cnt > 1);
 
     if (extruder_cnt != m_extruders_cb->GetCount()) {
         m_extruders_cb->Clear();
