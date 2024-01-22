@@ -351,6 +351,9 @@ private:
         ExtrusionRole role,
         const std::string &comment
     );
+
+    std::string travel_to_first_position(const Vec3crd& point);
+
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
 
     std::string     retract_and_wipe(bool toolchange = false);

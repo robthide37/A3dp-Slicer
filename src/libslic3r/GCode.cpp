@@ -2947,9 +2947,38 @@ void GCodeGenerator::GCodeOutputStream::write_format(const char* format, ...)
     va_end(args);
 }
 
+std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point) {
+    std::string gcode;
+
+    const Vec3d gcode_point = to_3d(this->point_to_gcode(point.head<2>()), unscaled(point.z()));
+
+    if (!this->last_position) {
+        double lift{
+            EXTRUDER_CONFIG(travel_ramping_lift) ? EXTRUDER_CONFIG(travel_max_lift) :
+                                                   EXTRUDER_CONFIG(retract_lift)};
+        const double upper_limit = EXTRUDER_CONFIG(retract_lift_below);
+        const double lower_limit = EXTRUDER_CONFIG(retract_lift_above);
+        if ((lower_limit > 0 && gcode_point.z() < lower_limit) ||
+            (upper_limit > 0 && gcode_point.z() > upper_limit)) {
+            lift = 0.0;
+        }
+        gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + lift, "lift");
+    }
+
+    this->last_position = point.head<2>();
+    this->writer().update_position(gcode_point);
+
+    std::string comment{"move to first layer point"};
+    gcode += this->writer().get_travel_to_xy_gcode(gcode_point.head<2>(), comment);
+    gcode += this->writer().get_travel_to_z_gcode(gcode_point.z(), comment);
+
+    m_current_layer_first_position = gcode_point;
+    return gcode;
+}
+
 std::string GCodeGenerator::_extrude(
-    const ExtrusionAttributes       &path_attr, 
-    const Geometry::ArcWelder::Path &path, 
+    const ExtrusionAttributes       &path_attr,
+    const Geometry::ArcWelder::Path &path,
     const std::string_view           description,
     double                           speed)
 {
@@ -2958,27 +2987,7 @@ std::string GCodeGenerator::_extrude(
 
     if (!m_current_layer_first_position) {
         const Vec3crd point = to_3d(path.front().point, scaled(this->m_last_layer_z + this->m_config.z_offset.value));
-        const Vec3d gcode_point = to_3d(this->point_to_gcode(point.head<2>()), unscaled(point.z()));
-
-        if (!this->last_position) {
-            double lift{
-                EXTRUDER_CONFIG(travel_ramping_lift) ? EXTRUDER_CONFIG(travel_max_lift) :
-                                                       EXTRUDER_CONFIG(retract_lift)};
-            const double upper_limit = EXTRUDER_CONFIG(retract_lift_below);
-            const double lower_limit = EXTRUDER_CONFIG(retract_lift_above);
-            if ((lower_limit > 0 && gcode_point.z() < lower_limit) ||
-                (upper_limit > 0 && gcode_point.z() > upper_limit)) {
-                lift = 0.0;
-            }
-            gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + lift, "lift");
-        }
-
-        this->last_position = path.front().point;
-        this->writer().update_position(gcode_point);
-
-        gcode += this->writer().get_travel_to_xy_gcode(gcode_point.head<2>(), "move to first layer point");
-        gcode += this->writer().get_travel_to_z_gcode(gcode_point.z(), "move to first layer point");
-        m_current_layer_first_position = gcode_point;
+        gcode += this->travel_to_first_position(point);
     } else {
         // go to first point of extrusion path
         if (!this->last_position) {

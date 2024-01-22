@@ -72,14 +72,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
             }
         } else {
             const Vec3crd point = to_3d(xy_point, scaled(z));
-            const Vec3d gcode_point = gcodegen.point_to_gcode(point);
-            gcodegen.last_position = point.head<2>();
-            gcodegen.writer().update_position(gcode_point);
-            gcode += gcodegen.writer()
-                         .get_travel_to_xy_gcode(gcode_point.head<2>(), comment);
-            gcode += gcodegen.writer()
-                         .get_travel_to_z_gcode(gcode_point.z(), comment);
-            gcodegen.m_current_layer_first_position = gcode_point;
+            gcode += gcodegen.travel_to_first_position(point);
         }
         gcode += gcodegen.unretract();
     } else {
