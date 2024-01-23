@@ -287,6 +287,14 @@ Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, flo
     if (role == frExternalPerimeter) {
         config_width = print_config.opt<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_width");
         config_spacing = print_config.opt<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_spacing");
+        // external peri spacing is only half spacing -> transform it into a full spacing
+        if (!config_spacing.is_phony() && !config_spacing.value == 0) {
+            double raw_spacing = config_spacing.get_abs_value(nozzle_diameter);
+            config_spacing.percent = false;
+            config_spacing.value = rounded_rectangle_extrusion_spacing(
+                rounded_rectangle_extrusion_width_from_spacing(raw_spacing, layer_height, 0.5f),
+                layer_height, 1.f);
+        }
         overlap = (float)print_config.get_abs_value("external_perimeter_overlap", 1.0);
     } else if (role == frPerimeter) {
         config_width = print_config.opt<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");

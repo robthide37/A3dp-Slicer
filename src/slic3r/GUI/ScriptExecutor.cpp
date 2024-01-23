@@ -173,10 +173,20 @@ float as_get_float(std::string& key)
     }
 }
 
-double round(float f) {
+double round(float value) {
+    double intpart;
+    if (modf(value, &intpart) == 0.0) {
+        // shortcut for int
+        return value;
+    }
     std::stringstream ss;
+    //first, get the int part, to see how many digit it takes
+    int long10 = 0;
+    if (intpart > 9)
+        long10 = (int)std::floor(std::log10(std::abs(intpart)));
+        //set the usable precision: there is only ~7 decimal digit in a float (15-16 decimal digit in a double)
+        ss << std::fixed << std::setprecision(7 - long10) << value;
     double dbl_val;
-    ss << f;
     ss >> dbl_val;
     return dbl_val;
 }
