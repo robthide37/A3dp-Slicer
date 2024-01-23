@@ -2767,8 +2767,9 @@ std::string GCodeGenerator::extrude_skirt(
     const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed)
 {
     assert(loop_src.is_counter_clockwise());
+    Point seam_point = this->last_position.has_value() ? *this->last_position : Point::Zero();
     GCode::SmoothPath smooth_path = smooth_path_cache.resolve_or_fit_split_with_seam(
-        loop_src, false, m_scaled_resolution, *this->last_position, scaled<double>(0.0015));
+        loop_src, false, m_scaled_resolution, seam_point, scaled<double>(0.0015));
 
     // Clip the path to avoid the extruder to get exactly on the first point of the loop;
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
