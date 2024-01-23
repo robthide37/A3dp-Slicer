@@ -115,7 +115,7 @@ namespace Slic3r {
                 
             }
             extrusion_entities_append_paths(
-                eec.set_entities(), std::move(polylines_layer),
+                eec, std::move(polylines_layer),
                 good_role,
                 params.flow.mm3_per_mm() * params.flow_mult * mult_flow,
                 //min-reduced flow width for a better view (it's mostly a gui thing, but some support code can want to mess with it)

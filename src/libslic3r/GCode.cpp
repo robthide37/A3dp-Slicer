@@ -2894,7 +2894,7 @@ std::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*
 // and performing the extruder specific extrusions together.
 LayerResult GCode::process_layer(
     const Print                             &print,
-    Print::StatusMonitor                           &status_monitor,
+    Print::StatusMonitor                    &status_monitor,
     // Set of object & print layers of the same PrintObject and with the same print_z.
     const std::vector<LayerToPrint>         &layers,
     const LayerTools                        &layer_tools,
@@ -3423,9 +3423,15 @@ LayerResult GCode::process_layer(
                             gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
                     else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
                         gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
-                    gcode += this->extrude_support(
-                        // support_extrusion_role is erSupportMaterial, erSupportMaterialInterface or erMixed for all extrusion paths.
-                    instance_to_print.object_by_extruder.support->chained_path_from(m_last_pos, instance_to_print.object_by_extruder.support_extrusion_role));
+                    // support_extrusion_role is erSupportMaterial, erSupportMaterialInterface or erMixed for all extrusion paths.
+                    // note: filter_by_extrusion_role doesn't copy, so please don't modify / remove these entities
+                    ExtrusionEntitiesPtr only_support =
+                        filter_by_extrusion_role(instance_to_print.object_by_extruder.support->entities(),
+                                                 instance_to_print.object_by_extruder.support_extrusion_role);
+                    if (instance_to_print.object_by_extruder.support->can_sort())
+                        chain_and_reorder_extrusion_entities(only_support, &m_last_pos);
+                    //it's reaordered, now extrude.
+                    gcode += this->extrude_support(only_support);
                     m_layer = layer_to_print.layer();
                     m_object_layer_over_raft = object_layer_over_raft;
                 }
@@ -4887,7 +4893,8 @@ void GCode::use(const ExtrusionEntityCollection &collection) {
             next_entity->visit(*this);
         }
     } else {
-        ExtrusionEntityCollection chained = collection.chained_path_from(m_last_pos);
+        ExtrusionEntityCollection chained = collection; // TODO: 2.7 maybe we can visit a modifiable colelction, so we don't copy it at every step?
+        chained.chained_path_from(m_last_pos);
         for (const ExtrusionEntity* next_entity : chained.entities()) {
             next_entity->visit(*this);
         }
@@ -5074,20 +5081,20 @@ std::string GCode::extrude_ironing(const Print& print, const std::vector<ObjectB
     return gcode;
 }
 
-std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fills)
+std::string GCode::extrude_support(const ExtrusionEntitiesPtr &support_fills)
 {
     static constexpr const char *support_label            = "support material";
     static constexpr const char *support_interface_label  = "support material interface";
 
     std::string gcode;
-    if (! support_fills.entities().empty()) {
+    if (! support_fills.empty()) {
         const double  support_speed            = m_config.get_computed_value("support_material_speed");
         const double  support_interface_speed  = m_config.get_computed_value("support_material_interface_speed");
-        for (const ExtrusionEntity *ee : support_fills.entities()) {
+        for (const ExtrusionEntity *ee : support_fills) {
             ExtrusionRole role = ee->role();
             assert(role == erSupportMaterial || role == erSupportMaterialInterface || role == erMixed);
             if (const ExtrusionEntityCollection* coll = dynamic_cast<const ExtrusionEntityCollection*>(ee)) {
-                gcode += extrude_support(*coll);
+                gcode += extrude_support(coll->entities());
                 continue;
             }
             const char  *label = (role == erSupportMaterial) ? support_label : support_interface_label;

@@ -293,7 +293,7 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
             ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
             /// push the path
             extrusion_entities_append_paths(
-                eec->set_entities(), std::move(simple_polylines),
+                *eec, std::move(simple_polylines),
                 good_role,
                 params.flow.mm3_per_mm()* params.flow_mult * mult_flow,
                 (float)(params.flow.width()* params.flow_mult * mult_flow),
@@ -3676,7 +3676,7 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
             ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
             /// push the path
             extrusion_entities_append_paths(
-                eec_peri->set_entities(),
+                *eec_peri,
                 polylines_peri,
                 good_role,
                 params.flow.mm3_per_mm() * params.flow_mult,
@@ -3700,7 +3700,7 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
                     ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
                     /// push the path
                     extrusion_entities_append_paths(
-                        eec_infill->set_entities(),
+                        *eec_infill,
                         polys_infill,
                         good_role,
                         params.flow.mm3_per_mm() * params.flow_mult,

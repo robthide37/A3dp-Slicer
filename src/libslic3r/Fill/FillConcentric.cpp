@@ -260,7 +260,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
                             leaf_coll->append(ExtrusionEntityCollection{});
                             leaf_count.sortable = static_cast<ExtrusionEntityCollection*>(leaf_coll->set_entities().back());
                             ExtrusionEntityCollection new_coll_nosort{ false, false };
-                            new_coll_nosort.set_entities().push_back(elt);
+                            new_coll_nosort.append(ExtrusionEntitiesPtr{elt});
                             leaf_count.sortable->append(std::move(new_coll_nosort));
                         }
                         if (leaf_count.sortable) {

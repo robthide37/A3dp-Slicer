@@ -384,7 +384,7 @@ private:
     std::string     extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region);
     std::string     extrude_infill(const Print& print, const std::vector<ObjectByExtruder::Island::Region>& by_region, bool is_infill_first);
     std::string     extrude_ironing(const Print& print, const std::vector<ObjectByExtruder::Island::Region>& by_region);
-    std::string     extrude_support(const ExtrusionEntityCollection &support_fills);
+    std::string     extrude_support(const ExtrusionEntitiesPtr &support_fills);
 
     Polyline        travel_to(std::string& gcode, const Point &point, ExtrusionRole role);
     void            write_travel_to(std::string& gcode, const Polyline& travel, std::string comment);

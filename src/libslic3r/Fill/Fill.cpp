@@ -500,7 +500,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
             eec->set_can_sort_reverse(false, false);
             for (ExtrusionEntityCollection* per_priority : fills_by_priority) {
                 if (!per_priority->entities().empty())
-                    eec->set_entities().push_back(per_priority);
+                    eec->append(ExtrusionEntitiesPtr{per_priority});
                 else
                     delete per_priority;
             }
@@ -956,7 +956,7 @@ void Layer::make_ironing()
                 // Don't sort the ironing infill lines as they are monotonicly ordered.
                 eec->set_can_sort_reverse(false, false);
                 extrusion_entities_append_paths(
-                    eec->set_entities(), std::move(polylines),
+                    *eec, std::move(polylines),
                     erIroning,
                     //FIXME FLOW decide if it's good
                     flow_mm3_per_mm, extrusion_width/*float(flow.width())*/, float(extrusion_height)/*float(height)*/);

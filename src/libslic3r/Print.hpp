@@ -269,7 +269,7 @@ public:
 
     // Whoever will get a non-const pointer to PrintObject will be able to modify its layers.
     LayerPtrs&                   layers()               { return m_layers; }
-    SupportLayerPtrs&            support_layers()       { return m_support_layers; }
+    SupportLayerPtrs&            edit_support_layers()       { return m_support_layers; }
 
     // Bounding box is used to align the object infill patterns, and to calculate attractor for the rear seam.
     // The bounding box may not be quite snug.
@@ -307,8 +307,8 @@ public:
 
     size_t          support_layer_count() const { return m_support_layers.size(); }
     void            clear_support_layers();
-    SupportLayer*   get_support_layer(int idx) { return m_support_layers[idx]; }
-    SupportLayer*   add_support_layer(int id, int interface_id, coordf_t height, coordf_t print_z);
+    const SupportLayer*   get_support_layer(int idx) { return m_support_layers[idx]; }
+    void            add_support_layer(int id, int interface_id, coordf_t height, coordf_t print_z);
     SupportLayerPtrs::iterator insert_support_layer(SupportLayerPtrs::const_iterator pos, size_t id, size_t interface_id, coordf_t height, coordf_t print_z, coordf_t slice_z);
     //void            delete_support_layer(int idx);
     

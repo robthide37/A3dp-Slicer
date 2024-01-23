@@ -3499,7 +3499,7 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
             eec->set_can_sort_reverse(!this->no_sort(), !this->no_sort());
 
         extrusion_entities_append_paths(
-            eec->set_entities(), polylines_rectilinear,
+            *eec, polylines_rectilinear,
             good_role,
             params.flow.mm3_per_mm() * params.flow_mult,
             params.flow.width() * params.flow_mult,
