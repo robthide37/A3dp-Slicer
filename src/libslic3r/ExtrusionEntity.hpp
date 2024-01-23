@@ -345,7 +345,17 @@ public:
     ExtrusionMultiEntity& operator=(ExtrusionMultiEntity &&rhs) { this->paths = std::move(rhs.paths); return *this; }
 
     bool is_loop() const override { return false; }
-    ExtrusionRole role() const override { return this->paths.empty() ? erNone : this->paths.front().role(); }
+    ExtrusionRole role() const override
+    {
+        if (this->paths.empty())
+            return erNone;
+        ExtrusionRole role = this->paths.front().role();
+        for (const ExtrusionPath &path : this->paths)
+            if (role != path.role()) {
+                return erMixed;
+            }
+        return role;
+    }
     virtual const Point& first_point() const override { return this->paths.front().polyline.as_polyline().front(); }
     virtual const Point& last_point() const override { return this->paths.back().polyline.as_polyline().back(); }
 
@@ -480,7 +490,7 @@ public:
     // Test, whether the point is extruded by a bridging flow.
     // This used to be used to avoid placing seams on overhangs, but now the EdgeGrid is used instead.
     bool has_overhang_point(const Point &point) const;
-    ExtrusionRole role() const override { return this->paths.empty() ? erNone : this->paths.front().role(); }
+    ExtrusionRole role() const override;
     ExtrusionLoopRole loop_role() const { return m_loop_role; }
     // Produce a list of 2D polygons covered by the extruded paths, offsetted by the extrusion width.
     // Increase the offset by scaled_epsilon to achieve an overlap, so a union will produce no gaps.
@@ -674,6 +684,23 @@ public:
     virtual void use(ExtrusionEntityCollection& collection) override;
 };
 
+class HasRoleVisitor : public ExtrusionVisitorConst{
+public:
+    bool found = false;
+    void use(const ExtrusionMultiPath& multipath) override;
+    void use(const ExtrusionMultiPath3D& multipath3D) override;
+    void use(const ExtrusionLoop& loop) override;
+    void use(const ExtrusionEntityCollection& collection) override;
+    static bool search(const ExtrusionEntity &entity, HasRoleVisitor&& visitor);
+    static bool search(const ExtrusionEntitiesPtr &entities, HasRoleVisitor&& visitor);
+};
+struct HasInfillVisitor : public HasRoleVisitor{
+    void default_use(const ExtrusionEntity &entity) override { found = is_infill(entity.role()); };
+};
+struct HasSolidInfillVisitor : public HasRoleVisitor{
+    void default_use(const ExtrusionEntity &entity) override { found = is_solid_infill(entity.role()); };
+};
+
 
 //call simplify for all paths.
 class SimplifyVisitor : public ExtrusionVisitorRecursive {
@@ -726,7 +753,8 @@ public:
 #if _DEBUG
 struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
     virtual void default_use(const ExtrusionEntity& entity) override {};
-    virtual void use(const ExtrusionLoop& loop) override {
+    virtual void use(const ExtrusionPath &path) override { assert(path.length() > SCALED_EPSILON); }
+    virtual void use(const ExtrusionLoop &loop) override {
         for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
             assert(it->polyline.size() >= 2);
             assert(std::prev(it)->polyline.back() == it->polyline.front());

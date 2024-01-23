@@ -1291,6 +1291,7 @@ namespace SupportMaterialInternal {
                     return true;
             } else {
                 assert(! ee->is_loop());
+                // TODO: a bit dangerous, is there possible to have a bridge infill with mixed role?
                 if (is_bridge(ee->role()))
                     return true;
             }

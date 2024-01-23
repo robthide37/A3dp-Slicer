@@ -6307,16 +6307,18 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                         for (const ExtrusionEntity *ee : layerm->fills.entities()) {
                             // fill represents infill extrusions of a single island.
                             const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
-                            if (fill != nullptr && !fill->entities().empty())
+                            if (fill != nullptr && !fill->entities().empty()) {
+                                bool has_solid_infill = HasRoleVisitor::search(fill->entities(), HasSolidInfillVisitor{});
                                 _3DScene::extrusionentity_to_verts(*fill, 
                                     float(layer->print_z), 
                                     copy,
 	                                volume(idx_layer, 
-                                        is_solid_infill(fill->entities().front()->role()) ?
+                                        has_solid_infill ?
                                             layerm->region().config().solid_infill_extruder :
                                             layerm->region().config().infill_extruder,
-                                        is_solid_infill(fill->entities().front()->role()) ? 4 : 3),
+                                        has_solid_infill ? 4 : 3),
                                     feature_to_volume_map);
+                            }
                         }
                     }
                 }

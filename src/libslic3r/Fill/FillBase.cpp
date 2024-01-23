@@ -342,7 +342,7 @@ Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, Ext
         for (ThickPolyline poly : polylines_gapfill) {
             for (coord_t width : poly.points_width) {
                 if (width > params.flow.scaled_width() * 2.2) {
-                    std::cerr << "ERRROR!!!! gapfill width = " << unscaled(width) << " > max_width = " << (params.flow.width() * 2) << "\n";
+                    BOOST_LOG_TRIVIAL(error) << "ERRROR!!!! gapfill width = " << unscaled(width) << " > max_width = " << (params.flow.width() * 2) << "\n";
                 }
             }
         }
