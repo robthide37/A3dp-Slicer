@@ -349,7 +349,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "min_feature_size", "min_bead_width", "aaa" })
        toggle_field(el, have_arachne);
 
-    toggle_field("external_perimeters_vase", config->opt_bool("external_perimeters_first"));
+    toggle_field("external_perimeters_vase", config->opt_bool("external_perimeters_first") && !config->opt_bool("perimeter_loop"));
     for (auto el : { "external_perimeters_nothole", "external_perimeters_hole", "perimeter_bonding"})
         toggle_field(el, config->opt_bool("external_perimeters_first") && !have_arachne);
 
