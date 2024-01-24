@@ -658,7 +658,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
             size_t this_layer_id_interface  = layer_id_interface;
             if (this_layer_contacts_only) {
                 // Find a supporting layer for its interface ID.
-                for (auto it = object.support_layers().rbegin(); it != object.support_layers().rend(); ++ it)
+                for (auto it = object.edit_support_layers().rbegin(); it != object.edit_support_layers().rend(); ++ it)
                     if (const SupportLayer &other_layer = **it; std::abs(other_layer.print_z - top_contact_bottom_z) < EPSILON) {
                         // other_layer supports this top contact layer. Assign a different support interface direction to this layer
                         // from the layer that supports it.
@@ -702,7 +702,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
 #endif /* SLIC3R_DEBUG */
 
     // Generate the actual toolpaths and save them into each layer.
-    this->generate_toolpaths(object.support_layers(), raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
+    this->generate_toolpaths(object.edit_support_layers(), raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
 
 #ifdef SLIC3R_DEBUG
     {
@@ -1291,6 +1291,7 @@ namespace SupportMaterialInternal {
                     return true;
             } else {
                 assert(! ee->is_loop());
+                // TODO: a bit dangerous, is there possible to have a bridge infill with mixed role?
                 if (is_bridge(ee->role()))
                     return true;
             }
@@ -3566,8 +3567,7 @@ struct MyLayerExtruded
             *m_polygons_to_extrude = union_safety_offset(*m_polygons_to_extrude);
         }
         // 2) Merge the extrusions.
-        this->extrusions.set_entities().insert(this->extrusions.entities().end(), other.extrusions.entities().begin(), other.extrusions.entities().end());
-        other.extrusions.set_entities().clear();
+        this->extrusions.append_move_from(other.extrusions);
         // 3) Merge the infill polygons.
         Slic3r::polygons_append(this->layer->polygons, std::move(other.layer->polygons));
         this->layer->polygons = union_safety_offset(this->layer->polygons);
@@ -3817,7 +3817,7 @@ void LoopInterfaceProcessor::generate(MyLayerExtruded &top_contact_layer, const 
 
     // Transform loops into ExtrusionPath objects.
     extrusion_entities_append_paths(
-        top_contact_layer.extrusions.set_entities(),
+        top_contact_layer.extrusions,
         std::move(loop_lines),
         erSupportMaterialInterface, flow.mm3_per_mm(), flow.width(), flow.height());
 }
@@ -4106,7 +4106,7 @@ void modulate_extrusion_by_overlapping_layers(
     // If there are any non-consumed fragments, add them separately.
     //FIXME this shall not happen, if the Clipper works as expected and all paths split to fragments could be re-connected.
     for (auto it_fragment = path_fragments.begin(); it_fragment != path_fragments.end(); ++ it_fragment)
-        extrusion_entities_append_paths(extrusions_in_out.set_entities(), std::move(it_fragment->polylines), extrusion_role, it_fragment->mm3_per_mm, it_fragment->width, it_fragment->height);
+        extrusion_entities_append_paths(extrusions_in_out, std::move(it_fragment->polylines), extrusion_role, it_fragment->mm3_per_mm, it_fragment->width, it_fragment->height);
 }
 
 void PrintObjectSupportMaterial::generate_toolpaths(

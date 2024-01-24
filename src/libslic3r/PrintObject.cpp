@@ -776,15 +776,14 @@ FillLightning::GeneratorPtr PrintObject::prepare_lightning_infill_data()
         m_support_layers.clear();
     }
 
-SupportLayer* PrintObject::add_support_layer(int id, int interface_id, coordf_t height, coordf_t print_z)
+    void PrintObject::add_support_layer(int id, int interface_id, coordf_t height, coordf_t print_z)
     {
-    m_support_layers.emplace_back(new SupportLayer(id, interface_id, this, height, print_z, -1));
-        return m_support_layers.back();
+        m_support_layers.emplace_back(new SupportLayer(id, interface_id, this, height, print_z, -1));
     }
 
-SupportLayerPtrs::iterator PrintObject::insert_support_layer(SupportLayerPtrs::const_iterator pos, size_t id, size_t interface_id, coordf_t height, coordf_t print_z, coordf_t slice_z)
+    SupportLayerPtrs::iterator PrintObject::insert_support_layer(SupportLayerPtrs::const_iterator pos, size_t id, size_t interface_id, coordf_t height, coordf_t print_z, coordf_t slice_z)
     {
-    return m_support_layers.insert(pos, new SupportLayer(id, interface_id, this, height, print_z, slice_z));
+        return m_support_layers.insert(pos, new SupportLayer(id, interface_id, this, height, print_z, slice_z));
     }
 
     // Called by Print::apply().

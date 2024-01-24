@@ -2331,7 +2331,10 @@ void PrintConfigDef::init_fff_params()
     def->gui_flags = "show_value";
     def->label = L("Fill density");
     def->category = OptionCategory::infill;
-    def->tooltip = L("Density of internal infill, expressed in the range 0% - 100%.");
+    def->tooltip = L("Density of internal infill, expressed in the range 0% - 100%."
+        "\nSet 0 to remove any sparse infill."
+        "\nNote that using a value of 100% won't change the type of infill from sparse to solid."
+        " If you want only solid infill, you can set the 'Solid infill every X layers' (solid_infill_every_layers) to 1 instead.");
     def->sidetext = L("%");
     def->min = 0;
     def->max = 100;
@@ -2347,7 +2350,6 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("42");
     def->enum_values.push_back("55");
     def->enum_values.push_back("75");
-    def->enum_values.push_back("100");
     def->enum_labels.push_back("0");
     def->enum_labels.push_back("4");
     def->enum_labels.push_back("5.5");
@@ -2360,7 +2362,6 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back("42");
     def->enum_labels.push_back("55");
     def->enum_labels.push_back("75");
-    def->enum_labels.push_back("100");
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionPercent(18));
 
@@ -2831,6 +2832,14 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(50,true));
+
+    def = this->add("gcode_ascii", coBool);
+    def->label = L("Only ascii characters in gcode");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("When printing the gcode file, replace any non-ascii character by a '_'."
+        " Can be useful if the firmware or a software in a workflow doesn't support uft-8.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("gcode_comments", coBool);
     def->label = L("Verbose G-code");
@@ -7900,6 +7909,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "first_layer_infill_speed",
 "first_layer_min_speed",
 "first_layer_size_compensation_layers",
+"gcode_ascii",
 "gap_fill_acceleration",
 "gap_fill_extension",
 "gap_fill_fan_speed",

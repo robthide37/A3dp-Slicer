@@ -3051,9 +3051,10 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
     //TODO: find a way to avoid double copy (from EntityCollection to ChangeFlow to searcher.search_result.loop
     class ChangeFlow : public ExtrusionVisitor {
     public:
+        ChangeFlow(coordf_t resolution) : resolution_sqr(resolution * resolution) {}
         float percent_extrusion;
         std::vector<ExtrusionPath> paths;
-        Point* first_point = nullptr;
+        const Point* first_point = nullptr;
         coordf_t resolution_sqr;
         virtual void use(ExtrusionPath &path) override {
             //ensure the loop is continue.
@@ -3190,43 +3191,88 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
             searcher.search_result.path->polyline.set_points().erase(
                 searcher.search_result.path->polyline.set_points().begin() + searcher.search_result.idx_line + 1,
                 searcher.search_result.path->polyline.set_points().end());
-            if (searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.empty() ||
-                !searcher.search_result.loop->paths[searcher.search_result.idx_path] .polyline.back().coincides_with_epsilon(point))
-                searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.append(point);
-            if (searcher.search_result.loop->paths[searcher.search_result.idx_path].size() < 2 ||
-                searcher.search_result.loop->paths[searcher.search_result.idx_path].length() < SCALED_EPSILON) {
-                //if too small, replace
-                poly_after.points.front() = searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.front();
-                searcher.search_result.loop->paths[searcher.search_result.idx_path] = ExtrusionPath(poly_after, *searcher.search_result.path);
-            }else{
-                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + 1 + searcher.search_result.idx_path, 
+            size_t idx_path_before = searcher.search_result.idx_path;
+            size_t idx_path_to_add = idx_path_before + 1;
+            //check if the first part of the split polyline is long enough.
+            assert(!searcher.search_result.loop->paths[idx_path_before].empty());
+            if (searcher.search_result.loop->paths[idx_path_before].length() 
+                + searcher.search_result.loop->paths[idx_path_before].polyline.back().distance_to(point) < SCALED_EPSILON) {
+                //not long enough, move point to first point and destroy it
+                assert(!searcher.search_result.loop->paths[idx_path_before].empty());
+                point = searcher.search_result.loop->paths[idx_path_before].first_point();
+                searcher.search_result.loop->paths.erase(searcher.search_result.loop->paths.begin() + idx_path_before);
+                idx_path_to_add = idx_path_before;
+                idx_path_before--;
+            } else {
+                //long enough
+                if (!searcher.search_result.loop->paths[idx_path_before].polyline.back().coincides_with_epsilon(point)) {
+                    // add the point to previous path
+                    searcher.search_result.loop->paths[idx_path_before].polyline.append(point);
+                } else {
+                    //point too near of the start, just move the point
+                    point                     = searcher.search_result.loop->paths[idx_path_before].polyline.back();
+                    poly_after.points.front() = point;
+                }
+            }
+            // remove next point if too near to point for the poly_after
+            if (poly_after.size() > 1 && poly_after.points[0].coincides_with_epsilon(poly_after.points[1])) {
+                poly_after.points.erase(poly_after.begin() + 1);
+            }
+            assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].size() >= 2);
+            assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].length() > SCALED_EPSILON);
+            // check if poly_after is big enough to be added
+            if (poly_after.points.size() <= 1 || poly_after.length()  < SCALED_EPSILON) {
+                //if there is a path after it, then move a little bit the first point
+                if (searcher.search_result.loop->paths.size() > idx_path_to_add) {
+                    assert(searcher.search_result.loop->paths[idx_path_to_add].first_point().coincides_with_epsilon(point));
+                    searcher.search_result.loop->paths[idx_path_to_add].polyline.set_points().front() = point;
+                    // set return point, to move our return point
+                    poly_after.clear();
+                    poly_after.points.push_back(point);
+                } else {
+                    //use last point as the end pos
+                    Point end_pt = poly_after.back();
+                    poly_after.clear();
+                    poly_after.points.push_back(end_pt);
+                }
+            } else {
+                assert(poly_after.length() > SCALED_EPSILON);
+                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add, 
                     ExtrusionPath(poly_after, *searcher.search_result.path));
             }
-            assert(searcher.search_result.loop->paths[searcher.search_result.idx_path].polyline.size() > 1);
-            assert(poly_after.size() > 1);
+            assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].polyline.size() > 1);
+            assert(poly_after.size() > 0);
             
             //create thin wall path exttrusion
             ExtrusionEntityCollection tws;
             tws.append(Geometry::thin_variable_width({ tw }, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)), false));
             assert(!tws.entities().empty());
-            ChangeFlow change_flow;
+#if _DEBUG
+                tws.visit(LoopAssertVisitor{});
+#endif
+            ChangeFlow change_flow(std::max(scale_t(this->print_config->resolution), SCALED_EPSILON));
             if (tws.entities().size() == 1 && tws.entities()[0]->is_loop()) {
                 //loop, just add it 
                 change_flow.first_point = &point;
                 change_flow.percent_extrusion = 1;
                 change_flow.use(tws);
                 //add move back
-                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + 1 + searcher.search_result.idx_path,
+                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add,
                     change_flow.paths.begin(), change_flow.paths.end());
                 //add move to
-
+                if (poly_after.first_point() != point) {
+                    assert(poly_after.first_point().coincides_with_epsilon(point));
+                    assert(searcher.search_result.loop->paths.size() > idx_path_to_add);
+                    assert(poly_after.first_point().coincides_with_epsilon(searcher.search_result.loop->paths[idx_path_to_add].polyline.set_points().front()));
+                    searcher.search_result.loop->paths[idx_path_to_add].polyline.set_points().front() = poly_after.first_point();
+                }
 #if _DEBUG
                 searcher.search_result.loop->visit(LoopAssertVisitor{});
 #endif
             } else {
                 //first add the return path
                 //ExtrusionEntityCollection tws_second = tws; // this does a deep copy
-                change_flow.first_point = &point;
+                change_flow.first_point = &poly_after.first_point(); // end at the start of the next path
                 change_flow.percent_extrusion = 0.1f;
                 change_flow.use(tws); // tws_second); //does not need the deep copy if the change_flow copy the content instead of re-using it.
                 //force reverse
@@ -3234,14 +3280,18 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
                     path.reverse();
                 std::reverse(change_flow.paths.begin(), change_flow.paths.end());
                 //std::reverse(change_flow.paths.begin(), change_flow.paths.end());
-                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + 1 + searcher.search_result.idx_path,
-                    change_flow.paths.begin(), change_flow.paths.end());
+                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add,
+                    change_flow.paths.begin(), change_flow.paths.end()); //TODO 2.7:change role by a kind of thinwalltravel that won't be considered for seam
                 //add the real extrusion path
-                change_flow.first_point = &point;
+                change_flow.first_point = &point; // start at the end of previous extrusion
                 change_flow.percent_extrusion = 9.f; // 0.9 but as we modified it by 0.1 just before, has to multiply by 10
                 change_flow.paths = std::vector<ExtrusionPath>();
                 change_flow.use(tws);
-                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + 1 + searcher.search_result.idx_path,
+#if _DEBUG
+                for (ExtrusionPath &path : change_flow.paths)
+                    path.visit(LoopAssertVisitor{});
+#endif
+                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add,
                     change_flow.paths.begin(), change_flow.paths.end());
 #if _DEBUG
                 searcher.search_result.loop->visit(LoopAssertVisitor{});

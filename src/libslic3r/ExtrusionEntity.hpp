@@ -345,7 +345,17 @@ public:
     ExtrusionMultiEntity& operator=(ExtrusionMultiEntity &&rhs) { this->paths = std::move(rhs.paths); return *this; }
 
     bool is_loop() const override { return false; }
-    ExtrusionRole role() const override { return this->paths.empty() ? erNone : this->paths.front().role(); }
+    ExtrusionRole role() const override
+    {
+        if (this->paths.empty())
+            return erNone;
+        ExtrusionRole role = this->paths.front().role();
+        for (const ExtrusionPath &path : this->paths)
+            if (role != path.role()) {
+                return erMixed;
+            }
+        return role;
+    }
     virtual const Point& first_point() const override { return this->paths.front().polyline.as_polyline().front(); }
     virtual const Point& last_point() const override { return this->paths.back().polyline.as_polyline().back(); }
 
@@ -480,7 +490,7 @@ public:
     // Test, whether the point is extruded by a bridging flow.
     // This used to be used to avoid placing seams on overhangs, but now the EdgeGrid is used instead.
     bool has_overhang_point(const Point &point) const;
-    ExtrusionRole role() const override { return this->paths.empty() ? erNone : this->paths.front().role(); }
+    ExtrusionRole role() const override;
     ExtrusionLoopRole loop_role() const { return m_loop_role; }
     // Produce a list of 2D polygons covered by the extruded paths, offsetted by the extrusion width.
     // Increase the offset by scaled_epsilon to achieve an overlap, so a union will produce no gaps.
@@ -542,89 +552,6 @@ inline void extrusion_paths_append(ExtrusionPaths &dst, Polylines &&polylines, E
     polylines.clear();
 }
 
-inline void extrusion_entities_append_paths(ExtrusionEntitiesPtr &dst, Polylines &polylines, ExtrusionRole role, double mm3_per_mm, float width, float height, bool can_reverse = true)
-{
-    dst.reserve(dst.size() + polylines.size());
-    for (Polyline &polyline : polylines)
-        if (polyline.is_valid()) {
-            if (polyline.back() == polyline.front()) {
-                ExtrusionPath path(role, mm3_per_mm, width, height, can_reverse);
-                path.polyline = polyline;
-                dst.emplace_back(new ExtrusionLoop(std::move(path)));
-            } else {
-                ExtrusionPath *extrusion_path = new ExtrusionPath(role, mm3_per_mm, width, height, can_reverse);
-                dst.push_back(extrusion_path);
-                extrusion_path->polyline = polyline;
-            }
-        }
-}
-
-inline void extrusion_entities_append_paths(ExtrusionEntitiesPtr &dst, Polylines &&polylines, ExtrusionRole role, double mm3_per_mm, float width, float height, bool can_reverse = true)
-{
-    dst.reserve(dst.size() + polylines.size());
-    for (Polyline &polyline : polylines)
-        if (polyline.is_valid()) {
-            if (polyline.back() == polyline.front()) {
-                ExtrusionPath path(role, mm3_per_mm, width, height, can_reverse);
-                path.polyline = polyline;
-                dst.emplace_back(new ExtrusionLoop(std::move(path)));
-            } else {
-                ExtrusionPath *extrusion_path = new ExtrusionPath(role, mm3_per_mm, width, height, can_reverse);
-                dst.push_back(extrusion_path);
-                extrusion_path->polyline = std::move(polyline);
-            }
-        }
-    polylines.clear();
-}
-
-inline void extrusion_entities_append_loops(ExtrusionEntitiesPtr &dst, Polygons &loops, ExtrusionRole role, double mm3_per_mm, float width, float height, bool can_reverse = true) {
-    dst.reserve(dst.size() + loops.size());
-    for (Polygon & polygon : loops) {
-        if (polygon.is_valid()) {
-            ExtrusionPath path(role, mm3_per_mm, width, height, can_reverse);
-            path.polyline.append(polygon.points);
-            path.polyline.append(path.polyline.front());
-            dst.emplace_back(new ExtrusionLoop(std::move(path)));
-        }
-    }
-}
-
-inline void extrusion_entities_append_loops(ExtrusionEntitiesPtr &dst, Polygons &&loops, ExtrusionRole role, double mm3_per_mm, float width, float height, bool can_reverse = true)
-{
-    dst.reserve(dst.size() + loops.size());
-    for (Polygon &polygon : loops) {
-        if (polygon.is_valid()) {
-            ExtrusionPath path(role, mm3_per_mm, width, height, can_reverse);
-            path.polyline.append(std::move(polygon.points));
-            path.polyline.append(path.polyline.front());
-            ExtrusionLoop *loop = new ExtrusionLoop(std::move(path));
-            //default to ccw
-            loop->make_counter_clockwise();
-            dst.emplace_back(loop);
-        }
-    }
-    loops.clear();
-}
-
-inline void extrusion_entities_append_loops_and_paths(ExtrusionEntitiesPtr &dst, Polylines &&polylines, ExtrusionRole role, double mm3_per_mm, float width, float height, bool can_reverse = true)
-{
-    dst.reserve(dst.size() + polylines.size());
-    for (Polyline &polyline : polylines) {
-        if (polyline.is_valid()) {
-            if (polyline.is_closed()) {
-                ExtrusionPath extrusion_path(role, mm3_per_mm, width, height, can_reverse);
-                extrusion_path.polyline = std::move(polyline);
-                dst.emplace_back(new ExtrusionLoop(std::move(extrusion_path)));
-            } else {
-                ExtrusionPath *extrusion_path = new ExtrusionPath(role, mm3_per_mm, width, height, can_reverse);
-                extrusion_path->polyline      = std::move(polyline);
-                dst.emplace_back(extrusion_path);
-            }
-        }
-    }
-    polylines.clear();
-}
-
 class ExtrusionPrinter : public ExtrusionVisitorConst {
     std::stringstream ss;
     double mult;
@@ -672,6 +599,23 @@ public:
     virtual void use(ExtrusionMultiPath3D& multipath) override;
     virtual void use(ExtrusionLoop& loop) override;
     virtual void use(ExtrusionEntityCollection& collection) override;
+};
+
+class HasRoleVisitor : public ExtrusionVisitorConst{
+public:
+    bool found = false;
+    void use(const ExtrusionMultiPath& multipath) override;
+    void use(const ExtrusionMultiPath3D& multipath3D) override;
+    void use(const ExtrusionLoop& loop) override;
+    void use(const ExtrusionEntityCollection& collection) override;
+    static bool search(const ExtrusionEntity &entity, HasRoleVisitor&& visitor);
+    static bool search(const ExtrusionEntitiesPtr &entities, HasRoleVisitor&& visitor);
+};
+struct HasInfillVisitor : public HasRoleVisitor{
+    void default_use(const ExtrusionEntity &entity) override { found = is_infill(entity.role()); };
+};
+struct HasSolidInfillVisitor : public HasRoleVisitor{
+    void default_use(const ExtrusionEntity &entity) override { found = is_solid_infill(entity.role()); };
 };
 
 
@@ -726,7 +670,8 @@ public:
 #if _DEBUG
 struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
     virtual void default_use(const ExtrusionEntity& entity) override {};
-    virtual void use(const ExtrusionLoop& loop) override {
+    virtual void use(const ExtrusionPath &path) override { assert(path.length() > SCALED_EPSILON); }
+    virtual void use(const ExtrusionLoop &loop) override {
         for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
             assert(it->polyline.size() >= 2);
             assert(std::prev(it)->polyline.back() == it->polyline.front());

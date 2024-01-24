@@ -293,7 +293,7 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
             ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
             /// push the path
             extrusion_entities_append_paths(
-                eec->set_entities(), std::move(simple_polylines),
+                *eec, std::move(simple_polylines),
                 good_role,
                 params.flow.mm3_per_mm()* params.flow_mult * mult_flow,
                 (float)(params.flow.width()* params.flow_mult * mult_flow),
@@ -342,7 +342,7 @@ Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, Ext
         for (ThickPolyline poly : polylines_gapfill) {
             for (coord_t width : poly.points_width) {
                 if (width > params.flow.scaled_width() * 2.2) {
-                    std::cerr << "ERRROR!!!! gapfill width = " << unscaled(width) << " > max_width = " << (params.flow.width() * 2) << "\n";
+                    BOOST_LOG_TRIVIAL(error) << "ERRROR!!!! gapfill width = " << unscaled(width) << " > max_width = " << (params.flow.width() * 2) << "\n";
                 }
             }
         }
@@ -3676,7 +3676,7 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
             ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
             /// push the path
             extrusion_entities_append_paths(
-                eec_peri->set_entities(),
+                *eec_peri,
                 polylines_peri,
                 good_role,
                 params.flow.mm3_per_mm() * params.flow_mult,
@@ -3700,7 +3700,7 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
                     ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
                     /// push the path
                     extrusion_entities_append_paths(
-                        eec_infill->set_entities(),
+                        *eec_infill,
                         polys_infill,
                         good_role,
                         params.flow.mm3_per_mm() * params.flow_mult,

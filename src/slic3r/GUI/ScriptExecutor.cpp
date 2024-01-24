@@ -82,7 +82,7 @@ std::pair<const PresetCollection*, const ConfigOption*> get_coll(const std::stri
 bool as_get_bool(std::string& key)
 {
     const ConfigOption* opt = get_coll(key).second;
-    if (opt == nullptr || opt->type() != ConfigOptionType::coBool)
+    if (opt == nullptr || (opt->type() != ConfigOptionType::coBool && opt->type() != ConfigOptionType::coBools))
         throw NoDefinitionException("error, can't find bool option " + key);
     if (opt->is_vector()) {
         const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
@@ -102,18 +102,20 @@ void as_set_bool(std::string& key, bool b)
         conf.set_key_value(key, new ConfigOptionBool(b));
     } else if (result.second->type() == ConfigOptionType::coBools) {
         ConfigOptionBools* new_val = static_cast<ConfigOptionBools*>(result.second->clone());
-        new_val->set_at(b, 0);
+        for(size_t i=0; i<new_val->size(); ++i)
+            new_val->set_at(b, i);
         conf.set_key_value(key, new_val);
     }
 }
 int32_t as_get_int(std::string& key)
 {
+
     const ConfigOption* opt = get_coll(key).second;
-    if (opt == nullptr || (opt->type() != ConfigOptionType::coInt && opt->type() != ConfigOptionType::coEnum))
+    if (opt == nullptr || (opt->type() != ConfigOptionType::coInt && opt->type() != ConfigOptionType::coInts && opt->type() != ConfigOptionType::coEnum))
         throw NoDefinitionException("error, can't find int option " + key);
     if (opt->is_vector()) {
         const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
-        return (int32_t)vector->get_float(0);
+        return (int32_t)vector->get_int(0);
     } else {
         return (int32_t)(opt->get_int());
     }
@@ -129,7 +131,8 @@ void as_set_int(std::string& key, int val)
         conf.set_key_value(key, new ConfigOptionInt(val));
     } else if (result.second->type() == ConfigOptionType::coInts) {
         ConfigOptionInts* new_val = static_cast<ConfigOptionInts*>(result.second->clone());
-        new_val->set_at(val, 0);
+        for(size_t i=0; i<new_val->size(); ++i)
+            new_val->set_at(val, i);
         conf.set_key_value(key, new_val);
     } else if (result.second->type() == ConfigOptionType::coEnum) {
         //const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
@@ -170,10 +173,20 @@ float as_get_float(std::string& key)
     }
 }
 
-double round(float f) {
+double round(float value) {
+    double intpart;
+    if (modf(value, &intpart) == 0.0) {
+        // shortcut for int
+        return value;
+    }
     std::stringstream ss;
+    //first, get the int part, to see how many digit it takes
+    int long10 = 0;
+    if (intpart > 9)
+        long10 = (int)std::floor(std::log10(std::abs(intpart)));
+        //set the usable precision: there is only ~7 decimal digit in a float (15-16 decimal digit in a double)
+        ss << std::fixed << std::setprecision(7 - long10) << value;
     double dbl_val;
-    ss << f;
     ss >> dbl_val;
     return dbl_val;
 }
@@ -202,7 +215,8 @@ void as_set_float(std::string& key, float f_val)
             if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
                 new_val = old_value;
         }
-        new_opt->set_at(new_val, 0);
+        for(size_t i=0; i<new_opt->size(); ++i)
+            new_opt->set_at(new_val, i);
         conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coPercent) {
         double percent_f = floor(f_val * 100000. + 0.5) / 1000.;
@@ -220,7 +234,8 @@ void as_set_float(std::string& key, float f_val)
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
                 percent_f = old_value;
         }
-        new_opt->set_at(percent_f, 0);
+        for(size_t i=0; i<new_opt->size(); ++i)
+            new_opt->set_at(percent_f, i);
         conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
         double new_val = round(f_val);
@@ -240,7 +255,8 @@ void as_set_float(std::string& key, float f_val)
             if (std::abs(old_value - new_val) / std::abs(old_value) < 0.0000001)
                 new_val = old_value;
         }
-        new_opt->set_at(FloatOrPercent{ new_val, false}, 0);
+        for(size_t i=0; i<new_opt->size(); ++i)
+            new_opt->set_at(FloatOrPercent{ new_val, false}, i);
         conf.set_key_value(key, new_opt);
     }
 }
@@ -275,7 +291,8 @@ void as_set_percent(std::string& key, float f_val)
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
                 percent_f = old_value;
         }
-        new_opt->set_at(percent_f / 100., 0);
+        for(size_t i=0; i<new_opt->size(); ++i)
+            new_opt->set_at(percent_f / 100., i);
         conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coPercent) {
         // only update if difference is significant
@@ -291,7 +308,8 @@ void as_set_percent(std::string& key, float f_val)
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
                 percent_f = old_value;
         }
-        new_opt->set_at(percent_f, 0);
+        for(size_t i=0; i<new_opt->size(); ++i)
+            new_opt->set_at(percent_f, i);
         conf.set_key_value(key, new_opt);
     } else if (result.second->type() == ConfigOptionType::coFloatOrPercent) {
         if (static_cast<const ConfigOptionFloatOrPercent*>(result.second)->percent) {
@@ -309,7 +327,8 @@ void as_set_percent(std::string& key, float f_val)
             if (std::abs(old_value - percent_f) / std::abs(old_value) < 0.0000001)
                 percent_f = old_value;
         }
-        new_opt->set_at(FloatOrPercent{ percent_f, true }, 0);
+        for(size_t i=0; i<new_opt->size(); ++i)
+            new_opt->set_at(FloatOrPercent{ percent_f, true }, i);
         conf.set_key_value(key, new_opt);
     }
 }
@@ -338,7 +357,8 @@ void as_set_string(std::string& key, std::string& val)
         conf.set_key_value(key, new ConfigOptionString(val));
     } else if (result.second->type() == ConfigOptionType::coStrings) {
         ConfigOptionStrings* new_val = (ConfigOptionStrings*)result.second->clone();
-        new_val->set_at(val, 0);
+        for(size_t i=0; i<new_val->size(); ++i)
+            new_val->set_at(val, i);
         conf.set_key_value(key, new_val);
     } else if (result.second->type() == ConfigOptionType::coEnum) {
         const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);

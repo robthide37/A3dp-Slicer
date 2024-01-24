@@ -123,6 +123,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "gap_fill_fan_speed",
         "gap_fill_flow_match_perimeter",
         "gap_fill_speed",
+        "gcode_ascii",
         "gcode_comments",
         "gcode_filename_illegal_char",
         "gcode_label_objects",
@@ -1608,9 +1609,8 @@ void Print::_make_wipe_tower()
         if (idx_begin != size_t(-1)) {
             // Find the position in m_objects.first()->support_layers to insert these new support layers.
             double wipe_tower_new_layer_print_z_first = m_wipe_tower_data.tool_ordering.layer_tools()[idx_begin].print_z;
-            SupportLayerPtrs::const_iterator it_layer = m_objects.front()->support_layers().begin();
-            SupportLayerPtrs::const_iterator it_end   = m_objects.front()->support_layers().end();
-            for (; it_layer != it_end && (*it_layer)->print_z - EPSILON < wipe_tower_new_layer_print_z_first; ++ it_layer);
+            SupportLayerPtrs::const_iterator it_layer = m_objects.front()->edit_support_layers().begin();
+            for (; it_layer != m_objects.front()->edit_support_layers().end() && (*it_layer)->print_z - EPSILON < wipe_tower_new_layer_print_z_first; ++ it_layer);
             // Find the stopper of the sequence of wipe tower layers, which do not have a counterpart in an object or a support layer.
             for (size_t i = idx_begin; i < idx_end; ++ i) {
                 LayerTools &lt = const_cast<LayerTools&>(m_wipe_tower_data.tool_ordering.layer_tools()[i]);

@@ -500,7 +500,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
             eec->set_can_sort_reverse(false, false);
             for (ExtrusionEntityCollection* per_priority : fills_by_priority) {
                 if (!per_priority->entities().empty())
-                    eec->set_entities().push_back(per_priority);
+                    eec->append(ExtrusionEntitiesPtr{per_priority});
                 else
                     delete per_priority;
             }
@@ -696,8 +696,9 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     double real_surface = 0;
                     for(auto &t : temp) real_surface += t.area();
                     assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height + EPSILON);
-                    assert(compute_volume.volume < unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 1.001);
-                    assert(compute_volume.volume > unscaled(unscaled(real_surface)) * surface_fill.params.layer_height * 0.999);
+                    double area = unscaled(unscaled(real_surface));
+                    assert(compute_volume.volume < area * surface_fill.params.layer_height * 1.001);
+                    assert(compute_volume.volume > area * surface_fill.params.layer_height * 0.999 || area < std::max(1.,surface_fill.params.config->solid_infill_below_area.value));
                 }
 #endif
             }
@@ -955,7 +956,7 @@ void Layer::make_ironing()
                 // Don't sort the ironing infill lines as they are monotonicly ordered.
                 eec->set_can_sort_reverse(false, false);
                 extrusion_entities_append_paths(
-                    eec->set_entities(), std::move(polylines),
+                    *eec, std::move(polylines),
                     erIroning,
                     //FIXME FLOW decide if it's good
                     flow_mm3_per_mm, extrusion_width/*float(flow.width())*/, float(extrusion_height)/*float(height)*/);
