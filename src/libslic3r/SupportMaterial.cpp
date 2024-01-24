@@ -4122,10 +4122,6 @@ void PrintObjectSupportMaterial::generate_toolpaths(
     LoopInterfaceProcessor loop_interface_processor(1.5 * m_support_params.support_material_interface_flow.scaled_width());
     loop_interface_processor.n_contact_loops = this->has_contact_loops() ? 1 : 0;
 
-    //std::vector<float>      angles { m_support_params.base_angle };
-    //if (m_object_config->support_material_pattern.value == smpRectilinearGrid)
-    //    angles.push_back(m_support_params.interface_angle);
-
     BoundingBox bbox_object(Point(-scale_(1.), -scale_(1.0)), Point(scale_(1.), scale_(1.)));
 
 //    const coordf_t link_max_length_factor = 3.;
@@ -4277,7 +4273,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
     filler_first_layer_ptr->ratio_fill_inside = 0.2f;
     tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
         [this, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor, 
-            &bbox_object, /*&angles,*/ link_max_length_factor, &filler_first_layer_ptr, &raft_top_interface_idx, &raft_angle_interface]
+            &bbox_object, link_max_length_factor, &filler_first_layer_ptr, &raft_top_interface_idx, &raft_angle_interface]
             (const tbb::blocked_range<size_t>& range) {
         // Indices of the 1st layer in their respective container at the support layer height.
         size_t idx_layer_bottom_contact   = size_t(-1);
@@ -4318,7 +4314,9 @@ void PrintObjectSupportMaterial::generate_toolpaths(
 
             //compute if the support has to switch its angle
             float suppport_angle = m_support_params.base_angle;
-            if (m_support_params.base_angle_height > 0 && (int(support_layer.print_z / m_support_params.base_angle_height)) % 2 == 1) {
+            if (m_object_config->support_material_pattern.value == smpRectilinearGrid && support_layer_id % 2 == 1) {
+                suppport_angle = m_support_params.interface_angle;
+            } else if (m_support_params.base_angle_height > 0 && (int(support_layer.print_z / m_support_params.base_angle_height)) % 2 == 1) {
                 suppport_angle += float(M_PI) / 2;
             }
 
@@ -4419,7 +4417,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     } else {
                         filler->angle = interface_as_base ?
                             // If zero interface layers are configured, use the same angle as for the base layers.
-                            suppport_angle : //angles[support_layer_id % angles.size()] :
+                            suppport_angle :
                             // Use interface angle for the interface layers.
                             m_support_params.interface_angle + interface_angle_delta;
                         supp_density = interface_as_base ? m_support_params.support_density : m_support_params.interface_density;
@@ -4484,7 +4482,6 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     // its pattern to the other layers
                     filler_spacing = flow.spacing();
                 } else{
-                    //filler->angle = angles[support_layer_id % angles.size()];
                     filler->angle = suppport_angle;
                     filler->link_max_length = coord_t(scale_(filler_spacing * link_max_length_factor / m_support_params.support_density));
                 }

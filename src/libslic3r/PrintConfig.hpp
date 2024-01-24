@@ -391,7 +391,8 @@ public:
     void                to_prusa(t_config_option_key& opt_key, std::string& value) const override
         { PrintConfigDef::to_prusa(opt_key, value, *this); }
     // utilities to help convert from prusa config.
-    void                convert_from_prusa();
+    // if with_phony, then the phony settigns will be set to phony if needed.
+    void                convert_from_prusa(bool with_phony);
 
     /// <summary>
     /// callback to changed other settings that are linked (like width & spacing)
@@ -1669,7 +1670,8 @@ public:
 
 
     // utilities to help convert from prusa config.
-    void convert_from_prusa(const DynamicPrintConfig& global_config);
+    // if with_phony, then the phony settigns will be set to phony if needed.
+    void convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony);
 
 private:
     friend class cereal::access;

@@ -152,8 +152,8 @@ public:
         throw Slic3r::RuntimeError("Calling length() on a ExtrusionEntityCollection");
         return 0.;        
     }
-    virtual void visit(ExtrusionVisitor &visitor) { visitor.use(*this); };
-    virtual void visit(ExtrusionVisitorConst &visitor) const { visitor.use(*this); };
+    virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
+    virtual void visit(ExtrusionVisitorConst &visitor) const override{ visitor.use(*this); };
 };
 
 //// visitors /////

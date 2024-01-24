@@ -802,7 +802,7 @@ ConfigSubstitutions PresetBundle::load_config_file(const std::string &path, Forw
         ConfigSubstitutions config_substitutions = config.load_from_gcode_file(path, compatibility_rule);
         Preset::normalize(config);
         if(from_prusa)
-            config.convert_from_prusa();
+            config.convert_from_prusa(true);
 		load_config_file_config(path, true, std::move(config));
 		return config_substitutions;
 	}
@@ -838,7 +838,7 @@ ConfigSubstitutions PresetBundle::load_config_file(const std::string &path, Forw
             config_substitutions = config.load(tree, compatibility_rule);
     		Preset::normalize(config);
             if (from_prusa) {
-                config.convert_from_prusa();
+                config.convert_from_prusa(true);
             }
     		load_config_file_config(path, true, std::move(config));
             return config_substitutions;
@@ -1335,7 +1335,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
                         config.set_deserialize(kvp.first, kvp.second.data(), substitution_context);
                     }
                     if (flags.has(LoadConfigBundleAttribute::ConvertFromPrusa))
-                        config.convert_from_prusa();
+                        config.convert_from_prusa(true);
                 };
                 if (presets == &this->printers) {
                     // Select the default config based on the printer_technology field extracted from kvp.

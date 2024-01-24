@@ -114,7 +114,7 @@ std::string escape_strings_cstyle(const std::vector<std::string> &strs)
         bool should_quote = strs.size() == 1 && str.empty();
         for (size_t i = 0; i < str.size(); ++ i) {
             char c = str[i];
-            if (c == ' ' || c == ';' || c == '\t' || c == '\\' || c == '"' || c == '\r' || c == '\n') {
+            if (c == ' ' || c == ';' || c == ',' || c == '\t' || c == '\\' || c == '"' || c == '\r' || c == '\n') {
                 should_quote = true;
                 break;
             }
@@ -212,7 +212,7 @@ bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &o
         } else {
             for (; i < str.size(); ++ i) {
                 c = str[i];
-                if (c == ';')
+                if (c == ';' || c == ',')
                     break;
                 buf.push_back(c);
             }
@@ -229,7 +229,7 @@ bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &o
                 return true;
             c = str[i];
         }
-        if (c != ';')
+        if (c != ';' && c != ',')
             return false;
         if (++ i == str.size()) {
             // Emit one additional empty string.

@@ -1414,7 +1414,7 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
             // thus a probability of incorrect substitution is low and the G-code viewer is a consumer-only anyways.
             config.load_from_gcode_file(filename, ForwardCompatibilitySubstitutionRule::EnableSilent);
             if (m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3rPE)
-                config.convert_from_prusa();
+                config.convert_from_prusa(true);
             apply_config(config);
         } else if (m_producer == EProducer::Simplify3D)
             apply_config_simplify3d(filename);

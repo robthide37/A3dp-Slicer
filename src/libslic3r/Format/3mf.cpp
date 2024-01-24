@@ -9,11 +9,11 @@
 #include "../PrintConfig.hpp"
 #include "../Semver.hpp"
 #include "../Time.hpp"
+#include "BBConfig.hpp"
 
 #include "../I18N.hpp"
 
 #include "3mf.hpp"
-
 #include <limits>
 #include <stdexcept>
 
@@ -37,6 +37,8 @@ namespace pt = boost::property_tree;
 
 #include <fast_float/fast_float.h>
 
+#include "bbs_3mf.hpp"
+
 // Slightly faster than sprintf("%.9g"), but there is an issue with the karma floating point formatter,
 // https://github.com/boostorg/spirit/pull/586
 // where the exported string is one digit shorter than it should be to guarantee lossless round trip.
@@ -53,6 +55,7 @@ const unsigned int VERSION_3MF = 1;
 // Allow loading version 2 file as well.
 const unsigned int VERSION_3MF_COMPATIBLE = 2;
 const char* SLIC3RPE_3MF_VERSION = "slic3rpe:Version3mf"; // definition of the metadata name saved into .model file
+const char* BB_3MF_VERSION = "BambuStudio:3mfVersion"; // definition of the metadata name saved into .model file
 
 // Painting gizmos data version numbers
 // 0 : 3MF files saved by older PrusaSlicer or the painting gizmo wasn't used. No version definition in them.
@@ -71,16 +74,24 @@ const std::string MODEL_FILE = "3D/3dmodel.model"; // << this is the only format
 const std::string CONTENT_TYPES_FILE = "[Content_Types].xml";
 const std::string RELATIONSHIPS_FILE = "_rels/.rels";
 const std::string THUMBNAIL_FILE = "Metadata/thumbnail.png";
-const std::string SLIC3R_PRINT_CONFIG_FILE = "Metadata/Slic3r.config";
-const std::string SLIC3R_MODEL_CONFIG_FILE = "Metadata/Slic3r_model.config";
-const std::string SLIC3R_LAYER_CONFIG_RANGES_FILE = "Metadata/Slic3r_layer_config_ranges.xml";
-const std::string SUPER_PRINT_CONFIG_FILE = "Metadata/SuperSlicer.config";
-const std::string SUPER_MODEL_CONFIG_FILE = "Metadata/SuperSlicer_model.config";
-const std::string SUPER_LAYER_CONFIG_RANGES_FILE = "Metadata/SuperSlicer_layer_config_ranges.xml";
-const std::string PRUSA_PRINT_CONFIG_FILE = "Metadata/Slic3r_PE.config";
-const std::string PRUSA_MODEL_CONFIG_FILE = "Metadata/Slic3r_PE_model.config";
-const std::string PRUSA_LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config_ranges.xml";
+
+const std::string SLIC3R_PRINT_CONFIG_FILE = "Metadata/Slic3r.config"; // gcode-style
+const std::string SUPER_PRINT_CONFIG_FILE = "Metadata/SuperSlicer.config"; // gcode-style
+const std::string PRUSA_PRINT_CONFIG_FILE = "Metadata/Slic3r_PE.config"; // gcode-style
+const std::string BBS_PROJECT_CONFIG_FILE = "Metadata/project_settings.config"; // json
+
+const std::string SLIC3R_MODEL_CONFIG_FILE = "Metadata/Slic3r_model.config"; // xml
+const std::string SUPER_MODEL_CONFIG_FILE = "Metadata/SuperSlicer_model.config"; // xml
+const std::string PRUSA_MODEL_CONFIG_FILE = "Metadata/Slic3r_PE_model.config"; // xml
+const std::string BBS_MODEL_CONFIG_FILE = "Metadata/model_settings.config"; // xml
+
+const std::string SLIC3R_LAYER_CONFIG_RANGES_FILE = "Metadata/Slic3r_layer_config_ranges.xml"; // xml
+const std::string SUPER_LAYER_CONFIG_RANGES_FILE = "Metadata/SuperSlicer_layer_config_ranges.xml"; // xml
+const std::string PRUSA_LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config_ranges.xml"; // xml
+const std::string BBS_LAYER_CONFIG_RANGES_FILE = "Metadata/layer_config_ranges.xml"; // xml
+
 const std::string LAYER_HEIGHTS_PROFILE_FILE = "Metadata/Slic3r_PE_layer_heights_profile.txt";
+
 const std::string SLA_SUPPORT_POINTS_FILE = "Metadata/Slic3r_PE_sla_support_points.txt";
 const std::string SLA_DRAIN_HOLES_FILE = "Metadata/Slic3r_PE_sla_drain_holes.txt";
 const std::string CUSTOM_GCODE_PER_PRINT_Z_FILE = "Metadata/Prusa_Slicer_custom_gcode_per_print_z.xml";
@@ -169,6 +180,12 @@ public:
     version_error(const char* what_arg) : Slic3r::FileIOError(what_arg) {}
 };
 
+class bambu_version_error : public version_error
+{
+public:
+    bambu_version_error(const std::string& what_arg) : version_error(what_arg) {}
+    bambu_version_error(const char* what_arg) : version_error(what_arg) {}
+};
 const char* get_attribute_value_charptr(const char** attributes, unsigned int attributes_size, const char* attribute_key)
 {
     if ((attributes == nullptr) || (attributes_size == 0) || (attributes_size % 2 != 0) || (attribute_key == nullptr))
@@ -659,6 +676,34 @@ namespace Slic3r {
                             add_error("Archive does not contain a valid model");
                             return false;
                         }
+                    } catch (const bambu_version_error &e) {
+                        // ensure the zip archive is closed and rethrow the exception
+                        close_zip_reader(&archive);
+                        // First, Try to parse it with bambu parser
+                        PlateDataPtrs plates;
+                        std::vector<Preset *> project_presets;
+                        bool is_bbl_3mf = true;
+                        Semver file_version;
+                        std::function<void(int,int,int,bool&)> Import3mfProgressFn =
+                            [](int import_stage, int current, int total, bool &cancel) {
+                                BOOST_LOG_TRIVIAL(info) << "import BBS 3mf: stage " << import_stage
+                                                        << ", current: " << current << " / " << total;
+                            };
+                        bool result = load_bbs_3mf(filename.c_str(), 
+                                                  &config,
+                                                  &config_substitutions,
+                                                  &model,
+                                                  &plates,
+                                                  &project_presets,
+                                                  &is_bbl_3mf,
+                                                  &file_version,
+                                                   Import3mfProgressFn,
+                                                   LoadStrategy::Default | LoadStrategy::LoadModel | LoadStrategy::LoadConfig,
+                                                   /*BBLProject *project = nullptr,*/
+                                                   0);
+                        if(!result)
+                            throw Slic3r::FileIOError(e.what());
+                        return true;
                     }
                     catch (const std::exception& e)
                     {
@@ -769,16 +814,19 @@ namespace Slic3r {
             return true;
         };
         bool use_prusa_config = false;
-        if (!print_config_parsed)
+        if (!print_config_parsed) {
             if (!read_from_other_storage(SUPER_PRINT_CONFIG_FILE, SUPER_MODEL_CONFIG_FILE, SUPER_LAYER_CONFIG_RANGES_FILE, false))
                 return false;
-        if (!print_config_parsed)
+        }
+        if (!print_config_parsed) {
             if (!read_from_other_storage(PRUSA_PRINT_CONFIG_FILE, PRUSA_MODEL_CONFIG_FILE, PRUSA_LAYER_CONFIG_RANGES_FILE, true))
                 return false;
-            else {
+            if (print_config_parsed) {
+                //succeed to read prusa
                 use_prusa_config = true;
-                config.convert_from_prusa();
+                config.convert_from_prusa(true);
             }
+        }
 
         close_zip_reader(&archive);
 
@@ -853,7 +901,7 @@ namespace Slic3r {
             IdToSlaSupportPointsMap::iterator obj_sla_support_points = m_sla_support_points.find(object.second + 1);
             if (obj_sla_support_points != m_sla_support_points.end() && !obj_sla_support_points->second.empty()) {
                 model_object->sla_support_points = std::move(obj_sla_support_points->second);
-                model_object->sla_points_status = sla::PointsStatus::UserModified;
+                model_object->sla_points_status  = sla::PointsStatus::UserModified;
             }
 
             IdToSlaDrainHolesMap::iterator obj_drain_holes = m_sla_drain_holes.find(object.second + 1);
@@ -861,7 +909,7 @@ namespace Slic3r {
                 model_object->sla_drain_holes = std::move(obj_drain_holes->second);
             }
 
-            ObjectMetadata::VolumeMetadataList volumes;
+            ObjectMetadata::VolumeMetadataList  volumes;
             ObjectMetadata::VolumeMetadataList* volumes_ptr = nullptr;
 
             IdToMetadataMap::iterator obj_metadata = m_objects_metadata.find(object.first);
@@ -870,11 +918,11 @@ namespace Slic3r {
 
                 // apply object's name and config data
                 for (const Metadata& metadata : obj_metadata->second.metadata) {
-                    if (metadata.key == "name")
-                        model_object->name = metadata.value;
-                    else
-                        model_object->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
-                }
+                        if (metadata.key == "name")
+                            model_object->name = metadata.value;
+                        else
+                            model_object->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
+                    }
 
                 // select object's detected volumes
                 volumes_ptr = &obj_metadata->second.volumes;
@@ -893,11 +941,11 @@ namespace Slic3r {
                 return false;
 
             if (use_prusa_config) {
-                model_object->config.convert_from_prusa(config);
+                model_object->config.convert_from_prusa(config, false);
                 for (ModelVolume* volume : model_object->volumes)
-                    volume->config.convert_from_prusa(config);
+                    volume->config.convert_from_prusa(config, false);
                 for (auto entry : model_object->layer_config_ranges)
-                    entry.second.convert_from_prusa(config);
+                    entry.second.convert_from_prusa(config, false);
             }
 
         }
@@ -969,10 +1017,15 @@ namespace Slic3r {
                 return n;
                 }, &data, 0);
         }
+        catch (const bambu_version_error& e)
+        {
+            // rethrow the exception
+            throw e;
+        }
         catch (const version_error& e)
         {
             // rethrow the exception
-            throw Slic3r::FileIOError(e.what());
+            throw e;
         }
         catch (std::exception& e)
         {
@@ -1830,6 +1883,8 @@ namespace Slic3r {
                 const std::string msg = (boost::format("The selected 3mf file has been saved with a newer version of %1% and is not compatible.") % std::string(SLIC3R_APP_NAME)).str();
                 throw version_error(msg);
             }
+        } else if (m_curr_metadata_name == BB_3MF_VERSION) {
+            throw bambu_version_error("bambu 3mf");
         } else if (m_curr_metadata_name == "Application") {
             // Generator application of the 3MF.
             // SLIC3R_APP_KEY - SLIC3R_VERSION

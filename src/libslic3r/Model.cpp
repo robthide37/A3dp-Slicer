@@ -752,7 +752,7 @@ bool ModelObject::equals(const ModelObject& rhs) {
 //    return new ModelObject(parent, *this, true);
 //}
 
-ModelVolume* ModelObject::add_volume(const TriangleMesh &mesh, bool centered /*= true*/)
+ModelVolume* ModelObject::add_volume(const TriangleMesh &mesh, ModelVolumeType type /*= ModelVolumeType::MODEL_PART*/, bool centered /*= true*/)
 {
     ModelVolume* v = new ModelVolume(this, mesh);
     this->volumes.push_back(v);
@@ -1773,8 +1773,10 @@ void ModelVolume::center_geometry_after_creation(bool update_source_offset)
     Vec3d shift = this->mesh().bounding_box().center();
     if (!shift.isApprox(Vec3d::Zero()))
     {
-    	if (m_mesh)
+    	if (m_mesh) {
         	const_cast<TriangleMesh*>(m_mesh.get())->translate(-(float)shift(0), -(float)shift(1), -(float)shift(2));
+            const_cast<TriangleMesh*>(m_mesh.get())->set_init_shift(shift);
+        }
         if (m_convex_hull)
 			const_cast<TriangleMesh*>(m_convex_hull.get())->translate(-(float)shift(0), -(float)shift(1), -(float)shift(2));
         translate(shift);

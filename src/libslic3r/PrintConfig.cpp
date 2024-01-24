@@ -7793,7 +7793,7 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
 
 
 template<typename CONFIG_CLASS>
-void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_config) {
+void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_config, bool with_phony) {
     //void convert_from_prusa(DynamicPrintConfig& conf, const DynamicPrintConfig & global_config) {
     //void convert_from_prusa(ModelConfigObject& conf, const DynamicPrintConfig& global_config) {
     std::map<std::string, std::string> results;
@@ -7820,23 +7820,33 @@ void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_co
             conf.set_key_value(entry.first, opt_new);
         }
     }
+
     // set phony entries
-    for (const t_config_option_key &opt_key :
-         {"extrusion_spacing", "perimeter_extrusion_spacing", "external_perimeter_extrusion_spacing",
-          "first_layer_extrusion_spacing", "infill_extrusion_spacing", "solid_infill_extrusion_spacing",
-          "top_infill_extrusion_spacing"}) {
-            ConfigOption* opt_new = print_config_def.get(opt_key)->default_value.get()->clone();
-            opt_new->deserialize(""); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
-            opt_new->set_phony(true);
-            conf.set_key_value(opt_key, opt_new);
+    if (with_phony) {
+        for (auto &[opt_key_width, opt_key_spacing] :
+             {std::pair<char *, char *>{"extrusion_width", "extrusion_spacing"},
+              std::pair<char *, char *>{"perimeter_extrusion_width", "perimeter_extrusion_spacing"},
+              std::pair<char *, char *>{"external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing"},
+              std::pair<char *, char *>{"first_layer_extrusion_width", "first_layer_extrusion_spacing"},
+              std::pair<char *, char *>{"infill_extrusion_width", "infill_extrusion_spacing"},
+              std::pair<char *, char *>{"solid_infill_extrusion_width", "solid_infill_extrusion_spacing"},
+              std::pair<char *, char *>{"top_infill_extrusion_width", "top_infill_extrusion_spacing"}}) {
+            // if prusa has defined a width, or if the conf has a default spacing that need to be overwritten
+            if (conf.option(opt_key_width) != nullptr || conf.option(opt_key_spacing) != nullptr) {
+                ConfigOption *opt_new = print_config_def.get(opt_key_spacing)->default_value.get()->clone();
+                opt_new->deserialize(""); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
+                opt_new->set_phony(true);
+                conf.set_key_value(opt_key_spacing, opt_new);
+            }
+        }
     }
 }
 
-void DynamicPrintConfig::convert_from_prusa() {
-    _convert_from_prusa(*this, *this);
+void DynamicPrintConfig::convert_from_prusa(bool with_phony) {
+    _convert_from_prusa(*this, *this, with_phony);
 }
-void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config) {
-    _convert_from_prusa(*this, global_config);
+void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony) {
+    _convert_from_prusa(*this, global_config, with_phony);
 }
 
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
