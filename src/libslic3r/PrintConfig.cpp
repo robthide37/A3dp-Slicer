@@ -2833,6 +2833,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(50,true));
 
+    def = this->add("gcode_ascii", coBool);
+    def->label = L("Only ascii characters in gcode");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("When printing the gcode file, replace any non-ascii character by a '_'."
+        " Can be useful if the firmware or a software in a workflow doesn't support uft-8.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("gcode_comments", coBool);
     def->label = L("Verbose G-code");
     def->category = OptionCategory::output;
@@ -7901,6 +7909,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "first_layer_infill_speed",
 "first_layer_min_speed",
 "first_layer_size_compensation_layers",
+"gcode_ascii",
 "gap_fill_acceleration",
 "gap_fill_extension",
 "gap_fill_fan_speed",

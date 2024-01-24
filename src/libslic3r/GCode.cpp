@@ -1328,6 +1328,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         m_find_replace = make_unique<GCodeFindReplace>(print.config());
         file.set_find_replace(m_find_replace.get(), false);
     }
+    file.set_only_ascii(print.config().gcode_ascii.value);
 
     // resets analyzer's tracking data
     m_last_height  = 0.f;
@@ -5145,6 +5146,9 @@ void GCode::GCodeOutputStream::write(const char *what)
     if (what != nullptr) {
         //FIXME don't allocate a string, maybe process a batch of lines?
         std::string gcode(m_find_replace ? m_find_replace->process_layer(what) : what);
+        if (m_only_ascii) {
+            remove_not_ascii(gcode);
+        }
         // writes string to file
         fwrite(gcode.c_str(), 1, gcode.size(), this->f);
         m_processor.process_buffer(gcode);

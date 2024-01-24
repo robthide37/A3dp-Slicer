@@ -214,6 +214,7 @@ private:
         // It is being set to null inside process_layers(), because the find-replace process
         // is being called on a secondary thread to improve performance.
         void set_find_replace(GCodeFindReplace *find_replace, bool enabled) { m_find_replace_backup = find_replace; m_find_replace = enabled ? find_replace : nullptr; }
+        void set_only_ascii(bool only_ascii) { m_only_ascii = only_ascii; }
         void find_replace_enable() { m_find_replace = m_find_replace_backup; }
         void find_replace_supress() { m_find_replace = nullptr; }
 
@@ -239,6 +240,7 @@ private:
         FILE             *f { nullptr };
         // Find-replace post-processor to be called before GCodePostProcessor.
         GCodeFindReplace *m_find_replace { nullptr };
+        bool              m_only_ascii;
         // If suppressed, the backoup holds m_find_replace.
         GCodeFindReplace *m_find_replace_backup { nullptr };
         GCodeProcessor   &m_processor;

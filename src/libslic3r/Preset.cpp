@@ -810,6 +810,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "fan_speedup_time",
     "fan_percentage",
     "fan_printer_min_speed",
+    "gcode_ascii",
     "gcode_filename_illegal_char",
     "gcode_flavor",
     "gcode_precision_xyz",
