@@ -458,7 +458,8 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 
         const int gl_major = required_opengl_version.first;
         const int gl_minor = required_opengl_version.second;
-        const bool supports_core_profile = (gl_major < 3) ? false : (gl_major > 3) ? true : gl_minor >= 2;
+        const bool supports_core_profile =
+            std::find(OpenGLVersions::core.begin(), OpenGLVersions::core.end(), std::make_pair(gl_major, gl_minor)) != OpenGLVersions::core.end();
 
         if (gl_major == 0 && !enable_compatibility_profile) {
             // search for highest supported core profile version
@@ -513,9 +514,15 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
             }
         }
 
-        if (m_context == nullptr)
-            // no valid context was created
-            throw Slic3r::RuntimeError("Unable to create context for OpenGL.");
+        if (m_context == nullptr) {
+            wxGLContextAttrs attrs;
+            attrs.PlatformDefaults();
+            if (m_debug_enabled)
+                attrs.DebugCtx();
+            attrs.EndList();
+            // if no valid context was created use the default one
+            m_context = new wxGLContext(&canvas, nullptr, &attrs);
+        }
 #else
         m_context = new wxGLContext(&canvas);
 #endif // ENABLE_OPENGL_ES

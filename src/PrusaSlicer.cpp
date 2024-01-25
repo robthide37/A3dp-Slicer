@@ -190,8 +190,13 @@ int CLI::run(int argc, char **argv)
         if (semver.has_value() && (*semver) >= opengl_minimum ) {
             opengl_version.first = semver->maj();
             opengl_version.second = semver->min();
+            if (std::find(Slic3r::GUI::OpenGLVersions::core.begin(), Slic3r::GUI::OpenGLVersions::core.end(), std::make_pair(opengl_version.first, opengl_version.second)) == Slic3r::GUI::OpenGLVersions::core.end()) {
+                opengl_version = { 0, 0 };
+                boost::nowide::cerr << "Required OpenGL version " << opengl_version_str << " not recognized.\n Option 'opengl-version' ignored." << std::endl;
+            }
         } else
-            boost::nowide::cerr << "Required OpenGL version " << opengl_version_str << " is invalid. Must be greater than or equal to " << opengl_minimum.to_string() << std::endl;
+            boost::nowide::cerr << "Required OpenGL version " << opengl_version_str << " is invalid. Must be greater than or equal to " <<
+                opengl_minimum.to_string() << "\n Option 'opengl-version' ignored." << std::endl;
         start_gui = true;
         m_actions.erase(it);
     }
