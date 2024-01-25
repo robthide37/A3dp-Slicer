@@ -2255,16 +2255,6 @@ LayerResult GCodeGenerator::process_layer(
     // Map from extruder ID to <begin, end> index of skirt loops to be extruded with that extruder.
     std::map<unsigned int, std::pair<size_t, size_t>> skirt_loops_per_extruder;
 
-    if (single_object_instance_idx == size_t(-1) && layer_tools.custom_gcode != nullptr) {
-        // Normal (non-sequential) print.
-        std::string custom_gcode = ProcessLayer::emit_custom_gcode_per_print_z(*this, *layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());
-        if (layer_tools.custom_gcode->type == CustomGCode::ColorChange) {
-            // We have a color change to do on this layer, but we want to do it immediately before the first extrusion instead of now, in order to fix GH #2672
-            m_pending_pre_extrusion_gcode = custom_gcode;
-        } else {
-            gcode += custom_gcode;
-        }
-    }
     // Extrude skirt at the print_z of the raft layers and normal object layers
     // not at the print_z of the interlaced support material layers.
     skirt_loops_per_extruder = first_layer ?
@@ -2283,6 +2273,23 @@ LayerResult GCodeGenerator::process_layer(
         }
     }
 
+    const bool has_custom_gcode_to_emit     = single_object_instance_idx == size_t(-1) && layer_tools.custom_gcode != nullptr;
+    const int  extruder_id_for_custom_gcode = int(layer_tools.extruder_needed_for_color_changer) - 1;
+
+    if (has_custom_gcode_to_emit && extruder_id_for_custom_gcode == -1) {
+        // Normal (non-sequential) print with some custom code without picking a specific extruder before it.
+        // If we don't need to pick a specific extruder before the color change, we can just emit a custom g-code.
+        // Otherwise, we will emit the g-code after picking the specific extruder.
+
+        std::string custom_gcode = ProcessLayer::emit_custom_gcode_per_print_z(*this, *layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());
+        if (layer_tools.custom_gcode->type == CustomGCode::ColorChange) {
+            // We have a color change to do on this layer, but we want to do it immediately before the first extrusion instead of now, in order to fix GH #2672.
+            m_pending_pre_extrusion_gcode = custom_gcode;
+        } else {
+            gcode += custom_gcode;
+        }
+    }
+
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (unsigned int extruder_id : layer_tools.extruders)
     {
@@ -2293,6 +2300,13 @@ LayerResult GCodeGenerator::process_layer(
         // let analyzer tag generator aware of a role type change
         if (layer_tools.has_wipe_tower && m_wipe_tower)
             m_last_processor_extrusion_role = GCodeExtrusionRole::WipeTower;
+
+        if (has_custom_gcode_to_emit && extruder_id_for_custom_gcode == int(extruder_id)) {
+            assert(m_writer.extruder()->id() == extruder_id_for_custom_gcode);
+            assert(m_pending_pre_extrusion_gcode.empty());
+            // Now we have picked the right extruder, so we can emit the custom g-code.
+            gcode += ProcessLayer::emit_custom_gcode_per_print_z(*this, *layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());
+        }
 
         if (auto loops_it = skirt_loops_per_extruder.find(extruder_id); loops_it != skirt_loops_per_extruder.end()) {
             const std::pair<size_t, size_t> loops = loops_it->second;

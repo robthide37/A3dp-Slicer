@@ -169,34 +169,37 @@ static bool layer_height_ranges_equal(const t_layer_config_ranges &lr1, const t_
     return true;
 }
 
-// Returns true if va == vb when all CustomGCode items that are not ToolChangeCode are ignored.
-static bool custom_per_printz_gcodes_tool_changes_differ(const std::vector<CustomGCode::Item> &va, const std::vector<CustomGCode::Item> &vb)
-{
+// Returns true if va == vb when all CustomGCode items that are not the specified type (not_ignore_type) are ignored.
+static bool custom_per_printz_gcodes_tool_changes_differ(
+    const std::vector<CustomGCode::Item> &va,
+    const std::vector<CustomGCode::Item> &vb,
+    CustomGCode::Type                     not_ignore_type
+) {
 	auto it_a = va.begin();
 	auto it_b = vb.begin();
 	while (it_a != va.end() || it_b != vb.end()) {
-		if (it_a != va.end() && it_a->type != CustomGCode::ToolChange) {
-			// Skip any CustomGCode items, which are not tool changes.
+		if (it_a != va.end() && it_a->type != not_ignore_type) {
+			// Skip any CustomGCode items, which are not equal to not_ignore_type.
 			++ it_a;
 			continue;
 		}
-		if (it_b != vb.end() && it_b->type != CustomGCode::ToolChange) {
-			// Skip any CustomGCode items, which are not tool changes.
+		if (it_b != vb.end() && it_b->type != not_ignore_type) {
+			// Skip any CustomGCode items, which are not equal to not_ignore_type.
 			++ it_b;
 			continue;
 		}
 		if (it_a == va.end() || it_b == vb.end())
-			// va or vb contains more Tool Changes than the other.
+			// va or vb contains more items of not_ignore_type than the other.
 			return true;
-		assert(it_a->type == CustomGCode::ToolChange);
-		assert(it_b->type == CustomGCode::ToolChange);
+		assert(it_a->type == not_ignore_type);
+		assert(it_b->type == not_ignore_type);
 		if (*it_a != *it_b)
-			// The two Tool Changes differ.
+			// The two items of not_ignore_type differ.
 			return true;
 		++ it_a;
 		++ it_b;
 	}
-	// There is no change in custom Tool Changes.
+	// There is no change in specified not_ignore_type items.
 	return false;
 }
 
@@ -1059,11 +1062,20 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 			model_object_status_db.add(*model_object, ModelObjectStatus::New);
     } else {
         if (m_model.custom_gcode_per_print_z != model.custom_gcode_per_print_z) {
-            update_apply_status(num_extruders_changed || 
-            	// Tool change G-codes are applied as color changes for a single extruder printer, no need to invalidate tool ordering.
-            	//FIXME The tool ordering may be invalidated unnecessarily if the custom_gcode_per_print_z.mode is not applicable
-            	// to the active print / model state, and then it is reset, so it is being applicable, but empty, thus the effect is the same.
-            	(num_extruders > 1 && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z.gcodes, model.custom_gcode_per_print_z.gcodes)) ?
+            const CustomGCode::Mode current_mode = m_model.custom_gcode_per_print_z.mode;
+            const CustomGCode::Mode next_mode    = model.custom_gcode_per_print_z.mode;
+
+            const bool multi_extruder_differ = (current_mode == next_mode) && (current_mode == CustomGCode::MultiExtruder || next_mode == CustomGCode::MultiExtruder);
+            // Tool change G-codes are applied as color changes for a single extruder printer, no need to invalidate tool ordering.
+            // FIXME The tool ordering may be invalidated unnecessarily if the custom_gcode_per_print_z.mode is not applicable
+            // to the active print / model state, and then it is reset, so it is being applicable, but empty, thus the effect is the same.
+            const bool tool_change_differ    = num_extruders > 1 && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z.gcodes, model.custom_gcode_per_print_z.gcodes, CustomGCode::ToolChange);
+            // For multi-extruder printers, we perform a tool change before a color change.
+            // So, in that case, we must invalidate tool ordering and wipe tower even if custom color change g-codes differ.
+            const bool color_change_differ   = num_extruders > 1 && (next_mode == CustomGCode::MultiExtruder) && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z.gcodes, model.custom_gcode_per_print_z.gcodes, CustomGCode::ColorChange);
+
+            update_apply_status(
+                (num_extruders_changed || tool_change_differ || multi_extruder_differ || color_change_differ) ?
             	// The Tool Ordering and the Wipe Tower are no more valid.
             	this->invalidate_steps({ psWipeTower, psGCodeExport }) :
             	// There is no change in Tool Changes stored in custom_gcode_per_print_z, therefore there is no need to update Tool Ordering.
