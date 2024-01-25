@@ -93,7 +93,8 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
             gcodegen.m_wipe.reset_path(); // We don't want wiping on the ramming lines.
         toolchange_gcode_str = gcodegen.set_extruder(new_extruder_id, tcr.print_z); // TODO: toolchange_z vs print_z
         if (gcodegen.config().wipe_tower) {
-            deretraction_str += gcodegen.writer().get_travel_to_z_gcode(tcr.print_z, "restore layer Z");
+            const double retract_to_z = tcr.priming ? tcr.print_z + gcodegen.config().z_offset.value : z;
+            deretraction_str += gcodegen.writer().get_travel_to_z_gcode(retract_to_z, "restore layer Z");
             deretraction_str += gcodegen.unretract();
         }
     }
