@@ -1939,15 +1939,17 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                                 // Change of this option influences for an update of "Sliced Info"
                                 wxGetApp().sidebar().update_sliced_info_sizer();
                                 wxGetApp().sidebar().Layout();
-                            } else
-                                on_value_change(opt_key, value);
+                            }
+                            // this will be done by the lambda added by new_optgroup()
+                            //else on_value_change(opt_key, value);
                         });
                 } else if (params[i] == "validate_gcode") {
                     current_group->m_on_change = set_or_add(current_group->m_on_change, [this, &current_group](t_config_option_key opt_key, boost::any value) {
                         //validate_custom_gcode_cb(this, current_group, opt_key, value);
                         this->validate_custom_gcodes_was_shown = !Tab::validate_custom_gcode(current_group->title, boost::any_cast<std::string>(value));
-                        this->update_dirty();
-                        this->on_value_change(opt_key, value);
+                        // these will be done by the lambda added by new_optgroup()
+                        //this->update_dirty();
+                        //this->on_value_change(opt_key, value);
                     });
                 }
             }

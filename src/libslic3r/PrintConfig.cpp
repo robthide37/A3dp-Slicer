@@ -8463,8 +8463,7 @@ void DynamicPrintConfig::set_num_extruders(unsigned int num_extruders)
             // empty fields there, if not defined by the system profile.
             continue;
         auto* opt = this->option(key, false);
-        assert(opt != nullptr);
-        assert(opt->is_vector());
+        assert(opt != nullptr && opt->is_vector());
         if (opt != nullptr && opt->is_vector())
             static_cast<ConfigOptionVectorBase*>(opt)->resize(num_extruders, defaults.option(key));
     }

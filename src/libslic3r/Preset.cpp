@@ -1068,7 +1068,7 @@ void PresetCollection::load_presets(
                     preset.config.apply(std::move(config));
                     Preset::normalize(preset.config);
                     // Report configuration fields, which are misplaced into a wrong group.
-                    std::string incorrect_keys = Preset::remove_invalid_keys(config, default_preset.config);
+                    std::string incorrect_keys = Preset::remove_invalid_keys(preset.config, default_preset.config);
                     if (! incorrect_keys.empty())
                         BOOST_LOG_TRIVIAL(error) << "Error in a preset file: The preset \"" <<
                             preset.file << "\" contains the following incorrect keys: " << incorrect_keys << ", which were removed";
