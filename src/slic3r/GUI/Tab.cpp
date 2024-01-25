@@ -3322,11 +3322,10 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
             }
         m_has_single_extruder_MM_page = false;
     }
-    if (from_initial_build ||
-        (m_extruders_count > 1 && m_config->opt_bool("single_extruder_multi_material") && !m_has_single_extruder_MM_page)) {
+    if (m_extruders_count > 1 && m_config->opt_bool("single_extruder_multi_material") && !m_has_single_extruder_MM_page) {
         // create a page, but pretend it's an extruder page, so we can add it to m_pages ourselves
-        auto page = create_options_page(L("Single extruder MM setup"), "printer");
-        auto optgroup = page->new_optgroup(L("Single extruder multimaterial parameters"));
+        PageShp page = create_options_page(L("Single extruder MM setup"), "printer");
+        ConfigOptionsGroupShp optgroup = page->new_optgroup(L("Single extruder multimaterial parameters"));
         optgroup->append_single_option_line("cooling_tube_retraction");
         optgroup->append_single_option_line("cooling_tube_length");
         optgroup->append_single_option_line("parking_pos_retraction");
@@ -3337,12 +3336,8 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
         optgroup->append_single_option_line("wipe_advanced_nozzle_melted_volume");
         optgroup->append_single_option_line("wipe_advanced_multiplier");
         optgroup->append_single_option_line("wipe_advanced_algo");
-        if (from_initial_build) {
-            page->clear();
-        } else {
-            m_pages.insert(m_pages.begin() + n_before_extruders, page);
-            m_has_single_extruder_MM_page = true;
-        }
+        m_pages.insert(m_pages.begin() + n_before_extruders, page);
+        m_has_single_extruder_MM_page = true;
         changed = true;
     }
     if(m_has_single_extruder_MM_page)
