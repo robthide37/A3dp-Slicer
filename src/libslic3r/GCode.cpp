@@ -1924,6 +1924,9 @@ namespace ProcessLayer
 
             // we should add or not colorprint_change in respect to nozzle_diameter count instead of really used extruders count
             if (color_change || tool_change) {
+                const bool single_extruder_multi_material = config.single_extruder_multi_material;
+                const bool single_extruder_printer        = config.nozzle_diameter.size() == 1;
+
                 int color_change_extruder = -1;
                 if (color_change && custom_gcode->extruder > 0)
                     color_change_extruder = custom_gcode->extruder - 1;
@@ -1935,7 +1938,7 @@ namespace ProcessLayer
 
                 DynamicConfig cfg;
                 cfg.set_key_value("color_change_extruder", new ConfigOptionInt(color_change_extruder));
-                if (!single_extruder_printer && color_change_extruder >= 0 && first_extruder_id != unsigned(color_change_extruder)) {
+                if (single_extruder_multi_material && !single_extruder_printer && color_change_extruder >= 0 && first_extruder_id != unsigned(color_change_extruder)) {
                     //! FIXME_in_fw show message during print pause
                     // FIXME: Why is pause_print_gcode here? Why is it supplied "color_change_extruder"?
                     gcode += gcodegen.placeholder_parser_process("pause_print_gcode", config.pause_print_gcode, current_extruder_id, &cfg);
