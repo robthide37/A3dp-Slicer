@@ -753,10 +753,38 @@ static wxRichToolTipPopup* get_rtt_popup(wxButton* btn)
     return nullptr;
 }
 
+// Help function to find and check if some combobox is dropped down and then dismiss it
+static bool found_and_dismiss_shown_dropdown(wxWindow* win)
+{
+    auto children = win->GetChildren(); 
+    if (children.IsEmpty()) {
+        if (auto dd = dynamic_cast<DropDown*>(win); dd && dd->IsShown()) {
+            dd->CallDismissAndNotify();
+            return true;
+        }
+    }
+
+    for (auto child : children) {
+        if (found_and_dismiss_shown_dropdown(child))
+            return true;
+    }
+    return false;
+}
+
 void Sidebar::priv::show_rich_tip(const wxString& tooltip, wxButton* btn)
 {   
     if (tooltip.IsEmpty())
         return;
+
+    // Currently state (propably wxWidgets issue) : 
+    // When second wxPopupTransientWindow is popped up, then first wxPopupTransientWindow doesn't receive EVT_DISMISS and stay on the top. 
+    // New comboboxes use wxPopupTransientWindow as DropDown now
+    // That is why DropDown stay on top, when we show rich tooltip for btn.
+    // (see https://github.com/prusa3d/PrusaSlicer/issues/11988)
+
+    // So, check the combo boxes and close them if necessary before showing the rich tip.
+    found_and_dismiss_shown_dropdown(scrolled);
+
     wxRichToolTip tip(tooltip, "");
     tip.SetIcon(wxICON_NONE);
     tip.SetTipKind(wxTipKind_BottomRight);
