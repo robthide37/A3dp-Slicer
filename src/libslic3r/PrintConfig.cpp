@@ -4295,7 +4295,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 100;
     def->mode = comSimpleAE | comSuSi;
-    def->set_default_value(new ConfigOptionInt(35));
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("printer_model", coString);
     def->label = L("Printer type");
