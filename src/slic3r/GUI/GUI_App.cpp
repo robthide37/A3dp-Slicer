@@ -846,13 +846,43 @@ wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
 
 bool GUI_App::init_opengl()
 {
-#ifdef __linux__
-    bool status = m_opengl_mgr.init_gl();
-    m_opengl_initialized = true;
-    return status;
+    bool initialized = m_opengl_mgr.init_gl();
+    if (!m_opengl_initialized && initialized) {
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+        // Delayed init for x86
+#ifdef __APPLE__
+        // intel apple
+        hard_cpu = AppConfig::HardwareType::hCpuIntel;
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+        } catch (std::exception ex) {}
 #else
-    return m_opengl_mgr.init_gl();
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+            if (boost::contains(gpu_vendor, "Nvidia") || boost::contains(gpu_vendor, "NVIDIA"))
+                hard_gpu = AppConfig::HardwareType::hGpuNvidia;
+            if (boost::contains(gpu_vendor, "Apple") || boost::contains(gpu_vendor, "APPLE")) {
+                assert(false); // apple gpu are only in _M_ARM64
+            }
+        } catch (std::exception ex) {}
 #endif
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+    }
+#ifdef __linux__
+    m_opengl_initialized = true;
+#else
+    m_opengl_initialized = initialized;
+#endif
+    return initialized;
 }
 
 // gets path to PrusaSlicer.ini, returns semver from first line comment
@@ -915,9 +945,27 @@ void GUI_App::init_app_config()
         m_datadir_redefined = true;
     }
 
-	if (!app_config)
+	if (!app_config) {
         app_config.reset(new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer));
-
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+#ifdef _M_ARM64
+#ifdef __APPLE__
+        // Arm apple
+        hard_cpu = AppConfig::HardwareType::hCpuApple;
+        hard_gpu = AppConfig::HardwareType::hGpuApple;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#else
+        // Arm
+        hard_cpu = AppConfig::HardwareType::hCpuArmGeneric;
+        hard_gpu = AppConfig::HardwareType::hGpuArmGeneric;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#endif
+#else
+        // x86 (not-apple)
+        //can't know the gpu before the openg init, so it's delayed. until it
+#endif
+    }
 	// load settings
 	m_app_conf_exists = app_config->exists();
 	if (m_app_conf_exists) {

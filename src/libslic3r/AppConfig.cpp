@@ -360,9 +360,9 @@ void AppConfig::set_defaults()
         if (get("check_blacklisted_library").empty())
             set("check_blacklisted_library", "1");
 #endif // _WIN32
-
-        if (get("compress_png_texture").empty())
-            set("compress_png_texture", "1");
+            //disable by default if amd graphic card detected, but can't know before the opengl is launched
+        //if (get("compress_png_texture").empty())
+            //set("compress_png_texture", (m_hardware&hGpuAmd) == hGpuAmd ? "0" : "1");
 
         // remove old 'use_legacy_opengl' parameter from this config, if present
         if (!get("use_legacy_opengl").empty())
@@ -458,7 +458,11 @@ void AppConfig::set_defaults()
             set("use_rich_tooltip", "0");
 
         if (get("hide_slice_tooltip").empty())
+#ifdef _WIN32
+            set("hide_slice_tooltip", "1");
+#else
             set("hide_slice_tooltip", "0");
+#endif // _WIN32
 
         if (get("show_layer_height_doubleslider").empty())
             set("show_layer_height_doubleslider", "1");
@@ -612,6 +616,15 @@ void AppConfig::set_defaults()
     erase("", "object_settings_maximized");
     erase("", "object_settings_pos");
     erase("", "object_settings_size");
+}
+
+void AppConfig::set_hardware_type(HardwareType hard) {
+    this->m_hardware = hard;
+    // Set default that depends on hardware type
+
+    //disable by default if amd graphic card detected, but can't know before the opengl is launched
+    if (get("compress_png_texture").empty() && (m_hardware&hHasGpu) != 0)
+        set("compress_png_texture", (m_hardware&hGpuAmd) == hGpuAmd ? "0" : "1");
 }
 
 void AppConfig::init_ui_layout() {
