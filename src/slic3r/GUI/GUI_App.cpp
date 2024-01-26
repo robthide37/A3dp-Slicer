@@ -789,7 +789,7 @@ void GUI_App::post_init()
             return;
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
-            this->preset_updater->sync(preset_bundle);
+            this->preset_updater->sync(preset_bundle.get());
             if (! cw_showed) {
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
@@ -830,18 +830,6 @@ GUI_App::GUI_App(EAppMode mode)
 	this->init_app_config();
     //ImGuiWrapper need the app config to get the colors
     m_imgui.reset(new ImGuiWrapper{});
-}
-
-GUI_App::~GUI_App()
-{
-    if (app_config != nullptr)
-        delete app_config;
-
-    if (preset_bundle != nullptr)
-        delete preset_bundle;
-
-    if (preset_updater != nullptr)
-        delete preset_updater;
 }
 
 // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
@@ -928,7 +916,7 @@ void GUI_App::init_app_config()
     }
 
 	if (!app_config)
-        app_config = new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer);
+        app_config.reset(new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer));
 
 	// load settings
 	m_app_conf_exists = app_config->exists();
@@ -1233,7 +1221,7 @@ bool GUI_App::on_init_inner()
             scrn->SetText(_L("Loading configuration") + dots);
         }
 
-    preset_bundle = new PresetBundle();
+    preset_bundle.reset(new PresetBundle());
 
     // just checking for existence of Slic3r::data_dir is not enough : it may be an empty directory
     // supplied as argument to --datadir; in that case we should still run the wizard
@@ -1252,7 +1240,7 @@ bool GUI_App::on_init_inner()
             associate_stl_files();
 #endif // __WXMSW__
 
-        preset_updater = new PresetUpdater();
+        preset_updater.reset(new PresetUpdater());
         Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
         app_config->set("version_online", into_u8(evt.GetString()));
         app_config->save();
@@ -2984,9 +2972,8 @@ void GUI_App::OSXStoreOpenFiles(const wxArrayString &fileNames)
         // just G-codes were passed. Switch to G-code viewer mode.
         m_app_mode = EAppMode::GCodeViewer;
         unlock_lockfile(get_instance_hash_string() + ".lock", data_dir() + "/cache/");
-        if(app_config != nullptr)
-            delete app_config;
-        app_config = nullptr;
+        if(app_config)
+            app_config.reset();
         init_app_config();
     }
     wxApp::OSXStoreOpenFiles(fileNames);

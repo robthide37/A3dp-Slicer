@@ -169,7 +169,7 @@ void Tab::create_preset_tab()
     SetDoubleBuffered(true);
 #endif //__WINDOWS__
 
-    m_preset_bundle = wxGetApp().preset_bundle;
+    m_preset_bundle = wxGetApp().preset_bundle.get();
 
     // Vertical sizer to hold the choice menu and the rest of the page.
 #ifdef __WXOSX__
