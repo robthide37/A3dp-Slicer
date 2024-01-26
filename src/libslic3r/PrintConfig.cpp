@@ -7816,9 +7816,19 @@ void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_co
         const ConfigOptionDef* def = print_config_def.get(entry.first);
         if (def) {
             ConfigOption* opt_new = def->default_value.get()->clone();
-            opt_new->deserialize(entry.second);
+            opt_new->deserialize(entry.second); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
             conf.set_key_value(entry.first, opt_new);
         }
+    }
+    // set phony entries
+    for (const t_config_option_key &opt_key :
+         {"extrusion_spacing", "perimeter_extrusion_spacing", "external_perimeter_extrusion_spacing",
+          "first_layer_extrusion_spacing", "infill_extrusion_spacing", "solid_infill_extrusion_spacing",
+          "top_infill_extrusion_spacing"}) {
+            ConfigOption* opt_new = print_config_def.get(opt_key)->default_value.get()->clone();
+            opt_new->deserialize(""); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
+            opt_new->set_phony(true);
+            conf.set_key_value(opt_key, opt_new);
     }
 }
 
