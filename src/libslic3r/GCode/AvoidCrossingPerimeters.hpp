@@ -45,12 +45,17 @@ public:
         EdgeGrid::Grid                  grid;
         //used to move the point inside the boundary
         std::vector<std::pair<ExPolygon, ExPolygon>> boundary_growth;
+        // area (top) where you don't want to travel, even more so than over voids.
+        ExPolygons to_avoid;
+        // Used for detection of intersection between line and any polygon from to_avoid
+        EdgeGrid::Grid to_avoid_grid;
 
         void clear()
         {
             boundaries.clear();
             boundaries_params.clear();
             boundary_growth.clear();
+            to_avoid.clear();
         }
     };
 
