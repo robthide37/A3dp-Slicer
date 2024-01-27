@@ -1773,7 +1773,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             if (params.size() < 2) continue;
             if (params.size() == 2) params.push_back("wrench");
 
-            std::string label = L(params[params.size()-2]);
+            wxString label = _(params[params.size()-2]);
 
             for (int i = 1; i < params.size() - 1; i++) {
                 if (params[i] == "idx")
@@ -1783,7 +1783,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             }
 
             if(logs) Slic3r::slic3r_log->info("settings gui") << "create page " << label.c_str() <<" : "<< params[params.size() - 1] << "\n";
-            pages.push_back(create_options_page(L(label), params[params.size() - 1]));
+            pages.push_back(create_options_page(label, params[params.size() - 1]));
             current_page = pages.back();
         }
         else if (boost::starts_with(full_line, "end_page"))
@@ -4459,8 +4459,8 @@ void Tab::update_show_hide_incompatible_button()
     m_btn_hide_incompatible_presets->SetBitmap_(m_show_incompatible_presets ?
         m_bmp_show_incompatible_presets : m_bmp_hide_incompatible_presets);
     m_btn_hide_incompatible_presets->SetToolTip(m_show_incompatible_presets ?
-        "Both compatible an incompatible presets are shown. Click to hide presets not compatible with the current printer." :
-        "Only compatible presets are shown. Click to show both the presets compatible and not compatible with the current printer.");
+        _L("Both compatible and incompatible presets are shown. Click to hide presets not compatible with the current printer.") :
+        _L("Only compatible presets are shown. Click to show both the presets compatible and not compatible with the current printer."));
 }
 
 void Tab::update_ui_from_settings()

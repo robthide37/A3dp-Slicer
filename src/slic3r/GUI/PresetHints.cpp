@@ -194,32 +194,36 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
     }
 
     if (slowdown_below_layer_time > 0) {
-        out += (boost::format(_utf8(L("\n\nIf estimated layer time is below ~%1%s")))
-            % slowdown_below_layer_time).str();
+        out += std::string("\n\n");
+        out += format_wxstr(_L("If estimated layer time is below ~%1%s"), slowdown_below_layer_time);
         if (max_fan_speed > 0 && max_fan_speed > min_fan_speed) {
-            out += " " + (boost::format(_utf8(L("fan will run by default to %1%%%")))
-                % max_fan_speed).str();
+            out += " ";
+            out += format_wxstr(_L("fan will run by default to %1%%%"), max_fan_speed);
 
-            if (disable_fan_first_layers > 1)
-                out += " (" + (boost::format(_utf8(L("except for the first %1% layers where the fan is disabled"))) % disable_fan_first_layers).str();
-            else if (disable_fan_first_layers == 1)
-                out += " (" + _utf8(L("except for the first layer where the fan is disabled"));
+            if (disable_fan_first_layers > 1) {
+                out += " (";
+                out += format_wxstr(_L("except for the first %1% layers where the fan is disabled"), disable_fan_first_layers);
+            } else if (disable_fan_first_layers == 1) {
+                out += " (";
+                out += _L("except for the first layer where the fan is disabled");
+            }
             if (full_fan_speed_layer > disable_fan_first_layers + 1 && disable_fan_first_layers > 0)
-                out += (boost::format(_utf8(L(" and will gradually speed-up to the above speeds over %1% layers"))) % (full_fan_speed_layer - disable_fan_first_layers)).str();
+                out += format_wxstr(_L(" and will gradually speed-up to the above speeds over %1% layers"), full_fan_speed_layer);
             if(disable_fan_first_layers > 0)
                 out += ")";
             out += " and";
         }
             
-        out += " " + (boost::format(_utf8(L("print speed will be reduced "
-            "so that no less than %1%s are spent on that layer"))) % slowdown_below_layer_time).str();
+        out += " ";
+        out += format_wxstr(_L("print speed will be reduced so that no less than %1%s are spent on that layer"), slowdown_below_layer_time);
         if(min_print_speed > 0)
-            if(max_speed_reduc > 0)
-                out += " " + (boost::format(_utf8(L("(however, speed will never be reduced below %1%mm/s or up to %2%%% reduction)")))
-                    % min_print_speed % max_speed_reduc).str();
-            else
-                out += " " + (boost::format(_utf8(L("(however, speed will never be reduced below %1%mm/s)")))
-                    % min_print_speed).str();
+            if (max_speed_reduc > 0) {
+                out += " ";
+                out += format_wxstr(_L("(however, speed will never be reduced below %1%mm/s or up to %2%%% reduction)"), min_print_speed, max_speed_reduc);
+            } else {
+                out += " ";
+                out += format_wxstr(_L("(however, speed will never be reduced below %1%mm/s)"), min_print_speed);
+            }
     }
 
     if (fan_below_layer_time > 0 || slowdown_below_layer_time > 0) {
@@ -229,15 +233,15 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
 
     //tooltip for Depractaed values
     if (preset_fil.config.opt_int("top_fan_speed", 0) == 1)
-        out += "\n\n! 1 for the Top fan speed is Deprecated, please set it to 0 to stop the fan!";
+        out += "\n\n" + _L("! 1 for the Top fan speed is Deprecated, please set it to 0 to stop the fan!");
     if (preset_fil.config.opt_int("top_fan_speed", 0) == 1)
-        out += "\n\n! 1 for the Top fan speed is Deprecated, please set it to 0 to stop the fan!";
+        out += "\n\n" + _L("! 1 for the Top fan speed is Deprecated, please set it to 0 to stop the fan!");
     if (preset_fil.config.opt_int("external_perimeter_fan_speed", 0) == 1)
-        out += "\n\n! 1 for the External perimeters fan speed is Deprecated, please set it to 0 to stop the fan!";
+        out += "\n\n" + _L("! 1 for the External perimeters fan speed is Deprecated, please set it to 0 to stop the fan!");
     if (preset_fil.config.opt_int("bridge_fan_speed", 0) == 1)
-        out += "\n\n! 1 for the Bridge fan speed is Deprecated, please set it to 0 to stop the fan!";
+        out += "\n\n" + _L("! 1 for the Bridge fan speed is Deprecated, please set it to 0 to stop the fan!");
     if (preset_fil.config.opt_int("bridge_internal_fan_speed", 0) == 1)
-        out += "\n\n! 1 for the Infill bridge fan speed is Deprecated, please set it to 0 to stop the fan!";
+        out += "\n\n" + _L("! 1 for the Infill bridge fan speed is Deprecated, please set it to 0 to stop the fan!");
 
     return out.ToStdString();
 }

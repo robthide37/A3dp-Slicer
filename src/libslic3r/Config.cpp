@@ -54,15 +54,15 @@ std::string toString(OptionCategory opt) {
     case OptionCategory::filoverride: return L("Filament overrides");
     case OptionCategory::customgcode: return L("Custom G-code");
     case OptionCategory::general: return L("General");
-    case OptionCategory::limits: return "Machine limits"; // if not used, no need ot ask for translation
-    case OptionCategory::mmsetup: return "Single Extruder MM Setup";
-    case OptionCategory::firmware: return "Firmware";
-    case OptionCategory::pad: return "Pad";
-    case OptionCategory::padSupp: return "Pad and Support";
+    case OptionCategory::limits: return L("Machine limits"); // if not used, no need ot ask for translation
+    case OptionCategory::mmsetup: return L("Single Extruder MM Setup");
+    case OptionCategory::firmware: return L("Firmware");
+    case OptionCategory::pad: return L("Pad");
+    case OptionCategory::padSupp: return L("Pad and Support");
     case OptionCategory::wipe: return L("Wipe Options");
     case OptionCategory::milling: return L("Milling");
     case OptionCategory::hollowing: return "Hollowing";
-    case OptionCategory::milling_extruders: return "Milling tools";
+    case OptionCategory::milling_extruders: return L("Milling tools");
     case OptionCategory::fuzzy_skin : return L("Fuzzy skin");
     }
     return "error";
