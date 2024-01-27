@@ -114,6 +114,9 @@ namespace Slic3r {
                 BOOST_LOG_TRIVIAL(info) << "Layer " << layer_id << " Ironing process " << idx << " extrude " << extruded_volume << " mm3 for a volume of " << volume_to_occupy << " mm3 : we mult the flow by " << mult_flow;
                 
             }
+#if _DEBUG
+            this->debug_verify_flow_mult = mult_flow;
+#endif
             extrusion_entities_append_paths(
                 eec, std::move(polylines_layer),
                 good_role,
