@@ -700,7 +700,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height + EPSILON);
                     double area = unscaled(unscaled(real_surface));
                     assert(compute_volume.volume <= area * surface_fill.params.layer_height * 1.001 || f->debug_verify_flow_mult <= 0.8);
-                    assert(compute_volume.volume >= area * surface_fill.params.layer_height * 0.999 || f->debug_verify_flow_mult >= 1.3 || area < std::max(1.,surface_fill.params.config->solid_infill_below_area.value));
+                    if(compute_volume.volume > 0) //can fail for thin regions
+                        assert(compute_volume.volume >= area * surface_fill.params.layer_height * 0.999 || f->debug_verify_flow_mult >= 1.3 || area < std::max(1.,surface_fill.params.config->solid_infill_below_area.value));
                 }
 #endif
             }
