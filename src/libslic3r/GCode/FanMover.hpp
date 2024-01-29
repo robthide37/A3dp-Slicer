@@ -15,11 +15,15 @@ namespace Slic3r {
 
 class BufferData {
 public:
+    //raw string, contains end position
     std::string raw;
+    // time to go from start to end
     float time;
     int16_t fan_speed;
     bool is_kickstart;
+    // start position
     float x = 0, y = 0, z = 0, e = 0;
+    // delta to go to end position
     float dx = 0, dy = 0, dz = 0, de = 0;
     BufferData(std::string line, float time = 0, int16_t fan_speed = 0, float is_kickstart = false) : raw(line), time(time), fan_speed(fan_speed), is_kickstart(is_kickstart){
         //avoid double \n
@@ -86,6 +90,7 @@ private:
     void _put_in_middle_G1(std::list<BufferData>::iterator item_to_split, float nb_sec, BufferData&& line_to_write);
     void _print_in_middle_G1(BufferData& line_to_split, float nb_sec, const std::string& line_to_write);
     void _remove_slow_fan(int16_t min_speed, float past_sec);
+    void write_buffer_data();
     std::string _set_fan(int16_t speed);
 };
 
