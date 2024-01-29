@@ -292,7 +292,7 @@ class DefaultArranger: public Arranger<ArrItem> {
 
         firstfit::SelectionStrategy sel{cmpfn, on_arranged, stop_cond};
 
-        constexpr auto ep = ex_seq;
+        constexpr auto ep = ex_tbb;
 
         VariantKernel basekernel;
         switch (m_settings.get_arrange_strategy()) {
