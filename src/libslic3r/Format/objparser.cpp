@@ -352,10 +352,18 @@ bool objparse(const char *path, ObjData &data)
 		return false;
 
 	try {
-		char buf[65536 * 2];
+		char buf[(65536+1) * 2];
 		size_t len = 0;
 		size_t lenPrev = 0;
 		while ((len = ::fread(buf + lenPrev, 1, 65536, pFile)) != 0) {
+            if (std::feof(pFile)) {
+                // Fix issue with missing last trinagle in obj file:
+                // https://github.com/prusa3d/PrusaSlicer/issues/12157
+                // algorithm expect line endings after last face
+                // but file format support it
+                buf[len] = '\n';
+                ++len;
+            }
 			len += lenPrev;
 			size_t lastLine = 0;
 			for (size_t i = 0; i < len; ++ i)
