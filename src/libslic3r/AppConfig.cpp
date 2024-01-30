@@ -504,9 +504,6 @@ void AppConfig::set_defaults()
     if (get("show_splash_screen").empty())
         set("show_splash_screen", "1");
 
-    if (get("show_splash_screen").empty())
-        set("show_splash_screen", "1");
-
     if (get("restore_win_position").empty())
         set("restore_win_position", "1");       // allowed values - "1", "0", "crashed_at_..."
 
@@ -519,7 +516,7 @@ void AppConfig::set_defaults()
     {
 
         //try to load splashscreen from ui file
-        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", "benchy-splashscreen.jpg"}, {"splash_screen_gcodeviewer", "prusa-gcodepreview.jpg"} };
+        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", ""}, {"splash_screen_gcodeviewer", ""} };
         boost::property_tree::ptree tree_splashscreen;
         boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
         try {
@@ -547,10 +544,13 @@ void AppConfig::set_defaults()
         if (get("splash_screen_gcodeviewer").empty())
             set("splash_screen_gcodeviewer", "default");
 
-        if (!get("show_splash_screen_random").empty() && get("show_splash_screen_random") == "1") {
+        bool switch_to_random = get("show_splash_screen_random") == "1";
+        if (switch_to_random || key2splashscreen["splash_screen_editor"].empty())
             set("splash_screen_editor", "random");
+        if (switch_to_random || key2splashscreen["splash_screen_gcodeviewer"].empty())
+            set("splash_screen_gcodeviewer", "random");
+        if (switch_to_random)
             set("show_splash_screen_random", "0");
-        }
     }
 
 #ifdef _WIN32
