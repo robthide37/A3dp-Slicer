@@ -1391,6 +1391,20 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
 
     std::string preamble_to_put_start_layer = "";
 
+    
+    // if thumbnail type of BTT_TFT, insert above header
+    // if not, it is inserted under the header in its normal spot
+    const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+    const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+    if (thumbnails_format != nullptr && thumbnails_format->value == GCodeThumbnailsFormat::BIQU)
+        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
+            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
+            thumbnails_with_bed ? thumbnails_with_bed->value : false,
+            thumbnails_format->value,
+            true, 
+            [&file](const char *sz) { file.write(sz); },
+            [&print]() { print.throw_if_canceled(); });
+
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
@@ -1398,9 +1412,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     //print thumbnails at the start unless requested at the end.
     const ConfigOptionBool* thumbnails_end_file = print.full_print_config().option<ConfigOptionBool>("thumbnails_end_file");
     if(!thumbnails_end_file || !thumbnails_end_file->value) {
-        const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
         const ConfigOptionBool* thumbnails_tag_with_format = print.full_print_config().option<ConfigOptionBool>("thumbnails_tag_format");
-        const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
         // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
         // If "thumbnails_format" is not defined, export to PNG.
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
@@ -2092,8 +2104,8 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     }
     print.throw_if_canceled();
 
-    //print thumbnails at the end instead of the start if requested
-    if (thumbnails_end_file && thumbnails_end_file->value) {
+    //print thumbnails at the end instead of the start if requested (unless BTT / biqu thumbnail)
+    if (thumbnails_end_file && thumbnails_end_file->value && (thumbnails_format == nullptr || thumbnails_format->value != GCodeThumbnailsFormat::BIQU)) {
         const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
         const ConfigOptionBool* thumbnails_tag_with_format = print.full_print_config().option<ConfigOptionBool>("thumbnails_tag_format");
         const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");

@@ -3500,6 +3500,11 @@ void TabPrinter::toggle_options()
     bool custom_color = m_config->opt_bool("thumbnails_custom_color");
     field = get_field("thumbnails_color");
     if (field) field->toggle(custom_color);
+    const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = m_config->option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+    field = get_field("thumbnails_end_file");
+    if (thumbnails_format && field) field->toggle(thumbnails_format->value != (GCodeThumbnailsFormat::BIQU));
+    field = get_field("thumbnails_tag_format");
+    if (thumbnails_format && field) field->toggle(thumbnails_format->value != (GCodeThumbnailsFormat::BIQU));
 
     //firmware
     bool have_remaining_times = m_config->opt_bool("remaining_times");
