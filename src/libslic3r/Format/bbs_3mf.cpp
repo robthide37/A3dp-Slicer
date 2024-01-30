@@ -1409,6 +1409,25 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         is_bbl_3mf = m_is_bbl_3mf;
         if (m_bambuslicer_generator_version)
             file_version = *m_bambuslicer_generator_version;
+        if (result && plate_data_list.size() > 0) {
+            if(config.opt<ConfigOptionBool>("gcode_label_objects") == nullptr)
+                config.set_key_value("gcode_label_objects", config.get_option_def("gcode_label_objects")->default_value->clone());
+            bool has_label_objests = config.opt<ConfigOptionBool>("gcode_label_objects")->value;
+            for (PlateData *plate : plate_data_list)
+                has_label_objests = has_label_objests || plate->is_label_object_enabled;
+            config.opt<ConfigOptionBool>("gcode_label_objects")->value = has_label_objests;
+            std::string print_vars = config.opt<ConfigOptionString>("print_custom_variables") == nullptr ? "" : config.opt<ConfigOptionString>("print_custom_variables")->value;
+            if (print_vars.find("plate_name") == std::string::npos && plate_data_list.front()) {
+                std::string plate_name = "";
+                for (PlateData *plate : plate_data_list)
+                    plate_name += plate_name.empty() ? plate->plate_name : std::string(" ; ") + plate->plate_name;
+                boost::replace_all(plate_name, "\"", "'");
+                if (!print_vars.empty() && print_vars.back() != '\n')
+                    print_vars += std::string("\n");
+                print_vars += std::string("plate_name=\"") + plate_name + std::string("\"\n");
+                config.set_key_value("print_custom_variables", new ConfigOptionString(print_vars));
+            }
+        }
         // save for restore
         //if (result && m_load_aux && !m_load_restore) {
         //    save_string_file(model.get_backup_path() + "/origin.txt", filename);

@@ -443,6 +443,7 @@ namespace Slic3r {
         // Version of the 3mf file
         unsigned int m_version;
         bool m_check_version;
+        bool m_trying_read_prusa = false;
 
         // Semantic version of PrusaSlicer, that generated this 3MF.
         boost::optional<Semver> m_prusaslicer_generator_version;
@@ -504,7 +505,7 @@ namespace Slic3r {
 
         void _extract_print_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig& config, ConfigSubstitutionContext& subs_context, const std::string& archive_filename);
         bool _extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model);
-
+        
         // handlers to parse the .model file
         void _handle_start_model_xml_element(const char* name, const char** attributes);
         void _handle_end_model_xml_element(const char* name);
@@ -571,7 +572,7 @@ namespace Slic3r {
         bool _handle_start_config_metadata(const char** attributes, unsigned int num_attributes);
         bool _handle_end_config_metadata();
 
-        bool _generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions, DynamicPrintConfig& config_not_used_remove_plz);
+        bool _generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions, DynamicPrintConfig& global_config);
 
         // callbacks to parse the .model file
         static void XMLCALL _handle_start_model_xml_element(void* userData, const char* name, const char** attributes);
@@ -599,6 +600,7 @@ namespace Slic3r {
     {
         _destroy_xml_parser();
     }
+
 
     bool _3MF_Importer::load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, bool check_version)
     {
@@ -769,7 +771,9 @@ namespace Slic3r {
 
                     if (boost::algorithm::iequals(name, PRUSA_LAYER_CONFIG_RANGES_FILE)) {
                         // extract slic3r layer config ranges file from a bad named file
-                        _extract_layer_config_ranges_from_archive(archive, stat, config_substitutions);
+                            m_trying_read_prusa = true;
+                            _extract_layer_config_ranges_from_archive(archive, stat, config_substitutions);
+                            m_trying_read_prusa = false;
                         break;
                     }
                 }
@@ -779,30 +783,24 @@ namespace Slic3r {
         //parsed superslicer/prusa files if slic3r not found
         //note that is we successfully read one of the config file, then the other ones should also have the same name
         auto read_from_other_storage = [this, &print_config_parsed, num_entries, &archive, &stat, &config, &model, &filename, &config_substitutions]
-                (const std::string &print_config_name, const std::string& model_config_name, const std::string& layer_config_name, bool from_prusa) -> bool {
-            for (mz_uint i = 0; i < num_entries; ++i)
-            {
-                if (mz_zip_reader_file_stat(&archive, i, &stat))
-                {
+                (const std::string &print_config_name, const std::string& model_config_name, const std::string& layer_config_name) -> bool {
+            for (mz_uint i = 0; i < num_entries; ++i) {
+                if (mz_zip_reader_file_stat(&archive, i, &stat)) {
                     std::string name(stat.m_filename);
                     std::replace(name.begin(), name.end(), '\\', '/');
 
-                    //TODO use special methods to convert them better?
+                    // TODO use special methods to convert them better?
 
-                    if (boost::algorithm::iequals(name, layer_config_name))
-                    {
+                    if (boost::algorithm::iequals(name, layer_config_name)) {
                         // extract slic3r layer config ranges file
                         _extract_layer_config_ranges_from_archive(archive, stat, config_substitutions);
-                    } else if (boost::algorithm::iequals(name, print_config_name))
-                    {
+                    } else if (boost::algorithm::iequals(name, print_config_name)) {
                         // extract slic3r print config file
                         _extract_print_config_from_archive(archive, stat, config, config_substitutions, filename);
                         print_config_parsed = true;
-                    } else if (boost::algorithm::iequals(name, model_config_name))
-                    {
+                    } else if (boost::algorithm::iequals(name, model_config_name)) {
                         // extract slic3r model config file
-                        if (!_extract_model_config_from_archive(archive, stat, model))
-                        {
+                        if (!_extract_model_config_from_archive(archive, stat, model)) {
                             close_zip_reader(&archive);
                             add_error("Archive does not contain a valid model config");
                             return false;
@@ -815,17 +813,19 @@ namespace Slic3r {
         };
         bool use_prusa_config = false;
         if (!print_config_parsed) {
-            if (!read_from_other_storage(SUPER_PRINT_CONFIG_FILE, SUPER_MODEL_CONFIG_FILE, SUPER_LAYER_CONFIG_RANGES_FILE, false))
+            if (!read_from_other_storage(SUPER_PRINT_CONFIG_FILE, SUPER_MODEL_CONFIG_FILE, SUPER_LAYER_CONFIG_RANGES_FILE))
                 return false;
         }
         if (!print_config_parsed) {
-            if (!read_from_other_storage(PRUSA_PRINT_CONFIG_FILE, PRUSA_MODEL_CONFIG_FILE, PRUSA_LAYER_CONFIG_RANGES_FILE, true))
+            m_trying_read_prusa = true;
+            if (!read_from_other_storage(PRUSA_PRINT_CONFIG_FILE, PRUSA_MODEL_CONFIG_FILE, PRUSA_LAYER_CONFIG_RANGES_FILE))
                 return false;
             if (print_config_parsed) {
                 //succeed to read prusa
                 use_prusa_config = true;
                 config.convert_from_prusa(true);
             }
+            m_trying_read_prusa = false;
         }
 
         close_zip_reader(&archive);
@@ -917,12 +917,15 @@ namespace Slic3r {
                 // config data has been found, this model was saved using slic3r pe
 
                 // apply object's name and config data
-                for (const Metadata& metadata : obj_metadata->second.metadata) {
-                        if (metadata.key == "name")
-                            model_object->name = metadata.value;
-                        else
-                            model_object->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
+                std::map<t_config_option_key, std::string> opt_key_to_value;
+                for (const Metadata &metadata : obj_metadata->second.metadata) {
+                    if (metadata.key == "name") {
+                        model_object->name = metadata.value;
+                    } else {
+                        opt_key_to_value.emplace(metadata.key, metadata.value);
                     }
+                }
+                deserialize_maybe_from_prusa(opt_key_to_value, model_object->config, config, config_substitutions, true, m_trying_read_prusa);
 
                 // select object's detected volumes
                 volumes_ptr = &obj_metadata->second.volumes;
@@ -1062,7 +1065,8 @@ namespace Slic3r {
             // parsing 3MFs from before PrusaSlicer 2.0.0 (which can have duplicated entries in the INI.
             // See https://github.com/prusa3d/PrusaSlicer/issues/7155. We'll revert it for now.
             //config_substitutions.substitutions = config.load_from_ini_string_commented(std::move(buffer), config_substitutions.rule);
-            ConfigBase::load_from_gcode_string_legacy(config, buffer.data(), config_substitutions);
+            //ConfigBase::load_from_gcode_string_legacy(config, buffer.data(), config_substitutions);
+            deserialize_maybe_from_prusa(ConfigBase::load_gcode_string_legacy(buffer.data()), config, config_substitutions, true, m_trying_read_prusa);
         }
     }
 
@@ -1167,7 +1171,7 @@ namespace Slic3r {
 
                     // get Z range information
                     DynamicPrintConfig config;
-
+                    std::map<t_config_option_key, std::string> opt_key_to_value;
                     for (const auto& option : range_tree) {
                         if (option.first != "option")
                             continue;
@@ -1175,14 +1179,16 @@ namespace Slic3r {
                         std::string value = option.second.data();
                         if (value.empty() && opt_key.find("pattern") != std::string::npos) {
                             add_error("Error while reading '"+ opt_key +"': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
-                            ConfigSubstitution config_substitution;
-                            config_substitution.opt_def = config.get_option_def(opt_key);
-                            config_substitution.old_value = "Error while reading '" + opt_key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
-                            config_substitution.new_value = ConfigOptionUniquePtr(config_substitution.opt_def->default_value->clone());
-                            config_substitutions.substitutions.emplace_back(std::move(config_substitution));
-                        }else
-                            config.set_deserialize(opt_key, value, config_substitutions);
+                            std::string old_value = "Error while reading '" + opt_key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
+                            const ConfigOptionDef *opt_def = config.get_option_def(opt_key);
+                            config_substitutions.emplace(opt_def,
+                                std::move(old_value),
+                                ConfigOptionUniquePtr(opt_def->default_value->clone()));
+                        } else {
+                            opt_key_to_value.emplace(opt_key, value);
+                        }
                     }
+                    deserialize_maybe_from_prusa(opt_key_to_value, config, config_substitutions, true, m_trying_read_prusa);
 
                     config_ranges[{ min_z, max_z }].assign_config(std::move(config));
                 }
@@ -2084,7 +2090,7 @@ namespace Slic3r {
         return true;
     }
 
-    bool _3MF_Importer::_generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions, DynamicPrintConfig& config_not_used_remove_plz)
+    bool _3MF_Importer::_generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions, DynamicPrintConfig& global_config)
     {
         if (!object.volumes.empty()) {
             add_error("Found invalid volumes count");
@@ -2189,6 +2195,7 @@ namespace Slic3r {
             volume->mmu_segmentation_facets.shrink_to_fit();
 
             // apply the remaining volume's metadata
+            std::map<t_config_option_key, std::string> opt_key_to_value;
             for (const Metadata& metadata : volume_data.metadata) {
                 if (metadata.key == NAME_KEY)
                     volume->name = metadata.value;
@@ -2212,17 +2219,21 @@ namespace Slic3r {
                     volume->source.is_converted_from_inches = metadata.value == "1";
                 else if (metadata.key == SOURCE_IN_METERS)
                     volume->source.is_converted_from_meters = metadata.value == "1";
+                else if (metadata.key == MATRIX_KEY)
+                    ;//already parsed
                 else
                     if (metadata.value.empty() && metadata.key.find("pattern") != std::string::npos) {
-                        add_error("Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
-                        ConfigSubstitution config_substitution;
-                        config_substitution.opt_def = config_not_used_remove_plz.get_option_def(metadata.key);
-                        config_substitution.old_value = "Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
-                        config_substitution.new_value = ConfigOptionUniquePtr(config_substitution.opt_def->default_value->clone());
-                        config_substitutions.substitutions.emplace_back(std::move(config_substitution));
-                    } else
-                        volume->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
+                            add_error("Error while reading '"+  metadata.key +"': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
+                            std::string old_value = "Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
+                            const ConfigOptionDef *opt_def = global_config.get_option_def(metadata.key);
+                            config_substitutions.emplace(opt_def,
+                                std::move(old_value),
+                                ConfigOptionUniquePtr(opt_def->default_value->clone()));
+                    } else {
+                        opt_key_to_value.emplace(metadata.key, metadata.value);
+                    }
             }
+            deserialize_maybe_from_prusa(opt_key_to_value, volume->config, global_config, config_substitutions, true, m_trying_read_prusa);
 
             // this may happen for 3mf saved by 3rd part softwares
             if (volume->name.empty()) {

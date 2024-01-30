@@ -1592,7 +1592,7 @@ ConfigSubstitutions load_from_superslicer_gcode_file(const std::string& filename
     if (key_value_pairs < 80)
         throw Slic3r::RuntimeError(format("Suspiciously low number of configuration values extracted from %1%: %2%", filename, key_value_pairs));
 
-    return std::move(substitutions_ctxt.substitutions);
+    return std::move(substitutions_ctxt).data();
 }
 
 void GCodeProcessor::apply_config_superslicer(const std::string& filename)

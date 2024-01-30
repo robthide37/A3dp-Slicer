@@ -167,7 +167,7 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
     CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, config);
     CustomGCode::check_mode_for_custom_gcode_per_print_z(model.custom_gcode_per_print_z);
 
-    sort_remove_duplicates(config_substitutions->substitutions);
+    config_substitutions->sort_and_remove_duplicates();
     return model;
 }
 

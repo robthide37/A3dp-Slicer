@@ -317,6 +317,13 @@ void PreferencesDialog::build(size_t selected_tab)
         option = Option(def, "check_material_export");
         m_optgroups_general.back()->append_single_option_line(option);
 
+        def.label = L("Show ignored settings when loading a project or configuration");
+        def.type = coBool;
+        def.tooltip = L("When loading a configuration, if it's coming from an earlier, a future or from another software, show the ignored settings that deosn't suit this version. Uncheck to remove this anoying pop-up.");
+        def.set_default_value(new ConfigOptionBool{ app_config->has("show_unknown_setting") ? app_config->get("show_unknown_setting") == "1" : false });
+        option = Option(def, "show_unknown_setting");
+        m_optgroups_general.back()->append_single_option_line(option);
+
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Dialogs"), tabs, 0));
 

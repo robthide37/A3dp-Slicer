@@ -44,6 +44,17 @@ namespace BBConfiguration {
 
 std::map<std::string, std::string> key_translation_map;
 std::map<std::string, std::map<std::string, std::string>> value_translation_map;
+std::vector<std::pair<std::string, std::string>> custom_gcode_replace; // vector<pair>, as i want to keep the ordering
+enum BBSettingType: uint8_t{
+    bbstFFF_PRINT = 0<<0,
+    bbstFFF_FILAMENT = 0<<1,
+    bbstFFF_PRINTER = 0<<2,
+    bbstSLA_PRINT = 0<<3,
+    bbstSLA_MATERIAL = 0<<4,
+    bbstSLA_PRINTER = 0<<5,
+
+};
+std::map<std::string, BBSettingType> key_custom_settings_translation_map;
 // std::map<std::string, std::function<void(std::map<std::string, std::string>&, std::map<std::string,
 // std::vector<std::string>>&, const std::string&, const std::string&)>> transform_complicated; std::map<std::string,
 // std::function<void(std::map<std::string, std::string>&, std::map<std::string, std::vector<std::string>>&, const
@@ -52,11 +63,30 @@ bool is_init = false;
 
 void init()
 {
-    //list from https://github.com/theophile/SuperSlicer_to_Orca_scripts/blob/main/superslicer_to_orca.pl
+    key_translation_map["version"] = "";
+    key_translation_map["from"] = "";
+    key_translation_map["name"] = "";
+
+    //list (partially) from https://github.com/theophile/SuperSlicer_to_Orca_scripts/blob/main/superslicer_to_orca.pl
+    key_translation_map["extra_perimeters_on_overhangs"]    = "extra_perimeters_overhangs";
+    key_translation_map["internal_solid_infill_pattern"]    = "solid_fill_pattern";
+    key_translation_map["overhang_speed_classic"]           = "overhangs_speed";
+    key_translation_map["preferred_orientation"]            = "init_z_rotate";
+    key_translation_map["solid_infill_filament"]            = "solid_infill_extruder";
+    key_translation_map["support_filament"]                 = "support_material_extruder";
+    key_translation_map["support_interface_filament"]       = "support_material_interface_extruder";
+    key_translation_map["sparse_infill_filament"]           = "infill_extruder";
+    key_translation_map["wall_filament"]                    = "perimeter_extruder";
+    key_translation_map["first_layer_filament"]             = "first_layer_extruder";
+    key_translation_map["spiral_mode"]                      = "spiral_vase";
+    
     // print
+    key_translation_map["alternate_extra_wall"]             = "extra_perimeters_odd_layers";
+    key_translation_map["is_infill_first"]                          = "infill_first";
     key_translation_map["enable_arc_fitting"]                       = "arc_fitting";
     key_translation_map["bottom_shell_layers"]                      = "bottom_solid_layers";
     key_translation_map["bottom_shell_thickness"]                   = "bottom_solid_min_thickness";
+    key_translation_map["bottom_solid_infill_flow_ratio"]   = "first_layer_flow_ratio ";
     //key_translation_map["bridge_acceleration"]                      = "bridge_acceleration";
     //key_translation_map["bridge_angle"]                             = "bridge_angle";
     key_translation_map["bridge_density"]                           = "bridge_overlap_min";
@@ -74,7 +104,8 @@ void init()
     key_translation_map["detect_overhang_wall"]                     = "overhangs"; // will go to handle_legacy
     key_translation_map["detect_thin_wall"]                         = "thin_walls";
     //key_translation_map["draft_shield"]                             = "draft_shield";
-    //key_translation_map["elefant_foot_compensation"]  // will go to handle_legacy               = "first_layer_size_compensation";
+    key_translation_map["elefant_foot_compensation"]                = "elefant_foot_compensation";  // will go to handle_legacy
+    key_translation_map["elefant_foot_compensation_layers"]         = "first_layer_size_compensation_layers";
     key_translation_map["enable_overhang_speed"]                    = "enable_dynamic_overhang_speeds"; //2.7
     //key_translation_map["extra_perimeters_on_overhangs"]            = "extra_perimeters_on_overhangs";
     key_translation_map["enable_prime_tower"]                       = "wipe_tower";
@@ -153,7 +184,7 @@ void init()
     key_translation_map["support_line_width"]                       = "support_material_extrusion_width";
     key_translation_map["support_on_build_plate_only"]              = "support_material_buildplate_only";
     key_translation_map["support_threshold_angle"]                  = "support_material_threshold";
-    //key_translation_map["thick_bridges"]                            = "thick_bridges"; //handled by from_prusa
+    key_translation_map["thick_bridges"]                            = "thick_bridges"; //handled by from_prusa
     key_translation_map["top_shell_layers"]                         = "top_solid_layers";
     key_translation_map["top_shell_thickness"]                      = "top_solid_min_thickness";
     key_translation_map["top_surface_acceleration"]                 = "top_solid_infill_acceleration";
@@ -195,9 +226,9 @@ void init()
     key_translation_map["bottom_solid_infill_flow_ratio"]           = "initial_layer_flow_ratio";
     key_translation_map["infill_combination"]                       = "infill_every_layers";
     key_translation_map["print_sequence"]                           = "complete_objects";
-    //key_translation_map["brim_type"]                                = "brim_type"; //handled by from_prusa
+    key_translation_map["brim_type"]                                = "brim_type"; //handled by from_prusa
     //key_translation_map["notes"]                                    = "notes";
-    //key_translation_map["support_material_style"]                   = "support_material_style";
+    key_translation_map["support_style"]                   = "support_material_style";
     //key_translation_map["ironing"]                                  = "ironing";
     //key_translation_map["ironing_type"]                             = "ironing_type";
     //key_translation_map["ironing_angle"]                            = "ironing_angle";
@@ -283,6 +314,7 @@ void init()
     //key_translation_map["default_filament_profile"]            = "default_filament_profile";
     //key_translation_map["default_print_profile"]               = "default_print_profile";
     key_translation_map["deretraction_speed"]                  = "deretract_speed";
+    key_translation_map["emit_machine_limits_to_gcode"]       = "machine_limits_usage";
     //key_translation_map["gcode_flavor"]                        = "gcode_flavor";
     //key_translation_map["inherits"]                            = "inherits";
     key_translation_map["layer_change_gcode"]                  = "layer_gcode";
@@ -418,12 +450,36 @@ void init()
     value_translation_map["support_material_style"]["normal"] = "grid";
     value_translation_map["support_material_style"]["default"] = "grid";
     value_translation_map["support_material_style"]["tree"] = "snug"; // organic in 2.7
+    value_translation_map["support_material_style"]["tree_slim"] = "snug"; // organic in 2.7
+    value_translation_map["support_material_style"]["tree_strong"] = "snug"; // organic in 2.7
+    value_translation_map["support_material_style"]["tree_hybrid"] = "snug"; // organic in 2.7
     value_translation_map["support_material_style"]["organic"] = "snug"; // organic in 2.7
     value_translation_map["retract_lift_top"]["Bottom Only"] = "Not on top";
     value_translation_map["retract_lift_top"]["Top Only"] = "Only on top";
     value_translation_map["thumbnails_format"]["BTT_TFT"] = "BIQU";
     value_translation_map["complete_objects"]["by layer"] = "0";
     value_translation_map["complete_objects"]["by object"] = "1";
+    value_translation_map["machine_limits_usage"]["0"] = "time_estimate_only";
+    value_translation_map["machine_limits_usage"]["1"] = "emit_to_gcode";
+
+
+
+/// GCODE
+    custom_gcode_replace.emplace_back("[bed_temperature_initial_layer_single]", "{first_layer_bed_temperature[initial_extruder]}");
+    custom_gcode_replace.emplace_back("bed_temperature_initial_layer_single", "first_layer_bed_temperature[initial_extruder]");
+    custom_gcode_replace.emplace_back("initial_extruder_id", "initial_extruder");
+    custom_gcode_replace.emplace_back("bbl_bed_temperature_gcode", "false");
+    custom_gcode_replace.emplace_back("bed_temperature_initial_layer", "first_layer_bed_temperature");
+    custom_gcode_replace.emplace_back("bed_temperature_initial_layer_vector", "\"\"");
+    custom_gcode_replace.emplace_back("[temperature_initial_layer]", "{first_layer_temperature[initial_extruder]}");
+    custom_gcode_replace.emplace_back("temperature_initial_layer", "first_layer_temperature[initial_extruder]");
+    //custom_gcode_replace.emplace_back("overall_chamber_temperature", "chamber_temperature"); //fixme: it's a max.
+
+    //if plate_name, then add plate_name as custom setting
+    key_custom_settings_translation_map["print_custom_variables"] = BBSettingType(bbstFFF_PRINT | bbstSLA_PRINT);
+    key_custom_settings_translation_map["filament_custom_variables"] = BBSettingType(bbstFFF_FILAMENT | bbstSLA_MATERIAL);
+    key_custom_settings_translation_map["printer_custom_variables"] = BBSettingType(bbstFFF_PRINTER | bbstSLA_PRINTER);
+    key_custom_settings_translation_map["plate_name"] = BBSettingType(bbstFFF_PRINT | bbstSLA_PRINT);
 }
 
 void complicated_convert(t_config_option_key &opt_key, std::string &value, const std::map<std::string, std::string> &input, std::map<std::string, std::string> &output)
@@ -434,11 +490,109 @@ void complicated_convert(t_config_option_key &opt_key, std::string &value, const
         output["ironing"] = "0";
         assert(input.find("ironing") == input.end() || input.find("ironing")->second == "0");
     }
+    if ("brim_type" == opt_key && "brim_ears" == value) {
+        opt_key = "brim_ears";
+        value = "1";
+    }
+    if ("disable_m73" == opt_key) {
+        output["remaining_times_type"] = "m73";
+        opt_key = "remaining_times";
+        if ("1" == value) {
+            value = "0";
+        } else {
+            value = "1";
+        }
+    }
+    if ("enable_overhang_speed") {
+    
+    }
 }
 
 //settings from orca that I can't convert
 // ironing_pattern
 
+bool push_into_custom_variable(DynamicPrintConfig &print_config,
+                               const std::string & opt_key,
+                               const std::string & opt_value)
+{
+    if (auto it = key_custom_settings_translation_map.find(opt_key); it != key_custom_settings_translation_map.end()) {
+        if ((it->second & bbstFFF_PRINT) != 0 || (it->second & bbstSLA_PRINT) != 0) {
+            if (print_config.opt<ConfigOptionStrings>("print_custom_variables") == nullptr)
+                print_config.set_deserialize("print_custom_variables", "");
+            std::string &value = print_config.opt<ConfigOptionString>("print_custom_variables")->value;
+            if (value.find(opt_key) == std::string::npos)
+                value += opt_key + std::string("=") + opt_value + std::string("\n");
+        }
+        if ((it->second & bbstFFF_FILAMENT) != 0 || (it->second & bbstSLA_MATERIAL) != 0) {
+            if (print_config.opt<ConfigOptionStrings>("filament_custom_variables") == nullptr)
+                print_config.set_deserialize("filament_custom_variables", "");
+            const std::string &val = print_config.opt<ConfigOptionStrings>("filament_custom_variables")->get_at(0);
+            if (val.find(opt_key) == std::string::npos)
+                print_config.opt<ConfigOptionStrings>("filament_custom_variables")
+                    ->set_at(val + opt_key + std::string("=") + opt_value + std::string("\n"), 0);
+        }
+        if ((it->second & bbstFFF_PRINTER) != 0 || (it->second & bbstSLA_PRINTER) != 0) {
+            if (print_config.opt<ConfigOptionStrings>("printer_custom_variables") == nullptr)
+                print_config.set_deserialize("printer_custom_variables", "");
+            std::string &value = print_config.opt<ConfigOptionString>("printer_custom_variables")->value;
+            if (value.find(opt_key) == std::string::npos)
+                value += opt_key + std::string("=") + opt_value + std::string("\n");
+        }
+        return true;
+    }
+    return false;
+}
+
+bool push_into_custom_variables(DynamicPrintConfig &            print_config,
+                                const std::string &             opt_key,
+                                const std::vector<std::string> &opt_value)
+{
+    if (auto it = key_custom_settings_translation_map.find(opt_key); it != key_custom_settings_translation_map.end()) {
+        if ((it->second & bbstFFF_FILAMENT) != 0 || (it->second & bbstSLA_MATERIAL) != 0) {
+            for (int i = 0; i < opt_value.size(); ++i) {
+                if (print_config.opt<ConfigOptionStrings>("filament_custom_variables") == nullptr)
+                    print_config.set_deserialize("filament_custom_variables", "");
+                const std::string &val = print_config.opt<ConfigOptionStrings>("filament_custom_variables")->get_at(i);
+                if (val.find(opt_key) == std::string::npos)
+                    print_config.opt<ConfigOptionStrings>("filament_custom_variables")
+                        ->set_at(val + opt_key + std::string("=") + opt_value[i] + std::string("\n"), i);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+//TODO: ensure it's inside '{' '[' script section, reliably
+void custom_gcode_transform(DynamicPrintConfig &print_config)
+{
+    for (std::string opt_key : {"template_custom_gcode", "toolchange_gcode", "before_layer_gcode",
+                                "between_objects_gcode", "end_gcode", "layer_gcode", "feature_gcode", "start_gcode",
+                                "color_change_gcode", "pause_print_gcode", "toolchange_gcode"}) {
+        auto opt = print_config.opt<ConfigOptionString>(opt_key);
+        if (opt != nullptr) {
+            std::string &custom_gcode = opt->value;
+            // check & replace setting name
+            for (auto &entry : key_translation_map) { boost::replace_all(custom_gcode, entry.first, entry.second); }
+            // check & replace special things
+            for (auto &entry : custom_gcode_replace) { boost::replace_all(custom_gcode, entry.first, entry.second); }
+        }
+    }
+    for (std::string opt_key : {"end_filament_gcode", "start_filament_gcode"}) {
+        auto opt = print_config.opt<ConfigOptionStrings>(opt_key);
+        if (opt != nullptr)
+            for (std::string &custom_gcode : opt->values) {
+                // check & replace setting name
+                for (auto &entry : key_translation_map) {
+                    boost::replace_all(custom_gcode, entry.first, entry.second);
+                }
+                // check & replace special things
+                for (auto &entry : custom_gcode_replace) {
+                    boost::replace_all(custom_gcode, entry.first, entry.second);
+                }
+            }
+    }
+}
 
 } // BBconfiguration
 
@@ -536,9 +690,13 @@ bool read_json_file_bambu(const std_path &temp_file,
     for (auto &entry : key_values) {
         t_config_option_key opt_key = entry.first;
         std::string         value   = entry.second;
+
+        if (push_into_custom_variable(config, opt_key, value))
+            continue;
+
         if (auto it = key_translation_map.find(opt_key); it != key_translation_map.end())
             opt_key = it->second;
-        PrintConfigDef::handle_legacy(opt_key, value);
+        PrintConfigDef::handle_legacy(opt_key, value, false);
 
         complicated_convert(opt_key, value, key_values, good_key_values);
 
@@ -548,18 +706,24 @@ bool read_json_file_bambu(const std_path &temp_file,
 
         if (!opt_key.empty())
             good_key_values[opt_key] = value;
+        //else
+        //    config_substitutions.substitutions.push_back(ConfigSubstitution{ nullptr, entry.first+std::string(" : ")+value, nullptr});
     }
 
     for (auto &entry : key_vector_values) {
         t_config_option_key      key    = entry.first;
         std::vector<std::string> values = entry.second;
+        if (push_into_custom_variables(config, key, values))
+            continue;
         if (auto it = key_translation_map.find(key); it != key_translation_map.end())
             key = it->second;
         std::string check_val = values[0];
-        PrintConfigDef::handle_legacy(key, values[0]);
+        PrintConfigDef::handle_legacy(key, values[0], false);
         assert(check_val == values[0]); // can't change a vec value, sadly.
         if (!key.empty())
             good_key_vector_values[key] = values;
+        //else
+        //    config_substitutions.substitutions.push_back(ConfigSubstitution{ nullptr, entry.first+std::string(" : ")+(values.empty()?"":values.front()), nullptr});
     }
 
     // check how to serialize the array (string use ';', others ',')
@@ -608,15 +772,26 @@ bool read_json_file_bambu(const std_path &temp_file,
         }
         if (valid)
             good_key_values[opt_key] = value_str;
+        else if(optdef)
+            config_substitutions.add(ConfigSubstitution( optdef, value_str, ConfigOptionUniquePtr(optdef->default_value->clone()) ));
+        else
+            config_substitutions.add(ConfigSubstitution(entry.first, value_str));
+
     }
 
     // push these into config
+
     for (auto &entry : good_key_values) {
-        config.set_deserialize(entry.first, entry.second, config_substitutions);
+        if(config_def->has(entry.first))
+            config.set_deserialize(entry.first, entry.second, config_substitutions);
+        else
+            config_substitutions.add(ConfigSubstitution(entry.first, entry.second));
     }
 
     // final transform
     config.convert_from_prusa(with_phony);
+
+    custom_gcode_transform(config);
 
     return true;
 }
@@ -650,9 +825,13 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
     for (auto &entry : bambu_settings_serialized) {
         t_config_option_key opt_key = entry.first;
         std::string         value   = entry.second;
+
+        if (push_into_custom_variable(print_config, opt_key, value))
+            continue;
+
         if (auto it = key_translation_map.find(opt_key); it != key_translation_map.end())
             opt_key = it->second;
-        PrintConfigDef::handle_legacy(opt_key, value);
+        PrintConfigDef::handle_legacy(opt_key, value, false);
         
         complicated_convert(opt_key, value, bambu_settings_serialized, good_key_values);
 
@@ -666,12 +845,18 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
     
 
     // push these into config
+    const ConfigDef *config_def = print_config.def();
     for (auto &entry : good_key_values) {
-        print_config.set_deserialize(entry.first, entry.second, config_substitutions);
+        if(config_def->has(entry.first))
+            print_config.set_deserialize(entry.first, entry.second, config_substitutions);
+        else
+            config_substitutions.add(ConfigSubstitution(entry.first, entry.second));
     }
     
     // final transform
     print_config.convert_from_prusa(with_phony);
+    custom_gcode_transform(print_config);
+
     return true;
 }
 
@@ -692,7 +877,7 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
         std::string         value   = entry.second;
         if (auto it = key_translation_map.find(opt_key); it != key_translation_map.end())
             opt_key = it->second;
-        PrintConfigDef::handle_legacy(opt_key, value);
+        PrintConfigDef::handle_legacy(opt_key, value, false);
         
         complicated_convert(opt_key, value, bambu_settings_serialized, good_key_values);
 
@@ -706,8 +891,12 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
     
 
     // push these into config
+    const ConfigDef *config_def = object_config.get().def();
     for (auto &entry : good_key_values) {
-        object_config.set_deserialize(entry.first, entry.second, config_substitutions);
+        if(config_def->has(entry.first))
+            object_config.set_deserialize(entry.first, entry.second, config_substitutions);
+        else
+            config_substitutions.add(ConfigSubstitution(entry.first, entry.second));
     }
     
     // final transform
