@@ -10,14 +10,14 @@
 #include <functional>
 #include <boost/log/trivial.hpp>
 
-#include "utils/VoronoiUtils.hpp"
-
 #include "utils/linearAlg2D.hpp"
 #include "Utils.hpp"
 #include "SVG.hpp"
 #include "Geometry/VoronoiVisualUtils.hpp"
 #include "Geometry/VoronoiUtilsCgal.hpp"
 #include "../EdgeGrid.hpp"
+
+#include "Geometry/VoronoiUtils.hpp"
 
 #define SKELETAL_TRAPEZOIDATION_BEAD_SEARCH_MAX 1000 //A limit to how long it'll keep searching for adjacent beads. Increasing will re-use beadings more often (saving performance), but search longer for beading (costing performance).
 
@@ -218,21 +218,18 @@ void SkeletalTrapezoidation::transferEdge(Point from, Point to, VD::edge_type& v
 
 Points SkeletalTrapezoidation::discretize(const VD::edge_type& vd_edge, const std::vector<Segment>& segments)
 {
+    assert(Geometry::VoronoiUtils::is_in_range<coord_t>(vd_edge));
+
     /*Terminology in this function assumes that the edge moves horizontally from
     left to right. This is not necessarily the case; the edge can go in any
     direction, but it helps to picture it in a certain direction in your head.*/
 
-    const VD::cell_type* left_cell = vd_edge.cell();
-    const VD::cell_type* right_cell = vd_edge.twin()->cell();
+    const VD::cell_type *left_cell  = vd_edge.cell();
+    const VD::cell_type *right_cell = vd_edge.twin()->cell();
 
-    assert(VoronoiUtils::p(vd_edge.vertex0()).x() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge.vertex0()).x() >= std::numeric_limits<coord_t>::lowest());
-    assert(VoronoiUtils::p(vd_edge.vertex0()).y() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge.vertex0()).y() >= std::numeric_limits<coord_t>::lowest());
-    assert(VoronoiUtils::p(vd_edge.vertex1()).x() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge.vertex1()).x() >= std::numeric_limits<coord_t>::lowest());
-    assert(VoronoiUtils::p(vd_edge.vertex1()).y() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge.vertex1()).y() >= std::numeric_limits<coord_t>::lowest());
+    Point start = Geometry::VoronoiUtils::to_point(vd_edge.vertex0()).cast<coord_t>();
+    Point end   = Geometry::VoronoiUtils::to_point(vd_edge.vertex1()).cast<coord_t>();
 
-    Point start = VoronoiUtils::p(vd_edge.vertex0()).cast<coord_t>();
-    Point end = VoronoiUtils::p(vd_edge.vertex1()).cast<coord_t>();
-    
     bool point_left = left_cell->contains_point();
     bool point_right = right_cell->contains_point();
     if ((!point_left && !point_right) || vd_edge.is_secondary()) // Source vert is directly connected to source segment
@@ -241,20 +238,20 @@ Points SkeletalTrapezoidation::discretize(const VD::edge_type& vd_edge, const st
     }
     else if (point_left != point_right) //This is a parabolic edge between a point and a line.
     {
-        Point p = VoronoiUtils::getSourcePoint(*(point_left ? left_cell : right_cell), segments);
-        const Segment& s = VoronoiUtils::getSourceSegment(*(point_left ? right_cell : left_cell), segments);
-        return VoronoiUtils::discretizeParabola(p, s, start, end, discretization_step_size, transitioning_angle);
+        Point          p = Geometry::VoronoiUtils::get_source_point(*(point_left ? left_cell : right_cell), segments.begin(), segments.end());
+        const Segment& s = Geometry::VoronoiUtils::get_source_segment(*(point_left ? right_cell : left_cell), segments.begin(), segments.end());
+        return Geometry::VoronoiUtils::discretize_parabola(p, s, start, end, discretization_step_size, transitioning_angle);
     }
     else //This is a straight edge between two points.
     {
         /*While the edge is straight, it is still discretized since the part
         becomes narrower between the two points. As such it may need different
         beadings along the way.*/
-        Point left_point = VoronoiUtils::getSourcePoint(*left_cell, segments);
-        Point right_point = VoronoiUtils::getSourcePoint(*right_cell, segments);
-        coord_t d = (right_point - left_point).cast<int64_t>().norm();
-        Point middle = (left_point + right_point) / 2;
-        Point x_axis_dir = perp(Point(right_point - left_point));
+        Point   left_point    = Geometry::VoronoiUtils::get_source_point(*left_cell, segments.begin(), segments.end());
+        Point   right_point   = Geometry::VoronoiUtils::get_source_point(*right_cell, segments.begin(), segments.end());
+        coord_t d             = (right_point - left_point).cast<int64_t>().norm();
+        Point   middle        = (left_point + right_point) / 2;
+        Point   x_axis_dir    = perp(Point(right_point - left_point));
         coord_t x_axis_length = x_axis_dir.cast<int64_t>().norm();
 
         const auto projected_x = [x_axis_dir, x_axis_length, middle](Point from) //Project a point on the edge.
@@ -345,11 +342,11 @@ bool SkeletalTrapezoidation::computePointCellRange(VD::cell_type& cell, Point& s
         vert.y() >= double(std::numeric_limits<int64_t>::max()) || vert.y() <= double(std::numeric_limits<int64_t>::lowest()))
         return false; // Don't copy any part of this cell
 
-    const Point source_point = VoronoiUtils::getSourcePoint(cell, segments);
-    const PolygonsPointIndex source_point_index = VoronoiUtils::getSourcePointIndex(cell, segments);
-    Vec2i64 some_point = VoronoiUtils::p(cell.incident_edge()->vertex0());
+    const Point              source_point       = Geometry::VoronoiUtils::get_source_point(cell, segments.begin(), segments.end());
+    const PolygonsPointIndex source_point_index = Geometry::VoronoiUtils::get_source_point_index(cell, segments.begin(), segments.end());
+    Vec2i64                  some_point         = Geometry::VoronoiUtils::to_point(cell.incident_edge()->vertex0());
     if (some_point == source_point.cast<int64_t>())
-        some_point = VoronoiUtils::p(cell.incident_edge()->vertex1());
+        some_point = Geometry::VoronoiUtils::to_point(cell.incident_edge()->vertex1());
 
     //Test if the some_point is even inside the polygon.
     //The edge leading out of a polygon must have an endpoint that's not in the corner following the contour of the polygon at that vertex.
@@ -361,60 +358,19 @@ bool SkeletalTrapezoidation::computePointCellRange(VD::cell_type& cell, Point& s
     VD::edge_type* vd_edge = cell.incident_edge();
     do {
         assert(vd_edge->is_finite());
-        if (Vec2i64 p1 = VoronoiUtils::p(vd_edge->vertex1()); p1 == source_point.cast<int64_t>()) {
+        if (Vec2i64 p1 = Geometry::VoronoiUtils::to_point(vd_edge->vertex1()); p1 == source_point.cast<int64_t>()) {
             start_source_point = source_point;
             end_source_point = source_point;
             starting_vd_edge = vd_edge->next();
             ending_vd_edge = vd_edge;
         } else {
-            assert((VoronoiUtils::p(vd_edge->vertex0()) == source_point.cast<int64_t>() || !vd_edge->is_secondary()) && "point cells must end in the point! They cannot cross the point with an edge, because collinear edges are not allowed in the input.");
+            assert((Geometry::VoronoiUtils::to_point(vd_edge->vertex0()) == source_point.cast<int64_t>() || !vd_edge->is_secondary()) && "point cells must end in the point! They cannot cross the point with an edge, because collinear edges are not allowed in the input.");
         }
     }
     while (vd_edge = vd_edge->next(), vd_edge != cell.incident_edge());
     assert(starting_vd_edge && ending_vd_edge);
     assert(starting_vd_edge != ending_vd_edge);
     return true;
-}
-
-void SkeletalTrapezoidation::computeSegmentCellRange(VD::cell_type& cell, Point& start_source_point, Point& end_source_point, VD::edge_type*& starting_vd_edge, VD::edge_type*& ending_vd_edge, const std::vector<Segment>& segments)
-{
-    const Segment &source_segment = VoronoiUtils::getSourceSegment(cell, segments);
-    const Point    from           = source_segment.from();
-    const Point    to             = source_segment.to();
-
-    // Find starting edge
-    // Find end edge
-    bool seen_possible_start = false;
-    bool after_start = false;
-    bool ending_edge_is_set_before_start = false;
-    VD::edge_type* edge = cell.incident_edge();
-    do {
-        if (edge->is_infinite())
-            continue;
-
-        Vec2i64 v0 = VoronoiUtils::p(edge->vertex0());
-        Vec2i64 v1 = VoronoiUtils::p(edge->vertex1());
-
-        assert(!(v0 == to.cast<int64_t>() && v1 == from.cast<int64_t>() ));
-        if (v0 == to.cast<int64_t>()  && !after_start) { // Use the last edge which starts in source_segment.to
-            starting_vd_edge = edge;
-            seen_possible_start = true;
-        }
-        else if (seen_possible_start) {
-            after_start = true;
-        }
-
-        if (v1 == from.cast<int64_t>()  && (!ending_vd_edge || ending_edge_is_set_before_start)) {
-            ending_edge_is_set_before_start = !after_start;
-            ending_vd_edge = edge;
-        }
-    } while (edge = edge->next(), edge != cell.incident_edge());
-    
-    assert(starting_vd_edge && ending_vd_edge);
-    assert(starting_vd_edge != ending_vd_edge);
-    
-    start_source_point = source_segment.to();
-    end_source_point = source_segment.from();
 }
 
 SkeletalTrapezoidation::SkeletalTrapezoidation(const Polygons& polys, const BeadingStrategy& beading_strategy,
@@ -433,11 +389,11 @@ SkeletalTrapezoidation::SkeletalTrapezoidation(const Polygons& polys, const Bead
 
 static bool has_finite_edge_with_non_finite_vertex(const VD &voronoi_diagram)
 {
-    for (const VoronoiUtils::vd_t::edge_type &edge : voronoi_diagram.edges()) {
+    for (const VD::edge_type &edge : voronoi_diagram.edges()) {
         if (edge.is_finite()) {
             assert(edge.vertex0() != nullptr && edge.vertex1() != nullptr);
-            if (edge.vertex0() == nullptr || edge.vertex1() == nullptr || !VoronoiUtils::is_finite(*edge.vertex0()) ||
-                !VoronoiUtils::is_finite(*edge.vertex1()))
+            if (edge.vertex0() == nullptr || edge.vertex1() == nullptr || !Geometry::VoronoiUtils::is_finite(*edge.vertex0()) ||
+                !Geometry::VoronoiUtils::is_finite(*edge.vertex1()))
                 return true;
         }
     }
@@ -453,7 +409,7 @@ static bool detect_missing_voronoi_vertex(const VD &voronoi_diagram, const std::
             continue; // There is no spoon
 
         if (cell.contains_segment()) {
-            const SkeletalTrapezoidation::Segment &source_segment = VoronoiUtils::getSourceSegment(cell, segments);
+            const SkeletalTrapezoidation::Segment &source_segment = Geometry::VoronoiUtils::get_source_segment(cell, segments.begin(), segments.end());
             const Point                            from           = source_segment.from();
             const Point                            to             = source_segment.to();
 
@@ -462,15 +418,15 @@ static bool detect_missing_voronoi_vertex(const VD &voronoi_diagram, const std::
             bool                           seen_possible_start             = false;
             bool                           after_start                     = false;
             bool                           ending_edge_is_set_before_start = false;
-            VoronoiUtils::vd_t::edge_type *starting_vd_edge                = nullptr;
-            VoronoiUtils::vd_t::edge_type *ending_vd_edge                  = nullptr;
-            VoronoiUtils::vd_t::edge_type *edge                            = cell.incident_edge();
+            VD::edge_type *starting_vd_edge                = nullptr;
+            VD::edge_type *ending_vd_edge                  = nullptr;
+            VD::edge_type *edge                            = cell.incident_edge();
             do {
-                if (edge->is_infinite() || edge->vertex0() == nullptr || edge->vertex1() == nullptr || !VoronoiUtils::is_finite(*edge->vertex0()) || !VoronoiUtils::is_finite(*edge->vertex1()))
+                if (edge->is_infinite() || edge->vertex0() == nullptr || edge->vertex1() == nullptr || !Geometry::VoronoiUtils::is_finite(*edge->vertex0()) || !Geometry::VoronoiUtils::is_finite(*edge->vertex1()))
                     continue;
 
-                Vec2i64 v0 = VoronoiUtils::p(edge->vertex0());
-                Vec2i64 v1 = VoronoiUtils::p(edge->vertex1());
+                Vec2i64 v0 = Geometry::VoronoiUtils::to_point(edge->vertex0());
+                Vec2i64 v1 = Geometry::VoronoiUtils::to_point(edge->vertex1());
 
                 assert(!(v0 == to.cast<int64_t>() && v1 == from.cast<int64_t>()));
                 if (v0 == to.cast<int64_t>() && !after_start) { // Use the last edge which starts in source_segment.to
@@ -517,7 +473,7 @@ inline static void rotate_back_skeletal_trapezoidation_graph_after_fix(SkeletalT
     }
 }
 
-bool detect_voronoi_edge_intersecting_input_segment(const VD &voronoi_diagram, const std::vector<VoronoiUtils::Segment> &segments)
+bool detect_voronoi_edge_intersecting_input_segment(const VD &voronoi_diagram, const std::vector<PolygonsSegmentIndex> &segments)
 {
     for (VD::cell_type cell : voronoi_diagram.cells()) {
         if (!cell.incident_edge())
@@ -526,18 +482,16 @@ bool detect_voronoi_edge_intersecting_input_segment(const VD &voronoi_diagram, c
         if (!cell.contains_segment())
             continue; // Skip cells that don't contain segments.
 
-        const VoronoiUtils::Segment &source_segment      = VoronoiUtils::getSourceSegment(cell, segments);
-        const Vec2d                  source_segment_from = source_segment.from().cast<double>();
-        const Vec2d                  source_segment_vec  = source_segment.to().cast<double>() - source_segment_from;
+        const PolygonsSegmentIndex &source_segment      = Geometry::VoronoiUtils::get_source_segment(cell, segments.begin(), segments.end());
+        const Vec2d                 source_segment_from = source_segment.from().cast<double>();
+        const Vec2d                 source_segment_vec  = source_segment.to().cast<double>() - source_segment_from;
 
-        Point          start_source_point, end_source_point;
-        VD::edge_type *begin_voronoi_edge = nullptr, *end_voronoi_edge = nullptr;
-        SkeletalTrapezoidation::computeSegmentCellRange(cell, start_source_point, end_source_point, begin_voronoi_edge, end_voronoi_edge, segments);
+        Geometry::SegmentCellRange<Point> cell_range = Geometry::VoronoiUtils::compute_segment_cell_range(cell, segments.begin(), segments.end());
         // All Voronoi vertices must be on left side of the source segment, otherwise Voronoi diagram is invalid.
         // FIXME Lukas H.: Be aware that begin_voronoi_edge and end_voronoi_edge could be nullptr in some specific cases.
         //                 It mostly happens when there is some missing Voronoi, for example, in GH issue #8846 (IssuesWithMysteriousPerimeters.3mf).
-        if (begin_voronoi_edge != nullptr && end_voronoi_edge != nullptr)
-            for (VD::edge_type *edge = begin_voronoi_edge; edge != end_voronoi_edge; edge = edge->next())
+        if (cell_range.edge_begin != nullptr && cell_range.edge_end != nullptr)
+            for (VD::edge_type *edge = cell_range.edge_begin; edge != cell_range.edge_end; edge = edge->next())
                 if (const Vec2d edge_v1(edge->vertex1()->x(), edge->vertex1()->y()); Slic3r::cross2(source_segment_vec, edge_v1 - source_segment_from) < 0)
                     return true;
     }
@@ -652,7 +606,7 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
 #endif
 
     VD voronoi_diagram;
-    voronoi_diagram.construct_voronoi(segments.begin(), segments.end());
+    voronoi_diagram.construct_voronoi(segments.cbegin(), segments.cend());
 
 #ifdef ARACHNE_DEBUG_VORONOI
     {
@@ -696,10 +650,10 @@ process_voronoi_diagram:
         if (!cell.incident_edge())
             continue; // There is no spoon
 
-        Point start_source_point;
-        Point end_source_point;
-        VD::edge_type* starting_voronoi_edge = nullptr;
-        VD::edge_type* ending_voronoi_edge   = nullptr;
+        Point          start_source_point;
+        Point          end_source_point;
+        VD::edge_type *starting_voronoi_edge = nullptr;
+        VD::edge_type *ending_voronoi_edge   = nullptr;
         // Compute and store result in above variables
 
         if (cell.contains_point()) {
@@ -708,7 +662,12 @@ process_voronoi_diagram:
                 continue;
         } else {
             assert(cell.contains_segment());
-            computeSegmentCellRange(cell, start_source_point, end_source_point, starting_voronoi_edge, ending_voronoi_edge, segments);
+            Geometry::SegmentCellRange<Point> cell_range = Geometry::VoronoiUtils::compute_segment_cell_range(cell, segments.cbegin(), segments.cend());
+            assert(cell_range.is_valid());
+            start_source_point    = cell_range.segment_start_point;
+            end_source_point      = cell_range.segment_end_point;
+            starting_voronoi_edge = cell_range.edge_begin;
+            ending_voronoi_edge   = cell_range.edge_end;
         }
 
         if (!starting_voronoi_edge || !ending_voronoi_edge) {
@@ -717,33 +676,25 @@ process_voronoi_diagram:
         }
 
         // Copy start to end edge to graph
-        edge_t* prev_edge = nullptr;
-        assert(VoronoiUtils::p(starting_voronoi_edge->vertex1()).x() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(starting_voronoi_edge->vertex1()).x() >= std::numeric_limits<coord_t>::lowest());
-        assert(VoronoiUtils::p(starting_voronoi_edge->vertex1()).y() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(starting_voronoi_edge->vertex1()).y() >= std::numeric_limits<coord_t>::lowest());
-        transferEdge(start_source_point, VoronoiUtils::p(starting_voronoi_edge->vertex1()).cast<coord_t>(), *starting_voronoi_edge, prev_edge, start_source_point, end_source_point, segments);
-        node_t* starting_node = vd_node_to_he_node[starting_voronoi_edge->vertex0()];
+        assert(Geometry::VoronoiUtils::is_in_range<coord_t>(*starting_voronoi_edge));
+        edge_t *prev_edge = nullptr;
+        transferEdge(start_source_point, Geometry::VoronoiUtils::to_point(starting_voronoi_edge->vertex1()).cast<coord_t>(), *starting_voronoi_edge, prev_edge, start_source_point, end_source_point, segments);
+        node_t *starting_node                    = vd_node_to_he_node[starting_voronoi_edge->vertex0()];
         starting_node->data.distance_to_boundary = 0;
 
         constexpr bool is_next_to_start_or_end = true;
         graph.makeRib(prev_edge, start_source_point, end_source_point, is_next_to_start_or_end);
         for (VD::edge_type* vd_edge = starting_voronoi_edge->next(); vd_edge != ending_voronoi_edge; vd_edge = vd_edge->next()) {
             assert(vd_edge->is_finite());
+            assert(Geometry::VoronoiUtils::is_in_range<coord_t>(*vd_edge));
 
-            assert(VoronoiUtils::p(vd_edge->vertex0()).x() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge->vertex0()).x() >= std::numeric_limits<coord_t>::lowest());
-            assert(VoronoiUtils::p(vd_edge->vertex0()).y() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge->vertex0()).y() >= std::numeric_limits<coord_t>::lowest());
-            assert(VoronoiUtils::p(vd_edge->vertex1()).x() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge->vertex1()).x() >= std::numeric_limits<coord_t>::lowest());
-            assert(VoronoiUtils::p(vd_edge->vertex1()).y() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(vd_edge->vertex1()).y() >= std::numeric_limits<coord_t>::lowest());
-
-            Point v1 = VoronoiUtils::p(vd_edge->vertex0()).cast<coord_t>();
-            Point v2 = VoronoiUtils::p(vd_edge->vertex1()).cast<coord_t>();
+            Point v1 = Geometry::VoronoiUtils::to_point(vd_edge->vertex0()).cast<coord_t>();
+            Point v2 = Geometry::VoronoiUtils::to_point(vd_edge->vertex1()).cast<coord_t>();
             transferEdge(v1, v2, *vd_edge, prev_edge, start_source_point, end_source_point, segments);
-
             graph.makeRib(prev_edge, start_source_point, end_source_point, vd_edge->next() == ending_voronoi_edge);
         }
 
-        assert(VoronoiUtils::p(starting_voronoi_edge->vertex0()).x() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(starting_voronoi_edge->vertex0()).x() >= std::numeric_limits<coord_t>::lowest());
-        assert(VoronoiUtils::p(starting_voronoi_edge->vertex0()).y() <= std::numeric_limits<coord_t>::max() && VoronoiUtils::p(starting_voronoi_edge->vertex0()).y() >= std::numeric_limits<coord_t>::lowest());
-        transferEdge(VoronoiUtils::p(ending_voronoi_edge->vertex0()).cast<coord_t>(), end_source_point, *ending_voronoi_edge, prev_edge, start_source_point, end_source_point, segments);
+        transferEdge(Geometry::VoronoiUtils::to_point(ending_voronoi_edge->vertex0()).cast<coord_t>(), end_source_point, *ending_voronoi_edge, prev_edge, start_source_point, end_source_point, segments);
         prev_edge->to->data.distance_to_boundary = 0;
     }
 

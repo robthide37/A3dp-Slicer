@@ -11,8 +11,6 @@
 
 #include <ankerl/unordered_dense.h>
 
-#include <Arachne/utils/VoronoiUtils.hpp>
-
 #include "utils/HalfEdgeGraph.hpp"
 #include "utils/PolygonsSegmentIndex.hpp"
 #include "utils/ExtrusionJunction.hpp"
@@ -234,32 +232,6 @@ protected:
      * polygon we should skip processing it altogether.
      */
     static bool computePointCellRange(VD::cell_type& cell, Point& start_source_point, Point& end_source_point, VD::edge_type*& starting_vd_edge, VD::edge_type*& ending_vd_edge, const std::vector<Segment>& segments);
-
-    /*!
-     * Compute the range of line segments that surround a cell of the skeletal
-     * graph that belongs to a line segment of the medial axis.
-     *
-     * This should only be used on cells that belong to a central line segment
-     * of the skeletal graph, e.g. trapezoid cells, not triangular cells.
-     *
-     * The resulting line segments is just the first and the last segment. They
-     * are linked to the neighboring segments, so you can iterate over the
-     * segments until you reach the last segment.
-     * \param cell The cell to compute the range of line segments for.
-     * \param[out] start_source_point The start point of the source segment of
-     * this cell.
-     * \param[out] end_source_point The end point of the source segment of this
-     * cell.
-     * \param[out] starting_vd_edge The edge of the Voronoi diagram where the
-     * loop around the cell starts.
-     * \param[out] ending_vd_edge The edge of the Voronoi diagram where the loop
-     * around the cell ends.
-     * \param points All vertices of the input Polygons.
-     * \param segments All edges of the input Polygons.
-     * /return Whether the cell is inside of the polygon. If it's outside of the
-     * polygon we should skip processing it altogether.
-     */
-    static void computeSegmentCellRange(VD::cell_type& cell, Point& start_source_point, Point& end_source_point, VD::edge_type*& starting_vd_edge, VD::edge_type*& ending_vd_edge, const std::vector<Segment>& segments);
 
     /*!
      * For VD cells associated with an input polygon vertex, we need to separate the node at the end and start of the cell into two
@@ -602,7 +574,7 @@ protected:
      */
     void generateLocalMaximaSingleBeads();
 
-    friend bool detect_voronoi_edge_intersecting_input_segment(const VD &voronoi_diagram, const std::vector<VoronoiUtils::Segment> &segments);
+    friend bool detect_voronoi_edge_intersecting_input_segment(const VD &voronoi_diagram, const std::vector<Segment> &segments);
 };
 
 } // namespace Slic3r::Arachne

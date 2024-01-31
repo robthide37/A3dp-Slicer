@@ -7,7 +7,7 @@
 #include <CGAL/Surface_sweep_2_algorithms.h>
 
 #include "libslic3r/Geometry/Voronoi.hpp"
-#include "libslic3r/Arachne/utils/VoronoiUtils.hpp"
+#include "libslic3r/Geometry/VoronoiUtils.hpp"
 
 #include "VoronoiUtilsCgal.hpp"
 
@@ -178,22 +178,22 @@ struct ParabolicSegment
     const CGAL::Orientation is_focus_on_left;
 };
 
-inline static ParabolicSegment get_parabolic_segment(const VD::edge_type &edge, const std::vector<VoronoiUtils::Segment> &segments)
+inline static ParabolicSegment get_parabolic_segment(const VD::edge_type &edge, const std::vector<PolygonsSegmentIndex> &segments)
 {
     assert(edge.is_curved());
 
     const VD::cell_type *left_cell  = edge.cell();
     const VD::cell_type *right_cell = edge.twin()->cell();
 
-    const Point                  focus_pt   = VoronoiUtils::getSourcePoint(*(left_cell->contains_point() ? left_cell : right_cell), segments);
-    const VoronoiUtils::Segment &directrix  = VoronoiUtils::getSourceSegment(*(left_cell->contains_point() ? right_cell : left_cell), segments);
-    CGAL::Orientation            focus_side = CGAL::opposite(CGAL::orientation(to_cgal_point(edge.vertex0()), to_cgal_point(edge.vertex1()), to_cgal_point(focus_pt)));
+    const Point                 focus_pt   = VoronoiUtils::get_source_point(*(left_cell->contains_point() ? left_cell : right_cell), segments.begin(), segments.end());
+    const PolygonsSegmentIndex &directrix  = VoronoiUtils::get_source_segment(*(left_cell->contains_point() ? right_cell : left_cell), segments.begin(), segments.end());
+    CGAL::Orientation           focus_side = CGAL::opposite(CGAL::orientation(to_cgal_point(edge.vertex0()), to_cgal_point(edge.vertex1()), to_cgal_point(focus_pt)));
 
     assert(focus_side == CGAL::Orientation::LEFT_TURN || focus_side == CGAL::Orientation::RIGHT_TURN);
     return {focus_pt, Line(directrix.from(), directrix.to()), make_linef(edge), focus_side};
 }
 
-inline static CGAL::Orientation orientation_of_two_edges(const VD::edge_type &edge_a, const VD::edge_type &edge_b, const std::vector<VoronoiUtils::Segment> &segments) {
+inline static CGAL::Orientation orientation_of_two_edges(const VD::edge_type &edge_a, const VD::edge_type &edge_b, const std::vector<PolygonsSegmentIndex> &segments) {
     assert(is_equal(*edge_a.vertex0(), *edge_b.vertex0()));
     CGAL::Orientation orientation;
     if (edge_a.is_linear() && edge_b.is_linear()) {
@@ -230,7 +230,7 @@ inline static CGAL::Orientation orientation_of_two_edges(const VD::edge_type &ed
     return orientation;
 }
 
-static bool check_if_three_edges_are_ccw(const VD::edge_type &first, const VD::edge_type &second, const VD::edge_type &third, const std::vector<VoronoiUtils::Segment> &segments)
+static bool check_if_three_edges_are_ccw(const VD::edge_type &first, const VD::edge_type &second, const VD::edge_type &third, const std::vector<PolygonsSegmentIndex> &segments)
 {
     assert(is_equal(*first.vertex0(), *second.vertex0()) && is_equal(*second.vertex0(), *third.vertex0()));
 
@@ -254,7 +254,7 @@ static bool check_if_three_edges_are_ccw(const VD::edge_type &first, const VD::e
     }
 }
 
-bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &voronoi_diagram, const std::vector<VoronoiUtils::Segment> &segments)
+bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &voronoi_diagram, const std::vector<PolygonsSegmentIndex> &segments)
 {
     for (const VD::vertex_type &vertex : voronoi_diagram.vertices()) {
         std::vector<const VD::edge_type *> edges;
