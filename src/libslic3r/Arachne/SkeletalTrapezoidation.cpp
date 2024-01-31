@@ -517,7 +517,7 @@ VoronoiDiagramStatus detect_voronoi_diagram_known_issues(const VD               
     } else if (const bool has_voronoi_edge_intersecting_input_segment = detect_voronoi_edge_intersecting_input_segment(voronoi_diagram, segments); has_voronoi_edge_intersecting_input_segment) {
         // Detection if Voronoi edge is intersecting input segment detects at least one model in GH issue #8446.
         return VoronoiDiagramStatus::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT;
-    } else if (const bool is_voronoi_diagram_planar = Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segments); !is_voronoi_diagram_planar) {
+    } else if (const bool is_voronoi_diagram_planar = Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segments.begin(), segments.end()); !is_voronoi_diagram_planar) {
         // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514 and #8446.
         return VoronoiDiagramStatus::NON_PLANAR_VORONOI_DIAGRAM;
     }
