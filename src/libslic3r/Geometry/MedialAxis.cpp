@@ -467,7 +467,7 @@ void MedialAxis::build(ThickPolylines* polylines)
         test(l.b.y());
     }
 #endif // NDEBUG
-    construct_voronoi(m_lines.begin(), m_lines.end(), &m_vd);
+    m_vd.construct_voronoi(m_lines.begin(), m_lines.end());
     Slic3r::Voronoi::annotate_inside_outside(m_vd, m_lines);
 //    static constexpr double threshold_alpha = M_PI / 12.; // 30 degrees
 //    std::vector<Vec2d> skeleton_edges = Slic3r::Voronoi::skeleton_edges_rough(vd, lines, threshold_alpha);

@@ -702,7 +702,7 @@ struct MMU_Graph
 
     // All Voronoi vertices are post-processes to merge very close vertices to single. Witch eliminates issues with intersection edges.
     // Also, Voronoi vertices outside of the bounding of input polygons are throw away by marking them.
-    void append_voronoi_vertices(const Geometry::VoronoiDiagram &vd, const Polygons &color_poly_tmp, BoundingBox bbox) {
+    void append_voronoi_vertices(const Voronoi::VD &vd, const Polygons &color_poly_tmp, BoundingBox bbox) {
         bbox.offset(SCALED_EPSILON);
 
         struct CPoint
@@ -884,7 +884,7 @@ static inline Line clip_finite_voronoi_edge(const Voronoi::VD::edge_type &edge, 
 
 static MMU_Graph build_graph(size_t layer_idx, const std::vector<std::vector<ColoredLine>> &color_poly)
 {
-    Geometry::VoronoiDiagram vd;
+    Voronoi::VD              vd;
     std::vector<ColoredLine> lines_colored  = to_lines(color_poly);
     const Polygons           color_poly_tmp = colored_points_to_polygon(color_poly);
     const Points             points         = to_points(color_poly_tmp);
@@ -908,7 +908,7 @@ static MMU_Graph build_graph(size_t layer_idx, const std::vector<std::vector<Col
         force_edge_adding[&c_poly - &color_poly.front()] = force_edge;
     }
 
-    boost::polygon::construct_voronoi(lines_colored.begin(), lines_colored.end(), &vd);
+    vd.construct_voronoi(lines_colored.begin(), lines_colored.end());
     MMU_Graph graph;
     graph.nodes.reserve(points.size() + vd.vertices().size());
     for (const Point &point : points)

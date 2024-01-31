@@ -254,7 +254,7 @@ static bool check_if_three_edges_are_ccw(const VD::edge_type &first, const VD::e
     }
 }
 
-bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VoronoiDiagram &voronoi_diagram, const std::vector<VoronoiUtils::Segment> &segments)
+bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &voronoi_diagram, const std::vector<VoronoiUtils::Segment> &segments)
 {
     for (const VD::vertex_type &vertex : voronoi_diagram.vertices()) {
         std::vector<const VD::edge_type *> edges;
@@ -271,9 +271,9 @@ bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VoronoiDiagram &vor
         // Checking for CCW make sense for three and more edges.
         if (edges.size() > 2) {
             for (auto edge_it = edges.begin() ; edge_it != edges.end(); ++edge_it) {
-                const Geometry::VoronoiDiagram::edge_type *prev_edge = edge_it == edges.begin() ? edges.back() : *std::prev(edge_it);
-                const Geometry::VoronoiDiagram::edge_type *curr_edge = *edge_it;
-                const Geometry::VoronoiDiagram::edge_type *next_edge = std::next(edge_it) == edges.end() ? edges.front() : *std::next(edge_it);
+                const VD::edge_type *prev_edge = edge_it == edges.begin() ? edges.back() : *std::prev(edge_it);
+                const VD::edge_type *curr_edge = *edge_it;
+                const VD::edge_type *next_edge = std::next(edge_it) == edges.end() ? edges.front() : *std::next(edge_it);
 
                 if (!check_if_three_edges_are_ccw(*prev_edge, *curr_edge, *next_edge, segments))
                     return false;
