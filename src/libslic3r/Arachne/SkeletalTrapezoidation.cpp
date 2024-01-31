@@ -387,77 +387,6 @@ SkeletalTrapezoidation::SkeletalTrapezoidation(const Polygons& polys, const Bead
     constructFromPolygons(polys);
 }
 
-static bool has_finite_edge_with_non_finite_vertex(const VD &voronoi_diagram)
-{
-    for (const VD::edge_type &edge : voronoi_diagram.edges()) {
-        if (edge.is_finite()) {
-            assert(edge.vertex0() != nullptr && edge.vertex1() != nullptr);
-            if (edge.vertex0() == nullptr || edge.vertex1() == nullptr || !Geometry::VoronoiUtils::is_finite(*edge.vertex0()) ||
-                !Geometry::VoronoiUtils::is_finite(*edge.vertex1()))
-                return true;
-        }
-    }
-    return false;
-}
-
-static bool detect_missing_voronoi_vertex(const VD &voronoi_diagram, const std::vector<SkeletalTrapezoidation::Segment> &segments) {
-    if (has_finite_edge_with_non_finite_vertex(voronoi_diagram))
-        return true;
-
-    for (VD::cell_type cell : voronoi_diagram.cells()) {
-        if (!cell.incident_edge())
-            continue; // There is no spoon
-
-        if (cell.contains_segment()) {
-            const SkeletalTrapezoidation::Segment &source_segment = Geometry::VoronoiUtils::get_source_segment(cell, segments.begin(), segments.end());
-            const Point                            from           = source_segment.from();
-            const Point                            to             = source_segment.to();
-
-            // Find starting edge
-            // Find end edge
-            bool                           seen_possible_start             = false;
-            bool                           after_start                     = false;
-            bool                           ending_edge_is_set_before_start = false;
-            VD::edge_type *starting_vd_edge                = nullptr;
-            VD::edge_type *ending_vd_edge                  = nullptr;
-            VD::edge_type *edge                            = cell.incident_edge();
-            do {
-                if (edge->is_infinite() || edge->vertex0() == nullptr || edge->vertex1() == nullptr || !Geometry::VoronoiUtils::is_finite(*edge->vertex0()) || !Geometry::VoronoiUtils::is_finite(*edge->vertex1()))
-                    continue;
-
-                Vec2i64 v0 = Geometry::VoronoiUtils::to_point(edge->vertex0());
-                Vec2i64 v1 = Geometry::VoronoiUtils::to_point(edge->vertex1());
-
-                assert(!(v0 == to.cast<int64_t>() && v1 == from.cast<int64_t>()));
-                if (v0 == to.cast<int64_t>() && !after_start) { // Use the last edge which starts in source_segment.to
-                    starting_vd_edge    = edge;
-                    seen_possible_start = true;
-                } else if (seen_possible_start) {
-                    after_start = true;
-                }
-
-                if (v1 == from.cast<int64_t>() && (!ending_vd_edge || ending_edge_is_set_before_start)) {
-                    ending_edge_is_set_before_start = !after_start;
-                    ending_vd_edge                  = edge;
-                }
-            } while (edge = edge->next(), edge != cell.incident_edge());
-
-            if (!starting_vd_edge || !ending_vd_edge || starting_vd_edge == ending_vd_edge)
-                return true;
-        }
-    }
-
-    return false;
-}
-
-static bool has_missing_twin_edge(const SkeletalTrapezoidationGraph &graph)
-{
-    for (const auto &edge : graph.edges)
-        if (edge.twin == nullptr)
-            return true;
-    return false;
-}
-
 using PointMap = SkeletalTrapezoidation::PointMap;
 
 inline static void rotate_back_skeletal_trapezoidation_graph_after_fix(SkeletalTrapezoidationGraph  &graph,
@@ -471,57 +400,6 @@ inline static void rotate_back_skeletal_trapezoidation_graph_after_fix(SkeletalT
         else
             node.p.rotate(-fix_angle);
     }
-}
-
-bool detect_voronoi_edge_intersecting_input_segment(const VD &voronoi_diagram, const std::vector<PolygonsSegmentIndex> &segments)
-{
-    for (VD::cell_type cell : voronoi_diagram.cells()) {
-        if (!cell.incident_edge())
-            continue; // Degenerated cell, there is no spoon
-
-        if (!cell.contains_segment())
-            continue; // Skip cells that don't contain segments.
-
-        const PolygonsSegmentIndex &source_segment      = Geometry::VoronoiUtils::get_source_segment(cell, segments.begin(), segments.end());
-        const Vec2d                 source_segment_from = source_segment.from().cast<double>();
-        const Vec2d                 source_segment_vec  = source_segment.to().cast<double>() - source_segment_from;
-
-        Geometry::SegmentCellRange<Point> cell_range = Geometry::VoronoiUtils::compute_segment_cell_range(cell, segments.begin(), segments.end());
-        // All Voronoi vertices must be on left side of the source segment, otherwise Voronoi diagram is invalid.
-        // FIXME Lukas H.: Be aware that begin_voronoi_edge and end_voronoi_edge could be nullptr in some specific cases.
-        //                 It mostly happens when there is some missing Voronoi, for example, in GH issue #8846 (IssuesWithMysteriousPerimeters.3mf).
-        if (cell_range.edge_begin != nullptr && cell_range.edge_end != nullptr)
-            for (VD::edge_type *edge = cell_range.edge_begin; edge != cell_range.edge_end; edge = edge->next())
-                if (const Vec2d edge_v1(edge->vertex1()->x(), edge->vertex1()->y()); Slic3r::cross2(source_segment_vec, edge_v1 - source_segment_from) < 0)
-                    return true;
-    }
-
-    return false;
-}
-
-enum class VoronoiDiagramStatus {
-    NO_ISSUE_DETECTED,
-    MISSING_VORONOI_VERTEX,
-    NON_PLANAR_VORONOI_DIAGRAM,
-    VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT,
-    OTHER_TYPE_OF_VORONOI_DIAGRAM_DEGENERATION
-};
-
-// Try to detect cases when some Voronoi vertex is missing, when the Voronoi diagram
-// is not planar or some Voronoi edge is intersecting input segment.
-VoronoiDiagramStatus detect_voronoi_diagram_known_issues(const VD                                           &voronoi_diagram,
-                                                         const std::vector<SkeletalTrapezoidation::Segment> &segments)
-{
-    if (const bool has_missing_voronoi_vertex = detect_missing_voronoi_vertex(voronoi_diagram, segments); has_missing_voronoi_vertex) {
-        return VoronoiDiagramStatus::MISSING_VORONOI_VERTEX;
-    } else if (const bool has_voronoi_edge_intersecting_input_segment = detect_voronoi_edge_intersecting_input_segment(voronoi_diagram, segments); has_voronoi_edge_intersecting_input_segment) {
-        // Detection if Voronoi edge is intersecting input segment detects at least one model in GH issue #8446.
-        return VoronoiDiagramStatus::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT;
-    } else if (const bool is_voronoi_diagram_planar = Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segments.begin(), segments.end()); !is_voronoi_diagram_planar) {
-        // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514 and #8446.
-        return VoronoiDiagramStatus::NON_PLANAR_VORONOI_DIAGRAM;
-    }
-    return VoronoiDiagramStatus::NO_ISSUE_DETECTED;
 }
 
 inline static std::pair<PointMap, double> try_to_fix_degenerated_voronoi_diagram_by_rotation(
@@ -565,7 +443,7 @@ inline static std::pair<PointMap, double> try_to_fix_degenerated_voronoi_diagram
         }
 #endif
 
-        if (detect_voronoi_diagram_known_issues(voronoi_diagram, segments) == VoronoiDiagramStatus::NO_ISSUE_DETECTED)
+        if (VD::detect_known_issues(voronoi_diagram, segments.cbegin(), segments.cend()) == VD::IssueType::NO_ISSUE_DETECTED)
             break;
     }
 
@@ -617,34 +495,33 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
 
     // When any Voronoi vertex is missing, the Voronoi diagram is not planar, or some voronoi edge is
     // intersecting input segment, rotate the input polygon and try again.
-    VoronoiDiagramStatus      status         = detect_voronoi_diagram_known_issues(voronoi_diagram, segments);
+    VD::IssueType             status         = VD::detect_known_issues(voronoi_diagram, segments.cbegin(), segments.cend());
     const std::vector<double> fix_angles     = {PI / 6, PI / 5, PI / 7, PI / 11};
     double                    fixed_by_angle = fix_angles.front();
 
     PointMap vertex_mapping;
     // polys_copy is referenced through items stored in the std::vector segments.
     Polygons                                    polys_copy = polys;
-    if (status != VoronoiDiagramStatus::NO_ISSUE_DETECTED) {
-        if (status == VoronoiDiagramStatus::MISSING_VORONOI_VERTEX)
+    if (status != VD::IssueType::NO_ISSUE_DETECTED) {
+        if (status == VD::IssueType::MISSING_VORONOI_VERTEX)
             BOOST_LOG_TRIVIAL(warning) << "Detected missing Voronoi vertex, input polygons will be rotated back and forth.";
-        else if (status == VoronoiDiagramStatus::NON_PLANAR_VORONOI_DIAGRAM)
+        else if (status == VD::IssueType::NON_PLANAR_VORONOI_DIAGRAM)
             BOOST_LOG_TRIVIAL(warning) << "Detected non-planar Voronoi diagram, input polygons will be rotated back and forth.";
-        else if (status == VoronoiDiagramStatus::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT)
+        else if (status == VD::IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT)
             BOOST_LOG_TRIVIAL(warning) << "Detected Voronoi edge intersecting input segment, input polygons will be rotated back and forth.";
 
         std::tie(vertex_mapping, fixed_by_angle) = try_to_fix_degenerated_voronoi_diagram_by_rotation(voronoi_diagram, polys, polys_copy, segments, fix_angles);
 
-        VoronoiDiagramStatus status_after_fix = detect_voronoi_diagram_known_issues(voronoi_diagram, segments);
-        assert(status_after_fix == VoronoiDiagramStatus::NO_ISSUE_DETECTED);
-        if (status_after_fix == VoronoiDiagramStatus::MISSING_VORONOI_VERTEX)
+        VD::IssueType status_after_fix = VD::detect_known_issues(voronoi_diagram, segments.cbegin(), segments.cend());
+        assert(status_after_fix == VD::IssueType::NO_ISSUE_DETECTED);
+        if (status_after_fix == VD::IssueType::MISSING_VORONOI_VERTEX)
             BOOST_LOG_TRIVIAL(error) << "Detected missing Voronoi vertex even after the rotation of input.";
-        else if (status_after_fix == VoronoiDiagramStatus::NON_PLANAR_VORONOI_DIAGRAM)
+        else if (status_after_fix == VD::IssueType::NON_PLANAR_VORONOI_DIAGRAM)
             BOOST_LOG_TRIVIAL(error) << "Detected non-planar Voronoi diagram even after the rotation of input.";
-        else if (status_after_fix == VoronoiDiagramStatus::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT)
+        else if (status_after_fix == VD::IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT)
             BOOST_LOG_TRIVIAL(error) << "Detected Voronoi edge intersecting input segment even after the rotation of input.";
     }
 
-process_voronoi_diagram:
     assert(this->graph.edges.empty() && this->graph.nodes.empty() && this->vd_edge_to_he_edge.empty() && this->vd_node_to_he_node.empty());
     for (VD::cell_type cell : voronoi_diagram.cells()) {
         if (!cell.incident_edge())
@@ -698,37 +575,7 @@ process_voronoi_diagram:
         prev_edge->to->data.distance_to_boundary = 0;
     }
 
-    // For some input polygons, as in GH issues #8474 and #8514 resulting Voronoi diagram is degenerated because it is not planar.
-    // When this degenerated Voronoi diagram is processed, the resulting half-edge structure contains some edges that don't have
-    // a twin edge. Based on this, we created a fast mechanism that detects those causes and tries to recompute the Voronoi
-    // diagram on slightly rotated input polygons that usually make the Voronoi generator generate a non-degenerated Voronoi diagram.
-    if (status == VoronoiDiagramStatus::NO_ISSUE_DETECTED && has_missing_twin_edge(this->graph)) {
-        BOOST_LOG_TRIVIAL(warning) << "Detected degenerated Voronoi diagram, input polygons will be rotated back and forth.";
-        status                                   = VoronoiDiagramStatus::OTHER_TYPE_OF_VORONOI_DIAGRAM_DEGENERATION;
-        std::tie(vertex_mapping, fixed_by_angle) = try_to_fix_degenerated_voronoi_diagram_by_rotation(voronoi_diagram, polys, polys_copy, segments, fix_angles);
-
-        assert(!detect_missing_voronoi_vertex(voronoi_diagram, segments));
-        if (detect_missing_voronoi_vertex(voronoi_diagram, segments))
-            BOOST_LOG_TRIVIAL(error) << "Detected missing Voronoi vertex after the rotation of input.";
-
-        assert(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(voronoi_diagram));
-
-        this->graph.edges.clear();
-        this->graph.nodes.clear();
-        this->vd_edge_to_he_edge.clear();
-        this->vd_node_to_he_node.clear();
-
-        goto process_voronoi_diagram;
-    }
-
-    if (status != VoronoiDiagramStatus::NO_ISSUE_DETECTED) {
-        assert(!has_missing_twin_edge(this->graph));
-
-        if (has_missing_twin_edge(this->graph))
-            BOOST_LOG_TRIVIAL(error) << "Detected degenerated Voronoi diagram even after the rotation of input.";
-    }
-
-    if (status != VoronoiDiagramStatus::NO_ISSUE_DETECTED)
+    if (status != VD::IssueType::NO_ISSUE_DETECTED)
         rotate_back_skeletal_trapezoidation_graph_after_fix(this->graph, fixed_by_angle, vertex_mapping);
 
 #ifdef ARACHNE_DEBUG
