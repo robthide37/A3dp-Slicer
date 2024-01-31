@@ -140,6 +140,16 @@ public:
     try_to_repair_degenerated_voronoi_diagram(SegmentIterator segment_begin, SegmentIterator segment_end);
 
 private:
+    struct Segment
+    {
+        Point from;
+        Point to;
+
+        Segment() = delete;
+        explicit Segment(const Point &from, const Point &to) : from(from), to(to) {}
+    };
+
+    void copy_to_local(voronoi_diagram_type &voronoi_diagram);
 
     // Detect issues related to Voronoi cells, or that can be detected by iterating over Voronoi cells.
     // The first type of issue that can be detected is a missing Voronoi vertex, especially when it is
@@ -161,8 +171,29 @@ private:
     bool                  m_is_modified = false;
     State                 m_state       = State::UNKNOWN;
     IssueType             m_issue_type  = IssueType::UNKNOWN;
+
+public:
+    using SegmentIt = std::vector<Slic3r::Geometry::VoronoiDiagram::Segment>::iterator;
+
+    friend struct boost::polygon::segment_traits<Slic3r::Geometry::VoronoiDiagram::Segment>;
 };
 
 } // namespace Slic3r::Geometry
+
+namespace boost::polygon {
+template<> struct geometry_concept<Slic3r::Geometry::VoronoiDiagram::Segment>
+{
+    typedef segment_concept type;
+};
+
+template<> struct segment_traits<Slic3r::Geometry::VoronoiDiagram::Segment>
+{
+    using coordinate_type = coord_t;
+    using point_type      = Slic3r::Point;
+    using segment_type    = Slic3r::Geometry::VoronoiDiagram::Segment;
+
+    static inline point_type get(const segment_type &segment, direction_1d dir) { return dir.to_int() ? segment.to : segment.from; }
+};
+} // namespace boost::polygon
 
 #endif // slic3r_Geometry_Voronoi_hpp_

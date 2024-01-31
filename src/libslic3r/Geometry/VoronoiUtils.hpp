@@ -31,6 +31,8 @@ public:
 
     static bool is_finite(const VD::vertex_type &vertex);
 
+    static VD::vertex_type make_rotated_vertex(VD::vertex_type &vertex, double angle);
+
     template<typename SegmentIterator>
     static typename boost::polygon::enable_if<
         typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<

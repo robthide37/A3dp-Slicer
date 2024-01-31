@@ -11,12 +11,15 @@ using ColoredLinesIt              = ColoredLines::iterator;
 
 // Explicit template instantiation.
 template LinesIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
+template VD::SegmentIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
 template ColoredLinesIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
 template PolygonsSegmentIndexConstIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
+template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, LinesIt, LinesIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
 template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
 template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 template Points VoronoiUtils::discretize_parabola(const Point &, const Arachne::PolygonsSegmentIndex &, const Point &, const Point &, coord_t, float);
@@ -249,6 +252,21 @@ Vec2i64 VoronoiUtils::to_point(const VD::vertex_type *vertex)
 bool VoronoiUtils::is_finite(const VD::vertex_type &vertex)
 {
     return std::isfinite(vertex.x()) && std::isfinite(vertex.y());
+}
+
+VD::vertex_type VoronoiUtils::make_rotated_vertex(VD::vertex_type &vertex, const double angle)
+{
+    const double cos_a = std::cos(angle);
+    const double sin_a = std::sin(angle);
+
+    const double rotated_x = (cos_a * vertex.x() - sin_a * vertex.y());
+    const double rotated_y = (cos_a * vertex.y() + sin_a * vertex.x());
+
+    VD::vertex_type rotated_vertex{rotated_x, rotated_y};
+    rotated_vertex.incident_edge(vertex.incident_edge());
+    rotated_vertex.color(vertex.color());
+
+    return rotated_vertex;
 }
 
 } // namespace Slic3r::Geometry

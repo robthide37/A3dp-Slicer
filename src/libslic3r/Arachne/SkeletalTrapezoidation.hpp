@@ -80,7 +80,6 @@ class SkeletalTrapezoidation
 
 public:
     using Segment  = PolygonsSegmentIndex;
-    using PointMap = ankerl::unordered_dense::map<Point, Point, PointHash>;
     using NodeSet  = ankerl::unordered_dense::set<node_t*>;
 
     /*!

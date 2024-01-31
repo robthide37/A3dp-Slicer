@@ -23,6 +23,7 @@ using ColoredLinesIt              = ColoredLines::iterator;
 
 // Explicit template instantiation.
 template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, LinesIt, LinesIt);
+template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, VD::SegmentIt, VD::SegmentIt);
 template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, ColoredLinesIt, ColoredLinesIt);
 template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 
