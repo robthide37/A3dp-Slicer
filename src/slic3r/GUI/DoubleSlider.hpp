@@ -405,6 +405,7 @@ private:
     FocusedItem m_focus = fiNone;
     wxPoint     m_moving_pos = wxDefaultPosition;
 
+    int         m_dead_zone_height;
     wxRect      m_rect_lower_thumb;
     wxRect      m_rect_higher_thumb;
     wxRect      m_rect_tick_action;
