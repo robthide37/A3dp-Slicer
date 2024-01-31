@@ -389,6 +389,8 @@ public:
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Comparing incompatible types");
         assert(dynamic_cast<const ConfigOptionSingle*>(&rhs));
+        if (this->is_nil() && rhs.is_nil())
+            return true;
         return this->value == static_cast<const ConfigOptionSingle*>(&rhs)->value;
     }
 
