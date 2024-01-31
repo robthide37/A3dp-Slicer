@@ -21,25 +21,6 @@
 
 #define SKELETAL_TRAPEZOIDATION_BEAD_SEARCH_MAX 1000 //A limit to how long it'll keep searching for adjacent beads. Increasing will re-use beadings more often (saving performance), but search longer for beading (costing performance).
 
-namespace boost::polygon {
-
-template<> struct geometry_concept<Slic3r::Arachne::PolygonsSegmentIndex>
-{
-    typedef segment_concept type;
-};
-
-template<> struct segment_traits<Slic3r::Arachne::PolygonsSegmentIndex>
-{
-    typedef coord_t          coordinate_type;
-    typedef Slic3r::Point    point_type;
-    static inline point_type get(const Slic3r::Arachne::PolygonsSegmentIndex &CSegment, direction_1d dir)
-    {
-        return dir.to_int() ? CSegment.p() : CSegment.next().p();
-    }
-};
-
-} // namespace boost::polygon
-
 namespace Slic3r::Arachne
 {
 

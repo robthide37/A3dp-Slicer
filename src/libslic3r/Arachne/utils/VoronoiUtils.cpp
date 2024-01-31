@@ -34,11 +34,11 @@ Point VoronoiUtils::getSourcePoint(const vd_t::cell_type& cell, const std::vecto
             break;
         case boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT:
             assert(cell.source_index() < segments.size());
-            return segments[cell.source_index()].to();
+            return boost::polygon::segment_traits<Segment>::get(segments[cell.source_index()], boost::polygon::LOW);
             break;
         case boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT:
             assert(cell.source_index() < segments.size());
-            return segments[cell.source_index()].from();
+            return boost::polygon::segment_traits<Segment>::get(segments[cell.source_index()], boost::polygon::HIGH);
             break;
         default:
             assert(false && "getSourcePoint should only be called on point cells!\n");
@@ -60,14 +60,12 @@ PolygonsPointIndex VoronoiUtils::getSourcePointIndex(const vd_t::cell_type& cell
     switch (cell.source_category()) {
         case boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT: {
             assert(cell.source_index() < segments.size());
-            PolygonsPointIndex ret = segments[cell.source_index()];
-            ++ret;
-            return ret;
+            return segments[cell.source_index()];
             break;
         }
         case boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT: {
             assert(cell.source_index() < segments.size());
-            return segments[cell.source_index()];
+            return segments[cell.source_index()].next();
             break;
         }
         default:
