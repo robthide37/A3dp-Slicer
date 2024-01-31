@@ -177,11 +177,13 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
     //add sub-part after scale
     float zscale_number = (first_layer_height + layer_height) / 0.4;
     std::vector < std::vector<ModelObject*>> part_tower;
+    std::vector<std::string> filament_temp_item_name;
     for (size_t id_item = 0; id_item < nb_items; id_item++) {
         part_tower.emplace_back();
         int mytemp = temp - temp_decr * id_item;
         if (mytemp <= 285 && mytemp >= 180 && mytemp % 5 == 0) {
-            add_part(model.objects[objs_idx[id_item]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("t" + std::to_string(mytemp) + ".amf")).string(),
+            filament_temp_item_name.push_back("t" + std::to_string(mytemp) + ".amf");
+            add_part(model.objects[objs_idx[id_item]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / filament_temp_item_name.back()).string(),
                 Vec3d{ 0,0, scale * 0.0 - 4.8 }, Vec3d{ scale,scale,scale });
             model.objects[objs_idx[id_item]]->volumes[1]->rotate(PI / 2, Vec3d(0, 0, 1));
             model.objects[objs_idx[id_item]]->volumes[1]->rotate(-PI / 2, Vec3d(1, 0, 0));
@@ -209,6 +211,8 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
 
 
     /// --- custom config ---
+    assert(filament_temp_item_name.size() == nb_items);
+    assert(model.objects.size() == nb_items);
     for (size_t i = 0; i < nb_items; i++) {
         //speed
         double perimeter_speed = full_print_config.get_computed_value("perimeter_speed");
@@ -218,8 +222,9 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         model.objects[objs_idx[i]]->config.set_key_value("perimeters", new ConfigOptionInt(2));
         model.objects[objs_idx[i]]->config.set_key_value("external_perimeters_first", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(0));
-        model.objects[objs_idx[i]]->volumes[0]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(2));
-        //model.objects[objs_idx[i]]->volumes[1]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(2));
+        for(auto& volume : model.objects[objs_idx[i]]->volumes)
+            if( volume->name == filament_temp_item_name[i] || volume->name.empty()) // if temperature patch or the main retraction patch (empty name because it's the initial volume)
+                volume->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(2));
         model.objects[objs_idx[i]]->config.set_key_value("top_solid_layers", new ConfigOptionInt(0));
         model.objects[objs_idx[i]]->config.set_key_value("fill_density", new ConfigOptionPercent(0));
         //model.objects[objs_idx[i]]->config.set_key_value("fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
