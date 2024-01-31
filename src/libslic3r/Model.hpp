@@ -353,6 +353,7 @@ public:
     /// It operates on the total size by duplicating the object according to all the instances.
     /// \param size Sizef3 the size vector
     void scale_to_fit(const Vec3d &size);
+    /// Rotate the model along its internal position (does not take its position into account)
     void rotate(double angle, Axis axis);
     void rotate(double angle, const Vec3d& axis);
     void mirror(Axis axis);
