@@ -2233,3 +2233,59 @@ TEST_CASE("Non-planar voronoi diagram", "[VoronoiNonPlanar]")
 
 //    REQUIRE(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(vd));
 }
+
+// This case is extracted from SPE-1729, where several ExPolygon with very thin lines
+// and holes formed by very close (1-5nm) vertices that are on the edge of our resolution.
+// Those thin lines and holes are both unprintable and cause the Voronoi diagram to be invalid.
+TEST_CASE("Invalid Voronoi diagram - Thin lines - SPE-1729", "[InvalidVoronoiDiagramThinLinesSPE1729]")
+{
+    Polygon contour = {
+        {32247689, -2405501},
+        {32247733, -2308514},
+        {32247692, -2405496},
+        {50484384,   332941},
+        {50374839,  1052546},
+        {32938040, -1637993},
+        {32938024, -1673788},
+        {32942107,  7220481},
+        {32252205,  7447599},
+        {32252476,  8037808},
+        {32555965,  8277599},
+        {17729260,  8904718},
+        {17729236,  8853233},
+        {17729259,  8904722},
+        {17039259,  8935481},
+        {17033440, -3880421},
+        {17204385, -3852156},
+        {17723645, -3441873},
+        {17723762, -3187210},
+        {17728957,  8240730},
+        {17728945,  8213866},
+        {31716233,  7614090},
+        {20801623, -1009882},
+        {21253963, -1580792},
+        {32252082,  7157187},
+        {32248022, -1673787},
+        {24245653, -2925506},
+        {18449246, -3809095},
+        {18728385, -4449246}
+    };
+
+    Polygon hole = {
+        {32247789, -2181284},
+        {32247870, -2003865},
+        {32247872, -2003866},
+        {32247752, -2267007}
+    };
+
+    Polygons polygons = {contour, hole};
+
+    VD    vd;
+    Lines lines = to_lines(polygons);
+    vd.construct_voronoi(lines.begin(), lines.end());
+#ifdef VORONOI_DEBUG_OUT
+    dump_voronoi_to_svg(debug_out_path("invalid-voronoi-diagram-thin-lines.svg").c_str(), vd, Points(), lines);
+#endif
+
+//    REQUIRE(vd.is_valid());
+}
