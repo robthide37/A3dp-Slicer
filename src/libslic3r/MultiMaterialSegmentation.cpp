@@ -20,30 +20,7 @@
 #include <mutex>
 #include <boost/thread/lock_guard.hpp>
 
-namespace Slic3r {
-struct ColoredLine {
-    Line line;
-    int color;
-    int poly_idx = -1;
-    int local_line_idx = -1;
-};
-}
-
 #include <boost/polygon/polygon.hpp>
-namespace boost::polygon {
-template <>
-struct geometry_concept<Slic3r::ColoredLine> { typedef segment_concept type; };
-
-template <>
-struct segment_traits<Slic3r::ColoredLine> {
-    typedef coord_t coordinate_type;
-    typedef Slic3r::Point point_type;
-
-    static inline point_type get(const Slic3r::ColoredLine& line, const direction_1d& dir) {
-        return dir.to_int() ? line.line.b : line.line.a;
-    }
-};
-}
 
 //#define MMU_SEGMENTATION_DEBUG_GRAPH
 //#define MMU_SEGMENTATION_DEBUG_REGIONS
