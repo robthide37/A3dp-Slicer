@@ -5403,6 +5403,8 @@ void TabSLAMaterial::update()
     if (m_preset_bundle->printers.get_selected_preset().printer_technology() == ptFFF)
         return;
 
+    toggle_options();
+
     update_description_lines();
     Layout();
 
@@ -5518,7 +5520,7 @@ void TabSLAMaterial::create_line_with_near_label_widget(ConfigOptionsGroupShp op
         wxWindow* check_box = CheckBox::GetNewWin(parent);
         wxGetApp().UpdateDarkUI(check_box);
 
-        check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, key](wxCommandEvent& evt) {
+        check_box->Bind(wxEVT_CHECKBOX, [this, optgroup_wk, key](wxCommandEvent& evt) {
             const bool is_checked = evt.IsChecked();
             if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
                 auto opt_keys = get_override_opt_kyes_for_line(optgroup_sh->title.ToStdString(), key);
@@ -5531,6 +5533,8 @@ void TabSLAMaterial::create_line_with_near_label_widget(ConfigOptionsGroupShp op
                             field->set_na_value();
                     }
             }
+
+            toggle_options();
         });
 
         m_overrides_options[key] = check_box;
@@ -5597,8 +5601,6 @@ void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp op
         is_checked = !m_config->option(opt_key)->is_nil();
         opt_keys.push_back(opt_key);
     }
-
-    // m_overrides_options[key]->Enable(is_checked);
 
     CheckBox::SetValue(m_overrides_options[key], is_checked);
 
@@ -5735,8 +5737,6 @@ void TabSLAPrint::update()
         return;
 
     m_update_cnt++;
-
-    m_config_manipulation.update_print_sla_config(m_config, true);
 
     update_description_lines();
     Layout();
