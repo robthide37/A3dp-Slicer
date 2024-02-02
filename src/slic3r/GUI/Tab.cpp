@@ -2132,6 +2132,7 @@ void TabFilament::update_extruder_combobox()
     }
 
     m_extruders_cb->SetSelection(m_active_extruder);
+    m_extruders_cb->Show(extruder_cnt > 1);
 }
 
 bool TabFilament::set_active_extruder(int new_selected_extruder)
