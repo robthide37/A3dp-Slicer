@@ -1055,7 +1055,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->set_status(90, message);
 
     // Create GCode on heap, it has quite a lot of data.
-    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator);
+    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator(const_cast<const Print*>(this)));
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
     if (m_conflict_result.has_value())

@@ -545,6 +545,29 @@ namespace DoExport {
     }
 } // namespace DoExport
 
+GCodeGenerator::GCodeGenerator(const Print* print) :
+    m_origin(Vec2d::Zero()),
+    m_enable_loop_clipping(true), 
+    m_enable_cooling_markers(false), 
+    m_enable_extrusion_role_markers(false),
+    m_last_processor_extrusion_role(GCodeExtrusionRole::None),
+    m_layer_count(0),
+    m_layer_index(-1), 
+    m_layer(nullptr),
+    m_object_layer_over_raft(false),
+    m_volumetric_speed(0),
+    m_last_extrusion_role(GCodeExtrusionRole::None),
+    m_last_width(0.0f),
+#if ENABLE_GCODE_VIEWER_DATA_CHECKING
+    m_last_mm3_per_mm(0.0),
+#endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
+    m_brim_done(false),
+    m_second_layer_things_done(false),
+    m_silent_time_estimator_enabled(false),
+    m_current_instance({nullptr, -1}),
+    m_print(print)
+    {}
+
 void GCodeGenerator::do_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     CNumericLocalesSetter locales_setter;
@@ -896,7 +919,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         binary_data.file_metadata.raw_data.emplace_back("Producer", std::string(SLIC3R_APP_NAME) + " " + std::string(SLIC3R_VERSION));
 
         // config data
-        encode_full_config(print, binary_data.slicer_metadata.raw_data);
+        encode_full_config(*m_print, binary_data.slicer_metadata.raw_data);
 
         // printer data - this section contains duplicates from the slicer metadata
         // that we just created. Find and copy the entries that we want to duplicate.
@@ -1384,7 +1407,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         {
             file.write("\n; prusaslicer_config = begin\n");
             std::string full_config;
-            append_full_config(print, full_config);
+            append_full_config(*m_print, full_config);
             if (!full_config.empty())
                 file.write(full_config);
             file.write("; prusaslicer_config = end\n");
@@ -1740,7 +1763,7 @@ static bool custom_gcode_sets_temperature(const std::string &gcode, const int mc
 
 // Print the machine envelope G-code for the Marlin firmware based on the "machine_max_xxx" parameters.
 // Do not process this piece of G-code by the time estimator, it already knows the values through another sources.
-void GCodeGenerator::print_machine_envelope(GCodeOutputStream &file, Print &print)
+void GCodeGenerator::print_machine_envelope(GCodeOutputStream &file, const Print &print)
 {
     const GCodeFlavor flavor = print.config().gcode_flavor.value;
     if ( (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware)
@@ -1801,7 +1824,7 @@ void GCodeGenerator::print_machine_envelope(GCodeOutputStream &file, Print &prin
 // Only do that if the start G-code does not already contain any M-code controlling an extruder temperature.
 // M140 - Set Extruder Temperature
 // M190 - Set Extruder Temperature and Wait
-void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
+void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
     bool autoemit = print.config().autoemit_temperature_commands;
     // Initial bed temperature based on the first extruder.
@@ -1823,7 +1846,7 @@ void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file,
 // M104 - Set Extruder Temperature
 // M109 - Set Extruder Temperature and Wait
 // RepRapFirmware: G10 Sxx
-void GCodeGenerator::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
+void GCodeGenerator::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
     bool autoemit = print.config().autoemit_temperature_commands;
     // Is the bed temperature set by the provided custom G-code?
@@ -2630,7 +2653,7 @@ void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
     m_scaled_resolution = scaled<double>(print_config.gcode_resolution.value);
 }
 
-void GCodeGenerator::append_full_config(const Print &print, std::string &str)
+void GCodeGenerator::append_full_config(const Print& print, std::string &str)
 {
     std::vector<std::pair<std::string, std::string>> config;
     encode_full_config(print, config);
