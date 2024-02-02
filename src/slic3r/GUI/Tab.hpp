@@ -365,7 +365,7 @@ protected:
 
 	DynamicPrintConfig* m_config;
 public:
-	PresetBundle*		m_preset_bundle;
+	PresetBundle*		m_preset_bundle; //note: it's managed by the GUI_App, we don't own it.
 	bool				m_show_btn_incompatible_presets = false;
 	PresetCollection*	m_presets = nullptr;
 	ogStaticText*		m_parent_preset_description_line = nullptr;

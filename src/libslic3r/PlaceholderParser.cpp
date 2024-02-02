@@ -941,6 +941,7 @@ namespace client
             case coString:  output.set_s(static_cast<const ConfigOptionString*>(opt.opt)->value); break;
             case coPercent: output.set_d(opt.opt->get_float());   break;
             case coPoint:   output.set_s(opt.opt->serialize());  break;
+            case coEnum:    output.set_s(opt.opt->serialize());  break;
             case coBool:    output.set_b(opt.opt->get_bool());    break;
             case coFloatOrPercent:
             {

@@ -108,6 +108,8 @@ Control::Control( wxWindow *parent,
     m_bmp_cog                  = ScalableBitmap(this, "cog");
     m_cog_icon_dim    = m_bmp_cog.GetBmpWidth();
 
+    m_dead_zone_height = m_lock_icon_dim / 2;
+
     m_selection = ssUndef;
     m_ticks.set_pause_print_msg(_utf8(L("Place bearings in slots and resume printing")));
     m_ticks.set_extruder_colors(&m_extruder_colors);
@@ -176,6 +178,8 @@ void Control::msw_rescale()
     m_bmp_one_layer_unlock_off.msw_rescale();
     m_lock_icon_dim = m_bmp_one_layer_lock_on.bmp().GetSize().x;
 
+    m_dead_zone_height = m_lock_icon_dim / 2;
+
     m_bmp_revert.msw_rescale();
     m_revert_icon_dim = m_bmp_revert.bmp().GetSize().x;
     m_bmp_cog.msw_rescale();
@@ -202,6 +206,8 @@ void Control::sys_color_changed()
     m_bmp_one_layer_unlock_on .msw_rescale();
     m_bmp_one_layer_unlock_off.msw_rescale();
     m_lock_icon_dim = m_bmp_one_layer_lock_on.GetBmpWidth();
+
+    m_dead_zone_height = m_lock_icon_dim / 2;
 
     m_bmp_revert.msw_rescale();
     m_revert_icon_dim = m_bmp_revert.GetBmpWidth();
@@ -339,7 +345,7 @@ void Control::get_size(int* w, int* h) const
     GetSize(w, h);
     if (m_draw_mode == dmSequentialGCodeView)
         return; // we have no more icons for drawing
-    is_horizontal() ? *w -= m_lock_icon_dim : *h -= m_lock_icon_dim;
+    is_horizontal() ? *w -= m_lock_icon_dim + m_dead_zone_height : *h -= m_lock_icon_dim + m_dead_zone_height;
 }
 
 double Control::get_double_value(const SelectedSlider& selection)
@@ -621,8 +627,11 @@ void Control::draw_info_line_with_icon(wxDC& dc, const wxPoint& pos, const Selec
     if (m_selection == selection) {
         //draw info line
         dc.SetPen(DARK_COLOR_PEN);
-        const wxPoint pt_beg = is_horizontal() ? wxPoint(pos.x, pos.y - m_thumb_size.y) : wxPoint(pos.x - m_thumb_size.x, pos.y/* - 1*/);
-        const wxPoint pt_end = is_horizontal() ? wxPoint(pos.x, pos.y + m_thumb_size.y) : wxPoint(pos.x + m_thumb_size.x, pos.y/* - 1*/);
+        auto panel_size = this->get_size();
+        const wxPoint pt_beg = is_horizontal() ? wxPoint(pos.x, (m_selection == ssLower) ? m_tick_icon_dim * 1.3f : pos.y - m_thumb_size.y) 
+                                               : wxPoint((m_selection == ssLower) ? m_tick_icon_dim * 1.3f : pos.x - m_thumb_size.x, pos.y/* - 1*/);
+        const wxPoint pt_end = is_horizontal() ? wxPoint(pos.x, (m_selection == ssLower) ? pos.y + m_thumb_size.y : panel_size.y - m_tick_icon_dim * 1.3f) 
+                                               : wxPoint((m_selection == ssLower) ? pos.x + m_thumb_size.x : panel_size.x - m_tick_icon_dim * 1.3f, pos.y/* - 1*/);
         dc.DrawLine(pt_beg, pt_end);
 
         //draw action icon
@@ -788,7 +797,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
             bool show_lheight = GUI::wxGetApp().app_config->get("show_layer_height_doubleslider") == "1";
             bool show_ltime = GUI::wxGetApp().app_config->get("show_layer_time_doubleslider") == "1";
             int nb_lines = 2; // to move things down if the slider is on top
-            wxString comma = "\n(";
+            wxString comma = "\n";
             if (show_lheight) {
                 nb_lines++;
                 double layer_height = 0;
@@ -801,7 +810,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
                     layer_height = m_values.empty() ? m_label_koef : m_values[layer_number] - (layer_number > 1 ? m_values[layer_number - 1] : 0);
                 }
                 str = str + comma + wxString::Format("%.*f", 2, layer_height);
-                comma = ",\n";
+                comma = "\n";
             }
             if (show_ltime && !m_layers_times.empty()) {
                 if (m_layers_times.size() +1 >= m_values.size()) {
@@ -814,7 +823,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
                         double previous_time = (layer_idx_time > 0 ? m_layers_times[layer_idx_time - 1] : 0);
                         wxString layer_time_wstr = short_and_splitted_time(get_time_dhms(m_layers_times[layer_idx_time] - previous_time));
                         str = str + comma + layer_time_wstr;
-                        comma = ",\n";
+                        comma = "\n";
                     }
                 }
             }
@@ -823,7 +832,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
                 str = "\n" + str;
                 nb_step_down--;
             }
-            return format_wxstr("%1%%2%%3%)", str, comma, layer_number);
+            return format_wxstr("%1%%2%%3%", str, comma, layer_number);
         }
     }
 
@@ -912,20 +921,38 @@ void Control::draw_thumbs(wxDC& dc, const wxCoord& lower_pos, const wxCoord& hig
     const wxPoint pos_l = is_horizontal() ? wxPoint(lower_pos, height*0.5) : wxPoint(0.5*width, lower_pos);
     const wxPoint pos_h = is_horizontal() ? wxPoint(higher_pos, height*0.5) : wxPoint(0.5*width, higher_pos);
 
-    // Draw lower thumb
-    draw_thumb_item(dc, pos_l, ssLower);
-    // Draw lower info_line
-    draw_info_line_with_icon(dc, pos_l, ssLower);
+    if(m_selection != ssLower) {
+        // Draw lower thumb
+        draw_thumb_item(dc, pos_l, ssLower);
+        // Draw lower info_line
+        draw_info_line_with_icon(dc, pos_l, ssLower);
+        // Draw lower thumb text
+        draw_thumb_text(dc, pos_l, ssLower);
+    } else {
+        // Draw higher thumb
+        draw_thumb_item(dc, pos_h, ssHigher);
+        // Draw higher info_line
+        draw_info_line_with_icon(dc, pos_h, ssHigher);
+        // Draw higher thumb text
+        draw_thumb_text(dc, pos_h, ssHigher);
+    }
+    
+    if(m_selection == ssLower) {
+        // Draw lower thumb
+        draw_thumb_item(dc, pos_l, ssLower);
+        // Draw lower info_line
+        draw_info_line_with_icon(dc, pos_l, ssLower);
+        // Draw lower thumb text
+        draw_thumb_text(dc, pos_l, ssLower);
+    } else {
+        // Draw higher thumb
+        draw_thumb_item(dc, pos_h, ssHigher);
+        // Draw higher info_line
+        draw_info_line_with_icon(dc, pos_h, ssHigher);
+        // Draw higher thumb text
+        draw_thumb_text(dc, pos_h, ssHigher);
+    }
 
-    // Draw higher thumb
-    draw_thumb_item(dc, pos_h, ssHigher);
-    // Draw higher info_line
-    draw_info_line_with_icon(dc, pos_h, ssHigher);
-    // Draw higher thumb text
-    draw_thumb_text(dc, pos_h, ssHigher);
-
-    // Draw lower thumb text
-    draw_thumb_text(dc, pos_l, ssLower);
 }
 
 void Control::draw_ticks_pair(wxDC& dc, wxCoord pos, wxCoord mid, int tick_len)
@@ -1253,6 +1280,9 @@ void Control::draw_one_layer_icon(wxDC& dc)
     is_horizontal() ? x_draw = width-2 : x_draw = 0.5*width - 0.5*m_lock_icon_dim;
     is_horizontal() ? y_draw = 0.5*height - 0.5*m_lock_icon_dim : y_draw = height-2;
 
+    //add a little dead zone to ease mouse click
+    y_draw += m_dead_zone_height;
+
     dc.DrawBitmap(icon, x_draw, y_draw);
 
     //update rect of the lock/unlock icon
@@ -1270,6 +1300,9 @@ void Control::draw_revert_icon(wxDC& dc)
     wxCoord x_draw, y_draw;
     is_horizontal() ? x_draw = width-2 : x_draw = 0.25*SLIDER_MARGIN;
     is_horizontal() ? y_draw = 0.25*SLIDER_MARGIN: y_draw = height-2;
+
+    //add a little dead zone to ease mouse click
+    y_draw += m_dead_zone_height;
 
     dc.DrawBitmap(m_bmp_revert.bmp(), x_draw, y_draw);
 
@@ -1294,6 +1327,9 @@ void Control::draw_cog_icon(wxDC& dc)
         is_horizontal() ? x_draw = width - 2 : x_draw = width - m_cog_icon_dim - 2;
         is_horizontal() ? y_draw = height - m_cog_icon_dim - 2 : y_draw = height - 2;
     }
+
+    //add a little dead zone to ease mouse click
+    y_draw += m_dead_zone_height;
 
     dc.DrawBitmap(m_bmp_cog.bmp(), x_draw, y_draw);
 
@@ -1385,7 +1421,6 @@ void Control::OnLeftDown(wxMouseEvent& event)
         return;
     this->CaptureMouse();
 
-    m_is_left_down = true;
     m_mouse = maNone;
 
     wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
@@ -1403,8 +1438,12 @@ void Control::OnLeftDown(wxMouseEvent& event)
             m_mouse = maRevertIconClick;
     }
 
+    // move only if not in not in motion and not in dead zone (in vertical slicer)
+    if(is_horizontal() || (m_mouse == maNone && pos.y < m_rect_one_layer_icon.y - m_rect_one_layer_icon.height/2))
+        m_is_left_down = true;
+
     if (m_mouse == maNone)
-        detect_selected_slider(pos);
+            detect_selected_slider(pos);
 
     event.Skip();
 }
@@ -1711,11 +1750,11 @@ void Control::OnLeftUp(wxMouseEvent& event)
     if (!HasCapture())
         return;
     this->ReleaseMouse();
-    m_is_left_down = false;
 
     switch (m_mouse) {
     case maNone :
-        move_current_thumb_to_pos(event.GetLogicalPosition(wxClientDC(this)));
+        if(m_is_left_down)
+            move_current_thumb_to_pos(event.GetLogicalPosition(wxClientDC(this)));
         break;
     case maDeleteTick : 
         delete_current_tick();
@@ -1735,6 +1774,8 @@ void Control::OnLeftUp(wxMouseEvent& event)
     default :
         break;
     }
+
+    m_is_left_down = false;
 
     Refresh();
     Update();

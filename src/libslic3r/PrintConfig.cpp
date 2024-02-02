@@ -4295,7 +4295,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 100;
     def->mode = comSimpleAE | comSuSi;
-    def->set_default_value(new ConfigOptionInt(35));
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("printer_model", coString);
     def->label = L("Printer type");
@@ -5772,6 +5772,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
+
     def = this->add("threads", coInt);
     def->label = L("Threads");
     def->tooltip = L("Threads are used to parallelize long-running tasks. Optimal threads number "
@@ -7461,7 +7462,7 @@ void PrintConfigDef::init_sla_params()
     def->set_default_value(new ConfigOptionFloat(0.001));
 }
 
-void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
+void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value, bool remove_unkown_keys)
 {
     // handle legacy options (other than aliases)
     if (opt_key == "extrusion_width_ratio" || opt_key == "bottom_layer_speed_ratio"
@@ -7672,21 +7673,6 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         opt_key = "";
         return;
     }
-
-    if (! print_config_def.has(opt_key)) {
-        //check the aliases
-        for(const auto& entry : print_config_def.options) {
-            for (const std::string& alias : entry.second.aliases) {
-                if (alias == opt_key) {
-                    // translate
-                    opt_key = entry.first;
-                    return;
-                }
-            }
-        }
-        opt_key = "";
-        return;
-    }
     //in ps 2.4, the raft_first_layer_density is now more powerful than the support_material_solid_first_layer, also it always does the perimeter.
     if ("support_material_solid_first_layer" == opt_key) {
         opt_key = "raft_first_layer_density";
@@ -7703,6 +7689,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         } else {
             opt_key = "";
         }
+        return;
     }
 
     //prusa
@@ -7710,7 +7697,25 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         if ("reprap" == value)
             value = "sprinter";
     }
+
+    if (!print_config_def.has(opt_key)) {
+        //check the aliases
+        for(const auto& entry : print_config_def.options) {
+            for (const std::string& alias : entry.second.aliases) {
+                if (alias == opt_key) {
+                    // translate
+                    opt_key = entry.first;
+                    return;
+                }
+            }
+        }
+        if (remove_unkown_keys)
+            opt_key = "";
+        return;
+    }
 }
+
+bool PrintConfigDef::is_defined(t_config_option_key &opt_key) { return print_config_def.has(opt_key); }
 
 // this is for extra things to add / modify from prusa that can't be handled otherwise.
 // after handle_legacy
@@ -7733,6 +7738,7 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         output["first_layer_infill_speed"] = value;
     }
     if ("brim_type" == opt_key) {
+        opt_key = "";
         if ("no_brim" == value) {
             output["brim_width"] = "0";
             output["brim_width_interior"] = "0";
@@ -7788,12 +7794,35 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
             output["thumbnails_tag_format"] = "0";
     }
 
+    
+    // ---- custom gcode: ----
+    static const std::vector<std::pair<std::string, std::string>> custom_gcode_replace =
+        {{"[temperature]", "{temperature+extruder_temperature_offset}"},
+         {"{temperature}", "{temperature+extruder_temperature_offset}"},
+         {"{temperature[initial_extruder]}", "{temperature[initial_extruder]+extruder_temperature_offset[initial_extruder]}"},
+         {"[first_layer_temperature]", "{first_layer_temperature+extruder_temperature_offset}"},
+         {"{first_layer_temperature}", "{first_layer_temperature+extruder_temperature_offset}"},
+         {"{first_layer_temperature[initial_extruder]}", "{first_layer_temperature[initial_extruder]+extruder_temperature_offset[initial_extruder]}"}};
+
+    static const std::set<t_config_option_key> custom_gcode_keys =
+        {"template_custom_gcode", "toolchange_gcode", "before_layer_gcode",
+         "between_objects_gcode", "end_gcode",        "layer_gcode",
+         "feature_gcode",         "start_gcode",      "color_change_gcode",
+         "pause_print_gcode",     "toolchange_gcode", "end_filament_gcode",
+         "start_filament_gcode"};
+    if (custom_gcode_keys.find(opt_key) != custom_gcode_keys.end()) {
+        // check & replace
+        for (auto &entry : custom_gcode_replace) {
+            boost::replace_all(value, entry.first, entry.second);
+        }
+    }
+
     return output;
 }
 
 
 template<typename CONFIG_CLASS>
-void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_config) {
+void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_config, bool with_phony) {
     //void convert_from_prusa(DynamicPrintConfig& conf, const DynamicPrintConfig & global_config) {
     //void convert_from_prusa(ModelConfigObject& conf, const DynamicPrintConfig& global_config) {
     std::map<std::string, std::string> results;
@@ -7816,18 +7845,155 @@ void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_co
         const ConfigOptionDef* def = print_config_def.get(entry.first);
         if (def) {
             ConfigOption* opt_new = def->default_value.get()->clone();
-            opt_new->deserialize(entry.second);
+            opt_new->deserialize(entry.second); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
             conf.set_key_value(entry.first, opt_new);
+        }
+    }
+
+    // set phony entries
+    if (with_phony) {
+        for (auto &[opt_key_width, opt_key_spacing] :
+             {std::pair<char *, char *>{"extrusion_width", "extrusion_spacing"},
+              std::pair<char *, char *>{"perimeter_extrusion_width", "perimeter_extrusion_spacing"},
+              std::pair<char *, char *>{"external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing"},
+              std::pair<char *, char *>{"first_layer_extrusion_width", "first_layer_extrusion_spacing"},
+              std::pair<char *, char *>{"infill_extrusion_width", "infill_extrusion_spacing"},
+              std::pair<char *, char *>{"solid_infill_extrusion_width", "solid_infill_extrusion_spacing"},
+              std::pair<char *, char *>{"top_infill_extrusion_width", "top_infill_extrusion_spacing"}}) {
+            // if prusa has defined a width, or if the conf has a default spacing that need to be overwritten
+            if (conf.option(opt_key_width) != nullptr || conf.option(opt_key_spacing) != nullptr) {
+                ConfigOption *opt_new = print_config_def.get(opt_key_spacing)->default_value.get()->clone();
+                opt_new->deserialize(""); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
+                opt_new->set_phony(true);
+                conf.set_key_value(opt_key_spacing, opt_new);
+            }
         }
     }
 }
 
-void DynamicPrintConfig::convert_from_prusa() {
-    _convert_from_prusa(*this, *this);
+void DynamicPrintConfig::convert_from_prusa(bool with_phony) {
+    _convert_from_prusa(*this, *this, with_phony);
 }
-void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config) {
-    _convert_from_prusa(*this, global_config);
+void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony) {
+    _convert_from_prusa(*this, global_config, with_phony);
 }
+
+
+template<typename CONFIG_CLASS>
+void _deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+                                           CONFIG_CLASS &                             config,
+                                           const DynamicPrintConfig &                 global_config,
+                                           ConfigSubstitutionContext &                config_substitutions,
+                                           bool                                       with_phony,
+                                           bool                                       check_prusa)
+{
+    std::map<t_config_option_key, std::string> unknown_keys;
+    const ConfigDef *def = config.def();
+    for (auto [key, value] : settings) {
+        try {
+            t_config_option_key opt_key = key;
+            PrintConfigDef::handle_legacy(opt_key, value, false);
+            if (!opt_key.empty())
+                if (!def->has(opt_key)) {
+                    unknown_keys.emplace(key, value);
+                } else {
+                    config.set_deserialize(opt_key, value, config_substitutions);
+                }
+        } catch (UnknownOptionException & /* e */) {
+            // log & ignore
+            if (config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable)
+                config_substitutions.add(ConfigSubstitution(key, value));
+            assert(false);
+        } catch (BadOptionValueException &e) {
+            if (config_substitutions.rule == ForwardCompatibilitySubstitutionRule::Disable)
+                throw e;
+            // log the error
+            const ConfigDef *def = config.def();
+            if (def == nullptr)
+                throw e;
+            const ConfigOptionDef *optdef = def->get(key);
+            config_substitutions.emplace(optdef,std::string(value), ConfigOptionUniquePtr(optdef->default_value->clone()));
+        }
+    }
+    // from prusa: try again with from_prusa before handle_legacy
+    if (check_prusa) {
+        std::map<t_config_option_key, std::string> settings_to_change;
+        for (auto [key, value] : unknown_keys) {
+            t_config_option_key                        opt_key = key;
+            std::map<t_config_option_key, std::string> result  = PrintConfigDef::from_prusa(opt_key, value, global_config);
+            settings_to_change.insert(result.begin(), result.end());
+            if (!opt_key.empty())
+                //check if good this time
+                PrintConfigDef::handle_legacy(opt_key, value, false);
+            if (!opt_key.empty()) {
+                if (!def->has(opt_key)) {
+                    if (config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable) {
+                        config_substitutions.add(ConfigSubstitution(key, value));
+                    }
+                } else {
+                    try {
+                        config.set_deserialize(opt_key, value, config_substitutions);
+                    } catch (BadOptionValueException &e) {
+                        if (config_substitutions.rule == ForwardCompatibilitySubstitutionRule::Disable)
+                            throw e;
+                        // log the error
+                        if (def == nullptr)
+                            throw e;
+                        const ConfigOptionDef *optdef = def->get(key);
+                        config_substitutions.emplace(optdef, std::string(value), ConfigOptionUniquePtr(optdef->default_value->clone()));
+                    }
+                }
+            }
+        }
+        for (auto entry : settings_to_change)
+            config.set_deserialize(entry.first, entry.second, config_substitutions);
+    } else {
+        for (auto [key, value] : unknown_keys) {
+            if (config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable) {
+                config_substitutions.add(ConfigSubstitution(key, value));
+            }
+        }
+    }
+
+    // set phony entries
+    if (with_phony) {
+        const ConfigDef *def = config.def();
+        for (auto &[opt_key_width, opt_key_spacing] :
+                {std::pair<char *, char *>{"extrusion_width", "extrusion_spacing"},
+                std::pair<char *, char *>{"perimeter_extrusion_width", "perimeter_extrusion_spacing"},
+                std::pair<char *, char *>{"external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing"},
+                std::pair<char *, char *>{"first_layer_extrusion_width", "first_layer_extrusion_spacing"},
+                std::pair<char *, char *>{"infill_extrusion_width", "infill_extrusion_spacing"},
+                std::pair<char *, char *>{"solid_infill_extrusion_width", "solid_infill_extrusion_spacing"},
+                std::pair<char *, char *>{"top_infill_extrusion_width", "top_infill_extrusion_spacing"}}) {
+            // if prusa has defined a width, or if the config has a default spacing that need to be overwritten
+            if (config.option(opt_key_width) != nullptr || config.option(opt_key_spacing) != nullptr) {
+                ConfigOption *opt_new = def->get(opt_key_spacing)->default_value.get()->clone();
+                opt_new->deserialize(""); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
+                opt_new->set_phony(true);
+                config.set_key_value(opt_key_spacing, opt_new);
+            }
+        }
+    }
+}
+void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+                                  ModelConfig &                              config,
+                                  const DynamicPrintConfig &                 global_config,
+                                  ConfigSubstitutionContext &                config_substitutions,
+                                  bool                                       with_phony,
+                                  bool                                       check_prusa)
+{
+    _deserialize_maybe_from_prusa(settings, config, global_config, config_substitutions, with_phony, check_prusa);
+}
+void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+                                  DynamicPrintConfig &                       config,
+                                  ConfigSubstitutionContext &                config_substitutions,
+                                  bool                                       with_phony,
+                                  bool                                       check_prusa)
+{
+    _deserialize_maybe_from_prusa(settings, config, config, config_substitutions, with_phony, check_prusa);
+}
+
 
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "allow_empty_layers",
@@ -8211,6 +8377,24 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
             new_entries["fan_always_on"] = "1";
         }
     }
+
+    // ---- custom gcode: ----
+    static const std::vector<std::pair<std::string, std::string>> custom_gcode_replace =
+        {{"extruder_temperature_offset[initial_extruder]", "0"}, {"extruder_temperature_offset", "0"}};
+    static const std::set<t_config_option_key> custom_gcode_keys =
+        {"template_custom_gcode", "toolchange_gcode", "before_layer_gcode",
+         "between_objects_gcode", "end_gcode",        "layer_gcode",
+         "feature_gcode",         "start_gcode",      "color_change_gcode",
+         "pause_print_gcode",     "toolchange_gcode", "end_filament_gcode",
+         "start_filament_gcode"};
+    if (custom_gcode_keys.find(opt_key) != custom_gcode_keys.end()) {
+        // check & replace
+        for (auto &entry : custom_gcode_replace) {
+            boost::replace_all(value, entry.first, entry.second);
+        }
+    }
+    // --end-- custom gcode: --end--
+
     return new_entries;
 }
 
@@ -8463,8 +8647,7 @@ void DynamicPrintConfig::set_num_extruders(unsigned int num_extruders)
             // empty fields there, if not defined by the system profile.
             continue;
         auto* opt = this->option(key, false);
-        assert(opt != nullptr);
-        assert(opt->is_vector());
+        assert(opt != nullptr && opt->is_vector());
         if (opt != nullptr && opt->is_vector())
             static_cast<ConfigOptionVectorBase*>(opt)->resize(num_extruders, defaults.option(key));
     }

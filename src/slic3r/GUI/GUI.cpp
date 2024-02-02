@@ -3,6 +3,7 @@
 #include "format.hpp"
 #include "I18N.hpp"
 
+#include "libslic3r/AppConfig.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 
 #include <string>
@@ -150,11 +151,16 @@ static wxString bold_string(const wxString& str)
 static void add_config_substitutions(const ConfigSubstitutions& conf_substitutions, wxString& changes)
 {
 	changes += "<table>";
+    size_t nb_entries_changes = 0;
+    size_t nb_entries_unknown = 0;
 	for (const ConfigSubstitution& conf_substitution : conf_substitutions) {
 		wxString new_val;
 		const ConfigOptionDef* def = conf_substitution.opt_def;
-		if (!def)
-			continue;
+        if (!def) {
+            nb_entries_unknown++;
+            continue;
+        }
+        nb_entries_changes++;
 		switch (def->type) {
 		case coEnum:
 		{
@@ -208,7 +214,25 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 				   format_wxstr(_L("%1% was substituted with %2%"), bold_string(conf_substitution.old_value), bold(new_val)) + 
 				   "</td></tr>";
 	}
-	changes += "</table>";
+    assert(nb_entries_changes + nb_entries_unknown > 0);
+    if(nb_entries_changes > 0)
+		changes += "</table>";
+    if (get_app_config()->get("show_unknown_setting") == "1") {
+        if (nb_entries_unknown > 0) {
+            changes += format_wxstr(_L("The following key-values are ignored, as the key doesn't have any substitution in this "
+                          "version of %1%:"), SLIC3R_APP_NAME);
+            changes += "<table>";
+        }
+        for (const ConfigSubstitution &conf_substitution : conf_substitutions) {
+            if (!conf_substitution.opt_def) {
+                changes += format_wxstr("<tr><td>%1%</td><td>(%2%)</td></tr>",
+                                        format_wxstr(_L("Unknow setting: <b>%1%</b>"), conf_substitution.old_name),
+                                        format_wxstr(_L("value: %1%"), bold_string(conf_substitution.old_value)));
+            }
+        }
+        if (nb_entries_unknown > 0)
+            changes += "</table>";
+    }
 }
 
 static wxString substitution_message(const wxString& changes)
@@ -219,9 +243,43 @@ static wxString substitution_message(const wxString& changes)
 		_L("Review the substitutions and adjust them if needed.");
 }
 
-void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_substitutions) 
+size_t  check_count(const PresetsConfigSubstitutions &presets_config_substitutions) {
+    size_t nb_entries_changes = 0;
+    size_t nb_entries_unknown = 0;
+    for (const PresetConfigSubstitutions &substitution : presets_config_substitutions) {
+        for (const ConfigSubstitution &conf_substitution : substitution.substitutions) {
+            if (conf_substitution.opt_def)
+                nb_entries_changes++;
+            else
+                nb_entries_unknown++;
+        }
+    }
+    if (get_app_config()->get("show_unknown_setting") != "1")
+        nb_entries_unknown = 0;
+    return nb_entries_changes + nb_entries_unknown;
+}
+
+size_t  check_count(const ConfigSubstitutions &substitutions) {
+    size_t nb_entries_changes = 0;
+    size_t nb_entries_unknown = 0;
+    for (const ConfigSubstitution &conf_substitution : substitutions) {
+        if (conf_substitution.opt_def)
+            nb_entries_changes++;
+        else
+            nb_entries_unknown++;
+    }
+    if (get_app_config()->get("show_unknown_setting") != "1")
+        nb_entries_unknown = 0;
+    return nb_entries_changes + nb_entries_unknown;
+}
+
+void show_substitutions_info(const PresetsConfigSubstitutions &presets_config_substitutions)
 {
-	wxString changes;
+    wxString changes;
+
+    // check count
+    if (check_count(presets_config_substitutions) == 0)
+        return;
 
 	auto preset_type_name = [](Preset::Type type) {
 		switch (type) {
@@ -249,6 +307,10 @@ void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_su
 
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename)
 {
+    // check count
+    if (check_count(config_substitutions) == 0)
+        return;
+
 	wxString changes = "\n";
 	add_config_substitutions(config_substitutions, changes);
 
@@ -331,7 +393,7 @@ void combochecklist_set_flags(wxComboCtrl* comboCtrl, unsigned int flags)
 
 AppConfig* get_app_config()
 {
-    return wxGetApp().app_config;
+    return wxGetApp().app_config.get();
 }
 
 wxString from_u8(const std::string &str)

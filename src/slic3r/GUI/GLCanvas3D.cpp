@@ -1076,7 +1076,7 @@ void GLCanvas3D::set_last_arrange_settings(float new_value) {
     }
     ptr->previously_used_distance = new_value;
 
-    auto& appcfg = wxGetApp().app_config;
+    AppConfig *appcfg = wxGetApp().app_config.get();
     std::string dist_key = "min_object_distance", rot_key = "enable_rotation";
     dist_key += postfix;
     rot_key += postfix;
@@ -3139,7 +3139,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_dirty = true;
     };
 
-    auto* app_config = GUI::wxGetApp().app_config;
+    auto* app_config = GUI::wxGetApp().app_config.get();
     bool focus_platter_on_mouse = app_config->get("focus_platter_on_mouse") == "1";
     if (m_gizmos.on_mouse(evt)) {
         if (focus_platter_on_mouse) {

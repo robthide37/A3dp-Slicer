@@ -789,7 +789,7 @@ void GUI_App::post_init()
             return;
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
-            this->preset_updater->sync(preset_bundle);
+            this->preset_updater->sync(preset_bundle.get());
             if (! cw_showed) {
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
@@ -832,18 +832,6 @@ GUI_App::GUI_App(EAppMode mode)
     m_imgui.reset(new ImGuiWrapper{});
 }
 
-GUI_App::~GUI_App()
-{
-    if (app_config != nullptr)
-        delete app_config;
-
-    if (preset_bundle != nullptr)
-        delete preset_bundle;
-
-    if (preset_updater != nullptr)
-        delete preset_updater;
-}
-
 // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
 // Otherwise HTML formatted for the system info dialog.
 std::string GUI_App::get_gl_info(bool for_github)
@@ -858,13 +846,43 @@ wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
 
 bool GUI_App::init_opengl()
 {
-#ifdef __linux__
-    bool status = m_opengl_mgr.init_gl();
-    m_opengl_initialized = true;
-    return status;
+    bool initialized = m_opengl_mgr.init_gl();
+    if (!m_opengl_initialized && initialized) {
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+        // Delayed init for x86
+#ifdef __APPLE__
+        // intel apple
+        hard_cpu = AppConfig::HardwareType::hCpuIntel;
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+        } catch (std::exception ex) {}
 #else
-    return m_opengl_mgr.init_gl();
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+            if (boost::contains(gpu_vendor, "Nvidia") || boost::contains(gpu_vendor, "NVIDIA"))
+                hard_gpu = AppConfig::HardwareType::hGpuNvidia;
+            if (boost::contains(gpu_vendor, "Apple") || boost::contains(gpu_vendor, "APPLE")) {
+                assert(false); // apple gpu are only in _M_ARM64
+            }
+        } catch (std::exception ex) {}
 #endif
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+    }
+#ifdef __linux__
+    m_opengl_initialized = true;
+#else
+    m_opengl_initialized = initialized;
+#endif
+    return initialized;
 }
 
 // gets path to PrusaSlicer.ini, returns semver from first line comment
@@ -927,9 +945,27 @@ void GUI_App::init_app_config()
         m_datadir_redefined = true;
     }
 
-	if (!app_config)
-        app_config = new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer);
-
+	if (!app_config) {
+        app_config.reset(new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer));
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+#ifdef _M_ARM64
+#ifdef __APPLE__
+        // Arm apple
+        hard_cpu = AppConfig::HardwareType::hCpuApple;
+        hard_gpu = AppConfig::HardwareType::hGpuApple;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#else
+        // Arm
+        hard_cpu = AppConfig::HardwareType::hCpuArmGeneric;
+        hard_gpu = AppConfig::HardwareType::hGpuArmGeneric;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#endif
+#else
+        // x86 (not-apple)
+        //can't know the gpu before the openg init, so it's delayed. until it
+#endif
+    }
 	// load settings
 	m_app_conf_exists = app_config->exists();
 	if (m_app_conf_exists) {
@@ -1233,7 +1269,7 @@ bool GUI_App::on_init_inner()
         scrn->SetText(_L("Loading configuration")+ dots);
     }
 
-    preset_bundle = new PresetBundle();
+    preset_bundle.reset(new PresetBundle());
 
     // just checking for existence of Slic3r::data_dir is not enough : it may be an empty directory
     // supplied as argument to --datadir; in that case we should still run the wizard
@@ -1252,7 +1288,7 @@ bool GUI_App::on_init_inner()
             associate_stl_files();
 #endif // __WXMSW__
 
-        preset_updater = new PresetUpdater();
+        preset_updater.reset(new PresetUpdater());
         Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
         app_config->set("version_online", into_u8(evt.GetString()));
         app_config->save();
@@ -2984,9 +3020,8 @@ void GUI_App::OSXStoreOpenFiles(const wxArrayString &fileNames)
         // just G-codes were passed. Switch to G-code viewer mode.
         m_app_mode = EAppMode::GCodeViewer;
         unlock_lockfile(get_instance_hash_string() + ".lock", data_dir() + "/cache/");
-        if(app_config != nullptr)
-            delete app_config;
-        app_config = nullptr;
+        if(app_config)
+            app_config.reset();
         init_app_config();
     }
     wxApp::OSXStoreOpenFiles(fileNames);

@@ -124,6 +124,9 @@ public:
 
     // Octree builds on mesh for usage in the adaptive cubic infill
     FillAdaptive::Octree* adapt_fill_octree = nullptr;
+#if _DEBUG
+    mutable double debug_verify_flow_mult = 0;
+#endif
 protected:
     // in unscaled coordinates, please use init (after settings all others settings) as some algos want to modify the value
     coordf_t    spacing_priv;

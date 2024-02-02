@@ -53,7 +53,7 @@ double Tool::extrude(double dE)
 double Tool::retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange)
 {
     assert(length < std::numeric_limits<int32_t>::max());
-    assert(length > 0);
+    //assert(length > 0); // it's possible, as you may want to "reset the extruder but do not use restart_extra yet.
     assert(!restart_extra || *restart_extra < std::numeric_limits<int32_t>::max());
     assert(!restart_extra || *restart_extra > -std::numeric_limits<int32_t>::max());
     assert(!restart_extra_toolchange || *restart_extra_toolchange < std::numeric_limits<int32_t>::max());

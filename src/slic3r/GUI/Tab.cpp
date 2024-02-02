@@ -169,7 +169,7 @@ void Tab::create_preset_tab()
     SetDoubleBuffered(true);
 #endif //__WINDOWS__
 
-    m_preset_bundle = wxGetApp().preset_bundle;
+    m_preset_bundle = wxGetApp().preset_bundle.get();
 
     // Vertical sizer to hold the choice menu and the rest of the page.
 #ifdef __WXOSX__
@@ -1773,7 +1773,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             if (params.size() < 2) continue;
             if (params.size() == 2) params.push_back("wrench");
 
-            std::string label = L(params[params.size()-2]);
+            wxString label = _(params[params.size()-2]);
 
             for (int i = 1; i < params.size() - 1; i++) {
                 if (params[i] == "idx")
@@ -1783,7 +1783,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             }
 
             if(logs) Slic3r::slic3r_log->info("settings gui") << "create page " << label.c_str() <<" : "<< params[params.size() - 1] << "\n";
-            pages.push_back(create_options_page(L(label), params[params.size() - 1]));
+            pages.push_back(create_options_page(label, params[params.size() - 1]));
             current_page = pages.back();
         }
         else if (boost::starts_with(full_line, "end_page"))
@@ -1939,15 +1939,17 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                                 // Change of this option influences for an update of "Sliced Info"
                                 wxGetApp().sidebar().update_sliced_info_sizer();
                                 wxGetApp().sidebar().Layout();
-                            } else
-                                on_value_change(opt_key, value);
+                            }
+                            // this will be done by the lambda added by new_optgroup()
+                            //else on_value_change(opt_key, value);
                         });
                 } else if (params[i] == "validate_gcode") {
                     current_group->m_on_change = set_or_add(current_group->m_on_change, [this, &current_group](t_config_option_key opt_key, boost::any value) {
                         //validate_custom_gcode_cb(this, current_group, opt_key, value);
                         this->validate_custom_gcodes_was_shown = !Tab::validate_custom_gcode(current_group->title, boost::any_cast<std::string>(value));
-                        this->update_dirty();
-                        this->on_value_change(opt_key, value);
+                        // these will be done by the lambda added by new_optgroup()
+                        //this->update_dirty();
+                        //this->on_value_change(opt_key, value);
                     });
                 }
             }
@@ -3320,11 +3322,10 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
             }
         m_has_single_extruder_MM_page = false;
     }
-    if (from_initial_build ||
-        (m_extruders_count > 1 && m_config->opt_bool("single_extruder_multi_material") && !m_has_single_extruder_MM_page)) {
+    if (m_extruders_count > 1 && m_config->opt_bool("single_extruder_multi_material") && !m_has_single_extruder_MM_page) {
         // create a page, but pretend it's an extruder page, so we can add it to m_pages ourselves
-        auto page = create_options_page(L("Single extruder MM setup"), "printer");
-        auto optgroup = page->new_optgroup(L("Single extruder multimaterial parameters"));
+        PageShp page = create_options_page(L("Single extruder MM setup"), "printer");
+        ConfigOptionsGroupShp optgroup = page->new_optgroup(L("Single extruder multimaterial parameters"));
         optgroup->append_single_option_line("cooling_tube_retraction");
         optgroup->append_single_option_line("cooling_tube_length");
         optgroup->append_single_option_line("parking_pos_retraction");
@@ -3335,12 +3336,8 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
         optgroup->append_single_option_line("wipe_advanced_nozzle_melted_volume");
         optgroup->append_single_option_line("wipe_advanced_multiplier");
         optgroup->append_single_option_line("wipe_advanced_algo");
-        if (from_initial_build) {
-            page->clear();
-        } else {
-            m_pages.insert(m_pages.begin() + n_before_extruders, page);
-            m_has_single_extruder_MM_page = true;
-        }
+        m_pages.insert(m_pages.begin() + n_before_extruders, page);
+        m_has_single_extruder_MM_page = true;
         changed = true;
     }
     if(m_has_single_extruder_MM_page)
@@ -3503,6 +3500,11 @@ void TabPrinter::toggle_options()
     bool custom_color = m_config->opt_bool("thumbnails_custom_color");
     field = get_field("thumbnails_color");
     if (field) field->toggle(custom_color);
+    const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = m_config->option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+    field = get_field("thumbnails_end_file");
+    if (thumbnails_format && field) field->toggle(thumbnails_format->value != (GCodeThumbnailsFormat::BIQU));
+    field = get_field("thumbnails_tag_format");
+    if (thumbnails_format && field) field->toggle(thumbnails_format->value != (GCodeThumbnailsFormat::BIQU));
 
     //firmware
     bool have_remaining_times = m_config->opt_bool("remaining_times");
@@ -4462,8 +4464,8 @@ void Tab::update_show_hide_incompatible_button()
     m_btn_hide_incompatible_presets->SetBitmap_(m_show_incompatible_presets ?
         m_bmp_show_incompatible_presets : m_bmp_hide_incompatible_presets);
     m_btn_hide_incompatible_presets->SetToolTip(m_show_incompatible_presets ?
-        "Both compatible an incompatible presets are shown. Click to hide presets not compatible with the current printer." :
-        "Only compatible presets are shown. Click to show both the presets compatible and not compatible with the current printer.");
+        _L("Both compatible and incompatible presets are shown. Click to hide presets not compatible with the current printer.") :
+        _L("Only compatible presets are shown. Click to show both the presets compatible and not compatible with the current printer."));
 }
 
 void Tab::update_ui_from_settings()

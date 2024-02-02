@@ -51,9 +51,10 @@ inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb,
                 auto compressed = compress_thumbnail(data, format);
                 if (compressed->data && compressed->size) {
                     if (format == GCodeThumbnailsFormat::BIQU) {
-                        output((boost::format("\n;\n; %s begin %dx%d %d\n") 
-                            % (with_tag_format ? compressed->tag() : EMPTY_TAG)
-                            % data.width % data.height % (compressed->size - 1)).str().c_str());
+                        // BIQU firmware need to have nothing before the thumbnail
+                        //output((boost::format("\n;\n; %s begin %dx%d %d\n") 
+                        //    % (with_tag_format ? compressed->tag() : EMPTY_TAG)
+                        //    % data.width % data.height % (compressed->size - 1)).str().c_str());
                         //print size in hex
                         std::stringstream ss;
                         ss << std::setfill('0') << std::hex;

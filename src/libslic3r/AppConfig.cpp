@@ -360,9 +360,9 @@ void AppConfig::set_defaults()
         if (get("check_blacklisted_library").empty())
             set("check_blacklisted_library", "1");
 #endif // _WIN32
-
-        if (get("compress_png_texture").empty())
-            set("compress_png_texture", "1");
+            //disable by default if amd graphic card detected, but can't know before the opengl is launched
+        //if (get("compress_png_texture").empty())
+            //set("compress_png_texture", (m_hardware&hGpuAmd) == hGpuAmd ? "0" : "1");
 
         // remove old 'use_legacy_opengl' parameter from this config, if present
         if (!get("use_legacy_opengl").empty())
@@ -394,6 +394,9 @@ void AppConfig::set_defaults()
 
         if (get("check_material_export").empty())
             set("check_material_export", "0");
+
+        if (get("show_unknown_setting").empty())
+            set("show_unknown_setting", "1");
 
         if (get("use_custom_toolbar_size").empty())
             set("use_custom_toolbar_size", "0");
@@ -458,7 +461,11 @@ void AppConfig::set_defaults()
             set("use_rich_tooltip", "0");
 
         if (get("hide_slice_tooltip").empty())
+#ifdef _WIN32
+            set("hide_slice_tooltip", "1");
+#else
             set("hide_slice_tooltip", "0");
+#endif // _WIN32
 
         if (get("show_layer_height_doubleslider").empty())
             set("show_layer_height_doubleslider", "1");
@@ -500,9 +507,6 @@ void AppConfig::set_defaults()
     if (get("show_splash_screen").empty())
         set("show_splash_screen", "1");
 
-    if (get("show_splash_screen").empty())
-        set("show_splash_screen", "1");
-
     if (get("restore_win_position").empty())
         set("restore_win_position", "1");       // allowed values - "1", "0", "crashed_at_..."
 
@@ -515,7 +519,7 @@ void AppConfig::set_defaults()
     {
 
         //try to load splashscreen from ui file
-        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", "benchy-splashscreen.jpg"}, {"splash_screen_gcodeviewer", "prusa-gcodepreview.jpg"} };
+        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", ""}, {"splash_screen_gcodeviewer", ""} };
         boost::property_tree::ptree tree_splashscreen;
         boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
         try {
@@ -543,10 +547,13 @@ void AppConfig::set_defaults()
         if (get("splash_screen_gcodeviewer").empty())
             set("splash_screen_gcodeviewer", "default");
 
-        if (!get("show_splash_screen_random").empty() && get("show_splash_screen_random") == "1") {
+        bool switch_to_random = get("show_splash_screen_random") == "1";
+        if (switch_to_random || key2splashscreen["splash_screen_editor"].empty())
             set("splash_screen_editor", "random");
+        if (switch_to_random || key2splashscreen["splash_screen_gcodeviewer"].empty())
+            set("splash_screen_gcodeviewer", "random");
+        if (switch_to_random)
             set("show_splash_screen_random", "0");
-        }
     }
 
 #ifdef _WIN32
@@ -612,6 +619,15 @@ void AppConfig::set_defaults()
     erase("", "object_settings_maximized");
     erase("", "object_settings_pos");
     erase("", "object_settings_size");
+}
+
+void AppConfig::set_hardware_type(HardwareType hard) {
+    this->m_hardware = hard;
+    // Set default that depends on hardware type
+
+    //disable by default if amd graphic card detected, but can't know before the opengl is launched
+    if (get("compress_png_texture").empty() && (m_hardware&hHasGpu) != 0)
+        set("compress_png_texture", (m_hardware&hGpuAmd) == hGpuAmd ? "0" : "1");
 }
 
 void AppConfig::init_ui_layout() {

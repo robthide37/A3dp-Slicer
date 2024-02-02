@@ -29,7 +29,8 @@ void as_message_callback(const AngelScript::asSMessageInfo* msg, void* param)
     printf("%s (%d, %d) : %s : %s\n", msg->section, msg->row, msg->col, type, msg->message);
 }
 
-//FIXME put script methods in the ScriptContainer class so there isn't this dangerous global var here.
+//TODO find a way to put script methods in the ScriptContainer class so there isn't this mutex-locked global var.
+std::mutex current_script_mutex;
 ScriptContainer* current_script;
 void as_print(std::string& str)
 {
@@ -853,16 +854,21 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
         break;
     }
     }
-    // init globals for script exec (TODO find a way to change that)
-    current_script = this;
     m_need_refresh = false;
     m_to_update.clear();
     for (Tab* tab : wxGetApp().tabs_list)
         if (tab->completed())
             m_to_update[tab->type()] = {};
     m_can_set = true;
-    // exec
-    /*int res = */ctx->Execute();
+    // init globals for script exec (TODO find a way to change that)
+    assert(current_script == nullptr);
+    {
+        std::lock_guard<std::mutex> lock(current_script_mutex);
+        current_script = this;
+        // exec
+        /*int res = */ ctx->Execute();
+        current_script = nullptr;
+    }
     m_can_set = false;
     std::map<Preset::Type, DynamicPrintConfig> to_update = m_to_update;
     m_to_update.clear();
@@ -916,8 +922,15 @@ bool ScriptContainer::call_script_function_reset(const ConfigOptionDef& def)
     }
     ctx->Prepare(func);
     m_can_set = true;
-    // exec
-    /*int res = */ctx->Execute();
+    // init globals for script exec (TODO find a way to change that)
+    assert(current_script == nullptr);
+    {
+        std::lock_guard<std::mutex> lock(current_script_mutex);
+        current_script = this;
+        // exec
+        /*int res = */ ctx->Execute();
+        current_script = nullptr;
+    }
     m_can_set = false;
     std::map<Preset::Type, DynamicPrintConfig> to_update = m_to_update;
     m_to_update.clear();
@@ -957,37 +970,6 @@ bool ScriptContainer::call_script_function_reset(const ConfigOptionDef& def)
     }
     return true;
 }
- 
-//void ScriptContainer::call_script_function_refresh(const std::string& def_id)
-//{
-//    std::string func_name = ("int " + def_id + "_refresh()");
-//    AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl(func_name.c_str());
-//    if (func == nullptr) {
-//        BOOST_LOG_TRIVIAL(error) << "Error, can't find function '" << func_name << "' in the script file";
-//        return;
-//    }
-//    AngelScript::asIScriptContext* ctx = m_script_engine->CreateContext();
-//    if (ctx == nullptr) {
-//        BOOST_LOG_TRIVIAL(error) << "Error, can't create script context for function '" << func_name << "'";
-//        return;
-//    }
-//    ctx->Prepare(func);
-//    // init globals for script exec (TODO find a way to change that)
-//    script_current_tab = m_tab;
-//    current_script->tech() = m_tech;
-//    // exec
-//    int res = ctx->Execute();
-//    int ret = ctx->GetReturnDWord();
-//    if (ret >= 0) {
-//        m_tab->set_value(def_id, unsigned char(ret));
-//    } else {
-//        m_tab->set_value(def_id, unsigned char(2));
-//    }
-//    //TODO: add the keyt into a collection of dirty script-widget in our tab. Then, ask for update_dirty() and add the code to use that collection in update_changed_ui
-//    m_tab->add_dirty_setting(def_id);
-//    //m_tab->update_dirty();
-//    //m_tab->
-//}
 
 boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef& def)
 {
@@ -1044,10 +1026,15 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     case coEnum: ctx->SetArgObject(0, &ret_str); break;
     }
     // init globals for script exec (TODO find a way to change that)
-    current_script = this;
-    m_need_refresh = false;
-    // exec
-    int res = ctx->Execute();
+    assert(current_script == nullptr);
+    {
+        std::lock_guard<std::mutex> lock(current_script_mutex);
+        current_script = this;
+        m_need_refresh = false;
+        // exec
+        int res        = ctx->Execute();
+        current_script = nullptr;
+    }
     int32_t ret_int;
     float ret_float;
     boost::any opt_val;
@@ -1149,8 +1136,15 @@ void ScriptContainer::refresh(const ConfigOptionDef& def, boost::any value)
         return true;
     }
     ctx->Prepare(func);
-    // exec
-    /*int res = */ ctx->Execute();
+    // init globals for script exec (TODO find a way to change that)
+    assert(current_script == nullptr);
+    {
+        std::lock_guard<std::mutex> lock(current_script_mutex);
+        current_script = this;
+        // exec
+        /*int res = */ ctx->Execute();
+        current_script = nullptr;
+    }
     uint8_t ret = ctx->GetReturnByte();
     return ret != 0;
 }

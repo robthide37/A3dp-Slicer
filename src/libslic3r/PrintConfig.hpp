@@ -309,8 +309,9 @@ class PrintConfigDef : public ConfigDef
 {
 public:
     PrintConfigDef();
-
-    static void handle_legacy(t_config_option_key& opt_key, std::string& value);
+    
+    static void handle_legacy(t_config_option_key& opt_key, std::string& value, bool remove_unkown_keys = true);
+    static bool is_defined(t_config_option_key& opt_key);
     static std::map<std::string, std::string> to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
     static std::map<std::string, std::string> from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
 
@@ -391,7 +392,8 @@ public:
     void                to_prusa(t_config_option_key& opt_key, std::string& value) const override
         { PrintConfigDef::to_prusa(opt_key, value, *this); }
     // utilities to help convert from prusa config.
-    void                convert_from_prusa();
+    // if with_phony, then the phony settigns will be set to phony if needed.
+    void                convert_from_prusa(bool with_phony);
 
     /// <summary>
     /// callback to changed other settings that are linked (like width & spacing)
@@ -1649,6 +1651,7 @@ public:
     auto                        cend() const { return m_data.cend(); }
     t_config_option_keys        keys() const { return m_data.keys(); }
     bool                        has(const t_config_option_key& opt_key) const { return m_data.has(opt_key); }
+    const ConfigDef*            def() const { return m_data.def(); }
     bool                        operator==(const ModelConfig& other) const { return m_data.equals(other.m_data); }
     bool                        operator!=(const ModelConfig& other) const { return !this->operator==(other); }
     const ConfigOption*         option(const t_config_option_key &opt_key) const { return m_data.option(opt_key); }
@@ -1669,7 +1672,8 @@ public:
 
 
     // utilities to help convert from prusa config.
-    void convert_from_prusa(const DynamicPrintConfig& global_config);
+    // if with_phony, then the phony settigns will be set to phony if needed.
+    void convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony);
 
 private:
     friend class cereal::access;
@@ -1681,6 +1685,19 @@ private:
     static uint64_t             s_last_timestamp;
 };
 
+
+
+void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+                                  ModelConfig &                              config,
+                                  const DynamicPrintConfig &                 global_config,
+                                  ConfigSubstitutionContext &                config_substitutions,
+                                  bool                                       with_phony,
+                                  bool                                       check_prusa);
+void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+                                  DynamicPrintConfig &                       config,
+                                  ConfigSubstitutionContext &                config_substitutions,
+                                  bool                                       with_phony,
+                                  bool                                       check_prusa);
 
 
 } // namespace Slic3r

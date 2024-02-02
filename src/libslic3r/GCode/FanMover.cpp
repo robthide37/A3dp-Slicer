@@ -34,8 +34,7 @@ const std::string& FanMover::process_gcode(const std::string& gcode, bool flush)
 
     if (flush) {
         while (!m_buffer.empty()) {
-            m_process_output += m_buffer.front().raw + "\n";
-            remove_from_buffer(m_buffer.begin());
+            write_buffer_data();
         }
     }
 
@@ -282,6 +281,15 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
                     dist = std::sqrt(dist);
                     time = dist / m_current_speed;
                 }
+            } else if (::atoi(&cmd[1]) == 2 || ::atoi(&cmd[1]) == 3) {
+                // TODO: compute real dist
+                double distx = line.dist_X(reader);
+                double disty = line.dist_Y(reader);
+                double dist = distx * distx + disty * disty;
+                if (dist > 0) {
+                    dist = std::sqrt(dist);
+                    time = dist / m_current_speed;
+                }
             }
             break;
         }
@@ -433,11 +441,18 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
         }
         if (line.has(Axis::E)) {
             new_data.e = reader.e();
-            if (relative_e)
+            if (relative_e) {
+                assert(new_data.e == 0);
                 new_data.de = line.e();
-            else
+            } else
                 new_data.de = line.dist_E(reader);
         }
+        assert(new_data.dx == 0 || reader.x() == new_data.x);
+        assert(new_data.dx == 0 || reader.x() + new_data.dx == line.x());
+        assert(new_data.dy == 0 ||reader.y() == new_data.y);
+        assert(new_data.dy == 0 || reader.y() + new_data.dy == line.y());
+        assert(new_data.de == 0 || reader.e() == new_data.e);
+        assert(new_data.de == 0 || reader.e() + new_data.de == line.e());
 
         if (m_current_kickstart.time > 0 && time > 0) {
             m_current_kickstart.time -= time;
@@ -472,23 +487,7 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
     //if buffer too big, flush it.
     if (time >= 0) {
         while (!m_buffer.empty() && (need_flush || m_buffer_time_size - m_buffer.front().time > nb_seconds_delay - EPSILON) ){
-            BufferData& frontdata = m_buffer.front();
-            if (frontdata.fan_speed < 0 || frontdata.fan_speed != m_front_buffer_fan_speed || frontdata.is_kickstart) {
-                if (frontdata.is_kickstart && frontdata.fan_speed < m_front_buffer_fan_speed) {
-                    //you have to slow down! not kickstart! rewrite the fan speed.
-                    m_process_output += _set_fan(frontdata.fan_speed);//m_writer.set_fan(frontdata.fan_speed,true); //FIXME extruder id (or use the gcode writer, but then you have to disable the multi-thread thing
-                        
-                    m_front_buffer_fan_speed = frontdata.fan_speed;
-                } else {
-                    m_process_output += frontdata.raw + "\n";
-                    if (frontdata.fan_speed >= 0) {
-                        //note that this is the only place where the fan_speed is set and we print from the buffer, as if the fan_speed >= 0 => time == 0
-                        //and as this flush all time == 0 lines from the back of the queue...
-                        m_front_buffer_fan_speed = frontdata.fan_speed;
-                    }
-                }
-            }
-            remove_from_buffer(m_buffer.begin());
+            write_buffer_data();
         }
     }
 #if _DEBUG
@@ -496,6 +495,29 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
     for (auto& data : m_buffer) sum += data.time;
     assert( std::abs(m_buffer_time_size - sum) < 0.01);
 #endif
+}
+
+void FanMover::write_buffer_data()
+{
+    BufferData &frontdata = m_buffer.front();
+    if (frontdata.fan_speed < 0 || frontdata.fan_speed != m_front_buffer_fan_speed || frontdata.is_kickstart) {
+        if (frontdata.is_kickstart && frontdata.fan_speed < m_front_buffer_fan_speed) {
+            // you have to slow down! not kickstart! rewrite the fan speed.
+            m_process_output += _set_fan(
+                frontdata.fan_speed); // m_writer.set_fan(frontdata.fan_speed,true); //FIXME extruder id (or use the
+                                      // gcode writer, but then you have to disable the multi-thread thing
+
+            m_front_buffer_fan_speed = frontdata.fan_speed;
+        } else {
+            m_process_output += frontdata.raw + "\n";
+            if (frontdata.fan_speed >= 0) {
+                // note that this is the only place where the fan_speed is set and we print from the buffer, as if the
+                // fan_speed >= 0 => time == 0 and as this flush all time == 0 lines from the back of the queue...
+                m_front_buffer_fan_speed = frontdata.fan_speed;
+            }
+        }
+    }
+    remove_from_buffer(m_buffer.begin());
 }
 
 } // namespace Slic3r

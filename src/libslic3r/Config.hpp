@@ -354,10 +354,12 @@ using  ConfigOptionUniquePtr = std::unique_ptr<ConfigOption, ConfigOptionDeleter
 // This structure serves to inform the user about the substitutions having been done during file import.
 struct ConfigSubstitution {
     const ConfigOptionDef   *opt_def { nullptr };
+    std::string              old_name; // for when opt_def is nullptr (option not defined in this version)
     std::string              old_value;
     ConfigOptionUniquePtr    new_value;
     ConfigSubstitution() = default;
-    ConfigSubstitution(const ConfigOptionDef* def, std::string old, ConfigOptionUniquePtr&& new_v) : opt_def(def), old_value(old), new_value(std::move(new_v)) {}
+    ConfigSubstitution(const ConfigOptionDef* def, std::string old, ConfigOptionUniquePtr&& new_v) : opt_def(def), old_name(), old_value(old), new_value(std::move(new_v)) {}
+    ConfigSubstitution(std::string bad_key, std::string value) : opt_def(nullptr), old_name(bad_key), old_value(value), new_value() {}
 };
 
 using  ConfigSubstitutions = std::vector<ConfigSubstitution>;
@@ -367,10 +369,20 @@ using  ConfigSubstitutions = std::vector<ConfigSubstitution>;
 struct ConfigSubstitutionContext
 {
     ConfigSubstitutionContext(ForwardCompatibilitySubstitutionRule rl) : rule(rl) {}
-    bool empty() const throw() { return substitutions.empty(); }
 
     ForwardCompatibilitySubstitutionRule 	rule;
-    ConfigSubstitutions					    substitutions;
+    
+    bool empty() const throw() { return m_substitutions.empty(); }
+    const ConfigSubstitutions &get() const { return m_substitutions; }
+    ConfigSubstitutions data() && { return std::move(m_substitutions); }
+    void add(ConfigSubstitution&& substitution) { m_substitutions.push_back(std::move(substitution)); }
+    void emplace(std::string &&key, std::string &&value) { m_substitutions.emplace_back(std::move(key), std::move(value)); }
+    void emplace(const ConfigOptionDef* def, std::string &&old_value, ConfigOptionUniquePtr&& new_v) { m_substitutions.emplace_back(def, std::move(old_value), std::move(new_v)); }
+    void clear() { m_substitutions.clear(); }
+    void sort_and_remove_duplicates() { sort_remove_duplicates(m_substitutions); }
+
+private:
+    ConfigSubstitutions					    m_substitutions;
 };
 
 // A generic value of a configuration option.
@@ -2364,6 +2376,7 @@ public:
 	// Set all the nullable values to nils.
     void null_nullables();
 
+    static std::map<t_config_option_key, std::string> load_gcode_string_legacy(const char* str);
     static size_t load_from_gcode_string_legacy(ConfigBase& config, const char* str, ConfigSubstitutionContext& substitutions);
 
 private:

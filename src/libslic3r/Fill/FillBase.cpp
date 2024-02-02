@@ -215,8 +215,8 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
 
 
             // ensure it doesn't over or under-extrude
-            double mult_flow = 1;
             if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
+            double mult_flow = 1;
                 // compute real volume
                 double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
                 if (extruded_volume != 0 && polyline_volume != 0) mult_flow *= polyline_volume / extruded_volume;
@@ -282,6 +282,9 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 if (mult_flow < 0.8) mult_flow = 0.8;
                 BOOST_LOG_TRIVIAL(info) << "Layer " << layer_id << ": Fill process extrude " << extruded_volume << " mm3 for a volume of " << polyline_volume << " mm3 : we mult the flow by " << mult_flow;
             }
+#if _DEBUG
+            this->debug_verify_flow_mult = mult_flow;
+#endif
 
             // Save into layer.
             auto* eec = new ExtrusionEntityCollection();
