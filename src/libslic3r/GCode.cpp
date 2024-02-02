@@ -3040,6 +3040,20 @@ std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point) {
     return gcode;
 }
 
+double cap_speed(
+    double speed, const double mm3_per_mm, const FullPrintConfig &config, int extruder_id
+) {
+    const double general_cap{config.max_volumetric_speed.value};
+    if (general_cap > 0) {
+        speed = std::min(speed, general_cap / mm3_per_mm);
+    }
+    const double filament_cap{config.filament_max_volumetric_speed.get_at(extruder_id)};
+    if (filament_cap > 0) {
+        speed = std::min(speed, filament_cap / mm3_per_mm);
+    }
+    return speed;
+}
+
 std::string GCodeGenerator::_extrude(
     const ExtrusionAttributes       &path_attr,
     const Geometry::ArcWelder::Path &path,
@@ -3139,33 +3153,15 @@ std::string GCodeGenerator::_extrude(
         speed = m_config.get_abs_value("first_layer_speed", speed);
     else if (this->object_layer_over_raft())
         speed = m_config.get_abs_value("first_layer_speed_over_raft", speed);
-    if (m_config.max_volumetric_speed.value > 0) {
-        // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)
-        speed = std::min(
-            speed,
-            m_config.max_volumetric_speed.value / path_attr.mm3_per_mm
-        );
-    }
-    if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
-        // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)
-        speed = std::min(
-            speed,
-            EXTRUDER_CONFIG(filament_max_volumetric_speed) / path_attr.mm3_per_mm
-        );
-    }
 
     std::pair<float, float> dynamic_speed_and_fan_speed{-1, -1};
     if (path_attr.overhang_attributes.has_value()) {
         double external_perim_reference_speed = m_config.get_abs_value("external_perimeter_speed");
         if (external_perim_reference_speed == 0)
             external_perim_reference_speed = m_volumetric_speed / path_attr.mm3_per_mm;
-        if (m_config.max_volumetric_speed.value > 0)
-            external_perim_reference_speed = std::min(external_perim_reference_speed,
-                                                      m_config.max_volumetric_speed.value / path_attr.mm3_per_mm);
-        if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
-            external_perim_reference_speed = std::min(external_perim_reference_speed,
-                                                      EXTRUDER_CONFIG(filament_max_volumetric_speed) / path_attr.mm3_per_mm);
-        }
+        external_perim_reference_speed = cap_speed(
+            external_perim_reference_speed, path_attr.mm3_per_mm, m_config, m_writer.extruder()->id()
+        );
 
         dynamic_speed_and_fan_speed = ExtrusionProcessor::calculate_overhang_speed(path_attr, this->m_config, m_writer.extruder()->id(),
                                                                                    external_perim_reference_speed, speed);
@@ -3174,6 +3170,9 @@ std::string GCodeGenerator::_extrude(
     if (dynamic_speed_and_fan_speed.first > -1) {
         speed = dynamic_speed_and_fan_speed.first;
     }
+
+    // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)
+    speed = cap_speed(speed, path_attr.mm3_per_mm, m_config, m_writer.extruder()->id());
 
     double F = speed * 60;  // convert mm/sec to mm/min
 
