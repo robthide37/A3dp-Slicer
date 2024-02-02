@@ -451,7 +451,7 @@ struct WipeTowerData
     std::unique_ptr<std::vector<WipeTower::ToolChangeResult>> priming;
     std::vector<std::vector<WipeTower::ToolChangeResult>> tool_changes;
     std::unique_ptr<WipeTower::ToolChangeResult>          final_purge;
-    std::vector<float>                                    used_filament;
+    std::vector<std::pair<float, std::vector<float>>>     used_filament_until_layer;
     int                                                   number_of_toolchanges;
 
     // Depth of the wipe tower to pass to GLCanvas3D for exact bounding box:
@@ -471,7 +471,7 @@ struct WipeTowerData
         priming.reset(nullptr);
         tool_changes.clear();
         final_purge.reset(nullptr);
-        used_filament.clear();
+        used_filament_until_layer.clear();
         number_of_toolchanges = -1;
         depth = 0.f;
         z_and_depth_pairs.clear();

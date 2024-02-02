@@ -1569,8 +1569,9 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
         }
     }
 
-    for (auto& used : m_used_filament_length) // reset used filament stats
-        used = 0.f;
+    m_used_filament_length.assign(m_used_filament_length.size(), 0.f); // reset used filament stats
+    assert(m_used_filament_length_until_layer.empty());
+    m_used_filament_length_until_layer.emplace_back(0.f, m_used_filament_length);
 
     m_old_temperature = -1; // reset last temperature written in the gcode
 
@@ -1613,6 +1614,10 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
         }
 
 		result.emplace_back(std::move(layer_result));
+
+        if (m_used_filament_length_until_layer.empty() || m_used_filament_length_until_layer.back().first != layer.z)
+            m_used_filament_length_until_layer.emplace_back();
+        m_used_filament_length_until_layer.back() = std::make_pair(layer.z, m_used_filament_length);
 	}
 }
 
