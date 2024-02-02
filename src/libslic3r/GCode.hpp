@@ -53,6 +53,7 @@ namespace Slic3r {
 
 // Forward declarations.
 class GCodeGenerator;
+struct WipeTowerData;
 
 namespace { struct Item; }
 struct PrintInstance;
@@ -356,7 +357,7 @@ private:
     struct PlaceholderParserIntegration {
         void reset();
         void init(const GCodeWriter &config);
-        void update_from_gcodewriter(const GCodeWriter &writer);
+        void update_from_gcodewriter(const GCodeWriter &writer, const WipeTowerData& wipe_tower_data);
         void validate_output_vector_variables();
 
         PlaceholderParser                   parser;
