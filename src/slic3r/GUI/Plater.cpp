@@ -2640,6 +2640,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         config.apply(loaded_printer_technology == ptFFF ?
                             static_cast<const ConfigBase&>(FullPrintConfig::defaults()) :
                             static_cast<const ConfigBase&>(SLAFullPrintConfig::defaults()));
+                        // Set all the nullable values in defaults to nils.
+                        config.null_nullables();
                         // and place the loaded config over the base.
                         config += std::move(config_loaded);
                     }

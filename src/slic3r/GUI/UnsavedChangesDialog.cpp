@@ -1095,7 +1095,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
 
     switch (opt->type) {
     case coInt:
-        return from_u8((boost::format("%1%") % config.opt_int(opt_key)).str());
+        return from_u8((boost::format("%1%") % config.option(opt_key)->getInt()).str());
     case coInts: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionIntsNullable>(opt_key);
@@ -1140,7 +1140,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return _L("Undef");
     }
     case coFloat:
-        return double_to_string(config.opt_float(opt_key));
+        return double_to_string(config.option(opt_key)->getFloat());
     case coFloats: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionFloatsNullable>(opt_key);
@@ -1289,7 +1289,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
         m_tree->model->AddPreset(type, from_u8(presets->get_edited_preset().name), old_pt, from_u8(new_selected_preset));
 
         // Collect dirty options.
-        const bool deep_compare = type != Preset::TYPE_FILAMENT;
+        const bool deep_compare = type != Preset::TYPE_FILAMENT && type != Preset::TYPE_SLA_MATERIAL;
         auto dirty_options = presets->current_dirty_options(deep_compare);
 
         // process changes of extruders count

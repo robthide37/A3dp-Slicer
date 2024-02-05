@@ -566,6 +566,12 @@ public:
 
 class TabSLAMaterial : public Tab
 {
+	void		create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key);
+	void		update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, bool is_checked = true);
+	void		add_material_overrides_page();
+	void		update_material_overrides_page();
+
+	std::map<std::string, wxWindow*> m_overrides_options;
 public:
     TabSLAMaterial(wxBookCtrlBase* parent) :
 		Tab(parent, _(L("Material Settings")), Slic3r::Preset::TYPE_SLA_MATERIAL) {}
