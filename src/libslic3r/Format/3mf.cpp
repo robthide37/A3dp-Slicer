@@ -3574,11 +3574,11 @@ bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionCo
     // All import should use "C" locales for number formatting.
     CNumericLocalesSetter locales_setter;
     _3MF_Importer         importer;
-    importer.load_model_from_file(path, *model, config, config_substitutions, check_version);
+    bool res = importer.load_model_from_file(path, *model, config, config_substitutions, check_version);
     importer.log_errors();
     handle_legacy_project_loaded(importer.version(), config, importer.prusaslicer_generator_version());
 
-    return !model->objects.empty() || !config.empty();
+    return res;
 }
 
 bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
