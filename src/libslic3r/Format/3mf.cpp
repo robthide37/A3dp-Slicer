@@ -706,12 +706,20 @@ namespace Slic3r {
         m_name = boost::filesystem::path(filename).stem().string();
 
         // we first loop the entries to read from the archive the .model file only, in order to extract the version from it
+        bool found_model = false;
         for (mz_uint i = 0; i < num_entries; ++i) {
             if (mz_zip_reader_file_stat(&archive, i, &stat)) {
                 std::string name(stat.m_filename);
                 std::replace(name.begin(), name.end(), '\\', '/');
 
-                if (boost::algorithm::istarts_with(name, MODEL_FOLDER) && boost::algorithm::iends_with(name, MODEL_EXTENSION)) {
+                if (boost::algorithm::iends_with(name, MODEL_EXTENSION)) {
+                    if(found_model){
+                        close_zip_reader(&archive);
+                        add_error("3mf contain multiple .model files and it is not supported yet.");
+                        return false;
+                    }
+                    found_model = true;
+
                     try
                     {
                         // valid model name -> extract model
@@ -729,6 +737,11 @@ namespace Slic3r {
                     }
                 }
             }
+        }
+        if (!found_model) {
+            close_zip_reader(&archive);
+            add_error("Not valid 3mf. There is missing .model file.");
+            return false;
         }
 
         // we then loop again the entries to read other files stored in the archive
