@@ -18,10 +18,10 @@ template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &,
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, LinesIt, LinesIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 template Points VoronoiUtils::discretize_parabola(const Point &, const Arachne::PolygonsSegmentIndex &, const Point &, const Point &, coord_t, float);
 template Arachne::PolygonsPointIndex VoronoiUtils::get_source_point_index(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 
@@ -195,7 +195,7 @@ typename boost::polygon::enable_if<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     Geometry::SegmentCellRange<
         typename boost::polygon::segment_point_type<typename std::iterator_traits<SegmentIterator>::value_type>::type>>::type
-VoronoiUtils::compute_segment_cell_range(VD::cell_type &cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+VoronoiUtils::compute_segment_cell_range(const VD::cell_type &cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
 {
     using Segment          = typename std::iterator_traits<SegmentIterator>::value_type;
     using Point            = typename boost::polygon::segment_point_type<Segment>::type;
@@ -211,10 +211,10 @@ VoronoiUtils::compute_segment_cell_range(VD::cell_type &cell, const SegmentItera
     SegmentCellRange cell_range(to, from);
 
     // Find starting edge and end edge
-    bool           seen_possible_start             = false;
-    bool           after_start                     = false;
-    bool           ending_edge_is_set_before_start = false;
-    VD::edge_type *edge                            = cell.incident_edge();
+    bool                 seen_possible_start             = false;
+    bool                 after_start                     = false;
+    bool                 ending_edge_is_set_before_start = false;
+    const VD::edge_type *edge                            = cell.incident_edge();
     do {
         if (edge->is_infinite())
             continue;

@@ -164,9 +164,9 @@ protected:
      * mapping each voronoi VD edge to the corresponding halfedge HE edge
      * In case the result segment is discretized, we map the VD edge to the *last* HE edge
      */
-    ankerl::unordered_dense::map<VD::edge_type*, edge_t*> vd_edge_to_he_edge;
-    ankerl::unordered_dense::map<VD::vertex_type*, node_t*> vd_node_to_he_node;
-    node_t& makeNode(VD::vertex_type& vd_node, Point p); //!< Get the node which the VD node maps to, or create a new mapping if there wasn't any yet.
+    ankerl::unordered_dense::map<const VD::edge_type *, edge_t *> vd_edge_to_he_edge;
+    ankerl::unordered_dense::map<const VD::vertex_type *, node_t *> vd_node_to_he_node;
+    node_t &makeNode(const VD::vertex_type &vd_node, Point p); //!< Get the node which the VD node maps to, or create a new mapping if there wasn't any yet.
 
     /*!
      * (Eventual) returned 'polylines per index' result (from generateToolpaths):
@@ -177,7 +177,7 @@ protected:
      * Transfer an edge from the VD to the HE and perform discretization of parabolic edges (and vertex-vertex edges)
      * \p prev_edge serves as input and output. May be null as input.
      */
-    void transferEdge(Point from, Point to, VD::edge_type& vd_edge, edge_t*& prev_edge, Point& start_source_point, Point& end_source_point, const std::vector<Segment>& segments);
+    void transferEdge(Point from, Point to, const VD::edge_type &vd_edge, edge_t *&prev_edge, Point &start_source_point, Point &end_source_point, const std::vector<Segment> &segments);
 
     /*!
      * Discretize a Voronoi edge that represents the medial axis of a vertex-
@@ -230,7 +230,7 @@ protected:
      * /return Whether the cell is inside of the polygon. If it's outside of the
      * polygon we should skip processing it altogether.
      */
-    static bool computePointCellRange(VD::cell_type& cell, Point& start_source_point, Point& end_source_point, VD::edge_type*& starting_vd_edge, VD::edge_type*& ending_vd_edge, const std::vector<Segment>& segments);
+    static bool computePointCellRange(const VD::cell_type &cell, Point &start_source_point, Point &end_source_point, const VD::edge_type *&starting_vd_edge, const VD::edge_type *&ending_vd_edge, const std::vector<Segment> &segments);
 
     /*!
      * For VD cells associated with an input polygon vertex, we need to separate the node at the end and start of the cell into two

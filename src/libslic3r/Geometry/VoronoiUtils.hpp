@@ -11,10 +11,10 @@ namespace Slic3r::Geometry {
 // Represent trapezoid Voronoi cell around segment.
 template<typename PT> struct SegmentCellRange
 {
-    const PT       segment_start_point;  // The start point of the source segment of this cell.
-    const PT       segment_end_point;    // The end point of the source segment of this cell.
-    VD::edge_type *edge_begin = nullptr; // The edge of the Voronoi diagram where the loop around the cell starts.
-    VD::edge_type *edge_end   = nullptr; // The edge of the Voronoi diagram where the loop around the cell ends.
+    const PT             segment_start_point;  // The start point of the source segment of this cell.
+    const PT             segment_end_point;    // The end point of the source segment of this cell.
+    const VD::edge_type *edge_begin = nullptr; // The edge of the Voronoi diagram where the loop around the cell starts.
+    const VD::edge_type *edge_end   = nullptr; // The edge of the Voronoi diagram where the loop around the cell ends.
 
     SegmentCellRange() = delete;
     explicit SegmentCellRange(const PT &segment_start_point, const PT &segment_end_point)
@@ -92,7 +92,7 @@ public:
             typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
         Geometry::SegmentCellRange<
             typename boost::polygon::segment_point_type<typename std::iterator_traits<SegmentIterator>::value_type>::type>>::type
-    compute_segment_cell_range(VD::cell_type &cell, SegmentIterator segment_begin, SegmentIterator segment_end);
+    compute_segment_cell_range(const VD::cell_type &cell, SegmentIterator segment_begin, SegmentIterator segment_end);
 
     template<typename T> static bool is_in_range(double value)
     {

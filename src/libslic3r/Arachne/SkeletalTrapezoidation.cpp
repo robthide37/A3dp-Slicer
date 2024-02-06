@@ -89,8 +89,7 @@ static void export_graph_to_svg(const std::string                               
 }
 #endif
 
-SkeletalTrapezoidation::node_t& SkeletalTrapezoidation::makeNode(VD::vertex_type& vd_node, Point p)
-{
+SkeletalTrapezoidation::node_t &SkeletalTrapezoidation::makeNode(const VD::vertex_type &vd_node, Point p) {
     auto he_node_it = vd_node_to_he_node.find(&vd_node);
     if (he_node_it == vd_node_to_he_node.end())
     {
@@ -105,8 +104,7 @@ SkeletalTrapezoidation::node_t& SkeletalTrapezoidation::makeNode(VD::vertex_type
     }
 }
 
-void SkeletalTrapezoidation::transferEdge(Point from, Point to, VD::edge_type& vd_edge, edge_t*& prev_edge, Point& start_source_point, Point& end_source_point, const std::vector<Segment>& segments)
-{
+void SkeletalTrapezoidation::transferEdge(Point from, Point to, const VD::edge_type &vd_edge, edge_t *&prev_edge, Point &start_source_point, Point &end_source_point, const std::vector<Segment> &segments) {
     auto he_edge_it = vd_edge_to_he_edge.find(vd_edge.twin());
     if (he_edge_it != vd_edge_to_he_edge.end())
     { // Twin segment(s) have already been made
@@ -328,8 +326,7 @@ Points SkeletalTrapezoidation::discretize(const VD::edge_type& vd_edge, const st
     }
 }
 
-bool SkeletalTrapezoidation::computePointCellRange(VD::cell_type& cell, Point& start_source_point, Point& end_source_point, VD::edge_type*& starting_vd_edge, VD::edge_type*& ending_vd_edge, const std::vector<Segment>& segments)
-{
+bool SkeletalTrapezoidation::computePointCellRange(const VD::cell_type &cell, Point &start_source_point, Point &end_source_point, const VD::edge_type *&starting_vd_edge, const VD::edge_type *&ending_vd_edge, const std::vector<Segment> &segments) {
     if (cell.incident_edge()->is_infinite())
         return false; //Infinite edges only occur outside of the polygon. Don't copy any part of this cell.
 
@@ -355,7 +352,7 @@ bool SkeletalTrapezoidation::computePointCellRange(VD::cell_type& cell, Point& s
     if (!LinearAlg2D::isInsideCorner(source_point_index.prev().p(), source_point_index.p(), source_point_index.next().p(), some_point))
         return false; // Don't copy any part of this cell
 
-    VD::edge_type* vd_edge = cell.incident_edge();
+    const VD::edge_type* vd_edge = cell.incident_edge();
     do {
         assert(vd_edge->is_finite());
         if (Vec2i64 p1 = Geometry::VoronoiUtils::to_point(vd_edge->vertex1()); p1 == source_point.cast<int64_t>()) {
@@ -429,14 +426,14 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
 #endif
 
     assert(this->graph.edges.empty() && this->graph.nodes.empty() && this->vd_edge_to_he_edge.empty() && this->vd_node_to_he_node.empty());
-    for (VD::cell_type cell : voronoi_diagram.cells()) {
+    for (const VD::cell_type &cell : voronoi_diagram.cells()) {
         if (!cell.incident_edge())
             continue; // There is no spoon
 
-        Point          start_source_point;
-        Point          end_source_point;
-        VD::edge_type *starting_voronoi_edge = nullptr;
-        VD::edge_type *ending_voronoi_edge   = nullptr;
+        Point                start_source_point;
+        Point                end_source_point;
+        const VD::edge_type *starting_voronoi_edge = nullptr;
+        const VD::edge_type *ending_voronoi_edge   = nullptr;
         // Compute and store result in above variables
 
         if (cell.contains_point()) {
@@ -467,7 +464,7 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
 
         constexpr bool is_next_to_start_or_end = true;
         graph.makeRib(prev_edge, start_source_point, end_source_point, is_next_to_start_or_end);
-        for (VD::edge_type* vd_edge = starting_voronoi_edge->next(); vd_edge != ending_voronoi_edge; vd_edge = vd_edge->next()) {
+        for (const VD::edge_type* vd_edge = starting_voronoi_edge->next(); vd_edge != ending_voronoi_edge; vd_edge = vd_edge->next()) {
             assert(vd_edge->is_finite());
             assert(Geometry::VoronoiUtils::is_in_range<coord_t>(*vd_edge));
 
