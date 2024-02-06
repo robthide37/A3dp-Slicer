@@ -29,6 +29,8 @@ class VoronoiUtils
 public:
     static Vec2i64 to_point(const VD::vertex_type *vertex);
 
+    static Vec2i64 to_point(const VD::vertex_type &vertex);
+
     static bool is_finite(const VD::vertex_type &vertex);
 
     static VD::vertex_type make_rotated_vertex(VD::vertex_type &vertex, double angle);

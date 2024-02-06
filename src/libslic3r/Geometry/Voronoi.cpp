@@ -11,11 +11,11 @@ namespace Slic3r::Geometry {
 
 using PolygonsSegmentIndexConstIt = std::vector<Arachne::PolygonsSegmentIndex>::const_iterator;
 using LinesIt                     = Lines::iterator;
-using ColoredLinesIt              = ColoredLines::iterator;
+using ColoredLinesConstIt         = ColoredLines::const_iterator;
 
 // Explicit template instantiation.
 template void VoronoiDiagram::construct_voronoi(LinesIt, LinesIt, bool);
-template void VoronoiDiagram::construct_voronoi(ColoredLinesIt, ColoredLinesIt, bool);
+template void VoronoiDiagram::construct_voronoi(ColoredLinesConstIt, ColoredLinesConstIt, bool);
 template void VoronoiDiagram::construct_voronoi(PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt, bool);
 
 template<typename SegmentIterator>

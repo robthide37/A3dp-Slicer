@@ -19,12 +19,12 @@ namespace Slic3r::Geometry {
 
 using PolygonsSegmentIndexConstIt = std::vector<Arachne::PolygonsSegmentIndex>::const_iterator;
 using LinesIt                     = Lines::iterator;
-using ColoredLinesIt              = ColoredLines::iterator;
+using ColoredLinesConstIt         = ColoredLines::const_iterator;
 
 // Explicit template instantiation.
 template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, LinesIt, LinesIt);
 template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, VD::SegmentIt, VD::SegmentIt);
-template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, ColoredLinesIt, ColoredLinesIt);
+template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, ColoredLinesConstIt, ColoredLinesConstIt);
 template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 
 // The tangent vector of the parabola is computed based on the Proof of the reflective property.

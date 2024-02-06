@@ -8,19 +8,22 @@ namespace Slic3r::Geometry {
 using PolygonsSegmentIndexConstIt = std::vector<Arachne::PolygonsSegmentIndex>::const_iterator;
 using LinesIt                     = Lines::iterator;
 using ColoredLinesIt              = ColoredLines::iterator;
+using ColoredLinesConstIt         = ColoredLines::const_iterator;
 
 // Explicit template instantiation.
 template LinesIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
 template VD::SegmentIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
 template ColoredLinesIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
+template ColoredLinesConstIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, ColoredLinesConstIt, ColoredLinesConstIt);
 template PolygonsSegmentIndexConstIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
+template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, ColoredLinesConstIt, ColoredLinesConstIt);
 template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
 template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, ColoredLinesConstIt, ColoredLinesConstIt);
 template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 template Points VoronoiUtils::discretize_parabola(const Point &, const Arachne::PolygonsSegmentIndex &, const Point &, const Point &, coord_t, float);
 template Arachne::PolygonsPointIndex VoronoiUtils::get_source_point_index(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
@@ -241,7 +244,13 @@ VoronoiUtils::compute_segment_cell_range(const VD::cell_type &cell, const Segmen
 
 Vec2i64 VoronoiUtils::to_point(const VD::vertex_type *vertex)
 {
-    const double x = vertex->x(), y = vertex->y();
+    assert(vertex != nullptr);
+    return VoronoiUtils::to_point(*vertex);
+}
+
+Vec2i64 VoronoiUtils::to_point(const VD::vertex_type &vertex)
+{
+    const double x = vertex.x(), y = vertex.y();
 
     assert(std::isfinite(x) && std::isfinite(y));
     assert(is_in_range<int64_t>(x) && is_in_range<int64_t>(y));

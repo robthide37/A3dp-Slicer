@@ -1905,7 +1905,7 @@ void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
         cnv->get_gizmos_manager().reset_all_states();
         Plater::TakeSnapshot(plater, _L("Remove Multi Material painting"));
         for (ModelVolume* mv : (*m_objects)[obj_idx]->volumes)
-            mv->mmu_segmentation_facets.reset();
+            mv->mm_segmentation_facets.reset();
         break;
 
     case InfoItemType::Sinking:
@@ -2897,7 +2897,7 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
                                       [type](const ModelVolume *mv) {
                                           return !(type == InfoItemType::CustomSupports ? mv->supported_facets.empty() :
                                                    type == InfoItemType::CustomSeam     ? mv->seam_facets.empty() :
-                                                                                          mv->mmu_segmentation_facets.empty());
+                                                                                          mv->mm_segmentation_facets.empty());
                                       });
             break;
 
