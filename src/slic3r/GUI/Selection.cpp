@@ -1273,8 +1273,8 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
 
 void Selection::mirror(Axis axis, TransformationType transformation_type)
 {
-  const Vec3d mirror((axis == X) ? -1.0 : 1.0, (axis == Y) ? -1.0 : 1.0, (axis == Z) ? -1.0 : 1.0);
-  scale_and_translate(mirror, Vec3d::Zero(), transformation_type);
+    const Vec3d mirror((axis == X) ? -1.0 : 1.0, (axis == Y) ? -1.0 : 1.0, (axis == Z) ? -1.0 : 1.0);
+    scale_and_translate(mirror, Vec3d::Zero(), transformation_type);
 }
 
 void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& world_translation, TransformationType transformation_type)
@@ -1346,7 +1346,8 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& world_trans
         synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
 
-    ensure_on_bed();
+    if (m_mode == EMode::Instance)
+        ensure_on_bed();
     set_bounding_boxes_dirty();
     wxGetApp().plater()->canvas3D()->requires_check_outside_state();
 }
