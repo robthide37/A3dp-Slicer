@@ -1239,7 +1239,10 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 			model_volume_list_copy_configs(model_object /* dst */, model_object_new /* src */, ModelVolumeType::PARAMETER_MODIFIER);
             layer_height_ranges_copy_configs(model_object.layer_config_ranges /* dst */, model_object_new.layer_config_ranges /* src */);
             // Copy the ModelObject name, input_file and instances. The instances will be compared against PrintObject instances in the next step.
-            model_object.name       = model_object_new.name;
+            if (model_object.name != model_object_new.name) {
+                update_apply_status(this->invalidate_step(psGCodeExport));
+                model_object.name = model_object_new.name;
+            }
             model_object.input_file = model_object_new.input_file;
             // Only refresh ModelInstances if there is any change.
             if (model_object.instances.size() != model_object_new.instances.size() || 

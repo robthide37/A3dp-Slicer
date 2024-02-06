@@ -694,6 +694,8 @@ void ObjectList::update_name_in_model(const wxDataViewItem& item) const
             //update object name with text marker in ObjectList
             m_objects_model->SetName(get_item_name(obj->name, true), item);
         }
+        // Renaming an object should invalidate gcode export - schedule Print::apply call.
+        wxGetApp().plater()->schedule_background_process();
         return;
     }
 
