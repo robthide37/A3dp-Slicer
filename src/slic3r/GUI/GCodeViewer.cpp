@@ -192,22 +192,85 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
 }
 
 
-float GCodeViewer::Extrusions::Range::step_size(bool log) const
+void GCodeViewer::Extrusions::Range::update_from(const float value)
+{
+    if (value != max && value != min)
+        ++count;
+    min = std::min(min, value);
+    max = std::max(max, value);
+
+    total_count++;
+    // don't keep outliers
+    uint8_t idx = std::min(19, std::max(0, int(9 + log2(min))));
+    counts[idx]++;
+    mins[idx] = std::min(mins[idx], value);
+    maxs[idx] = std::max(maxs[idx], value);
+}
+void GCodeViewer::Extrusions::Range::reset()
+{
+    min         = FLT_MAX;
+    max         = -FLT_MAX;
+    count       = 0;
+    total_count = 0;
+    for (size_t idx = 0; idx < 20; idx++) {
+        counts[idx] = 0;
+        maxs[idx]   = -FLT_MAX;
+        mins[idx]   = FLT_MAX;
+    }
+}
+
+float GCodeViewer::Extrusions::Range::get_max_no_outliers(float ratio_outlier) const
+{
+    size_t min_number = ratio_outlier * total_count / 20;
+    for (size_t idx = 19; idx < 20; --idx) {
+        if (counts[idx] > min_number) {
+            return maxs[idx];
+        }
+    }
+    assert(false);
+    return max;
+}
+
+float GCodeViewer::Extrusions::Range::get_min_no_outliers(float ratio_outlier) const
+{
+    size_t min_number = ratio_outlier * total_count / 20;
+    for (size_t idx = 0; idx < 20; ++idx) {
+        if (counts[idx] > min_number) {
+            return mins[idx];
+        }
+    }
+    assert(false);
+    return min;
+}
+
+float GCodeViewer::Extrusions::Range::step_size_no_outliers(float ratio_outlier, bool log) const
+{
+    return step_size(get_min_no_outliers(ratio_outlier), get_max_no_outliers(ratio_outlier), log);
+}
+
+GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at_no_outliers(float value,
+                                                                            float ratio_outlier,
+                                                                            bool  log) const
+{
+    return get_color_at(get_min_no_outliers(ratio_outlier), get_max_no_outliers(ratio_outlier), value, log);
+}
+
+float GCodeViewer::Extrusions::Range::step_size(float min, float max, bool log)
 {
     if (log)
     {
         float min_range = min;
         if (min_range == 0)
             min_range = 0.001f;
-        return (std::log(max / min_range) / (static_cast<float>(Range_Colors.size()) - 1.0f));
+        return (std::log(max / min_range) / (static_cast<float>(GCodeViewer::Range_Colors.size()) - 1.0f));
     } else
-        return (max - min) / (static_cast<float>(Range_Colors.size()) - 1.0f);
+        return (max - min) / (static_cast<float>(GCodeViewer::Range_Colors.size()) - 1.0f);
 }
 
-GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value, bool log) const
+GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float min, float max, float value, bool log)
 {
     // Input value scaled to the colors range
-    const float step = step_size(log);
+    const float step = step_size(min, max, log);
     float global_t;
     if (log)
     {
@@ -2265,16 +2328,26 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         switch (m_view_type)
         {
         case EViewType::FeatureType:    { color = Extrusion_Role_Colors[static_cast<unsigned int>(path.role)]; break; }
-        case EViewType::Height:         { color = m_extrusions.ranges.height.get_color_at(path.height); break; }
-        case EViewType::Width:          { color = m_extrusions.ranges.width.get_color_at(path.width); break; }
-        case EViewType::Feedrate:       { color = m_extrusions.ranges.feedrate.get_color_at(path.feedrate); break; }
-        case EViewType::FanSpeed:       { color = m_extrusions.ranges.fan_speed.get_color_at(path.fan_speed); break; }
-        case EViewType::Temperature:    { color = m_extrusions.ranges.temperature.get_color_at(path.temperature); break; }
-        case EViewType::LayerTime:      { color = m_extrusions.ranges.layer_duration.get_color_at(path.layer_time); break; }
-        case EViewType::LayerTimeLog:   { color = m_extrusions.ranges.layer_duration.get_color_at(path.layer_time, true); break; }
-        case EViewType::Chronology:     { color = m_extrusions.ranges.elapsed_time.get_color_at(path.elapsed_time); break; }
-        case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
-        case EViewType::VolumetricFlow: { color = m_extrusions.ranges.volumetric_flow.get_color_at(path.volumetric_flow); break; }
+        case EViewType::Height:         { color = m_extrusions.ranges.height.get_color_at_with_outliers(path.height); break; }
+        case EViewType::Width:          { color = m_extrusions.ranges.width.get_color_at_with_outliers(path.width); break; }
+        case EViewType::Feedrate:       { color = m_extrusions.ranges.feedrate.get_color_at_with_outliers(path.feedrate); break; }
+        case EViewType::FanSpeed:       { color = m_extrusions.ranges.fan_speed.get_color_at_with_outliers(path.fan_speed); break; }
+        case EViewType::Temperature:    { color = m_extrusions.ranges.temperature.get_color_at_with_outliers(path.temperature); break; }
+        case EViewType::LayerTime:      { color = m_extrusions.ranges.layer_duration.get_color_at_with_outliers(path.layer_time); break; }
+        case EViewType::LayerTimeLog:   { color = m_extrusions.ranges.layer_duration.get_color_at_with_outliers(path.layer_time, true); break; }
+        case EViewType::Chronology:     { color = m_extrusions.ranges.elapsed_time.get_color_at_with_outliers(path.elapsed_time); break; }
+        case EViewType::VolumetricRate: {
+            color = m_outliers_allowed ?
+                        m_extrusions.ranges.volumetric_rate.get_color_at_with_outliers(path.volumetric_rate) :
+                        m_extrusions.ranges.volumetric_rate.get_color_at_no_outliers(path.volumetric_rate);
+            break;
+        }
+        case EViewType::VolumetricFlow: {
+            color = m_outliers_allowed ?
+                        m_extrusions.ranges.volumetric_flow.get_color_at_with_outliers(path.volumetric_flow) :
+                        m_extrusions.ranges.volumetric_flow.get_color_at_no_outliers(path.volumetric_flow);
+            break;
+        }
         case EViewType::Tool:           { color = m_tool_colors[path.extruder_id]; break; }
         case EViewType::Filament:       { color = m_filament_colors[path.extruder_id]; break; }
         case EViewType::ColorPrint:     {
@@ -3129,6 +3202,7 @@ void GCodeViewer::render_legend(float& legend_height)
     const PrintEstimatedStatistics::Mode& time_mode = m_print_statistics.modes[static_cast<size_t>(m_time_estimate_mode)];
     bool show_estimated_time = time_mode.time > 0.0f && (m_view_type == EViewType::FeatureType ||
         (m_view_type == EViewType::ColorPrint && !time_mode.custom_gcode_times.empty()));
+    bool show_switch_show_outliers = (m_view_type == EViewType::VolumetricFlow || m_view_type == EViewType::VolumetricRate);
 
     const float icon_size = ImGui::GetTextLineHeight();
     const float percent_bar_size = 2.0f * ImGui::GetTextLineHeight();
@@ -3229,7 +3303,7 @@ void GCodeViewer::render_legend(float& legend_height)
             ImGui::PopStyleVar();
     };
 
-    auto append_range = [append_item](const Extrusions::Range& range, unsigned int decimals) {
+    auto append_range = [append_item](const Extrusions::Range& range, unsigned int decimals, bool ignore_outliers) {
         auto append_range_item = [append_item](int i, float value, unsigned int decimals) {
             char buf[1024];
             ::sprintf(buf, "%.*f", decimals, value);
@@ -3244,7 +3318,7 @@ void GCodeViewer::render_legend(float& legend_height)
             append_range_item(0, range.min, decimals);
         }
         else {
-            const float step_size = range.step_size();
+            const float step_size = ignore_outliers ? range.step_size_no_outliers() : range.step_size_with_outliers();
             for (int i = static_cast<int>(Range_Colors.size()) - 1; i >= 0; --i) {
                 append_range_item(i, range.min + static_cast<float>(i) * step_size, decimals);
             }
@@ -3259,7 +3333,7 @@ void GCodeViewer::render_legend(float& legend_height)
             append_item(EItemType::Rect, Range_Colors[static_cast<int>(Range_Colors.size()) - 1], get_time_dhms(range.max));
             append_item(EItemType::Rect, Range_Colors[0], get_time_dhms(range.min));
         } else {
-            float step_size = range.step_size(is_log);
+            float step_size = range.step_size_with_outliers(is_log);
             for (int i = static_cast<int>(Range_Colors.size()) - 1; i >= 0; --i) {
                 if (!is_log)
                     append_item(EItemType::Rect, Range_Colors[i], get_time_dhms(range.min + static_cast<float>(i) * step_size));
@@ -3487,16 +3561,16 @@ void GCodeViewer::render_legend(float& legend_height)
         }
         break;
     }
-    case EViewType::Height:         { append_range(m_extrusions.ranges.height, 3); break; }
-    case EViewType::Width:          { append_range(m_extrusions.ranges.width, 3); break; }
-    case EViewType::Feedrate:       { append_range(m_extrusions.ranges.feedrate, 1); break; }
-    case EViewType::FanSpeed:       { append_range(m_extrusions.ranges.fan_speed, 0); break; }
-    case EViewType::Temperature:    { append_range(m_extrusions.ranges.temperature, 0); break; }
+    case EViewType::Height:         { append_range(m_extrusions.ranges.height, 3, false); break; }
+    case EViewType::Width:          { append_range(m_extrusions.ranges.width, 3, false); break; }
+    case EViewType::Feedrate:       { append_range(m_extrusions.ranges.feedrate, 1, false); break; }
+    case EViewType::FanSpeed:       { append_range(m_extrusions.ranges.fan_speed, 0, false); break; }
+    case EViewType::Temperature:    { append_range(m_extrusions.ranges.temperature, 0, false); break; }
     case EViewType::LayerTime:      { append_range_time(m_extrusions.ranges.layer_duration, false); break; }
     case EViewType::LayerTimeLog:   { append_range_time(m_extrusions.ranges.layer_duration, true); break; }
     case EViewType::Chronology:     { append_range_time(m_extrusions.ranges.elapsed_time, false); break; }
-    case EViewType::VolumetricRate: { append_range(m_extrusions.ranges.volumetric_rate, 3); break; }
-    case EViewType::VolumetricFlow: { append_range(m_extrusions.ranges.volumetric_flow, 3); break; }
+    case EViewType::VolumetricRate: { append_range(m_extrusions.ranges.volumetric_rate, 3, !m_outliers_allowed); break; }
+    case EViewType::VolumetricFlow: { append_range(m_extrusions.ranges.volumetric_flow, 3, !m_outliers_allowed); break; }
     case EViewType::Tool:
     {
         // shows only extruders actually used
@@ -3905,6 +3979,41 @@ void GCodeViewer::render_legend(float& legend_height)
                 }
             }
         }
+    }
+    
+    if (show_switch_show_outliers) {
+        ImGui::Spacing();
+        const bool outliers_allowed = m_outliers_allowed;
+        if (!outliers_allowed)
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.3333f);
+
+        ImDrawList *draw_list = ImGui::GetWindowDrawList();
+        ImVec2      pos       = ImGui::GetCursorScreenPos();
+
+        // draw text
+        ImGui::SameLine();
+        if (ImGui::MenuItem((_u8L("Allow outliers")).c_str())) {
+            m_outliers_allowed = !m_outliers_allowed;
+            // update buffers' render paths
+            refresh_render_paths(false, false);
+            wxGetApp().plater()->update_preview_moves_slider();
+            wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
+            wxGetApp().plater()->update_preview_bottom_toolbar();
+        } else {
+            // show tooltip
+            if (ImGui::IsItemHovered()) {
+                ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiWrapper::COL_WINDOW_BACKGROUND);
+                ImGui::BeginTooltip();
+                imgui.text(outliers_allowed ? _u8L("Click to disable") : _u8L("Click to enable"));
+                ImGui::EndTooltip();
+                ImGui::PopStyleColor();
+
+                // to avoid the tooltip to change size when moving the mouse
+                imgui.set_requires_extra_frame();
+            }
+        }
+        if (!outliers_allowed)
+            ImGui::PopStyleVar();
     }
 
     // total estimated printing time section
