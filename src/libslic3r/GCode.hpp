@@ -53,6 +53,7 @@ namespace Slic3r {
 
 // Forward declarations.
 class GCodeGenerator;
+struct WipeTowerData;
 
 namespace { struct Item; }
 struct PrintInstance;
@@ -116,28 +117,8 @@ struct PrintObjectInstance
 
 class GCodeGenerator {
 
-public:        
-    GCodeGenerator() : 
-    	m_origin(Vec2d::Zero()),
-        m_enable_loop_clipping(true), 
-        m_enable_cooling_markers(false), 
-        m_enable_extrusion_role_markers(false),
-        m_last_processor_extrusion_role(GCodeExtrusionRole::None),
-        m_layer_count(0),
-        m_layer_index(-1), 
-        m_layer(nullptr),
-        m_object_layer_over_raft(false),
-        m_volumetric_speed(0),
-        m_last_extrusion_role(GCodeExtrusionRole::None),
-        m_last_width(0.0f),
-#if ENABLE_GCODE_VIEWER_DATA_CHECKING
-        m_last_mm3_per_mm(0.0),
-#endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
-        m_brim_done(false),
-        m_second_layer_things_done(false),
-        m_silent_time_estimator_enabled(false),
-        m_current_instance({nullptr, -1})
-        {}
+public:
+    GCodeGenerator(const Print* print = nullptr); // The default value is only used in unit tests.
     ~GCodeGenerator() = default;
 
     // throws std::runtime_exception on error,
@@ -376,7 +357,7 @@ private:
     struct PlaceholderParserIntegration {
         void reset();
         void init(const GCodeWriter &config);
-        void update_from_gcodewriter(const GCodeWriter &writer);
+        void update_from_gcodewriter(const GCodeWriter &writer, const WipeTowerData& wipe_tower_data);
         void validate_output_vector_variables();
 
         PlaceholderParser                   parser;
@@ -468,11 +449,14 @@ private:
     // Processor
     GCodeProcessor                      m_processor;
 
+    // Back-pointer to Print (const).
+    const Print*                        m_print;
+
     std::string                         _extrude(
         const ExtrusionAttributes &attribs, const Geometry::ArcWelder::Path &path, const std::string_view description, double speed = -1);
-    void                                print_machine_envelope(GCodeOutputStream &file, Print &print);
-    void                                _print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
-    void                                _print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
+    void                                print_machine_envelope(GCodeOutputStream &file, const Print &print);
+    void                                _print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
+    void                                _print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
     // On the first printing layer. This flag triggers first layer speeds.
     bool                                on_first_layer() const { return m_layer != nullptr && m_layer->id() == 0; }
     // To control print speed of 1st object layer over raft interface.

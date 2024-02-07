@@ -1055,7 +1055,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->set_status(90, message);
 
     // Create GCode on heap, it has quite a lot of data.
-    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator);
+    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator(const_cast<const Print*>(this)));
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
     if (m_conflict_result.has_value())
@@ -1581,7 +1581,7 @@ void Print::_make_wipe_tower()
     m_wipe_tower_data.final_purge = Slic3r::make_unique<WipeTower::ToolChangeResult>(
         wipe_tower.tool_change((unsigned int)(-1)));
 
-    m_wipe_tower_data.used_filament = wipe_tower.get_used_filament();
+    m_wipe_tower_data.used_filament_until_layer = wipe_tower.get_used_filament_until_layer();
     m_wipe_tower_data.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
     m_wipe_tower_data.width = wipe_tower.width();
     m_wipe_tower_data.first_layer_height = config().first_layer_height;
