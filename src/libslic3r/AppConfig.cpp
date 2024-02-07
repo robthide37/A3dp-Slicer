@@ -913,7 +913,9 @@ void AppConfig::save()
         // Returns "undefined" if the thread naming functionality is not supported by the operating system.
         std::optional<std::string> current_thread_name = get_current_thread_name();
         if (current_thread_name && *current_thread_name != "slic3r_main")
-            throw CriticalException("Calling AppConfig::save() from a worker thread!");
+            //in win11, it seems that the gui event thread isn't named 'slic3r_main'
+            BOOST_LOG_TRIVIAL(warning) << "AppConfig::save() from thread '" << *current_thread_name << "' instead of 'slic3r_main'\n";
+            //throw CriticalException("Calling AppConfig::save() from a worker thread!");
     }
 
     // The config is first written to a file with a PID suffix and then moved
