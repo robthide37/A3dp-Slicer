@@ -3056,6 +3056,25 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
         std::vector<ExtrusionPath> paths;
         const Point* first_point = nullptr;
         coordf_t resolution_sqr;
+        //TODO real travel with role & width
+        void ensure_travel_to(const Point &pt) {
+            assert(!paths.empty());
+            Point last_point = paths.back().last_point();
+            if (last_point != pt) {
+                if (last_point.distance_to_square(pt) < resolution_sqr) {
+                    paths.back().polyline.set_points().back() = pt;
+                } else {
+                    //add travel
+                    ExtrusionPath travel(paths.back().role(), false);
+                    travel.width = paths.back().width;
+                    travel.height = paths.back().height;
+                    travel.mm3_per_mm = 0;
+                    travel.polyline.append(last_point);
+                    travel.polyline.append(pt);
+                    paths.push_back(travel);
+                }
+            }
+        }
         virtual void use(ExtrusionPath &path) override {
             //ensure the loop is continue.
             if (first_point != nullptr) {
@@ -3256,16 +3275,19 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
                 change_flow.first_point = &point;
                 change_flow.percent_extrusion = 1;
                 change_flow.use(tws);
-                //add move back
+                // ChangeFlow added the first move if needed, now add the second
+                change_flow.ensure_travel_to(point);
+                //add move around
                 searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add,
                     change_flow.paths.begin(), change_flow.paths.end());
-                //add move to
-                if (poly_after.first_point() != point) {
-                    assert(poly_after.first_point().coincides_with_epsilon(point));
-                    assert(searcher.search_result.loop->paths.size() > idx_path_to_add);
-                    assert(poly_after.first_point().coincides_with_epsilon(searcher.search_result.loop->paths[idx_path_to_add].polyline.set_points().front()));
-                    searcher.search_result.loop->paths[idx_path_to_add].polyline.set_points().front() = poly_after.first_point();
-                }
+                ////add move to -> ??? i don't remember why i wrote that, so here it's removed.
+                assert(poly_after.first_point() == point);
+                //if (poly_after.first_point() != point) {
+                //    assert(poly_after.first_point().coincides_with_epsilon(point));
+                //    assert(searcher.search_result.loop->paths.size() > idx_path_to_add);
+                //    assert(poly_after.first_point().coincides_with_epsilon(searcher.search_result.loop->paths[idx_path_to_add].polyline.set_points().front()));
+                //    searcher.search_result.loop->paths[idx_path_to_add].polyline.set_points().front() = poly_after.first_point();
+                //}
 #if _DEBUG
                 searcher.search_result.loop->visit(LoopAssertVisitor{});
 #endif

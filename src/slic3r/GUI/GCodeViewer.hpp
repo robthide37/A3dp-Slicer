@@ -390,19 +390,22 @@ class GCodeViewer
             float min;
             float max;
             unsigned int count;
+            uint32_t counts[20];
+            uint64_t total_count;
+            float maxs[20];
+            float mins[20];
 
             Range() { reset(); }
-
-            void update_from(const float value) {
-                if (value != max && value != min)
-                    ++count;
-                min = std::min(min, value);
-                max = std::max(max, value);
-            }
-            void reset() { min = FLT_MAX; max = -FLT_MAX; count = 0; }
-
-            float step_size(bool log = false) const;
-            Color get_color_at(float value, bool log = false) const;
+            void update_from(const float value);
+            void reset();
+            float get_max_no_outliers(float ratio_outlier = 0.01) const;
+            float get_min_no_outliers(float ratio_outlier = 0.01) const;
+            float step_size_no_outliers(float ratio_outlier = 0.01, bool log = false) const;
+            Color get_color_at_no_outliers(float value, float ratio_outlier = 0.01, bool log = false) const;
+            float step_size_with_outliers(float ratio_outlier = 0.01, bool log = false) const { return step_size(min, max, log); }
+            Color get_color_at_with_outliers(float value, float ratio_outlier = 0.01, bool log = false) const { return get_color_at(min, max, value, log); }
+            static float step_size(float min, float max, bool log = false);
+            static Color get_color_at(float min, float max, float value, bool log = false);
         };
 
         struct Ranges
@@ -728,6 +731,7 @@ private:
     Shells m_shells;
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
+    bool m_outliers_allowed{ true };
     PrintEstimatedStatistics m_print_statistics;
     PrintEstimatedStatistics::ETimeMode m_time_estimate_mode{ PrintEstimatedStatistics::ETimeMode::Normal };
 #if ENABLE_GCODE_VIEWER_STATISTICS
