@@ -79,6 +79,7 @@ struct SurfaceFillParams : FillParams
             RETURN_COMPARE_NON_EQUAL(config->bridge_speed);
             RETURN_COMPARE_NON_EQUAL(config->bridge_speed_internal);
             RETURN_COMPARE_NON_EQUAL(config->gap_fill_speed);
+            RETURN_COMPARE_NON_EQUAL(config->print_extrusion_multiplier);
         }
         assert(*this == rhs);
         return false;
