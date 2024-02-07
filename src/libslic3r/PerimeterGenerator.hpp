@@ -153,7 +153,7 @@ private:
     ExPolygons unmillable;
     coord_t mill_extra_size;
 
-    ProcessSurfaceResult process_classic(int& loop_number, const Surface& surface);
+    ProcessSurfaceResult process_classic(int& contour_count, int& holes_count, const Surface& surface);
     ProcessSurfaceResult process_arachne(int& loop_number, const Surface& surface);
     
     void        processs_no_bridge(Surfaces& all_surfaces);

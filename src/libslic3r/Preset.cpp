@@ -449,7 +449,10 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
 
 static std::vector<std::string> s_Preset_print_options {
         "layer_height", 
-        "first_layer_height", "perimeters", "spiral_vase",
+        "first_layer_height",
+        "perimeters",
+        "perimeters_hole",
+        "spiral_vase",
         "slice_closing_radius",
         "slicing_mode",
         "top_solid_layers",

@@ -1047,6 +1047,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "no_perimeter_unsupported_algo"
                 || opt_key == "filament_max_overlap"
                 || opt_key == "perimeters"
+                || opt_key == "perimeters_hole"
                 || opt_key == "perimeter_overlap"
                 || opt_key == "solid_infill_extrusion_change_odd_layers"
                 || opt_key == "solid_infill_extrusion_spacing"

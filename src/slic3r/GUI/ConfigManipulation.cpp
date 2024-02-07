@@ -344,8 +344,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_perimeters);
 
     bool has_spiral_vase = have_perimeters && config->opt_bool("spiral_vase");
-
-    bool have_arachne = have_perimeters && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
+    
+    bool have_arachne = have_perimeters && (config->opt_int("perimeters") == config->opt_int("perimeters_hole") || config->opt_int("perimeters_hole") < 0);
+    toggle_field("perimeter_generator", have_arachne);
+    have_arachne = have_arachne && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
     for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "min_feature_size", "min_bead_width", "aaa" })
        toggle_field(el, have_arachne);
 
