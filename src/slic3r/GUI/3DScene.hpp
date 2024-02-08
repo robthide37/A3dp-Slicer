@@ -44,7 +44,7 @@
 
 namespace Slic3r {
 class SLAPrintObject;
-enum  SLAPrintObjectStep : unsigned int;
+enum  SLAPrintObjectStep : uint8_t;
 class BuildVolume;
 class DynamicPrintConfig;
 class ExtrusionPath;
@@ -55,7 +55,7 @@ class ExtrusionEntity;
 class ExtrusionEntityCollection;
 class ModelObject;
 class ModelVolume;
-enum ModelInstanceEPrintVolumeState : unsigned char;
+enum ModelInstanceEPrintVolumeState : uint8_t;
 
 // Return appropriate color based on the ModelVolume.
 extern ColorRGBA color_from_model_volume(const ModelVolume& model_volume);
@@ -76,6 +76,7 @@ public:
     static const ColorRGBA PARAMETER_MODIFIER_COLOR;
     static const ColorRGBA SUPPORT_BLOCKER_COLOR;
     static const ColorRGBA SUPPORT_ENFORCER_COLOR;
+    static const ColorRGBA SEAM_POSITION_COLOR;
 
     enum EHoverState : unsigned char
     {

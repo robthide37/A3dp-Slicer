@@ -44,8 +44,6 @@ public:
 	wxBitmap* 		insert(const std::string &name, const wxBitmap &bmp);
 	wxBitmap* 		insert_raw_rgba(const std::string &bitmap_key, unsigned width, unsigned height, const unsigned char *raw_data, const bool grayscale = false);
 
-	// Load png from resources/icons. bitmap_key is given without the .png suffix. Bitmap will be rescaled to provided height/width if nonzero.
-    wxBitmap* 		load_png(const std::string &bitmap_key, unsigned width = 0, unsigned height = 0, uint32_t color = 0xFFFFFFFF);
 
 	// Parses SVG file from a file, returns SVG image as paths.
 	// And makes replases befor parsing
@@ -55,7 +53,8 @@ public:
 	// replace_map containes old_value->new_value
     static void		nsvgGetDataFromFileWithReplace(const char* filename, std::string& data_str, const std::map<std::string, std::string>& replaces);
 	wxBitmapBundle* from_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height, const bool dark_mode, const std::string& new_color = "");
-	wxBitmapBundle* from_png(const std::string& bitmap_name, unsigned width, unsigned height);
+	// Load png from resources/icons. bitmap_key is given without the .png suffix. Bitmap will be rescaled to provided height/width if nonzero.
+	wxBitmapBundle* from_png(const std::string& bitmap_name, unsigned width, unsigned height, uint32_t color = 0xFFFFFFFF);
 	// Load svg from resources/icons. bitmap_key is given without the .svg suffix. SVG will be rasterized to provided height/width.
     wxBitmap* 		load_svg(const std::string &bitmap_key, unsigned width = 0, unsigned height = 0, const bool grayscale = false, const bool dark_mode = false, const std::string& new_color = "");
 	wxBitmap*		load_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height, std::map<std::string, std::string> replaces);

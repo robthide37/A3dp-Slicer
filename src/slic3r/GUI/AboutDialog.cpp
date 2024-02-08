@@ -142,11 +142,11 @@ void CopyrightsDialog::fill_entries()
         { "CuraEngine (Arachne, etc.)"
                             , "Ultimaker"                                   , "https://github.com/Ultimaker/CuraEngine" },
         { "Open CASCADE Technology"
-                            , "Open Cascade SAS", "https://github.com/Open-Cascade-SAS/OCCT" }
+                            , "Open Cascade SAS"                            , "https://github.com/Open-Cascade-SAS/OCCT" },
         { "Arc Welder"
                             , "Brad Hochgesang"                             , "https://github.com/FormerLurker/ArcWelderLib/" },
         { "BambuStudio"
-                            , "bambulab"                             , "https://github.com/bambulab/BambuStudio" },
+                            , "bambulab"                                    , "https://github.com/bambulab/BambuStudio" },
     };
 }
 
@@ -309,14 +309,14 @@ AboutDialog::AboutDialog()
             "%11%"
             "</font>"
             "</body>"
-            "</html>") % bgr_clr_str % text_clr_str % text_clr_str
-            % copyright_str % copyright_str
-            % is_lecensed_str
-            % license_str
-            % based_on_str
-            % contributors_str
-            % manual_str
-            % icon_str).str());
+            "</html>" , bgr_clr_str , text_clr_str , text_clr_str
+            , copyright_str , copyright_str
+            , is_lecensed_str
+            , license_str
+            , based_on_str
+            , contributors_str
+            , manual_str
+            , icon_str);
         m_html->SetPage(text);
         vsizer->Add(m_html, 1, wxEXPAND | wxBOTTOM, 10);
         m_html->Bind(wxEVT_HTML_LINK_CLICKED, &AboutDialog::onLinkClicked, this);

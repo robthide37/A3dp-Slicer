@@ -161,7 +161,7 @@ static Semver parse_version_string(const std::string& version)
     if (numbers.size() > 1)
         gl_minor = ::atoi(numbers[1].c_str());
 
-    return Semver(gl_major, gl_minor, 0);
+    return Semver(gl_major, gl_minor, 0, 0);
 }
 
 bool OpenGLManager::GLInfo::is_version_greater_or_equal_to(unsigned int major, unsigned int minor) const
@@ -169,7 +169,7 @@ bool OpenGLManager::GLInfo::is_version_greater_or_equal_to(unsigned int major, u
     if (!m_detected)
         detect();
     
-    return m_version >= Semver(major, minor, 0);
+    return m_version >= Semver(major, minor, 0, 0);
 }
 
 bool OpenGLManager::GLInfo::is_glsl_version_greater_or_equal_to(unsigned int major, unsigned int minor) const
@@ -177,7 +177,7 @@ bool OpenGLManager::GLInfo::is_glsl_version_greater_or_equal_to(unsigned int maj
     if (!m_detected)
         detect();
 
-    return m_glsl_version >= Semver(major, minor, 0);
+    return m_glsl_version >= Semver(major, minor, 0, 0);
 }
 
 // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.

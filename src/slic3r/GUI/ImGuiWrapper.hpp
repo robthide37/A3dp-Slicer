@@ -218,7 +218,7 @@ public:
     /// <param name="thickness">Width of polygon line</param>
     static void draw(const Polygon &polygon,
                      ImDrawList *   draw_list = ImGui::GetOverlayDrawList(),
-                     ImU32 color     = ImGui::GetColorU32(COL_ORANGE_LIGHT),
+                     ImU32 color     = ImGui::GetColorU32(COL_LIGHT),
                      float thickness = 3.f);
 
     /// <summary>

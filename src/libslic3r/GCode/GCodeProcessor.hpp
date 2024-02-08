@@ -139,7 +139,7 @@ namespace Slic3r {
             float mm3_per_mm{ 0.0f };
             float fan_speed{ 0.0f }; // percentage
             float temperature{ 0.0f }; // Celsius degrees
-            float time{ 0.0f }; // s
+            float time{ 0.0f }; // s (TODO: for each mode (silent or not) )
             float layer_duration{ 0.0f }; // s (layer id before finalize)
             uint16_t layer_id{ 0 };
             bool internal_only{ false };

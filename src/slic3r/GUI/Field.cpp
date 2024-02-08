@@ -78,19 +78,12 @@ wxString double_to_string(double const value, const int max_precision /*= 6*/)
 
 wxString get_points_string(const std::vector<Vec2d>& values)
 {
-    std::string input_string = into_u8(str);
-
-    str.Clear();
-
-    auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(input_string);
-    if (!thumbnails_list.empty()) {
-        const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
-        for (const auto& [format, size] : thumbnails_list)
-            str += format_wxstr("%1%x%2%/%3%, ", size.x(), size.y(), extentions[int(format)]);
-        str.resize(str.Len() - 2);
+    wxString ret_str;
+	for (size_t i = 0; i < values.size(); ++ i) {
+		const Vec2d& el = values[i];
+		ret_str += wxString::Format((i == 0) ? "%ix%i" : ", %ix%i", int(el[0]), int(el[1]));
 	}
-
-    return errors;
+    return ret_str;
 }
 
 Field::~Field()
@@ -622,6 +615,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 show_error(m_parent, format_wxstr(_L("Invalid input format. Expected vector of dimensions in the following format: \"%1%\""),"XxY, XxY, ..." ));
             }
         }
+    }
 
 	default:
 		break;
@@ -953,18 +947,6 @@ wxWindow* CheckBox::GetNewWin(wxWindow* parent, const wxString& label /*= wxEmpt
 
 void CheckBox::SetValue(wxWindow* win, bool value)
 {
-    if (wxGetApp().suppress_round_corners()) {
-        if (::CheckBox* ch_b = dynamic_cast<::CheckBox*>(win)) {
-            ch_b->SetValue(value);
-            return;
-        }
-    }
-    else {
-        if (::SwitchButton* ch_b = dynamic_cast<::SwitchButton*>(win)) {
-            ch_b->SetValue(value);
-            return;
-        }
-    }
 #ifdef __WXGTK2__
     if (wxToggleButton* tgl = dynamic_cast<wxToggleButton*>(window)) {
         tgl->SetValue(new_val);
@@ -974,6 +956,18 @@ void CheckBox::SetValue(wxWindow* win, bool value)
             tgl->SetLabel("");
     }
 #endif
+    if (wxGetApp().suppress_round_corners()) {
+        if (::CheckBox* ch_b = dynamic_cast<::CheckBox*>(win)) {
+            ch_b->SetValue(value);
+            return;
+        }else assert(false);
+    }
+    else {
+        if (::SwitchButton* ch_b = dynamic_cast<::SwitchButton*>(win)) {
+            ch_b->SetValue(value);
+            return;
+        }else assert(false);
+    }
 }
 
 bool CheckBox::GetValue(wxWindow* win)
@@ -1011,30 +1005,17 @@ void CheckBox::Rescale(wxWindow* win)
 void CheckBox::SysColorChanged(wxWindow* win)
 {
     if (!wxGetApp().suppress_round_corners())
-        if(::SwitchButton* chk = dynamic_cast<::SwitchButton*>(win)) {
+        if(::SwitchButton* chk = dynamic_cast<::SwitchButton*>(win))
             chk->SysColorChange();
 }
 
-void CheckBox::SetValue(bool value)
+bool CheckBox::GetValue(wxWindow* window)
 {
-/*
-    if (wxGetApp().suppress_round_corners())
-        dynamic_cast<::CheckBox*>(window)->SetValue(value);
-    else
-        dynamic_cast<::SwitchButton*>(window)->SetValue(value);
-*/
-    SetValue(windows, value);
-}
 
-bool CheckBox::GetValue()
-{
-/*
     if (wxGetApp().suppress_round_corners())
         return dynamic_cast<::CheckBox*>(window)->GetValue();
 
     return dynamic_cast<::SwitchButton*>(window)->GetValue();
-*/
-    GetValue(window);
 }
 
 void CheckBox::BUILD() {
@@ -1060,7 +1041,7 @@ void CheckBox::BUILD() {
 	if (m_opt.readonly) 
         window->Disable();
 
-	SetValue(check_value);
+	CheckBox::SetValue(window, check_value);
 
 	window->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent e) {
         m_is_na_val = false;
@@ -1074,7 +1055,7 @@ void CheckBox::BUILD() {
 void CheckBox::set_value(const bool value, bool change_event/* = false*/)
 {
     m_disable_change_event = !change_event;
-    SetValue(value);
+    CheckBox::SetValue(window, value);
     m_disable_change_event = false;
 }
 
@@ -1085,15 +1066,15 @@ void CheckBox::set_value(const boost::any& value, bool change_event)
         m_is_na_val = boost::any_cast<unsigned char>(value) == ConfigOptionBoolsNullable::nil_value();
         if (!m_is_na_val)
             m_last_meaningful_value = value;
-        set_widget_value(m_is_na_val ? false : boost::any_cast<unsigned char>(value) != 0);
+        CheckBox::SetValue(window, m_is_na_val ? false : boost::any_cast<unsigned char>(value) != 0);
     } else if (m_opt.is_script) {
         uint8_t val = boost::any_cast<uint8_t>(value);
         if (val == uint8_t(2) && dynamic_cast<wxCheckBox*>(window) != nullptr) // dead code, no more wxCheckBox. have to modify the custom button state to retreive that.
             dynamic_cast<wxCheckBox*>(window)->Set3StateValue(wxCheckBoxState::wxCHK_UNDETERMINED);
         else
-            SetValue(boost::any_cast<bool>(val != 0));
+            SetValue(window, boost::any_cast<bool>(val != 0));
     } else
-        set_widget_value(boost::any_cast<bool>(value));
+        CheckBox::SetValue(window, boost::any_cast<bool>(value));
     m_disable_change_event = false;
 }
 
@@ -1101,7 +1082,7 @@ void CheckBox::set_last_meaningful_value()
 {
     if (m_opt.nullable) {
         m_is_na_val = false;
-        SetValue(boost::any_cast<unsigned char>(m_last_meaningful_value) != 0);
+        CheckBox::SetValue(window, boost::any_cast<unsigned char>(m_last_meaningful_value) != 0);
         on_change_field();
     }
 }

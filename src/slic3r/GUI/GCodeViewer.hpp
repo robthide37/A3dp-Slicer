@@ -34,8 +34,9 @@ class GCodeViewer
     using InstanceBuffer = std::vector<float>;
     using InstanceIdBuffer = std::vector<size_t>;
     using InstancesOffsets = std::vector<Vec3f>;
-
-    std::vector<ColorRGBA> Extrusion_Role_Colors;
+    
+    // loaded from config ini file
+    std::vector<ColorRGBA>              Extrusion_Role_Colors;
     static const std::vector<ColorRGBA> Options_Colors;
     static const std::vector<ColorRGBA> Travel_Colors;
     static const std::vector<ColorRGBA> Range_Colors;
@@ -795,7 +796,7 @@ private:
     float m_max_print_height{ 0.0f };
     float m_z_offset{ 0.0f };
     std::vector<ColorRGBA> m_tool_colors;
-    std::vector<Color> m_filament_colors;
+    std::vector<ColorRGBA> m_filament_colors;
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;
     std::vector<GCodeExtrusionRole> m_roles;
@@ -900,7 +901,7 @@ public:
 
     std::vector<CustomGCode::Item>& get_custom_gcode_per_print_z() { return m_custom_gcode_per_print_z; }
     size_t get_extruders_count() { return m_extruders_count; }
-    const std::vector<Color>& get_extrusion_colors() const { return Extrusion_Role_Colors; }
+    const std::vector<ColorRGBA>& get_extrusion_colors() const { return Extrusion_Role_Colors; }
 
     void invalidate_legend() { m_legend_resizer.reset(); }
 

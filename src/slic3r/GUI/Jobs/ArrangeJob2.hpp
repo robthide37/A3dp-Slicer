@@ -82,6 +82,7 @@ private:
     std::string m_task_msg;
 
 public:
+
     void process(Ctl &ctl) override
     {
         ctl.call_on_main_thread([this]{

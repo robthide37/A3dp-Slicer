@@ -282,7 +282,7 @@ std::string GLGizmoCut3D::get_tooltip() const
 
 bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
 {
-    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+    Vec2i32 mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     Vec2d mouse_pos = mouse_coord.cast<double>();
 
     if (mouse_event.ShiftDown() && mouse_event.LeftDown())
@@ -2245,7 +2245,7 @@ void GLGizmoCut3D::render_shortcuts()
 
     if (m_show_shortcuts)
         for (const auto&shortcut : m_shortcuts ){
-            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, shortcut.first);
+            m_imgui->text_colored(ImGuiWrapper::get_COL_LIGHT(), shortcut.first);
             ImGui::SameLine(m_shortcut_label_width);
             m_imgui->text(shortcut.second);
         }
@@ -2275,7 +2275,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     // render_connect_mode_radio_button(CutConnectorMode::Manual);
 
     ImGui::AlignTextToFramePadding();
-    m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Connectors"]);
+    m_imgui->text_colored(ImGuiWrapper::get_COL_LIGHT(), m_labels_map["Connectors"]);
 
     m_imgui->disabled_begin(connectors.empty());
     ImGui::SameLine(m_label_width);
@@ -2368,7 +2368,7 @@ void GLGizmoCut3D::render_build_size()
     ImGui::AlignTextToFramePadding();
     m_imgui->text(_L("Build Volume"));
     ImGui::SameLine();
-    m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, size);
+    m_imgui->text_colored(ImGuiWrapper::get_COL_LIGHT(), size);
 }
 
 void GLGizmoCut3D::reset_cut_plane()
@@ -2639,7 +2639,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::AlignTextToFramePadding();
         ImGuiWrapper::text(wxString(ImGui::InfoMarkerSmall));
         ImGui::SameLine();
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT,
+        ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_LIGHT(),
                               get_wraped_wxString(_L("Hold SHIFT key to draw a cut line"), 40));
         ImGui::Separator();
 
@@ -2691,7 +2691,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         else if (mode == CutMode::cutTongueAndGroove) {
             m_is_slider_editing_done = false;
             ImGui::Separator();
-            ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Groove"] + ": ");
+            ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_LIGHT(), m_labels_map["Groove"] + ": ");
             render_groove_float_input(m_labels_map["Depth"], m_groove.depth, m_groove.depth_init, m_groove.depth_tolerance);
             render_groove_float_input(m_labels_map["Width"], m_groove.width, m_groove.width_init, m_groove.width_tolerance);
             render_groove_angle_input(m_labels_map["Flap Angle"], m_groove.flaps_angle, m_groove.flaps_angle_init, 30.f, 120.f);

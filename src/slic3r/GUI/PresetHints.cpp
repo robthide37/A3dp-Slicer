@@ -48,109 +48,109 @@ std::string PresetHints::cooling_description(const Preset &preset)
     if (ext_peri_fan_speed == 1) ext_peri_fan_speed = 0;
 
     //if (preset.config.opt_bool("cooling", 0)) {
-    out = _utf8(L("Fan"));
+    out = _u8L("Fan");
     if (preset.config.opt_bool("fan_always_on", 0)) {
 
-        out += " " + (boost::format(_utf8(L("will run at %1%%% by default"))) % min_fan_speed).str() ;
+        out += " " + (boost::format(_u8L("will run at %1%%% by default")) % min_fan_speed).str() ;
 
         if (ext_peri_fan_speed >= 0 && ext_peri_fan_speed != min_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over external perimeters"))) % ext_peri_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over external perimeters")) % ext_peri_fan_speed).str();
         }
         if (top_fan_speed >= 0 && top_fan_speed != min_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over top fill surfaces"))) % top_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over top fill surfaces")) % top_fan_speed).str();
         }
         if (supp_inter_fan_speed >= 0 && supp_inter_fan_speed != min_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over support interface surfaces"))) % supp_inter_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over support interface surfaces")) % supp_inter_fan_speed).str();
         }
         if (bridge_fan_speed >= 0 && bridge_fan_speed > min_fan_speed) {
             if (bridge_internal_fan_speed < 0)
-                out += ", " + (boost::format(_utf8(L("at %1%%% over all bridges"))) % bridge_fan_speed).str();
+                out += ", " + (boost::format(_u8L("at %1%%% over all bridges")) % bridge_fan_speed).str();
             else
-                out += ", " + (boost::format(_utf8(L("at %1%%% over bridges"))) % bridge_fan_speed).str();
+                out += ", " + (boost::format(_u8L("at %1%%% over bridges")) % bridge_fan_speed).str();
         }
         if (bridge_internal_fan_speed >= 0){
             if (bridge_internal_fan_speed > min_fan_speed) {
-                out += ", " + (boost::format(_utf8(L("at %1%%% over infill bridges"))) % bridge_internal_fan_speed).str();
+                out += ", " + (boost::format(_u8L("at %1%%% over infill bridges")) % bridge_internal_fan_speed).str();
             } else if (bridge_fan_speed >= 0 && bridge_fan_speed > min_fan_speed) {
-                out += ", " + (boost::format(_utf8(L("at %1%%% over infill bridges"))) % min_fan_speed).str();
+                out += ", " + (boost::format(_u8L("at %1%%% over infill bridges")) % min_fan_speed).str();
             }
         }
         if (disable_fan_first_layers > 1)
-            out += ", " + (boost::format(_utf8(L("except for the first %1% layers where the fan is disabled"))) % disable_fan_first_layers).str();
+            out += ", " + (boost::format(_u8L("except for the first %1% layers where the fan is disabled")) % disable_fan_first_layers).str();
         else if (disable_fan_first_layers == 1)
-            out += ", " + _utf8(L("except for the first layer where the fan is disabled"));
+            out += ", " + _u8L("except for the first layer where the fan is disabled");
         if(full_fan_speed_layer > disable_fan_first_layers + 1 && disable_fan_first_layers > 0)
-            out += (boost::format(_utf8(L(" and will gradually speed-up to the above speeds over %1% layers")))  % (full_fan_speed_layer - disable_fan_first_layers)).str();
+            out += (boost::format(_u8L(" and will gradually speed-up to the above speeds over %1% layers"))  % (full_fan_speed_layer - disable_fan_first_layers)).str();
         out += ".";
     } else
-       out += " " + _utf8(L("will be turned off by default."));
+       out += " " + _u8L("will be turned off by default.");
 
 
     if (fan_below_layer_time > 0
         && fan_below_layer_time > slowdown_below_layer_time
         && max_fan_speed > min_fan_speed) {
         
-        out += (boost::format(_utf8(L("\n\nIf estimated layer time is below ~%1%s, but still greater than ~%2%s, "
-            "fan will run at a proportionally increasing speed between %3%%% and %4%%%")))
+        out += (boost::format(_u8L("\n\nIf estimated layer time is below ~%1%s, but still greater than ~%2%s, "
+            "fan will run at a proportionally increasing speed between %3%%% and %4%%%"))
             % fan_below_layer_time % slowdown_below_layer_time % min_fan_speed % max_fan_speed).str();
 
         if (ext_peri_fan_speed > max_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over external perimeters"))) % ext_peri_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over external perimeters")) % ext_peri_fan_speed).str();
         } else if (ext_peri_fan_speed > min_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("between %1%%% %2%%% over external perimeters"))) % ext_peri_fan_speed % max_fan_speed).str();
+            out += ", " + (boost::format(_u8L("between %1%%% %2%%% over external perimeters")) % ext_peri_fan_speed % max_fan_speed).str();
         }
         if (top_fan_speed >= 0) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over top fill surfaces"))) % top_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over top fill surfaces")) % top_fan_speed).str();
         }
         if (supp_inter_fan_speed >= 0) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over support interface surfaces"))) % supp_inter_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over support interface surfaces")) % supp_inter_fan_speed).str();
         }
         if (bridge_fan_speed > max_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over bridges"))) % bridge_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over bridges")) % bridge_fan_speed).str();
         } else if (bridge_fan_speed > min_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("between %1%%% %2%%% over bridges"))) % bridge_fan_speed % max_fan_speed).str();
+            out += ", " + (boost::format(_u8L("between %1%%% %2%%% over bridges")) % bridge_fan_speed % max_fan_speed).str();
         }
         if (bridge_internal_fan_speed > max_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("at %1%%% over infill bridges"))) % bridge_internal_fan_speed).str();
+            out += ", " + (boost::format(_u8L("at %1%%% over infill bridges")) % bridge_internal_fan_speed).str();
         } else if (bridge_internal_fan_speed > min_fan_speed) {
-            out += ", " + (boost::format(_utf8(L("between %1%%% %2%%% over infill bridges"))) % bridge_internal_fan_speed % max_fan_speed).str();
+            out += ", " + (boost::format(_u8L("between %1%%% %2%%% over infill bridges")) % bridge_internal_fan_speed % max_fan_speed).str();
         }
         if (disable_fan_first_layers > 1)
-            out += " ; " + ((boost::format(_utf8(L("except for the first %1% layers where the fan is disabled"))) % disable_fan_first_layers).str());
+            out += " ; " + ((boost::format(_u8L("except for the first %1% layers where the fan is disabled")) % disable_fan_first_layers).str());
         else if (disable_fan_first_layers == 1)
-            out += " ; "+ _utf8(L("except for the first layer where the fan is disabled"));
+            out += " ; "+ _u8L("except for the first layer where the fan is disabled");
         if (full_fan_speed_layer > disable_fan_first_layers + 1 && disable_fan_first_layers > 0)
-            out += (boost::format(_utf8(L(" and will gradually speed-up to the above speeds over %1% layers"))) % (full_fan_speed_layer - disable_fan_first_layers)).str();
+            out += (boost::format(_u8L(" and will gradually speed-up to the above speeds over %1% layers")) % (full_fan_speed_layer - disable_fan_first_layers)).str();
         out += ".";
     }
 
     if (slowdown_below_layer_time > 0) {
 
-        out += (boost::format(_utf8(L("\n\nIf estimated layer time is below ~%1%s")))
+        out += (boost::format(_u8L("\n\nIf estimated layer time is below ~%1%s"))
             % slowdown_below_layer_time).str();
         if (max_fan_speed > 0 && max_fan_speed > min_fan_speed) {
-            out += " " + (boost::format(_utf8(L("fan will run by default to %1%%%")))
+            out += " " + (boost::format(_u8L("fan will run by default to %1%%%"))
                 % max_fan_speed).str();
 
             if (disable_fan_first_layers > 1)
-                out += " (" + (boost::format(_utf8(L("except for the first %1% layers where the fan is disabled"))) % disable_fan_first_layers).str();
+                out += " (" + (boost::format(_u8L("except for the first %1% layers where the fan is disabled")) % disable_fan_first_layers).str();
             else if (disable_fan_first_layers == 1)
-                out += " (" + _utf8(L("except for the first layer where the fan is disabled"));
+                out += " (" + _u8L("except for the first layer where the fan is disabled");
             if (full_fan_speed_layer > disable_fan_first_layers + 1 && disable_fan_first_layers > 0)
-                out += (boost::format(_utf8(L(" and will gradually speed-up to the above speeds over %1% layers"))) % (full_fan_speed_layer - disable_fan_first_layers)).str();
+                out += (boost::format(_u8L(" and will gradually speed-up to the above speeds over %1% layers")) % (full_fan_speed_layer - disable_fan_first_layers)).str();
             if(disable_fan_first_layers > 0)
                 out += ")";
             out += " and";
         }
             
-        out += " " + (boost::format(_utf8(L("print speed will be reduced "
-            "so that no less than %1%s are spent on that layer"))) % slowdown_below_layer_time).str();
+        out += " " + (boost::format(_u8L("print speed will be reduced "
+            "so that no less than %1%s are spent on that layer")) % slowdown_below_layer_time).str();
         if(min_print_speed > 0)
             if(max_speed_reduc > 0)
-                out += " " + (boost::format(_utf8(L("(however, speed will never be reduced below %1%mm/s or up to %2%%% reduction)")))
+                out += " " + (boost::format(_u8L("(however, speed will never be reduced below %1%mm/s or up to %2%%% reduction)"))
                     % min_print_speed % max_speed_reduc).str();
             else
-                out += " " + (boost::format(_utf8(L("(however, speed will never be reduced below %1%mm/s)")))
+                out += " " + (boost::format(_u8L("(however, speed will never be reduced below %1%mm/s)"))
                     % min_print_speed).str();
     }
 

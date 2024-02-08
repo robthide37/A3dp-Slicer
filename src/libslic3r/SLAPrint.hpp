@@ -23,13 +23,13 @@
 
 namespace Slic3r {
 
-enum SLAPrintStep : unsigned int {
+enum SLAPrintStep : uint8_t {
     slapsMergeSlicesAndEval,
     slapsRasterize,
 	slapsCount
 };
 
-enum SLAPrintObjectStep : unsigned int {
+enum SLAPrintObjectStep : uint8_t {
     slaposAssembly,
     slaposHollowing,
     slaposDrillHoles,

@@ -394,7 +394,7 @@ public:
 
 private:
 	void SetValue(bool value);
-	bool GetValue();
+	//bool GetValue();
 };
 
 class SpinCtrl : public Field {

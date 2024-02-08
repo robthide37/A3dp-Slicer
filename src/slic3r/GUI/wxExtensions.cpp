@@ -749,8 +749,8 @@ ScalableButton::ScalableButton( wxWindow *          parent,
 
 void ScalableButton::SetBitmap_(const ScalableBitmap& bmp)
 {
-    m_bmp_width(bmp.px_size().x),
-    m_bmp_height(bmp.px_size().y),
+    m_bmp_width = (bmp.px_size().x),
+    m_bmp_height = (bmp.px_size().y),
     SetBitmap(bmp.bmp());
     m_current_icon_name = bmp.name();
 }
@@ -760,20 +760,21 @@ void ScalableButton::SetBitmap_(const wxBitmap& bmp)
     SetBitmap(bmp);
 }
 
-bool ScalableButton::SetBitmap_(const std::string& bmp_name)
-{
-    m_current_icon_name = bmp_name;
-    if (m_current_icon_name.empty())
-        return false;
-
-    wxBitmapBundle bmp = *get_bmp_bundle(m_current_icon_name, m_bmp_width, m_bmp_height);
-    SetBitmap(bmp);
-    SetBitmapCurrent(bmp);
-    SetBitmapPressed(bmp);
-    SetBitmapFocus(bmp);
-    SetBitmapDisabled(bmp);
-    return true;
-}
+// not used
+//bool ScalableButton::SetBitmap_(const std::string& bmp_name)
+//{
+//    m_current_icon_name = bmp_name;
+//    if (m_current_icon_name.empty())
+//        return false;
+//
+//    wxBitmapBundle bmp = *get_bmp_bundle(m_current_icon_name, m_bmp_width, m_bmp_height);
+//    SetBitmap(bmp);
+//    SetBitmapCurrent(bmp);
+//    SetBitmapPressed(bmp);
+//    SetBitmapFocus(bmp);
+//    SetBitmapDisabled(bmp);
+//    return true;
+//}
 
 void ScalableButton::SetBitmapDisabled_(const ScalableBitmap& bmp)
 {

@@ -232,7 +232,7 @@ void GCodeViewer::COG::render()
     //ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     //ImGui::SetNextWindowBgAlpha(0.25f);
     //imgui.begin(std::string("COG"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
-    //imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Center of mass") + ":");
+    //imgui.text_colored(ImGuiWrapper::get_COL_LIGHT(), _u8L("Center of mass") + ":");
     //ImGui::SameLine();
     //char buf[1024];
     //const Vec3d position = cog();
@@ -405,11 +405,9 @@ void GCodeViewer::SequentialView::GCodeWindow::add_gcode_line_to_lines_cache(con
                 parameters += " " + tokens[i];
             }
         }
-        return true;
     }
 
     m_lines_cache.push_back({ command, parameters, comment });
-    return false;
 }
 
 void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, size_t curr_line_id)
@@ -762,27 +760,27 @@ GCodeViewer::GCodeViewer()
     //load Extrusion colors
     {
         this->Extrusion_Role_Colors.clear();
-        this->Extrusion_Role_Colors.insert(this->Extrusion_Role_Colors.begin(), GCode ExtrusionRole::Count,{ 0.00f, 0.00f, 0.00f, 1.f });
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::None]              = { 0.75f, 0.75f, 0.75f, 1.f }, // note: should never occur
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::Perimeter]         = { 1.00f, 0.90f, 0.30f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::ExternalPerimeter] = { 1.00f, 0.49f, 0.22f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::OverhangPerimeter] = { 0.12f, 0.12f, 1.00f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::InternalInfill]    = { 0.69f, 0.19f, 0.16f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::InternalBridgeInfill] = { 0.79f, 0.29f, 0.26f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::SolidInfill]       = { 0.59f, 0.33f, 0.80f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::TopSolidInfill]    = { 0.94f, 0.25f, 0.25f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::Ironing]           = { 1.00f, 0.55f, 0.41f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::BridgeInfill]      = { 0.30f, 0.50f, 0.73f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::ThinWall]          = { 0.00f, 1.00f, 0.40f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::GapFill]           = { 1.00f, 1.00f, 1.00f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::Skirt]             = { 0.00f, 0.53f, 0.43f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::SupportMaterial]   = { 0.00f, 1.00f, 0.00f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::SupportMaterialInterface] = { 0.00f, 0.50f, 0.00f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::WipeTower]         = { 0.70f, 0.89f, 0.67f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::Milling]           = { 0.70f, 0.70f, 0.70f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::Custom]            = { 0.37f, 0.82f, 0.58f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::Mixed]             = { 0.00f, 0.00f, 0.00f, 1.f };
-        this->Extrusion_Role_Colors[GCodeExtrusionRole::Travel]            = GCodeViewer::Travel_Colors.front();
+        this->Extrusion_Role_Colors.insert(this->Extrusion_Role_Colors.begin(), size_t(GCodeExtrusionRole::Count), { 0.00f, 0.00f, 0.00f, 1.f });
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::None)]              = { 0.75f, 0.75f, 0.75f, 1.f }, // note: should never occur
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::Perimeter)]         = { 1.00f, 0.90f, 0.30f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::ExternalPerimeter)] = { 1.00f, 0.49f, 0.22f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::OverhangPerimeter)] = { 0.12f, 0.12f, 1.00f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::InternalInfill)]    = { 0.69f, 0.19f, 0.16f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = { 0.79f, 0.29f, 0.26f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::SolidInfill)]       = { 0.59f, 0.33f, 0.80f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::TopSolidInfill)]    = { 0.94f, 0.25f, 0.25f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::Ironing)]           = { 1.00f, 0.55f, 0.41f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::BridgeInfill)]      = { 0.30f, 0.50f, 0.73f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::ThinWall)]          = { 0.00f, 1.00f, 0.40f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::GapFill)]           = { 1.00f, 1.00f, 1.00f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::Skirt)]             = { 0.00f, 0.53f, 0.43f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::SupportMaterial)]   = { 0.00f, 1.00f, 0.00f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::SupportMaterialInterface)] = { 0.00f, 0.50f, 0.00f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::WipeTower)]         = { 0.70f, 0.89f, 0.67f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::Milling)]           = { 0.70f, 0.70f, 0.70f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::Custom)]            = { 0.37f, 0.82f, 0.58f, 1.f };
+        //this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::Mixed)]             = { 0.00f, 0.00f, 0.00f, 1.f };
+        this->Extrusion_Role_Colors[uint8_t(GCodeExtrusionRole::Travel)]            = GCodeViewer::Travel_Colors.front();
 
 
         //try to load colors from ui file
@@ -799,9 +797,9 @@ GCodeViewer::GCodeViewer()
                 if (color_code.length() > 5) {
                     wxColour color;
                     color.Set((color_code[0] == '#') ? color_code : ("#" + color_code));
-                    Extrusion_Role_Colors[i][0] = color.Red() / 256.f;
-                    Extrusion_Role_Colors[i][1] = color.Green() / 256.f;
-                    Extrusion_Role_Colors[i][2] = color.Blue() / 256.f;
+                    Extrusion_Role_Colors[i].r(color.Red() / 256.f);
+                    Extrusion_Role_Colors[i].g(color.Green() / 256.f);
+                    Extrusion_Role_Colors[i].b(color.Blue() / 256.f);
                 }
             }
         }
@@ -1007,14 +1005,17 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
 
     if (!gcode_result.filament_colors.empty())
         // update tool colors from config stored in the gcode
-        m_filament_colors = decode_colors(gcode_result.filament_colors);
+        decode_colors(gcode_result.filament_colors, m_filament_colors);
     else
         // use tool colors
-        m_filament_colors = decode_colors(str_tool_colors);
+        decode_colors(str_tool_colors, m_filament_colors);
 
     // ensure there are enough colors defined
-    while (m_filament_colors.size() < std::max(size_t(1), gcode_result.extruders_count))
-        m_filament_colors.push_back(decode_color("#FF8000"));
+    while (m_filament_colors.size() < std::max(size_t(1), gcode_result.extruders_count)) {
+        ColorRGBA decoded;
+        decode_color("#FF8000",decoded);
+        m_filament_colors.push_back(decoded);
+    }
 
     // update ranges for coloring / legend
     m_extrusions.reset_ranges();
@@ -1038,12 +1039,13 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
                 m_extrusions.ranges.volumetric_rate.update_from(round_to_bin(curr.volumetric_rate()));
                 m_extrusions.ranges.volumetric_flow.update_from(round_to_bin(curr.mm3_per_mm));
             }
-            if (curr.layer_duration > 0.f)
-                m_extrusions.ranges.layer_duration.update_from(curr.layer_duration);
-            m_extrusions.ranges.elapsed_time.update_from(curr.time);
+            if (curr.layer_duration > 0.f && (gcode_result.print_statistics.modes.empty() || gcode_result.print_statistics.modes.front().layers_times.empty()))
+                m_extrusions.ranges.layer_time[0].update_from(curr.layer_duration);
+            if (curr.layer_duration > 0.f && (gcode_result.print_statistics.modes.empty() || gcode_result.print_statistics.modes.front().time == 0))
+                m_extrusions.ranges.elapsed_time[0].update_from(curr.time);
             [[fallthrough]];
         }
-        case EMoveType::Travel:
+        case EMoveType::Travel: 
         {
             if (m_buffers[buffer_id(curr.type)].visible)
                 m_extrusions.ranges.feedrate.update_from(curr.feedrate);
@@ -1056,6 +1058,7 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
 
     for (size_t i = 0; i < gcode_result.print_statistics.modes.size(); ++i) {
         m_layers_times[i] = gcode_result.print_statistics.modes[i].layers_times;
+        m_extrusions.ranges.elapsed_time[i].update_from(gcode_result.print_statistics.modes[i].time);
     }
 
     for (size_t i = 0; i < m_layers_times.size(); ++i) {
@@ -1091,7 +1094,7 @@ void GCodeViewer::reset()
     m_max_print_height = 0.0f;
     m_z_offset = 0.0f;
     m_tool_colors = std::vector<ColorRGBA>();
-    m_filament_colors = std::vector<Color>();
+    m_filament_colors = std::vector<ColorRGBA>();
     m_extruders_count = 0;
     m_extruder_ids = std::vector<unsigned char>();
     m_filament_diameters = std::vector<float>();
@@ -2579,7 +2582,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
             }
             break;
         }
-        case EViewType::Chronology:     { color = m_extrusions.ranges.elapsed_time.get_color_at(path.elapsed_time); break; }
+        case EViewType::Chronology:     { color = m_extrusions.ranges.elapsed_time[static_cast<size_t>(m_time_estimate_mode)].get_color_at(path.elapsed_time); break; } //TODO: 
         case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
         case EViewType::VolumetricFlow: { color = m_extrusions.ranges.volumetric_flow.get_color_at(path.volumetric_flow); break; }
         case EViewType::Tool:           { color = m_tool_colors[path.extruder_id]; break; }
@@ -3607,7 +3610,7 @@ void GCodeViewer::render_legend(float& legend_height)
                 pos = ImGui::GetCursorScreenPos();
                 const float width = std::max(1.0f, percent_bar_size * percent / max_percent);
                 draw_list->AddRectFilled({ pos.x, pos.y + 2.0f }, { pos.x + width, pos.y + icon_size - 2.0f },
-                    ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT));
+                    ImGui::GetColorU32(ImGuiWrapper::get_COL_LIGHT()));
                 ImGui::Dummy({ percent_bar_size, icon_size });
                 ImGui::SameLine();
                 char buf[64];
@@ -3954,7 +3957,7 @@ void GCodeViewer::render_legend(float& legend_height)
         case EViewType::VolumetricFlow:       { append_range(m_extrusions.ranges.volumetric_flow, 3); break; }
         case EViewType::LayerTimeLinear:      { append_time_range(m_extrusions.ranges.layer_time[static_cast<size_t>(m_time_estimate_mode)], Extrusions::Range::EType::Linear); break; }
         case EViewType::LayerTimeLogarithmic: { append_time_range(m_extrusions.ranges.layer_time[static_cast<size_t>(m_time_estimate_mode)], Extrusions::Range::EType::Logarithmic); break; }
-        case EViewType::Chronology:           { append_time_range(m_extrusions.ranges.elapsed_time, Extrusions::Range::EType::Linear); break; }
+        case EViewType::Chronology:           { append_time_range(m_extrusions.ranges.elapsed_time[static_cast<size_t>(m_time_estimate_mode)], Extrusions::Range::EType::Linear); break; }
         case EViewType::Tool:                 {
             // shows only extruders actually used
             for (unsigned char extruder_id : m_extruder_ids) {
@@ -4263,17 +4266,17 @@ void GCodeViewer::render_legend(float& legend_height)
 
         if (ImGui::BeginTable("Settings", 2)) {
             if (!m_settings_ids.printer.empty())
-                add_strings_row_to_table(_u8L("Printer") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+                add_strings_row_to_table(_u8L("Printer") + ":", ImGuiWrapper::get_COL_LIGHT(),
                     trim_text_if_needed(m_settings_ids.printer), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
             if (!m_settings_ids.print.empty())
-                add_strings_row_to_table(_u8L("Print settings") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+                add_strings_row_to_table(_u8L("Print settings") + ":", ImGuiWrapper::get_COL_LIGHT(),
                     trim_text_if_needed(m_settings_ids.print), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
             if (!m_settings_ids.filament.empty()) {
                 for (unsigned char i : m_extruder_ids) {
                     if (i < static_cast<unsigned char>(m_settings_ids.filament.size()) && !m_settings_ids.filament[i].empty()) {
                         std::string txt = _u8L("Filament");
                         txt += (m_extruder_ids.size() == 1) ? ":" : " " + std::to_string(i + 1);
-                        add_strings_row_to_table(txt, ImGuiWrapper::COL_ORANGE_LIGHT,
+                        add_strings_row_to_table(txt, ImGuiWrapper::get_COL_LIGHT(),
                             trim_text_if_needed(m_settings_ids.filament[i]), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
                     }
                 }
@@ -4328,11 +4331,11 @@ void GCodeViewer::render_legend(float& legend_height)
 
         if (ImGui::BeginTable("Times", 2)) {
             if (!time_mode.layers_times.empty()) {
-                add_strings_row_to_table(_u8L("First layer") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+                add_strings_row_to_table(_u8L("First layer") + ":", ImGuiWrapper::get_COL_LIGHT(),
                     short_time_ui(get_time_dhms(time_mode.layers_times.front())), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
             }
 
-            add_strings_row_to_table(_u8L("Total") + ":", ImGuiWrapper::COL_ORANGE_LIGHT,
+            add_strings_row_to_table(_u8L("Total") + ":", ImGuiWrapper::get_COL_LIGHT(),
                 short_time_ui(get_time_dhms(time_mode.time)), ImGuiWrapper::to_ImVec4(ColorRGBA::WHITE()));
 
             ImGui::EndTable();

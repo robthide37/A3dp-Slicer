@@ -27,7 +27,6 @@
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
-#include "libslic3r/Format/Format.hpp"
 #include "libslic3r/Format/SL1.hpp"
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/libslic3r.h"
@@ -203,13 +202,7 @@ void BackgroundSlicingProcess::process_sla()
 
             ThumbnailsList thumbnails = this->render_thumbnails(
                 ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true});
-
-            Zipper zipper(export_path);
-            m_sla_archive->export_print(zipper, *m_sla_print);
-                for (const ThumbnailData& data : thumbnails)
-                    if (data.is_valid())
-                        write_thumbnail(zipper, data);
-            zipper.finalize();
+			m_sla_print->export_print(export_path, thumbnails);
 
         } else if (! m_upload_job.empty()) {
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
@@ -634,10 +627,6 @@ Print::ApplyStatus BackgroundSlicingProcess::apply(const Model &model, const Dyn
 		// In addition, this early memory deallocation reduces memory footprint.
 		if (m_gcode_result != nullptr)
 			m_gcode_result->reset();
-	}
-	if (invalidated && m_print->technology() == ptSLA) {
-			m_sla_archive = Slic3r::get_output_format(config);
-			m_sla_print->set_printer(m_sla_archive);
 	}
 	return invalidated;
 }

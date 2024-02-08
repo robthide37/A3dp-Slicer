@@ -273,7 +273,7 @@ void GLVolume::set_render_color(bool force_transparent)
             set_render_color(HOVER_DESELECT_COLOR);
         else if (hover == HS_Select || selected) {
             const ColorRGBA rc = outside ? SELECTED_OUTSIDE_COLOR : SELECTED_COLOR;
-            if (color == NEGATIVE_VOLUME_COLOR || color == PARAMETER_MODIFIER_COLOR || color == SUPPORT_BLOCKER_COLOR || color == SUPPORT_ENFORCER_COLOR)
+            if (color == NEGATIVE_VOLUME_COLOR || color == PARAMETER_MODIFIER_COLOR || color == SUPPORT_BLOCKER_COLOR || color == SUPPORT_ENFORCER_COLOR || color == SEAM_POSITION_COLOR)
                 set_render_color(ColorRGBA(rc.r() * color.r(), rc.g() * color.g(), rc.b() * color.b(), rc.a() * color.a()));
             else
                 set_render_color(rc);
@@ -1456,7 +1456,7 @@ void _3DScene::thick_lines_to_verts(
 // Fill in the qverts and tverts with quads and triangles for the extrusion_path.
 void _3DScene::extrusionentity_to_verts(const ExtrusionPath& extrusion_path, float print_z, const Point& copy, GUI::GLModel::Geometry& geometry)
 {
-    Polyline            polyline = extrusion_path.polyline.as_polyline();
+    Polyline            polyline = extrusion_path.polyline.to_polyline(); //TODO: 2.7 check: need to set a resolution?
     polyline.remove_duplicate_points();
     polyline.translate(copy);
     const Lines               lines = polyline.lines();
@@ -1472,7 +1472,7 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionLoop& extrusion_loop, flo
     std::vector<double> widths;
     std::vector<double> heights;
     for (const ExtrusionPath& extrusion_path : extrusion_loop.paths) {
-        Polyline            polyline = extrusion_path.polyline.as_polyline();
+        Polyline            polyline = extrusion_path.polyline.to_polyline();
         polyline.remove_duplicate_points();
         polyline.translate(copy);
         const Lines lines_this = polyline.lines();
@@ -1490,7 +1490,7 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath& extrusion_mult
     std::vector<double> widths;
     std::vector<double> heights;
     for (const ExtrusionPath& extrusion_path : extrusion_multi_path.paths) {
-        Polyline            polyline = extrusion_path.polyline.as_polyline();
+        Polyline            polyline = extrusion_path.polyline.to_polyline();
         polyline.remove_duplicate_points();
         polyline.translate(copy);
         const Lines lines_this = polyline.lines();
@@ -1507,7 +1507,7 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath3D &extrusion_mu
     std::vector<double> widths;
     std::vector<double> heights;
     for (const ExtrusionPath3D &extrusion_path : extrusion_multi_path.paths) {
-        Polyline            polyline = extrusion_path.polyline.as_polyline();
+        Polyline            polyline = extrusion_path.polyline.to_polyline();
         polyline.remove_duplicate_points();
         polyline.translate(copy);
         const Lines lines_this = polyline.lines();

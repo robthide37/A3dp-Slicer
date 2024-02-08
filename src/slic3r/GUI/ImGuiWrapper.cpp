@@ -1627,7 +1627,7 @@ ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &dialog_size,
 void ImGuiWrapper::draw(
     const Polygon &polygon,
     ImDrawList *   draw_list /* = ImGui::GetOverlayDrawList()*/,
-    ImU32          color     /* = ImGui::GetColorU32(COL_ORANGE_LIGHT)*/,
+    ImU32          color     /* = ImGui::GetColorU32(COL_LIGHT)*/,
     float          thickness /* = 3.f*/)
 {
     // minimal one line consist of 2 points

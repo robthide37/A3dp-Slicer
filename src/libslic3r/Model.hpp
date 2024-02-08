@@ -1123,7 +1123,7 @@ inline const ModelVolume* model_volume_find_by_id(const ModelVolumePtrs &model_v
     return it != model_volumes.end() && (*it)->id() == id ? *it : nullptr;
 }
 
-enum ModelInstanceEPrintVolumeState : unsigned char
+enum ModelInstanceEPrintVolumeState : uint8_t
 {
     ModelInstancePVS_Inside,
     ModelInstancePVS_Partly_Outside,

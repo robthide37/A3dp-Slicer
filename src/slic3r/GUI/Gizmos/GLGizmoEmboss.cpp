@@ -251,7 +251,7 @@ struct GuiCfg
     unsigned int icon_width                           = 0;
 
     // maximal width and height of style image
-    Vec2i max_style_image_size = Vec2i(0, 0);
+    Vec2i32 max_style_image_size = Vec2i32(0, 0);
 
     float indent                = 0.f;
     float input_offset          = 0.f;
@@ -261,7 +261,7 @@ struct GuiCfg
     ImVec2 text_size;
 
     // maximal size of face name image
-    Vec2i face_name_size             = Vec2i(0, 0);
+    Vec2i32 face_name_size             = Vec2i32(0, 0);
     float face_name_texture_offset_x = 0.f;
 
     // maximal texture generate jobs running at once
@@ -817,7 +817,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
     auto   draw_list = ImGui::GetOverlayDrawList();
     ImVec2 p1        = ImGui::GetMousePos();
     ImVec2 p2(p1.x + offset->x(), p1.y + offset->y());
-    ImU32  color     = ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT);
+    ImU32  color     = ImGui::GetColorU32(ImGuiWrapper::get_COL_LIGHT());
     float  thickness = 3.f;
     draw_list->AddLine(p1, p2, color, thickness);
 }
@@ -1580,7 +1580,7 @@ void GLGizmoEmboss::init_font_name_texture() {
     glsafe(::glBindTexture(target, id));
     glsafe(::glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
     glsafe(::glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-    const Vec2i &size = m_gui_cfg->face_name_size;
+    const Vec2i32 &size = m_gui_cfg->face_name_size;
     GLint w = size.x(), h = m_face_names->count_cached_textures * size.y();
     std::vector<unsigned char> data(4*w * h, {0});
     const GLenum format = GL_RGBA, type = GL_UNSIGNED_BYTE;
@@ -1623,7 +1623,7 @@ void GLGizmoEmboss::draw_font_list_line()
     bool exist_change_in_font = m_style_manager.is_font_changed();
     const std::string& font_text = m_gui_cfg->translations.font;
     if (exist_change_in_font || !exist_stored_style)
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, font_text);
+        ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_LIGHT(), font_text);
     else
         ImGuiWrapper::text(font_text);
 
@@ -1925,9 +1925,9 @@ void GLGizmoEmboss::draw_style_rename_popup() {
 
     bool allow_change = false;
     if (new_name.empty()) {
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_DARK(), _u8L("Name can't be empty."));
     }else if (!is_unique) { 
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_DARK(), _u8L("Name has to be unique."));
     } else {
         ImGui::NewLine();
         allow_change = true;
@@ -2006,9 +2006,9 @@ void GLGizmoEmboss::draw_style_save_as_popup() {
     bool is_unique = m_style_manager.is_unique_style_name(new_name);        
     bool allow_change = false;
     if (new_name.empty()) {
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_DARK(), _u8L("Name can't be empty."));
     }else if (!is_unique) { 
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_DARK(), _u8L("Name has to be unique."));
     } else {
         ImGui::NewLine();
         allow_change = true;
@@ -2177,7 +2177,7 @@ void GLGizmoEmboss::draw_style_list() {
     if (m_style_manager.exist_stored_style())
         ImGui::Text("%s", title.c_str());
     else
-        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_LIGHT, "%s", title.c_str());
+        ImGui::TextColored(ImGuiWrapper::get_COL_LIGHT(), "%s", title.c_str());
         
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     auto add_text_modify = [&is_modified](const std::string& name) {
@@ -2401,7 +2401,7 @@ bool GLGizmoEmboss::revertible(const std::string &name,
 {
     bool changed = exist_change(value, default_value);
     if (changed || default_value == nullptr)
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, name);
+        ImGuiWrapper::text_colored(ImGuiWrapper::get_COL_LIGHT(), name);
     else
         ImGuiWrapper::text(name);
 
@@ -3703,8 +3703,8 @@ GuiCfg create_gui_configuration()
 
     int max_style_image_width = static_cast<int>(std::round(cfg.max_style_name_width/2 - 2 * style.FramePadding.x));
     int max_style_image_height = static_cast<int>(std::round(1.5 * input_height));
-    cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
-    cfg.face_name_size = Vec2i(cfg.input_width, line_height_with_spacing);
+    cfg.max_style_image_size = Vec2i32(max_style_image_width, max_style_image_height);
+    cfg.face_name_size = Vec2i32(cfg.input_width, line_height_with_spacing);
     cfg.face_name_texture_offset_x = cfg.face_name_size.x() + space;
     return cfg;
 }

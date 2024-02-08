@@ -738,12 +738,11 @@ void CreateMMUTiledCanvas::load_config()
         def.type = coInt;
         def.tooltip = L("Choose how to compare color, to choose what's merged");
         def.gui_type = ConfigOptionDef::GUIType::i_enum_open;
-        def.enum_values.push_back("0");
-        def.enum_values.push_back("1");
-        def.enum_values.push_back("2");
-        def.enum_labels.push_back("RGB");
-        def.enum_labels.push_back("RGb");
-        def.enum_labels.push_back("Hsv");
+        def.set_enum_values(ConfigOptionDef::GUIType::i_enum_open, {
+            { "0", "RGB" },
+            { "1", "RGb" },
+            { "2", "Hsv" }
+        });
         def.set_default_value(new ConfigOptionInt{ 0 });
         m_config.config_def.options["color_comp"] = def;
         m_config.set_key_value("color_comp", def.default_value.get()->clone());

@@ -28,7 +28,7 @@ public:
     static const Segment     &getSourceSegment(const vd_t::cell_type &cell, const std::vector<Segment> &segments);
     static PolygonsPointIndex getSourcePointIndex(const vd_t::cell_type &cell, const std::vector<Segment> &segments);
 
-    static Vec2i64 p(const vd_t::vertex_type *node);
+    static Vec2i3264 p(const vd_t::vertex_type *node);
 
     /*!
      * Discretize a parabola based on (approximate) step size.

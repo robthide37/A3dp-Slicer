@@ -358,7 +358,7 @@ bool SkeletalTrapezoidation::computePointCellRange(vd_t::cell_type& cell, Point&
     // Check if any point of the cell is inside or outside polygon
     // Copy whole cell into graph or not at all
 
-    // If the cell.incident_edge()->vertex0() is far away so much that it doesn't even fit into Vec2i64, then there is no way that it will be inside the input polygon.
+    // If the cell.incident_edge()->vertex0() is far away so much that it doesn't even fit into Vec2i3264, then there is no way that it will be inside the input polygon.
     if (const vd_t::vertex_type &vert = *cell.incident_edge()->vertex0();
         vert.x() >= double(std::numeric_limits<int64_t>::max()) || vert.x() <= double(std::numeric_limits<int64_t>::lowest()) ||
         vert.y() >= double(std::numeric_limits<int64_t>::max()) || vert.y() <= double(std::numeric_limits<int64_t>::lowest()))
@@ -366,7 +366,7 @@ bool SkeletalTrapezoidation::computePointCellRange(vd_t::cell_type& cell, Point&
 
     const Point source_point = VoronoiUtils::getSourcePoint(cell, segments);
     const PolygonsPointIndex source_point_index = VoronoiUtils::getSourcePointIndex(cell, segments);
-    Vec2i64 some_point = VoronoiUtils::p(cell.incident_edge()->vertex0());
+    Vec2i3264 some_point = VoronoiUtils::p(cell.incident_edge()->vertex0());
     if (some_point == source_point.cast<int64_t>())
         some_point = VoronoiUtils::p(cell.incident_edge()->vertex1());
 
@@ -380,7 +380,7 @@ bool SkeletalTrapezoidation::computePointCellRange(vd_t::cell_type& cell, Point&
     vd_t::edge_type* vd_edge = cell.incident_edge();
     do {
         assert(vd_edge->is_finite());
-        if (Vec2i64 p1 = VoronoiUtils::p(vd_edge->vertex1()); p1 == source_point.cast<int64_t>()) {
+        if (Vec2i3264 p1 = VoronoiUtils::p(vd_edge->vertex1()); p1 == source_point.cast<int64_t>()) {
             start_source_point = source_point;
             end_source_point = source_point;
             starting_vd_edge = vd_edge->next();
@@ -411,8 +411,8 @@ void SkeletalTrapezoidation::computeSegmentCellRange(vd_t::cell_type& cell, Poin
         if (edge->is_infinite())
             continue;
 
-        Vec2i64 v0 = VoronoiUtils::p(edge->vertex0());
-        Vec2i64 v1 = VoronoiUtils::p(edge->vertex1());
+        Vec2i3264 v0 = VoronoiUtils::p(edge->vertex0());
+        Vec2i3264 v1 = VoronoiUtils::p(edge->vertex1());
 
         assert(!(v0 == to.cast<int64_t>() && v1 == from.cast<int64_t>() ));
         if (v0 == to.cast<int64_t>()  && !after_start) { // Use the last edge which starts in source_segment.to
@@ -488,8 +488,8 @@ static bool detect_missing_voronoi_vertex(const Geometry::VoronoiDiagram &vorono
                 if (edge->is_infinite() || edge->vertex0() == nullptr || edge->vertex1() == nullptr || !VoronoiUtils::is_finite(*edge->vertex0()) || !VoronoiUtils::is_finite(*edge->vertex1()))
                     continue;
 
-                Vec2i64 v0 = VoronoiUtils::p(edge->vertex0());
-                Vec2i64 v1 = VoronoiUtils::p(edge->vertex1());
+                Vec2i3264 v0 = VoronoiUtils::p(edge->vertex0());
+                Vec2i3264 v1 = VoronoiUtils::p(edge->vertex1());
 
                 assert(!(v0 == to.cast<int64_t>() && v1 == from.cast<int64_t>()));
                 if (v0 == to.cast<int64_t>() && !after_start) { // Use the last edge which starts in source_segment.to

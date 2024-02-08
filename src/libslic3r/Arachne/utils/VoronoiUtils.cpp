@@ -11,7 +11,7 @@
 namespace Slic3r::Arachne
 {
 
-Vec2i64 VoronoiUtils::p(const vd_t::vertex_type *node)
+Vec2i3264 VoronoiUtils::p(const vd_t::vertex_type *node)
 {
     const double x = node->x();
     const double y = node->y();

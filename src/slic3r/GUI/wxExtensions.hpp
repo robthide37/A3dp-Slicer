@@ -169,7 +169,7 @@ public:
     ScalableBitmap(wxWindow* parent, 
         const wxBitmap& bitmap,
         const int px_cnt = 16) 
-        : m_bmp(bitmap), m_px_cnt(px_cnt) {};
+        : m_bmp(bitmap), m_bmp_width(px_cnt) {};
 
     ScalableBitmap( wxWindow *parent,
                     const std::string& icon_name,

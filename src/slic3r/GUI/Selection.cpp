@@ -2587,22 +2587,22 @@ void Selection::render_debug_window() const
                 float spacing = 0.0f;
                 if (svd.rotation) {
                     ImGui::SameLine(0.0f, spacing);
-                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, svd.rotation_90_degrees ? "Rotation 90 degs" : "Rotation");
+                    imgui.text_colored(ImGuiWrapper::get_COL_LIGHT(), svd.rotation_90_degrees ? "Rotation 90 degs" : "Rotation");
                     spacing = 10.0f;
                 }
                 if (svd.scale) {
                     ImGui::SameLine(0.0f, spacing);
-                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, svd.anisotropic_scale ? "Anisotropic scale" : "Isotropic scale");
+                    imgui.text_colored(ImGuiWrapper::get_COL_LIGHT(), svd.anisotropic_scale ? "Anisotropic scale" : "Isotropic scale");
                     spacing = 10.0f;
                 }
                 if (svd.mirror) {
                     ImGui::SameLine(0.0f, spacing);
-                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Mirror");
+                    imgui.text_colored(ImGuiWrapper::get_COL_LIGHT(), "Mirror");
                     spacing = 10.0f;
                 }
                 if (svd.skew) {
                     ImGui::SameLine(0.0f, spacing);
-                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Skew");
+                    imgui.text_colored(ImGuiWrapper::get_COL_LIGHT(), "Skew");
                 }
             }
         }

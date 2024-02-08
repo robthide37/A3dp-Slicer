@@ -72,10 +72,10 @@ Bed3D::Bed3D()
             }
         }
         catch (const std::ifstream::failure& err) {
-            trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()));
+            BOOST_LOG_TRIVIAL(warning) << "The color file cannot be loaded. Path: '"<< path_colors.string()<<"'. Reason: " << err.what() ;
         }
         catch (const std::runtime_error& err) {
-            trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()));
+            BOOST_LOG_TRIVIAL(warning) << "Fail loading the color file Path: '"<< path_colors.string()<<"'. Reason: " << err.what() ;
         }
     }
 
@@ -276,12 +276,11 @@ void Bed3D::init_gridlines()
         return;
 
     const BoundingBox& bed_bbox = m_contour.contour.bounding_box();
-    const coord_t step = scale_(10.0);
 
     Polylines axes_lines;
     Polylines axes_lines_big;
     Polylines axes_lines_small;
-    coord_t step = scale_(5);
+    coord_t step = scale_t(5);
     while (bed_bbox.radius() > step * 100) {
         step *= 10;
     }
@@ -309,8 +308,8 @@ void Bed3D::init_gridlines()
     }
 
     // clip with a slightly grown expolygon because our lines lay on the contours and may get erroneously clipped
-    Polygons contour_offset = offset(m_contour, float(SCALED_EPSILON);
-    Lines gridlines = to_lines(intersection_pl(axes_lines, contour_offset)));
+    Polygons contour_offset = offset(m_contour, float(SCALED_EPSILON));
+    Lines gridlines = to_lines(intersection_pl(axes_lines, contour_offset));
     Lines gridlines_big = to_lines(intersection_pl(axes_lines_big, contour_offset));
     Lines gridlines_small = to_lines(intersection_pl(axes_lines_small, contour_offset));
 
@@ -332,7 +331,7 @@ void Bed3D::init_gridlines()
 	    }
 
 	    model_to_fill.init_from(std::move(init_data));
-    }
+    };
     createGrid(gridlines, m_gridlines);
     createGrid(gridlines_big, m_gridlines_big);
     createGrid(gridlines_small, m_gridlines_small);
@@ -397,7 +396,7 @@ void Bed3D::render_axes()
 void Bed3D::render_grid(bool bottom, bool has_model)
 {
     // draw grid
-    ColorRGBA grid_color = m_grid_color.data();
+    ColorRGBA grid_color = m_grid_color;
     if (has_model && !bottom)
         grid_color = DEFAULT_SOLID_GRID_COLOR;
     else if (bottom)

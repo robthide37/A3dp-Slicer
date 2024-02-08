@@ -50,8 +50,8 @@ class ModelInstance;
 class PrintBase;
 class Print;
 class SLAPrint;
-enum PrintObjectStep : unsigned int;
-enum SLAPrintObjectStep : unsigned int;
+enum PrintObjectStep : uint8_t;
+enum SLAPrintObjectStep : uint8_t;
 enum class ConversionType : int;
 
 using ModelInstancePtrs = std::vector<ModelInstance*>;

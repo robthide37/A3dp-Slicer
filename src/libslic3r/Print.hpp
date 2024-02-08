@@ -72,7 +72,7 @@ namespace FillLightning {
 
 // Print step IDs for keeping track of the print state.
 // The Print steps are applied in this order.
-enum PrintStep : unsigned int {
+enum PrintStep : uint8_t {
     psWipeTower,
     // Ordering of the tools on PrintObjects for a multi-material print.
     // psToolOrdering is a synonym to psWipeTower, as the Wipe Tower calculates and modifies the ToolOrdering,
@@ -87,7 +87,7 @@ enum PrintStep : unsigned int {
     psCount,
 };
 
-enum PrintObjectStep : uint16_t {
+enum PrintObjectStep : uint8_t {
     posSlice,
     posPerimeters,
     posPrepareInfill,

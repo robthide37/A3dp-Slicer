@@ -334,7 +334,7 @@ void StyleManager::init_trunc_names(float max_width) {
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 
-void StyleManager::init_style_images(const Vec2i &max_size,
+void StyleManager::init_style_images(const Vec2i32 &max_size,
                                     const std::string &text)
 {
     // check already initialized

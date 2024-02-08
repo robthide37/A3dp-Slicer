@@ -69,7 +69,7 @@ public:
 };
 
 extern void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent, 
-    wxColourPickerCtrl** default_colour, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour, wxColourPickerCtrl** phony_colour;
+    wxColourPickerCtrl** default_colour, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour, wxColourPickerCtrl** phony_colour);
 extern void FillSizerWithModeColorDescriptions(wxSizer* sizer, wxWindow* parent,
 		                                       std::vector<wxColourPickerCtrl**> clr_pickers,
 		                                       std::vector<wxColour>& mode_palette);

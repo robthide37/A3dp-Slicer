@@ -190,11 +190,11 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                     else if (this->local_config->get().optptr("support_material"))
                         new_conf.set_key_value("support_material", new ConfigOptionBool(false));
                     this->local_config->apply_only(new_conf, this->local_config->keys(), true);
-                        else if ( answer == wxID_YES) {
+                } else if (answer == wxID_YES) {
                     new_conf.set_key_value("support_material_synchronize_layers", new ConfigOptionBool(true));
-                }
-                else
+                } else {
                     new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
+                }
                 apply(config, &new_conf);
             }
         } else {
@@ -286,12 +286,10 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         const int fill_pattern = config->option<ConfigOptionEnum<InfillPattern>>("fill_pattern")->value;
         bool correct_100p_fill = config->option_def("top_fill_pattern")->enum_def->enum_to_index(fill_pattern).has_value();
         if (!correct_100p_fill) {
-            const std::vector<std::string>& bottom_fill_pattern_values = config->def()->get("bottom_fill_pattern")->enum_values;
-            correct_100p_fill = std::find(bottom_fill_pattern_values.begin(), bottom_fill_pattern_values.end(), fill_pattern) != bottom_fill_pattern_values.end();
+            correct_100p_fill = config->option_def("bottom_fill_pattern")->enum_def->enum_to_index(fill_pattern).has_value();
         }
         if (!correct_100p_fill) {
-            const std::vector<std::string>& bottom_fill_pattern_values = config->def()->get("solid_fill_pattern")->enum_values;
-            correct_100p_fill = std::find(bottom_fill_pattern_values.begin(), bottom_fill_pattern_values.end(), fill_pattern) != bottom_fill_pattern_values.end();
+            correct_100p_fill = config->option_def("solid_fill_pattern")->enum_def->enum_to_index(fill_pattern).has_value();
         }
         if (!correct_100p_fill) {
             // get fill_pattern name from enum_labels for using this one at dialog_msg
