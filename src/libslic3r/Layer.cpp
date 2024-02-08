@@ -777,25 +777,28 @@ void Layer::make_perimeters()
                         }
     	            }
     	            // make perimeters
+                    assert(fill_expolygons_ranges.empty()); // merill test
     	            layerm_config->make_perimeters(new_slices, perimeter_and_gapfill_ranges, fill_expolygons, fill_expolygons_ranges);
 
-            // TODO: review if it's not useless or creates bugs.
-            // assign fill_expolygons to each LayerRegion
-            if (!fill_expolygons.empty()) { 
-                for (LayerRegionPtrs::iterator l = layerms.begin(); l != layerms.end(); ++l) {
-                    // Separate the fill surfaces.
-                    ExPolygons expp = intersection_ex(to_expolygons(fill_surfaces.surfaces), fill_expolygons);
-                    (*l)->m_fill_expolygons = expp;
-                    (*l)->m_fill_no_overlap_expolygons = (layerm_config)->fill_no_overlap_expolygons;
-                    //(*l)->perimeters = (layerm_config)->perimeters;
-                    //(*l)->thin_fills = (layerm_config)->thin_fills;
-                    (*l)->m_fill_surfaces.clear();
-                    for (Surface &surf: m_fill_surfaces.surfaces) {
-                        ExPolygons exp = intersection_ex(ExPolygons{ surf.expolygon }, fill_expolygons);
-                        (*l)->m_fill_surfaces.append(std::move(exp), surf);
+                    // TODO: review if it's not useless or creates bugs.
+                    // assign fill_expolygons to each LayerRegion
+                    if (!fill_expolygons.empty()) { 
+                        for (uint32_t layer_region_id : layer_region_ids) {
+                            LayerRegion &layerm = *m_regions[region_id];
+                            // Separate the fill surfaces.
+                            ExPolygons expp = intersection_ex(to_expolygons(new_slices.surfaces), fill_expolygons);
+                            layerm.m_fill_expolygons = expp;
+                            assert(layerm_config != m_regions[region_id]); // merill test
+                            layerm.m_fill_no_overlap_expolygons = (layerm_config)->fill_no_overlap_expolygons();
+                            //layerm.perimeters = (layerm_config)->perimeters;
+                            //layerm.thin_fills = (layerm_config)->thin_fills;
+                            layerm.m_fill_surfaces.clear();
+                            for (Surface &surf: new_slices.surfaces) {
+                                ExPolygons exp = intersection_ex(ExPolygons{ surf.expolygon }, fill_expolygons);
+                                layerm.m_fill_surfaces.append(std::move(exp), surf);
+                            }
+                        }
                     }
-                }
-            }
 
                     this->sort_perimeters_into_islands(new_slices, region_id_config, perimeter_and_gapfill_ranges, std::move(fill_expolygons), fill_expolygons_ranges, layer_region_ids);
     	        }
@@ -814,7 +817,7 @@ void Layer::make_milling_post_process() {
 
     for (LayerRegionPtrs::iterator layerm = m_regions.begin(); layerm != m_regions.end(); ++layerm) {
         if ((*layerm)->slices().empty()) {
-            (*layerm)->milling.clear();
+            (*layerm)->m_millings.clear();
         } else {
             size_t region_id = layerm - m_regions.begin();
             if (done[region_id])
@@ -854,7 +857,7 @@ void Layer::make_milling_post_process() {
                     for (LayerRegion* layerm : layerms) {
                         for (const Surface& surface : layerm->slices().surfaces)
                             slices[surface.extra_perimeters].emplace_back(surface);
-                        layerm->milling.clear();
+                        layerm->m_millings.clear();
                     }
                     // merge the surfaces assigned to each group
                     for (std::pair<const unsigned short, Surfaces>& surfaces_with_extra_perimeters : slices)
@@ -915,9 +918,9 @@ void Layer::sort_perimeters_into_islands(
         if (! sample_set) {
             // If there is no infill, take a sample of some inner perimeter.
             for (uint32_t iperimeter : extrusions.first) {
-                const ExtrusionEntity &ee = *this_layer_region.perimeters().entities[iperimeter];
+                const ExtrusionEntity &ee = *this_layer_region.perimeters().entities()[iperimeter];
                 if (ee.is_collection()) {
-                    for (const ExtrusionEntity *ee2 : dynamic_cast<const ExtrusionEntityCollection&>(ee).entities)
+                    for (const ExtrusionEntity *ee2 : dynamic_cast<const ExtrusionEntityCollection&>(ee).entities())
                         if (! ee2->role().is_external()) {
                             sample     = ee2->middle_point();
                             sample_set = true;
@@ -933,12 +936,12 @@ void Layer::sort_perimeters_into_islands(
             if (! sample_set) {
                 if (! extrusions.second.empty()) {
                     // If there is no inner perimeter, take a sample of some gap fill extrusion.
-                    sample     = this_layer_region.thin_fills().entities[*extrusions.second.begin()]->middle_point();
+                    sample     = this_layer_region.thin_fills().entities()[*extrusions.second.begin()]->middle_point();
                     sample_set = true;
                 }
                 if (! sample_set && ! extrusions.first.empty()) {
                     // As a last resort, take a sample of some external perimeter.
-                    sample     = this_layer_region.perimeters().entities[*extrusions.first.begin()]->middle_point();
+                    sample     = this_layer_region.perimeters().entities()[*extrusions.first.begin()]->middle_point();
                     sample_set = true;
                 }
             }
@@ -978,10 +981,10 @@ void Layer::sort_perimeters_into_islands(
                 assert(l.m_fill_no_overlap_expolygons.empty());
                 l.m_fill_no_overlap_expolygons = this_layer_region.m_fill_no_overlap_expolygons;
                 // ensure fill_surface is good (this was deleted in prusa2.7, i wonder if prusa ever used fill_surfaces after perimetergeneration)
-                l.fill_surfaces.clear();
-                for (Surface &surf: slices) {
+                l.m_fill_surfaces.clear();
+                for (const Surface &surf: slices) {
                     ExPolygons exp = intersection_ex(ExPolygons{ surf.expolygon }, l_slices_exp);
-                    l.fill_surfaces.append(std::move(exp), surf);
+                    l.m_fill_surfaces.append(std::move(exp), surf);
                 }
                 //bounding boxes
                 l.m_fill_expolygons_bboxes.reserve(l.fill_expolygons().size());
@@ -1246,11 +1249,11 @@ void Layer::export_region_fill_surfaces_to_svg_debug(const char *name) const
 void SupportLayer::simplify_support_extrusion_path() {
     const PrintConfig& print_config = this->object()->print()->config();
     const bool spiral_mode = print_config.spiral_vase;
-    const bool enable_arc_fitting = print_config.arc_fitting && !spiral_mode;
+    const bool enable_arc_fitting = print_config.arc_fitting != ArcFittingType::Disabled && !spiral_mode;
     coordf_t scaled_resolution = scale_d(print_config.resolution.value);
     if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
 
-    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting, &print_config.arc_fitting_tolerance };
+    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting ? print_config.arc_fitting : ArcFittingType::Disabled, &print_config.arc_fitting_tolerance };
     this->support_fills.visit(visitor);
 }
 

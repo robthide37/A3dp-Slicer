@@ -36,7 +36,7 @@ void Wipe::set_path(const ExtrusionPaths &paths, bool reversed)
 {
     this->reset_path();
 
-    if (this->enabled() && ! paths.empty()) {
+    if (this->is_enabled() && ! paths.empty()) {
         if (reversed) {
             m_path = paths.back().as_polyline().get_arc();
             Geometry::ArcWelder::reverse(m_path);
@@ -110,7 +110,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             }
         };
         const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer(), extruder.id());
-        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e](const Vec2d &prev_quantized, Vec2d &p) {
+        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e, use_firmware_retract](const Vec2d &prev_quantized, Vec2d &p) {
             Vec2d  p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(p);
             if (p_quantized == prev_quantized) {
                 p = p_quantized;
@@ -134,7 +134,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             retract_length -= dE;
             return done;
         };
-        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, &wipe_linear](
+        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, use_firmware_retract, &wipe_linear](
             const Vec2d &prev_quantized, Vec2d &p, double radius_in, const bool ccw) {
             Vec2d  p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(p);
             if (p_quantized == prev_quantized) {
@@ -325,8 +325,8 @@ std::optional<Point> wipe_hide_seam(const ExtrusionPaths &paths, bool is_hole, d
     // or that the wipe move direction could be calculated with reasonable accuracy.
     if (longer_than(paths, 2.5 * wipe_length)) {
         // The print head will be moved away from path end inside the island.
-        Point p_current = path.back().path.back().point;
-        Point p_next = path.front().path.front().point;
+        Point p_current = paths.back().last_point();//paths.back().path.back().point;
+        Point p_next = paths.front().first_point();//paths.front().path.front().point;
         Point p_prev;
         {
             // Is the seam hiding gap large enough already?
@@ -347,7 +347,7 @@ std::optional<Point> wipe_hide_seam(const ExtrusionPaths &paths, bool is_hole, d
         }
         // Detect angle between last and first segment.
         // The side depends on the original winding order of the polygon (left for contours, right for holes).
-        double angle_inside = angle(p_next - p_current, p_prev - p_current);
+        double angle_inside = angle_ccw(p_next - p_current, p_prev - p_current);
         assert(angle_inside >= -M_PI && angle_inside <= M_PI);
         // 3rd of this angle will be taken, thus make the angle monotonic before interpolation.
         if (is_hole) {

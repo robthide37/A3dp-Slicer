@@ -134,7 +134,7 @@ inline Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> perp(cons
 }
 
 #if _DEBUG
-double ccw_angle_old_test(const Vec2crd &me, const Vec2crd &p1, const Vec2crd &p2)
+inline double ccw_angle_old_test(const Vec2crd &me, const Vec2crd &p1, const Vec2crd &p2)
 {
     //FIXME this calculates an atan2 twice! Project one vector into the other!
     double angle = atan2(p1.x() - (me).x(), p1.y() - (me).y())

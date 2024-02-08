@@ -725,8 +725,8 @@ struct MMU_Graph
         struct CPointAccessor { const Point* operator()(const CPoint &pt) const { return &pt.point(); }};
         typedef ClosestPointInRadiusLookup<CPoint, CPointAccessor> CPointLookupType;
 
-        CPointLookupType closest_voronoi_point(coord_t(SCALED_EPSILON));
-        CPointLookupType closest_contour_point(3 * coord_t(SCALED_EPSILON));
+        CPointLookupType closest_voronoi_point(SCALED_EPSILON);
+        CPointLookupType closest_contour_point(3 * SCALED_EPSILON);
         for (const Polygon &polygon : color_poly_tmp)
             for (const Point &pt : polygon.points)
                 closest_contour_point.insert(CPoint(Vec2d(pt.x(), pt.y()), &polygon - &color_poly_tmp.front(), &pt - &polygon.points.front()));

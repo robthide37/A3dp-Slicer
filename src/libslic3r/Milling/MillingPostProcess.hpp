@@ -15,17 +15,17 @@ public:
     // Inputs:
     const SurfaceCollection     *slices;
     const ExPolygons            *lower_slices;
-    const PrintRegionConfig     *config;
-    const PrintObjectConfig     *object_config;
-    const PrintConfig           *print_config;
+    const PrintRegionConfig     &config;
+    const PrintObjectConfig     &object_config;
+    const PrintConfig           &print_config;
     
     MillingPostProcess(
         // Input:
         const SurfaceCollection*    slices,
         const ExPolygons*           lower_slices,
-        const PrintRegionConfig*    config,
-        const PrintObjectConfig*    object_config,
-        const PrintConfig*          print_config)
+        const PrintRegionConfig&    config,
+        const PrintObjectConfig&    object_config,
+        const PrintConfig&          print_config)
         : slices(slices), lower_slices(lower_slices),
             config(config), object_config(object_config), print_config(print_config)
         {};

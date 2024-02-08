@@ -571,11 +571,11 @@ std::string GCodeWriter::travel_to_z(double z, const std::string_view comment)
     /*  In all the other cases, we perform an actual Z move and cancel
         the lift. */
     m_lifted = 0;
-    return this->_travel_to_z(z, comment);
+    return this->get_travel_to_z_gcode(z, comment);
 }
 
 
-std::string GCodeWriter::_travel_to_z(double z, const std::string_view comment)
+std::string GCodeWriter::get_travel_to_z_gcode(double z, const std::string_view comment)
 {
     m_pos.z() = z;
 
@@ -814,7 +814,7 @@ std::string GCodeWriter::lift(int layer_id)
     // and subtracting layer_height from retract_lift might not give
     // exactly zero
     if (std::abs(m_lifted) < target_lift - EPSILON && target_lift > 0) {
-        std::string str =  this->_travel_to_z(m_pos.z() + target_lift - m_lifted, "lift Z");
+        std::string str =  this->get_travel_to_z_gcode(m_pos.z() + target_lift - m_lifted, "lift Z");
         m_lifted = target_lift;
         return str;
     }
@@ -825,7 +825,7 @@ std::string GCodeWriter::unlift()
 {
     std::string gcode;
     if (m_lifted > 0) {
-        gcode += this->_travel_to_z(m_pos.z() - m_lifted, "restore layer Z");
+        gcode += this->get_travel_to_z_gcode(m_pos.z() - m_lifted, "restore layer Z");
     }
     m_lifted = 0;
     return gcode;

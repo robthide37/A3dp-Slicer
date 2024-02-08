@@ -79,11 +79,12 @@ struct CoolingLine
         TYPE_STORE_FOR_WT       = 1 << 18,
         TYPE_RESTORE_AFTER_WT   = 1 << 19,
         // G2 or G3: Arc interpolation
-        TYPE_G2                 = 1 << 20,
-        TYPE_G3                 = 1 << 21,
-        TYPE_G2G3  TODO: review it with prusa code: seems like G2 & G2 can be of 2 different types: XYR or XYIJ
+        TYPE_G2G3              = 1 << 20,
+        //TYPE_G2                 = 1 << 20, == TYPE_G2G3_CW
+        //TYPE_G3                 = 1 << 21, == TYPE_G2G3_CCW
+        TYPE_G2_CW              = 1 << 20, //TODO: review it with prusa code: seems like G2 & G2 can be of 2 different types: XYR or XYIJ
         // Arc interpolation, counter-clockwise.
-        TYPE_G2G3_CCW           = 1 << 22,
+        TYPE_G3_CCW           = 1 << 21,
         // Arc interpolation, arc defined by IJ (offset of arc center from its start position).
         TYPE_G2G3_IJ            = 1 << 23,
         // Arc interpolation, arc defined by R (arc radius, positive - smaller, negative - larger).
@@ -112,7 +113,7 @@ struct CoolingLine
         return (this->type & TYPE_ADJUSTABLE) && this->time < this->time_max;
     }
 
-    size_t  type;
+    uint32_t  type;
     // Start of this line at the G-code snippet.
     size_t  line_start;
     // End of this line at the G-code snippet.
@@ -443,10 +444,10 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_G1;
         else if (boost::starts_with(sline, "G2 "))
             // Arc, clockwise.
-            line.type = CoolingLine::TYPE_G2;
+            line.type = CoolingLine::TYPE_G2G3 | CoolingLine::TYPE_G2_CW;
         else if (boost::starts_with(sline, "G3 "))
             // Arc, counter-clockwise.
-            line.type = CoolingLine::TYPE_G3 | CoolingLine::TYPE_G2G3_CCW;
+            line.type = CoolingLine::TYPE_G2G3 | CoolingLine::TYPE_G3_CCW;
         else if (boost::starts_with(sline, "G92 "))
             line.type = CoolingLine::TYPE_G92;
         if (line.type) {
@@ -485,10 +486,13 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 for (; c != sline.end() && *c != ' ' && *c != '\t'; ++ c);
             }
             // If G2 or G3, then either center of the arc or radius has to be defined.
-            assert(! (line.type & CoolingLine::TYPE_G2G3) ||
+            assert(!(line.type & CoolingLine::TYPE_G2G3) ||
                 (line.type & (CoolingLine::TYPE_G2G3_IJ | CoolingLine::TYPE_G2G3_R)));
+            assert(!(line.type & CoolingLine::TYPE_G2G3) ||
+                (line.type & (CoolingLine::TYPE_G2_CW | CoolingLine::TYPE_G3_CCW)));
             // Arc is defined either by IJ or by R, not by both.
             assert(! ((line.type & CoolingLine::TYPE_G2G3_IJ) && (line.type & CoolingLine::TYPE_G2G3_R)));
+            assert(! ((line.type & CoolingLine::TYPE_G2_CW) && (line.type & CoolingLine::TYPE_G3_CCW)));
             bool wipe               = boost::contains(sline, ";_WIPE");
             if (wipe)
                 line.type |= CoolingLine::TYPE_WIPE;
@@ -515,7 +519,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                             Vec2d(current_pos[AxisIdx::X], current_pos[AxisIdx::Y]),
                             Vec2d(new_pos[AxisIdx::X], new_pos[AxisIdx::Y]),
                             Vec2d(current_pos[AxisIdx::X] + new_pos[AxisIdx::I], current_pos[AxisIdx::Y] + new_pos[AxisIdx::J]),
-                            line.type & CoolingLine::TYPE_G2G3_CCW));
+                            line.type & CoolingLine::TYPE_G3_CCW));
                     } else if (line.type & CoolingLine::TYPE_G2G3_R) {
                         dxy2 = sqr(Geometry::ArcWelder::arc_length(
                             Vec2d(current_pos[AxisIdx::X], current_pos[AxisIdx::Y]),
@@ -547,7 +551,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     if(adjustment->max_speed_reduction > 0)
                         line.time_max = std::min(line.time_max, line.time / (1- adjustment->max_speed_reduction));
                 }
-                if (active_speed_modifier < adjustment->lines.size() && (line.type & (CoolingLine::TYPE_G1 | CoolingLine::TYPE_G2 | CoolingLine::TYPE_G3))) {
+                if (active_speed_modifier < adjustment->lines.size() && (line.type & (CoolingLine::TYPE_G1 | CoolingLine::TYPE_G2G3))) {
                     // Inside the ";_EXTRUDE_SET_SPEED" blocks, there must not be a G1 Fxx entry.
                     assert((line.type & CoolingLine::TYPE_HAS_F) == 0);
                     CoolingLine &sm = adjustment->lines[active_speed_modifier];
@@ -587,7 +591,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_TOOLCHANGE")) {
             //not using m_toolchange_prefix anymore because there is no use case for it, there is always a _TOOLCHANGE for when a fan change is needed.
             int prefix = 13;
-            uint16_t new_extruder = (uint16_t)atoi(sline.c_str() + 12);
+            uint16_t new_extruder = (uint16_t)atoi(sline.data() + 12);
             auto res = std::from_chars(sline.data() + prefix, sline.data() + sline.size(), new_extruder);
             if (res.ec != std::errc::invalid_argument) {
             // Only change extruder in case the number is meaningful. User could provide an out-of-range index through custom gcodes - those shall be ignored.
@@ -608,9 +612,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_EXTRUDETYPE_") && sline.size() > 14) {
             //set the extrusiontype
             line.type |= CoolingLine::Type(sline[14] - 'A') | CoolingLine::Type::TYPE_EXTRUDE_START;
-            assert(CoolingLine::to_extrusion_role(uint32_t(line.type)) != 0);
-            if (CoolingLine::to_extrusion_role(uint32_t(line.type)) == 0) {
-                line.type |=  GCodeExtrusionRole::Custom;
+            assert(CoolingLine::to_extrusion_role(uint32_t(line.type)) != GCodeExtrusionRole::None);
+            if (CoolingLine::to_extrusion_role(uint32_t(line.type)) == GCodeExtrusionRole::None) {
+                line.type |=  uint32_t(GCodeExtrusionRole::Custom);
             }
         } else if (boost::starts_with(sline, "G4 ")) {
             // Parse the wait time.
@@ -938,9 +942,9 @@ std::string CoolingBuffer::apply_layer_cooldown(
     default_fan_speed[ uint8_t(GCodeExtrusionRole::OverhangPerimeter)] = EXTRUDER_CONFIG(overhangs_fan_speed);
     default_fan_speed[ uint8_t(GCodeExtrusionRole::GapFill)] = EXTRUDER_CONFIG(gap_fill_fan_speed);
     auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, 
-            &fan_control, &fan_speeds, &default_fan_speed, &min_fan_speed]()
+            &fan_control, &fan_speeds, &default_fan_speed]()
     {
-        std::pair<int, int> custom_fan_speed_limits{fan_speed_new, 100 };
+        std::pair<int, int> custom_fan_speed_limits{fan_speeds[0], 100 }; // TODO REVIEW 2.7: min-max. min is min_fan_speed if always on.
         int disable_fan_first_layers = EXTRUDER_CONFIG(disable_fan_first_layers);
         // Is the fan speed ramp enabled?
         int full_fan_speed_layer = EXTRUDER_CONFIG(full_fan_speed_layer);
@@ -948,7 +952,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             int   max_fan_speed             = EXTRUDER_CONFIG(max_fan_speed);
             float slowdown_below_layer_time = float(EXTRUDER_CONFIG(slowdown_below_layer_time));
             float fan_below_layer_time      = float(EXTRUDER_CONFIG(fan_below_layer_time));
-            for (int i = 0; i <  GCodeExtrusionRole::Count; i++) {
+            for (int i = 0; i <  uint8_t(GCodeExtrusionRole::Count); i++) {
                 fan_speeds[i] = default_fan_speed[i];
             }
             //if not always on, the default is "no fan" and not the min.
@@ -990,7 +994,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             }
             //only activate fan control if the fan speed is higher than default
             fan_control[0] = true;
-            for (size_t i = 1; i <  GCodeExtrusionRole::Count; i++) {
+            for (size_t i = 1; i < uint8_t(GCodeExtrusionRole::Count); i++) {
                 fan_control[i] = fan_speeds[i] >= 0 && fan_speeds[i] > fan_speeds[0];
             }
 
@@ -1060,7 +1064,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                                               EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
                                               "restore fan after wipe tower");
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_START) {
-            assert(CoolingLine::to_extrusion_role(uint32_t(line->type)) != 0);
+            assert(CoolingLine::to_extrusion_role(uint32_t(line->type)) != GCodeExtrusionRole::None);
             extrude_tree.push_back(CoolingLine::to_extrusion_role(uint32_t(line->type)));
             fan_need_set = true;
         } else if (line->type & CoolingLine::TYPE_SET_FAN_SPEED) {
@@ -1168,10 +1172,10 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 //use the most current fan
                 bool fan_set = false;
                 for (size_t i = extrude_tree.size() - 1; i < extrude_tree.size(); --i) {
-                    if (fan_control[extrude_tree[i]]) {
-                        std::string extrusion_str = gcode_extrusion_role_to_string(extrusion_role_to_gcode_extrusion_role(extrude_tree[i]));
+                    if (fan_control[uint8_t(extrude_tree[i])]) {
+                        std::string extrusion_str = gcode_extrusion_role_to_string((extrude_tree[i]));
                         new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments,
-                                                          fan_speeds[extrude_tree[i]],
+                                                          fan_speeds[uint8_t(extrude_tree[i])],
                                                           EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
                                                           std::string("set fan for ") + extrusion_str);
                         fan_set = true;

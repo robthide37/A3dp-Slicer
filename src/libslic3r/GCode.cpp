@@ -3871,7 +3871,7 @@ std::string GCodeGenerator::extrude_loop_vase(const ExtrusionLoop &original_loop
     m_writer.set_acceleration((uint16_t)floor(get_default_acceleration(m_config) + 0.5));
 
     //don't wipe here
-    //if (m_wipe.enable)
+    //if (m_wipe.is_enabled())
     //    m_wipe.path = paths.front().polyline;  // TODO: don't limit wipe to last path
 
     //just continue on the perimeter a bit while retracting
@@ -4564,9 +4564,9 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
             for (ExtrusionPath& path : paths_wipe) {
                 Point center;
                 for (const Geometry::ArcWelder::Segment& segment : path.polyline.get_arc()) {
-                    double radius = segment.radius;
+                    coordf_t radius = segment.radius;
                     if (radius > 0) {
-                        center = Geometry::ArcWelder::arc_center(current_point, segment.point, segment.radius, segment.ccw());
+                        center = Geometry::ArcWelder::arc_center_scalar<coord_t, coordf_t>(current_point, segment.point, segment.radius, segment.ccw());
                         // Don't extrude a degenerated circle.
                         if (center.coincides_with_epsilon(current_point))
                             radius = 0;
@@ -4574,8 +4574,8 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
                     if (radius == 0) {
                         gcode += m_writer.travel_to_xy(this->point_to_gcode(segment.point), 0.0, "; extra wipe"sv);
                     } else {
-                        const Vec2d  center_offset = this->point_to_gcode(center) - this->point_to_gcode(current_point);
-                        double      angle         = Geometry::ArcWelder::arc_angle(current_point, segment.point, radius);
+                        const Vec2d center_offset = this->point_to_gcode(center) - this->point_to_gcode(current_point);
+                        coordf_t    angle         = Geometry::ArcWelder::arc_angle(current_point, segment.point, coord_t(radius));
                         assert(angle > 0);
                         const coordf_t line_length = angle * std::abs(radius);
                         gcode += m_writer.travel_arc_to_xy(this->point_to_gcode(segment.point), center_offset, segment.ccw(), 0.0, "; extra wipe"sv);
@@ -4633,7 +4633,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
         gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
 
         // also shift the wipe on retract if wipe_inside_end
-        if (m_wipe.enabled() && EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true)) {
+        if (m_wipe.is_enabled() && EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true)) {
             current_pos = pt_inside.cast<double>();
             //go to the inside (use clipper for easy shift)
             Polygon original_polygon = original_loop.polygon();
@@ -4700,10 +4700,10 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
 
 template <typename THING>
 void GCodeGenerator::add_wipe_points(const std::vector<THING>& paths, bool reverse /*= true*/) {
-    if (m_wipe.enable) {
+    if (m_wipe.is_enabled()) {
         ArcPolyline wipe_polyline;
         for (const THING& path : paths) {
-            if (is_bridge(path.role()))
+            if (path.role().is_bridge())
                 break; // Do not perform a wipe on bridges.
             assert(path.polyline.size() >= 2);
             assert(wipe_polyline.empty() || wipe_polyline.back() == path.first_point());
@@ -4909,7 +4909,7 @@ std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, const std::s
     gcode += this->_extrude(simplifed_path, description, speed_mm_per_sec);
 
     //simplifed_path will be discarded i can reuse it to create the wipe
-    if (m_wipe.enabled()) {
+    if (m_wipe.is_enabled()) {
         simplifed_path.reverse();
         m_wipe.set_path(simplifed_path.polyline.get_arc());
     }
@@ -4956,7 +4956,7 @@ std::string GCodeGenerator::extrude_path_3D(const ExtrusionPath3D &path, const s
     }
     gcode += this->_after_extrude(simplifed_path);
 
-    if (m_wipe.enabled()) {
+    if (m_wipe.is_enabled()) {
         ArcPolyline temp = simplifed_path.as_polyline();
         temp.reverse();
         m_wipe.set_path(std::move(temp.get_arc()));
@@ -4968,7 +4968,7 @@ std::string GCodeGenerator::extrude_path_3D(const ExtrusionPath3D &path, const s
 
 void GCodeGenerator::set_region_for_extrude(const Print &print, const PrintObject *print_object, std::string &gcode)
 {
-    PrintRegionConfig &region_config = this->m_region == nullptr ? 
+    const PrintRegionConfig &region_config = this->m_region == nullptr ? 
         //FIXME
         (print_object == nullptr ? print.default_region_config() : print_object->default_region_config(print.default_region_config()) ) :
         //print.default_region_config() :
@@ -5106,7 +5106,7 @@ void GCodeGenerator::extrude_skirt(
         gcode += this->extrude_loop(loop_src, description, -1);
     }
 
-    if (m_wipe.enabled())
+    if (m_wipe.is_enabled())
         // Wipe will hide the seam.
         m_wipe.set_path(loop_src.paths, false);
 
@@ -5334,7 +5334,7 @@ void GCodeGenerator::_extrude_line_cut_corner(std::string& gcode_str, const Line
 
 std::string GCodeGenerator::_extrude(const ExtrusionPath &path, const std::string_view description, double speed) {
 
-    std::string descr = description.empty() ? gcode_extrusion_role_to_string(extrusion_role_to_gcode_extrusion_role(path.role())) : description;
+    std::string descr = description.empty() ? gcode_extrusion_role_to_string(extrusion_role_to_gcode_extrusion_role(path.role())) : std::string(description);
     std::string gcode = this->_before_extrude(path, descr, speed);
 
     std::function<void(std::string&, const Line&, double, const std::string&)> func = [this](std::string& gcode, const Line& line, double e_per_mm, const std::string& comment) {
@@ -5382,7 +5382,7 @@ std::string GCodeGenerator::_extrude(const ExtrusionPath &path, const std::strin
                 const Geometry::ArcWelder::Segment &segment = polyline.get_arc(idx);
                 radius = segment.radius;
                 if (radius > 0) {
-                    center = Geometry::ArcWelder::arc_center(current_pos, segment.point, segment.radius, segment.ccw());
+                    center = Geometry::ArcWelder::arc_center_scalar<coord_t, coordf_t>(current_pos, segment.point, segment.radius, segment.ccw());
                     // Don't extrude a degenerated circle.
                     if (center.coincides_with_epsilon(current_pos))
                         radius = 0;
@@ -5420,17 +5420,17 @@ std::string GCodeGenerator::_extrude(const ExtrusionPath &path, const std::strin
                 assert(p != prev);
                 if (p != prev) {
                     // Center of the radius to be emitted into the G-code: Either by radius or by center offset.
-                    double radius = 0;
+                    coordf_t radius = 0;
                     Vec2d  ij;
                     if (it->radius != 0) {
                         // Extrude an arc.
                         assert(m_config.arc_fitting == ArcFittingType::EmitCenter);
-                        radius = unscaled<double>(it->radius);
+                        radius = unscaled<coordf_t>(it->radius);
                         {
                             // Calculate quantized IJ circle center offset.
                             ij = m_writer.get_default_gcode_formatter().quantize(
                                 Vec2d(
-                                    Geometry::ArcWelder::arc_center(prev_exact.cast<double>(), p_exact.cast<double>(), double(radius), it->ccw())
+                                    Geometry::ArcWelder::arc_center(prev_exact.cast<coordf_t>(), p_exact.cast<coordf_t>(), coordf_t(radius), it->ccw())
                                     - prev));
                             if (ij == Vec2d::Zero())
                                 // Don't extrude a degenerated circle.
@@ -5444,7 +5444,7 @@ std::string GCodeGenerator::_extrude(const ExtrusionPath &path, const std::strin
                             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
                         }
                     } else {
-                        double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
+                        double angle = Geometry::ArcWelder::arc_angle(prev.cast<coordf_t>(), p.cast<coordf_t>(), coordf_t(radius));
                         assert(angle > 0);
                         const double line_length = angle * std::abs(radius);
                         //path_length += line_length;
@@ -5505,7 +5505,7 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path_att
             }
         } else if (path_attrs.role() == ExtrusionRole::Ironing) {
             speed = m_config.get_computed_value("ironing_speed");
-        } else if (path_attrs.role() == ExtrusionRole::None || path_attrs.role() == ExtrusionRole::Travel) {
+        } else if (path_attrs.role() == ExtrusionRole::None || path_attrs.role().has(ExtrusionRoleModifier::Travel)) {
             assert(path_attrs.role() != ExtrusionRole::None);
             speed = m_config.get_computed_value("travel_speed");
         } else if (path_attrs.role() == ExtrusionRole::Milling) {
@@ -5558,7 +5558,7 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path_att
         speed = m_config.max_print_speed.value;
     // Apply small perimeter 'modifier
     //  don't modify bridge speed
-    if (factor < 1 && !(is_bridge(path_attrs.role()))) {
+    if (factor < 1 && !path_attrs.role().is_bridge()) {
         float small_speed = (float)m_config.small_perimeter_speed.get_abs_value(m_config.get_computed_value("perimeter_speed"));
         if (small_speed > 0)
             //apply factor between feature speed and small speed
@@ -5588,7 +5588,7 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path_att
     }
 
     // the first_layer_flow_ratio is added at the last time to take into account everything. So do the compute like it's here.
-    double path_attrs_mm3_per_mm = path_attrs.mm3_per_mm();
+    double path_mm3_per_mm = path_attrs.mm3_per_mm();
     if (m_layer->bottom_z() < EPSILON)
         path_mm3_per_mm *= this->config().first_layer_flow_ratio.get_abs_value(1);
     // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)
@@ -5607,25 +5607,26 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path_att
     
     // compute for enable_dynamic_overhang_speeds & overhang_speed_0 1 2 3
     std::pair<float, float> dynamic_speed_and_fan_speed{-1, -1};
-    if (path_attrs.overhang_attributes.has_value()) {
+    if (path_attrs.attributes().overhang_attributes.has_value()) {
         double external_perim_reference_speed = m_config.get_computed_value("external_perimeter_speed");
         if (external_perim_reference_speed == 0)
-            external_perim_reference_speed = m_volumetric_speed / path_attrs.mm3_per_mm;
+            external_perim_reference_speed = m_volumetric_speed / path_attrs.mm3_per_mm();
         // apply again all min/max/mod on external_perim_reference_speed
         if (m_layer->bottom_z() < EPSILON)
             external_perim_reference_speed *= this->config().first_layer_flow_ratio.get_abs_value(1);
         if (m_config.max_volumetric_speed.value > 0)
             external_perim_reference_speed = std::min(external_perim_reference_speed,
-                                                      m_config.max_volumetric_speed.value / path_attrs.mm3_per_mm);
-        if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
+                                                      m_config.max_volumetric_speed.value / path_attrs.mm3_per_mm());
+        if (EXTRUDER_CONFIG_WITH_DEFAULT(filament_max_volumetric_speed, 0) > 0) {
             external_perim_reference_speed = std::min(external_perim_reference_speed,
-                                                      filament_max_volumetric_speed / path_attr.mm3_per_mm);
+                                                      filament_max_volumetric_speed / path_attrs.mm3_per_mm());
         }
         if (filament_max_speed > 0) {
             external_perim_reference_speed = std::min(filament_max_speed, external_perim_reference_speed);
         }
-        dynamic_speed_and_fan_speed = ExtrusionProcessor::calculate_overhang_speed(path_attrs,
-            this->m_config, m_writer.extruder()->id(), external_perim_reference_speed, speed);
+        assert(m_writer.tool());
+        dynamic_speed_and_fan_speed = ExtrusionProcessor::calculate_overhang_speed(path_attrs.attributes(),
+            this->m_config, m_writer.tool()->id(), external_perim_reference_speed, speed);
     }
     if (dynamic_speed_and_fan_speed.first >= 0) {
         speed = dynamic_speed_and_fan_speed.first;
@@ -5972,7 +5973,7 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
             + "\n";
     }
     if (m_enable_extrusion_role_markers) {
-        if (path.role() != m_last_extrusion_role) {
+        if (grole != m_last_extrusion_role) {
             char buf[32];
             sprintf(buf, ";_EXTRUSION_ROLE:%d\n", int(grole));
             gcode += buf;
@@ -5986,11 +5987,11 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
     bool last_was_wipe_tower = (m_last_processor_extrusion_role == GCodeExtrusionRole::WipeTower);
     assert(is_decimal_separator_point());
 
-    if (GCodeExtrusionRole role = extrusion_role_to_gcode_extrusion_role(path.role()); role != m_last_processor_extrusion_role) {
+    if (grole != m_last_processor_extrusion_role) {
         m_last_processor_extrusion_role = grole;
         char buf[64];
         sprintf(buf, ";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(),
-            gcode_extrusion_role_to_string(m_last_processor_extrusion_role).c_str());
+            gcode_extrusion_role_to_string(grole).c_str());
         gcode += buf;
     }
 
@@ -6020,9 +6021,9 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
     assert(grole < GCodeExtrusionRole::Count);
     if (m_enable_cooling_markers) {
         // Send the current extrusion type to Coolingbuffer
-        gcode += ";_EXTRUDETYPE_"; gcode += char('A' + path.role()); gcode += "\n";
+        gcode += ";_EXTRUDETYPE_"; gcode += char('A' + uint8_t(grole)); gcode += "\n";
         // comment to be on the same line as the speed command.
-        cooling_marker_setspeed_comments = GCodeGenerator::_cooldown_marker_speed[path.role()];
+        cooling_marker_setspeed_comments = GCodeGenerator::_cooldown_marker_speed[uint8_t(grole)];
     }
     // F     is mm per minute.
     // speed is mm per second
@@ -6619,32 +6620,32 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
         if (m_layer_slices_offseted.layer != m_layer) {
             m_layer_slices_offseted.layer = m_layer;
             m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4));
-            Expolygons slices = m_layer->lslices;
-            Expolygons slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
+            ExPolygons slices = m_layer->lslices;
+            ExPolygons slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
             //remove top surfaces
             for (const LayerRegion* reg : m_layer->regions()) {
-                slices_offsetted = diff_ex(slices_offsetted, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
-                slices = diff_ex(slices, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
+                slices_offsetted = diff_ex(slices_offsetted, to_expolygons(reg->fill_surfaces().filter_by_type_flag(SurfaceType::stPosTop)));
+                slices = diff_ex(slices, to_expolygons(reg->fill_surfaces().filter_by_type_flag(SurfaceType::stPosTop)));
             }
             //create bb for speeding things up.
             m_layer_slices_offseted.slices.clear();
             for (ExPolygon &ex : slices) {
-                BoundingBox bb{ex.contour().points}; 
+                BoundingBox bb{ex.contour.points}; 
                 m_layer_slices_offseted.slices.emplace_back(std::move(ex),std::move(bb)); 
             }
             m_layer_slices_offseted.slices_offsetted.clear();
             for (ExPolygon &ex : slices_offsetted) {
-                BoundingBox bb{ex.contour().points}; 
+                BoundingBox bb{ex.contour.points}; 
                 m_layer_slices_offseted.slices_offsetted.emplace_back(std::move(ex),std::move(bb)); 
             }
             
             
         }
         // test if a expoly contains the entire travel
-        for (const pair<ExPolygon, BoundingBox> &expoly_2_bb : 
+        for (const std::pair<ExPolygon, BoundingBox> &expoly_2_bb : 
             offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices)
             // first check if it's roughtly inside the bb, to reject quickly.
-            if (travel.size > 1 && expoly_2_bb.second.contains(travel.front())
+            if (travel.size() > 1 && expoly_2_bb.second.contains(travel.front())
                 && expoly_2_bb.second.contains(travel.front())
                 && expoly_2_bb.second.contains(travel.points[travel.size()/2]) )
                 //check precisely if it's inside (via a costly diff)

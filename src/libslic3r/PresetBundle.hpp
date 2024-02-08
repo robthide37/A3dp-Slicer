@@ -174,7 +174,7 @@ public:
 
     static std::array<Preset::Type, 3>  types_list(PrinterTechnology pt) {
         if (pt == ptFFF)
-            return  { Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT };
+            return  { Preset::TYPE_PRINTER, Preset::TYPE_FFF_PRINT, Preset::TYPE_FFF_FILAMENT };
         return      { Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
     }
 

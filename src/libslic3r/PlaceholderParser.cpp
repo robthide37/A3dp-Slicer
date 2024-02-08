@@ -1068,7 +1068,7 @@ namespace client
             const MyContext* ctx,
             boost::iterator_range<Iterator>& opt_key,
             Iterator& end_pos,
-            expr<Iterator>& out,
+            expr& out,
             std::unique_ptr<ConfigOption>&& default_val)
         {
             bool has_default_value = default_val.get() != nullptr;
@@ -1091,7 +1091,7 @@ namespace client
             }
             // return (wanted for exists() but not for default())
             if(!has_default_value)
-                out = expr<Iterator>(opt != nullptr, out.it_range.begin(), end_pos);
+                out = expr(opt != nullptr, out.it_range.begin(), end_pos);
         }
 
         static void store_variable_index(
@@ -1182,8 +1182,8 @@ namespace client
     		    break;
     		}
             case coInts:
-                opt_def = print_config_def.get(opt_key);
-                if (opt_def->is_vector_extruder) {
+                vector_opt = static_cast<const ConfigOptionVectorBase*>(opt.opt);
+                if (vector_opt->is_extruder_size()) {
                     output.set_i(int(((ConfigOptionVectorBase*)opt.opt)->getFloat(int(ctx->current_extruder_id))));
                     break;
                 } else
@@ -1232,7 +1232,7 @@ namespace client
 
             if (opt.opt->is_scalar()) {
                 if (0 != (opt.opt->flags & ConfigOption::FCO_PLACEHOLDER_TEMP)) // fake var, from checked_vars
-                    return scalar_variable_reference(ctx, opt, output);
+                    return scalar_variable_to_expr(ctx, opt, output);
                 ctx->throw_exception("Referencing a scalar variable when vector is expected", opt.it_range);
             }
             const ConfigOptionVectorBase* vec = static_cast<const ConfigOptionVectorBase*>(opt.opt);
@@ -1242,7 +1242,7 @@ namespace client
             if (!opt.has_index()) {
                 if (!vec->is_extruder_size() && int(ctx->current_extruder_id) >= 0 && int(ctx->current_extruder_id) < int(vec->size()))
                     ctx->throw_exception("Referencing a (not-extruder sized) vector variable when scalar is expected", opt.it_range);
-                idx = size_t(ctx->current_extruder_id))
+                idx = size_t(ctx->current_extruder_id);
             } else if (opt.has_index() && opt.index >= 0 && opt.index < int(vec->size()))
                 idx = size_t(opt.index);
             else if (!opt.has_index())
@@ -2104,15 +2104,15 @@ namespace client
         static void noexpr(expr &out) { out.reset(); }
 
         //functions for default keyword
-        static void default_bool_(bool &value, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr<Iterator>& out)
+        static void default_bool_(bool &value, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr& out)
                 { MyContext::check_variable<Iterator>(ctx, opt_key, end_pos, out, std::make_unique<ConfigOptionBool>(value)); }
-        static void default_int_(int &value, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr<Iterator>& out)
+        static void default_int_(int &value, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr& out)
                 { MyContext::check_variable<Iterator>(ctx, opt_key, end_pos, out, std::make_unique<ConfigOptionInt>(value)); }
-        static void default_double_(double &value, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr<Iterator>& out)
+        static void default_double_(double &value, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr& out)
                 { MyContext::check_variable<Iterator>(ctx, opt_key, end_pos, out, std::make_unique<ConfigOptionFloat>(value)); }
-        static void default_string_(boost::iterator_range<Iterator>& it_range, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr<Iterator>& out)
+        static void default_string_(boost::iterator_range<Iterator>& it_range, const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr& out)
                 { MyContext::check_variable<Iterator>(ctx, opt_key, end_pos, out, std::make_unique<ConfigOptionString>(std::string(it_range.begin() + 1, it_range.end() - 1))); }
-        static void exists_(const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr<Iterator>& out)
+        static void exists_(const MyContext* ctx, boost::iterator_range<Iterator>& opt_key, Iterator& end_pos, expr& out)
                 { MyContext::check_variable<Iterator>(ctx, opt_key, end_pos, out, std::unique_ptr<ConfigOption>{nullptr}); }
 
         //function for changing state

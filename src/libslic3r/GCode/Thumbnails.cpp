@@ -168,7 +168,7 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail(const ThumbnailData &d
     }
 }
 
-std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbnail_list(const std::string& thumbnails_string, const std::string_view def_ext /*= "PNG"sv*/)
+std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbnail_list_from_prusa(const std::string& thumbnails_string, const std::string_view def_ext /*= "PNG"sv*/)
 {
     if (thumbnails_string.empty())
         return {};
@@ -218,15 +218,32 @@ std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbna
     return std::make_pair(std::move(thumbnails_list), errors);
 }
 
+std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbnail_list(const std::vector<Vec2d>& thumbnails, GCodeThumbnailsFormat format)
+{
+    if (thumbnails.empty())
+        return {};
+
+    ThumbnailErrors errors;
+    GCodeThumbnailDefinitionsList thumbnails_list;
+
+    // generate thumbnails data to process it
+    for (const Vec2d &point : thumbnails) {
+        thumbnails_list.emplace_back(std::make_pair(format, point));
+    }
+
+    return std::make_pair(std::move(thumbnails_list), errors);
+}
+
 std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbnail_list(const ConfigBase& config)
 {
     // ??? Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
     // ??? If "thumbnails_format" is not defined, export to PNG.
 
     // generate thumbnails data to process it
-
-    if (const auto thumbnails_value = config.option<ConfigOptionString>("thumbnails"))
-        return make_and_check_thumbnail_list(thumbnails_value->value);
+    assert(config.option<ConfigOptionPoints>("thumbnails"));
+    assert(config.option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format"));
+    if (const auto thumbnails_value = config.option<ConfigOptionPoints>("thumbnails"))
+        return make_and_check_thumbnail_list(thumbnails_value->values, config.option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format")->value);
 
     return {};
 }

@@ -23,13 +23,13 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 
     // Support must be enabled and set to Tree style.
     assert(config.support_material || config.support_material_enforce_layers > 0);
-    assert(config.support_material_style == smsTree || config.support_material_style == smsOrganic);
+    assert(config.support_material_style.value == smsTree || config.support_material_style.value == smsOrganic);
 
     // Calculate maximum external perimeter width over all printing regions, taking into account the default layer height.
     coordf_t external_perimeter_width = 0.;
     for (size_t region_id = 0; region_id < print_object.num_printing_regions(); ++ region_id) {
         const PrintRegion &region = print_object.printing_region(region_id);
-        external_perimeter_width = std::max<coordf_t>(external_perimeter_width, region.flow(print_object, frExternalPerimeter, config.layer_height).width());
+        external_perimeter_width = std::max<coordf_t>(external_perimeter_width, region.flow(print_object, frExternalPerimeter, config.layer_height, 2 /*not first layer, even layer*/).width());
     }
 
     this->layer_height              = scaled<coord_t>(config.layer_height.value);
@@ -61,7 +61,7 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
     this->support_floor_layers      = this->support_floor_enable ? config.support_material_bottom_interface_layers.value : 0;
 //    this->minimum_roof_area         = 
 //    this->support_roof_angles       = 
-    this->support_roof_pattern      = config.support_material_interface_pattern;
+    this->support_roof_pattern      = config.support_material_interface_pattern.value;
     this->support_pattern           = config.support_material_pattern;
     this->support_line_spacing      = scaled<coord_t>(config.support_material_spacing.value);
 //    this->support_bottom_offset     = 
@@ -78,7 +78,7 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
     this->support_tree_branch_diameter_angle = std::clamp<double>(config.support_tree_branch_diameter_angle * M_PI / 180., 0., 0.5 * M_PI - EPSILON);
     this->support_tree_top_rate       = config.support_tree_top_rate.value; // percent
 //    this->support_tree_tip_diameter = this->support_line_width;
-    this->support_tree_tip_diameter = std::clamp(scaled<coord_t>(config.support_tree_tip_diameter.value), 0, this->support_tree_branch_diameter);
+    this->support_tree_tip_diameter = std::clamp(scaled<coord_t>(config.support_tree_tip_diameter.value), coord_t(0), this->support_tree_branch_diameter);
 }
 
 TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mesh_group_settings, const SlicingParameters &slicing_params)

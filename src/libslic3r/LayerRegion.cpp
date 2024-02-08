@@ -173,18 +173,18 @@ void LayerRegion::make_perimeters(
     );
     
     perimeter_and_gapfill_ranges.emplace_back(
-        ExtrusionRange{ perimeters_begin, uint32_t(m_perimeters.size()) }, 
-        ExtrusionRange{ gap_fills_begin,  uint32_t(m_thin_fills.size()) });
-    fill_expolygons_ranges.emplace_back(ExtrusionRange{ fill_expolygons_begin, uint32_t(fill_expolygons.size()) });
+        ExtrusionRange{ uint32_t(perimeters_begin), uint32_t(m_perimeters.size()) }, 
+        ExtrusionRange{ uint32_t(gap_fills_begin),  uint32_t(m_thin_fills.size()) });
+    fill_expolygons_ranges.emplace_back(ExtrusionRange{ uint32_t(fill_expolygons_begin), uint32_t(fill_expolygons.size()) });
 }
 
 void LayerRegion::make_milling_post_process(const SurfaceCollection& slices) {
     MillingPostProcess mill(// input:
         &slices,
         (this->layer()->lower_layer != nullptr) ? &this->layer()->lower_layer->lslices : nullptr,
-        &this->region().config(),
-        &this->layer()->object()->config(),
-        &this->layer()->object()->print()->config()
+        this->region().config(),
+        this->layer()->object()->config(),
+        this->layer()->object()->print()->config()
     );
     m_millings = mill.process(this->layer());
 }

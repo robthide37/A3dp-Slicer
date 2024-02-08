@@ -293,6 +293,7 @@ public:
     ArcPolyline(const ArcPolyline &) = default;
     ArcPolyline(ArcPolyline &&)      = default;
     ArcPolyline(const Polyline &other) : m_path(_from_polyline(other.points)) {}
+    ArcPolyline(const Points &other) : m_path(_from_polyline(other)) {}
     ArcPolyline &operator=(const ArcPolyline &) = default;
     ArcPolyline &operator=(ArcPolyline &&) = default;
 
@@ -323,9 +324,12 @@ public:
 
     //works on points only (be careful)
     bool split_at_index(const size_t index, ArcPolyline &p1, ArcPolyline &p2) const;
-    int  find_point(const Point &point, coordf_t epsilon) const;
     void pop_front();
     void pop_back();
+    // need some work to work better on arc
+    void                  set_front(const Point &p);
+    void                  set_back(const Point &p);
+    int  find_point(const Point &point, coordf_t epsilon) const;
 
 
     // Works on points & arc
@@ -341,7 +345,6 @@ public:
     void                  rotate(double angle); // to test for arc, but should be okay
     Point                 get_point_from_begin(coord_t distance) const;
     Point                 get_point_from_end(coord_t distance) const;
-    void                  set_front(Point &p);
 
     // douglas_peuker and create arc if with_fitting_arc (don't touch the current arcs, only try in-between)
     void simplify(coordf_t tolerance, ArcFittingType with_fitting_arc, double fit_tolerance);

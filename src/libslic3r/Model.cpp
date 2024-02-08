@@ -771,8 +771,11 @@ bool ModelObject::equals(const ModelObject& rhs) {
     if (this->layer_height_profile != rhs.layer_height_profile) return false;
     if (this->printable != rhs.printable) return false;
     if (this->origin_translation != rhs.origin_translation) return false;
-    if (m_bounding_box != rhs.m_bounding_box) return false;
-    if (m_bounding_box_valid != rhs.m_bounding_box_valid) return false;
+    if (m_bounding_box_approx != rhs.m_bounding_box_approx) return false;
+    if (m_bounding_box_approx_valid != rhs.m_bounding_box_approx_valid) return false;
+    if (m_bounding_box_exact != rhs.m_bounding_box_exact) return false;
+    if (m_bounding_box_exact_valid != rhs.m_bounding_box_exact_valid) return false;
+    if (m_min_max_z_valid != rhs.m_min_max_z_valid) return false;
     if (m_raw_bounding_box != rhs.m_raw_bounding_box) return false;
     if (m_raw_bounding_box_valid != rhs.m_raw_bounding_box_valid) return false;
     if (m_raw_mesh_bounding_box != rhs.m_raw_mesh_bounding_box) return false;
@@ -949,6 +952,7 @@ const BoundingBoxf3& ModelObject::bounding_box_approx() const
 {
     if (! m_bounding_box_approx_valid) {
         m_bounding_box_approx_valid = true;
+        BoundingBoxf3 raw_bbox = this->raw_mesh_bounding_box();
         m_bounding_box_approx.reset();
         for (const ModelInstance *i : this->instances)
             m_bounding_box_approx.merge(i->transform_bounding_box(raw_bbox));

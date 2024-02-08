@@ -86,6 +86,7 @@ public:
     std::string travel_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const bool is_ccw, const double speed, const std::string_view comment);
     std::string travel_to_xyz(const Vec3d &point, const double speed = 0.0, const std::string_view comment = {});
     std::string travel_to_z(double z, const std::string_view comment = {});
+    std::string get_travel_to_z_gcode(double z, const std::string_view comment = {});
     bool        will_move_z(double z) const;
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
     std::string extrude_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, double dE, const bool is_ccw, const std::string_view comment = {}); //BBS: generate G2 or G3 extrude which moves by arc
@@ -120,7 +121,7 @@ public:
     std::string set_fan(uint8_t speed, uint16_t default_tool = 0);
     uint8_t get_fan() { return m_last_fan_speed; }
 
-    const GCodeFormatter &get_default_gcode_formatter() { return GCodeFormatter(config.gcode_precision_xyz, config.gcode_precision_e); }
+    GCodeFormatter get_default_gcode_formatter() const { return GCodeFormatter(config.gcode_precision_xyz, config.gcode_precision_e); }
 
     static std::string get_default_pause_gcode(const GCodeConfig &config);
     static std::string get_default_color_change_gcode(const GCodeConfig &config);
@@ -152,7 +153,6 @@ private:
     
     GCodeFormatter  m_formatter {0,0};
 
-    std::string _travel_to_z(double z, const std::string_view comment = {});
     std::string _retract(double length, double restart_extra, double restart_extra_toolchange, const std::string_view comment = {});
 
 };

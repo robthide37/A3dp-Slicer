@@ -174,9 +174,9 @@ enum SupportMaterialStyle {
 };
 
 //from prusa, not used in superslicer as InfillPattern is enough.
-enum SupportMaterialInterfacePattern {
-    smipAuto, smipRectilinear, smipConcentric,
-};
+//enum SupportMaterialInterfacePattern {
+//    smipAuto, smipRectilinear, smipConcentric,
+//};
 
 enum SeamPosition {
     spRandom,
@@ -310,7 +310,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(IroningType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialPattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialStyle)
-CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialInterfacePattern)
+//CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialInterfacePattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SeamPosition)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAMaterial)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DenseInfillAlgo)

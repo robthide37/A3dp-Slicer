@@ -1110,8 +1110,8 @@ indexed_triangle_set its_make_sphere(double radius, double fa)
     // First build an icosahedron (taken from http://www.songho.ca/opengl/gl_sphere.html)
     indexed_triangle_set mesh;
 
-    const float PI = 3.1415926f;
-    const float H_ANGLE = PI / 180 * 72;    // 72 degree = 360 / 5
+    //const float PI = 3.1415926f;
+    const float H_ANGLE = float(PI) / 180 * 72;    // 72 degree = 360 / 5
     const float V_ANGLE = atanf(1.0f / 2);  // elevation = 26.565 degree
 
     auto& vertices = mesh.vertices;
@@ -1120,7 +1120,7 @@ indexed_triangle_set its_make_sphere(double radius, double fa)
     indices.reserve(20);
 
     float z, xy;
-    float hAngle1 = -PI / 2 - H_ANGLE / 2;
+    float hAngle1 = -float(PI) / 2 - H_ANGLE / 2;
 
     vertices[0] = stl_vertex(0, 0, radius); // the first top vertex at (0, 0, r)
 

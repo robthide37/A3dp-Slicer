@@ -50,10 +50,15 @@ public:
     constexpr bool operator!=(const enum_bitmask r) const { return m_bits != r.m_bits; }
     // For sorting by the enum values.
     constexpr bool lower(const enum_bitmask r) const { return m_bits < r.m_bits; }
-
+    
+    // For having ascees to the underlying_type, to use it as hash key, mostly.
+    // Can be modified, is it problematic?
+    constexpr underlying_type& operator*() { return m_bits; }
+    constexpr underlying_type operator*() const { return m_bits; }
 private:
     underlying_type m_bits = 0;
 };
+
 
 // For enabling free functions producing enum_bitmask<> type from bit operations on enums.
 template<typename Enum> struct is_enum_bitmask_type { static constexpr const bool enable = false; };

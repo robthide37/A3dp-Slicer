@@ -164,23 +164,14 @@ public:
     // Children contour, may be both CCW and CW oriented (outer contours or holes).
     std::vector<PerimeterGeneratorLoop> children;
 
-    PerimeterGeneratorLoop(const Polygon &polygon, unsigned short depth, bool is_contour, bool fuzzify)
-        : polygon(polygon), is_contour(is_contour), depth(depth), fuzzify(fuzzify)
+    PerimeterGeneratorLoop(const Polygon &polygon, unsigned short depth, bool is_contour, bool steep_overhangs, bool fuzzify)
+        : polygon(polygon), is_contour(is_contour), is_steep_overhang(steep_overhangs), depth(depth), fuzzify(fuzzify)
     {}
     // External perimeter. It may be CCW or CW oriented (outer contour or hole contour).
     bool is_external() const { return this->depth == 0; }
     // it's the last loop of the contour (not hole), so the first to be printed (if all goes well)
     // An island, which may have holes, but it does not have another internal island.
-    bool is_internal_contour() const
-    {
-        // An internal contour is a contour containing no other contours
-        if (!this->is_contour)
-            return false;
-        for (const PerimeterGeneratorLoop &loop : this->children)
-            if (loop.is_contour)
-                return false;
-        return true;
-    }
+    bool is_internal_contour() const;
 };
 typedef std::vector<PerimeterGeneratorLoop> PerimeterGeneratorLoops;
 
@@ -231,7 +222,7 @@ private:
     ExPolygons unmillable;
     coord_t mill_extra_size;
 
-    ProcessSurfaceResult process_classic(const Parameters &params, int& loop_number, const Surface& surface, ExtrusionEntityCollection &loops);
+    ProcessSurfaceResult process_classic(const Parameters &params, int& loop_number, const Surface& surface, ExtrusionEntityCollection &loops, ExtrusionEntityCollection &gapfill);
     ProcessSurfaceResult process_arachne(const Parameters &params, int& loop_number, const Surface& surface, ExtrusionEntityCollection &loops);
     
     void        processs_no_bridge(const Parameters params, Surfaces& all_surfaces, ExPolygons &fill_surfaces);

@@ -295,8 +295,9 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             return {};
         }
         const float                                    flow_width = get_flow_width(layer_region, entity->role());
+        const Polyline entity_points = entity->as_polyline().to_polyline(scale_t(flow_width*4));
         std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
-            ExtrusionProcessor::estimate_points_properties<true, true, true, true>(entity->as_polyline().points, prev_layer_boundary,
+            ExtrusionProcessor::estimate_points_properties<true, true, true, true>(entity_points.points, prev_layer_boundary,
                                                                                    flow_width, params.bridge_distance);
 
         std::vector<ExtrusionLine> lines_out;
@@ -349,8 +350,9 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
         const float flow_width = get_flow_width(layer_region, entity->role());
         // Compute only unsigned distance - prev_layer_lines can contain unconnected paths, thus the sign of the distance is unreliable
+        const Polyline entity_points = entity->as_polyline().to_polyline(scale_t(flow_width*4));
         std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
-            ExtrusionProcessor::estimate_points_properties<true, true, false, false>(entity->as_polyline().points, prev_layer_lines,
+            ExtrusionProcessor::estimate_points_properties<true, true, false, false>(entity_points.points, prev_layer_lines,
                                                                                      flow_width, params.bridge_distance);
 
         std::vector<ExtrusionLine> lines_out;
@@ -667,7 +669,7 @@ std::vector<const ExtrusionEntityCollection*> gather_extrusions(const LayerSlice
         const LayerRegion *perimeter_region = layer->get_region(island.perimeters.region());
         for (size_t perimeter_idx : island.perimeters) {
             auto collection = static_cast<const ExtrusionEntityCollection *>(
-                perimeter_region->perimeters().entities[perimeter_idx]
+                perimeter_region->perimeters().entities()[perimeter_idx]
             );
             result.push_back(collection);
         }
@@ -675,7 +677,7 @@ std::vector<const ExtrusionEntityCollection*> gather_extrusions(const LayerSlice
             const LayerRegion *fill_region = layer->get_region(fill_range.region());
             for (size_t fill_idx : fill_range) {
                 auto collection = static_cast<const ExtrusionEntityCollection *>(
-                   fill_region->fills().entities[fill_idx]
+                   fill_region->fills().entities()[fill_idx]
                 );
                 result.push_back(collection);
             }
@@ -690,29 +692,28 @@ bool has_brim(const Layer* layer, const Params& params){
     return
         int(layer->id()) == params.raft_layers_count
         && params.raft_layers_count == 0
-        && params.brim_type != BrimType::btNoBrim
-        && params.brim_width > 0.0;
+        && (params.brim_width_outer > 0 || params.brim_width_inner > 0);
 }
 
 
-Polygons get_brim(const ExPolygon& slice_polygon, const BrimType brim_type, const float brim_width) {
+Polygons get_brim(const ExPolygon& slice_polygon, const float brim_width_outer, const float brim_width_inner) {
     // TODO: The algorithm here should take into account that multiple slices may
     // have coliding Brim areas and the final brim area is smaller,
     // thus has lower adhesion. For now this effect will be neglected.
     ExPolygons brim;
-    if (brim_type == BrimType::btOuterAndInner || brim_type == BrimType::btOuterOnly) {
+    if (brim_width_outer > 0) {
         Polygon brim_hole = slice_polygon.contour;
         brim_hole.reverse();
-        Polygons c = expand(slice_polygon.contour, scale_(brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
+        Polygons c = expand(slice_polygon.contour, scale_t(brim_width_outer)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
         if (!c.empty()) {
             brim.push_back(ExPolygon{c.front(), brim_hole});
         }
     }
-    if (brim_type == BrimType::btOuterAndInner || brim_type == BrimType::btInnerOnly) {
+    if (brim_width_inner > 0) {
         Polygons brim_contours = slice_polygon.holes;
         polygons_reverse(brim_contours);
         for (const Polygon &brim_contour : brim_contours) {
-            Polygons brim_holes = shrink({brim_contour}, scale_(brim_width));
+            Polygons brim_holes = shrink({brim_contour}, scale_t(brim_width_inner));
             polygons_reverse(brim_holes);
             ExPolygon inner_brim{brim_contour};
             inner_brim.holes = brim_holes;
@@ -817,7 +818,7 @@ std::vector<EnitityToCheck> gather_entities_to_check(const Layer* layer) {
             const ExtrusionEntity *next = queue.back();
             queue.pop_back();
             if (next->is_collection()) {
-                for (const ExtrusionEntity *e : static_cast<const ExtrusionEntityCollection *>(next)->entities) {
+                for (const ExtrusionEntity *e : static_cast<const ExtrusionEntityCollection *>(next)->entities()) {
                     queue.push_back(e);
                 }
             } else {
@@ -834,7 +835,7 @@ std::vector<EnitityToCheck> gather_entities_to_check(const Layer* layer) {
             for (const LayerExtrusionRange &fill_range : island.fills) {
                 const LayerRegion *fill_region = layer->get_region(fill_range.region());
                 for (size_t fill_idx : fill_range) {
-                    for (const ExtrusionEntity *e : get_flat_entities(fill_region->fills().entities[fill_idx])) {
+                    for (const ExtrusionEntity *e : get_flat_entities(fill_region->fills().entities()[fill_idx])) {
                         if (e->role() == ExtrusionRole::BridgeInfill) {
                             entities_to_check.push_back({e, fill_region, slice_idx});
                         }
@@ -844,7 +845,7 @@ std::vector<EnitityToCheck> gather_entities_to_check(const Layer* layer) {
 
             const LayerRegion *perimeter_region = layer->get_region(island.perimeters.region());
             for (size_t perimeter_idx : island.perimeters) {
-                for (const ExtrusionEntity *e : get_flat_entities(perimeter_region->perimeters().entities[perimeter_idx])) {
+                for (const ExtrusionEntity *e : get_flat_entities(perimeter_region->perimeters().entities()[perimeter_idx])) {
                     entities_to_check.push_back({e, perimeter_region, slice_idx});
                 }
             }
@@ -930,7 +931,7 @@ SliceMappings update_active_object_parts(const Layer                        *lay
 
         const std::optional<Polygons> brim{
              has_brim(layer, params) ?
-             std::optional{get_brim(layer->lslices[slice_idx], params.brim_type, params.brim_width)} :
+             std::optional{get_brim(layer->lslices[slice_idx], params.brim_width_outer, params.brim_width_inner)} :
              std::nullopt
         };
         ObjectPart new_part{
@@ -1169,8 +1170,8 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
         l->curled_lines.clear();
         std::vector<ExtrusionLine> current_layer_lines;
 
-        for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
-            Polyline pl = extrusion->as_polyline();
+        for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities()) {
+            Polyline pl = extrusion->as_polyline().to_polyline(scale_t(flow_width*4));
             Polygon  pol(pl.points);
             pol.make_counter_clockwise();
 
@@ -1243,7 +1244,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
         AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
         std::vector<ExtrusionLine>           current_layer_lines;
         for (const LayerRegion *layer_region : l->regions()) {
-            for (const ExtrusionEntity *extrusion : layer_region->perimeters().flatten().entities) {
+            for (const ExtrusionEntity *extrusion : layer_region->perimeters().flatten().entities()) {
                 if (!extrusion->role().is_external_perimeter())
                     continue;
 

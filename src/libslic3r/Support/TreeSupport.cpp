@@ -145,7 +145,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
 #endif // NDEBUG
         // Support must be enabled and set to Tree style.
         assert(object_config.support_material || object_config.support_material_enforce_layers > 0);
-        assert(object_config.support_material_style == smsTree || object_config.support_material_style == smsOrganic);
+        assert(object_config.support_material_style.value == smsTree || object_config.support_material_style.value == smsOrganic);
 
         bool found_existing_group = false;
         TreeSupportSettings next_settings{ TreeSupportMeshGroupSettings{ print_object }, print_object.slicing_parameters() };
@@ -681,14 +681,15 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     FillParams             fill_params;
 
     filler->layer_id = layer_idx;
-    filler->spacing  = flow.spacing();
     filler->angle = roof ? 
         //fixme support_layer.interface_id() instead of layer_idx
         (support_params.interface_angle + (layer_idx & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.)) :
         support_params.base_angle;
 
-    fill_params.density     = float(roof ? support_params.interface_density : scaled<float>(filler->spacing) / (scaled<float>(filler->spacing) + float(support_infill_distance)));
+    fill_params.density     = float(roof ? support_params.interface_density : scaled<float>(flow.spacing()) / (scaled<float>(flow.spacing()) + float(support_infill_distance)));
     fill_params.dont_adjust = true;
+    
+    filler->init_spacing(flow.spacing(), fill_params);
 
     Polylines out;
     for (ExPolygon &expoly : union_ex(polygon)) {
@@ -700,7 +701,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
 #endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
         assert(intersecting_edges(to_polygons(expoly)).empty());
         check_self_intersections(expoly, "generate_support_infill_lines");
-        Surface surface(stInternal, std::move(expoly));
+        Surface surface(stPosInternal | stDensSparse, std::move(expoly));
         try {
             Polylines pl = filler->fill_surface(&surface, fill_params);
             assert(pl.empty() || get_extents(surface.expolygon).inflated(SCALED_EPSILON).contains(get_extents(pl)));
@@ -775,7 +776,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     Polygons collision_trimmed_buffer;
     auto collision_trimmed = [&collision_trimmed_buffer, &collision, &ret, distance]() -> const Polygons& {
         if (collision_trimmed_buffer.empty() && ! collision.empty())
-            collision_trimmed_buffer = ClipperUtils::clip_clipper_polygons_with_subject_bbox(collision, get_extents(ret).inflated(std::max(0, distance) + SCALED_EPSILON));
+            collision_trimmed_buffer = ClipperUtils::clip_clipper_polygons_with_subject_bbox(collision, get_extents(ret).inflated(std::max(coord_t(0), distance) + SCALED_EPSILON));
         return collision_trimmed_buffer;
     };
 
@@ -974,7 +975,7 @@ private:
     std::vector<SupportElements>                       &move_bounds;
 
     // Temps
-    static constexpr const auto                         m_base_radius = scaled<int>(0.01);
+    static constexpr const coordf_t                     m_base_radius = scale_d(0.01);
     const Polygon                                       m_base_circle { make_circle(m_base_radius, SUPPORT_TREE_CIRCLE_RESOLUTION) };
     
     // Mutexes, guards
@@ -3533,11 +3534,11 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
 
             // ### draw these points as circles
             
-            if (print_object.config().support_material_style == smsTree)
+            if (print_object.config().support_material_style.value == smsTree)
                 draw_areas(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
                     bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
             else {
-                assert(print_object.config().support_material_style == smsOrganic);
+                assert(print_object.config().support_material_style.value == smsOrganic);
                 organic_draw_branches(
                     *print.get_object(processing.second.front()), volumes, config, move_bounds, 
                     bottom_contacts, top_contacts, interface_placer, intermediate_layers, layer_storage, 

@@ -34,6 +34,7 @@ public:
     void keep_types(std::initializer_list<SurfaceType> types);
     void keep_types_flag(const SurfaceType flags_to_keep, const SurfaceType flags_to_remove = stNone);
     void remove_type(const SurfaceType type);
+    void remove_type(const SurfaceType type, ExPolygons *polygons);
     void remove_types(std::initializer_list<SurfaceType> types);
     void filter_by_type(const SurfaceType type, Polygons* polygons) const;
     void filter_by_type_flag(Polygons* polygons, const SurfaceType flags_needed, const SurfaceType flags_not_allowed = stNone) const;

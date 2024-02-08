@@ -24,14 +24,42 @@ inline Eigen::Matrix<Float, 2, 1, Eigen::DontAlign> arc_center(
     static_assert(std::is_same<typename Derived::Scalar, Float>::value, "arc_center(): Radius must be of the same type as the vectors.");
     assert(radius != 0);
     using Vector = Eigen::Matrix<Float, 2, 1, Eigen::DontAlign>;
-    auto  v  = end_pos - start_pos;
+    Vector v  = end_pos - start_pos;
     Float q2 = v.squaredNorm();
     assert(q2 > 0);
     Float t2 = sqr(radius) / q2 - Float(.25f);
     // If the start_pos and end_pos are nearly antipodal, t2 may become slightly negative.
     // In that case return a centroid of start_point & end_point.
     Float t = t2 > 0 ? sqrt(t2) : Float(0);
-    auto mid = Float(0.5) * (start_pos + end_pos);
+    Vector mid = (start_pos + end_pos) * Float(0.5f);
+    Vector vp{ -v.y() * t, v.x() * t };
+    return (radius > Float(0)) == is_ccw ? (mid + vp).eval() : (mid - vp).eval();
+}
+
+
+// Calculate center point (center of a circle) of an arc given two points and a radius.
+// positive radius: take shorter arc
+// negative radius: take longer arc
+// radius must NOT be zero!
+template<typename Scalar, typename Float>
+inline Eigen::Matrix<Scalar, 2, 1, Eigen::DontAlign> arc_center_scalar(
+    const Eigen::Matrix<Scalar, 2, 1, Eigen::DontAlign>   &start_pos,
+    const Eigen::Matrix<Scalar, 2, 1, Eigen::DontAlign>   &end_pos, 
+    const Float                         radius,
+    const bool                          is_ccw)
+{
+    static_assert(!std::is_same<Scalar, Float>::value, "arc_center_scalar(): Radius shouldn't be a scalar but a float.");
+    assert(radius != 0);
+    assert(radius * 1.001 != radius && radius * 0.999 != radius); // check if Float is a float
+    using Vector = Eigen::Matrix<Scalar, 2, 1, Eigen::DontAlign>;
+    Vector v  = end_pos - start_pos;
+    Float q2 = v.squaredNorm();
+    assert(q2 > 0);
+    Float t2 = sqr(radius) / q2 - Float(.25f);
+    // If the start_pos and end_pos are nearly antipodal, t2 may become slightly negative.
+    // In that case return a centroid of start_point & end_point.
+    Float t = t2 > 0 ? sqrt(t2) : Float(0);
+    Vector mid = (start_pos + end_pos) * Float(0.5f);
     Vector vp{ -v.y() * t, v.x() * t };
     return (radius > Float(0)) == is_ccw ? (mid + vp).eval() : (mid - vp).eval();
 }
@@ -408,6 +436,12 @@ struct Segment
     float       radius{ 0.f };
     // CCW or CW. Ignored for zero radius (linear segment).
     Orientation orientation{ Orientation::CCW };
+
+    Segment() : point(0, 0), radius(0.f), orientation(Orientation::CCW) {}
+    Segment(const Point &pt, float fradius, Orientation orien) : point(pt), radius(fradius), orientation(orien) {}
+    Segment(Point &&pt, float fradius, Orientation orien) : point(std::move(pt)), radius(fradius), orientation(orien) {}
+    Segment(const Point &pt) : point(pt), radius(0.f), orientation(Orientation::CCW) {}
+    Segment(Point &&pt) : point(std::move(pt)), radius(0.f), orientation(Orientation::CCW) {}
 
     bool    linear() const { return radius == 0; }
     bool    ccw() const { return orientation == Orientation::CCW; }

@@ -721,16 +721,23 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
             // check whether first point forms a convex angle
             //note: we allow a deviation of 5.7° (0.01rad = 0.57°)
             bool ok = true;
-            ok = (hole.points.front().ccw_angle(hole.points.back(), *(hole.points.begin() + 1)) <= PI + 0.1);
+            //ok = (hole.points.front().ccw_angle(hole.points.back(), *(hole.points.begin() + 1)) <= PI + 0.1);
+            assert(ccw_angle_old_test(hole.points.front(), hole.points.back(), *(hole.points.begin() + 1)) == 
+                angle_ccw(*(hole.points.begin() + 1) - hole.points.front(), hole.points.back() - hole.points.front()));
+            ok = (angle_ccw(*(hole.points.begin() + 1) - hole.points.front(), hole.points.back() - hole.points.front()) <= PI + 0.1);
             // check whether points 1..(n-1) form convex angles
             if (ok)
                 for (Points::const_iterator p = hole.points.begin() + 1; p != hole.points.end() - 1; ++p) {
-                    ok = (p->ccw_angle(*(p - 1), *(p + 1)) <= PI + 0.1);
+                    //ok = (p->ccw_angle(*(p - 1), *(p + 1)) <= PI + 0.1);
+                    assert(ccw_angle_old_test(*p, *(p - 1), *(p + 1)) == angle_ccw((*(p + 1)) - *p, (*(p - 1)) - *p));
+                    ok = (angle_ccw((*(p + 1)) - *p, (*(p - 1)) - *p) <= PI + 0.1);
                     if (!ok) break;
                 }
 
             // check whether last point forms a convex angle
-            ok &= (hole.points.back().ccw_angle(*(hole.points.end() - 2), hole.points.front()) <= PI + 0.1);
+            //ok &= (hole.points.back().ccw_angle(*(hole.points.end() - 2), hole.points.front()) <= PI + 0.1);
+            assert(ccw_angle_old_test(hole.points.back(), *(hole.points.end() - 2), hole.points.front()) == angle_ccw(hole.points.front() - hole.points.back(), *(hole.points.end() - 2) - hole.points.back()));
+            ok &= (angle_ccw(hole.points.front() - hole.points.back(), *(hole.points.end() - 2) - hole.points.back()) <= PI + 0.1);
 
             if (ok && not_convex_delta != convex_delta) {
                 if (convex_delta != 0) {
@@ -799,13 +806,17 @@ Polygon _smooth_curve(Polygon& p, double max_angle, double min_angle_convex, dou
         //put first point
         pout.points.push_back(p[idx]);
         //get angles
-        double angle1 = p[idx].ccw_angle(p.points[idx - 1], p.points[idx + 1]);
+        //double angle1 = p[idx].ccw_angle(p.points[idx - 1], p.points[idx + 1]);
+        assert(ccw_angle_old_test(p[idx], p.points[idx - 1], p.points[idx + 1]) == angle_ccw(p.points[idx + 1] - p[idx], p.points[idx - 1] - p[idx]));
+        double angle1 = angle_ccw(p.points[idx + 1] - p[idx], p.points[idx - 1] - p[idx]);
         bool angle1_concave = true;
         if (angle1 > PI) {
             angle1 = 2 * PI - angle1;
             angle1_concave = false;
         }
-        double angle2 = p[idx + 1].ccw_angle(p.points[idx], p.points[idx + 2]);
+        //double angle2 = p[idx + 1].ccw_angle(p.points[idx], p.points[idx + 2]);
+        assert(ccw_angle_old_test(p[idx + 1], p.points[idx], p.points[idx + 2]) == angle_ccw(p.points[idx + 2] - p[idx + 1], p.points[idx] - p[idx + 1]));
+        double angle2 = angle_ccw(p.points[idx + 2] - p[idx + 1], p.points[idx] - p[idx + 1]);
         bool angle2_concave = true;
         if (angle2 > PI) {
             angle2 = 2 * PI - angle2;
@@ -1065,7 +1076,6 @@ void PrintObject::slice_volumes()
 
                         float max_growth = std::max(hole_delta, std::max(inner_delta, outter_delta));
                         float min_growth = std::min(hole_delta, std::min(inner_delta, outter_delta));
-                        bool clip = m_config.clip_multipart_objects.value;
                         ExPolygons merged_poly_for_holes_growing;
                         if (max_growth > 0) {
                             //merge polygons because region can cut "holes".
@@ -1078,8 +1088,8 @@ void PrintObject::slice_volumes()
                             LayerRegion* layerm = layer->regions()[region_id];
                             has_curve_smoothing = layerm->region().config().curve_smoothing_precision > 0.f;
                         }
-                        //note: ps has removed that step...
-                        if (clip || max_growth > 0 || has_curve_smoothing) {
+                        //note: ps has removed that step... (because no more clips?)
+                        if (max_growth > 0 || has_curve_smoothing) {
                             // Multiple regions, growing or just clipping one region by the other.
                             // When clipping the regions, priority is given to the first regions.
                             Polygons processed;
@@ -1095,12 +1105,6 @@ void PrintObject::slice_volumes()
                                 //smoothing
                                 if (layerm->region().config().curve_smoothing_precision > 0.f)
                                     slices = _smooth_curves(slices, layerm->region().config());
-                                // Trim by the slices of already processed regions.
-                                if (region_id > 0 && clip)
-                                    slices = diff_ex(to_polygons(std::move(slices)), processed);
-                                if (clip && (region_id + 1 < layer->regions().size()))
-                                    // Collect the already processed regions to trim the to be processed regions.
-                                    polygons_append(processed, slices);
                                 layerm->m_slices.set(std::move(slices), stPosInternal | stDensSparse);
                             }
                         }

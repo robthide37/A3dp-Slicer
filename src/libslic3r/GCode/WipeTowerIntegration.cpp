@@ -131,7 +131,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
         path.reserve(tcr.wipe_path.size());
         std::transform(tcr.wipe_path.begin(), tcr.wipe_path.end(), std::back_inserter(path),
             [&gcodegen, &transform_wt_pt](const Vec2f &wipe_pt) { 
-                return Geometry::ArcWelder::Segment{ wipe_tower_point_to_object_point(gcodegen, transform_wt_pt(wipe_pt)) };
+                return Geometry::ArcWelder::Segment(wipe_tower_point_to_object_point(gcodegen, transform_wt_pt(wipe_pt)), 0, Geometry::ArcWelder::Orientation::CCW);
             });
         // Pass to the wipe cache.
         gcodegen.m_wipe.set_path(std::move(path));

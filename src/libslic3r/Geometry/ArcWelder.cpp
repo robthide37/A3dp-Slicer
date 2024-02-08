@@ -530,7 +530,7 @@ Path fit_path(const Points &src_in, double tolerance, double fit_circle_percent_
         // Perform simplification & fitting.
         // Index of the start of a last polyline, which has not yet been decimated.
         int begin_pl_idx = 0;
-        out.push_back({ src.front(), 0.f });
+        out.push_back(Segment(src.front()));
         for (auto it = std::next(src.begin()); it != src.end();) {
             // Minimum 2 additional points required for circle fitting.
             auto begin = std::prev(it);

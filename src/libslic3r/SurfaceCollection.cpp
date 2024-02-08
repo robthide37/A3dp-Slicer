@@ -53,7 +53,7 @@ SurfacesConstPtr SurfaceCollection::filter_by_type(const SurfaceType type) const
     SurfacesConstPtr ss;
     for (const Surface & surface : this->surfaces) {
         if (surface.surface_type == type)
-            s.push_back(&surface);
+            ss.push_back(&surface);
     }
     return ss;
 }
@@ -80,7 +80,7 @@ void SurfaceCollection::filter_by_type(const SurfaceType type, Polygons *polygon
 {
     for (const Surface & surface : this->surfaces) {
         if (surface.surface_type == type) {
-            Polygons pp = surface.expolygon;
+            Polygons pp = to_polygons(surface.expolygon);
             polygons->insert(polygons->end(), pp.begin(), pp.end());
         }
     }
@@ -90,7 +90,7 @@ SurfaceCollection::filter_by_type_flag(Polygons* polygons, const SurfaceType fla
 {
     for (const Surface & surface : this->surfaces) {
         if ((surface.surface_type & flags_needed) == flags_needed && (surface.surface_type & flags_not_allowed)==0) {
-            Polygons pp = surface.expolygon;
+            Polygons pp = to_polygons(surface.expolygon);
             polygons->insert(polygons->end(), pp.begin(), pp.end());
         }
     }

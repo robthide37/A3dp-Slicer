@@ -1083,17 +1083,18 @@ ExtrusionEntityReferences chain_extrusion_references(const std::vector<Extrusion
 
 ExtrusionEntityReferences chain_extrusion_references(const ExtrusionEntityCollection &eec, const Point *start_near, const bool reversed)
 {
-	if (eec.no_sort) {
+	if (!eec.can_sort()) {
 		ExtrusionEntityReferences out;
-		out.reserve(eec.entities.size());
-	    for (const ExtrusionEntity *ee : eec.entities) {
+		out.reserve(eec.entities().size());
+	    for (const ExtrusionEntity *ee : eec.entities()) {
 			assert(ee != nullptr);
 			// Never reverse a loop.
-	        out.push_back({ *ee, ! ee->is_loop() && reversed });
+			assert(!ee->is_loop() || !ee->can_reverse());
+	        out.push_back({ *ee, ee->can_reverse() && reversed });
 	    }
 		return out;
 	} else
-		return chain_extrusion_references(eec.entities, start_near, reversed);
+		return chain_extrusion_references(eec.entities(), start_near, reversed);
 }
 
 std::vector<std::pair<size_t, bool>> chain_extrusion_paths(std::vector<ExtrusionPath> &extrusion_paths, const Point *start_near)

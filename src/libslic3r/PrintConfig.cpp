@@ -227,12 +227,12 @@ static const t_config_enum_values s_keys_map_SupportMaterialStyle {
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialStyle)
 
 //unused
-static const t_config_enum_values s_keys_map_SupportMaterialInterfacePattern {
-    { "auto",           smipAuto },
-    { "rectilinear",    smipRectilinear },
-    { "concentric",     smipConcentric }
-};
-CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialInterfacePattern)
+//static const t_config_enum_values s_keys_map_SupportMaterialInterfacePattern {
+//    { "auto",           smipAuto },
+//    { "rectilinear",    smipRectilinear },
+//    { "concentric",     smipConcentric }
+//};
+//CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialInterfacePattern)
 
 static const t_config_enum_values s_keys_map_SeamPosition {
         {"random",    spRandom},
@@ -633,7 +633,7 @@ void PrintConfigDef::init_fff_params()
                      "G-code resolution will be used as the fitting tolerance.");
     def->set_enum<ArcFittingType>({
         { "disabled",       "Disabled" },
-        { "emit_center",    "Enabled: G2/3 I J (ArcWelder)" }
+        { "emit_center",    "Enabled: G2/3 I J (ArcWelder)" },
         { "bambu",       "Enabled: G2/3 I J (Bambu)" },
     });
     def->mode = comAdvancedE | comPrusa;
@@ -932,7 +932,7 @@ void PrintConfigDef::init_fff_params()
 
     def             = this->add("enable_dynamic_overhang_speeds", coBool);
     def->label      = L("Enable dynamic overhang speeds");
-    def->category   = OptionCategory:speed;
+    def->category   = OptionCategory::speed;
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->mode       = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
@@ -945,7 +945,7 @@ void PrintConfigDef::init_fff_params()
 
     def             = this->add("overhang_speed_0", coFloatOrPercent);
     def->label      = L("speed for 0% overlap (bridge)");
-    def->category   = OptionCategory:speed;
+    def->category   = OptionCategory::speed;
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
@@ -954,7 +954,7 @@ void PrintConfigDef::init_fff_params()
 
     def             = this->add("overhang_speed_1", coFloatOrPercent);
     def->label      = L("speed for 25% overlap");
-    def->category   = OptionCategory:speed;
+    def->category   = OptionCategory::speed;
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
@@ -963,7 +963,7 @@ void PrintConfigDef::init_fff_params()
 
     def             = this->add("overhang_speed_2", coFloatOrPercent);
     def->label      = L("speed for 50% overlap");
-    def->category   = OptionCategory:speed;
+    def->category   = OptionCategory::speed;
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
@@ -972,7 +972,7 @@ void PrintConfigDef::init_fff_params()
 
     def             = this->add("overhang_speed_3", coFloatOrPercent);
     def->label      = L("speed for 75% overlap");
-    def->category   = OptionCategory:speed;
+    def->category   = OptionCategory::speed;
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
@@ -1452,6 +1452,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Fill pattern for top infill. This only affects the top visible layer, and not its adjacent solid shells."
         "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
     def->cli = "top-fill-pattern|external-fill-pattern=s";
+    def->aliases = { "external_fill_pattern" };
     def->set_enum<InfillPattern>({
         { "rectilinear",        L("Rectilinear") },
         { "monotonic",          L("Monotonic") },
@@ -1466,9 +1467,6 @@ void PrintConfigDef::init_fff_params()
         { "sawtooth",     L("Sawtooth") },
         { "smooth",     L("Ironing") },
     });
-
-    def->enum_labels.push_back(L("Sawtooth"));
-    def->enum_labels.push_back(L("Ironing"));
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipMonotonic));
 
@@ -1479,7 +1477,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Fill pattern for bottom infill. This only affects the bottom visible layer, and not its adjacent solid shells."
         "\nIf you want an 'aligned' pattern, set 90° to the fill angle increment setting.");
     def->cli = "bottom-fill-pattern|external-fill-pattern=s";
-    def->aliases = def_top_fill_pattern->aliases;
+    def->aliases = { "external_fill_pattern" };
     def->set_enum<InfillPattern>({
         { "rectilinear",        L("Rectilinear") },
         { "monotonic",          L("Monotonic") },
@@ -1738,10 +1736,11 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("extra_perimeters_on_overhangs", coBool);
     def->label = L("Extra perimeters on overhangs (Experimental)");
-    def->category = L("Layers and Perimeters");
+    def->category = OptionCategory::perimeter;
     def->tooltip = L("Detect overhang areas where bridges cannot be anchored, and fill them with "
-                    "extra perimeter paths. These paths are anchored to the nearby non-overhang area when possible.
+                    "extra perimeter paths. These paths are anchored to the nearby non-overhang area when possible."
                     "\nIf you use this setting, strongly consider also using overhangs_reverse.");
+    def->aliases = {"extra_perimeters_overhangs"};
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -2691,7 +2690,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("fuzzy_skin", coEnum);
     def->label = L("Fuzzy Skin");
-    def->category = L("Fuzzy Skin");
+    def->category = OptionCategory::fuzzy_skin;
     def->tooltip = L("Fuzzy skin type.");
     def->set_enum<FuzzySkinType>({
         { "none",       L("None") },
@@ -2917,7 +2916,7 @@ void PrintConfigDef::init_fff_params()
     def->set_enum<LabelObjectsStyle>({
         { "disabled",   L("Disabled") },
         { "octoprint",  L("OctoPrint comments") },
-        { "firmware",   L("Firmware-specific") }
+        { "firmware",   L("Firmware-specific") },
         { "both",       L("Print both") }
         });
     def->aliases = { "label_printed_objects" };
@@ -3507,7 +3506,7 @@ void PrintConfigDef::init_fff_params()
     def->set_enum<MachineLimitsUsage>({
         { "emit_to_gcode",      L("Also emit limits to G-code") },
         { "time_estimate_only", L("Use also for time estimate") },
-        { "limits",             L("Use only as safeguards") }
+        { "limits",             L("Use only as safeguards") },
         { "ignore",             L("Disable") }
     });
     def->mode = comAdvancedE | comPrusa;
@@ -3872,10 +3871,9 @@ void PrintConfigDef::init_fff_params()
         { "repetier",       "Repetier" },
         { "klipper",        "Klipper" },
         { "mpmdv2",         "MPMDv2" },
-        { "mks",            "MKS" }
+        { "mks",            "MKS" },
         { "monoprice",      "Monoprice lcd" },
     });
-    def->enum_labels.push_back("Monoprice lcd");
     def->mode = comAdvancedE | comPrusa;
     def->cli = ConfigOptionDef::nocli;
     def->set_default_value(new ConfigOptionEnum<PrintHostType>(htPrusaLink));
@@ -4031,7 +4029,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Overhang reversal");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Extrude perimeters that have a part over an overhang in the reverse direction on odd layers. This alternating pattern can drastically improve steep overhang."
-        "\n!! this is a very slow algorithm (it uses the same results as extra_perimeters_overhangs) !!");
+        "\n!! this is a very slow algorithm !!");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -5384,7 +5382,6 @@ void PrintConfigDef::init_fff_params()
         { "0.2",    "0.2" },
         { "50%",    "50%" },
     });
-    def->enum_labels.push_back("50%");
     def->min = 0;
     def->max_literal = { 20, true };
     def->mode = comAdvancedE | comPrusa;
@@ -5594,29 +5591,13 @@ void PrintConfigDef::init_fff_params()
     def->set_enum<InfillPattern>({
         { "auto",              L("Default") },
         { "rectilinear",       L("Rectilinear") },
-        { "monotonic",         L("Monotonic") }
+        { "monotonic",         L("Monotonic") },
         { "concentric",        L("Concentric") },
         { "sawtooth",          L("Sawtooth") },
         { "hilbertcurve",      L("Hilbert Curve") },
         { "concentricgapfill", L("Concentric (filled)") },
         { "smooth",            L("Ironing") },
     });
-    def->enum_values.push_back("auto");
-    def->enum_values.push_back("rectilinear");
-    def->enum_values.push_back("monotonic");
-    def->enum_values.push_back("concentric");
-    def->enum_values.push_back("sawtooth");
-    def->enum_values.push_back("hilbertcurve");
-    def->enum_values.push_back("concentricgapfill");
-    def->enum_values.push_back("smooth");
-    def->enum_labels.push_back(L("Default"));
-    def->enum_labels.push_back(L("Rectilinear"));
-    def->enum_labels.push_back(L("Monotonic"));
-    def->enum_labels.push_back(L("Concentric"));
-    def->enum_labels.push_back(L("Sawtooth"));
-    def->enum_labels.push_back(L("Hilbert Curve"));
-    def->enum_labels.push_back(L("Concentric (filled)"));
-    def->enum_labels.push_back(L("Ironing"));
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinear));
 
@@ -5703,7 +5684,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("support_tree_angle", coFloat);
     def->label = L("Maximum Branch Angle");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Maximum Branch Angle"
     def->tooltip = L("The maximum angle of the branches, when the branches have to avoid the model. "
                      "Use a lower angle to make them more vertical and more stable. Use a higher angle to be able to have more reach.");
@@ -5715,7 +5696,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("support_tree_angle_slow", coFloat);
     def->label = L("Preferred Branch Angle");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Preferred Branch Angle"
     def->tooltip = L("The preferred angle of the branches, when they do not have to avoid the model. "
                      "Use a lower angle to make them more vertical and more stable. Use a higher angle for branches to merge faster.");
@@ -5727,7 +5708,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("support_tree_tip_diameter", coFloat);
     def->label = L("Tip Diameter");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Tip Diameter"
     def->tooltip = L("Branch tip diameter for organic supports.");
     def->sidetext = L("mm");
@@ -5738,7 +5719,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("support_tree_branch_diameter", coFloat);
     def->label = L("Branch Diameter");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Branch Diameter"
     def->tooltip = L("The diameter of the thinnest branches of organic support. Thicker branches are more sturdy. "
                      "Branches towards the base will be thicker than this.");
@@ -5751,7 +5732,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_tree_branch_diameter_angle", coFloat);
     // TRN PrintSettings: #lmFIXME 
     def->label = L("Branch Diameter Angle");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Branch Diameter Angle"
     def->tooltip = L("The angle of the branches' diameter as they gradually become thicker towards the bottom. "
                      "An angle of 0 will cause the branches to have uniform thickness over their length. "
@@ -5764,7 +5745,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("support_tree_branch_diameter_double_wall", coFloat);
     def->label = L("Branch Diameter with double walls");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Branch Diameter"
     def->tooltip = L("Branches with area larger than the area of a circle of this diameter will be printed with double walls for stability. "
                      "Set this value to zero for no double walls.");
@@ -5780,7 +5761,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_tree_branch_distance", coFloat);
     // TRN PrintSettings: #lmFIXME 
     def->label = L("Branch Distance");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Branch Distance"
     def->tooltip = L("How far apart the branches need to be when they touch the model. "
                      "Making this distance small will cause the tree support to touch the model at more points, "
@@ -5790,7 +5771,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("support_tree_top_rate", coPercent);
     def->label = L("Branch Density");
-    def->category = L("Support material");
+    def->category = OptionCategory::support;
     // TRN PrintSettings: "Organic supports" > "Branch Density"
     def->tooltip = L("Adjusts the density of the support structure used to generate the tips of the branches. "
                      "A higher value results in better overhangs but the supports are harder to remove, "
@@ -5798,7 +5779,7 @@ void PrintConfigDef::init_fff_params()
                      "if dense interfaces are needed.");
     def->sidetext = L("%");
     def->min = 5;
-    def->max_literal = 35;
+    def->max_literal = {35, false};
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionPercent(15));
 
@@ -6425,7 +6406,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("wipe_tower_extruder", coInt);
     def->label = L("Wipe tower extruder");
-    def->category = L("Extruders");
+    def->category = OptionCategory::extruders;
     def->tooltip = L("The extruder to use when printing perimeter of the wipe tower. "
                      "Set to 0 to use the one that is available (non-soluble would be preferred).");
     def->min = 0;
@@ -6434,7 +6415,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("solid_infill_every_layers", coInt);
     def->label = L("Solid infill every");
-    def->category = L("Infill");
+    def->category = OptionCategory::infill;
     def->tooltip = L("This feature allows to force a solid layer every given number of layers. "
                    "Zero to disable. You can set this to any value (for example 9999); "
                    "Slic3r will automatically choose the maximum possible number of layers "
@@ -6777,16 +6758,19 @@ void PrintConfigDef::init_milling_params()
     def->category = OptionCategory::general;
     def->tooltip = L("The milling cutter to use (unless more specific extruder settings are specified). ");
     def->min = 0;  // 0 = inherit defaults
-    def->enum_labels.push_back("default");  // override label for item 0
-    def->enum_labels.push_back("1");
-    def->enum_labels.push_back("2");
-    def->enum_labels.push_back("3");
-    def->enum_labels.push_back("4");
-    def->enum_labels.push_back("5");
-    def->enum_labels.push_back("6");
-    def->enum_labels.push_back("7");
-    def->enum_labels.push_back("8");
-    def->enum_labels.push_back("9");
+    def->set_enum_values(ConfigOptionDef::GUIType::f_enum_open, {
+    //TRN Print Settings: "Bottom contact Z distance". Have to be as short as possible
+        { "default",      L("Default") },
+        { "1",    "1" },
+        { "2",    "2" },
+        { "3",    "3" },
+        { "4",    "4" },
+        { "5",    "5" },
+        { "6",    "6" },
+        { "7",    "7" },
+        { "8",    "8" },
+        { "9",    "9" },
+    });
 
     def = this->add("milling_diameter", coFloats);
     def->label = L("Milling diameter");
@@ -6899,7 +6883,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_head_front_diameter", coFloat);
     def->label = L("Pinhead front diameter");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("Diameter of the pointing side of the head");
     def->sidetext = L("mm");
     def->min = 0;
@@ -6908,7 +6892,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_head_penetration", coFloat);
     def->label = L("Head penetration");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("How much the pinhead has to penetrate the model surface");
     def->sidetext = L("mm");
     def->mode = comAdvanced;
@@ -6917,7 +6901,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_head_width", coFloat);
     def->label = L("Pinhead width");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("Width from the back sphere center to the front sphere center");
     def->sidetext = L("mm");
     def->min = 0;
@@ -6927,7 +6911,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_pillar_diameter", coFloat);
     def->label = L("Pillar diameter");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("Diameter in mm of the support pillars");
     def->sidetext = L("mm");
     def->min = 0;
@@ -6937,7 +6921,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_small_pillar_diameter_percent", coPercent);
     def->label = L("Small pillar diameter percent");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("The percentage of smaller pillars compared to the normal pillar diameter "
                       "which are used in problematic areas where a normal pilla cannot fit.");
     def->sidetext = L("%");
@@ -6958,7 +6942,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_max_weight_on_model", coFloat);
     def->label = L("Max weight on model");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip  = L(
         "Maximum weight of sub-trees that terminate on the model instead of the print bed. The weight is the sum of the lenghts of all "
         "branches emanating from the endpoint.");
@@ -6981,14 +6965,14 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_buildplate_only", coBool);
     def->label = L("Support on build plate only");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("Only create support if it lies on a build plate. Don't create support on a print.");
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add(prefix + "support_pillar_widening_factor", coFloat);
     def->label = L("Pillar widening factor");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
 
     def->tooltip  = 
         L("Merging bridges or pillars into another pillars can "
@@ -7003,7 +6987,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_base_diameter", coFloat);
     def->label = L("Support base diameter");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("Diameter in mm of the pillar base");
     def->sidetext = L("mm");
     def->min = 0;
@@ -7013,7 +6997,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_base_height", coFloat);
     def->label = L("Support base height");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("The height of the pillar base cone");
     def->sidetext = L("mm");
     def->min = 0;
@@ -7022,7 +7006,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_base_safety_distance", coFloat);
     def->label = L("Support base safety distance");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip  = L(
         "The minimum distance of the pillar base from the model in mm. "
         "Makes sense in zero elevation mode where a gap according "
@@ -7035,7 +7019,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_critical_angle", coFloat);
     def->label = L("Critical angle");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("The default angle for connecting support sticks and junctions.");
     def->sidetext = L("°");
                     def->min = 0;
@@ -7045,7 +7029,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_max_bridge_length", coFloat);
     def->label = L("Max bridge length");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("The max length of a bridge");
     def->sidetext = L("mm");
     def->min = 0;
@@ -7059,7 +7043,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_max_pillar_link_distance", coFloat);
     def->label = L("Max pillar linking distance");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("The max distance of two pillars to get linked with each other."
                                " A zero value will prohibit pillar cascading.");
     def->sidetext = L("mm");
@@ -7069,7 +7053,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def = this->add(prefix + "support_object_elevation", coFloat);
     def->label = L("Object elevation");
-    def->category = L("Supports");
+    def->category = OptionCategory::support;
     def->tooltip = L("How much the supports should lift up the supported object. "
                       "If \"Pad around object\" is enabled, this value is ignored.");
     def->sidetext = L("mm");
@@ -7938,36 +7922,35 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 // Don't convert single options here, implement such conversion in PrintConfigDef::handle_legacy() instead.
 void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
 {
-FIXME
-    if (config.has("thumbnails")) {
-        std::string extention;
-        if (config.has("thumbnails_format")) {
-            if (const ConfigOptionDef* opt = config.def()->get("thumbnails_format")) {
-                auto label = opt->enum_def->enum_to_label(config.option("thumbnails_format")->getInt());
-                if (label.has_value())
-                    extention = *label;
-            }
-        }
+    //if (config.has("thumbnails")) {
+    //    std::string extention;
+    //    if (config.has("thumbnails_format")) {
+    //        if (const ConfigOptionDef* opt = config.def()->get("thumbnails_format")) {
+    //            auto label = opt->enum_def->enum_to_label(config.option("thumbnails_format")->getInt());
+    //            if (label.has_value())
+    //                extention = *label;
+    //        }
+    //    }
 
-        std::string thumbnails_str = config.opt_string("thumbnails");
-        auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(thumbnails_str, extention);
+    //    std::string thumbnails_str = config.opt_string("thumbnails");
+    //    auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(thumbnails_str, extention);
 
-        if (errors != enum_bitmask<ThumbnailError>()) {
-            std::string error_str = "\n" + format("Invalid value provided for parameter %1%: %2%", "thumbnails", thumbnails_str);
-            error_str += GCodeThumbnails::get_error_string(errors);
-            throw BadOptionValueException(error_str);
-        }
+    //    if (errors != enum_bitmask<ThumbnailError>()) {
+    //        std::string error_str = "\n" + format("Invalid value provided for parameter %1%: %2%", "thumbnails", thumbnails_str);
+    //        error_str += GCodeThumbnails::get_error_string(errors);
+    //        throw BadOptionValueException(error_str);
+    //    }
 
-        if (!thumbnails_list.empty()) {
-            const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
-            thumbnails_str.clear();
-            for (const auto& [ext, size] : thumbnails_list)
-                thumbnails_str += format("%1%x%2%/%3%, ", size.x(), size.y(), extentions[int(ext)]);
-            thumbnails_str.resize(thumbnails_str.length() - 2);
+    //    if (!thumbnails_list.empty()) {
+    //        const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
+    //        thumbnails_str.clear();
+    //        for (const auto& [ext, size] : thumbnails_list)
+    //            thumbnails_str += format("%1%x%2%/%3%, ", size.x(), size.y(), extentions[int(ext)]);
+    //        thumbnails_str.resize(thumbnails_str.length() - 2);
 
-            config.set_key_value("thumbnails", new ConfigOptionString(thumbnails_str));
-        }
-    }
+    //        config.set_key_value("thumbnails", new ConfigOptionString(thumbnails_str));
+    //    }
+    //}
 }
 
 // this is for extra things to add / modify from prusa that can't be handled otherwise.
@@ -8034,6 +8017,18 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
     if ("fill_pattern" == opt_key && "alignedrectilinear" == value) {
         value = "rectilinear";
         output["fill_angle_increment"] = "90";
+    }
+    if ("thumbnails" == opt_key && value.find('/') != std::string::npos) {
+        // new (string from 2.7) .x./. , not old (Points before) type .x.
+        auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list_from_prusa(value);
+        ConfigOptionPoints pts;
+        ConfigOptionEnum<GCodeThumbnailsFormat> opt_format;
+        opt_format.value = thumbnails_list.empty() ? GCodeThumbnailsFormat::PNG : thumbnails_list.front().first;
+        for (auto [format, pt] : thumbnails_list) {
+            pts.values.push_back(pt);
+        }
+        value = pts.serialize();
+        output["thumbnails_format"] = opt_format.serialize();
     }
 
     return output;
@@ -8119,7 +8114,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "external_perimeters_nothole",
 "external_perimeters_vase",
 "extra_perimeters_odd_layers",
-"extra_perimeters_overhangs",
 "extruder_fan_offset",
 "extruder_temperature_offset",
 "extrusion_spacing",
@@ -8650,7 +8644,7 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionBool>("ensure_vertical_shell_thickness", true)->value = false;
             this->opt<ConfigOptionBool>("infill_dense", true)->value = false;
             this->opt<ConfigOptionBool>("extra_perimeters", true)->value = false;
-            this->opt<ConfigOptionBool>("extra_perimeters_overhangs", true)->value = false;
+            this->opt<ConfigOptionBool>("extra_perimeters_on_overhangs", true)->value = false;
             this->opt<ConfigOptionBool>("extra_perimeters_odd_layers", true)->value = false;
             this->opt<ConfigOptionBool>("overhangs_reverse", true)->value = false; 
         }
@@ -9258,7 +9252,7 @@ std::string validate(const FullPrintConfig& cfg)
             return "Spiral vase mode is not compatible with support material";
         if (cfg.infill_dense)
             return "Spiral vase mode can only print hollow objects and have no top surface, so you don't need any dense infill";
-        if (cfg.extra_perimeters || cfg.extra_perimeters_overhangs || cfg.extra_perimeters_odd_layers)
+        if (cfg.extra_perimeters || cfg.extra_perimeters_on_overhangs || cfg.extra_perimeters_odd_layers)
             return "Can't make more than one perimeter when spiral vase mode is enabled";
         if (cfg.overhangs_reverse)
             return "Can't reverse the direction of the perimeter every layer when spiral vase mode is enabled";
@@ -9331,6 +9325,7 @@ std::string validate(const FullPrintConfig& cfg)
                     out_of_range = true;
                     break;
                 }
+            }
             break;
         }
         case coInt:
@@ -9377,7 +9372,7 @@ std::string validate(const FullPrintConfig& cfg)
         return ret; \
     }
 PRINT_CONFIG_CACHE_INITIALIZE((
-    PrintObjectConfig, PrintRegionConfig, MachineEnvelopeConfig, GCodeConfig, PrintConfig, FullPrintConfig,
+    PrintObjectConfig, PrintRegionConfig, MachineEnvelopeConfig, GCodeConfig, PrintConfig, FullPrintConfig, 
     SLAMaterialConfig, SLAPrintConfig, SLAPrintObjectConfig, SLAPrinterConfig, SLAFullPrintConfig))
 static int print_config_static_initialized = print_config_static_initializer();
 
@@ -9395,7 +9390,6 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def = this->add("export_svg", coBool);
     def->label = L("Export SVG");
     def->tooltip = L("Slice the model and export solid slices as SVG.");
-    def->set_default_value(new ConfigOptionBool(false);
     def->set_default_value(new ConfigOptionBool(false));
 */
 
@@ -9498,19 +9492,16 @@ CLITransformConfigDef::CLITransformConfigDef()
     def = this->add("cut_grid", coFloat);
     def->label = L("Cut");
     def->tooltip = L("Cut model in the XY plane into tiles of the specified max size.");
-    def->set_default_value(new ConfigOptionPoint();
     def->set_default_value(new ConfigOptionPoint());
 
     def = this->add("cut_x", coFloat);
     def->label = L("Cut");
     def->tooltip = L("Cut model at the given X.");
-    def->set_default_value(new ConfigOptionFloat(0);
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("cut_y", coFloat);
     def->label = L("Cut");
     def->tooltip = L("Cut model at the given Y.");
-    def->set_default_value(new ConfigOptionFloat(0);
     def->set_default_value(new ConfigOptionFloat(0));
 */
 

@@ -36,6 +36,8 @@ enum class ExtrusionRoleModifier : uint16_t {
     // Indicator that the extrusion role was mixed from multiple differing extrusion roles,
     // for example from Support and SupportInterface.
     Mixed,
+    //Travel
+    Travel,
     // Stopper, there should be maximum 16 modifiers defined for uint16_t bit mask.
     Count
 };
@@ -89,6 +91,8 @@ struct ExtrusionRole : public ExtrusionRoleModifiers
     static constexpr const ExtrusionRoleModifiers Milling{ExtrusionRoleModifier::Mill};
     // Extrusion role for a collection with multiple extrusion roles.
     static constexpr const ExtrusionRoleModifiers Mixed{ExtrusionRoleModifier::Mixed};
+    // Travel
+    static constexpr const ExtrusionRoleModifiers Travel{ExtrusionRoleModifier::Travel};
 
     bool is_perimeter() const { return this->ExtrusionRoleModifiers::has(ExtrusionRoleModifier::Perimeter); }
     bool is_external_perimeter() const { return this->is_perimeter() && this->is_external(); }
@@ -125,7 +129,7 @@ enum ExtrusionLoopRole : uint16_t {
 // Be careful when editing this list, you also have to add values to other lists like
 // GCodeViewer::Extrusion_Role_Colors ; for that, search occurences of GCodeExtrusionRole::Custom
 enum class GCodeExtrusionRole : uint8_t {
-    None,
+    None = 0,
     Perimeter,
     ExternalPerimeter,
     OverhangPerimeter,
@@ -160,5 +164,18 @@ GCodeExtrusionRole string_to_gcode_extrusion_role(const std::string_view role);
 inline std::string er_to_string(ExtrusionRole role) { return gcode_extrusion_role_to_string(extrusion_role_to_gcode_extrusion_role(role)); }
 
 } // namespace Slic3r
+
+//for unordered_set/map
+namespace std {
+template<> struct hash<Slic3r::ExtrusionRole>
+{
+    typedef Slic3r::ExtrusionRole argument_type;
+    typedef uint16_t              result_type;
+
+    result_type operator()(const argument_type &t) const {
+        return *t;
+    }
+};
+} // namespace std
 
 #endif // slic3r_ExtrusionRole_hpp_

@@ -472,7 +472,7 @@ const std::string& PresetBundle::get_preset_name_by_alias( const Preset::Type& p
     if (preset_type == Preset::TYPE_PRINTER || preset_type == Preset::TYPE_INVALID)
         return alias;
 
-    if (preset_type == Preset::TYPE_FILAMENT)
+    if (preset_type == Preset::TYPE_FFF_FILAMENT)
         return extruders_filaments[extruder_id].get_preset_name_by_alias(alias);
 
     const PresetCollection& presets = get_presets(preset_type);
@@ -494,10 +494,10 @@ void PresetBundle::save_changes_for_preset(const std::string& new_name, Preset::
     if (type == Preset::TYPE_PRINTER)
         copy_bed_model_and_texture_if_needed(presets.get_edited_preset().config);
 
-    if (type == Preset::TYPE_FILAMENT)
+    if (type == Preset::TYPE_FFF_FILAMENT)
         cache_extruder_filaments_names();
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
-    if (presets.save_current_preset(new_name) && type == Preset::TYPE_FILAMENT)
+    if (presets.save_current_preset(new_name) && type == Preset::TYPE_FFF_FILAMENT)
         reset_extruder_filaments();
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.

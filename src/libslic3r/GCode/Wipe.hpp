@@ -28,7 +28,7 @@ public:
     void            init(const PrintConfig &config, const GCodeWriter &writer, const std::vector<uint16_t> &extruders);
     void            enable(double wipe_len_max) { m_enabled = true; m_wipe_len_max = wipe_len_max; }
     void            disable() { m_enabled = false; }
-    bool            enabled() const { return m_enabled; }
+    bool            is_enabled() const { return m_enabled; }
 
     const Path&     path() const { return m_path; }
     bool            has_path() const { assert(m_path.empty() || m_path.size() > 1); return ! m_path.empty(); }
@@ -36,13 +36,13 @@ public:
     void            set_path(const Path &path) {
         assert(path.empty() || path.size() > 1);
         this->reset_path(); 
-        if (this->enabled() && path.size() > 1) 
+        if (this->is_enabled() && path.size() > 1) 
             m_path = path;
     }
     void            set_path(Path &&path) {
         assert(path.empty() || path.size() > 1);
         this->reset_path(); 
-        if (this->enabled() && path.size() > 1)
+        if (this->is_enabled() && path.size() > 1)
             m_path = std::move(path);
     }
     void            set_path(const ExtrusionPaths &paths, bool reversed);

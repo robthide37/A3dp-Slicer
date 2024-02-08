@@ -578,8 +578,9 @@ bool not_arc(const ArcPolyline& arcs)
 
 void ArcPolyline::append(const Points &src)
 {
-    for (const Point &point : src) 
-        m_path.emplace_back(point, 0, Geometry::ArcWelder::Orientation::Unknown);
+    for (const Point &point : src)
+        m_path.emplace_back(point, 0.f, Geometry::ArcWelder::Orientation::Unknown);
+        //m_path.push_back(Geometry::ArcWelder::Segment(point, 0.f, Geometry::ArcWelder::Orientation::Unknown));
 }
 void ArcPolyline::append(Points &&src)
 {
@@ -717,6 +718,7 @@ std::pair<int, Point> ArcPolyline::foot_pt(const Point &pt) const
 
 void ArcPolyline::pop_front()
 {
+    assert(m_only_strait);
     assert(m_path.size() > 2);
     m_path.erase(m_path.begin());
     if (!m_path.empty())
@@ -727,6 +729,8 @@ void ArcPolyline::pop_front()
 
 void ArcPolyline::pop_back()
 {
+    assert(m_only_strait);
+    assert(m_path.size() > 2);
     m_path.pop_back();
     if (!m_only_strait)
         m_only_strait = not_arc(*this);
@@ -818,6 +822,7 @@ void ArcPolyline::split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const
         p1.clear();
         p1.append(point);
         p2 = *this;
+        return;
     }
 
     // 0 judge whether the point is on the polyline
@@ -851,25 +856,22 @@ void ArcPolyline::split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const
 
 bool ArcPolyline::split_at_index(const size_t index, ArcPolyline &p1, ArcPolyline &p2) const
 {
+    assert(m_only_strait);
     if (index >= this->size())
         return false;
 
     if (index == 0) {
-        p1.clear();
         p1.append(this->front());
         p2 = *this;
     } else if (index == this->size() - 1) {
-        p2.clear();
-        p2.append(this->back());
-        p2.m_path.front().radius = 0; // first point can't be an arc
+        p2.m_path.insert(p2.m_path.begin(), Geometry::ArcWelder::Segment{this->back(), 0.f, Geometry::ArcWelder::Orientation::Unknown});
         p1 = *this;
     } else {
-        p1.clear();
-        p1.m_path.reserve(index + 1);
-        p1.m_path.insert(p1.m_path.begin(), this->m_path.begin(), this->m_path.begin() + index + 1);
+        p1.m_path.reserve(p1.m_path.size() + index + 1);
+        p1.m_path.insert(p1.m_path.end(), this->m_path.begin(), this->m_path.begin() + index + 1);
         p1.m_only_strait = not_arc(p1);
-        p2.clear();
-        p2.m_path.reserve(this->size() - index);
+
+        p2.m_path.reserve(p2.m_path.size() + this->size() - index);
         p2.m_path.insert(p2.m_path.begin(), this->m_path.begin() + index, this->m_path.end());
         p2.m_path.front().radius = 0; // first point can't be an arc
         p2.m_only_strait         = not_arc(p2);
@@ -948,12 +950,17 @@ Point ArcPolyline::get_point_from_end(coord_t distance) const {
     return m_path.front().point;
 }
 
-
-void ArcPolyline::set_front(Point &p) {
+void ArcPolyline::set_front(const Point &p) {
     assert(!m_path.empty());
     m_path.front().point = p;
     if(m_path.size()>1)
         m_path[1].radius = 0.f;
+}
+
+void ArcPolyline::set_back(const Point &p) {
+    assert(!m_path.empty());
+    m_path.back().point = p;
+    m_path.back().radius = 0.f;
 }
 
 Polyline ArcPolyline::to_polyline(coord_t deviation/*=0*/) const {
@@ -1251,6 +1258,7 @@ void PolylineOrArc::split_at(Point& point, PolylineOrArc* p1, PolylineOrArc* p2)
     if (this->points.front() == point) {
         *p1 = PolylineOrArc{ point };
         *p2 = *this;
+        return;
     }
 
     //0 judge whether the point is on the polyline

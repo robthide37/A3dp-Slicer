@@ -442,7 +442,7 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
         is_visible = app_config.get_variant(vendor->id, model, variant);
     } else if (type == TYPE_FFF_FILAMENT || type == TYPE_SLA_MATERIAL) {
     	const std::string &section_name = (type == TYPE_FFF_FILAMENT) ? AppConfig::SECTION_FILAMENTS : AppConfig::SECTION_MATERIALS;
-        if (type == TYPE_FILAMENT && app_config.get_bool("no_templates") && vendor && vendor->templates_profile)
+        if (type == TYPE_FFF_FILAMENT && app_config.get_bool("no_templates") && vendor && vendor->templates_profile)
             is_visible = false;
     	else if (app_config.has_section(section_name)) {
     		// Check whether this profile is marked as "installed" in PrusaSlicer.ini,
@@ -1713,19 +1713,20 @@ void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& 
 }
 
 // list of options with vector variable, which is independent from number of extruders
-static const std::set<std::string> independent_from_extruder_number_options = {
-    "bed_shape",
-    "compatible_printers",
-    "compatible_prints",
-    "filament_ramming_parameters",
-    "gcode_substitutions",
-    "post_process",
-};
-
-bool PresetCollection::is_independent_from_extruder_number_option(const std::string& opt_key)
-{
-    return independent_from_extruder_number_options.find(opt_key) != independent_from_extruder_number_options.end();
-}
+// //Superslicer: use opt.is_vector_extruder() instead.
+//static const std::set<std::string> independent_from_extruder_number_options = {
+//    "bed_shape",
+//    "compatible_printers",
+//    "compatible_prints",
+//    "filament_ramming_parameters",
+//    "gcode_substitutions",
+//    "post_process",
+//};
+//
+//bool PresetCollection::is_independent_from_extruder_number_option(const std::string& opt_key)
+//{
+//    return independent_from_extruder_number_options.find(opt_key) != independent_from_extruder_number_options.end();
+//}
 
 // Use deep_diff to correct return of changed options, considering individual options for each extruder.
 inline t_config_option_keys deep_diff(const ConfigBase &config_this, const ConfigBase &config_other, bool ignore_phony)
@@ -1739,7 +1740,11 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
             && (ignore_phony || !(this_opt->is_phony() && other_opt->is_phony()))
             && ((*this_opt != *other_opt) || (this_opt->is_phony() != other_opt->is_phony())))
         {
-            if (PresetCollection::is_independent_from_extruder_number_option(opt_key)) {
+            const ConfigOptionVectorBase *this_opt_vector = nullptr;
+            if (this_opt->is_vector()) {
+                this_opt_vector = static_cast<const ConfigOptionVectorBase*>(this_opt);
+            }
+            if (this_opt_vector && !this_opt_vector->is_extruder_size()) {
                 // Scalar variable, or a vector variable, which is independent from number of extruders,
                 // thus the vector is presented to the user as a single input.
                 // Merill: these are 'button' special settings.
@@ -1791,7 +1796,7 @@ bool PresetCollection::is_dirty(const Preset *edited, const Preset *reference)
         // Only compares options existing in both configs.
         //don't consider phony field for equals (false param)
         bool is_dirty = !reference->config.equals(edited->config, false);
-        if (is_dirty && edited->type != Preset::TYPE_FILAMENT) {
+        if (is_dirty && edited->type != Preset::TYPE_FFF_FILAMENT) {
             // for non-filaments preset check deep difference for compared configs
             // there can be cases (as for thumbnails), when configs can logically equal
             // even when their values are not equal.

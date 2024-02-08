@@ -54,10 +54,11 @@ void remove_bridges_from_contacts(
     // compute the area of bridging perimeters
     Polygons bridges;
     {
+        coordf_t nozzle_diameter = scale_t(print_config.nozzle_diameter.get_at(layerm.region().config().perimeter_extruder-1));
         // Surface supporting this layer, expanded by 0.5 * nozzle_diameter, as we consider this kind of overhang to be sufficiently supported.
         Polygons lower_grown_slices = expand(lower_layer.lslices,
             //FIXME to mimic the decision in the perimeter generator, we should use half the external perimeter width.
-            0.5f * float(scale_(print_config.nozzle_diameter.get_at(layerm.region().config().perimeter_extruder-1))),
+            0.5f * float(nozzle_diameter),
             SUPPORT_SURFACES_OFFSET_PARAMETERS);
         // Collect perimeters of this layer.
         //FIXME split_at_first_point() could split a bridge mid-way
@@ -69,7 +70,7 @@ void remove_bridges_from_contacts(
         // Trim the perimeters of this layer by the lower layer to get the unsupported pieces of perimeters.
         overhang_perimeters = diff_pl(overhang_perimeters, lower_grown_slices);
     #else
-        Polylines overhang_perimeters = diff_pl(layerm.perimeters().as_polylines(), lower_grown_slices);
+        Polylines overhang_perimeters = diff_pl(to_polylines(layerm.perimeters().as_polylines(), nozzle_diameter*2), lower_grown_slices);
     #endif
         
         // only consider straight overhangs
@@ -648,12 +649,12 @@ static inline void tree_supports_generate_paths(
             if (double area = expoly.area(); area > support_params.tree_branch_diameter_double_wall_area_scaled) {
                 eec = std::make_unique<ExtrusionEntityCollection>();
                 // Don't reoder internal / external loops of the same island, always start with the internal loop.
-                eec->no_sort = true;
+                eec->set_can_sort_reverse(false, false);
                 // Make the tree branch stable by adding another perimeter.
                 ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
                 if (level2.size() == 1) {
                     Polylines polylines;
-                    extrusion_entities_append_paths(eec->entities, draw_perimeters(expoly, clip_length), { ExtrusionRole::SupportMaterial, flow },
+                    extrusion_entities_append_paths(eec->set_entities(), draw_perimeters(expoly, clip_length), { ExtrusionRole::SupportMaterial, flow },
                         // Disable reversal of the path, always start with the anchor, always print CCW.
                         false);
                     expoly = level2.front();
@@ -758,12 +759,12 @@ static inline void tree_supports_generate_paths(
             polylines.emplace_back(std::move(pl));
         }
 
-        ExtrusionEntitiesPtr &out = eec ? eec->entities : dst;
+        ExtrusionEntitiesPtr &out = eec ? eec->set_entities() : dst;
         extrusion_entities_append_paths(out, std::move(polylines), { ExtrusionRole::SupportMaterial, flow },
             // Disable reversal of the path, always start with the anchor, always print CCW.
             false);
         if (eec) {
-            std::reverse(eec->entities.begin(), eec->entities.end());
+            std::reverse(eec->set_entities().begin(), eec->set_entities().end());
             dst.emplace_back(eec.release());
         }
     }
@@ -1388,7 +1389,7 @@ static void modulate_extrusion_by_overlapping_layers(
             frag_polyline.points.front() = pt_current;
             // Don't repeat the first point.
             if (! path->polyline.empty())
-                path->polyline.clip_last_point();
+                path->polyline.pop_back();
             // Consume the fragment's polyline, remove it from the input fragments, so it will be ignored the next time.
             path->polyline.append(std::move(frag_polyline));
             frag_polyline.points.clear();
@@ -1643,7 +1644,8 @@ void generate_support_toolpaths(
             } else
                 continue;
             filler->link_max_length = scale_t(spacing * link_max_length_factor / density);
-            fill_expolygons_with_sheath_generate_paths(
+            //fill_expolygons_with_sheath_generate_paths( //TODO 2.7 test if the pattern contains the sheath
+            fill_expolygons_generate_paths(
                 // Destination
                 support_layer.support_fills.set_entities(), 
                 // Regions to fill
@@ -1906,7 +1908,7 @@ void generate_support_toolpaths(
                 Flow interface_flow     = support_params.support_material_flow.with_height(float(base_interface_layer.layer->height));
                 filler->angle           = suppport_angle + interface_angle_delta;
                 filler_spacing  = support_params.support_material_interface_flow.spacing();
-                filler->link_max_length = scale_t(filler->spacing * link_max_length_factor / support_params.interface_density);
+                filler->link_max_length = scale_t(filler->get_spacing() * link_max_length_factor / support_params.interface_density);
                 fill_expolygons_generate_paths(
                     // Destination
                     base_interface_layer.extrusions.set_entities(), 
@@ -1941,7 +1943,7 @@ void generate_support_toolpaths(
                     //FIXME When paralellizing, each thread shall have its own copy of the fillers.
                     filler_spacing          = flow.spacing();
                     filler->link_max_length = scale_t(filler_spacing * link_max_length_factor / density);
-                } else if (config.support_material_style == SupportMaterialStyle::smsOrganic) {
+                } else if (config.support_material_style.value == SupportMaterialStyle::smsOrganic) {
                     tree_supports_generate_paths(base_layer.extrusions.set_entities(), base_layer.polygons_to_extrude(), flow, support_params);
                     done = true;
                 } else {
@@ -1949,7 +1951,8 @@ void generate_support_toolpaths(
                     filler->link_max_length = scale_t(filler_spacing * link_max_length_factor / support_params.support_density);
                 }
                 if (! done)
-                    fill_expolygons_with_sheath_generate_paths(
+                    //fill_expolygons_with_sheath_generate_paths(
+                    fill_expolygons_generate_paths( //TODO: 2.7 test if pattern has the sheath
                         // Destination
                         base_layer.extrusions.set_entities(),
                         // Regions to fill

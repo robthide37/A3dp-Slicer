@@ -242,7 +242,7 @@ static Polygons contours_simplified(const Vec2i32 &grid_size, const double pixel
 }
 #endif // SUPPORT_USE_AGG_RASTERIZER
 
-PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object, std::shared_ptr<const SlicingParameters> slicing_params) :
+PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object, std::shared_ptr<SlicingParameters> slicing_params) :
     m_print_config          (&object->print()->config()),
     m_object_config         (&object->config()),
     m_slicing_params        (slicing_params),
@@ -358,7 +358,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
     // If raft is to be generated, the 1st top_contact layer will contain the 1st object layer silhouette with holes filled.
     // There is also a 1st intermediate layer containing bases of support columns.
     // Inflate the bases of the support columns and create the raft base under the object.
-    SupportGeneratorLayersPtr raft_layers = FFFSupport::generate_raft_base(object, m_support_params, m_slicing_params, top_contacts, interface_layers, base_interface_layers, intermediate_layers, layer_storage);
+    SupportGeneratorLayersPtr raft_layers = FFFSupport::generate_raft_base(object, m_support_params, *m_slicing_params, top_contacts, interface_layers, base_interface_layers, intermediate_layers, layer_storage);
 
 #ifdef SLIC3R_DEBUG
     for (const SupportGeneratorLayer *l : interface_layers)
@@ -423,7 +423,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
 #endif /* SLIC3R_DEBUG */
 
     // Generate the actual toolpaths and save them into each layer.
-    generate_support_toolpaths(object.support_layers(), *m_object_config, m_support_params, m_slicing_params, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
+    generate_support_toolpaths(object.support_layers(), *m_object_config, m_support_params, *m_slicing_params, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
 
 #ifdef SLIC3R_DEBUG
     {
@@ -1016,7 +1016,7 @@ namespace SupportMaterialInternal {
                     return true;
             } else {
                 assert(! ee->is_loop());
-                if (is_bridge(ee->role()))
+                if (ee->role().is_bridge())
                     return true;
             }
         }
@@ -1043,19 +1043,19 @@ namespace SupportMaterialInternal {
                     if (ep.size() >= 3) {
                         // This is a complete loop.
                         // Add the outer contour first.
-                        Polygon poly;
-                        poly.points = ep.polyline.get_points();
-                        poly.points.pop_back();
-                        if (poly.area() < 0)
-                            poly.reverse();
-                        polygons_append(out, offset(poly, exp, SUPPORT_SURFACES_OFFSET_PARAMETERS));
-                        Polygons holes = offset(poly, - exp, SUPPORT_SURFACES_OFFSET_PARAMETERS);
+                        Polygon polygon(ep.polyline.to_polyline().points);
+                        assert(polygon.front() == polygon.back());
+                        polygon.points.pop_back();
+                        if (polygon.area() < 0)
+                            polygon.reverse();
+                        polygons_append(out, offset(polygon, exp, SUPPORT_SURFACES_OFFSET_PARAMETERS));
+                        Polygons holes = offset(polygon, - exp, SUPPORT_SURFACES_OFFSET_PARAMETERS);
                         polygons_reverse(holes);
                         polygons_append(out, holes);
                     }
                 } else if (ep.size() >= 2) {
                     // Offset the polyline.
-                    polygons_append(out, offset(ep.polyline.as_polyline(), exp, SUPPORT_SURFACES_OFFSET_PARAMETERS));
+                    polygons_append(out, offset(Polygon(ep.polyline.to_polyline().points), exp, SUPPORT_SURFACES_OFFSET_PARAMETERS));
                 }
             }
     }
