@@ -214,6 +214,8 @@ set(SLIC3R_SOURCES
     Geometry/Voronoi.hpp
     Geometry/VoronoiOffset.cpp
     Geometry/VoronoiOffset.hpp
+    Geometry/VoronoiUtils.hpp
+    Geometry/VoronoiUtils.cpp
     Geometry/VoronoiVisualUtils.hpp
     Int128.hpp
     JumpPointSearch.cpp
@@ -464,7 +466,6 @@ set(SLIC3R_SOURCES
     BranchingTree/BranchingTree.hpp
     BranchingTree/PointCloud.cpp
     BranchingTree/PointCloud.hpp
-
     Arachne/BeadingStrategy/BeadingStrategy.hpp
     Arachne/BeadingStrategy/BeadingStrategy.cpp
     Arachne/BeadingStrategy/BeadingStrategyFactory.hpp
@@ -495,8 +496,9 @@ set(SLIC3R_SOURCES
     Arachne/utils/PolygonsSegmentIndex.hpp
     Arachne/utils/PolylineStitcher.hpp
     Arachne/utils/PolylineStitcher.cpp
-    Arachne/utils/VoronoiUtils.hpp
-    Arachne/utils/VoronoiUtils.cpp
+    Geometry/Voronoi.cpp
+    Geometry/VoronoiUtils.hpp
+    Geometry/VoronoiUtils.cpp
     Arachne/SkeletalTrapezoidation.hpp
     Arachne/SkeletalTrapezoidation.cpp
     Arachne/SkeletalTrapezoidationEdge.hpp

@@ -4922,7 +4922,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     for (GLVolume *vol : visible_volumes) {
         const int obj_idx = vol->object_idx();
         const int vol_idx = vol->volume_idx();
-        const bool render_as_painted = is_enabled_painted_thumbnail && obj_idx >= 0 && vol_idx >= 0 && !model_objects[obj_idx]->volumes[vol_idx]->mmu_segmentation_facets.empty();
+        const bool render_as_painted = is_enabled_painted_thumbnail && obj_idx >= 0 && vol_idx >= 0 && !model_objects[obj_idx]->volumes[vol_idx]->mm_segmentation_facets.empty();
         GLShaderProgram* shader = wxGetApp().get_shader(render_as_painted ? "mm_gouraud" : "gouraud_light");
         if (shader == nullptr)
             continue;
@@ -4958,7 +4958,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
             const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
             const size_t extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
             TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
-            ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
+            ts.deserialize(model_volume.mm_segmentation_facets.get_data(), true);
             ts.request_update_render_data();
 
             ts.render(nullptr, model_matrix);

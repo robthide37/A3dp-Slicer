@@ -78,8 +78,8 @@ static inline void model_volume_list_copy_configs(ModelObject &model_object_dst,
         mv_dst.supported_facets.assign(mv_src.supported_facets);
         assert(mv_dst.seam_facets.id() == mv_src.seam_facets.id());
         mv_dst.seam_facets.assign(mv_src.seam_facets);
-        assert(mv_dst.mmu_segmentation_facets.id() == mv_src.mmu_segmentation_facets.id());
-        mv_dst.mmu_segmentation_facets.assign(mv_src.mmu_segmentation_facets);
+        assert(mv_dst.mm_segmentation_facets.id() == mv_src.mm_segmentation_facets.id());
+        mv_dst.mm_segmentation_facets.assign(mv_src.mm_segmentation_facets);
         //FIXME what to do with the materials?
         // mv_dst.m_material_id = mv_src.m_material_id;
         ++ i_src;
@@ -1374,7 +1374,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         std::vector<unsigned int> painting_extruders;
         if (const auto &volumes = print_object.model_object()->volumes;
             num_extruders > 1 &&
-            std::find_if(volumes.begin(), volumes.end(), [](const ModelVolume *v) { return ! v->mmu_segmentation_facets.empty(); }) != volumes.end()) {
+            std::find_if(volumes.begin(), volumes.end(), [](const ModelVolume *v) { return ! v->mm_segmentation_facets.empty(); }) != volumes.end()) {
             //FIXME be more specific! Don't enumerate extruders that are not used for painting!
             painting_extruders.assign(num_extruders, 0);
             std::iota(painting_extruders.begin(), painting_extruders.end(), 1);
