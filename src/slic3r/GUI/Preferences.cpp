@@ -127,9 +127,9 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_use_custom_toolbar_size	= get_app_config()->get_bool("use_custom_toolbar_size");
 
 	// set Field for notify_release to its value
-	if (m_optgroup_gui && m_optgroup_gui->get_field("notify_release") != nullptr) {
+	if (m_optkey_to_optgroup.find("notify_release") != m_optkey_to_optgroup.end() && m_optkey_to_optgroup["notify_release"]->get_field("notify_release") != nullptr) {
 		boost::any val = s_keys_map_NotifyReleaseMode.at(wxGetApp().app_config->get("notify_release"));
-		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
+		m_optkey_to_optgroup["notify_release"]->get_field("notify_release")->set_value(val, false);
 	}
 	
 
@@ -145,8 +145,8 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		for (const std::string& opt_key : { "default_action_on_close_application"
 										   ,"default_action_on_new_project"
 										   ,"default_action_on_select_preset" })
-			m_optgroup_general->set_value(opt_key, app_config->get(opt_key) == "none");
-		m_optgroup_general->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty());
+			m_optkey_to_optgroup[opt_key]->set_value(opt_key, app_config->get(opt_key) == "none");
+		m_optkey_to_optgroup["default_action_on_dirty_project"]->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty());
 
 		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
@@ -154,9 +154,11 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 
 		// update color pickers for mode palette
 		const auto palette = wxGetApp().get_mode_palette(); 
-		std::vector<wxColourPickerCtrl*> color_pickres = {m_mode_simple, m_mode_advanced, m_mode_expert};
-		for (size_t mode = 0; mode < color_pickres.size(); ++mode)
-			update_color(color_pickres[mode], palette[mode]);
+		//std::vector<wxColourPickerCtrl*> color_pickres = {m_mode_simple, m_mode_advanced, m_mode_expert};
+		//for (size_t mode = 0; mode < color_pickres.size(); ++mode)
+			//update_color(color_pickres[mode], palette[mode]);
+		for (size_t mode = 0; mode < m_tag_color.size(); ++mode)
+			update_color(m_tag_color[0], palette[mode]);
 	}
 
 	this->ShowModal();
@@ -226,11 +228,10 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 				m_values[opt_key] = boost::any_cast<std::string>(value);
 			} else if (field->m_opt.type == coEnum) {
 				int val_int = boost::any_cast<int>(value);
-				for (const auto& item : *field->m_opt.enum_keys_map) {
-					if (item.second == val_int) {
-						m_values[opt_key] = item.first;
-						break;
-					}
+				auto vector = field->m_opt.enum_def->enums();
+				assert(vector.size() > val_int && val_int >= 0);
+				if(vector.size() > val_int && val_int >= 0){
+					m_values[opt_key] = vector[val_int];
 				}
 			}
 		} else {
@@ -250,7 +251,7 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 		}
 		if (opt_key == "use_custom_toolbar_size") {
 			m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
-			refresh_og(m_optgroup_gui);
+			refresh_og(m_optkey_to_optgroup["use_custom_toolbar_size"]);
 			get_app_config()->set("use_custom_toolbar_size", boost::any_cast<bool>(value) ? "1" : "0");
 			wxGetApp().plater()->get_current_canvas3D()->render();
 			return;
@@ -262,7 +263,7 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 				m_rb_new_settings_layout_mode->SetValue(false);
 				m_rb_old_settings_layout_mode->SetValue(true);
 			}
-			refresh_og(m_optgroup_gui);
+			refresh_og(m_optkey_to_optgroup["tabs_as_menu"]);
 		}
 
 	};
@@ -282,12 +283,12 @@ static void activate_options_tab(std::shared_ptr<ConfigOptionsGroup> optgroup, i
 	wxGetApp().sidebar().get_searcher().append_preferences_options(optgroup->get_lines());
 }
 
-static void append_bool_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+void PreferencesDialog::append_bool_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 								const std::string& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
 								bool def_val,
-								ConfigOptionMode mode = comSimpleAE)
+								ConfigOptionMode mode)
 {
 	ConfigOptionDef def = {opt_key, coBool};
 	def.label = label;
@@ -296,19 +297,44 @@ static void append_bool_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 	def.set_default_value(new ConfigOptionBool{ def_val });
 	Option option(def, opt_key);
 	optgroup->append_single_option_line(option);
+	
+	m_optkey_to_optgroup[opt_key] = optgroup;
+
+	// fill data to the Search Dialog
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+}
+
+void PreferencesDialog::append_int_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								int option_width,
+								int def_val,
+								ConfigOptionMode mode)
+{
+	ConfigOptionDef def = {opt_key, coInt};
+	def.label = label;
+	def.tooltip = tooltip;
+	def.mode = mode;
+	def.set_default_value(new ConfigOptionInt{ def_val });
+	Option option(def, opt_key);
+	option.opt.width = option_width;
+	optgroup->append_single_option_line(option);
+	
+	m_optkey_to_optgroup[opt_key] = optgroup;
 
 	// fill data to the Search Dialog
 	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
 }
 
 template<typename EnumType>
-static void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+void PreferencesDialog::append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 								const std::string& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
 								const ConfigOption* def_val,
 								std::initializer_list<std::pair<std::string_view, std::string_view>> enum_values,
-								ConfigOptionMode mode = comSimple)
+								ConfigOptionMode mode)
 {
 	ConfigOptionDef def = {opt_key, coEnum };
 	def.label = label;
@@ -319,6 +345,8 @@ static void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 	def.set_default_value(def_val);
 	Option option(def, opt_key);
 	optgroup->append_single_option_line(option);
+	
+	m_optkey_to_optgroup[opt_key] = optgroup;
 
 	// fill data to the Search Dialog
 	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
@@ -366,25 +394,25 @@ void PreferencesDialog::build()
 
 
 	if (is_editor) {
-		append_bool_option(m_optgroup_general, "remember_output_path", 
+		append_bool_option(m_optgroups_general.back(), "remember_output_path", 
 			L("Remember output directory"),
 			L("If this is enabled, Slic3r will prompt the last output directory instead of the one containing the input files."),
 			app_config->has("remember_output_path") ? app_config->get_bool("remember_output_path") : true);
 
         //activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Automation"), tabs, 0));
-
+		
 		append_bool_option(m_optgroups_general.back(), "autocenter", 
 			L("Auto-center parts"),
 			L("If this is enabled, Slic3r will auto-center objects around the print bed center."),
 			app_config->get_bool("autocenter"));
-
+		
 		append_bool_option(m_optgroups_general.back(), "background_processing", 
 			L("Background processing"),
 			L("If this is enabled, Slic3r will pre-process objects as soon "
 				"as they\'re loaded in order to save time when exporting G-code."),
 			app_config->get_bool("background_processing"));
-
+		
 		append_bool_option(m_optgroups_general.back(), "alert_when_supports_needed", 
 			L("Alert when supports needed"),
 			L("If this is enabled, Slic3r will raise alerts when it detects "
@@ -393,27 +421,26 @@ void PreferencesDialog::build()
 			app_config->get_bool("alert_when_supports_needed"));
 
 		//FIXME change it to enum, like the NotifyReleaseMode
+		m_optkey_to_optgroup["autocenter"] = m_optgroups_general.back();
 		def_combobox_auto_switch_preview.label = L("Switch to Preview when sliced");
 		def_combobox_auto_switch_preview.type = coStrings;
 		def_combobox_auto_switch_preview.tooltip = L("When an object is sliced, it will switch your view from the curent view to the "
 			"preview (and then gcode-preview) automatically, depending on the option choosen.");
 		def_combobox_auto_switch_preview.gui_type = ConfigOptionDef::GUIType::f_enum_open;
 		def_combobox_auto_switch_preview.gui_flags = "show_value";
-		def_combobox_auto_switch_preview.enum_values.push_back(_u8L("Don't switch"));
-		def_combobox_auto_switch_preview.enum_values.push_back(_u8L("Switch when possible"));
-		def_combobox_auto_switch_preview.enum_values.push_back(_u8L("Only if on platter"));
-		def_combobox_auto_switch_preview.enum_values.push_back(_u8L("Only when GCode is ready"));
+        def_combobox_auto_switch_preview.set_enum_labels(ConfigOptionDef::GUIType::f_enum_open, 
+        { _u8L("Don't switch"), _u8L("Switch when possible"), _u8L("Only if on platter"), _u8L("Only when GCode is ready") });
 		if (app_config->get("auto_switch_preview") == "0")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_values[0] });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(0) });
 		else if (app_config->get("auto_switch_preview") == "1")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_values[1] });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(1) });
 		else if (app_config->get("auto_switch_preview") == "2")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_values[2] });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(2) });
 		else if (app_config->get("auto_switch_preview") == "3")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_values[3] });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(3) });
 		else
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_values[2] });
-		option = Option(def_combobox_auto_switch_preview, "auto_switch_preview");
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(2) });
+		Option option = Option(def_combobox_auto_switch_preview, "auto_switch_preview");
 		m_optgroups_general.back()->append_single_option_line(option);
 
 		// Please keep in sync with ConfigWizard
@@ -451,85 +478,68 @@ void PreferencesDialog::build()
 			L("Suppress \" Template \" filament presets in configuration wizard and sidebar visibility."),
 			app_config->get_bool("no_templates"));
 
-		append_bool_option(m_optgroup_general, "show_incompatible_presets",
+		append_bool_option(m_optgroups_general.back(), "show_incompatible_presets",
 			L("Show incompatible print and filament presets"),
 			L("When checked, the print and filament presets are shown in the preset editor "
 			"even if they are marked as incompatible with the active printer"),
 			app_config->get_bool("show_incompatible_presets"));
 
-        def.label = L("Main GUI always in expert mode");
-        def.type = coBool;
-        def.tooltip = L("If enabled, the gui will be in expert mode even if the simple or advanced mode is selected (but not the setting tabs).");
-        def.set_default_value(new ConfigOptionBool{ app_config->get("objects_always_expert") == "1" });
-        option = Option(def, "objects_always_expert");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "objects_always_expert",
+			L("Main GUI always in expert mode"),
+			L("If enabled, the gui will be in expert mode even if the simple or advanced mode is selected (but not the setting tabs)."),
+			app_config->get_bool("objects_always_expert"));
 
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Files"), tabs, 0));
 
         // Please keep in sync with ConfigWizard
-        def.label = L("Export sources full pathnames to 3mf and amf");
-        def.type = coBool;
-        def.tooltip = L("If enabled, allows the Reload from disk command to automatically find and load the files when invoked.");
-        def.set_default_value(new ConfigOptionBool(app_config->get("export_sources_full_pathnames") == "1"));
-        option = Option(def, "export_sources_full_pathnames");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "export_sources_full_pathnames",
+			L("Export sources full pathnames to 3mf and amf"),
+			L("If enabled, allows the Reload from disk command to automatically find and load the files when invoked."),
+			app_config->get_bool("export_sources_full_pathnames"));
 
 #ifdef _WIN32
 		// Please keep in sync with ConfigWizard
-		def.label = (boost::format(_u8L("Associate .3mf files to %1%")) % SLIC3R_APP_NAME).str();
-		def.type = coBool;
-		def.tooltip = L("If enabled, sets Slic3r as default application to open .3mf files.");
-		def.set_default_value(new ConfigOptionBool(app_config->get("associate_3mf") == "1"));
-		option = Option(def, "associate_3mf");
-		m_optgroups_general.back()->append_single_option_line(option);
-
-		def.label = (boost::format(_u8L("Associate .stl files to %1%")) % SLIC3R_APP_NAME).str();
-		def.type = coBool;
-		def.tooltip = L("If enabled, sets Slic3r as default application to open .stl files.");
-		def.set_default_value(new ConfigOptionBool(app_config->get("associate_stl") == "1"));
-		option = Option(def, "associate_stl");
-		m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "associate_3mf",
+			(boost::format(_u8L("Associate .3mf files to %1%")) % SLIC3R_APP_NAME).str(),
+			L("If enabled, sets Slic3r as default application to open .3mf files."),
+			app_config->get_bool("associate_3mf"));
+		
+		append_bool_option(m_optgroups_general.back(), "associate_stl",
+			(boost::format(_u8L("Associate .stl files to %1%")) % SLIC3R_APP_NAME).str(),
+			L("If enabled, sets Slic3r as default application to open .stl files."),
+			app_config->get_bool("associate_stl"));
 #endif // _WIN32
-
-        def.label = L("Remember output directory");
-        def.type = coBool;
-        def.tooltip = L("If this is enabled, Slic3r will prompt the last output directory "
-            "instead of the one containing the input files.");
-        def.set_default_value(new ConfigOptionBool{ app_config->has("remember_output_path") ? app_config->get("remember_output_path") == "1" : true });
-        option = Option(def, "remember_output_path");
-        m_optgroups_general.back()->append_single_option_line(option);
-
-        def.label = L("Export headers with date and time");
-        def.type = coBool;
-        def.tooltip = L("If this is enabled, Slic3r will add the date of the export to the first line of any exported config and gcode file. Note that some software may rely on that to work, be careful and report any problem if you deactivate it.");
-        def.set_default_value(new ConfigOptionBool{ app_config->has("date_in_config_file") ? app_config->get("date_in_config_file") == "1" : true });
-        option = Option(def, "date_in_config_file");
-        m_optgroups_general.back()->append_single_option_line(option);
-
-        def.label = L("Show a Pop-up with the current material when exporting");
-        def.type = coBool;
-        def.tooltip = L("If you constantly forgot to select the right filament/material, check this option to have a really obtrusive reminder on each export.");
-        def.set_default_value(new ConfigOptionBool{ app_config->has("check_material_export") ? app_config->get("check_material_export") == "1" : false });
-        option = Option(def, "check_material_export");
-        m_optgroups_general.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_general.back(), "remember_output_path",
+			L("Remember output directory"),
+			L("If this is enabled, Slic3r will prompt the last output directory "
+            "instead of the one containing the input files."),
+			app_config->get_bool("remember_output_path"));
+		
+		append_bool_option(m_optgroups_general.back(), "date_in_config_file",
+			L("Export headers with date and time"),
+            L("If this is enabled, Slic3r will add the date of the export to the first line of any exported config and gcode file."
+              " Note that some software may rely on that to work, be careful and report any problem if you deactivate it."),
+			app_config->get_bool("date_in_config_file"));
+		
+		append_bool_option(m_optgroups_general.back(), "check_material_export",
+			L("Show a Pop-up with the current material when exporting"),
+            L("If you constantly forgot to select the right filament/material, check this option to have a really obtrusive reminder on each export."),
+			app_config->get_bool("check_material_export"));
 
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Dialogs"), tabs, 0));
-
-		def.label = L("Show drop project dialog");
-		def.type = coBool;
-		def.tooltip = L("When checked, whenever dragging and dropping a project file on the application, shows a dialog asking to select the action to take on the file to load.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("show_drop_project_dialog") == "1" });
-		option = Option(def, "show_drop_project_dialog");
-		m_optgroups_general.back()->append_single_option_line(option);
-
-		def.label = L("Show overwrite dialog.");
-		def.type = coBool;
-		def.tooltip = L("If this is enabled, Slic3r will prompt for when overwriting files from save dialogs.");
-		def.set_default_value(new ConfigOptionBool{ app_config->has("show_overwrite_dialog") ? app_config->get("show_overwrite_dialog") == "1" : true });
-		option = Option(def, "show_overwrite_dialog");
-		m_optgroups_general.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_general.back(), "show_drop_project_dialog",
+			L("Show drop project dialog"),
+            L("When checked, whenever dragging and dropping a project file on the application, shows a dialog asking to select the action to take on the file to load."),
+			app_config->get_bool("show_drop_project_dialog"));
+		
+		append_bool_option(m_optgroups_general.back(), "show_overwrite_dialog",
+			L("Show overwrite dialog."),
+            L("If this is enabled, Slic3r will prompt for when overwriting files from save dialogs."),
+			app_config->get_bool("show_overwrite_dialog"));
 
 		append_bool_option(m_optgroups_general.back(), "single_instance",
 #if __APPLE__
@@ -566,21 +576,17 @@ void PreferencesDialog::build()
 			L("Ask for unsaved changes in presets when creating new project"),
 			L("Always ask for unsaved changes in presets when creating new project"),
 			app_config->get("default_action_on_new_project") == "none");
-
-		def.label = L("Ask for 'new project' on 'Delete all'");
-		def.type = coBool;
-		def.tooltip = L("When you click on the garbage can (or ctrl+del), ask for the action to do. If disable, it will erase all object without asking");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_delete_all") == "1" });
-		option = Option(def, "default_action_delete_all");
-		m_optgroups_general.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_general.back(), "default_action_delete_all",
+			L("Ask for 'new project' on 'Delete all'"),
+			L("When you click on the garbage can (or ctrl+del), ask for the action to do. If disable, it will erase all object without asking"),
+			app_config->get_bool("default_action_delete_all"));
 
         // Clear Undo / Redo stack on new project
-        def.label = L("Clear Undo / Redo stack on new project");
-        def.type = coBool;
-        def.tooltip = L("Clear Undo / Redo stack on new project or when an existing project is loaded.");
-        def.set_default_value(new ConfigOptionBool{ app_config->get("clear_undo_redo_stack_on_new_project") == "1" });
-        option = Option(def, "clear_undo_redo_stack_on_new_project");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "clear_undo_redo_stack_on_new_project",
+			L("Clear Undo / Redo stack on new project"),
+			L("Clear Undo / Redo stack on new project or when an existing project is loaded."),
+			app_config->get_bool("clear_undo_redo_stack_on_new_project"));
 	}
 #ifdef _WIN32
 	else {
@@ -613,16 +619,20 @@ void PreferencesDialog::build()
 		m_optgroups_general.back()->title_width = 20;
 		m_optgroups_general.back()->label_width = 20;
 
+		m_optkey_to_optgroup["freecad_path"] = m_optgroups_general.back();
+		ConfigOptionDef def = {"freecad_path", coString};
 		def.label = L("FreeCAD path");
-		def.type = coString;
 		def.tooltip = L("If it point to a valid freecad instance, you can use the built-in python script to quickly generate geometry."
             "\nPut here the freecad directory from which you can access its 'lib' directory."
             "\nFreecad will use its own python (from the bin directoyr) on windows and will use the system python3 on linux & macos");
 		def.set_default_value(new ConfigOptionString{ app_config->get("freecad_path") });
-		option = Option(def, "freecad_path");
+		Option option(def, "freecad_path");
 		//option.opt.full_width = true;
 		option.opt.width = 50;
 		m_optgroups_general.back()->append_single_option_line(option);
+		
+		// fill data to the Search Dialog
+		wxGetApp().sidebar().get_searcher().add_key("freecad_path", Preset::TYPE_PREFERENCES, m_optgroups_general.back()->config_category(), L("Preferences"));
 	}
 
     activate_options_tab(m_optgroups_general.back(), m_optgroups_general.back()->parent()->GetSizer()->GetItemCount() > 1 ? 3 : 20);
@@ -655,13 +665,11 @@ void PreferencesDialog::build()
 
 #if defined(_WIN32) || defined(__APPLE__)
 	//m_optgroup_camera->append_separator();
-
-	def.label = L("Enable support for legacy 3DConnexion devices");
-	def.type = coBool;
-	def.tooltip = L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("use_legacy_3DConnexion") == "1" });
-	option = Option(def, "use_legacy_3DConnexion");
-	m_optgroup_camera->append_single_option_line(option);
+	
+	append_bool_option(m_optgroup_camera, "use_legacy_3DConnexion",
+		L("Enable support for legacy 3DConnexion devices"),
+		L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M"),
+		app_config->get_bool("use_legacy_3DConnexion"));
 #endif // _WIN32 || __APPLE__
 
 	activate_options_tab(m_optgroup_camera);
@@ -684,45 +692,43 @@ void PreferencesDialog::build()
 			L("Show sidebar collapse/expand button"),
 			L("If enabled, the button for the collapse sidebar will be appeared in top right corner of the 3D Scene"),
 			app_config->get_bool("show_collapse_button"));
-/*
+		
 		append_bool_option(m_optgroups_gui.back(), "suppress_hyperlinks",
 			L("Suppress to open hyperlink in browser"),
-			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
+			L("If enabled, Slic3r will not open a hyperlinks in your browser."),
 			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
 			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
 			app_config->get_bool("suppress_hyperlinks"));
-*/
+		
 		append_bool_option(m_optgroups_gui.back(), "color_manipulation_panel",
 			L("Use colors for axes values in Manipulation panel"),
 			L("If enabled, the axes names and axes values will be colorized according to the axes colors. "
 			  "If disabled, old UI will be used."),
 			app_config->get_bool("color_manipulation_panel"));
-
+		
 		append_bool_option(m_optgroups_gui.back(), "order_volumes",
 			L("Order object volumes by types"),
 			L("If enabled, volumes will be always ordered inside the object. Correct order is Model Part, Negative Volume, Modifier, Support Blocker and Support Enforcer. "
 			  "If disabled, you can reorder Model Parts, Negative Volumes and Modifiers. But one of the model parts have to be on the first place."),
 			app_config->get_bool("order_volumes"));
-
-		def.label = L("Focusing platter on mouse over");
-		def.type = coBool;
-		def.tooltip = L("If disabled, moving the mouse over the platter panel will not change the focus but some shortcuts from the platter may not work. "
-			"If enabled, moving the mouse over the platter panel will move focus there, and away from the current control.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("focus_platter_on_mouse") == "1" });
-		option = Option(def, "focus_platter_on_mouse");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_gui.back(), "focus_platter_on_mouse",
+			L("Focusing platter on mouse over"),
+			L("If disabled, moving the mouse over the platter panel will not change the focus but some shortcuts from the platter may not work. "
+			"If enabled, moving the mouse over the platter panel will move focus there, and away from the current control."),
+			app_config->get_bool("focus_platter_on_mouse"));
 
 		activate_options_tab(m_optgroups_gui.back(), 3);
 		m_optgroups_gui.emplace_back(create_options_group(_L("Appearance"), tabs, 2));
 
-
-		append_bool_option(m_optgroup_gui, "allow_auto_color_change",
+		
+		append_bool_option(m_optgroups_gui.back(), "allow_auto_color_change",
 			L("Allow automatically color change"),
 			L("If enabled, related notification will be shown, when sliced object looks like a logo or a sign."),
 			app_config->get_bool("allow_auto_color_change"));
 
 #ifdef _USE_CUSTOM_NOTEBOOK
-		append_bool_option(m_optgroup_gui, "tabs_as_menu",
+		append_bool_option(m_optgroups_gui.back(), "tabs_as_menu",
 			L("Set settings tabs as menu items"),
 			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
 			app_config->get_bool("tabs_as_menu"));
@@ -739,12 +745,12 @@ void PreferencesDialog::build()
 
 		m_optgroup_gui->append_separator();
 */
-		append_bool_option(m_optgroup_gui, "show_hints",
+		append_bool_option(m_optgroups_gui.back(), "show_hints",
 			L("Show \"Tip of the day\" notification after start"),
 			L("If enabled, useful hints are displayed at startup."),
 			app_config->get_bool("show_hints"));
 
-		append_enum_option<NotifyReleaseMode>(m_optgroup_gui, "notify_release",
+		append_enum_option<NotifyReleaseMode>(m_optgroups_gui.back(), "notify_release",
 			L("Notify about new releases"),
 			L("You will be notified about new release after startup acordingly: All = Regular release and alpha / beta releases. Release only = regular release."),
 			new ConfigOptionEnum<NotifyReleaseMode>(static_cast<NotifyReleaseMode>(s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release")))),
@@ -754,83 +760,64 @@ void PreferencesDialog::build()
 			});
 
 		m_optgroups_gui.back()->append_separator(); //seems it's not working
-
+		
 		append_bool_option(m_optgroups_gui.back(), "use_custom_toolbar_size",
 			L("Use custom size for toolbar icons"),
 			L("If enabled, you can change size of toolbar icons manually."),
 			app_config->get_bool("use_custom_toolbar_size"));
 		create_icon_size_slider(m_optgroups_gui.back().get());
 		m_icon_size_sizer->ShowItems(app_config->get("use_custom_toolbar_size") == "1");
-
-		def.label = L("Tab icon size");
-		def.type = coInt;
-		def.tooltip = L("Size of the tab icons, in pixels. Set to 0 to remove icons.");
-		def.set_default_value(new ConfigOptionInt{ atoi(app_config->get("tab_icon_size").c_str()) });
-		option = Option(def, "tab_icon_size");
-		option.opt.width = 6;
-		m_optgroups_gui.back()->append_single_option_line(option);
+		
+		append_int_option(m_optgroups_gui.back(), "tab_icon_size",
+			L("Tab icon size"),
+			L("Size of the tab icons, in pixels. Set to 0 to remove icons."),
+			6,
+			app_config->get_int("tab_icon_size"));
 		m_values_need_restart.push_back("tab_icon_size");
-
-		def.label = L("Font size");
-		def.type = coInt;
-		def.tooltip = L("Size of the font, and most of the gui (but not the menu and dialog ones). Set to 0 to let the Operating System decide.\nPlease don't set this preference unless your OS scaling factor doesn't works. Set 10 for 100% scaling, and 20 for 200% scaling.");
-		def.set_default_value(new ConfigOptionInt{ atoi(app_config->get("font_size").c_str()) });
-		option = Option(def, "font_size");
-		option.opt.width = 6;
-		m_optgroups_gui.back()->append_single_option_line(option);
+		
+		append_int_option(m_optgroups_gui.back(), "font_size",
+			L("Font size"),
+            L("Size of the font, and most of the gui (but not the menu and dialog ones). Set to 0 to let the Operating System decide."
+              "\nPlease don't set this preference unless your OS scaling factor doesn't works. Set 10 for 100% scaling, and 20 for 200% scaling."),
+			6,
+			app_config->get_int("font_size"));
 		m_values_need_restart.push_back("font_size");
-
-		def.label = L("Display setting icons");
-		def.type = coBool;
-		def.tooltip = L("The settings have a lock and dot to show how they are modified. You can hide them by uncheking this option.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("setting_icon") == "1" });
-		option = Option(def, "setting_icon");
-		option.opt.width = 6;
-		m_optgroups_gui.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_gui.back(), "setting_icon",
+			L("Display setting icons"),
+			L("The settings have a lock and dot to show how they are modified. You can hide them by uncheking this option."),
+			app_config->get_bool("setting_icon"));
 		m_values_need_restart.push_back("setting_icon");
-
-		def.label = L("Use custom tooltip");
-		def.type = coBool;
-		def.tooltip = L("On some OS like MacOS or some Linux, tooltips can't stay on for a long time. This setting replaces native tooltips with custom dialogs to improve readability (only for settings)."
-			"\nNote that for the number controls, you need to hover the arrows to get the custom tooltip. Also, it keeps the focus but will give it back when it closes. It won't show up if you are editing the field.");
-		def.set_default_value(new ConfigOptionBool{ app_config->has("use_rich_tooltip") ? app_config->get("use_rich_tooltip") == "1" :
-#if __APPLE__
-			true
-#else
-			false
-#endif
-			});
-		option = Option(def, "use_rich_tooltip");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_gui.back(), "use_rich_tooltip",
+			L("Use custom tooltip"),
+			L("On some OS like MacOS or some Linux, tooltips can't stay on for a long time."
+		      " This setting replaces native tooltips with custom dialogs to improve readability (only for settings)."
+			  "\nNote that for the number controls, you need to hover the arrows to get the custom tooltip."
+			  " Also, it keeps the focus but will give it back when it closes. It won't show up if you are editing the field."),
+			app_config->get_bool("use_rich_tooltip"));
 		m_values_need_restart.push_back("use_rich_tooltip");
-
-		def.label = L("Hide tooltips on slice buttons");
-		def.type = coBool;
-		def.tooltip = L("These tooltip may be bothersome. You can hide them with this option.");
-		def.set_default_value(new ConfigOptionBool{ app_config->has("hide_slice_tooltip") ? app_config->get("hide_slice_tooltip") == "1" : false });
-		option = Option(def, "hide_slice_tooltip");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_gui.back(), "hide_slice_tooltip",
+			L("Hide tooltips on slice buttons"),
+			L("These tooltip may be bothersome. You can hide them with this option."),
+			app_config->get_bool("hide_slice_tooltip"));
 		m_values_need_restart.push_back("hide_slice_tooltip");
-
-		def.label = L("Show layer height on the scroll bar");
-		def.type = coBool;
-		def.tooltip = L("Add the layer height (first number in parentheses) next to a widget of the layer double-scrollbar.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("show_layer_height_doubleslider") == "1" });
-		option = Option(def, "show_layer_height_doubleslider");
-		m_optgroups_gui.back()->append_single_option_line(option);
-
-		def.label = L("Show layer time on the scroll bar");
-		def.type = coBool;
-		def.tooltip = L("Add the layer height (before the layer count in parentheses) next to a widget of the layer double-scrollbar.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("show_layer_time_doubleslider") == "1" });
-		option = Option(def, "show_layer_time_doubleslider");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		
+		append_bool_option(m_optgroups_gui.back(), "show_layer_height_doubleslider",
+			L("Show layer height on the scroll bar"),
+			L("Add the layer height (first number in parentheses) next to a widget of the layer double-scrollbar."),
+			app_config->get_bool("show_layer_height_doubleslider"));
+		
+		append_bool_option(m_optgroups_gui.back(), "show_layer_time_doubleslider",
+			L("Show layer time on the scroll bar"),
+			L("Add the layer height (before the layer count in parentheses) next to a widget of the layer double-scrollbar."),
+			app_config->get_bool("show_layer_time_doubleslider"));
 	}
 
 
 
 	activate_options_tab(m_optgroups_gui.back(), 3);
-	if (is_editor) {
 
 	if (is_editor) {
 		// set Field for notify_release to its value to activate the object
@@ -852,41 +839,43 @@ void PreferencesDialog::build()
 		def_combobox.gui_flags = "show_value";
 		def_combobox.full_width = true;
 		//get all available configs
+		std::vector<std::string> enum_values;
 		for (const AppConfig::LayoutEntry& layout : get_app_config()->get_ui_layouts()) {
-			def_combobox.enum_values.push_back(layout.name+": "+layout.description);
+			enum_values.push_back(layout.name+": "+layout.description);
 		}
+		def_combobox.set_enum_values(enum_values);
+
 		AppConfig::LayoutEntry selected = get_app_config()->get_ui_layout();
 		def_combobox.set_default_value(new ConfigOptionStrings{ selected.name+": "+ selected.description });
-		option = Option(def_combobox, "ui_layout");
+		Option option = Option(def_combobox, "ui_layout");
 		m_optgroups_gui.back()->append_single_option_line(option);
 		m_values_need_restart.push_back("ui_layout");
+		m_optkey_to_optgroup["ui_layout"] = m_optgroups_gui.back();
 		activate_options_tab(m_optgroups_gui.back(), 3);
 	}
 
     m_optgroups_gui.emplace_back(create_options_group(_L("Splash screen"), tabs, 2));
 
     // Show/Hide splash screen
-    def.label = L("Show splash screen");
-    def.type = coBool;
-    def.tooltip = L("Show splash screen");
-    def.set_default_value(new ConfigOptionBool{ app_config->get("show_splash_screen") == "1" });
-    option = Option(def, "show_splash_screen");
-    m_optgroups_gui.back()->append_single_option_line(option);
+	append_bool_option(m_optgroups_gui.back(), "show_splash_screen",
+		L("Show splash screen"),
+		L("Show splash screen"),
+		app_config->get_bool("show_splash_screen"));
 
     // splashscreen image
     {
+
         ConfigOptionDef def_combobox;
         def_combobox.label = L("Splash screen image");
         def_combobox.type = coStrings;
         def_combobox.tooltip = L("Choose the image to use as splashscreen");
         def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
         def_combobox.gui_flags = "show_value";
-        def_combobox.enum_values.push_back("default");
-        def_combobox.enum_labels.push_back(L("Default"));
-        def_combobox.enum_values.push_back("icon");
-        def_combobox.enum_labels.push_back(L("Icon"));
-        def_combobox.enum_values.push_back("random");
-        def_combobox.enum_labels.push_back(L("Random"));
+        def_combobox.set_enum({
+			std::pair<std::string_view, std::string_view>{"default", L("Default")}, 
+			std::pair<std::string_view, std::string_view>{"icon", L("Icon")}, 
+			std::pair<std::string_view, std::string_view>{"random", L("Random")}
+			});
         //get all images in the spashscreen dir
         for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
             if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
@@ -898,8 +887,9 @@ void PreferencesDialog::build()
         if (std::find(def_combobox.enum_values.begin(), def_combobox.enum_values.end(), current_file_name) == def_combobox.enum_values.end())
             current_file_name = def_combobox.enum_values[0];
         def_combobox.set_default_value(new ConfigOptionStrings{ current_file_name });
-        option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
+        Option option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
         m_optgroups_gui.back()->append_single_option_line(option);
+		m_optkey_to_optgroup[def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer"] = m_optgroups_gui.back();
     }
 
     def.label = L("Restore window position on start");
@@ -911,13 +901,11 @@ void PreferencesDialog::build()
 
 #ifdef WIN32
     // Clear Undo / Redo stack on new project
-    def.label = L("Check for problematic dynamic libraries");
-    def.type = coBool;
-    def.tooltip = L("Some software like (for example) ASUS Sonic Studio injects a DLL (library) that is known to create some instabilities."
-        " This option let Slic3r check at startup if they are loaded.");
-    def.set_default_value(new ConfigOptionBool{ app_config->get("check_blacklisted_library") == "1" });
-    option = Option(def, "check_blacklisted_library");
-    m_optgroups_gui.back()->append_single_option_line(option);
+	append_bool_option(m_optgroups_gui.back(), "check_blacklisted_library",
+		L("Check for problematic dynamic libraries"),
+		L("Some software like (for example) ASUS Sonic Studio injects a DLL (library) that is known to create some instabilities."
+        " This option let Slic3r check at startup if they are loaded."),
+		app_config->get_bool("check_blacklisted_library"));
 #endif
 
     activate_options_tab(m_optgroups_gui.back(), 3);
@@ -979,27 +967,26 @@ void PreferencesDialog::build()
 
 #ifdef _WIN32
 	// Add "Dark Mode" group
-	{
-		// Add "Dark Mode" group
-		m_optgroups_colors.emplace_back(create_options_group(_L("Dark mode (experimental)"), tabs, 3));
+    {
+        // Add "Dark Mode" group
+        m_optgroups_colors.emplace_back(create_options_group(_L("Dark mode (experimental)"), tabs, 3));
 
-		append_bool_option(m_optgroup_dark_mode, "dark_color_mode",
-			L("Enable dark mode"),
-			L("If enabled, UI will use Dark mode colors. If disabled, old UI will be used."),
-			app_config->get_bool("dark_color_mode"));
+        append_bool_option(m_optgroups_colors.back(), "dark_color_mode", L("Enable dark mode"),
+                           L("If enabled, UI will use Dark mode colors. If disabled, old UI will be used."),
+                           app_config->get_bool("dark_color_mode"));
 
-		if (wxPlatformInfo::Get().GetOSMajorVersion() >= 10) // Use system menu just for Window newer then Windows 10
-															 // Use menu with ownerdrawn items by default on systems older then Windows 10
-		{
-		append_bool_option(m_optgroup_dark_mode, "sys_menu_enabled",
-			L("Use system menu for application"),
-			L("If enabled, application will use the standard Windows system menu,\n"
-			"but on some combination of display scales it can look ugly. If disabled, old UI will be used."),
-			app_config->get_bool("sys_menu_enabled"));
-		m_values_need_restart.push_back("sys_menu_enabled");
-		}
+        if (wxPlatformInfo::Get().GetOSMajorVersion() >= 10) // Use system menu just for Window newer then Windows 10
+                                                             // Use menu with ownerdrawn items by default on systems older then Windows 10
+        {
+            append_bool_option(m_optgroups_colors.back(), "sys_menu_enabled", L("Use system menu for application"),
+                               L("If enabled, application will use the standard Windows system menu,\n"
+                                 "but on some combination of display scales it can look ugly. If disabled, old UI will be used."),
+                               app_config->get_bool("sys_menu_enabled"));
+            m_values_need_restart.push_back("sys_menu_enabled");
+        }
 
-		activate_options_tab(m_optgroups_colors.back(), 3);
+        activate_options_tab(m_optgroups_colors.back(), 3);
+    }
 #endif //_WIN32
 
 	m_optgroups_colors.emplace_back(create_options_group(_L("Gui Colors"), tabs, 3));

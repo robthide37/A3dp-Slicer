@@ -52,6 +52,9 @@ class PreferencesDialog : public DPIDialog
 	std::vector<std::shared_ptr<ConfigOptionsGroup>> m_optgroups_colors;
 	std::shared_ptr<ConfigOptionsGroup> m_optgroup_other;
 
+	// ...
+	std::map<std::string, std::shared_ptr<ConfigOptionsGroup>> m_optkey_to_optgroup;
+
     ConfigOptionDef def_combobox_auto_switch_preview; //is this useful here?
 #if ENABLE_ENVIRONMENT_MAP
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_render;
@@ -112,6 +115,28 @@ protected:
     void create_downloader_path_sizer();
 	void init_highlighter(const t_config_option_key& opt_key);
 	std::vector<ConfigOptionsGroup*> optgroups();
+
+	void append_bool_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								bool def_val,
+								ConfigOptionMode mode = comSimpleAE);
+	void append_int_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								int option_width,
+								int def_val,
+								ConfigOptionMode mode = comSimpleAE);
+	template<typename EnumType>
+	void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								const ConfigOption* def_val,
+								std::initializer_list<std::pair<std::string_view, std::string_view>> enum_values,
+								ConfigOptionMode mode = comSimpleAE);
 
 	HighlighterForWx						m_highlighter;
 	std::map<std::string, BlinkingBitmap*>	m_blinkers;

@@ -109,6 +109,8 @@ public:
 		{ std::string value; this->get("", key, value); return value; }
 	bool  				get_bool(const std::string &key) const
 		{ return this->get(key) == "1"; }
+	bool  				get_int(const std::string &key) const
+		{ return atoi(this->get(key).c_str()); }
 	bool			    set(const std::string &section, const std::string &key, const std::string &value)
 	{
 #ifndef NDEBUG

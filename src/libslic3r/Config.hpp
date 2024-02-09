@@ -2213,6 +2213,11 @@ public:
 
     // Definition of values / labels for a combo box.
     Slic3r::clonable_ptr<ConfigOptionEnumDef> enum_def;
+    
+    void set_enum_values(const std::vector<std::string> il) {
+        this->enum_def_new();
+        enum_def->set_values(il);
+    }
 
     void set_enum_values(const std::initializer_list<std::string_view> il) {
         this->enum_def_new();

@@ -17,7 +17,7 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
-#include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Layer.hpp"
@@ -391,10 +391,10 @@ std::pair<SlicingParameters, const std::vector<double>> GLCanvas3D::LayersEditin
 
     assert(m_model_object != nullptr);
     this->update_slicing_parameters();
+    assert(m_slicing_parameters);
     PrintObject::update_layer_height_profile(*m_model_object, *m_slicing_parameters, m_layer_height_profile);
     std::pair<SlicingParameters, const std::vector<double>> ret = { *m_slicing_parameters, m_layer_height_profile };
-    delete m_slicing_parameters;
-    m_slicing_parameters = nullptr;
+    m_slicing_parameters.reset();
     return ret;
 }
 
@@ -1529,7 +1529,6 @@ void GLCanvas3D::reset_volumes(bool is_destroying)
     _set_current();
 
     m_selection.clear(is_destroying);
-    m_volumes.release_geometry();
     m_volumes.clear();
     m_dirty = true;
 
@@ -1747,7 +1746,7 @@ void GLCanvas3D::set_config(const DynamicPrintConfig* config)
 
         m_arrange_settings_db.set_active_slot(slot);
 
-        double objdst = min_object_distance(*config);
+        double objdst = min_object_distance(config, 1);
         double min_obj_dst = slot == ArrangeSettingsDb_AppCfg::slotFFFSeqPrint ? objdst : 0.;
         m_arrange_settings_db.set_distance_from_obj_range(slot, min_obj_dst, 100.);
         
@@ -2776,10 +2775,10 @@ bool GLCanvas3D::is_gcode_preview_dirty(const GCodeProcessorResult& gcode_result
 
 void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
 {
-    if (last_showned_gcode != gcode_result.computed_timestamp
-        || !m_gcode_viewer.is_loaded(gcode_result)) {
+    if (last_showned_gcode != gcode_result.computed_timestamp || !m_gcode_viewer.is_loaded(gcode_result)) {
         last_showned_gcode = gcode_result.computed_timestamp;
         m_gcode_viewer.load(gcode_result, *this->fff_print());
+    }
 
     if (wxGetApp().is_editor()) {
         _set_warning_notification_if_needed(EWarning::ToolpathOutside);
@@ -5033,7 +5032,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
     //parse custom color from config, if we need to set a special color to objects for thumbnail.
-    std::array<float, 4> custom_color = { -1.0f, 0.0f, 0.0f, 1.0f };
+    ColorRGBA custom_color = { -1.0f, 0.0f, 0.0f, 1.0f };
     if(Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER))
         if(const DynamicPrintConfig* printer_config = tab->get_config())
             if(const ConfigOptionBool *conf_ok = printer_config->option<ConfigOptionBool>("thumbnails_custom_color"))
@@ -5042,9 +5041,9 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
                         if(conf_color->value.length() > 6)
                         {
                             wxColour clr(conf_color->value);
-                            custom_color[0] = clr.Red() / 255.f;
-                            custom_color[1] = clr.Green() / 255.f;
-                            custom_color[2] = clr.Blue() / 255.f;
+                            custom_color.r(clr.Red() / 255.f);
+                            custom_color.g(clr.Green() / 255.f);
+                            custom_color.b(clr.Blue() / 255.f);
                         }
 
     const int extruders_count = wxGetApp().extruders_edited_cnt();
@@ -5070,7 +5069,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         else {
             shader->set_uniform("emission_factor", 0.0f);
             vol->model.set_color((vol->printable && !vol->is_outside) 
-                ? (custom_color[0] < 0 ? vol->color : custom_color)
+                ? (custom_color.r() < 0 ? vol->color : custom_color)
                 : ColorRGBA::GRAY());
         }
 
@@ -5116,7 +5115,12 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         glsafe(::glClearColor(1.0f, 1.0f, 1.0f, 1.0f));
 }
 
-void GLCanvas3D::_render_thumbnail_framebuffer(ThumbnailData& thumbnail_data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, const GLVolumeCollection& volumes, Camera::EType camera_type)
+void GLCanvas3D::_render_thumbnail_framebuffer(ThumbnailData &           thumbnail_data,
+                                               unsigned int              w,
+                                               unsigned int              h,
+                                               const ThumbnailsParams &  thumbnail_params,
+                                               const GLVolumeCollection &volumes,
+                                               Camera::EType             camera_type)
 {
     thumbnail_data.set(w, h);
     if (!thumbnail_data.is_valid())
@@ -6937,7 +6941,7 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
         return;
 
     //get skirt & brim color
-    const std::array<float, 4> color = m_gcode_viewer.get_extrusion_colors()[ ExtrusionRole::Skirt];
+    const ColorRGBA color = m_gcode_viewer.get_extrusion_colors()[uint8_t(GCodeExtrusionRole::Skirt)];
 
     // number of skirt layers
     size_t total_layer_count = 0;
@@ -6965,15 +6969,15 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
 
     // Ensure that no volume grows over the limits. If the volume is too large, allocate a new one. (on-demand)
     auto ensure_volume_is_ready = [&build_volume, this](GLVolume* vol, GLModel::Geometry& init_vol_data) -> GLVolume*{
-        if (init_data.vertices_size_bytes() > MAX_VERTEX_BUFFER_SIZE) {
+        if (init_vol_data.vertices_size_bytes() > MAX_VERTEX_BUFFER_SIZE) {
             vol->model.init_from(std::move(init_vol_data));
             //update is_outside before creating the new one
             vol->is_outside = !contains(build_volume, vol->model);
             //create the new one
             init_vol_data = GLModel::Geometry{};
-            volume = m_volumes.new_toolpath_volume(vol->color);
+            vol = m_volumes.new_toolpath_volume(vol->color);
         }
-        return volume;
+        return vol;
     };
 
     GLVolume *volume = m_volumes.new_toolpath_volume(color);
@@ -7022,7 +7026,10 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
     volume->is_outside = !contains(build_volume, volume->model);
 }
 
-void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, const BuildVolume& build_volume, const std::vector<std::string>& str_tool_colors, const std::vector<CustomGCode::Item>& color_print_values)
+void GLCanvas3D::_load_print_object_toolpaths(const PrintObject &                   print_object,
+                                              const BuildVolume &                   build_volume,
+                                              const std::vector<std::string> &      str_tool_colors,
+                                              const std::vector<CustomGCode::Item> &color_print_values)
 {
     std::vector<ColorRGBA> tool_colors;
     decode_colors(str_tool_colors, tool_colors);
@@ -7038,7 +7045,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
         bool                         is_single_material_print;
         int                          extruders_cnt;
         const std::vector<CustomGCode::Item>*   color_print_values;
-        std::vector<std::array<float, 4>>       features_colors;
+        std::vector<ColorRGBA>       features_colors;
 
         // For cloring by a tool, return a parsed color.
         bool                         color_by_tool() const { return tool_colors != nullptr; }
@@ -7214,16 +7221,16 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                                                                            GCodeExtrusionRole feature) -> GLModel::Geometry & {
             if (ctxt.color_by_color_print()) {
                 size_t color_id = ctxt.color_print_color_idx_by_layer_idx_and_extruder(layer_idx, extruder);
-                assert(color_id < colorid_2_geo_vol.size();
+                assert(color_id < geo_vol.size());
                 return geo_vol[color_id].first;
             } else if (ctxt.color_by_tool()) {
                 size_t color_id = std::min<int>(ctxt.number_tools() - 1, std::max<int>(extruder - 1, 0));
-                assert(color_id < colorid_2_geo_vol.size();
+                assert(color_id < geo_vol.size());
                 return geo_vol[color_id].first;
             } else {
                 auto it = feature_to_geometry_map.find(feature);
                 if (it != feature_to_geometry_map.end()) {
-                    return **it;
+                    return *it->second;
                 } else {
                     return *feature_to_geometry_map[GCodeExtrusionRole::Custom];
                 }
@@ -7232,7 +7239,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
 
         if (ctxt.color_by_color_print() || ctxt.color_by_tool()) {
             for (size_t i = 0; i < ctxt.number_tools(); ++i) {
-                geo_vol_temp.emplace_back(GLModel::Geometry(), new_volume(ctxt.color_tool(i)));
+                geo_vol.emplace_back(GLModel::Geometry(), new_volume(ctxt.color_tool(i)));
             }
         } else {
             for (GCodeExtrusionRole role : {
@@ -7251,7 +7258,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                     GCodeExtrusionRole::SupportMaterialInterface, 
                     GCodeExtrusionRole::Custom}) {
                 geo_vol.emplace_back(GLModel::Geometry(), new_volume(ctxt.features_colors[role]));
-                feature_to_geometry_map[role] = &geo_vol_temp.back().first;
+                feature_to_geometry_map[role] = &geo_vol.back().first;
             }
         }
         //after that, don't modify geo_vol ever, so feature_to_geometry_map kepp its valid pointer.
@@ -7308,10 +7315,10 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                             if (fill != nullptr && !fill->entities().empty())
                                 _3DScene::extrusionentity_to_verts(*fill, float(layer->print_z), copy,
                                                                    select_geometry(idx_layer,
-                                                                                   fill->entities.front()->role().is_solid_infill() ?
+                                                                                   fill->entities().front()->role().is_solid_infill() ?
                                                                                        layerm->region().config().solid_infill_extruder :
                                                                                        layerm->region().config().infill_extruder,
-                                                                                   is_solid_infill(fill->entities().front()->role()) ?
+                                                                                   fill->entities().front()->role().is_solid_infill() ?
                                                                                        GCodeExtrusionRole::SolidInfill :
                                                                                        GCodeExtrusionRole::InternalInfill),
                                                                    feature_to_geometry_map);
@@ -7321,9 +7328,9 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                 if (ctxt.has_support) {
                     const SupportLayer *support_layer = dynamic_cast<const SupportLayer*>(layer);
                     if (support_layer) {
-                        for (const ExtrusionEntity *extrusion_entity : support_layer->support_fills.entities)
+                        for (const ExtrusionEntity *extrusion_entity : support_layer->support_fills.entities())
                             _3DScene::extrusionentity_to_verts(
-                                extrusion_entity, float(layer->print_z), copy,
+                                *extrusion_entity, float(layer->print_z), copy,
                                 select_geometry(idx_layer,
                                                 (extrusion_entity->role() == ExtrusionRole::SupportMaterial) ?
                                                     support_layer->object()->config().support_material_extruder :
@@ -7391,7 +7398,7 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
         const std::vector<ColorRGBA> *tool_colors;
         Vec2f                         wipe_tower_pos;
         float                         wipe_tower_angle;
-        std::array<float, 4>         color_support;
+        ColorRGBA                     color_support;
 
         // For cloring by a tool, return a parsed color.
         bool                         color_by_tool() const { return tool_colors != nullptr; }

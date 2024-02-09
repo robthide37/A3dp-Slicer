@@ -11,7 +11,7 @@
 #include "ExtruderSequenceDialog.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/GCode.hpp"
-#include "libslic3r/gcode/GCodeWriter.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
 #include "libslic3r/Print.hpp"
 #include "GUI_Utils.hpp"
 #include "MsgDialog.hpp"
