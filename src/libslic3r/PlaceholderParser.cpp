@@ -1659,14 +1659,7 @@ void PlaceholderParser::append_custom_variables(std::map<std::string, std::vecto
         if (!SLIC3R_REGEX_NAMESPACE::regex_match(entry.first, is_a_name))
             continue;
         const std::vector<std::string>& values = entry.second;
-        //check if all values are empty
-        bool is_not_string = false;
-        for (uint16_t extruder_id = 0; extruder_id < nb_extruders; ++extruder_id) {
-            if (!values[extruder_id].empty()) {
-                is_not_string = true;
-                break;
-            }
-        }
+        bool is_not_string = true;
         std::vector<std::string> string_values;
         //check if all values are strings
         if (is_not_string) {
@@ -1679,6 +1672,7 @@ void PlaceholderParser::append_custom_variables(std::map<std::string, std::vecto
                     }
                     string_values.push_back(values[extruder_id].substr(1, values[extruder_id].size() - 2));
                 } else {
+                    //if value is empty, it's a string.
                     string_values.push_back("");
                 }
             }
