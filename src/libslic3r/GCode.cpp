@@ -2143,6 +2143,9 @@ std::string GCodeGenerator::get_layer_change_gcode(const Vec3d& from, const Vec3
     )};
 
     std::string travel_gcode;
+    if (this->m_config.retract_before_travel.get_at(extruder_id) > xy_path.length()) {
+        travel_gcode += this->writer().retract();
+    }
     Vec3d previous_point{this->point_to_gcode(travel.front())};
     for (const Vec3crd& point : tcb::span{travel}.subspan(1)) {
         const Vec3d gcode_point{this->point_to_gcode(point)};
@@ -3029,6 +3032,13 @@ std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point) {
         gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + lift, "lift");
     }
 
+    if (!EXTRUDER_CONFIG(travel_ramping_lift)) {
+        if (!this->last_position ||
+            EXTRUDER_CONFIG(retract_before_travel) <
+                (this->point_to_gcode(*this->last_position) - gcode_point.head<2>()).norm()) {
+            gcode += this->writer().retract();
+        }
+    }
     this->last_position = point.head<2>();
     this->writer().update_position(gcode_point);
 
