@@ -49,7 +49,7 @@ private:
     // in unit/second
     double m_current_speed = 1000 / 60.0;
     bool m_is_custom_gcode = false;
-    uint16_t m_currrent_extruder = 0;
+    uint16_t m_current_extruder = 0;
 
     // variable for when you add a line (front of the buffer)
     int m_front_buffer_fan_speed = 1;
@@ -86,6 +86,7 @@ private:
     }
     // Processes the given gcode line
     void _process_gcode_line(GCodeReader& reader, const GCodeReader::GCodeLine& line);
+    void _process_ACTIVATE_EXTRUDER(const std::string_view command);
     void _process_T(const std::string_view command);
     void _put_in_middle_G1(std::list<BufferData>::iterator item_to_split, float nb_sec, BufferData&& line_to_write);
     void _print_in_middle_G1(BufferData& line_to_split, float nb_sec, const std::string& line_to_write);

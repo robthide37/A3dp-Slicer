@@ -49,6 +49,11 @@ PressureEqualizer::PressureEqualizer(const Slic3r::GCodeConfig &config) : m_use_
         m_filament_crossections.push_back(float(a));
     }
 
+    m_extruder_names.clear();
+    for (const std::string & str: config.tool_name.values) {
+        m_extruder_names.push_back(str);
+    }
+
     // Volumetric rate of a 0.45mm x 0.2mm extrusion at 60mm/s XY movement: 0.45*0.2*60*60=5.4*60 = 324 mm^3/min
     // Volumetric rate of a 0.45mm x 0.2mm extrusion at 20mm/s XY movement: 0.45*0.2*20*60=1.8*60 = 108 mm^3/min
     // Slope of the volumetric rate, changing from 20mm/s to 60mm/s over 2 seconds: (5.4-1.8)*60*60/2=60*60*1.8 = 6480 mm^3/min^2 = 1.8 mm^3/s^2
@@ -235,7 +240,7 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
             gcode = parse_int(line);
         } catch (Slic3r::InvalidArgument &) {
             // Ignore invalid GCodes.
-        eatws(line);
+            eatws(line);
             break;
         }
 
@@ -368,16 +373,26 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
             // Ignore the rest of the M-codes.
         break;
         }
+    case 'A': {
+        parse_activate_extruder(str_line);
+        break;
+    }
     case 'T':
     {
         // Activate an extruder head.
-        int new_extruder = parse_int(line);
-        if (new_extruder != int(m_current_extruder)) {
-            m_current_extruder = new_extruder;
-            m_retracted = true;
-            buf.type = GCODELINETYPE_TOOL_CHANGE;
-        } else {
-            buf.type = GCODELINETYPE_NOOP;
+        try {
+            int new_extruder = parse_int(line);
+            if (new_extruder != int(m_current_extruder)) {
+                m_current_extruder = new_extruder;
+                //m_retracted = true; // why?
+                buf.type = GCODELINETYPE_TOOL_CHANGE;
+            } else {
+                buf.type = GCODELINETYPE_NOOP;
+            }
+        } catch (Slic3r::InvalidArgument &) {
+            // Ignore invalid GCodes.
+            eatws(line);
+            break;
         }
         break;
     }
@@ -391,6 +406,47 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     ++ line_idx;
 #endif
 	return true;
+}
+
+void PressureEqualizer::parse_activate_extruder(const std::string &line_str)
+{
+    if (size_t cmd_end = line_str.find("CTIVATE_EXTRUDER"); cmd_end != std::string::npos) {
+        bool   error              = false;
+        size_t extruder_pos_start = line_str.find("EXTRUDER", cmd_end + std::string_view("CTIVATE_EXTRUDER").size()) +
+                                    std::string_view("EXTRUDER").size();
+        assert(line_str[extruder_pos_start - 1] == 'R');
+        if (extruder_pos_start != std::string::npos) {
+            // remove next char until '-' or [0-9]
+            while (extruder_pos_start < line_str.size() &&
+                   (line_str[extruder_pos_start] == ' ' || line_str[extruder_pos_start] == '=' ||
+                    line_str[extruder_pos_start] == '\t'))
+                ++extruder_pos_start;
+            size_t extruder_pos_end = extruder_pos_start + 1;
+            while (extruder_pos_end < line_str.size() && line_str[extruder_pos_end] != ' ' &&
+                   line_str[extruder_pos_end] != '\t' && line_str[extruder_pos_end] != '\r' &&
+                   line_str[extruder_pos_end] != '\n')
+                ++extruder_pos_end;
+            std::string extruder_name = line_str.substr(extruder_pos_start, extruder_pos_end - extruder_pos_start);
+            // we have a "name". It may be whatever or "extruder" + X
+            for (size_t extruder_idx = 0; extruder_idx < m_extruder_names.size(); ++extruder_idx) {
+                if (m_extruder_names[extruder_idx] == extruder_name) {
+                    m_current_extruder = extruder_idx;
+                return;
+                }
+            }
+            std::string extruder_str("extruder");
+            if (extruder_str == extruder_name) {
+                m_current_extruder = 0;
+                return;
+            }
+            for (size_t extruder_idx = 0; extruder_idx < m_extruder_names.size(); ++extruder_idx) {
+                if (extruder_str + std::to_string(extruder_idx) == extruder_name) {
+                    m_current_extruder = extruder_idx;
+                return;
+                }
+            }
+        }
+    }
 }
 
 void PressureEqualizer::output_gcode_line(const size_t line_idx)
