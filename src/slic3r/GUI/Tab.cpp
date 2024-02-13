@@ -5562,6 +5562,7 @@ std::vector<std::pair<std::string, std::vector<std::string>>> material_overrides
 
 void TabSLAMaterial::add_material_overrides_page()
 {
+    // TRN: Page title in Material Settings in SLA mode.
     PageShp page = add_options_page(L("Material Overrides"), "wrench");
 
     for (const auto& [title, keys] : material_overrides_option_keys) {

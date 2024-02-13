@@ -670,18 +670,18 @@ std::string SLAPrint::validate(std::vector<std::string>*) const
         double head_width       = m_full_print_config.opt_float(prefix + "support_head_width");
 
         if (head_penetration > head_width) {
-            return _u8L("Invalid Head penetration") + "\n" +
-                   _u8L("Head penetration should not be greater than the head width.") + "\n" + 
-                   _u8L("Please check value of head penetration in print settings or material overrides.");
+            return _u8L("Invalid Head penetration\n"
+                        "Head penetration should not be greater than the Head width.\n"
+                        "Please check value of Head penetration in Print Settings or Material Overrides.");
         }
 
         double pinhead_d = m_full_print_config.opt_float(prefix + "support_head_front_diameter");
         double pillar_d  = m_full_print_config.opt_float(prefix + "support_pillar_diameter");
 
         if (pinhead_d > pillar_d) {
-            return _u8L("Invalid pinhead diameter") + "\n" +
-                    _u8L("Pinhead front diameter should be smaller than the pillar diameter.") + 
-                    _u8L("Please check value of pinhead front diameter in print settings or material overrides.");
+            return _u8L("Invalid pinhead diameter\n"
+                        "Pinhead front diameter should be smaller than the Pillar diameter.\n"
+                        "Please check value of Pinhead front diameter in Print Settings or Material Overrides.");
         }
     }
 

@@ -3295,10 +3295,9 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
     }
 
     if (is_windows10() && !err_objects_idxs.empty()) {
-        auto dlg = WarningDialog(plater, _L("Cut is performed and open eages or auto-repaired errors are detected in result objects.\n"
-                                            "You can fix them by Windows repair algorithm.\n\n"
-                                            "Do you want to fix cut objects?"), 
-                                         _L("Detected errors in cut objects"), wxYES_NO);
+        auto dlg = WarningDialog(plater, _L("Open edges or auto-repaired errors were detected after the cut.\n"
+                                            "Do you want to fix them by Windows repair algorithm?"), 
+                                         _L("Errors detected after cut operation"), wxYES_NO);
         if (dlg.ShowModal() == wxID_YES) {
             //          model_name
             std::vector<std::string>                           succes_models;
@@ -3316,11 +3315,12 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
                 std::vector<std::pair<std::string, std::string>>& failed_models) -> bool
                 {
                     const std::string& model_name = model_names[model_idx];
-                    wxString msg = _L("Repairing model");
+                    wxString msg;
                     if (model_names.size() == 1)
-                        msg += ": " + from_u8(model_name) + "\n";
+                        msg = GUI::format(_L("Repairing object %1%"), model_name) + "\n";
                     else {
-                        msg += ":\n";
+                        // TRN: This is followed by a list of object which are to be repaired.
+                        msg = _L("Repairing objects:")  + "\n";
                         for (int i = 0; i < int(model_names.size()); ++i)
                             msg += (i == model_idx ? " > " : "   ") + from_u8(model_names[i]) + "\n";
                         msg += "\n";
@@ -3338,6 +3338,7 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
                 };
 
             // Open a progress dialog.
+            // TRN: This shows in a progress dialog while the operation is in progress.
             wxProgressDialog progress_dlg(_L("Fixing by Windows repair algorithm"), "", 100, find_toplevel_parent(plater),
                 wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT);
             int model_idx{ 0 };
@@ -3352,7 +3353,8 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
 
             // Show info dialog
             wxString msg = MenuFactory::get_repaire_result_message(succes_models, failed_models);
-            InfoDialog(plater, _L("Repairing result"), msg).ShowModal();
+            // TRN: Title of a dialog informing the user about the result of the model repair operation.
+            InfoDialog(plater, _L("Repair operation finished"), msg).ShowModal();
         }
     }
 }

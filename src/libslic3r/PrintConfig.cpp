@@ -5104,7 +5104,7 @@ CLIMiscConfigDef::CLIMiscConfigDef()
 
     def = this->add("threads", coInt);
     def->label = L("Maximum number of threads");
-    def->tooltip = L("Sets the maximum number of threads the slicing process will use. If not defined, slic3r will decide.");
+    def->tooltip = L("Sets the maximum number of threads the slicing process will use. If not defined, it will be decided automatically.");
     def->min = 1;
 
     def = this->add("loglevel", coInt);
@@ -5440,6 +5440,7 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     def->tooltip = L("Height above the print bed when the toolchange takes place. Usually the same as layer_z, but can be different.");
 
     def = this->add("color_change_extruder", coInt);
+    // TRN: This is a label in custom g-code editor dialog, belonging to color_change_extruder. Denoted index of the extruder for which color change is performed.
     def->label = L("Color change extruder");
     def->tooltip = L("Index of the extruder for which color change will be performed. The index is zero based (first extruder has index 0).");
 }
