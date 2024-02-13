@@ -208,7 +208,7 @@ void FanMover::_remove_slow_fan(int16_t min_speed, float past_sec) {
 }
 
 std::string FanMover::_set_fan(int16_t speed) {
-    const Tool* tool = m_writer.get_tool(m_currrent_extruder < 20 ? m_currrent_extruder : 0);
+    const Tool* tool = m_writer.get_tool(m_current_extruder < 20 ? m_current_extruder : 0);
     std::string str = GCodeWriter::set_fan(m_writer.config.gcode_flavor.value, m_writer.config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, m_writer.config.fan_percentage.value);
     if(!str.empty() && str.back() == '\n')
         return str.substr(0,str.size()-1);
@@ -248,10 +248,48 @@ void FanMover::_process_T(const std::string_view command)
 
             // T-1 is a valid gcode line for RepRap Firmwares (used to deselects all tools) see https://github.com/prusa3d/PrusaSlicer/issues/5677
             if ((flavor != gcfRepRap && flavor != gcfSprinter) || eid != -1)
-                m_currrent_extruder = static_cast<uint16_t>(0);
+                m_current_extruder = static_cast<uint16_t>(0);
         } else {
-            m_currrent_extruder = static_cast<uint16_t>(eid);
+            m_current_extruder = static_cast<uint16_t>(eid);
         }
+    }
+}
+
+
+void FanMover::_process_ACTIVATE_EXTRUDER(const std::string_view cmd)
+{
+    if (size_t cmd_end = cmd.find("ACTIVATE_EXTRUDER"); cmd_end != std::string::npos) {
+        bool   error              = false;
+        size_t extruder_pos_start = cmd.find("EXTRUDER", cmd_end + std::string_view("ACTIVATE_EXTRUDER").size()) + std::string_view("EXTRUDER").size();
+        assert(cmd[extruder_pos_start - 1] == 'R');
+        if (extruder_pos_start != std::string::npos) {
+            //remove next char until '-' or [0-9]
+            while (extruder_pos_start < cmd.size() && (cmd[extruder_pos_start] == ' ' || cmd[extruder_pos_start] == '=' || cmd[extruder_pos_start] == '\t'))
+                ++extruder_pos_start;
+            size_t extruder_pos_end = extruder_pos_start + 1;
+            while (extruder_pos_end < cmd.size() && cmd[extruder_pos_end] != ' ' && cmd[extruder_pos_end] != '\t' && cmd[extruder_pos_end] != '\r' && cmd[extruder_pos_end] != '\n')
+                ++extruder_pos_end;
+            std::string_view extruder_name = cmd.substr(extruder_pos_start, extruder_pos_end-extruder_pos_start);
+            // we have a "name". It may be whatever or "extruder" + X
+            for (const Extruder &extruder : m_writer.extruders()) {
+                if (m_writer.config.tool_name.values[extruder.id()] == extruder_name) {
+                    m_current_extruder = static_cast<uint16_t>(extruder.id());
+                    return;
+                }
+            }
+            std::string extruder_str("extruder");
+            if (extruder_str == extruder_name) {
+                m_current_extruder = static_cast<uint16_t>(0);
+                return;
+            }
+            for (const Extruder &extruder : m_writer.extruders()) {
+                if (extruder_str + std::to_string(extruder.id()) == extruder_name) {
+                    m_current_extruder = static_cast<uint16_t>(extruder.id());
+                    return;
+                }
+            }
+        }
+        BOOST_LOG_TRIVIAL(error) << "invalid ACTIVATE_EXTRUDER gcode command: '" << cmd << "', ignored by the fam mover post-process.";
     }
 }
 
@@ -266,6 +304,9 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
         if (line.has_f())
             m_current_speed = line.f() / 60.0f;
         switch (::toupper(cmd[0])) {
+        case 'A':
+            _process_ACTIVATE_EXTRUDER(line.raw());
+                break;
         case 'T':
         case 't':
             _process_T(cmd);
@@ -442,17 +483,20 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
         if (line.has(Axis::E)) {
             new_data.e = reader.e();
             if (relative_e) {
-                assert(new_data.e == 0);
                 new_data.de = line.e();
+                // GCode reader doesn't know it's relative extrusion, we have to do it ourself.
+                //assert(new_data.e == 0);
+                new_data.e = 0;
             } else
                 new_data.de = line.dist_E(reader);
         }
         assert(new_data.dx == 0 || reader.x() == new_data.x);
-        assert(new_data.dx == 0 || reader.x() + new_data.dx == line.x());
-        assert(new_data.dy == 0 ||reader.y() == new_data.y);
-        assert(new_data.dy == 0 || reader.y() + new_data.dy == line.y());
-        assert(new_data.de == 0 || reader.e() == new_data.e);
-        assert(new_data.de == 0 || reader.e() + new_data.de == line.e());
+        assert(new_data.dx == 0 || std::abs(reader.x() + new_data.dx - line.x()) < 0.00001f);
+        assert(new_data.dy == 0 || reader.y() == new_data.y);
+        assert(new_data.dy == 0 || std::abs(reader.y() + new_data.dy - line.y()) < 0.00001f);
+        assert(new_data.de == 0 || (relative_e?0:reader.e()) == new_data.e);
+        assert(new_data.de == 0 || std::abs((relative_e?0.f:reader.e()) + new_data.de - line.e()) < 0.00001f);
+        //assert(new_data.de == 0 ||(relative_e?0.f:reader.e()) + new_data.de == line.e());
 
         if (m_current_kickstart.time > 0 && time > 0) {
             m_current_kickstart.time -= time;

@@ -1446,7 +1446,7 @@ static inline std::vector<std::vector<ExPolygons>> mmu_segmentation_top_and_bott
                 // color_idx == 0 means "don't know" extruder aka the underlying extruder.
                 // As this region may split existing regions, we collect statistics over all regions for color_idx == 0.
                 color_idx == 0 || config.perimeter_extruder == int(color_idx)) {
-                double perimeter_extrusion_width = config.get_computed_value("perimeter_extrusion_width");
+                double perimeter_extrusion_width = config.get_computed_value("perimeter_extrusion_width", config.perimeter_extruder);
                 out.extrusion_width     = std::max<double>(out.extrusion_width, perimeter_extrusion_width);
                 out.top_solid_layers    = std::max<int>(out.top_solid_layers, config.top_solid_layers);
                 out.bottom_solid_layers = std::max<int>(out.bottom_solid_layers, config.bottom_solid_layers);

@@ -947,7 +947,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 double t = (layer_time - slowdown_below_layer_time) / (fan_below_layer_time - slowdown_below_layer_time);
                 for (size_t etype_idx = 0; etype_idx < etype_can_increase_fan.size(); etype_idx++) {
                     uint16_t idx = etype_can_increase_fan[etype_idx];
-                    if (fan_speeds[idx] < max_fan_speed) // don't reduce speed if max speed is lower.
+                    if (fan_speeds[idx] < max_fan_speed) // if max speed is lower, this will reduce speed, so don't do it.
                         fan_speeds[idx] = std::clamp(int(t * fan_speeds[idx] + (1. - t) * max_fan_speed + 0.5), 0, 255);
                 }
             }

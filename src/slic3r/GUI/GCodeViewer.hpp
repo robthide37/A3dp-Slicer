@@ -37,6 +37,8 @@ class GCodeViewer
     static const std::vector<Color> Range_Colors;
     static const Color              Wipe_Color;
     static const Color              Neutral_Color;
+    static const Color              Too_Low_Value_Color;
+    static const Color              Too_High_Value_Color;
 
     enum class EOptionsColors : unsigned char
     {
@@ -382,6 +384,9 @@ class GCodeViewer
         bool visible{ false };
     };
 
+    public:
+        enum class EViewType : unsigned char;
+    private:
     // helper to render extrusion paths
     struct Extrusions
     {
@@ -389,23 +394,33 @@ class GCodeViewer
         {
             float min;
             float max;
-            unsigned int count;
-            uint32_t counts[20];
+            float full_precision_min;
+            float full_precision_max;
+
+            // 0 if no values, 1 if only one different value, 2 if only min max, 3 if more values.
+            uint8_t has_min_max = 0;
+
+            // count of all item passed into update
             uint64_t total_count;
+            // total_count per log item
+            uint32_t counts[20];
             float maxs[20];
             float mins[20];
+            
+            // set 0 or lower to disable
+            float user_min = 0;
+            float user_max = 0;
+            bool log_scale = false;
+            float ratio_outlier = 0.f;
 
             Range() { reset(); }
-            void update_from(const float value);
+            void update_from(const float value, const uint8_t decimal_precision);
             void reset();
-            float get_max_no_outliers(float ratio_outlier = 0.01) const;
-            float get_min_no_outliers(float ratio_outlier = 0.01) const;
-            float step_size_no_outliers(float ratio_outlier = 0.01, bool log = false) const;
-            Color get_color_at_no_outliers(float value, float ratio_outlier = 0.01, bool log = false) const;
-            float step_size_with_outliers(float ratio_outlier = 0.01, bool log = false) const { return step_size(min, max, log); }
-            Color get_color_at_with_outliers(float value, float ratio_outlier = 0.01, bool log = false) const { return get_color_at(min, max, value, log); }
+            float get_current_max() const;
+            float get_current_min() const;
+            float step_size() const;
+            Color get_color_at(float value) const;
             static float step_size(float min, float max, bool log = false);
-            static Color get_color_at(float min, float max, float value, bool log = false);
         };
 
         struct Ranges
@@ -429,7 +444,7 @@ class GCodeViewer
             // Color mapping by time.
             Range elapsed_time;
 
-
+            Range* get(EViewType type);
 
             void reset() {
                 height.reset();
@@ -697,7 +712,6 @@ public:
         FanSpeed,
         Temperature,
         LayerTime,
-        LayerTimeLog,
         Chronology,
         VolumetricRate,
         VolumetricFlow,
@@ -731,7 +745,6 @@ private:
     Shells m_shells;
     EViewType m_view_type{ EViewType::FeatureType };
     bool m_legend_enabled{ true };
-    bool m_outliers_allowed{ true };
     PrintEstimatedStatistics m_print_statistics;
     PrintEstimatedStatistics::ETimeMode m_time_estimate_mode{ PrintEstimatedStatistics::ETimeMode::Normal };
 #if ENABLE_GCODE_VIEWER_STATISTICS

@@ -123,8 +123,10 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
         out += _L("By default, there won't be any fan speed command.");
     else if (default_fan_speed == 0)
         out += _L("Fan will be turned off by default.");
+    else if(min_fan_speed == 0)
+        out += format_wxstr(_L("Fan will run at %1%%% by default."), std::max(default_fan_speed, min_fan_speed));
     else
-        out += format_wxstr(_L("Fan will run at %1%%% by default."), default_fan_speed);
+        out += format_wxstr(_L("Fan will run at %1%%% by default."), std::max(default_fan_speed, min_fan_speed))+" "+format_wxstr(_L("The minimum speed is %1%%%."), min_fan_speed);
     
     format_double_fan_min_speed(out, min_fan_speed, default_fan_speed, _L("Internal perimeters"), peri_fan_speed, _L("External perimeters"), ext_peri_fan_speed);
     format_simple_fan_min_speed(out, min_fan_speed, default_fan_speed, _L("Sparse infill"), infill_fan_speed);

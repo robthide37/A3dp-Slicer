@@ -7880,7 +7880,7 @@ void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config, bo
 
 
 template<typename CONFIG_CLASS>
-void _deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::string> settings,
                                            CONFIG_CLASS &                             config,
                                            const DynamicPrintConfig &                 global_config,
                                            ConfigSubstitutionContext &                config_substitutions,
@@ -7889,15 +7889,16 @@ void _deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> se
 {
     std::map<t_config_option_key, std::string> unknown_keys;
     const ConfigDef *def = config.def();
-    for (auto [key, value] : settings) {
+    for (const auto &[key, value] : settings) {
         try {
             t_config_option_key opt_key = key;
-            PrintConfigDef::handle_legacy(opt_key, value, false);
+            std::string opt_value = value;
+            PrintConfigDef::handle_legacy(opt_key, opt_value, false);
             if (!opt_key.empty())
                 if (!def->has(opt_key)) {
                     unknown_keys.emplace(key, value);
                 } else {
-                    config.set_deserialize(opt_key, value, config_substitutions);
+                    config.set_deserialize(opt_key, opt_value, config_substitutions);
                 }
         } catch (UnknownOptionException & /* e */) {
             // log & ignore
@@ -7918,7 +7919,7 @@ void _deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> se
     // from prusa: try again with from_prusa before handle_legacy
     if (check_prusa) {
         std::map<t_config_option_key, std::string> settings_to_change;
-        for (auto [key, value] : unknown_keys) {
+        for (auto& [key, value] : unknown_keys) {
             t_config_option_key                        opt_key = key;
             std::map<t_config_option_key, std::string> result  = PrintConfigDef::from_prusa(opt_key, value, global_config);
             settings_to_change.insert(result.begin(), result.end());
@@ -7945,10 +7946,10 @@ void _deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> se
                 }
             }
         }
-        for (auto entry : settings_to_change)
+        for (const auto &entry : settings_to_change)
             config.set_deserialize(entry.first, entry.second, config_substitutions);
     } else {
-        for (auto [key, value] : unknown_keys) {
+        for (const auto& [key, value] : unknown_keys) {
             if (config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable) {
                 config_substitutions.add(ConfigSubstitution(key, value));
             }
@@ -7958,7 +7959,7 @@ void _deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> se
     // set phony entries
     if (with_phony) {
         const ConfigDef *def = config.def();
-        for (auto &[opt_key_width, opt_key_spacing] :
+        for (const auto& [opt_key_width, opt_key_spacing] :
                 {std::pair<char *, char *>{"extrusion_width", "extrusion_spacing"},
                 std::pair<char *, char *>{"perimeter_extrusion_width", "perimeter_extrusion_spacing"},
                 std::pair<char *, char *>{"external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing"},
@@ -7966,12 +7967,38 @@ void _deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> se
                 std::pair<char *, char *>{"infill_extrusion_width", "infill_extrusion_spacing"},
                 std::pair<char *, char *>{"solid_infill_extrusion_width", "solid_infill_extrusion_spacing"},
                 std::pair<char *, char *>{"top_infill_extrusion_width", "top_infill_extrusion_spacing"}}) {
-            // if prusa has defined a width, or if the config has a default spacing that need to be overwritten
-            if (config.option(opt_key_width) != nullptr || config.option(opt_key_spacing) != nullptr) {
-                ConfigOption *opt_new = def->get(opt_key_spacing)->default_value.get()->clone();
-                opt_new->deserialize(""); // note: deserialize don't set phony, only the ConfigBase::set_deserialize*
-                opt_new->set_phony(true);
-                config.set_key_value(opt_key_spacing, opt_new);
+            const ConfigOption *opt_width = config.option(opt_key_width);
+            const ConfigOption *opt_spacing = config.option(opt_key_spacing);
+            if (opt_width && opt_spacing) {
+                // if the config has a default spacing that need to be overwritten (if the width wasn't deserialized as phony)
+                if (settings.find(opt_key_spacing) == settings.end()) {
+                    if (opt_width->is_phony()) {
+                        if (opt_spacing->is_phony()) {
+                            ConfigOption *opt_new = opt_spacing->clone();
+                            opt_new->set_phony(false);
+                            config.set_key_value(opt_key_spacing, opt_new);
+                        }
+                    } else {
+                        if (!opt_spacing->is_phony()) {
+                            ConfigOption *opt_new = opt_spacing->clone();
+                            opt_new->set_phony(true);
+                            config.set_key_value(opt_key_spacing, opt_new);
+                        }
+                    }
+                } else {
+                    //spacing exist in the config, make sure one if phony
+                    if (opt_spacing->is_phony() && opt_width->is_phony()) {
+                        ConfigOption *opt_new = opt_width->clone();
+                        opt_new->set_phony(false);
+                        config.set_key_value(opt_key_width, opt_new);
+                    }
+                    if (!opt_spacing->is_phony() && !opt_width->is_phony()) {
+                        ConfigOption *opt_new = opt_width->clone();
+                        opt_new->set_phony(true);
+                        config.set_key_value(opt_key_width, opt_new);
+                    }
+                }
+                assert(config.option(opt_key_width)->is_phony() != config.option(opt_key_spacing)->is_phony());
             }
         }
     }
