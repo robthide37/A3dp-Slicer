@@ -14,7 +14,7 @@
 using namespace Slic3r;
 using namespace Test;
 
-constexpr bool debug_files {false};
+constexpr bool debug_files {true};
 
 void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfig& config, const unsigned duplicate) {
     constexpr std::size_t tools_count = 4;
@@ -177,7 +177,7 @@ TEST_CASE("Z moves", "[retraction]") {
         { "start_gcode", "" },  // To avoid dealing with the nozzle lift in start G-code
         { "retract_length", "0" },
         { "retract_layer_change", "0" },
-        { "retract_lift", "0.2" },
+        { "retract_lift", "0.2" }
     });
 
     bool retracted = false;
@@ -214,8 +214,8 @@ TEST_CASE("Z moves", "[retraction]") {
     CHECK(layer_changes_with_retraction == 0);
     INFO("no retractions");
     CHECK(retractions == 0);
-    INFO("no lift other than for the first move");
-    CHECK(z_restores == 1);
+    INFO("no lift");
+    CHECK(z_restores == 0);
 }
 
 TEST_CASE("Firmware retraction handling", "[retraction]") {

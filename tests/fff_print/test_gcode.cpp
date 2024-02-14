@@ -130,7 +130,8 @@ TEST_CASE("Extrusion, travels, temeperatures", "[GCode]") {
         { "layer_height", 0.4 },
         { "first_layer_height", 0.4 },
         { "temperature", "200" },
-        { "first_layer_temperature", "210" }
+        { "first_layer_temperature", "210" },
+        { "retract_length", "0" }
     });
 
     std::vector<double> z_moves;

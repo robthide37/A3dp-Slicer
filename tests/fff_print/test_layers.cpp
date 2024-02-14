@@ -42,6 +42,7 @@ TEST_CASE("Layer heights are correct", "[Layers]") {
         { "start_gcode", "" },
         { "layer_height", 0.3 },
         { "first_layer_height", 0.2 },
+        { "retract_length", "0" }
     });
 
     SECTION("Absolute first layer height") {

@@ -3019,25 +3019,20 @@ std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point) {
 
     const Vec3d gcode_point = to_3d(this->point_to_gcode(point.head<2>()), unscaled(point.z()));
 
-    if (!this->last_position) {
-        double lift{
-            EXTRUDER_CONFIG(travel_ramping_lift) ? EXTRUDER_CONFIG(travel_max_lift) :
-                                                   EXTRUDER_CONFIG(retract_lift)};
-        const double upper_limit = EXTRUDER_CONFIG(retract_lift_below);
-        const double lower_limit = EXTRUDER_CONFIG(retract_lift_above);
-        if ((lower_limit > 0 && gcode_point.z() < lower_limit) ||
-            (upper_limit > 0 && gcode_point.z() > upper_limit)) {
-            lift = 0.0;
-        }
-        gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + lift, "lift");
+    double lift{
+        EXTRUDER_CONFIG(travel_ramping_lift) ? EXTRUDER_CONFIG(travel_max_lift) :
+                                               EXTRUDER_CONFIG(retract_lift)};
+    const double upper_limit = EXTRUDER_CONFIG(retract_lift_below);
+    const double lower_limit = EXTRUDER_CONFIG(retract_lift_above);
+    if ((lower_limit > 0 && gcode_point.z() < lower_limit) ||
+        (upper_limit > 0 && gcode_point.z() > upper_limit)) {
+        lift = 0.0;
     }
 
-    if (!EXTRUDER_CONFIG(travel_ramping_lift)) {
-        if (!this->last_position ||
-            EXTRUDER_CONFIG(retract_before_travel) <
-                (this->point_to_gcode(*this->last_position) - gcode_point.head<2>()).norm()) {
+    if (EXTRUDER_CONFIG(retract_length) > 0 && (!this->last_position || (!EXTRUDER_CONFIG(travel_ramping_lift)))) {
+        if (!this->last_position || EXTRUDER_CONFIG(retract_before_travel) < (this->point_to_gcode(*this->last_position) - gcode_point.head<2>()).norm()) {
             gcode += this->writer().retract();
-            gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + EXTRUDER_CONFIG(retract_lift), "lift");
+            gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + lift, "lift");
         }
     }
     this->last_position = point.head<2>();
