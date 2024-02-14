@@ -3005,13 +3005,20 @@ namespace Slic3r {
                                     opt_tree.put("<xmlattr>.opt_key", opt_key);
                                 } else {
                                     std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
-                                    log << "error in ranges, can't serialize " << opt_key << ": '" << value << "' " << (config.option(opt_key) != nullptr) << "\n";
-                                    if (config.option(opt_key) != nullptr) {
-                                        log << "type : " << config.option(opt_key)->type();
+                                    const ConfigOption *option = config.option(opt_key);
+                                    log << "error in ranges, can't serialize " << opt_key << ": '" << value << "' " << (option != nullptr) << "\n";
+                                    if (option != nullptr) {
+                                        log << "type : " << option->type();
+                                        log << ", flags : " << option->flags;
+                                        log << ", phony : " << option->is_phony();
+                                        log << ", serialized : '" << option->serialize() << "'";
                                         log << "\n";
                                     }
-                                    if (config.option(opt_key) != nullptr && config.option(opt_key)->type() == ConfigOptionType::coEnum) {
-                                        log << "enum : " << config.option(opt_key)->get_int();
+                                    log << "Keys in config:";
+                                    for(const std::string &k : config.keys()) log << " " << k;
+                                    log << "\n";
+                                    if (option != nullptr && option->type() == ConfigOptionType::coEnum) {
+                                        log << "enum : " << option->get_int();
                                         log << "\n";
                                         const ConfigOptionDef* def = nullptr;
                                         try {
@@ -3025,8 +3032,8 @@ namespace Slic3r {
                                             }
                                         }
                                     }
-                                    if (config.option(opt_key) != nullptr && config.option(opt_key)->type() == ConfigOptionType::coInt) {
-                                        log << "int : " << config.option(opt_key)->get_int();
+                                    if (option != nullptr && option->type() == ConfigOptionType::coInt) {
+                                        log << "int : " << option->get_int();
                                         log << "\n";
                                     }
                                     log.close();
@@ -3230,16 +3237,23 @@ namespace Slic3r {
                             stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                         } else {
                             std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
-                            log << "error in model, can't serialize " << key << ": '" << value << "' " << (obj->config.option(key) != nullptr) << "\n";
-                            if (obj->config.option(key) != nullptr) {
-                                log << "type : " << obj->config.option(key)->type();
+                            const ConfigOption *option = obj->config.option(key);
+                            log << "error in model, can't serialize " << key << ": '" << value << "' " << (option != nullptr) << "\n";
+                            if (option != nullptr) {
+                                log << "type : " << option->type();
+                                log << ", flags : " << option->flags;
+                                log << ", phony : " << option->is_phony();
+                                log << ", serialized : '" << option->serialize() << "'";
                                 log << "\n";
                             }
-                            if (obj->config.option(key) != nullptr && obj->config.option(key)->type() == ConfigOptionType::coEnum) {
+                            log << "Keys in obj:";
+                            for(const std::string &k : obj->config.keys()) log << " " << k;
+                            log << "\n";
+                            if (option != nullptr && option->type() == ConfigOptionType::coEnum) {
                                 try{
-                                    log << "raw_int_value : " << obj->config.option(key)->get_int() << "\n";
+                                    log << "raw_int_value : " << option->get_int() << "\n";
                                 } catch (std::exception ex) {}
-                                log << "enum : " << obj->config.option(key)->get_int();
+                                log << "enum : " << option->get_int();
                                 log << "\n";
                                 const ConfigOptionDef* def = nullptr;
                                 try {
@@ -3253,8 +3267,8 @@ namespace Slic3r {
                                     }
                                 }
                             }
-                            if (obj->config.option(key) != nullptr && obj->config.option(key)->type() == ConfigOptionType::coInt) {
-                                log << "int : " << obj->config.option(key)->get_int();
+                            if (option != nullptr && option->type() == ConfigOptionType::coInt) {
+                                log << "int : " << option->get_int();
                                 log << "\n";
                             }
                             log.close();
@@ -3338,16 +3352,23 @@ namespace Slic3r {
                                         stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                                     } else {
                                         std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
-                                        log << "error in volume, can't serialize " << key << ": '" << value << "' " << ((volume->config.option(key) != nullptr)?"exist":"doesn't exist") << "\n";
-                                        if (volume->config.option(key) != nullptr) {
-                                            log << "type : " << volume->config.option(key)->type();
+                                        const ConfigOption *option = volume->config.option(key);
+                                        log << "error in volume, can't serialize " << key << ": '" << value << "' " << ((option != nullptr)?"exist":"doesn't exist") << "\n";
+                                        if (option != nullptr) {
+                                            log << "type : " << option->type();
+                                            log << ", flags : " << option->flags;
+                                            log << ", phony : " << option->is_phony();
+                                            log << ", serialized : '" << option->serialize() << "'";
                                             log << "\n";
                                         }
-                                        if (volume->config.option(key) != nullptr && volume->config.option(key)->type() == ConfigOptionType::coEnum) {
+                                        log << "Keys in volume:";
+                                        for(const std::string &k : volume->config.keys()) log << " " << k;
+                                        log << "\n";
+                                        if (option != nullptr && option->type() == ConfigOptionType::coEnum) {
                                             try{
-                                                log << "raw_int_value : " << volume->config.option(key)->get_int() << "\n";
+                                                log << "raw_int_value : " << option->get_int() << "\n";
                                             } catch (std::exception ex) {}
-                                            log << "enum : " << volume->config.option(key)->get_int();
+                                            log << "enum : " << option->get_int();
                                             log << "\n";
                                             const ConfigOptionDef* def = nullptr;
                                             try {
@@ -3361,8 +3382,8 @@ namespace Slic3r {
                                                 }
                                             }
                                         }
-                                        if (volume->config.option(key) != nullptr && volume->config.option(key)->type() == ConfigOptionType::coInt) {
-                                            log << "int : " << volume->config.option(key)->get_int();
+                                        if (option != nullptr && option->type() == ConfigOptionType::coInt) {
+                                            log << "int : " << option->get_int();
                                             log << "\n";
                                         }
                                         log.close();
