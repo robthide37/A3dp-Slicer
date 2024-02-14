@@ -449,7 +449,7 @@ void Control::SetLayersTimes(const std::vector<float>& layers_times, float total
                 m_layers_times.push_back(total_time);
         Refresh();
         Update();
-}
+    }
 }
 
 void Control::SetLayersTimes(const std::vector<double>& layers_times)
@@ -458,6 +458,22 @@ void Control::SetLayersTimes(const std::vector<double>& layers_times)
     m_layers_times = layers_times;
     for (size_t i = 1; i < m_layers_times.size(); i++)
         m_layers_times[i] += m_layers_times[i - 1];
+}
+
+void Control::SetLayersAreas(const std::vector<float>& layers_areas)
+{
+    m_layers_areas.clear();
+    m_layers_areas.reserve(layers_areas.size());
+    for(float area : layers_areas)
+        m_layers_areas.push_back(area);
+    if (m_layers_values.size() == m_layers_areas.size() + 1)
+        m_layers_areas.insert(m_layers_areas.begin(), 0.);
+    if (m_is_wipe_tower && m_values.size() != m_layers_areas.size()) {
+        // When whipe tower is used to the end of print, there is one layer which is not marked in layers_times
+        // So, add this value from the total print time value
+        for (size_t i = m_layers_areas.size(); i < m_layers_values.size(); i++)
+            m_layers_areas.push_back(0.);
+    }
 }
 
 void Control::SetDrawMode(bool is_sla_print, bool is_sequential_print)
@@ -796,6 +812,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
             size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) /**/ + 1 : (m_values.empty() ? value : value /* + 1 */ );
             bool show_lheight = GUI::wxGetApp().app_config->get("show_layer_height_doubleslider") == "1";
             bool show_ltime = GUI::wxGetApp().app_config->get("show_layer_time_doubleslider") == "1";
+            bool show_larea = GUI::wxGetApp().app_config->get("show_layer_area_doubleslider") == "1";
             int nb_lines = 2; // to move things down if the slider is on top
             wxString comma = "\n";
             if (show_lheight) {
@@ -823,6 +840,19 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
                         double previous_time = (layer_idx_time > 0 ? m_layers_times[layer_idx_time - 1] : 0);
                         wxString layer_time_wstr = short_and_splitted_time(get_time_dhms(m_layers_times[layer_idx_time] - previous_time));
                         str = str + comma + layer_time_wstr;
+                        comma = "\n";
+                    }
+                }
+            }
+            if (show_larea && !m_layers_areas.empty()) {
+                if (m_layers_areas.size() +1 >= m_values.size()) {
+                    size_t layer_idx_time = layer_number;
+                    if (m_values.size() > m_layers_areas.size()) {
+                        layer_idx_time--;
+                    }
+                    if (layer_idx_time < m_layers_areas.size()) {
+                        nb_lines++;
+                        str = str + comma + wxString::Format("%.*f", m_layers_areas[layer_idx_time] < 1 ? 3 : m_layers_areas[layer_idx_time] < 10 ? 2 : m_layers_areas[layer_idx_time] < 100 ? 1 : 0, m_layers_areas[layer_idx_time]);
                         comma = "\n";
                     }
                 }

@@ -745,6 +745,29 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
         auto print_mode_stat = m_gcode_result->print_statistics.modes.front();
         m_layers_slider->SetLayersTimes(print_mode_stat.layers_times, print_mode_stat.time);
     }
+    {
+        // create area array
+        //area not computed for sla_print_technology //TODO
+        if (!sla_print_technology){
+            const std::vector<std::pair<coordf_t, float>> &layerz_to_area = plater->fff_print().print_statistics().layer_area_stats;
+            std::vector<float> areas;
+            for(auto [z, area] : layerz_to_area)
+                areas.push_back(area);
+            m_layers_slider->SetLayersAreas(areas);
+            //auto objects = plater->fff_print().objects();
+            //for (auto object : objects) {
+            //    for (auto layer : object->layers()) {
+            //        assert(layer->print_z > 100);
+            //        coord_t layer_z = 100*(coord_t(layer->print_z + 50)/100);
+            //        int32_t area = layerz_to_area[layer_z];
+            //        for (auto poly : layer->lslices) {
+            //            area += poly.area();
+            //        }
+            //        layerz_to_area[layer_z] = area;
+            //    }
+            //}
+        }
+    }
 
     // Suggest the auto color change, if model looks like sign
     if (m_layers_slider->IsNewPrint())

@@ -1799,7 +1799,7 @@ bool PrintObject::invalidate_state_by_config_options(
             double total_area = 0;
             if (this->print()->config().complete_objects.value) {
                 // sequential printing: only consider myself
-                for (const ExPolygon &slice : layer->lslices) { total_area += slice.area(); }
+                for (const ExPolygon &slice : my_layer->lslices) { total_area += slice.area(); }
             } else {
                 // parallel printing: get all objects
                 for (const PrintObject *object : this->print()->objects()) {

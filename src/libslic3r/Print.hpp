@@ -499,6 +499,7 @@ struct PrintStatistics
     std::string                     initial_filament_type;
     std::string                     printing_filament_types;
     std::map<size_t, double>        filament_stats;
+    std::vector<std::pair<double, float>> layer_area_stats; // print_z to area
 
     // Config with the filled in print statistics.
     DynamicConfig           config() const;

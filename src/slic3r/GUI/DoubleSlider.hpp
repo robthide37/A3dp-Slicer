@@ -249,6 +249,7 @@ public:
     void    SetTicksValues(const Info &custom_gcode_per_print_z);
     void    SetLayersTimes(const std::vector<float>& layers_times, float total_time);
     void    SetLayersTimes(const std::vector<double>& layers_times);
+    void    SetLayersAreas(const std::vector<float>& layers_areas);
 
     void    SetDrawMode(bool is_sla_print, bool is_sequential_print);
     void    SetDrawMode(DrawMode mode) { m_draw_mode = mode; }
@@ -424,6 +425,7 @@ private:
     std::vector<double> m_values;
     TickCodeInfo        m_ticks;
     std::vector<double> m_layers_times;
+    std::vector<double> m_layers_areas;
     std::vector<double> m_layers_values;
     std::vector<std::string>    m_extruder_colors;
     std::string         m_print_obj_idxs;

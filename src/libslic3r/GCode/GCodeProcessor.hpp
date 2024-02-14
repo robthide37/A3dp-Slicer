@@ -49,6 +49,7 @@ namespace Slic3r {
             std::vector<std::pair<EMoveType, float>> moves_times;
             std::vector<std::pair<ExtrusionRole, float>> roles_times;
             std::vector<float> layers_times;
+            std::vector<float> layers_areas;
 
             void reset() {
                 time = 0.0f;

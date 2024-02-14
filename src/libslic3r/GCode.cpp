@@ -2958,9 +2958,9 @@ LayerResult GCode::process_layer(
         return result;
 
     // Extract 1st object_layer and support_layer of this set of layers with an equal print_z.
-    coordf_t             print_z       = layer.print_z;
-    bool                 first_layer   = layer.id() == 0;
-    uint16_t         first_extruder_id = layer_tools.extruders.front();
+    coordf_t print_z           = layer.print_z;
+    bool     first_layer       = layer.id() == 0;
+    uint16_t first_extruder_id = layer_tools.extruders.front();
 
     // Initialize config with the 1st object to be printed at this layer.
     m_config.apply(print.default_region_config(), true);
@@ -3631,6 +3631,14 @@ LayerResult GCode::process_layer(
 
     file.write(gcode);
 #endif
+
+    // set area used in this layer
+    double layer_area = 0;
+    for (const LayerToPrint &print_layer : layers)
+        for (auto poly : print_layer.layer()->lslices)
+            layer_area += poly.area();
+    layer_area = unscaled(unscaled(layer_area));
+    status_monitor.stats().layer_area_stats.emplace_back(print_z, layer_area);
 
     BOOST_LOG_TRIVIAL(trace) << "Exported layer " << layer.id() << " print_z " << print_z <<
     log_memory_info();
