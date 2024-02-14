@@ -515,6 +515,8 @@ static std::vector<std::string> s_Preset_print_options {
         "fill_angle_template",
         "bridge_angle",
         "solid_infill_below_area",
+        "solid_infill_below_layer_area",
+        "solid_infill_below_width",
         "only_retract_when_crossing_perimeters", "enforce_retract_first_layer",
         "infill_first",
         "avoid_crossing_perimeters_max_detour",

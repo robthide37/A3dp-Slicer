@@ -394,6 +394,7 @@ private:
     void _transform_hole_to_polyholes();
     ExPolygons _smooth_curves(const ExPolygons &input, const PrintRegionConfig &conf) const;
     void detect_surfaces_type();
+    void apply_solid_infill_below_layer_area();
     void process_external_surfaces();
     void discover_vertical_shells();
     void bridge_over_infill();

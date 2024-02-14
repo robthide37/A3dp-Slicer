@@ -936,6 +936,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       small_perimeter_max_length))
     ((ConfigOptionEnum<InfillPattern>,  solid_fill_pattern))
     ((ConfigOptionFloat,                solid_infill_below_area))
+    ((ConfigOptionFloat,                solid_infill_below_layer_area))
+    ((ConfigOptionFloatOrPercent,       solid_infill_below_width))
     ((ConfigOptionInt,                  solid_infill_extruder))
     ((ConfigOptionFloatOrPercent,       solid_infill_extrusion_width))
     ((ConfigOptionFloatOrPercent,       solid_infill_extrusion_spacing))

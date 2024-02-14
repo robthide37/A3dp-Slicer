@@ -4963,6 +4963,26 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(70));
 
+    def = this->add("solid_infill_below_layer_area", coFloat);
+    def->label = L("Solid infill layer threshold area");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Force solid infill for the whole layer when the combined area of all objects that are printed at the same layer is smaller than this value.");
+    def->sidetext = L("mm²");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("solid_infill_below_width", coFloatOrPercent);
+    def->label = L("Solid infill threshold width");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Force solid infill for parts of regions having a smaller width than the specified threshold."
+                    "\nCan be a % of the current solid infill spacing."
+                    "\nSet 0 to disable");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
     def = this->add("solid_infill_overlap", coPercent);
     def->label = L("Solid fill overlap");
     def->category = OptionCategory::width;
@@ -8255,6 +8275,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "solid_infill_fan_speed",
 "solid_infill_overlap",
 "start_gcode_manual",
+"solid_infill_below_layer_area",
+"solid_infill_below_thickness",
 "support_material_angle_height",
 "support_material_acceleration",
 "support_material_contact_distance_type",
