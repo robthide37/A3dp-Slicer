@@ -388,8 +388,11 @@ private:
 // A generic value of a configuration option.
 class ConfigOption {
 public:
-    // if true, this option doesn't need to be saved, it's a computed value from an other configOption.
-    // uint32_t because macos crash if it's a bool. and it doesn't change the size of the object because of alignment.
+    // Flags ta save some states into the option.
+    // note: uint32_t because macos crash if it's a bool. and it doesn't change the size of the object because of alignment.
+    // FCO_PHONY: if true, this option doesn't need to be saved (or with empty string), it's a computed value from an other ConfigOption.
+    // FCO_EXTRUDER_ARRAY: set if the ConfigDef has is_extruder_size(). Only apply to ConfigVectorBase and childs
+    // FCO_PLACEHOLDER_TEMP: for PlaceholderParser, to be able to recognise temporary fake ConfigOption (for default_XXX() macro)
     uint32_t flags;
     enum FlagsConfigOption : uint32_t {
         FCO_PHONY = 1,
