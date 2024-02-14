@@ -965,7 +965,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     m_last_mm3_per_mm = 0.;
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
-    // How many times will be change_layer() called?
+    // How many times will be change_layer() called?gcode.cpp
     // change_layer() in turn increments the progress bar status.
     m_layer_count = 0;
     if (print.config().complete_objects.value) {
@@ -3036,7 +3036,8 @@ std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point) {
         if (!this->last_position ||
             EXTRUDER_CONFIG(retract_before_travel) <
                 (this->point_to_gcode(*this->last_position) - gcode_point.head<2>()).norm()) {
-            gcode += this->retract_and_wipe();
+            gcode += this->writer().retract();
+            gcode += this->writer().get_travel_to_z_gcode(gcode_point.z() + EXTRUDER_CONFIG(retract_lift), "lift");
         }
     }
     this->last_position = point.head<2>();
