@@ -2124,8 +2124,10 @@ std::string GCodeGenerator::get_layer_change_gcode(const Vec3d& from, const Vec3
     elevation_params.lift_height = std::max(z_change, elevation_params.lift_height);
 
     const double path_length = unscaled(xy_path.length());
-    const double lift_at_travel_end =
-        (elevation_params.lift_height / elevation_params.slope_end * path_length);
+    const double lift_at_travel_end = std::min(
+        elevation_params.lift_height,
+        elevation_params.lift_height / elevation_params.slope_end * path_length
+    );
     if (lift_at_travel_end < z_change) {
         elevation_params.lift_height = z_change;
         elevation_params.slope_end = path_length;
