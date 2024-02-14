@@ -14,7 +14,7 @@
 using namespace Slic3r;
 using namespace Test;
 
-constexpr bool debug_files {true};
+constexpr bool debug_files {false};
 
 void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfig& config, const unsigned duplicate) {
     constexpr std::size_t tools_count = 4;
@@ -31,6 +31,12 @@ void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfi
     Model model;
     Test::init_print({TestMesh::cube_20x20x20}, print, model, config, false, duplicate);
     std::string gcode = Test::gcode(print);
+
+    if constexpr(debug_files) {
+        static int count{0};
+        std::ofstream file{"check_gcode_" + std::to_string(count++) + ".gcode"};
+        file << gcode;
+    }
 
 	GCodeReader parser;
     parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {

@@ -3321,7 +3321,7 @@ std::string GCodeGenerator::generate_travel_gcode(
     gcode += this->m_writer.set_travel_acceleration(acceleration);
 
     Vec3d previous_point{this->point_to_gcode(travel.front())};
-    for (const Vec3crd& point : tcb::span{travel}.subspan(1)) {
+    for (const Vec3crd& point : travel) {
         const Vec3d gcode_point{this->point_to_gcode(point)};
 
         gcode += this->m_writer.travel_to_xyz(previous_point, gcode_point, comment);
