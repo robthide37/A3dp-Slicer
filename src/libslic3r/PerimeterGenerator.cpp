@@ -2281,10 +2281,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                 assert(thickpaths[i - 1].last_point() == thickpaths[i].first_point());
             }
 #endif
-            assert(thickpaths.front().first_point().x() == arachne_path.front().x());
-            assert(thickpaths.front().first_point().y() == arachne_path.front().y());
-            assert(thickpaths.back().last_point().x() == arachne_path.back().x());
-            assert(thickpaths.back().last_point().y() == arachne_path.back().y());
+            // thickpaths can be empty if extrusion_path is too short
+            assert(thickpaths.empty() || thickpaths.front().first_point().x() == arachne_path.front().x());
+            assert(thickpaths.empty() || thickpaths.front().first_point().y() == arachne_path.front().y());
+            assert(thickpaths.empty() || thickpaths.back().last_point().x() == arachne_path.back().x());
+            assert(thickpaths.empty() || thickpaths.back().last_point().y() == arachne_path.back().y());
             for (ExtrusionPath& path : thickpaths) {
                 path.set_can_reverse(!is_loop);
                 paths.push_back(std::move(path));
@@ -2303,10 +2304,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                 assert(thickpaths[i - 1].last_point() == thickpaths[i].first_point());
             }
 #endif
-            assert(thickpaths.front().first_point().x() == extrusion_path.front().x());
-            assert(thickpaths.front().first_point().y() == extrusion_path.front().y());
-            assert(thickpaths.back().last_point().x() == extrusion_path.back().x());
-            assert(thickpaths.back().last_point().y() == extrusion_path.back().y());
+            // thickpaths can be empty if extrusion_path is too short
+            assert(thickpaths.empty() || thickpaths.front().first_point().x() == extrusion_path.front().x());
+            assert(thickpaths.empty() || thickpaths.front().first_point().y() == extrusion_path.front().y());
+            assert(thickpaths.empty() || thickpaths.back().last_point().x() == extrusion_path.back().x());
+            assert(thickpaths.empty() || thickpaths.back().last_point().y() == extrusion_path.back().y());
             for (ExtrusionPath& path : thickpaths) {
                 path.set_can_reverse(!is_loop);
                 path.height = 0;
@@ -2326,10 +2328,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                 assert(thickpaths[i - 1].last_point() == thickpaths[i].first_point());
             }
 #endif
-            assert(thickpaths.front().first_point().x() == extrusion_path.front().x());
-            assert(thickpaths.front().first_point().y() == extrusion_path.front().y());
-            assert(thickpaths.back().last_point().x() == extrusion_path.back().x());
-            assert(thickpaths.back().last_point().y() == extrusion_path.back().y());
+            // thickpaths can be empty if extrusion_path is too short
+            assert(thickpaths.empty() || thickpaths.front().first_point().x() == extrusion_path.front().x());
+            assert(thickpaths.empty() || thickpaths.front().first_point().y() == extrusion_path.front().y());
+            assert(thickpaths.empty() || thickpaths.back().last_point().x() == extrusion_path.back().x());
+            assert(thickpaths.empty() || thickpaths.back().last_point().y() == extrusion_path.back().y());
             for (ExtrusionPath& path : thickpaths) {
                 path.set_can_reverse(!is_loop);
                 path.height = no_small_flow ? 2 : 1;
@@ -2349,10 +2352,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                 assert(thickpaths[i - 1].last_point() == thickpaths[i].first_point());
             }
 #endif
-            assert(thickpaths.front().first_point().x() == extrusion_path.front().x());
-            assert(thickpaths.front().first_point().y() == extrusion_path.front().y());
-            assert(thickpaths.back().last_point().x() == extrusion_path.back().x());
-            assert(thickpaths.back().last_point().y() == extrusion_path.back().y());
+            // thickpaths can be empty if extrusion_path is too short
+            assert(thickpaths.empty() || thickpaths.front().first_point().x() == extrusion_path.front().x());
+            assert(thickpaths.empty() || thickpaths.front().first_point().y() == extrusion_path.front().y());
+            assert(thickpaths.empty() || thickpaths.back().last_point().x() == extrusion_path.back().x());
+            assert(thickpaths.empty() || thickpaths.back().last_point().y() == extrusion_path.back().y());
             for (ExtrusionPath& path : thickpaths) {
                 path.set_can_reverse(!is_loop);
                 path.height = no_small_flow ? 3 : 2;
@@ -2372,10 +2376,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                 assert(thickpaths[i - 1].last_point() == thickpaths[i].first_point());
             }
 #endif
-            assert(thickpaths.front().first_point().x() == extrusion_path.front().x());
-            assert(thickpaths.front().first_point().y() == extrusion_path.front().y());
-            assert(thickpaths.back().last_point().x() == extrusion_path.back().x());
-            assert(thickpaths.back().last_point().y() == extrusion_path.back().y());
+            // thickpaths can be empty if extrusion_path is too short
+            assert(thickpaths.empty() || thickpaths.front().first_point().x() == extrusion_path.front().x());
+            assert(thickpaths.empty() || thickpaths.front().first_point().y() == extrusion_path.front().y());
+            assert(thickpaths.empty() || thickpaths.back().last_point().x() == extrusion_path.back().x());
+            assert(thickpaths.empty() || thickpaths.back().last_point().y() == extrusion_path.back().y());
             for (ExtrusionPath& path : thickpaths) {
                 // change flow to overhang one if too much.
                 if (path.mm3_per_mm > this->overhang_flow.mm3_per_mm() ){
@@ -2420,11 +2425,41 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     }
 
     //FIXME from here, it's exactly the same as the other create_overhangs, please merge that into a function.
-
+    
+    //(or not)
+    Point first_point(arachne_path.front().x(), arachne_path.front().y());
     // reapply the nearest point search for starting point
     // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
     if (!paths.empty())
-        chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
+        chain_and_reorder_extrusion_paths(paths, &first_point);
+
+    //check if evvrything is okay (it can fail)
+    bool not_sorted_enough = false;
+    for (int i = 1; i < paths.size(); i++) {
+        if (!paths[i - 1].last_point().coincides_with_epsilon(paths[i].first_point())) {
+            not_sorted_enough = true;
+            break;
+        }
+    }
+    if (not_sorted_enough) {
+        Point other_point = paths[1].first_point();
+        chain_and_reorder_extrusion_paths(paths, &other_point);
+        auto path = paths.back();
+        paths.erase(paths.end()-1);
+        paths.insert(paths.begin(), path);
+        bool not_sorted_enough = false;
+        for (int i = 1; i < paths.size(); i++) {
+            if (paths[i - 1].last_point().coincides_with_epsilon(paths[i].first_point())) {
+                not_sorted_enough = true;
+                break;
+            }
+        }
+        if (not_sorted_enough) {
+            // do it manually by brute-force
+            // TODO
+            chain_and_reorder_extrusion_paths(paths, &first_point);
+        }
+    }
 
     for (int i = 1; i < paths.size(); i++) {
         // diff/inter can generate points with ~3-5 unit of diff.
