@@ -3295,7 +3295,7 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
     }
 
     if (is_windows10() && !err_objects_idxs.empty()) {
-        auto dlg = WarningDialog(plater, _L("Open edges or auto-repaired errors were detected after the cut.\n"
+        auto dlg = WarningDialog(plater, _L("Open edges or errors were detected after the cut.\n"
                                             "Do you want to fix them by Windows repair algorithm?"), 
                                          _L("Errors detected after cut operation"), wxYES_NO);
         if (dlg.ShowModal() == wxID_YES) {

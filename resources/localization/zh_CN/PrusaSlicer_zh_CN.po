@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-02-13 11:10+0100\n"
+"POT-Creation-Date: 2024-02-15 16:11+0100\n"
 "PO-Revision-Date: 2023-05-30 18:31+0800\n"
 "Last-Translator: Ptsa <ptsa1987@gmail.com>\n"
 "Language-Team: ptsa1987@gmail.com\n"
@@ -9299,7 +9299,7 @@ msgstr "连接器"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3298
 msgid ""
-"Open edges or auto-repaired errors were detected after the cut.\n"
+"Open edges or errors were detected after the cut.\n"
 "Do you want to fix them by Windows repair algorithm?"
 msgstr ""
 

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Slic3rPE\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-02-13 11:10+0100\n"
+"POT-Creation-Date: 2024-02-15 16:11+0100\n"
 "PO-Revision-Date: 2022-12-06 17:21+0800\n"
 "Last-Translator: BiseChen <bise.chen@gmail.com>\n"
 "Language-Team: \n"
@@ -9266,7 +9266,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3298
 msgid ""
-"Open edges or auto-repaired errors were detected after the cut.\n"
+"Open edges or errors were detected after the cut.\n"
 "Do you want to fix them by Windows repair algorithm?"
 msgstr ""
 
