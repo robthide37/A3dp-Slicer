@@ -2149,9 +2149,9 @@ std::string GCodeGenerator::get_layer_change_gcode(const Vec3d& from, const Vec3
         travel_gcode += m_layer_change_wipe;
     }
     Vec3d previous_point{this->point_to_gcode(travel.front())};
-    for (const Vec3crd& point : tcb::span{travel}.subspan(1)) {
+    for (const Vec3crd& point : travel) {
         const Vec3d gcode_point{this->point_to_gcode(point)};
-        travel_gcode += this->m_writer.get_travel_to_xyz_gcode(previous_point, gcode_point, "ramping layer change");
+        travel_gcode += this->m_writer.get_travel_to_xyz_gcode(previous_point, gcode_point, "layer change");
         previous_point = gcode_point;
     }
     return travel_gcode;
