@@ -386,6 +386,7 @@ private:
 
     OozePrevention                      m_ooze_prevention;
     GCode::Wipe                         m_wipe;
+    std::string                         m_layer_change_wipe;
     GCode::LabelObjects                 m_label_objects;
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
     JPSPathFinder                       m_avoid_crossing_curled_overhangs;

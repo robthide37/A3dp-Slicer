@@ -2145,13 +2145,13 @@ std::string GCodeGenerator::get_layer_change_gcode(const Vec3d& from, const Vec3
     )};
 
     std::string travel_gcode;
-    if (this->m_config.retract_before_travel.get_at(extruder_id) < (to - from).norm()) {
-        travel_gcode += this->retract_and_wipe();
+    if (!this->m_config.retract_layer_change.get_at(extruder_id) && this->m_config.retract_before_travel.get_at(extruder_id) < (to - from).norm()) {
+        travel_gcode += m_layer_change_wipe;
     }
     Vec3d previous_point{this->point_to_gcode(travel.front())};
     for (const Vec3crd& point : tcb::span{travel}.subspan(1)) {
         const Vec3d gcode_point{this->point_to_gcode(point)};
-        travel_gcode += this->m_writer.get_travel_to_xyz_gcode(previous_point, gcode_point, "layer change");
+        travel_gcode += this->m_writer.get_travel_to_xyz_gcode(previous_point, gcode_point, "ramping layer change");
         previous_point = gcode_point;
     }
     return travel_gcode;
@@ -2743,8 +2743,15 @@ std::string GCodeGenerator::change_layer(
         // Increment a progress bar indicator.
         gcode += m_writer.update_progress(++ m_layer_index, m_layer_count);
 
-    if (EXTRUDER_CONFIG(retract_layer_change))
+    if (EXTRUDER_CONFIG(retract_layer_change)) {
         gcode += this->retract_and_wipe();
+    } else {
+        const GCodeWriter saved_writer{this->writer()};
+        const std::optional<Point> saved_last_position{this->last_position};
+        this->m_layer_change_wipe = this->retract_and_wipe();
+        this->m_writer = saved_writer;
+        this->last_position = saved_last_position;
+    }
 
     Vec3d new_position = this->writer().get_position();
     new_position.z() = print_z;
