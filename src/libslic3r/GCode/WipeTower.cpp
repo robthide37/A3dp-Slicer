@@ -537,7 +537,6 @@ WipeTower::WipeTower(const PrintConfig& config, const PrintRegionConfig& default
     m_no_sparse_layers(config.wipe_tower_no_sparse_layers),
     m_gcode_flavor(config.gcode_flavor),
     m_travel_speed(config.travel_speed),
-    m_travel_speed_z(config.travel_speed_z),
     m_infill_speed(default_region_config.infill_speed),
     m_perimeter_speed(default_region_config.perimeter_speed),
     m_current_tool(initial_tool),

@@ -323,13 +323,17 @@ std::string GCodeWriter::get_travel_to_xyz_gcode(const Vec3d &from, const Vec3d 
     GCodeG1Formatter w;
     w.emit_xyz(to);
 
+    double speed_z = this->config.travel_speed_z.value;
+    if (speed_z == 0.)
+        speed_z = this->config.travel_speed.value;
+
     const double distance_xy{(to.head<2>() - from.head<2>()).norm()};
     const double distnace_z{std::abs(to.z() - from.z())};
-    const double time_z = distnace_z / this->config.travel_speed_z.value;
+    const double time_z = distnace_z / speed_z;
     const double time_xy = distance_xy / this->config.travel_speed.value;
     const double factor = time_z > 0 ? time_xy / time_z : 1;
     if (factor < 1) {
-        w.emit_f((this->config.travel_speed.value * factor  + (1 - factor) * this->config.travel_speed_z.value) * 60.0);
+        w.emit_f((this->config.travel_speed.value * factor  + (1 - factor) * speed_z) * 60.0);
     } else {
         w.emit_f(this->config.travel_speed.value * 60.0);
     }
