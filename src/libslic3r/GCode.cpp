@@ -2145,9 +2145,6 @@ std::string GCodeGenerator::get_layer_change_gcode(const Vec3d& from, const Vec3
     )};
 
     std::string travel_gcode;
-    if (!this->m_config.retract_layer_change.get_at(extruder_id) && this->m_config.retract_before_travel.get_at(extruder_id) < (to - from).norm()) {
-        travel_gcode += m_layer_change_wipe;
-    }
     Vec3d previous_point{this->point_to_gcode(travel.front())};
     for (const Vec3crd& point : travel) {
         const Vec3d gcode_point{this->point_to_gcode(point)};
@@ -2246,6 +2243,7 @@ LayerResult GCodeGenerator::process_layer(
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
     m_last_height = height;
     m_current_layer_first_position = std::nullopt;
+    m_already_unretracted = false;
 
     // Set new layer - this will change Z and force a retraction if retract_layer_change is enabled.
     if (!first_layer && ! print.config().before_layer_gcode.value.empty()) {
@@ -2416,8 +2414,9 @@ LayerResult GCodeGenerator::process_layer(
         && m_layer_change_extruder_id
         && !result.spiral_vase_enable
         && print_z > previous_layer_z
-        && EXTRUDER_CONFIG(travel_ramping_lift)
-        && EXTRUDER_CONFIG(travel_slope) > 0 && EXTRUDER_CONFIG(travel_slope) < 90
+        && this->m_config.travel_ramping_lift.get_at(*m_layer_change_extruder_id)
+        && this->m_config.travel_slope.get_at(*m_layer_change_extruder_id) > 0
+        && this->m_config.travel_slope.get_at(*m_layer_change_extruder_id) < 90
     );
     if (first_layer) {
         layer_change_gcode = ""; // Explicit for readability.
@@ -2425,6 +2424,45 @@ LayerResult GCodeGenerator::process_layer(
         layer_change_gcode = this->get_layer_change_gcode(*m_previous_layer_last_position, *m_current_layer_first_position, *m_layer_change_extruder_id);
     } else {
         layer_change_gcode = this->writer().get_travel_to_z_gcode(print_z, "simple layer change");
+    }
+
+    const auto keep_retraciton{[&](){
+        if (!do_ramping_layer_change) {
+            return true;
+        }
+        const double travel_length{(*m_current_layer_first_position - *m_previous_layer_last_position_before_wipe).norm()};
+        if (this->m_config.retract_before_travel.get_at(*m_layer_change_extruder_id) < travel_length) {
+            // Travel is long, keep retraction.
+            return true;
+        }
+        return false;
+    }};
+
+    bool removed_retraction{false};
+    if (this->m_config.travel_ramping_lift.get_at(*m_layer_change_extruder_id)) {
+        const std::string retraction_start_tag = GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change_Retraction_Start);
+        const std::string retraction_end_tag = GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change_Retraction_End);
+
+        if (keep_retraciton()) {
+            boost::algorithm::replace_first(gcode, retraction_start_tag, "");
+            boost::algorithm::replace_first(gcode, retraction_end_tag, "");
+        } else {
+            const std::size_t start{gcode.find(retraction_start_tag)};
+            const std::size_t end_tag_start{gcode.find(retraction_end_tag)};
+            const std::size_t end{end_tag_start + retraction_end_tag.size()};
+            gcode.replace(start, end - start, "");
+
+            layer_change_gcode = this->get_layer_change_gcode(*m_previous_layer_last_position_before_wipe, *m_current_layer_first_position, *m_layer_change_extruder_id);
+            removed_retraction = true;
+        }
+    }
+
+    if (removed_retraction) {
+        const std::size_t start{gcode.find("FIRST_UNRETRACT")};
+        const std::size_t end{gcode.find("\n", start)};
+        gcode.replace(start, end - start, "");
+    } else {
+        boost::algorithm::replace_first(gcode,"FIRST_UNRETRACT", "");
     }
 
     boost::algorithm::replace_first(gcode, tag, layer_change_gcode);
@@ -2743,14 +2781,15 @@ std::string GCodeGenerator::change_layer(
         // Increment a progress bar indicator.
         gcode += m_writer.update_progress(++ m_layer_index, m_layer_count);
 
-    if (EXTRUDER_CONFIG(retract_layer_change)) {
+    if (!EXTRUDER_CONFIG(travel_ramping_lift) && EXTRUDER_CONFIG(retract_layer_change)) {
         gcode += this->retract_and_wipe();
-    } else {
-        const GCodeWriter saved_writer{this->writer()};
-        const std::optional<Point> saved_last_position{this->last_position};
-        this->m_layer_change_wipe = this->retract_and_wipe();
-        this->m_writer = saved_writer;
-        this->last_position = saved_last_position;
+    } else if (EXTRUDER_CONFIG(travel_ramping_lift)){
+        m_previous_layer_last_position_before_wipe = this->last_position ?
+            std::optional{to_3d(this->point_to_gcode(*this->last_position), previous_layer_z)} :
+            std::nullopt;
+        gcode += GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change_Retraction_Start);
+        gcode += this->retract_and_wipe();
+        gcode += GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change_Retraction_End);
     }
 
     Vec3d new_position = this->writer().get_position();
@@ -3100,7 +3139,12 @@ std::string GCodeGenerator::_extrude(
     }
 
     // compensate retraction
-    gcode += this->unretract();
+    if (this->m_already_unretracted) {
+        gcode += this->unretract();
+    } else {
+        this->m_already_unretracted = true;
+        gcode += "FIRST_UNRETRACT" + this->unretract();
+    }
 
     if (!m_pending_pre_extrusion_gcode.empty()) {
         // There is G-Code that is due to be inserted before an extrusion starts. Insert it.

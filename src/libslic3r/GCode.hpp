@@ -386,7 +386,6 @@ private:
 
     OozePrevention                      m_ooze_prevention;
     GCode::Wipe                         m_wipe;
-    std::string                         m_layer_change_wipe;
     GCode::LabelObjects                 m_label_objects;
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
     JPSPathFinder                       m_avoid_crossing_curled_overhangs;
@@ -425,9 +424,11 @@ private:
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
     std::optional<Vec3d>                m_previous_layer_last_position;
+    std::optional<Vec3d>                m_previous_layer_last_position_before_wipe;
     // This needs to be populated during the layer processing!
     std::optional<Vec3d>                m_current_layer_first_position;
     std::optional<unsigned>             m_layer_change_extruder_id;
+    bool                                m_already_unretracted{false};
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
     std::unique_ptr<GCodeFindReplace>   m_find_replace;
