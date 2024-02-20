@@ -370,6 +370,7 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
 
     // Load a PNG with an alpha channel.
     wxImage image;
+    BOOST_LOG_TRIVIAL(error) << "Trying to load texture (png) image: '"<<filename.c_str()<<"'";
     if (!image.LoadFile(wxString::FromUTF8(filename.c_str()), wxBITMAP_TYPE_PNG)) {
         reset();
         return false;
