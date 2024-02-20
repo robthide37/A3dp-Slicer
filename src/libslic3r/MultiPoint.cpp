@@ -132,7 +132,11 @@ bool MultiPoint::first_intersection(const Line& line, Point* intersection) const
 {
     bool   found = false;
     double dmin  = 0.;
-    for (const Line &l : this->lines()) {
+    Line l;
+    //for (const Line &l : this->lines()) {
+    for (size_t idx = 1; idx < points.size(); ++idx) {
+        l.a = points[idx-1];
+        l.b = points[idx];
         Point ip;
         if (l.intersection(line, &ip)) {
             if (! found) {

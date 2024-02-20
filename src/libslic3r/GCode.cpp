@@ -6010,24 +6010,24 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
         && !m_avoid_crossing_perimeters.disabled_once()
         && m_avoid_crossing_perimeters.is_init()
         && !(m_config.avoid_crossing_not_first_layer && this->on_first_layer());
-
+    
     // check / compute avoid_crossing_perimeters
-    bool will_cross_perimeter = this->can_cross_perimeter(travel, can_avoid_cross_peri);
-
-    // if a retraction would be needed (with a low min_dist threshold), try to use avoid_crossing_perimeters to plan a
-    // multi-hop travel path inside the configuration space
-    if (will_cross_perimeter && this->needs_retraction(travel, role, scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) * 3)
-        && can_avoid_cross_peri) {
-        this->m_throw_if_canceled();
-        travel = m_avoid_crossing_perimeters.travel_to(*this, point, &could_be_wipe_disabled);
+    bool may_need_avoid_crossing = can_avoid_cross_peri && this->needs_retraction(travel, role, scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) * 3);
+    
+    if (may_need_avoid_crossing) {
+        // if a retraction would be needed (with a low min_dist threshold), try to use avoid_crossing_perimeters to
+        // plan a multi-hop travel path inside the configuration space
+        if (this->can_cross_perimeter(travel, can_avoid_cross_peri)) {
+            this->m_throw_if_canceled();
+            travel = m_avoid_crossing_perimeters.travel_to(*this, point, &could_be_wipe_disabled);
+        }
     }
-    if(can_avoid_cross_peri)
-        will_cross_perimeter = this->can_cross_perimeter(travel, false);
 
     // check whether a straight travel move would need retraction
     bool needs_retraction = this->needs_retraction(travel, role);
-    if (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0))
-        needs_retraction = needs_retraction && will_cross_perimeter;
+    if (m_config.only_retract_when_crossing_perimeters &&
+        !(m_config.enforce_retract_first_layer && m_layer_index == 0))
+        needs_retraction = needs_retraction && can_avoid_cross_peri && this->can_cross_perimeter(travel, false);
 
     // Re-allow avoid_crossing_perimeters for the next travel moves
     m_avoid_crossing_perimeters.reset_once_modifiers();
@@ -6039,10 +6039,39 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
             //    m_wipe.reset_path();
             //} else {
             //check if it cross hull
-                auto result = diff_pl(Polylines{ travel }, to_polygons(m_layer->lslices));
-                if (result.empty()) {
-                    m_wipe.reset_path();
+
+            //TODO: add bbox cache & checks like for can_cross_perimeter
+            bool has_intersect = false;
+            for (const ExPolygon &expoly : m_layer->lslices) {
+                // first, check if it's inside the contour (still, it can go over holes)
+                Polylines diff_result = diff_pl(travel, expoly.contour);
+                if (diff_result.size() == 1 && diff_result.front() == travel)
+                    // not inside/cross this contour, try another one.
+                    continue;
+                if (!diff_result.empty()) {
+                    //it's crossing this contour!
+                    has_intersect = true;
+                } else {
+                    // it's inside this contour, does it cross a hole?
+                    Line  travel_line;
+                    Point whatever;
+                    for (size_t idx_travel = travel.size() - 1; idx_travel > 0; --idx_travel) {
+                        travel_line.a = travel.points[idx_travel];
+                        travel_line.b = travel.points[idx_travel - 1];
+                        for (const Polygon &hole : expoly.holes) {
+                            if (hole.first_intersection(travel_line, &whatever) ||
+                                Line(hole.first_point(), hole.last_point()).intersection(travel_line, &whatever)) {
+                                has_intersect = true;
+                                break;
+                            }
+                        }
+                    }
                 }
+                break;
+            }
+            if (!has_intersect) {
+                m_wipe.reset_path();
+            }
             //}
         }
 
@@ -6206,46 +6235,83 @@ bool GCode::needs_retraction(const Polyline& travel, ExtrusionRole role /*=erNon
 
 bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
 {
-    if(m_layer != nullptr)
-    if ( ( (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0)) && m_config.fill_density.value > 0) || m_config.avoid_crossing_perimeters)
-         {
-        //test && m_layer->any_internal_region_slice_contains(travel)
-        // Skip retraction if travel is contained in an internal slice *and*
-        // internal infill is enabled (so that stringing is entirely not visible).
-        //note: any_internal_region_slice_contains() is potentionally very slow, it shall test for the bounding boxes first.
-        //bool inside = false;
-        //BoundingBox bbtravel(travel.points);
-        //for (const BoundingBox &bbox : m_layer->lslices_bboxes) {
-        //    inside = bbox.overlap(bbtravel);
-        //    if(inside) break;
-        //}
-        ////have to do a bit more work to be sure
-        //if (inside) {
-            //contained inside at least one bb
-            //construct m_layer_slices_offseted if needed
+    if (m_layer != nullptr)
+        if (((m_config.only_retract_when_crossing_perimeters &&
+              !(m_config.enforce_retract_first_layer && m_layer_index == 0)) &&
+             m_config.fill_density.value > 0) ||
+            m_config.avoid_crossing_perimeters) {
+            // FROM 2.7
             if (m_layer_slices_offseted.layer != m_layer) {
-                m_layer_slices_offseted.layer = m_layer;
+                m_layer_slices_offseted.layer    = m_layer;
                 m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4));
-                m_layer_slices_offseted.slices = m_layer->lslices;
-                m_layer_slices_offseted.slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
-                //remove top surfaces
-                for (const LayerRegion* reg : m_layer->regions()) {
+                ExPolygons slices                = m_layer->lslices;
+                ExPolygons slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
+                // remove top surfaces
+                for (const LayerRegion *reg : m_layer->regions()) {
                     m_throw_if_canceled();
-                    m_layer_slices_offseted.slices_offsetted = diff_ex(m_layer_slices_offseted.slices_offsetted, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
-                    m_layer_slices_offseted.slices = diff_ex(m_layer_slices_offseted.slices, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
+                    slices_offsetted = diff_ex(slices_offsetted, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
+                    slices           = diff_ex(slices, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
                 }
-                
+                // create bb for speeding things up.
+                m_layer_slices_offseted.slices.clear();
+                for (ExPolygon &ex : slices) {
+                    BoundingBox bb{ex.contour.points};
+                    // simplify as much as possible
+                    for (ExPolygon &ex_simpl : ex.simplify(m_layer_slices_offseted.diameter)) {
+                        m_layer_slices_offseted.slices.emplace_back(std::move(ex_simpl), std::move(bb));
+                    }
+                }
+                m_layer_slices_offseted.slices_offsetted.clear();
+                for (ExPolygon &ex : slices_offsetted) {
+                    BoundingBox bb{ex.contour.points};
+                    for (ExPolygon &ex_simpl : ex.simplify(m_layer_slices_offseted.diameter)) {
+                        m_layer_slices_offseted.slices_offsetted.emplace_back(std::move(ex_simpl), std::move(bb));
+                    }
+                }
             }
             // test if a expoly contains the entire travel
-            for (const ExPolygon &poly :
+            for (const std::pair<ExPolygon, BoundingBox> &expoly_2_bb :
                  offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices) {
-                    m_throw_if_canceled();
-                if (poly.contains(travel)) {
-                    return false;
+                // first check if it's roughtly inside the bb, to reject quickly.
+                if (travel.size() > 1 && expoly_2_bb.second.contains(travel.front()) &&
+                    expoly_2_bb.second.contains(travel.back()) &&
+                    expoly_2_bb.second.contains(travel.points[travel.size() / 2])) {
+                    // first, check if it's inside the contour (still, it can go over holes)
+                    Polylines diff_result = diff_pl(travel, expoly_2_bb.first.contour);
+                    if (diff_result.size() == 1 && diff_result.front() == travel)
+                    //if (!diff_pl(travel, expoly_2_bb.first.contour).empty())
+                        continue;
+                    //second, check if it's crossing this contour
+                    if (!diff_result.empty()) {
+                        //has_intersect = true;
+                        return true;
+                    }
+                    // third, check if it's going over a hole
+                    // TODO: kdtree to get the ones interesting
+                    //bool  has_intersect = false;
+                    Line  travel_line;
+                    Point whatever;
+                    for (const Polygon &hole : expoly_2_bb.first.holes) {
+                        m_throw_if_canceled();
+                        for (size_t idx_travel = travel.size() - 1; idx_travel > 0; --idx_travel) {
+                            travel_line.a = travel.points[idx_travel];
+                            travel_line.b = travel.points[idx_travel - 1];
+                            if (hole.first_intersection(travel_line, &whatever) ||
+                                Line(hole.first_point(), hole.last_point()).intersection(travel_line, &whatever)) {
+                                //has_intersect = true;
+                                //break;
+                                return true;
+                            }
+                        }
+                        //if (has_intersect)
+                        //    break;
+                    }
+                    // if inside contour and does not inersect hole -> inside expoly, you don't need to avoid.
+                    //if (!has_intersect)
+                        return false;
                 }
             }
-        //}
-    }
+        }
 
     // retract if only_retract_when_crossing_perimeters is disabled or doesn't apply
     return true;
