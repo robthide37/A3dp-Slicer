@@ -7868,6 +7868,38 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         if (value == "PNG")
             output["thumbnails_tag_format"] = "0";
     }
+    
+    if ("thumbnails" == opt_key) {
+        //check if their format is inside the size
+        if (value.find('/') != std::string::npos) {
+            std::vector<std::string> sizes;
+            boost::split(sizes, value, boost::is_any_of(","), boost::token_compress_off);
+            value = "";
+            std::string coma = "";
+            size_t added = 0;
+            for (std::string &size : sizes) {
+                size_t pos = size.find('/');
+                assert(pos != std::string::npos);
+                if (pos != std::string::npos) {
+                    assert(size.find('/', pos + 1) == std::string::npos);
+                    value = value + coma + size.substr(0, pos);
+                } else {
+                    value = value + coma + size;
+                }
+                coma  = ",";
+                added++;
+                if (added >= 2)
+                    break;
+            }
+            //if less than 2: add 0X0 until two.
+            while (added < 2) {
+                value = value + coma + "0x0";
+                coma  = ",";
+                added++;
+            }
+            // format (the first) is still set by prusa, no need to parse it.
+        }
+    }
 
     
     // ---- custom gcode: ----
@@ -7895,6 +7927,11 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
     return output;
 }
 
+//keys that needs to go through from_prusa before beeing deserialized.
+std::unordered_set<std::string> prusa_import_to_review_keys =
+{
+    "thumbnails"
+};
 
 template<typename CONFIG_CLASS>
 void _convert_from_prusa(CONFIG_CLASS& conf, const DynamicPrintConfig& global_config, bool with_phony) {
@@ -7970,7 +8007,7 @@ void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::stri
             std::string opt_value = value;
             PrintConfigDef::handle_legacy(opt_key, opt_value, false);
             if (!opt_key.empty())
-                if (!def->has(opt_key)) {
+                if (!def->has(opt_key) || (check_prusa && prusa_import_to_review_keys.find(opt_key) != prusa_import_to_review_keys.end())) {
                     unknown_keys.emplace(key, value);
                 } else {
                     config.set_deserialize(opt_key, opt_value, config_substitutions);
@@ -8523,6 +8560,26 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         } else {
             opt_key = "min_fan_speed";
             new_entries["fan_always_on"] = "1";
+        }
+    }
+    
+    if ("thumbnails" == opt_key) {
+    // add format to thumbnails
+        const ConfigOptionEnum<GCodeThumbnailsFormat> *format_opt = all_conf.option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        std::string format = format_opt->serialize();
+        std::vector<std::string> sizes;
+        boost::split(sizes, value, boost::is_any_of(","), boost::token_compress_off);
+        value = "";
+        std::string coma = "";
+        for (std::string &size : sizes) {
+            //if first or second dimension is 0: ignore.
+            size_t test1 = size.find("0x");
+            size_t test2 = size.find("x0");
+            if (size.find("0x") == 0 || size.find("x0") + 2 == size.size())
+                continue;
+            assert(size.find('/') == std::string::npos);
+            value = value + coma + size + std::string("/") + format;
+            coma = ",";
         }
     }
 
