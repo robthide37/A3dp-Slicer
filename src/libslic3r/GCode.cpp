@@ -4111,9 +4111,11 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
                 bool is_convex = false;
                 if (is_hole_loop) {
                     //test if convex (as it's clockwise bc it's a hole, we have to do the opposite)
-                    is_convex = polygon_to_test.convex_points().empty();
+                    // 3.07 instead of PI to allow for some convex outliers (sometimes, stl can be a bit imprecise)
+                    is_convex = polygon_to_test.convex_points(3.07).empty();
                 } else {
-                    is_convex = polygon_to_test.concave_points().empty();
+                    // 3.3 instead of PI to allow for some concave outliers (sometimes, stl can be a bit imprecise)
+                    is_convex = polygon_to_test.concave_points(3.3).empty();
                 }
                 if (is_convex) {
                     // Computing circle center
@@ -4196,11 +4198,16 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
 
         //check if the current angle isn't too sharp
         double check_angle = 0;
+        // get min angle (and if at min or max value, push it a bit more to avoid not filtering outliers)
+        double min_angle = this->m_config.seam_notch_angle.value;
+        if(min_angle <= 179.9) min_angle -= 1;
+        if(min_angle >= 359.9) min_angle += 1;
+        min_angle *= PI / 180.;
         if (end_point.distance_to_square(start_point) < SCALED_EPSILON * SCALED_EPSILON) {
             check_angle = start_point.ccw_angle(prev_point, next_point);
         } else {
             check_angle = end_point.ccw_angle(prev_point, start_point);
-            if ((is_hole_loop ? -check_angle : check_angle) > this->m_config.seam_notch_angle.value * PI / 180.) {
+            if ((is_hole_loop ? -check_angle : check_angle) > min_angle) {
                 BOOST_LOG_TRIVIAL(debug) << "notch abord: too big angle\n";
                 return;
             }
@@ -4208,7 +4215,7 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
         }
         assert(end_point != start_point);
         assert(end_point != next_point);
-        if ((is_hole_loop ? -check_angle : check_angle) > this->m_config.seam_notch_angle.value * PI / 180.) {
+        if ((is_hole_loop ? -check_angle : check_angle) > min_angle) {
             BOOST_LOG_TRIVIAL(debug) << "notch abord: too big angle\n";
             return;
         }

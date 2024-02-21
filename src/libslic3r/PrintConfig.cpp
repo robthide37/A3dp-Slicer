@@ -1889,7 +1889,7 @@ void PrintConfigDef::init_fff_params()
         "\nA value that only takes values as 'true' or 'false' will be a boolean)"
         "\nEvery other value will be parsed as a string as-is."
         "\nThese variables will be available as an array in the custom gcode (one item per extruder), don't forget to use them with the {current_extruder} index to get the current value."
-        " If a filament has a typo on the variable that change its type, then the parser will convert evrything to strings."
+        " If a filament has a typo on the variable that change its type, then the parser will convert everything to strings."
         "\nAdvice: before using a variable, it's safer to use the function 'default_XXX(variable_name, default_value)'"
         " (enclosed in bracket as it's a script) in case it's not set. You can replace XXX by 'int' 'bool' 'double' 'string'.");
     def->multiline = true;
@@ -4708,9 +4708,10 @@ void PrintConfigDef::init_fff_params()
     def->label = L("max angle");
     def->full_label = L("Seam notch maximum angle");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("If the (external) angle at the seam is higher than this value, then no notch will be set. If the angle is too high, there isn't enough room for the notch.");
+    def->tooltip = L("If the (external) angle at the seam is higher than this value, then no notch will be set. If the angle is too high, there isn't enough room for the notch."
+                    "\nCan't be lower than 180° or it filters everything. At 360, it allows everything.");
     def->sidetext = L("°");
-    def->min = 0;
+    def->min = 180;
     def->max = 360;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloat(250));
