@@ -47,11 +47,11 @@
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Format/AMF.hpp"
 #include "libslic3r/Format/3mf.hpp"
-#include "libslic3r/Format/Format.hpp"
 #include "libslic3r/Format/STL.hpp"
 #include "libslic3r/Format/OBJ.hpp"
 #include "libslic3r/Format/SL1.hpp"
 #include "libslic3r/Format/CWS.hpp"
+#include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/BlacklistedLibraryCheck.hpp"
@@ -583,11 +583,12 @@ int CLI::run(int argc, char **argv)
                 PrintBase  *print = (printer_technology == ptFFF) ? static_cast<PrintBase*>(&fff_print) : static_cast<PrintBase*>(&sla_print);
                 if (! m_config.opt_bool("dont_arrange")) {
                     arr2::ArrangeSettings arrange_cfg;
-                    arrange_cfg.set_distance_from_objects(min_object_distance(m_print_config)) * 2;
-                    if(m_print_config.option("duplicate_distance") != nullptr)
-                        arrange_cfg.min_obj_distance += scaled(m_print_config.opt_float("duplicate_distance"));
-                    else
-                        arrange_cfg.min_obj_distance += 6;
+                    arrange_cfg.set_distance_from_objects(min_object_distance(static_cast<const ConfigBase*>(&m_print_config)));
+                    //arrange_cfg.set_distance_from_objects(min_object_distance(m_print_config)) * 2; //del (from 2.5)
+                    //if(m_print_config.option("duplicate_distance") != nullptr)
+                    //    arrange_cfg.min_obj_distance += scaled(m_print_config.opt_float("duplicate_distance"));
+                    //else
+                    //    arrange_cfg.min_obj_distance += 6;
                     if (dups > 1) {
                             try {
                             // if all input objects have defined position(s) apply duplication to the whole model

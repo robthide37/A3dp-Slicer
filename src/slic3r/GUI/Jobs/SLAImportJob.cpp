@@ -60,7 +60,7 @@ void SLAImportJob::process(Ctl &ctl)
     };
 
     std::string path = p->path.ToUTF8().data();
-    std::string format_id = p->import_dlg->get_archive_format();
+    OutputFormat format_id = p->import_dlg->get_archive_format(); //note: doesn't uwork, isn't used
 
     try {
         switch (p->sel) {

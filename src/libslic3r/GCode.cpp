@@ -3562,6 +3562,7 @@ Polygon Bed::get_inner_offset(const std::vector<Vec2d>& shape, const double padd
 }
 } // end namespace GCode::Impl
 
+// for spiral vase
 std::optional<std::string> GCodeGenerator::get_helical_layer_change_gcode(
     const coordf_t previous_layer_z,
     const coordf_t print_z,
@@ -6237,10 +6238,25 @@ void GCodeGenerator::write_travel_to(std::string &gcode, const Polyline& travel,
     }
 }
 
-/* // Prusa travel code
+// Prusa travel code (used for spiral vase)
 //TODO: review & merge  (at least the slope thing)
 
 namespace GCode::Impl {
+
+Points3 generate_flat_travel(tcb::span<const Point> xy_path, const float elevation) {
+    Points3 result;
+    result.reserve(xy_path.size() - 1);
+    for (const Point& point : xy_path.subspan(1)) {
+        result.emplace_back(point.x(), point.y(), scaled(elevation));
+    }
+    return result;
+}
+
+Vec2d place_at_segment(const Vec2d& current_point, const Vec2d& previous_point, const double distance) {
+    Vec2d direction = (current_point - previous_point).normalized();
+    return previous_point + direction * distance;
+}
+
 std::vector<DistancedPoint> slice_xy_path(tcb::span<const Point> xy_path, tcb::span<const double> sorted_distances) {
     assert(xy_path.size() >= 2);
     std::vector<DistancedPoint> result;
@@ -6453,17 +6469,17 @@ std::string GCodeGenerator::generate_travel_gcode(
 
     // generate G-code for the travel move
     // use G1 because we rely on paths being straight (G0 may make round paths)
-    gcode += this->m_writer.set_travel_acceleration(acceleration);
+    this->m_writer.set_travel_acceleration(acceleration);
 
     for (const Vec3crd& point : travel) {
-        gcode += this->m_writer.travel_to_xyz(to_3d(this->point_to_gcode(point.head<2>()), unscaled(point.z())), comment);
+        gcode += this->m_writer.travel_to_xyz(to_3d(this->point_to_gcode(point.head<2>()), unscaled(point.z())), 0.0, comment);
         this->set_last_pos(point.head<2>());
     }
 
     if (! GCodeWriter::supports_separate_travel_acceleration(config().gcode_flavor)) {
         // In case that this flavor does not support separate print and travel acceleration,
         // reset acceleration to default.
-        gcode += this->m_writer.set_travel_acceleration(acceleration);
+        this->m_writer.set_travel_acceleration(acceleration);
     }
 
     return gcode;
@@ -6508,7 +6524,7 @@ Polyline GCodeGenerator::generate_travel_xy_path(
 
     return xy_path;
 }
-
+/*
 // This method accepts &point in print coordinates.
 std::string GCodeGenerator::travel_to(const Point &point, ExtrusionRole role, std::string comment)
 {

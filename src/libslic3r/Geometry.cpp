@@ -644,10 +644,10 @@ Transformation Transformation::operator * (const Transformation& other) const
 }
 
 
-//bool Transformation::operator==(const Transformation& other) const
-//{
-//    return m_matrix. == other.m_matrix;
-//}
+bool Transformation::operator==(const Transformation& other) const
+{
+    return m_matrix.matrix() == other.m_matrix.matrix();
+}
 
 TransformationSVD::TransformationSVD(const Transform3d& trafo)
 {

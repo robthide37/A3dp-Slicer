@@ -9,6 +9,7 @@
 #include "LocalesUtils.hpp"
 #include "Thread.hpp"
 #include "format.hpp"
+#include "Color.hpp"
 
 #include <utility>
 #include <vector>
@@ -62,153 +63,6 @@ void AppConfig::reset()
     set_defaults();
 };
 
-AppConfig::hsv AppConfig::rgb2hsv(const AppConfig::rgb& in)
-{
-    hsv         out;
-    double      min, max, delta;
-
-    min = in.r < in.g ? in.r : in.g;
-    min = min < in.b ? min : in.b;
-
-    max = in.r > in.g ? in.r : in.g;
-    max = max > in.b ? max : in.b;
-
-    out.v = max;                                // v
-    delta = max - min;
-    if (delta < 0.00001)
-    {
-        out.s = 0;
-        out.h = 0; // undefined, maybe nan?
-        return out;
-    }
-    if (max > 0.0) { // NOTE: if Max is == 0, this divide would cause a crash
-        out.s = (delta / max);                  // s
-    } else {
-        // if max is 0, then r = g = b = 0              
-        // s = 0, h is undefined
-        out.s = 0.0;
-        out.h = NAN;                            // its now undefined
-        return out;
-    }
-    if (in.r >= max)                           // > is bogus, just keeps compilor happy
-        out.h = (in.g - in.b) / delta;        // between yellow & magenta
-    else
-        if (in.g >= max)
-            out.h = 2.0 + (in.b - in.r) / delta;  // between cyan & yellow
-        else
-            out.h = 4.0 + (in.r - in.g) / delta;  // between magenta & cyan
-
-    out.h *= 60.0;                              // degrees
-
-    if (out.h < 0.0)
-        out.h += 360.0;
-
-    return out;
-}
-
-
-AppConfig::rgb AppConfig::hsv2rgb(const AppConfig::hsv& in)
-{
-    double      hh, p, q, t, ff;
-    long        i;
-    rgb         out;
-
-    if (in.s <= 0.0) {       // < is bogus, just shuts up warnings
-        out.r = in.v;
-        out.g = in.v;
-        out.b = in.v;
-        return out;
-    }
-    hh = in.h;
-    if (hh >= 360.0) hh = 0.0;
-    hh /= 60.0;
-    i = (long)hh;
-    ff = hh - i;
-    p = in.v * (1.0 - in.s);
-    q = in.v * (1.0 - (in.s * ff));
-    t = in.v * (1.0 - (in.s * (1.0 - ff)));
-
-    switch (i) {
-    case 0:
-        out.r = in.v;
-        out.g = t;
-        out.b = p;
-        break;
-    case 1:
-        out.r = q;
-        out.g = in.v;
-        out.b = p;
-        break;
-    case 2:
-        out.r = p;
-        out.g = in.v;
-        out.b = t;
-        break;
-
-    case 3:
-        out.r = p;
-        out.g = q;
-        out.b = in.v;
-        break;
-    case 4:
-        out.r = t;
-        out.g = p;
-        out.b = in.v;
-        break;
-    case 5:
-    default:
-        out.r = in.v;
-        out.g = p;
-        out.b = q;
-        break;
-    }
-    return out;
-}
-
-uint32_t AppConfig::hex2int(const std::string& hex)
-{
-    uint32_t int_color;
-    if (hex.empty() || !(hex.size() == 6 || hex.size() == 7)) {
-        int_color = 0x2172eb;
-    } else {
-        std::stringstream ss;
-        ss << std::hex << (hex[0] == '#' ? hex.substr(1) : hex);
-        ss >> int_color;
-    }
-    // #RRVVBB so r in in the high bit, but we store it in the low one in an int
-    uint32_t good_int_color = 0;
-    good_int_color |= ((int_color & 0xFF0000) >> 16);
-    good_int_color |= ((int_color & 0xFF00));
-    good_int_color |= ((int_color & 0xFF) << 16);
-    return good_int_color;
-}
-
-std::string AppConfig::int2hex(uint32_t int_color)
-{
-    std::stringstream ss;
-    ss << std::hex << ((int_color & 0xF0) >> 4) << ((int_color & 0xF));
-    ss << ((int_color & 0xF000) >> 12) << ((int_color & 0xF00) >> 8);
-    ss << ((int_color & 0xF00000) >> 20) << ((int_color & 0xF0000) >> 16);
-    return ss.str();
-}
-
-AppConfig::rgb AppConfig::int2rgb(uint32_t int_color)
-{
-    return AppConfig::rgb{
-            ((int_color & 0xFF)) / 255.,
-            ((int_color & 0xFF00) >> 8) / 255.,
-            ((int_color & 0xFF0000) >> 16) / 255.,
-    };
-}
-uint32_t AppConfig::rgb2int(const AppConfig::rgb& rgb_color)
-{
-    uint32_t int_color = 0;
-    int_color |= std::min(255, int(rgb_color.r * 255));
-    int_color |= std::min(255, int(rgb_color.g * 255)) << 8;
-    int_color |= std::min(255, int(rgb_color.b * 255)) << 16;
-    return int_color;
-}
-
 uint32_t AppConfig::create_color(float saturation, float value, EAppColorType color_template)
 {
     std::string hex_str;
@@ -226,7 +80,7 @@ uint32_t AppConfig::create_color(float saturation, float value, EAppColorType co
     }
 
     uint32_t int_color = hex2int(hex_str);
-    rgb rgb_color = int2rgb(int_color);
+    ColorRGB rgb_color = int2rgb(int_color);
     hsv hsv_color = rgb2hsv(rgb_color);
 
     //modify h& v

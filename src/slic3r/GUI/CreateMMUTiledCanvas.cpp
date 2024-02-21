@@ -68,12 +68,12 @@ namespace GUI {
     int color_dist_hue(wxColour col1, wxColour col2) {
 
         uint32_t int_color = col1.GetRGB();
-        AppConfig::rgb rgb_color = AppConfig::int2rgb(int_color);
-        AppConfig::hsv hsv_color1 = AppConfig::rgb2hsv(rgb_color);
+        ColorRGB rgb_color = int2rgb(int_color);
+        hsv hsv_color1 = rgb2hsv(rgb_color);
 
         int_color = col2.GetRGB();
-        rgb_color = AppConfig::int2rgb(int_color);
-        AppConfig::hsv hsv_color2 = AppConfig::rgb2hsv(rgb_color);
+        rgb_color = int2rgb(int_color);
+        hsv hsv_color2 = rgb2hsv(rgb_color);
 
         int dist = 0;
         if (hsv_color1.h > hsv_color2.h)
@@ -1759,7 +1759,7 @@ void CreateMMUTiledCanvas::create_geometry(wxCommandEvent& event_args) {
         ConfigOptionStrings* new_color_conf = static_cast<ConfigOptionStrings*>(color_conf->clone());
         for(int idx_col = 0; idx_col < this->m_used_colors.size() && idx_col < new_color_conf->values.size(); idx_col++){
             wxColour col = this->m_used_colors[idx_col]->get_printed_color(use_spool_colors);
-            new_color_conf->values[idx_col] = "#" + AppConfig::int2hex(col.GetRGB());
+            new_color_conf->values[idx_col] = "#" + int2hex(col.GetRGB());
         }
         new_Printer_config.set_key_value("extruder_colour", new_color_conf);
 

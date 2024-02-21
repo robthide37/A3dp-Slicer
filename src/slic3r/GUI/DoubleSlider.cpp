@@ -446,9 +446,9 @@ void Control::SetLayersTimes(const std::vector<float>& layers_times, float total
         m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
         Refresh();
         Update();
+    }
     else
         m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
-}
 }
 
 void Control::SetLayersTimes(const std::vector<double>& layers_times)

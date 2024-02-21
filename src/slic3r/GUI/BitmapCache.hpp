@@ -51,13 +51,12 @@ public:
 	static NSVGimage* nsvgParseFromFileWithReplace(const char* filename, const char* units, float dpi, const std::map<std::string, std::string>& replaces);
 	// Gets a data from SVG file and makes replases
 	// replace_map containes old_value->new_value
-    static void		nsvgGetDataFromFileWithReplace(const char* filename, std::string& data_str, const std::map<std::string, std::string>& replaces);
-	wxBitmapBundle* from_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height, const bool dark_mode, const std::string& new_color = "");
+    static void		nsvgGetDataFromFileWithReplace(const char* filename, std::string& data_str, const ColorReplaces& replaces);
+	wxBitmapBundle* from_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height, /*const bool dark_mode, */ColorReplaces& color_change);
 	// Load png from resources/icons. bitmap_key is given without the .png suffix. Bitmap will be rescaled to provided height/width if nonzero.
-	wxBitmapBundle* from_png(const std::string& bitmap_name, unsigned width, unsigned height, uint32_t color = 0xFFFFFFFF);
+	wxBitmapBundle* from_png(const std::string& bitmap_name, unsigned width, unsigned height, const ColorReplaces& color_change);
 	// Load svg from resources/icons. bitmap_key is given without the .svg suffix. SVG will be rasterized to provided height/width.
-    wxBitmap* 		load_svg(const std::string &bitmap_key, unsigned width = 0, unsigned height = 0, const bool grayscale = false, const bool dark_mode = false, const std::string& new_color = "");
-	wxBitmap*		load_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height, std::map<std::string, std::string> replaces);
+    //wxBitmap* 		load_svg(const std::string &bitmap_key, unsigned width = 0, unsigned height = 0, const bool grayscale = false, const bool dark_mode = false, const ColorReplaces& new_color = {});
 
 	wxBitmapBundle	mksolid(size_t width, size_t height, unsigned char r, unsigned char g, unsigned char b, unsigned char transparency, size_t border_width = 0, bool dark_mode = false);
 	wxBitmapBundle*	mksolid_bndl(size_t width, size_t height, const std::string& color = std::string(), size_t border_width = 0, bool dark_mode = false);

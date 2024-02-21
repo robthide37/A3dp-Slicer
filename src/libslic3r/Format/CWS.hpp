@@ -6,6 +6,7 @@
 #define slic3r_format_CWS_HPP
 
 #include "libslic3r/Format/SL1.hpp"
+#include "libslic3r/I18N.hpp"
 #include "SLAArchiveWriter.hpp"
 #include "SLAArchiveFormatRegistry.hpp"
 

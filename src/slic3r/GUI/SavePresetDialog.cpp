@@ -92,9 +92,9 @@ void SavePresetDialog::Item::init_input_name_ctrl(wxBoxSizer *input_name_sizer, 
 static std::map<Preset::Type, std::string> TOP_LABELS =
 {
     // type                             Save settings    
-    { Preset::Type::TYPE_PRINT,         L("Save print settings as")   },
+    { Preset::Type::TYPE_FFF_PRINT,         L("Save print settings as")   },
     { Preset::Type::TYPE_SLA_PRINT,     L("Save print settings as")   },
-    { Preset::Type::TYPE_FILAMENT,      L("Save filament settings as")},
+    { Preset::Type::TYPE_FFF_FILAMENT,      L("Save filament settings as")},
     { Preset::Type::TYPE_SLA_MATERIAL,  L("Save material settings as")},
     { Preset::Type::TYPE_PRINTER,       L("Save printer settings as") },
 };
@@ -346,7 +346,7 @@ void SavePresetDialog::build(std::vector<Preset::Type> types, std::string suffix
     topSizer->Add(m_presets_sizer,  0, wxEXPAND | wxALL, BORDER_W);
     
     // Add checkbox for Template filament saving
-    if (template_filament && types.size() == 1 && *types.begin() == Preset::Type::TYPE_FILAMENT) {
+    if (template_filament && types.size() == 1 && *types.begin() == Preset::Type::TYPE_FFF_FILAMENT) {
         m_template_filament_checkbox = new wxCheckBox(this, wxID_ANY, _L("Save as profile derived from current printer only."));
         wxBoxSizer* check_sizer = new wxBoxSizer(wxVERTICAL);
         check_sizer->Add(m_template_filament_checkbox);

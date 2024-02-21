@@ -58,6 +58,7 @@ public:
     void sync();
 
     float get_distance_from_objects() const override { return get_ref(this).d_obj; }
+    float get_previous_distance_from_objects() const override { return get_ref(this).d_obj_prev; }
     float get_distance_from_bed() const  override { return get_ref(this).d_bed; }
     bool  is_rotation_enabled() const override { return get_ref(this).rotations; }
 
@@ -69,6 +70,7 @@ public:
     void distance_from_bed_range(float &min, float &max) const override;
 
     ArrangeSettingsDb& set_distance_from_objects(float v) override;
+    ArrangeSettingsDb& set_previous_distance_from_objects(float v) override;
     ArrangeSettingsDb& set_distance_from_bed(float v) override;
     ArrangeSettingsDb& set_rotation_enabled(bool v) override;
 

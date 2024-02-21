@@ -11,6 +11,8 @@
 #include "libslic3r/Utils.hpp" // ScopeGuard   
 
 #include "3DScene.hpp" // glsafe
+#include "GUI_App.hpp"
+#include "libslic3r/AppConfig.hpp"
 #include "GL/glew.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
@@ -155,8 +157,10 @@ IconManager::Icons IconManager::init(const InitTypes &input)
         const InitType &i = input[j];
         if (i.filepath.empty())
             continue; // no file path only reservation of space for texture
-        assert(boost::filesystem::exists(i.filepath));
-        if (!boost::filesystem::exists(i.filepath))
+        boost::filesystem::path file_boot_path;
+        file_boot_path = i.filepath;
+        assert(boost::filesystem::exists(file_boot_path));
+        if (!boost::filesystem::exists(file_boot_path))
             continue;
         assert(boost::algorithm::iends_with(i.filepath, ".svg"));
         if (!boost::algorithm::iends_with(i.filepath, ".svg"))
@@ -238,7 +242,8 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
     const auto& states = priv::get_states(type);
         
     bool compress  = false;
-    bool is_loaded = m_icons_texture.load_from_svg_files_as_sprites_array(file_paths, states, width, compress);
+    uint32_t color = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f, AppConfig::EAppColorType::Platter);
+    bool is_loaded = m_icons_texture.load_from_svg_files_as_sprites_array(file_paths, states, width, compress, color);
     if (!is_loaded || (size_t) m_icons_texture.get_width() < (states.size() * width) ||
         (size_t) m_icons_texture.get_height() < (file_paths.size() * width)) {
         // bad load of icons, but all usage of m_icons_texture check that texture is initialized

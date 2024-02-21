@@ -88,7 +88,7 @@ enum FileType
 
 extern wxString file_wildcards(FileType file_type, const std::string &custom_extension = {});
 
-wxString sla_wildcards(const char *formatid);
+wxString sla_wildcards(OutputFormat formatid);
 
 enum ConfigMenuIDs {
     ConfigMenuWizard,
@@ -150,7 +150,7 @@ private:
     wxColour        m_color_selected_btn_bg;
     bool            m_force_colors_update { false };
 #endif
-    std::vector<std::string>     m_mode_palette;
+    //std::vector<std::string>     m_mode_palette; //replaced by Slic3r::GUI::get_app_config()->tags()
 
     wxFont		    m_small_font;
     wxFont		    m_bold_font;
@@ -241,10 +241,12 @@ public:
 
     const std::string       get_html_bg_color(wxWindow* html_parent);
 
-    const std::string&      get_first_mode_btn_color(int mode_id);
-    const std::string&      get_last_mode_btn_color(int mode_id);
-    std::vector<wxColour>   get_mode_palette();
+    std::string             get_first_mode_btn_color(ConfigOptionMode mode_id) const;
+    std::string             get_last_mode_btn_color(ConfigOptionMode mode_id) const;
+#ifdef GUI_TAG_PALETTE
+    std::vector<wxColour>   get_mode_palette() const;
     void                    set_mode_palette(const std::vector<wxColour> &palette);
+#endif
 
 #ifdef _WIN32
     const wxColour& get_label_highlight_clr()   { return m_color_highlight_label_default; }

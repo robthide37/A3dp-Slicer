@@ -20,7 +20,7 @@ public:
     virtual Sel get_selection() const = 0;
     virtual SLAImportQuality get_quality() const = 0;
     virtual std::string get_path() const = 0;
-    virtual std::string get_archive_format() const  { return ""; }
+    virtual OutputFormat get_archive_format() const  { return OutputFormat::ofUnknown; }
 };
 
 class Plater;

@@ -1971,6 +1971,16 @@ private:
             m_labels.emplace_back(p.second);
         }
     }
+    void set_values(const std::vector<std::pair<std::string, std::string>> il) {
+        m_values.clear();
+        m_values.reserve(il.size());
+        m_labels.clear();
+        m_labels.reserve(il.size());
+        for (const std::pair<std::string, std::string>& p : il) {
+            m_values.emplace_back(p.first);
+            m_labels.emplace_back(p.second);
+        }
+    }
     void set_labels(const std::initializer_list<std::string_view> il) {
         m_labels.clear();
         m_labels.reserve(il.size());
@@ -2048,6 +2058,7 @@ public:
     // Default value of this option. The default value object is owned by ConfigDef, it is released in its destructor.
     Slic3r::clonable_ptr<const ConfigOption> default_value;
     void 								set_default_value(const ConfigOption* ptr) {
+        assert(!ptr->is_vector());
         this->default_value = Slic3r::clonable_ptr<const ConfigOption>(ptr);
     }
     void 								set_default_value(ConfigOptionVectorBase* ptr) {
@@ -2236,7 +2247,19 @@ public:
         enum_def->set_values(il);
     }
 
+    void set_enum_values(const std::vector<std::pair<std::string, std::string>> il) {
+        this->enum_def_new();
+        enum_def->set_values(il);
+    }
+
     void set_enum_values(GUIType gui_type, const std::initializer_list<std::pair<std::string_view, std::string_view>> il) {
+        this->enum_def_new();
+        assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open);
+        this->gui_type = gui_type;
+        enum_def->set_values(il);
+    }
+
+    void set_enum_values(GUIType gui_type, const std::vector<std::pair<std::string, std::string>> il) {
         this->enum_def_new();
         assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open);
         this->gui_type = gui_type;

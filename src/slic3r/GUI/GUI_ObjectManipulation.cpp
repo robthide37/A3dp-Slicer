@@ -1150,7 +1150,7 @@ void ObjectManipulation::set_uniform_scaling(const bool use_uniform_scale)
 
 void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
 {
-    if (wxGetApp().get_mode() == comSimple && !get_app_config()->get_bool("objects_always_expert")))
+    if (wxGetApp().get_mode() == comSimple && !get_app_config()->get_bool("objects_always_expert"))
         type = ECoordinatesType::World;
 
     if (m_coordinates_type == type)

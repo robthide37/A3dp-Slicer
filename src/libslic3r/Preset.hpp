@@ -624,7 +624,7 @@ public:
 
     const std::vector<std::pair<std::string, std::string>>& map_alias_to_profile_name() { return m_map_alias_to_profile_name; }
 private:
-    // Type of this PresetCollection: TYPE_PRINT, TYPE_FILAMENT or TYPE_PRINTER.
+    // Type of this PresetCollection: TYPE_FFF_PRINT, TYPE_FFF_FILAMENT or TYPE_PRINTER.
     Preset::Type            m_type;
     // List of presets, starting with the "- default -" preset.
     // Use deque to force the container to allocate an object per each entry, 

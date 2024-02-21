@@ -7257,7 +7257,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject &               
                     GCodeExtrusionRole::SupportMaterial, 
                     GCodeExtrusionRole::SupportMaterialInterface, 
                     GCodeExtrusionRole::Custom}) {
-                geo_vol.emplace_back(GLModel::Geometry(), new_volume(ctxt.features_colors[role]));
+                geo_vol.emplace_back(GLModel::Geometry(), new_volume(ctxt.features_colors[uint8_t(role)]));
                 feature_to_geometry_map[role] = &geo_vol.back().first;
             }
         }
@@ -7429,7 +7429,7 @@ void GLCanvas3D::_load_wipe_tower_toolpaths(const BuildVolume& build_volume, con
     ctxt.wipe_tower_angle = ctxt.print->config().wipe_tower_rotation_angle.value/180.f * PI;
     ctxt.wipe_tower_pos = Vec2f(ctxt.print->config().wipe_tower_x.value, ctxt.print->config().wipe_tower_y.value);
 
-    ctxt.color_support = m_gcode_viewer.get_extrusion_colors()[ ExtrusionRole::WipeTower];
+    ctxt.color_support = m_gcode_viewer.get_extrusion_colors()[uint8_t(GCodeExtrusionRole::WipeTower)];
 
     BOOST_LOG_TRIVIAL(debug) << "Loading wipe tower toolpaths in parallel - start" << m_volumes.log_memory_info() << log_memory_info();
 

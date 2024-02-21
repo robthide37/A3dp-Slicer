@@ -319,9 +319,9 @@ void CreateObjectJob::process(Ctl &ctl)
     Points bed_shape_;
     bed_shape_.reserve(m_input.bed_shape.size());
     for (const Vec2d &p : m_input.bed_shape)
-        bed_shape_.emplace_back(p.cast<int>());
+        bed_shape_.emplace_back(p.cast<coord_t>());
     Slic3r::Polygon bed(bed_shape_);
-    if (!bed.contains(bed_coor.cast<int>()))
+    if (!bed.contains(bed_coor.cast<coord_t>()))
         // mouse pose is out of build plate so create object in center of plate
         bed_coor = bed.centroid().cast<double>();
 
@@ -827,7 +827,8 @@ std::vector<BoundingBoxes> create_line_bounds(const ExPolygonsWithIds &shapes, s
 template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc was_canceled)
 {
     // method use square of coord stored into int64_t
-    static_assert(std::is_same<Point::coord_type, int32_t>());
+    static_assert( (std::is_same<Point::coord_type, int32_t>() && std::is_same<Coord2, int64_t>())
+        || (std::is_same<Point::coord_type, int64_t>() && std::is_same<Coord2, double>()));
     const EmbossShape &shape = input.create_shape();
     if (shape.shapes_with_ids.empty())
         return {};
@@ -844,7 +845,7 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
     // half of font em size for direction of letter emboss
     // double  em_2_mm      = prop.size_in_mm / 2.; // TODO: fix it
     double em_2_mm = 5.;
-    int32_t em_2_polygon = static_cast<int32_t>(std::round(scale_(em_2_mm)));
+    int32_t em_2_polygon = static_cast<int32_t>(std::round(scale_t(em_2_mm)));
 
     size_t s_i_offset = 0; // shape index offset(for next lines)
     indexed_triangle_set result;
@@ -1263,7 +1264,7 @@ indexed_triangle_set cut_surface_to_its(const ExPolygons &shapes, const Transfor
     if (is_text_reflected) {
         for (SurfaceCut::Contour &c : cut.contours)
             std::reverse(c.begin(), c.end());
-        for (Vec3i &t : cut.indices)
+        for (Vec3i32 &t : cut.indices)
             std::swap(t[0], t[1]);
     }
 

@@ -972,6 +972,10 @@ void CheckBox::SetValue(wxWindow* win, bool value)
 
 bool CheckBox::GetValue(wxWindow* win)
 {
+#ifdef __WXGTK2__
+    if (wxToggleButton* chk = dynamic_cast<wxToggleButton*>(window))
+        return chk->GetValue();
+#endif
     if (wxGetApp().suppress_round_corners())
         if(::CheckBox* chk = dynamic_cast<::CheckBox*>(win))
             return chk->GetValue();
@@ -979,10 +983,8 @@ bool CheckBox::GetValue(wxWindow* win)
     if(::SwitchButton* chk = dynamic_cast<::SwitchButton*>(win))
         return chk->GetValue();
 
-#ifdef __WXGTK2__
-    if (wxToggleButton* chk = dynamic_cast<wxToggleButton*>(window))
-        return chk->GetValue();
-#endif
+    assert(false);
+    return false;
 }
 
 void CheckBox::Rescale(wxWindow* win)
@@ -1007,15 +1009,6 @@ void CheckBox::SysColorChanged(wxWindow* win)
     if (!wxGetApp().suppress_round_corners())
         if(::SwitchButton* chk = dynamic_cast<::SwitchButton*>(win))
             chk->SysColorChange();
-}
-
-bool CheckBox::GetValue(wxWindow* window)
-{
-
-    if (wxGetApp().suppress_round_corners())
-        return dynamic_cast<::CheckBox*>(window)->GetValue();
-
-    return dynamic_cast<::SwitchButton*>(window)->GetValue();
 }
 
 void CheckBox::BUILD() {
@@ -1097,7 +1090,7 @@ void CheckBox::set_na_value()
 
 boost::any& CheckBox::get_value()
 {
-	bool value = GetValue();
+	bool value = CheckBox::GetValue(window);
 	if (m_opt.type == coBool)
 		m_value = static_cast<bool>(value);
 	else

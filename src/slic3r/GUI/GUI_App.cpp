@@ -238,13 +238,18 @@ public:
         int width = lround(m_main_bitmap.GetWidth() * 0.4);
 
         // load bitmap for logo
-        BitmapCache bmp_cache;
         int logo_size = lround(width * 0.25);
-        wxBitmap* logo_bmp_ptr = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
+        //BitmapCache bmp_cache;
+        //wxBitmap* logo_bmp_ptr = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
+        wxBitmapBundle *logo_bmp_ptr = get_bmp_bundle(wxGetApp().logo_name(), logo_size, logo_size);
         if (logo_bmp_ptr == nullptr)
             return;
-
-        wxBitmap logo_bmp = *logo_bmp_ptr;
+        
+#ifdef __APPLE__
+        wxBitmap logo_bmp = logo_bmp_ptr->GetBitmap(logo_bmp_ptr->GetDefaultSize() * mac_max_scaling_factor());
+#else
+        wxBitmap logo_bmp = logo_bmp_ptr->GetBitmapFor(this);
+#endif
 
         wxCoord margin = int(m_scale * 20);
 
@@ -255,7 +260,7 @@ public:
         wxMemoryDC memDc(m_main_bitmap);
 
         // draw logo
-        memDc.DrawBitmap(*logo_bmp, margin, margin, true);
+        memDc.DrawBitmap(logo_bmp, margin, margin, true);
 
         // draw the (white) labels inside of our black box (at the left of the splashscreen)
         memDc.SetTextForeground(wxColour(180, 180, 180));
@@ -1100,7 +1105,7 @@ std::string GUI_App::check_older_app_config(Semver current_version, bool backup)
             if (is_editor()) {
                 throw Slic3r::RuntimeError(
                     format(_u8L("Error parsing %1% config file, it is probably corrupted. "
-                        "Try to manually delete the file to recover from the error. Your user profiles will not be affected."
+                        "Try to manually delete the file to recover from the error. Your user profiles will not be affected.") +
                         "\n\n%2%\n\n%3%", SLIC3R_APP_NAME, app_config->config_path(), error));
             }
             else {
@@ -1563,6 +1568,7 @@ const wxColour GUI_App::get_label_default_clr_phony()
     return dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT) : wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT);
 }
 
+#ifdef GUI_TAG_PALETTE
 std::map<ConfigOptionMode, std::string> GUI_App::get_mode_default_palette()
 {
     std::map<ConfigOptionMode, std::string> tag_color_map;
@@ -1576,12 +1582,15 @@ std::map<ConfigOptionMode, std::string> GUI_App::get_mode_default_palette()
     }
     return tag_color_map;
 }
+#endif
 
 void GUI_App::init_ui_colours()
 {
     m_color_label_modified          = get_label_default_clr_modified();
     m_color_label_sys               = get_label_default_clr_system();
+#ifdef GUI_TAG_PALETTE
     m_mode_palette                  = get_mode_default_palette();
+#endif
     m_color_label_default           = get_label_default_clr_default();
     m_color_label_phony             = get_label_default_clr_phony();
 
@@ -1615,7 +1624,8 @@ void GUI_App::update_ui_colours_from_appconfig()
         if (!str.empty())
             m_color_label_modified = wxColour(str);
     }
-
+    
+#ifdef GUI_TAG_PALETTE
     // load mode markers colors
     if (app_config->has("mode_palette")) {
         const auto colors = app_config->get("mode_palette");
@@ -1625,6 +1635,7 @@ void GUI_App::update_ui_colours_from_appconfig()
                 m_mode_palette = get_mode_default_palette();
         }
     }
+#endif
 
     if (app_config->has("label_clr_default")) {
         auto str = app_config->get("label_clr_default");
@@ -1911,40 +1922,42 @@ const std::string GUI_App::get_html_bg_color(wxWindow* html_parent)
     return encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 }
 
-const std::string& GUI_App::get_first_mode_btn_color(ConfigOptionMode mode_id)
+std::string GUI_App::get_first_mode_btn_color(ConfigOptionMode mode_id) const
 {
-    assert(0 <= size_(mode_id));
+    assert(0 <= size_t(mode_id));
+    assert(size_t(mode_id)< get_app_config()->tags().size());
                            
-    for (const auto& [tag, color_str] : m_mode_palette) {
+    for (const AppConfig::Tag& tag : get_app_config()->tags()) {
         // get the first good tag.
-        if ((tag & mode_id) == tag) {
-            // store the pointer so we can return a valid reference.
-            return color_str;
+        if ((tag.tag & mode_id) == tag.tag) {
+            return tag.color_hash;
         }
     }
     return "";
 }
 
-const std::string& GUI_App::get_last_mode_btn_color(ConfigOptionMode mode_id)
+std::string GUI_App::get_last_mode_btn_color(ConfigOptionMode mode_id) const
 {
-    assert(0 <= size_(mode_id));
-    const std::string* str = nullptr;
-    for (const auto& [tag, color_str] : m_mode_palette) {
-        // get the last good tag.
-        if ((tag & mode_id) == tag) {
+    assert(0 <= size_t(mode_id));
+    assert(size_t(mode_id)< get_app_config()->tags().size());
+    for (size_t idx_p1 = get_app_config()->tags().size(); idx_p1 > 0; --idx_p1) {
+        const AppConfig::Tag& tag = get_app_config()->tags()[idx_p1-1];
+        // get the first good tag.
+        if ((tag.tag & mode_id) == tag.tag) {
             // store the pointer so we can return a valid reference.
-            str = &color_str;
+            return tag.color_hash;
         }
     }
-    return str ? *str : "";
+    return"";
 }
 
-std::map<ConfigOptionMode, wxColour> GUI_App::get_mode_palette()
+#ifdef GUI_TAG_PALETTE
+std::map<ConfigOptionMode, wxColour> GUI_App::get_mode_palette() const
 {
     std::map<ConfigOptionMode, wxColour> ret_map;
-    if(size_t(mode_id) < m_mode_palette.size()
-    for (const auto& [tag, color_str] : m_mode_palette) {
-        ret_map[tag] = wxColor(color_str);
+    //if(size_t(mode_id) < m_mode_palette.size()
+    for (const AppConfig::Tag& tag : get_app_config()->tags()) {
+        ret_map[tag.tag] = wxColor(tag.color_hash);
     }
     return ret_map;
 }
@@ -1967,6 +1980,7 @@ void GUI_App::set_mode_palette(std::map<ConfigOptionMode, wxColour>& palette)
         app_config->set("mode_palette", escape_strings_cstyle(m_mode_palette));
     }
 }
+#endif
 
 bool GUI_App::tabs_as_menu() const
 {
@@ -2767,7 +2781,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         int config_menu_idx = 0;
         for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
             mode_menu->AppendCheckItem(config_id_base + ConfigMenuCnt + config_menu_idx, _(tag.name), _(tag.description));
-            Bind(wxEVT_UPDATE_UI, [this, tag](wxUpdateUIEvent& evt) { evt.Check((get_mode() & tag.tag) = tag.tag); }, config_id_base + ConfigMenuCnt + config_menu_idx);
+            Bind(wxEVT_UPDATE_UI, [this, tag](wxUpdateUIEvent& evt) { evt.Check((get_mode() & tag.tag) == tag.tag); }, config_id_base + ConfigMenuCnt + config_menu_idx);
             config_menu_idx++;
         }
 
@@ -3208,7 +3222,7 @@ void GUI_App::load_current_presets(bool check_printer_presets_ /*= true*/)
 				// Mark the plater to update print bed by tab->load_current_preset() from Plater::on_config_change().
 				this->plater()->force_print_bed_update();
 			}
-            else if (tab->type() == Preset::TYPE_FILAMENT)
+            else if (tab->type() == Preset::TYPE_FFF_FILAMENT)
                 // active extruder can be changed in a respect to the new loaded configurations, if some filament preset will be modified
                 static_cast<TabFilament*>(tab)->invalidate_active_extruder();
 			tab->load_current_preset();
@@ -3445,7 +3459,8 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
     // Note, that mainframe is a parent of ConfigWizard.
     // So, wizard will be destroyed only during destroying of mainframe
     // To avoid this state the wizard have to be disconnected from mainframe and Destroyed explicitly
-    mainframe->RemoveChild(wizard);
+    assert(wizard);
+    mainframe->RemoveChild(wizard.get());
     wizard->Destroy();
 
     if (res) {
@@ -3751,21 +3766,21 @@ void GUI_App::associate_3mf_files()
 void GUI_App::associate_stl_files()
 {
 #ifdef SLIC3R_APP_W_PROG_ID
-    associate_file_type(L".stl", SLIC3R_APP_W_PROG_ID), SLIC3R_APP_WNAME, true);
+    associate_file_type(L".stl", SLIC3R_APP_W_PROG_ID, SLIC3R_APP_WNAME, true);
 #endif
 }
 
 void GUI_App::associate_gcode_files()
 {
 #ifdef GCODEVIEWER_APP_W_PROG_ID
-    associate_file_type(L".gcode", GCODEVIEWER_APP_W_PROG_ID, GCODEVIEWER_APP_WNAME, true);
+    associate_file_type(L".gcode", GCODEVIEWER_APP_W_PROG_ID, wxString(GCODEVIEWER_APP_NAME).ToStdWstring(), true);
 #endif
 }
 
 void GUI_App::associate_bgcode_files()
 {
 #ifdef GCODEVIEWER_APP_W_PROG_ID
-    associate_file_type(L".bgcode", GCODEVIEWER_APP_W_PROG_ID, GCODEVIEWER_APP_WNAME, true);
+    associate_file_type(L".bgcode", GCODEVIEWER_APP_W_PROG_ID, wxString(GCODEVIEWER_APP_NAME).ToStdWstring(), true);
 #endif
 }
 #endif // __WXMSW__

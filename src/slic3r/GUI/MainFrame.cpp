@@ -1089,7 +1089,7 @@ void MainFrame::init_tabpanel()
         if (icon_size < 16)
             icon_list =                       { "editor_menu", "layers", "preview_menu", "cog", "spool",      "printer",      "resin",        "sla_printer" };
         for (std::string icon_name : icon_list) {
-            const wxBitmap& bmp = create_scaled_bitmap(icon_name, this, icon_size);
+            const wxBitmap bmp = get_bmp_bundle(icon_name, icon_size)->GetBitmap(wxDefaultSize);
             if (img_list == nullptr)
                 img_list = new wxImageList(bmp.GetWidth(), bmp.GetHeight());
             img_list->Add(bmp);
@@ -2740,7 +2740,7 @@ void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
     else {
         select(false);
 #ifdef _USE_CUSTOM_NOTEBOOK
-        if (wxGetApp().tabs_as_menu() && tab == 0)
+        if (wxGetApp().tabs_as_menu() && tab == ETabType::Plater3D)
             m_plater->SetFocus();
 #endif
     }

@@ -218,13 +218,13 @@ FreeCADDialog::FreeCADDialog(GUI_App* app, MainFrame* mainframe)
     createSTC();
 
     wxStaticBitmap* logo = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap);
-    wxBitmapBundle* bmp_bndl = ;
+    wxBitmapBundle* bmp_bndl = get_bmp_bundle("freecad", 64);
 #ifdef __APPLE__
     wxBitmap bmp = bmp_bndl->GetBitmap(bmp_bndl->GetDefaultSize() * mac_max_scaling_factor());
 #else
     wxBitmap bmp = bmp_bndl->GetBitmapFor(this);
 #endif
-    logo->SetBitmap(*get_bmp_bundle("freecad", 64));
+    logo->SetBitmap(*bmp_bndl);
 
     m_errors = new wxTextCtrl(this, wxID_ANY, "",
         wxDefaultPosition, wxSize(200, 100 * this->scale_factor()), wxHW_SCROLLBAR_AUTO | wxTE_MULTILINE);

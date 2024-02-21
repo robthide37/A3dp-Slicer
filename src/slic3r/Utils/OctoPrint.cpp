@@ -306,7 +306,7 @@ wxString OctoPrint::get_test_failed_msg(wxString &msg) const
         return GUI::format_wxstr("Could not connect to %s: %s\n\n%s"
             , get_name()
             , msg
-            , _L(Note: OctoPrint version at least 1.1.0 is required."));
+            , _L("Note: OctoPrint version at least 1.1.0 is required."));
     } else {
         return GUI::format_wxstr("Could not connect to %s: %s\n\n%s"
             , get_name()
@@ -417,8 +417,6 @@ bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, Progr
     set_auth(http);
     set_http_send(http, upload_data);
     http.on_complete([&](std::string body, unsigned status) {
-  
-        .on_complete([&](std::string body, unsigned status) {
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: File uploaded: HTTP %2%: %3%") % name % status % body;
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
@@ -591,11 +589,9 @@ wxString MiniDeltaLCD::get_test_ok_msg() const
     return  wxString::Format(_L("Connection to %s works correctly."), "Monoprice lcd");
 }
 
-wxString MiniDeltaLCD::get_test_failed_msg(wxString& msg) const
+wxString MiniDeltaLCD::get_test_failed_msg(wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-        % _utf8(L("Could not connect to Monoprice lcd"))
-        % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to Monoprice lcd"), msg);
 }
 
 bool MiniDeltaLCD::validate_version_text(const boost::optional<std::string>& version_text) const

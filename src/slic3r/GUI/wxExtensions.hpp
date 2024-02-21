@@ -6,6 +6,7 @@
 #define slic3r_GUI_wxExtensions_hpp_
 
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Color.hpp"
 
 #include <wx/checklst.h>
 #include <wx/combo.h>
@@ -62,9 +63,9 @@ class wxDialog;
 void    update_Slic3r_string(wxString& tooltip);
 void    msw_buttons_rescale(wxDialog* dlg, const int em_unit, const std::vector<int>& btn_ids, double height_koef = 1.);
 int     em_unit(wxWindow* win);
-int     mode_icon_px_size();
 
 wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name, int width = 16, int height = -1, const std::string& new_color_rgb = std::string());
+wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name, int width, int height, Slic3r::ColorReplaces& color_changes);
 wxBitmapBundle* get_empty_bmp_bundle(int width, int height);
 wxBitmapBundle* get_solid_bmp_bundle(int width, int height, const std::string& color);
 
@@ -270,20 +271,20 @@ public:
 
     void SetBitmap_(const ScalableBitmap& bmp);
     void SetBitmap_(const wxBitmap& bmp);
-//    bool SetBitmap_(const std::string& bmp_name); //seems not used
+    bool SetBitmap_(const std::string& bmp_name, int bmp_width = 16);
     void SetBitmapDisabled_(const ScalableBitmap &bmp);
     int  GetBitmapHeight();
 
     virtual void    sys_color_changed();
 
 private:
-    wxWindow*       m_parent { nullptr };
     std::string     m_current_icon_name;
     std::string     m_disabled_icon_name;
     int             m_width {-1}; // should be multiplied to em_unit
     int             m_height{-1}; // should be multiplied to em_unit
 
 protected:
+    wxWindow*       m_parent { nullptr };
     // bitmap dimensions 
     int             m_bmp_width{ 16 };
     int             m_bmp_height{ -1 };

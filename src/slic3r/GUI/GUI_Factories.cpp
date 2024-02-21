@@ -178,7 +178,7 @@ wxBitmapBundle* SettingsFactory::get_category_bitmap(const Slic3r::OptionCategor
 //-------------------------------------
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
-static const constexpr std::array<std::pair<const char *, const char *>, 5> ADD_VOLUME_MENU_ITEMS = {{
+static const constexpr std::array<std::pair<const char *, const char *>, 6> ADD_VOLUME_MENU_ITEMS = {{
     //       menu_item Name              menu_item bitmap name
     {L("Add part"),              "add_part" },           // ~ModelVolumeType::MODEL_PART
     {L("Add negative volume"),   "add_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
@@ -555,7 +555,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
         if (type == ModelVolumeType::SEAM_POSITION) items = { "Sphere" };
         for (auto& item : items)
         {
-            if (type == ModelVolumeType::INVALID && strncmp(item, "Slab", 4) == 0)
+            if (type == ModelVolumeType::INVALID && strncmp(item.c_str(), "Slab", 4) == 0)
                 continue;
             append_menu_item(sub_menu, wxID_ANY, _(item), "",
                 [type, item](wxCommandEvent&) { obj_list()->load_generic_subobject(item, type); }, "", menu);

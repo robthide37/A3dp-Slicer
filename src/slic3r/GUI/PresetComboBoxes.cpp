@@ -512,9 +512,18 @@ wxBitmapBundle* PresetComboBox::get_bmp(  std::string bitmap_key, bool wide_icon
         {
             // Paint the color bars.
             bmps.emplace_back(get_empty_bmp_bundle(thin_space_icon_width, icon_height));
-            if (m_type == Preset::TYPE_SLA_MATERIAL)
-                bmps.emplace_back(bitmap_cache().from_svg(main_icon_name, 16, 16, dark_mode, material_rgb));
-            else
+            if (m_type == Preset::TYPE_SLA_MATERIAL) {
+                Slic3r::ColorReplaces replaces;
+                if(dark_mode)
+                    replaces.add("#808080", "#FFFFFF");
+                assert(material_rgb.empty() || material_rgb.size() == 7);
+                assert(material_rgb.empty() || material_rgb.front() == '#');
+                if (material_rgb.size() == 7) {
+                    replaces.add("#ED6B21", material_rgb);
+                    replaces.add("#2172eb", material_rgb);
+                }
+                bmps.emplace_back(bitmap_cache().from_svg(main_icon_name, 16, 16, replaces));//dark_mode, material_rgb));
+            } else
                 bmps.emplace_back(get_bmp_bundle(main_icon_name));
             // Paint a lock at the system presets.
             bmps.emplace_back(get_empty_bmp_bundle(wide_space_icon_width, icon_height));
@@ -861,7 +870,7 @@ void PlaterPresetComboBox::update()
     const Preset* selected_filament_preset = nullptr;
     std::string extruder_color;
     if (m_type == Preset::TYPE_FFF_FILAMENT) {
-        extruder_color = m_preset_bundle->printers.get_edited_preset().config.opt_string("extruder_colour", (unsigned int)m_extruder_idx);
+        extruder_color = m_preset_bundle->printers.get_edited_preset().config.opt_string("extruder_colour", size_t(m_extruder_idx));
         if (!can_decode_color(extruder_color))
             // Extruder color is not defined.
             extruder_color.clear();

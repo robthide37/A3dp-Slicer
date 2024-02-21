@@ -1770,9 +1770,6 @@ std::optional<Vec2d> Emboss::OrthoProject::unproject(const Vec3d &p, double *dep
 // sample slice
 namespace {
 
-// using coor2 = int64_t;
-using Coord2 = double;
-using P2     = Eigen::Matrix<Coord2, 2, 1, Eigen::DontAlign>;
 
 bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, const size_t &i, const Slic3r::Polygon &polygon, bool is_first, bool is_reverse = false)
 {
@@ -1842,7 +1839,7 @@ bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, c
     return true;
 }
 
-void point_in_distance(int32_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
+void point_in_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
 {
     Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
     bool is_first = true;
@@ -1854,7 +1851,7 @@ void point_in_distance(int32_t distance, PolygonPoint &p, const Slic3r::Polygon 
     // There is not point on polygon with this distance
 }
 
-void point_in_reverse_distance(int32_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
+void point_in_reverse_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
 {
     Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
     bool is_first = true;
@@ -1869,7 +1866,7 @@ void point_in_reverse_distance(int32_t distance, PolygonPoint &p, const Slic3r::
 } // namespace
 
 // calculate rotation, need copy of polygon point
-double Emboss::calculate_angle(int32_t distance, PolygonPoint polygon_point, const Polygon &polygon)
+double Emboss::calculate_angle(coord_t distance, PolygonPoint polygon_point, const Polygon &polygon)
 {
     PolygonPoint polygon_point2 = polygon_point; // copy
     point_in_distance(distance, polygon_point, polygon);
@@ -1882,7 +1879,7 @@ double Emboss::calculate_angle(int32_t distance, PolygonPoint polygon_point, con
     return std::atan2(norm_d.y(), norm_d.x());
 }
 
-std::vector<double> Emboss::calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon)
+std::vector<double> Emboss::calculate_angles(coord_t distance, const PolygonPoints& polygon_points, const Polygon &polygon)
 {
     std::vector<double> result;
     result.reserve(polygon_points.size());

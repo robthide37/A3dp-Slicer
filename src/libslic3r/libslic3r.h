@@ -45,15 +45,18 @@
 #include "Technologies.hpp"
 #include "Semver.hpp"
 
-using coord_t = 
+
 #define COORD_64B 1
 #ifndef COORD_64B
     // Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
-    int32_t;
+using coord_t = int32_t;
+using coor2 = int64_t;
 #else
     //FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
-    int64_t;
+using coord_t = int64_t;
+using Coord2 = double;
 #endif
+
 
 inline std::uint16_t operator "" _u(unsigned long long value)
 {

@@ -19,6 +19,8 @@
 namespace Slic3r {
 namespace GUI {
 
+#ifdef GUI_TAG_PALETTE
+	
 //static ModePaletteComboBox::PalettesMap MODE_PALETTES =
 static std::vector<std::pair<std::string, std::vector<std::string>>> MODE_PALETTES =
 {
@@ -86,7 +88,7 @@ wxBitmapBundle * ModePaletteComboBox::get_bmp(const std::vector<std::string> &pa
 
 	return bmp_bndl;
 }
-
+#endif
 namespace GUI_Descriptions {
 
 void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent,
@@ -137,11 +139,10 @@ void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent,
 
 void FillSizerWithModeColorDescriptions(
 	wxSizer* sizer, wxWindow* parent, 
-	std::vector<wxColourPickerCtrl**> clr_pickers, 
-	std::vector<wxColour>& mode_palette)
+	std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color)
 {
 	const int margin = em_unit(parent);
-
+#ifdef GUI_TAG_PALETTE
 	auto palette_cb = new ModePaletteComboBox(parent);
     palette_cb->UpdateSelection(mode_palette);
 
@@ -163,24 +164,30 @@ void FillSizerWithModeColorDescriptions(
 	h_sizer->Add(palette_cb, 1, wxEXPAND);
 
 	sizer->Add(h_sizer, 0, wxEXPAND | wxBOTTOM, margin);
-
+#endif
 	wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(9, 5, 5);
 	sizer->Add(grid_sizer, 0, wxEXPAND);
 
-	const std::vector<wxString> names = { _L("Simple"), _CTX("Advanced", "Mode"), _L("Expert") };
+	//const std::vector<wxString> names = { _L("Simple"), _CTX("Advanced", "Mode"), _L("Expert") };
 
-	for (size_t mode = 0; mode < names.size(); ++mode) {
-		wxColour& color = mode_palette[mode];
+	//for (size_t mode = 0; mode < names.size(); ++mode) {
+	for(auto& gui_2_tag : clr_pickers_2_color){
+		ColorRGB rgb_color;
+		if(!decode_color(gui_2_tag.second.color_hash, rgb_color))
+			continue;
+		wxColour color(rgb2int(rgb_color));
 
-		wxColourPickerCtrl** color_picker = clr_pickers[mode];
+		wxColourPickerCtrl** color_picker = gui_2_tag.first;
 		*color_picker = new wxColourPickerCtrl(parent, wxID_ANY, color);
 		wxGetApp().UpdateDarkUI((*color_picker)->GetPickerCtrl(), true);
 
-		(*color_picker)->Bind(wxEVT_COLOURPICKER_CHANGED, [color_picker, &color, palette_cb, &mode_palette](wxCommandEvent&) {
+		(*color_picker)->Bind(wxEVT_COLOURPICKER_CHANGED, [color_picker, &color](wxCommandEvent&) {
 			const wxColour new_color = (*color_picker)->GetColour();
 			if (new_color != color) {
 				color = new_color;
+#ifdef GUI_TAG_PALETTE
 				palette_cb->UpdateSelection(mode_palette);
+#endif
 			}
 		});
 
@@ -188,10 +195,12 @@ void FillSizerWithModeColorDescriptions(
 		auto btn = new ScalableButton(parent, wxID_ANY, "undo");
 		btn->SetToolTip(_L("Revert color"));
 
-		btn->Bind(wxEVT_BUTTON, [color_picker, &color, def_color, palette_cb, &mode_palette](wxEvent& event) {
+		btn->Bind(wxEVT_BUTTON, [color_picker, &color, def_color](wxEvent& event) {
 			color = def_color;
 			(*color_picker)->SetColour(def_color);
+#ifdef GUI_TAG_PALETTE
 			palette_cb->UpdateSelection(mode_palette);
+#endif
 		});
 		parent->Bind(wxEVT_UPDATE_UI, [color_picker, def_color](wxUpdateUIEvent& evt) {
 			evt.Enable((*color_picker)->GetColour() != def_color);
@@ -199,7 +208,7 @@ void FillSizerWithModeColorDescriptions(
 
 		grid_sizer->Add(*color_picker, 0, wxALIGN_CENTRE_VERTICAL);
 		grid_sizer->Add(btn, 0, wxALIGN_CENTRE_VERTICAL);
-		grid_sizer->Add(new wxStaticText(parent, wxID_ANY, names[mode]), 0, wxALIGN_CENTRE_VERTICAL | wxRIGHT, 2*margin);
+		grid_sizer->Add(new wxStaticText(parent, wxID_ANY, gui_2_tag.second.name), 0, wxALIGN_CENTRE_VERTICAL | wxRIGHT, 2*margin);
 	}
 }
 
@@ -229,12 +238,25 @@ Dialog::Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries) :
 	wxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 	GUI_Descriptions::FillSizerWithTextColorDescriptions(sizer, this, &default_colour, &sys_colour, &mod_colour, &phony_colour);
 	main_sizer->Add(sizer, 0, wxEXPAND | wxALL, 20);
-
+	
+#ifdef GUI_TAG_PALETTE
 	// Mode color markers description
 	mode_palette = wxGetApp().get_mode_palette();
+#endif
+	//check if we have enough colour picker
+	std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color;
+    for (AppConfig::Tag &tag : get_app_config()->tags()) {
+		//create nullptr if not present yet
+		if(tags.find(tag.tag) == tags.end())
+			tags[tag.tag] = nullptr;
+	}
+	//now tags is fixed for the end of this method
+    for (AppConfig::Tag &tag : get_app_config()->tags()) {
+		clr_pickers_2_color.emplace_back(&tags[tag.tag], tag);
+	}
 
 	wxSizer* mode_sizer = new wxBoxSizer(wxVERTICAL);
-	GUI_Descriptions::FillSizerWithModeColorDescriptions(mode_sizer, this, { &simple, &advanced, &expert }, mode_palette);
+	GUI_Descriptions::FillSizerWithModeColorDescriptions(mode_sizer, this, clr_pickers_2_color);
 	main_sizer->Add(mode_sizer, 0, wxEXPAND | wxALL, 20);
 
 	auto buttons = CreateStdDialogButtonSizer(wxOK|wxCANCEL);
@@ -246,7 +268,9 @@ Dialog::Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries) :
 		wxGetApp().set_label_clr_modified(mod_colour->GetColour());
 		wxGetApp().set_label_clr_default(default_colour->GetColour());
 		wxGetApp().set_label_clr_phony(phony_colour->GetColour());
+#ifdef GUI_TAG_PALETTE
 		wxGetApp().set_mode_palette(mode_palette);
+#endif
 
 		EndModal(wxID_OK);
 	});

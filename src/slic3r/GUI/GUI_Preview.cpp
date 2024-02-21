@@ -872,11 +872,11 @@ void Preview::load_print_as_fff(bool keep_z_range)
         const ConfigOptionStrings* filamemts_opt = dynamic_cast<const ConfigOptionStrings*>(m_config->option("filament_colour"));
         unsigned int colors_count = std::max((unsigned int)extruders_opt->values.size(), (unsigned int)filamemts_opt->values.size());
 
-        unsigned char rgb[3];
+        ColorRGBA rgba;
         for (unsigned int i = 0; i < colors_count; ++i)
         {
-            std::string color = m_config->opt_string("filament_colour", i);
-            if (!BitmapCache::parse_color(color, rgb))
+            std::string color = m_config->opt_string("filament_colour", size_t(i));
+            if (!decode_color(color, rgba))
             {
                 color = "#FFFFFF";
             }

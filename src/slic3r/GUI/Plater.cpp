@@ -1192,7 +1192,7 @@ void Sidebar::jump_to_option(size_t selected)
 {
     const Search::Option& opt = p->searcher.get_option(selected);
     if (opt.type == Preset::TYPE_PREFERENCES)
-        wxGetApp().open_preferences(opt.opt_key(), boost::nowide::narrow(opt.group));
+        wxGetApp().open_preferences(boost::nowide::narrow(opt.key), boost::nowide::narrow(opt.group));
     else {
         ConfigOptionMode mode = wxGetApp().get_mode();
         if ((opt.tags & mode) != mode) {
@@ -1443,12 +1443,12 @@ void Sidebar::update_sliced_info_sizer()
                 new_label = _L("Used Filament (g)");
                 info_text = wxString::Format("%.2f", ps.total_weight);
 
-
+                
+                const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
                 if (ps.filament_stats.size() > 1 || ps.color_extruderid_to_used_weight.size() > 0) {
                     bool has_spool = false;
                     new_label += ":";
 
-                    const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
                     //for each extruder
                     for (const auto& [filament_id, filament_vol] : ps.filament_stats) {
                         assert(filament_id < extruders_filaments.size());
@@ -1496,15 +1496,18 @@ void Sidebar::update_sliced_info_sizer()
                     }
                     if (has_spool)
                         new_label += "\n      " + _L("(including spool)");
-                } else {
+                } else if(ps.filament_stats.size() == 1) {
                     //add spool to main line if there is only one filament
-                    if (const Preset* filament_preset = filaments.find_preset(filament_presets.front(), false)) {
+                    if (const Preset* filament_preset = extruders_filaments[ps.filament_stats.begin()->first].get_selected_preset()) {
                         double spool_weight = filament_preset->config.opt_float("filament_spool_weight", 0);
                         if (spool_weight != 0.0) {
                             new_label += "\n      " + _L("(including spool)");
                             info_text += wxString::Format(" (%.2f)\n", ps.total_weight + spool_weight);
                         }
                     }
+                } else {
+                    // not possible anymore in 2.7?
+                    assert(false);
                 }
                 p->sliced_info->SetTextAndShow(siFilament_g, info_text, new_label);
             }
@@ -1714,7 +1717,7 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
 #endif // WIN32
 
     m_mainframe.Raise();
-    m_mainframe.select_tab(size_t(0));
+    m_mainframe.select_tab(MainFrame::ETabType::Plater3D);
     if (wxGetApp().is_editor())
         m_plater.select_view_3D("3D");
 
@@ -3492,7 +3495,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                 }
             }
             std::vector<std::string> warnings;
-            std::pair<PrintBase::PrintValidationError, std::string> = background_process.validate(&warnings);
+            std::pair<PrintBase::PrintValidationError, std::string> err = background_process.validate(&warnings);
             if (err.first != PrintBase::PrintValidationError::pveNone)
                 return return_state;
         }
@@ -4264,7 +4267,7 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 
     if (0 != (evt.status.flags & Slic3r::PrintBase::SlicingStatus::FlagBits::GCODE_ENDED)) {
         assert(m_worker.is_idle());
-        notification_manager->set_slicing_progress_ended(_utf8(evt.status.main_text));
+        notification_manager->set_slicing_progress_ended(Slic3r::GUI::I18N::translate_utf8(evt.status.main_text));
     } else {
         if (evt.status.percent >= -1) {
             if (!m_worker.is_idle()) {
@@ -4273,19 +4276,15 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
             }
 
             if (evt.status.args.empty()) {
-                notification_manager->set_slicing_progress_percentage(evt.status.main_text.empty() ? "" : _utf8(evt.status.main_text), evt.status.percent / 100.f, 0 == (evt.status.flags & PrintBase::SlicingStatus::FlagBits::SECONDARY_STATE));
+                notification_manager->set_slicing_progress_percentage(evt.status.main_text.empty() ? "" : Slic3r::GUI::I18N::translate_utf8(evt.status.main_text), evt.status.percent / 100.f, 0 == (evt.status.flags & PrintBase::SlicingStatus::FlagBits::SECONDARY_STATE));
             } else {
-                auto formatter = boost::format(_utf8(evt.status.main_text));
+                auto formatter = boost::format(Slic3r::GUI::I18N::translate_utf8(evt.status.main_text));
                 for (std::string& arg : evt.status.args)
-                    formatter = formatter % _utf8(arg);
+                    formatter = formatter % Slic3r::GUI::I18N::translate_utf8(arg);
                 notification_manager->set_slicing_progress_percentage(formatter.str(), evt.status.percent / 100.f, 0 == (evt.status.flags & PrintBase::SlicingStatus::FlagBits::SECONDARY_STATE));
             }
         }
     }
-    if (evt.status.percent >= -1) {
-        if (!m_worker.is_idle()) {
-            // Avoid a race condition
-            return;
 
     // Check template filaments and add warning
     // This is more convinient to do here than in slicing backend, so it happens on "Slicing complete".
@@ -4537,12 +4536,12 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
     }
 
     if (evt.cancelled()) {
-        if (wxGetApp().get_mode() == comSimple && !get_app_config->get_bool("objects_always_expert")) {
+        if (wxGetApp().get_mode() == comSimple && !get_app_config()->get_bool("objects_always_expert")) {
             sidebar->set_btn_label(ActionButtonType::abReslice, "Slice now");
         }
         show_action_buttons(true);
     } else {
-        if (wxGetApp().get_mode() == comSimple && !get_app_config->get_bool("objects_always_expert")) {
+        if (wxGetApp().get_mode() == comSimple && !get_app_config()->get_bool("objects_always_expert")) {
             show_action_buttons(false);
         }
         if (exporting_status != ExportingStatus::NOT_EXPORTING && !has_error) {
@@ -6230,7 +6229,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
         wxArrayString aux;
         aux.Add(from_u8(project_paths.front().string()));
         bool loaded3mf = load_files(aux, true);
-        load_files(non_project_paths, true, false);
+        load_files(non_project_paths, /*load_model=*/true, /*load_config=*/false, /*update_dirs=*/true, /*imperial_unit=*/false);
         boost::system::error_code ec;
         if (loaded3mf) {
             fs::remove(project_paths.front(), ec);
@@ -6248,8 +6247,8 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
     }
 
     // load all projects and all models as geometry
-    load_files(project_paths, true, false);
-    load_files(non_project_paths, true, false);
+    load_files(project_paths, true, false, true, false);
+    load_files(non_project_paths, true, false, true, false);
 #endif // 0
    
 
@@ -6966,7 +6965,7 @@ void Plater::export_gcode(bool prefer_removable)
                               _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"";
                     return true;
                 }
-                err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"));
+                err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("gcode_binary"));
                 return !err_out.IsEmpty();
             };
 
@@ -6975,7 +6974,7 @@ void Plater::export_gcode(bool prefer_removable)
                 ErrorDialog(this, error_str, [this](const std::string& key) -> void { sidebar().jump_to_option(key); }).ShowModal();
                 output_path.clear();
             } else {
-                alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
+                alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("gcode_binary"),
                                                   wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
             }
         }
@@ -7136,23 +7135,15 @@ void Plater::export_platter()
                 for (const SLAPrintObject* object : p->sla_print.objects()) {
                     const Transform3d mesh_trafo_inv = object->trafo().inverse();
 
-                    TriangleMesh pad_mesh;
-                    const bool has_pad_mesh = object->has_mesh(slaposPad);
-                    if (has_pad_mesh) {
-                        pad_mesh = object->get_mesh(slaposPad);
-                        pad_mesh.transform(mesh_trafo_inv);
-                    }
+                    TriangleMesh pad_mesh = object->pad_mesh();
+                    pad_mesh.transform(mesh_trafo_inv);
 
                     ModelObject* obj = model_to_save.add_object();
                     ModelVolume* vol = obj->add_volume(std::move(pad_mesh), ModelVolumeType::MODEL_PART, false);
                     vol->name = "pad_" + object->model_object()->name;
 
-                    TriangleMesh supports_mesh;
-                    const bool has_supports_mesh = object->has_mesh(slaposSupportTree);
-                    if (has_supports_mesh) {
-                        supports_mesh = object->get_mesh(slaposSupportTree);
-                        supports_mesh.transform(mesh_trafo_inv);
-                    }
+                    TriangleMesh supports_mesh = object->support_mesh();
+                    supports_mesh.transform(mesh_trafo_inv);
 
                     obj = model_to_save.add_object();
                     vol = obj->add_volume(std::move(supports_mesh), ModelVolumeType::MODEL_PART, false);
@@ -7360,9 +7351,9 @@ void Plater::export_stl_obj(std::string path_u8, bool extended, bool selection_o
         }
     }
 
-    if (path.Lower().EndsWith(".stl"))
+    if (wxString(path_u8).Lower().EndsWith(".stl"))
         Slic3r::store_stl(path_u8.c_str(), &mesh, true);
-    else if (path.Lower().EndsWith(".obj"))
+    else if (wxString(path_u8).Lower().EndsWith(".obj"))
         Slic3r::store_obj(path_u8.c_str(), &mesh);
 //    p->statusbar()->set_status_text(format_wxstr(_L("STL file exported to %s"), path));
 }
@@ -7373,7 +7364,7 @@ void Plater::export_amf()
 
     wxString path = p->get_export_file(FT_AMF);
     if (path.empty()) { return; }
-    const std::string path_u8 = into_u8(path);
+    std::string path_u8 = into_u8(path);
 
     wxBusyCursor wait;
     bool export_config = true;
@@ -7743,7 +7734,7 @@ void Plater::send_gcode()
 
         {
             const std::string ext = boost::algorithm::to_lower_copy(dlg.filename().extension().string());
-            const bool binary_output = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary");
+            const bool binary_output = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("gcode_binary");
             const wxString error_str = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, binary_output);
             if (! error_str.IsEmpty()) {
                 ErrorDialog(this, error_str, t_kill_focus([](const std::string& key) -> void { wxGetApp().sidebar().jump_to_option(key); })).ShowModal();
@@ -7751,7 +7742,7 @@ void Plater::send_gcode()
             }
         }
 
-        alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
+        alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("gcode_binary"),
                                           wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
 
         upload_job.upload_data.upload_path = dlg.filename();
@@ -7947,13 +7938,12 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
         else if(opt_key == "extruder_colour") {
             update_scheduled = true;
             if (p->config->option<ConfigOptionStrings>("filament_colour")->values.size() < config.option<ConfigOptionStrings>(opt_key)->values.size()) {
-                const std::vector<std::string> filament_presets = wxGetApp().preset_bundle->filament_presets;
-                const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
+                const std::vector<ExtruderFilaments> filament_presets = wxGetApp().preset_bundle->extruders_filaments;
                 std::vector<std::string> filament_colors;
                 filament_colors.reserve(filament_presets.size());
-
-                for (const std::string& filament_preset : filament_presets)
-                    filament_colors.push_back(filaments.find_preset(filament_preset, true)->config.opt_string("filament_colour", (unsigned)0));
+                for (const ExtruderFilaments &extruders_filaments : filament_presets) {
+                    filament_colors.push_back(extruders_filaments.get_selected_filament()->preset->config.opt_string("filament_colour", (unsigned) 0));
+                }
 
                 p->config->option<ConfigOptionStrings>("filament_colour")->values = filament_colors;
             }

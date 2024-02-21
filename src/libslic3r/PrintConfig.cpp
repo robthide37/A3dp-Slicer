@@ -6753,12 +6753,11 @@ void PrintConfigDef::init_milling_params()
     // Milling Printer settings
 
     def = this->add("milling_cutter", coInt);
-    def->gui_type = ConfigOptionDef::GUIType::i_enum_open;
     def->label = L("Milling cutter");
     def->category = OptionCategory::general;
     def->tooltip = L("The milling cutter to use (unless more specific extruder settings are specified). ");
     def->min = 0;  // 0 = inherit defaults
-    def->set_enum_values(ConfigOptionDef::GUIType::f_enum_open, {
+    def->set_enum_values(ConfigOptionDef::GUIType::i_enum_open, {
     //TRN Print Settings: "Bottom contact Z distance". Have to be as short as possible
         { "default",      L("Default") },
         { "1",    "1" },

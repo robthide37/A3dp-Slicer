@@ -1202,9 +1202,9 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return out;
     }
     case coFloatsOrPercents: {
-        const ConfigOptionFloatsOrPercents* opt = config.opt<ConfigOptionFloatsOrPercents>(opt_key);
-        if (opt) {
-            const auto val = opt->get_at(opt_idx);
+        const ConfigOptionFloatsOrPercents* floats_or_percents = config.opt<ConfigOptionFloatsOrPercents>(opt_key);
+        if (floats_or_percents) {
+            const auto val = floats_or_percents->get_at(opt_idx);
             out = double_to_string(val.value, opt->precision) + (val.percent ? "%" : "");
         }
         return out;
@@ -1307,7 +1307,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
         m_tree->model->AddPreset(type, from_u8(presets->get_edited_preset().name), old_pt, from_u8(new_selected_preset));
 
         // Collect dirty options.
-        const bool deep_compare = type != Preset::TYPE_FILAMENT;
+        const bool deep_compare = type != Preset::TYPE_FFF_FILAMENT;
         auto dirty_options = presets->current_dirty_options(deep_compare);
 
         // process changes of extruders count
@@ -1843,7 +1843,7 @@ void DiffPresetDialog::update_tree()
         }
 
         // Collect dirty options.
-        const bool deep_compare = type != Preset::TYPE_FILAMENT;
+        const bool deep_compare = type != Preset::TYPE_FFF_FILAMENT;
         auto dirty_options = type == Preset::TYPE_PRINTER && left_pt == ptFFF &&
                              left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() < right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size() ?
                              presets->dirty_options(right_preset, left_preset, deep_compare) :
@@ -2094,13 +2094,13 @@ void DiffPresetDialog::button_event(Action act)
 
 std::string DiffPresetDialog::get_left_preset_name(Preset::Type type)
 {
-    PresetComboBox* cb = m_preset_combos[int(type - Preset::TYPE_PRINT)].presets_left;
+    PresetComboBox* cb = m_preset_combos[int(type - Preset::TYPE_FFF_PRINT)].presets_left;
     return Preset::remove_suffix_modified(get_selection(cb));
 }
 
 std::string DiffPresetDialog::get_right_preset_name(Preset::Type type)
 {
-    PresetComboBox* cb = m_preset_combos[int(type - Preset::TYPE_PRINT)].presets_right;
+    PresetComboBox* cb = m_preset_combos[int(type - Preset::TYPE_FFF_PRINT)].presets_right;
     return Preset::remove_suffix_modified(get_selection(cb));
 }
 

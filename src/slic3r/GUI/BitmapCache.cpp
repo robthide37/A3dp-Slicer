@@ -332,7 +332,7 @@ error:
     return NULL;
 }
 
-void BitmapCache::nsvgGetDataFromFileWithReplace(const char* filename, std::string& data_str, const std::map<std::string, std::string>& replaces)
+void BitmapCache::nsvgGetDataFromFileWithReplace(const char* filename, std::string& data_str, const ColorReplaces& replaces)
 {
     FILE* fp = NULL;
     size_t size;
@@ -350,8 +350,8 @@ void BitmapCache::nsvgGetDataFromFileWithReplace(const char* filename, std::stri
     fclose(fp);
 
     data_str.assign(data);
-    for (auto val : replaces)
-        boost::replace_all(data_str, val.first, val.second);
+    for (const auto &val : replaces.changes)
+        boost::replace_all(data_str, val.color_to_replace_str, val.new_color_str);
 
     free(data);
     return;
@@ -363,43 +363,60 @@ error:
 }
 
 wxBitmapBundle* BitmapCache::from_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height,
-                                      const bool dark_mode, const std::string& new_color /*= ""*/)
+                                      /*const bool dark_mode, */ColorReplaces& color_changes /*= ""*/)
 {
+    uint32_t color_change_hash = 0;
+    for (size_t i = 0; i < color_changes.changes.size(); ++i) {
+        color_change_hash |= rgb2int(color_changes.changes[i].color_to_replace) << uint8_t(i%8);
+        color_change_hash |= rgb2int(color_changes.changes[i].new_color) << uint8_t(i%8);
+    }
+    color_change_hash = ((color_change_hash >> 16) & 0x0000FFFF) | (color_change_hash & 0x0000FFFF);
+
     if (target_width == 0)
         target_width = target_height;
     std::string bitmap_key = bitmap_name + (target_height != 0 ?
         "-h" + std::to_string(target_height) :
         "-w" + std::to_string(target_width))
-        + (dark_mode ? "-dm" : "")
-        + new_color;
+        //+ (dark_mode ? "-dm" : "")
+        + (color_change_hash>0 ? std::string("-") + std::to_string(color_change_hash): "");
 
     auto it = m_bndl_map.find(bitmap_key);
     if (it != m_bndl_map.end())
         return it->second;
 
     // map of color replaces
-    std::map<std::string, std::string> replaces;
-    if (dark_mode)
-        replaces["#808080"] = "#FFFFFF";
-    if (!new_color.empty())
-        replaces["#ED6B21"] = new_color;
+    //std::map<std::string, std::string> replaces;
+    //if (dark_mode)
+    //    replaces["#808080"] = "#FFFFFF";
+    //if (!new_color.empty())
+    //    replaces["#ED6B21"] = new_color;
 
-    replaces["#ButtonBG"] = dark_mode ? "#4E4E4E" : "#828282";
+    auto dark_mode_change = color_changes.has_value("#808080");
+    bool has_dark_mode = dark_mode_change.has_value() && dark_mode_change->new_color_str == "#FFFFFF";
+
+    color_changes.add(std::string("#ButtonBG"), std::string(has_dark_mode ? "#4E4E4E" : "#828282"));
 
     std::string str;
-    nsvgGetDataFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), str, replaces);
+    nsvgGetDataFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), str, color_changes);
     if (str.empty())
         return nullptr;
 
     return insert_bndl(bitmap_key, str.data(), target_width, target_height);
 }
 
-wxBitmapBundle* BitmapCache::from_png(const std::string& bitmap_name, unsigned width, unsigned height, uint32_t color)
+wxBitmapBundle* BitmapCache::from_png(const std::string& bitmap_name, unsigned width, unsigned height, const ColorReplaces& color_changes)
 {
+    uint32_t color_change_hash = 0;
+    for (size_t i = 0; i < color_changes.changes.size(); ++i) {
+        color_change_hash |= rgb2int(color_changes.changes[i].color_to_replace) << uint8_t(i%8);
+        color_change_hash |= rgb2int(color_changes.changes[i].new_color) << uint8_t(i%8);
+    }
+    color_change_hash = ((color_change_hash >> 16) & 0x0000FFFF) | (color_change_hash & 0x0000FFFF);
+
     std::string bitmap_key = bitmap_name + (height != 0 ?
         "-h" + std::to_string(height) :
         "-w" + std::to_string(width))
-        + ((color == 9079434) ? "-gs" : "");
+        + (color_change_hash>0 ? std::string("-") + std::to_string(color_change_hash): "");
 
     auto it = m_bndl_map.find(bitmap_key);
     if (it != m_bndl_map.end())
@@ -418,134 +435,98 @@ wxBitmapBundle* BitmapCache::from_png(const std::string& bitmap_name, unsigned w
     if (height != 0 && width != 0)
         image.Rescale(width, height, wxIMAGE_QUALITY_BILINEAR);
     
-    if (color == 9079434)
+    if (color_changes.has_value(int2rgb(9079434))) {
         image = image.ConvertToGreyscale(m_gs, m_gs, m_gs);
-    else if( color < 0xFFFFFFFF)
-        image.Replace(33, 114, 235, color & 0xFF, (color & 0xFF00) >> 8, (color & 0xFF0000) >> 16);
-
+    } else {
+        for (const ColorReplace &change : color_changes.changes) {
+            if(change.is_valid)
+                image.Replace(change.color_to_replace.r(), change.color_to_replace.g(), change.color_to_replace.b(), 
+                          change.new_color.r(), change.new_color.g(), change.new_color.b());
+        }
+    }
     return this->insert_bndl(bitmap_key, wxImage_to_wxBitmap_with_alpha(std::move(image)));
 }
-
-wxBitmap* BitmapCache::load_svg(const std::string &bitmap_name, unsigned target_width, unsigned target_height, 
-    const bool grayscale/* = false*/, const bool dark_mode/* = false*/, const std::string& new_color /*= ""*/)
-{
-    std::string bitmap_key = bitmap_name + (target_height != 0 ?
-        "-h" + std::to_string(target_height) :
-        "-w" + std::to_string(target_width))
-        + (m_scale != 1.0f ? "-s" + float_to_string_decimal_point(m_scale) : "")
-        + (dark_mode ? "-dm" : "")
-        + (grayscale ? "-gs" : "")
-        + new_color;
-
-    auto it = m_map.find(bitmap_key);
-    if (it != m_map.end())
-        return it->second;
-
-    // map of color replaces
-    std::map<std::string, std::string> replaces;
-    if (dark_mode)
-        replaces["#808080"] = "#FFFFFF";
-    if (!new_color.empty()) {
-        std::string color_str = new_color;
-        if (color_str.front() != '#')
-            color_str = "#" + color_str;
-        if (color_str.size() == 7) {
-            replaces["#ED6B21"] = color_str;
-            replaces["#2172eb"] = color_str;
-        }
-    }
-
-    // recolor directly in the svg.
-    // stop, now Using the string replacement to avoid problems in the hex -> int conversion, as they didn't match and may depends on the system.
-/*    if (color < 0xFFFFFFFF) {
-        NSVGshape* shape = image->shapes;
-        while (shape != nullptr) {
-            if ((shape->fill.color & 0xFFFFFF) == 15430177 || (shape->fill.color & 0xFFFFFF) == 2223467)
-                shape->fill.color = color | 0xFF000000;
-            if ((shape->stroke.color & 0xFFFFFF) == 15430177 || (shape->stroke.color & 0xFFFFFF) == 2223467)
-                shape->stroke.color = color | 0xFF000000;
-            shape = shape->next;
-        }
-    }*/
-
-    NSVGimage* image = nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, replaces);
-    if (image == nullptr)
-        return nullptr;
-
-    target_height != 0 ? target_height *= m_scale : target_width *= m_scale;
-
-    float svg_scale = target_height != 0 ?
-        (float)target_height / image->height : target_width != 0 ?
-        (float)target_width / image->width : 1;
-
-    int   width = (int)(svg_scale * image->width + 0.5f);
-    int   height = (int)(svg_scale * image->height + 0.5f);
-    int   n_pixels = width * height;
-    if (n_pixels <= 0) {
-        ::nsvgDelete(image);
-        return nullptr;
-    }
-
-    NSVGrasterizer* rast = ::nsvgCreateRasterizer();
-    if (rast == nullptr) {
-        ::nsvgDelete(image);
-        return nullptr;
-    }
-
-    std::vector<unsigned char> data(n_pixels * 4, 0);
-    ::nsvgRasterize(rast, image, 0, 0, svg_scale, data.data(), width, height, width * 4);
-    ::nsvgDeleteRasterizer(rast);
-    ::nsvgDelete(image);
-
-    return this->insert_raw_rgba(bitmap_key, width, height, data.data(), "greyscale" == new_color);
-}
-
-//TODO: unused?
-wxBitmap* BitmapCache::load_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height,
-    std::map<std::string, std::string> replaces)
-{
-    std::string bitmap_key = bitmap_name + (target_height != 0 ?
-        "-h" + std::to_string(target_height) :
-        "-w" + std::to_string(target_width))
-        + (m_scale != 1.0f ? "-s" + float_to_string_decimal_point(m_scale) : "");
-    for (auto str : replaces)
-        bitmap_key += "-" + str.first + ":" + str.second;
-
-    auto it = m_map.find(bitmap_key);
-    if (it != m_map.end())
-        return it->second;
-
-    NSVGimage* image = nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, replaces);
-    if (image == nullptr)
-        return nullptr;
-
-    target_height != 0 ? target_height *= m_scale : target_width *= m_scale;
-
-    float svg_scale = target_height != 0 ?
-        (float)target_height / image->height : target_width != 0 ?
-        (float)target_width / image->width : 1;
-
-    int   width = (int)(svg_scale * image->width + 0.5f);
-    int   height = (int)(svg_scale * image->height + 0.5f);
-    int   n_pixels = width * height;
-    if (n_pixels <= 0) {
-        ::nsvgDelete(image);
-        return nullptr;
-    }
-
-    NSVGrasterizer* rast = ::nsvgCreateRasterizer();
-    if (rast == nullptr) {
-        ::nsvgDelete(image);
-        return nullptr;
-    }
-
-    std::vector<unsigned char> data(n_pixels * 4, 0);
-    ::nsvgRasterize(rast, image, 0, 0, svg_scale, data.data(), width, height, width * 4);
-    ::nsvgDeleteRasterizer(rast);
-    ::nsvgDelete(image);
-
-    return this->insert_raw_rgba(bitmap_key, width, height, data.data(), false);
-}
+//
+//wxBitmap* BitmapCache::load_svg(const std::string &bitmap_name, unsigned target_width, unsigned target_height, 
+//    const bool grayscale/* = false*/, const bool dark_mode/* = false*/, const Slic3r::ColorReplaces& color_changes /*= ""*/)
+//{
+//    uint32_t color_change_hash = 0;
+//    for (size_t i = 0; i < color_changes.changes.size(); ++i) {
+//        color_change_hash |= rgb2int(color_changes.changes[i].color_to_replace) << uint8_t(i%8);
+//        color_change_hash |= rgb2int(color_changes.changes[i].new_color) << uint8_t(i%8);
+//    }
+//    color_change_hash = ((color_change_hash >> 16) & 0x0000FFFF) | (color_change_hash & 0x0000FFFF);
+//
+//    std::string bitmap_key = bitmap_name + (target_height != 0 ?
+//        "-h" + std::to_string(target_height) :
+//        "-w" + std::to_string(target_width))
+//        + (m_scale != 1.0f ? "-s" + float_to_string_decimal_point(m_scale) : "")
+//        + (dark_mode ? "-dm" : "")
+//        + (grayscale ? "-gs" : "")
+//        + (color_change_hash>0 ? std::string("-") + std::to_string(color_change_hash): "");
+//
+//    auto it = m_map.find(bitmap_key);
+//    if (it != m_map.end())
+//        return it->second;
+//
+//    // map of color replaces
+//    std::map<std::string, std::string> replaces;
+//    if (dark_mode)
+//        color_changes.add("#808080", "#FFFFFF");
+//    if (!new_color.empty()) {
+//        std::string color_str = new_color;
+//        if (color_str.front() != '#')
+//            color_str = "#" + color_str;
+//        if (color_str.size() == 7) {
+//            replaces["#ED6B21"] = color_str;
+//            replaces["#2172eb"] = color_str;
+//        }
+//    }
+//
+//    // recolor directly in the svg.
+//    // stop, now Using the string replacement to avoid problems in the hex -> int conversion, as they didn't match and may depends on the system.
+///*    if (color < 0xFFFFFFFF) {
+//        NSVGshape* shape = image->shapes;
+//        while (shape != nullptr) {
+//            if ((shape->fill.color & 0xFFFFFF) == 15430177 || (shape->fill.color & 0xFFFFFF) == 2223467)
+//                shape->fill.color = color | 0xFF000000;
+//            if ((shape->stroke.color & 0xFFFFFF) == 15430177 || (shape->stroke.color & 0xFFFFFF) == 2223467)
+//                shape->stroke.color = color | 0xFF000000;
+//            shape = shape->next;
+//        }
+//    }*/
+//
+//    NSVGimage* image = nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, replaces);
+//    if (image == nullptr)
+//        return nullptr;
+//
+//    target_height != 0 ? target_height *= m_scale : target_width *= m_scale;
+//
+//    float svg_scale = target_height != 0 ?
+//        (float)target_height / image->height : target_width != 0 ?
+//        (float)target_width / image->width : 1;
+//
+//    int   width = (int)(svg_scale * image->width + 0.5f);
+//    int   height = (int)(svg_scale * image->height + 0.5f);
+//    int   n_pixels = width * height;
+//    if (n_pixels <= 0) {
+//        ::nsvgDelete(image);
+//        return nullptr;
+//    }
+//
+//    NSVGrasterizer* rast = ::nsvgCreateRasterizer();
+//    if (rast == nullptr) {
+//        ::nsvgDelete(image);
+//        return nullptr;
+//    }
+//
+//    std::vector<unsigned char> data(n_pixels * 4, 0);
+//    ::nsvgRasterize(rast, image, 0, 0, svg_scale, data.data(), width, height, width * 4);
+//    ::nsvgDeleteRasterizer(rast);
+//    ::nsvgDelete(image);
+//
+//    return this->insert_raw_rgba(bitmap_key, width, height, data.data(), "greyscale" == new_color);
+//}
 
 //we make scaled solid bitmaps only for the cases, when its will be used with scaled SVG icon in one output bitmap
 //wxBitmap BitmapCache::mksolid(size_t width, size_t height, unsigned char r, unsigned char g, unsigned char b, unsigned char transparency, bool suppress_scaling/* = false* /, size_t border_width /*= 0* /, bool dark_mode/* = false* /)

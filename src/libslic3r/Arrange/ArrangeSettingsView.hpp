@@ -32,6 +32,7 @@ public:
     virtual ~ArrangeSettingsView() = default;
 
     virtual float get_distance_from_objects() const = 0;
+    virtual float get_previous_distance_from_objects() const = 0;
     virtual float get_distance_from_bed() const     = 0;
     virtual bool  is_rotation_enabled() const       = 0;
 
@@ -157,6 +158,7 @@ public:
     virtual void distance_from_bed_range(float &min, float &max) const = 0;
 
     virtual ArrangeSettingsDb& set_distance_from_objects(float v) = 0;
+    virtual ArrangeSettingsDb& set_previous_distance_from_objects(float v) = 0;
     virtual ArrangeSettingsDb& set_distance_from_bed(float v) = 0;
     virtual ArrangeSettingsDb& set_rotation_enabled(bool v) = 0;
 
@@ -165,7 +167,7 @@ public:
     virtual ArrangeSettingsDb& set_arrange_strategy(ArrangeStrategy v) = 0;
 
     struct Values {
-        float d_obj = 6.f, d_bed = 0.f, d_obj_prev = 6.f;
+        float d_obj = 6.f, d_bed = 0.f, d_obj_prev = 6.f; // last distance used when last pressed on "arrange". Used when "duplicate_distance" is set to 0
         bool rotations = false;
         XLPivots xl_align = XLPivots::xlpFrontLeft;
         GeometryHandling geom_handling = GeometryHandling::ghConvex;
@@ -189,6 +191,7 @@ public:
     {
         set_distance_from_bed(sv.get_distance_from_bed());
         set_distance_from_objects(sv.get_distance_from_objects());
+        set_previous_distance_from_objects(sv.get_previous_distance_from_objects());
         set_arrange_strategy(sv.get_arrange_strategy());
         set_geometry_handling(sv.get_geometry_handling());
         set_rotation_enabled(sv.is_rotation_enabled());
@@ -213,6 +216,7 @@ public:
     {}
 
     float get_distance_from_objects() const override { return m_v.d_obj; }
+    float get_previous_distance_from_objects() const override { return m_v.d_obj_prev; }
     float get_distance_from_bed() const override { return m_v.d_bed; }
     bool  is_rotation_enabled() const override { return m_v.rotations; }
     XLPivots get_xl_alignment() const override { return m_v.xl_align; }
@@ -223,6 +227,7 @@ public:
     void distance_from_bed_range(float &min, float &max) const override { min = 0.f; max = 100.f; }
 
     ArrangeSettings& set_distance_from_objects(float v) override { m_v.d_obj = v; return *this; }
+    ArrangeSettings& set_previous_distance_from_objects(float v) override { m_v.d_obj_prev = v; return *this; }
     ArrangeSettings& set_distance_from_bed(float v) override { m_v.d_bed = v; return *this; }
     ArrangeSettings& set_rotation_enabled(bool v) override { m_v.rotations = v; return *this; }
     ArrangeSettings& set_xl_alignment(XLPivots v) override { m_v.xl_align = v; return *this; }

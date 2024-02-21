@@ -3252,7 +3252,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
 
 ExtrusionEntitiesPtr
     thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, 
-    const coord_t resolution_internal, bool can_reverse, ExtrusionEntitiesPtr& coll)
+    const coord_t resolution_internal, bool can_reverse)
 {
     assert(resolution_internal > SCALED_EPSILON);
 
@@ -3260,6 +3260,7 @@ ExtrusionEntitiesPtr
     // variable extrusion within a single move; this value shall only affect the amount
     // of segments, and any pruning shall be performed before we apply this tolerance
     const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
+    ExtrusionEntitiesPtr coll;
     for (const ThickPolyline& p : polylines) {
         ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance, can_reverse);
         // Append paths to collection.

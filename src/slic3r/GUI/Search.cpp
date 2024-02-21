@@ -211,8 +211,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
 
         int cnt = 0;
 
-        //TODO opt.is_vector_extruder() instead of is_independent_from_extruder_number_option ?
-        if ( type != Preset::TYPE_FFF_FILAMENT && !PresetCollection::is_independent_from_extruder_number_option(opt_key) )
+        if ( type != Preset::TYPE_FFF_FILAMENT && opt.is_vector_extruder )
             switch (config->option(opt_key)->type())
             {
             case coInts:	change_opt_key<ConfigOptionInts		>(opt_key, config, cnt);	break;
@@ -548,11 +547,15 @@ void OptionsSearcher::append_preferences_option(const GUI::Line& opt_line)
         return;
 
     std::string key = get_key(opt_line.get_options().front().opt_id, type);
-    const GroupAndCategory& gc = groups_and_categories[key];
+    assert(groups_and_categories.find(key) != groups_and_categories.end());
+    assert(!groups_and_categories[key].empty());
+    // it's for TYPE_PREFERENCES, so no mode ?
+    const GroupAndCategory& gc = groups_and_categories[key].front(); 
     if (gc.group.IsEmpty() || gc.category.IsEmpty())
         return;        
         
-    preferences_options.emplace_back(Search::Option{ boost::nowide::widen(key), type,
+    preferences_options.emplace_back(Search::Option{ boost::nowide::widen(key), type, 
+                                -1, ConfigOptionMode::comSimpleAE,
                                 label.ToStdWstring(), _(label).ToStdWstring(),
                                 gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
                                 gc.category.ToStdWstring(), _(gc.category).ToStdWstring() });
@@ -575,6 +578,7 @@ void OptionsSearcher::append_preferences_options(const std::vector<GUI::Line>& o
         //    continue;        
         //
         //preferences_options.emplace_back(Search::Option{ boost::nowide::widen(key), type,
+        //                            -1, ConfigOptionMode::comSimpleAE,
         //                            label.ToStdWstring(), _(label).ToStdWstring(),
         //                            gc.group.ToStdWstring(), _(gc.group).ToStdWstring(),
         //                            gc.category.ToStdWstring(), _(gc.category).ToStdWstring() });

@@ -41,6 +41,12 @@
 using namespace std::string_view_literals;
 
 namespace Slic3r {
+    
+// static
+bool GCodeWriter::supports_separate_travel_acceleration(GCodeFlavor flavor)
+{
+    return (flavor == gcfRepetier || flavor == gcfMarlinFirmware ||  flavor == gcfRepRap);
+}
 
 std::string GCodeWriter::get_default_pause_gcode(const GCodeConfig &config)
 {

@@ -425,7 +425,7 @@ private:
     void discover_vertical_shells();
     void bridge_over_infill();
     void replaceSurfaceType(SurfaceType st_to_replace, SurfaceType st_replacement, SurfaceType st_under_it);
-    void clip_fill_surfaces();
+    // void clip_fill_surfaces(); //infill_only_where_needed
     void tag_under_bridge();
     void discover_horizontal_shells();
     void clean_surfaces();

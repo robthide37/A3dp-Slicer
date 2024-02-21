@@ -148,7 +148,7 @@ Option::Option(const ConfigOptionDef& _opt, t_config_option_key id) : opt(_opt),
             tooltip = _L("Unavailable for this method.") + "\n";
         tooltip += _(opt.tooltip);
 
-        edit_tooltip(tooltip);
+        update_Slic3r_string(tooltip);
 
         opt.tooltip = into_u8(tooltip);
     }

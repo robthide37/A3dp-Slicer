@@ -12,18 +12,22 @@
 
 #include "BitmapComboBox.hpp"
 
+#include "libslic3r/AppConfig.hpp"
+
 class ScalableBitmap;
 class wxColourPickerCtrl;
 
 namespace Slic3r {
+
 namespace GUI {
 
 class BitmapCache;
 
+//disabled for Susi, we can switch the entire gui look&feel, not only these icons.
+#ifdef GUI_TAG_PALETTE
 // ---------------------------------
 // ***  PaletteComboBox  ***
 // ---------------------------------
-
 // BitmapComboBox used to palets list in GUI Preferences
 class ModePaletteComboBox : public BitmapComboBox
 {
@@ -38,7 +42,7 @@ protected:
     static BitmapCache&		bitmap_cache();
     wxBitmapBundle*			get_bmp( const std::vector<std::string>& palette);
 };
-
+#endif
 namespace GUI_Descriptions {
 
 struct ButtonEntry {
@@ -57,11 +61,11 @@ class Dialog : public wxDialog
 	wxColourPickerCtrl* mod_colour{ nullptr };
 	wxColourPickerCtrl* phony_colour{ nullptr };
 
-	wxColourPickerCtrl* simple    { nullptr };
-	wxColourPickerCtrl* advanced  { nullptr };
-	wxColourPickerCtrl* expert    { nullptr };
-
+	//note: not thread-safe, dangerous container.
+	std::map<ConfigOptionMode, wxColourPickerCtrl*> tags;
+#ifdef GUI_TAG_PALETTE
 	std::vector<wxColour> mode_palette;
+#endif
 public:
 
 	Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries);
@@ -71,8 +75,7 @@ public:
 extern void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent, 
     wxColourPickerCtrl** default_colour, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour, wxColourPickerCtrl** phony_colour);
 extern void FillSizerWithModeColorDescriptions(wxSizer* sizer, wxWindow* parent,
-		                                       std::vector<wxColourPickerCtrl**> clr_pickers,
-		                                       std::vector<wxColour>& mode_palette);
+		                                       std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color);
 } // GUI_Descriptions
 
 } // GUI

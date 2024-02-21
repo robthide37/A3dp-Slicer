@@ -132,10 +132,34 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
     ImGui::SameLine();
 
     if (m_imgui->button(_L("Arrange")) && m_on_arrange_btn) {
+        m_db->set_previous_distance_from_objects(m_db->get_distance_from_objects());
         m_on_arrange_btn();
     }
 
     m_imgui->end();
+}
+
+void ArrangeSettingsDialogImgui::set_arrange_settings(const DynamicPrintConfig &conf, PrinterTechnology tech)
+{
+    const ConfigOptionFloat *dd_opt = conf.option<ConfigOptionFloat>("duplicate_distance");
+
+    if (dd_opt && dd_opt->value != 0) {
+        float dist = 6.f;
+        if (tech == ptSLA) {
+            dist = dd_opt->value;
+        } else if (tech == ptFFF) {
+            const ConfigOptionBool *co_opt = conf.option<ConfigOptionBool>("complete_objects");
+            if (co_opt && co_opt->value) {
+                dist = float(min_object_distance(&conf, 0.) * 2);
+            } else {
+                dist = 0.f;
+            }
+            dist += dd_opt->value;
+        }
+        m_db->set_distance_from_objects(dist);
+    } else {
+        m_db->set_distance_from_objects(m_db->get_previous_distance_from_objects());
+    }
 }
 
 }} // namespace Slic3r::GUI

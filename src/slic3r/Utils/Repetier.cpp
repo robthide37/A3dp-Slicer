@@ -50,13 +50,13 @@ static wxString validate_repetier(const boost::optional<std::string>& name,
         // Repetier allows "rebranding", so the "name" value is not reliable when detecting
         // server type. Newer Repetier versions send "software", which should be invariant.
         if ((*soft) == "Repetier-Server")
-            return GUI::format_wxstr(_L("Mismatched type of print host: %s"), (soft ? *soft : (text ? *text : "Repetier")));
+            return GUI::format_wxstr(_L("Mismatched type of print host: %s"), (soft ? *soft : "Repetier"));
     } else {
         // If there is no "software" value, validate there is at lest a printer field
         if (!name.has_value())
-            return GUI::from_u8((boost::format(_u8L("Can't process the repetier return message: missing field '%s'")) % ("name")).str());
+            return GUI::format_wxstr(_L("Can't process the repetier return message: missing field '%s'"), "name");
         else if (!printers.has_value()) {
-            return GUI::from_u8((boost::format(_u8L("Can't process the repetier return message: missing field '%s'")) % ("printers")).str());
+            return GUI::format_wxstr(_L("Can't process the repetier return message: missing field '%s'"), "printers");
         }
     }
     return "";
@@ -112,10 +112,8 @@ bool Repetier::test(wxString &msg) const
 
 wxString Repetier::get_test_failed_msg (wxString &msg) const
 {
-        return GUI::format_wxstr(_L("Could not connect to %s: %s\n\n%s"))
-        , get_name())
-        , msg
-        , _L("Note: Repetier version at least 0.90.0 is required.")).str());
+    return GUI::format_wxstr(_L("Could not connect to %s: %s\n\n%s"), get_name(), msg,
+                             _L("Note: Repetier version at least 0.90.0 is required."));
 }
 
 bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const

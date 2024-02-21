@@ -14,6 +14,8 @@
 #include <angelscript/add_on/scriptstdstring/scriptstdstring.h>
 #include <angelscript/add_on/scriptmath/scriptmath.h>
 
+#include <boost/filesystem/string_file.hpp>
+
 using namespace gw;
 
 namespace Slic3r {  namespace GUI {
@@ -343,11 +345,19 @@ void as_set_string(std::string& key, std::string& val)
     } else if (result.second->type() == ConfigOptionType::coEnum) {
         const ConfigOptionDef* def = result.first->get_edited_preset().config.get_option_def(key);
         int idx = 0;
-        for (; idx < def->enum_values.size() && def->enum_values[idx] != val; idx++) {}
-        if (idx >= 0 && idx < def->enum_values.size()) {
-            ConfigOption* copy = result.second->clone();
-            copy->setInt(idx);
-            conf.set_key_value(key, copy);
+        assert(def && def->enum_def);
+        if (def && def->enum_def) {
+            std::optional<int> idx = def->enum_def->value_to_index(val);
+            assert(idx);
+            //if (idx) {
+                //idx = def->enum_def->index_to_enum(*idx); we set the index, not the enum
+                assert(idx);
+                if (idx) {
+                    ConfigOption *copy = result.second->clone();
+                    copy->setInt(*idx);
+                    conf.set_key_value(key, copy);
+                }
+            //}
         }
     }
 }
@@ -361,8 +371,8 @@ std::string get_custom_var_option(int preset_type) {
         : current_script->tab()->m_preset_bundle->sla_prints.get_edited_preset().config.opt_string("print_custom_variables");
     else if (preset_type == 1) {
         return (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
-            ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0))
-            : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
+            ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", size_t(0))
+            : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", size_t(0));
     } else return current_script->tab()->m_preset_bundle->printers.get_edited_preset().config.opt_string("printer_custom_variables");
 }
 std::string get_custom_value(std::string custom_var_field, const std::string& opt_key) {
@@ -599,8 +609,8 @@ void as_back_custom_initial_value(int preset_type, std::string& key) {
         : current_script->tab()->m_preset_bundle->sla_prints.get_selected_preset().config.opt_string("print_custom_variables");
     else if (preset_type == 1) {
         initial_serialized_vars = (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
-            ? current_script->tab()->m_preset_bundle->filaments.get_selected_preset().config.opt_string("filament_custom_variables", (unsigned int)(0))
-            : current_script->tab()->m_preset_bundle->sla_materials.get_selected_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
+            ? current_script->tab()->m_preset_bundle->filaments.get_selected_preset().config.opt_string("filament_custom_variables", size_t(0))
+            : current_script->tab()->m_preset_bundle->sla_materials.get_selected_preset().config.opt_string("filament_custom_variables", size_t(0));
     } else initial_serialized_vars = current_script->tab()->m_preset_bundle->printers.get_selected_preset().config.opt_string("printer_custom_variables");
     std::string serialized_value = get_custom_value(initial_serialized_vars, key);
     std::string serialized_vars = get_custom_var_option(preset_type);
@@ -713,6 +723,7 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
         //res = builder.AddSectionFromFile(ui_script_file.string().c_str()); //seems to be problematic on cyrillic locale
         {
             std::string all_file;
+            
             boost::filesystem::load_string_file(ui_script_file, all_file);
             res = builder.AddSectionFromMemory(ui_script_file.string().c_str(), all_file.c_str(), (unsigned int)(all_file.length()), 0);
         }
@@ -812,8 +823,10 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     }
     case coEnum: {
         int32_t enum_idx = boost::any_cast<std::int32_t>(value);
-        if (enum_idx >= 0 && enum_idx < def.enum_values.size()) {
-            str_arg = def.enum_values[enum_idx];
+        assert(def.enum_def);
+        assert(enum_idx < def.enum_def->values().size());
+        if (enum_idx >= 0 && def.enum_def && enum_idx < def.enum_def->values().size()) {
+            str_arg = def.enum_def->label(enum_idx);
             ctx->SetArgAddress(0, &str_arg);
             ctx->SetArgDWord(1, enum_idx);
         }
@@ -1046,14 +1059,20 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     case coPoint3: { ret_float = ctx->GetReturnFloat(); field_val = Vec3d{ ret_float, ret_float, ret_float }; opt_val = double(ctx->GetReturnFloat());  break; }
     case coEnum: { 
         ret_int = ctx->GetReturnDWord();
-        if (ret_int >= 0 && ret_int < def.enum_values.size()) {
+        assert(def.enum_def && ret_int < def.enum_def->values().size());
+        if (ret_int >= 0 && def.enum_def && ret_int < def.enum_def->values().size()) {
             field_val = int32_t(ret_int);
         } else {
             field_val = int32_t(0);
-            for (size_t i = 0; i < def.enum_values.size(); i++) {
-                if (ret_str == def.enum_values[i])
-                    field_val = int32_t(i);
+            std::optional<int> idx;
+            if (def.enum_def->is_valid_closed_enum()) {
+                idx = def.enum_def->value_to_index(ret_str);
+            } else {
+                idx = def.enum_def->label_to_index(ret_str);
             }
+            assert(idx);
+            if(idx)
+                field_val = int32_t(*idx);
         }
         opt_val = field_val;
         break; //Choice

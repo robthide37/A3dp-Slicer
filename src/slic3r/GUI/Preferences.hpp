@@ -51,14 +51,14 @@ class PreferencesDialog : public DPIDialog
 	std::vector<std::shared_ptr<ConfigOptionsGroup>> m_optgroups_gui;
 	std::vector<std::shared_ptr<ConfigOptionsGroup>> m_optgroups_colors;
 	std::shared_ptr<ConfigOptionsGroup> m_optgroup_other;
-
-	// ...
-	std::map<std::string, std::shared_ptr<ConfigOptionsGroup>> m_optkey_to_optgroup;
-
-    ConfigOptionDef def_combobox_auto_switch_preview; //is this useful here?
 #if ENABLE_ENVIRONMENT_MAP
 	std::shared_ptr<ConfigOptionsGroup>	m_optgroup_render;
 #endif // ENABLE_ENVIRONMENT_MAP
+
+	// to retreive the group to get the field, or request a refresh
+	std::map<std::string, std::shared_ptr<ConfigOptionsGroup>> m_optkey_to_optgroup;
+
+    ConfigOptionDef def_combobox_auto_switch_preview; //is this useful here?
 	wxSizer*                            m_icon_size_sizer {nullptr};
 	wxSlider*							m_icon_size_slider {nullptr};
 	wxRadioButton*						m_rb_old_settings_layout_mode {nullptr};
@@ -71,7 +71,7 @@ class PreferencesDialog : public DPIDialog
 	wxColourPickerCtrl*					m_phony_colour {nullptr};
 
 	std::vector<wxColour>				m_mode_palette;
-	std::vector<std::pair<std::string, wxColourPickerCtrl*>> m_tag_color;
+	std::map<ConfigOptionMode, wxColourPickerCtrl*> m_tag_color;
 
 	DownloaderUtils::Worker*			downloader { nullptr };
 
@@ -105,14 +105,13 @@ protected:
     void layout();
 	void clear_cache();
 	void refresh_og(std::shared_ptr<ConfigOptionsGroup> og);
-	void refresh_og(ConfigOptionsGroup* og);
-    void create_icon_size_slider(ConfigOptionsGroup* parent);
-    void create_settings_mode_widget(wxWindow* tab);
+    void create_icon_size_slider(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp);
+    void create_settings_mode_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp);
     std::shared_ptr<ConfigOptionsGroup> create_options_group(const wxString& title, wxBookCtrlBase* tabs, int page_idx);
-    void create_settings_text_color_widget(wxWindow* tab);
-    void create_settings_mode_color_widget(wxWindow* tab);
-    void create_settings_font_widget(wxWindow* tab);
-    void create_downloader_path_sizer();
+    void create_settings_text_color_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp);
+    void create_settings_mode_color_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp);
+    void create_settings_font_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp);
+    void create_downloader_path_sizer(std::shared_ptr<ConfigOptionsGroup> opt_grp);
 	void init_highlighter(const t_config_option_key& opt_key);
 	std::vector<ConfigOptionsGroup*> optgroups();
 
@@ -128,6 +127,13 @@ protected:
 								const std::string& tooltip,
 								int option_width,
 								int def_val,
+								ConfigOptionMode mode = comSimpleAE);
+	
+	void append_color_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								std::string color_str,
 								ConfigOptionMode mode = comSimpleAE);
 	template<typename EnumType>
 	void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,

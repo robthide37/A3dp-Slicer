@@ -1,3 +1,8 @@
+///|/ Copyright (c) Superslicer 2021 - 2024 Durand Rémi @supermerill
+///|/ Copyright (c) 2021 Alexander Bachler Jansson
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "MPMDv2.hpp"
 
 #include <algorithm>
@@ -62,7 +67,7 @@ bool MPMDv2::test(wxString &msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (! res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "MiniDeltaLCD")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "MiniDeltaLCD"));
                 }
             }
             catch (const std::exception &) {
@@ -75,7 +80,7 @@ bool MPMDv2::test(wxString &msg) const
     return res;
 }
 
-bool MPMDv2::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const
+bool MPMDv2::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn,  InfoFn info_fn) const
 {
     const char *name = get_name();
 
@@ -129,14 +134,18 @@ bool MPMDv2::validate_version_text(const boost::optional<std::string> &version_t
 {
     return version_text ? boost::starts_with(*version_text, "MiniDeltaLCD") : true;
 }
+wxString MPMDv2::get_test_ok_msg () const
+{
+    return GUI::format_wxstr(_L("Connection to %1% works correctly."), get_name());
+}
 
 wxString MPMDv2::get_test_failed_msg (wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s\n\n%s")
-        % (boost::format(_u8L("Could not connect to %s")) % get_name())
-        % std::string(msg.ToUTF8())
-        % _u8L("Note: MiniDeltaLCD version at least 1.0 is required.")
-        ).str());
+    return GUI::format_wxstr("%s: %s\n\n%s",
+        (boost::format(_u8L("Could not connect to %s")) % get_name()),
+        std::string(msg.ToUTF8()),
+        _u8L("Note: MiniDeltaLCD version at least 1.0 is required.")
+        );
 }
 
 std::string MPMDv2::make_url(const std::string &path) const

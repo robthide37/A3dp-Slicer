@@ -95,6 +95,21 @@ void ArrangeSettingsDb_AppCfg::sync()
         m_settings_sla.vals.rotations = (en_rot_sla_str == "1" || en_rot_sla_str == "yes");
     else
         m_settings_sla.vals.rotations = m_settings_sla.defaults.rotations;
+    
+    if (!dist_fff_str.empty())
+        m_settings_fff.vals.d_obj_prev = string_to_float_decimal_point(dist_fff_str);
+    else
+        m_settings_fff.vals.d_obj_prev = m_settings_sla.defaults.d_obj_prev;
+
+    if (!dist_fff_seq_print_str.empty())
+        m_settings_fff_seq.vals.d_obj_prev = string_to_float_decimal_point(dist_fff_seq_print_str);
+    else
+        m_settings_fff_seq.vals.d_obj_prev = m_settings_sla.defaults.d_obj_prev;
+
+    if (!dist_sla_str.empty())
+        m_settings_sla.vals.d_obj_prev = string_to_float_decimal_point(dist_sla_str);
+    else
+        m_settings_sla.vals.d_obj_prev = m_settings_sla.defaults.d_obj_prev;
 
     // Override default alignment and save/load it to a temporary slot "alignment_xl"
     auto arr_alignment = ArrangeSettingsView::to_xl_pivots(alignment_xl_str)
@@ -139,6 +154,14 @@ arr2::ArrangeSettingsDb& ArrangeSettingsDb_AppCfg::set_distance_from_objects(flo
     slot.vals.d_obj = v;
     m_appcfg->set("arrange", "min_object_distance" + slot.postfix,
                   float_to_string_decimal_point(v));
+
+    return *this;
+}
+
+arr2::ArrangeSettingsDb& ArrangeSettingsDb_AppCfg::set_previous_distance_from_objects(float v)
+{
+    Slot &slot = get_slot(this);
+    slot.vals.d_obj_prev = v;
 
     return *this;
 }

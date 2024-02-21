@@ -448,6 +448,35 @@ static int scale()
 
 wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name_in, int width/* = 16*/, int height/* = -1*/, const std::string& new_color/* = std::string()*/)
 {
+
+    // Try loading an SVG first, then PNG if SVG is not found:
+    Slic3r::ColorReplaces changes;
+    bool grayscale = false; //TODO: remove? is it still used?
+    if (grayscale) {
+        changes.add("#ED6B21", "#606060");
+        changes.add("#2172eb", "#606060");
+        //color_int = 9079434;
+    } else if (new_color.empty() || new_color.size() > 7 || new_color.size() < 6) {
+        try {
+            uint32_t color_int = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
+            changes.add("#ED6B21", color_int);
+            changes.add("#2172eb", color_int);
+        }
+        catch (std::exception /*e*/) {
+        }
+    }
+    
+    if (Slic3r::GUI::wxGetApp().dark_mode()) {
+        changes.add("#808080", "#FFFFFF");
+    }
+
+    return get_bmp_bundle(bmp_name_in, width, height, changes);
+}
+
+
+wxBitmapBundle *get_bmp_bundle(const std::string &bmp_name_in, int width, int height, Slic3r::ColorReplaces &new_colors_rgb)
+{
+    
 #ifdef __WXGTK2__
     width *= scale();
     if (height > 0)
@@ -462,28 +491,13 @@ wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name_in, int width/* = 16*
     if (height < 0)
         height = width;
 
-    // Try loading an SVG first, then PNG if SVG is not found:
-    std::string color = new_color;
-    uint32_t color_int = -1;
-    bool grayscale = false; //TODO: remove? is it still used?
-    if (grayscale) {
-        color = "#606060";
-        color_int = 9079434;
-    } else if (color.empty() || color.size() > 7 || color.size() < 6) {
-        try {
-            color_int = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
-            color = color_to_hex(color_int);
-        }
-        catch (std::exception /*e*/) {
-            color = "";
-            color_int = 0xFFFFFFFF;
-        }
-    }
+    if (Slic3r::GUI::wxGetApp().dark_mode())
+        new_colors_rgb.add("#808080", "#FFFFFF");
 
     //wxBitmap *bmp = cache.load_svg(bmp_name, width, height, grayscale, dark_mode, color);
-    wxBitmapBundle* bmp = cache.from_svg(bmp_name, width, height, Slic3r::GUI::wxGetApp().dark_mode(), color);
+    wxBitmapBundle* bmp = cache.from_svg(bmp_name, width, height, new_colors_rgb);
     if (bmp == nullptr) {
-        bmp = cache.from_png(bmp_name, width, height, color_int);
+        bmp = cache.from_png(bmp_name, width, height, new_colors_rgb);
         if (!bmp)
         // Neither SVG nor PNG has been found, raise error
         throw Slic3r::RuntimeError("Could not load bitmap: " + bmp_name);
@@ -760,21 +774,22 @@ void ScalableButton::SetBitmap_(const wxBitmap& bmp)
     SetBitmap(bmp);
 }
 
-// not used
-//bool ScalableButton::SetBitmap_(const std::string& bmp_name)
-//{
-//    m_current_icon_name = bmp_name;
-//    if (m_current_icon_name.empty())
-//        return false;
-//
-//    wxBitmapBundle bmp = *get_bmp_bundle(m_current_icon_name, m_bmp_width, m_bmp_height);
-//    SetBitmap(bmp);
-//    SetBitmapCurrent(bmp);
-//    SetBitmapPressed(bmp);
-//    SetBitmapFocus(bmp);
-//    SetBitmapDisabled(bmp);
-//    return true;
-//}
+bool ScalableButton::SetBitmap_(const std::string& bmp_name, int bmp_width)
+{
+    m_current_icon_name = bmp_name;
+    if (m_current_icon_name.empty())
+        return false;
+
+    m_bmp_width = bmp_width;
+
+    wxBitmapBundle bmp = *get_bmp_bundle(m_current_icon_name, m_bmp_width, m_bmp_height);
+    SetBitmap(bmp);
+    SetBitmapCurrent(bmp);
+    SetBitmapPressed(bmp);
+    SetBitmapFocus(bmp);
+    SetBitmapDisabled(bmp);
+    return true;
+}
 
 void ScalableButton::SetBitmapDisabled_(const ScalableBitmap& bmp)
 {

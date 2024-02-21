@@ -212,6 +212,8 @@ set(SLIC3R_SOURCES
     # GCodeSender.hpp
     Geometry.cpp
     Geometry.hpp
+    Geometry/ArcFitter.cpp
+    Geometry/ArcFitter.hpp
     Geometry/ArcWelder.cpp
     Geometry/ArcWelder.hpp
     Geometry/Bicubic.hpp

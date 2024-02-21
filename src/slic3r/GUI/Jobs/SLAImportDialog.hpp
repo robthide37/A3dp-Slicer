@@ -36,7 +36,7 @@ std::string get_readers_wildcard()
 
     auto registry = registered_sla_archives();
 
-    for (const ArchiveEntry &entry : registry) {
+    for (const auto& [format, entry] : registry) {
         if (!entry.rdfactoryfn)
             continue;
 
@@ -173,12 +173,12 @@ public:
         return m_filepicker->GetPath().ToUTF8().data();
     }
 
-    std::string get_archive_format() const override
+    OutputFormat get_archive_format() const override
     {
         // TODO: the choosen format is inside the file dialog which is not
         // accessible from the file picker object. The file picker could be
         // changed to a custom file dialog.
-        return {};
+        return OutputFormat::ofUnknown;
     }
 };
 

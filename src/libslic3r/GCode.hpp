@@ -122,7 +122,7 @@ struct DistancedPoint {
 std::vector<DistancedPoint> slice_xy_path(tcb::span<const Point> xy_path, tcb::span<const double> sorted_distances);
 
 /**
- * @brief Take xy_path and genrate a travel acording to elevation.
+ * @brief Take xy_path and generate a travel acording to elevation.
  *
  * @param xy_path A list of points describing a path in xy.
  * @param ensure_points_at_distances See slice_xy_path sorted_distances.
@@ -463,12 +463,13 @@ private:
          const Points3& travel,
          const std::string& comment
      );
-    // Polyline generate_travel_xy_path(
-        // const Point& start,
-        // const Point& end,
-        // const bool needs_retraction,
-        // bool& could_be_wipe_disabled
-    // );
+    // for helical layer change for vase mode
+     Polyline generate_travel_xy_path(
+         const Point& start,
+         const Point& end,
+         const bool needs_retraction,
+         bool& could_be_wipe_disabled
+     );
     Polyline        travel_to(std::string& gcode, const Point &point, ExtrusionRole role);
     void            write_travel_to(std::string& gcode, const Polyline& travel, std::string comment);
     bool            can_cross_perimeter(const Polyline& travel, bool offset);

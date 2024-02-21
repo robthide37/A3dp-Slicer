@@ -371,8 +371,8 @@ Semver get_version(const std::string &str, const std::regex &regexp) {
 	return Semver::invalid();
 }
 
-void AppUpdater::priv::parse_version_string(const std::string& constbody) const
-
+void AppUpdater::priv::parse_version_string(const std::string& constbody)
+{
 	boost::property_tree::ptree root;
 	std::stringstream json_stream(constbody);
 	boost::property_tree::read_json(json_stream, root);

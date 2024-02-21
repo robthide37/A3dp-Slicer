@@ -769,7 +769,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
             if (!no_dots)
                 label += ":";
             if (!label.empty() || option.label_width > 0) {
-                int width = ctrl->opt_group->sublabel_width * ctrl->m_em_unit;
+                int width = 0;//ctrl->opt_group->sublabel_width * ctrl->m_em_unit; sublabel_width is never used
                 if (option.label_width >= 0) {
                     if (option.label_width != 0) {
                         width = option.label_width * ctrl->m_em_unit;

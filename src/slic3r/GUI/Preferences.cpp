@@ -151,20 +151,20 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
 		update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
-
+		
+#ifdef GUI_TAG_PALETTE
 		// update color pickers for mode palette
-		const auto palette = wxGetApp().get_mode_palette(); 
+		//const std::map<ConfigOptionMode, wxColour> palette = wxGetApp().get_mode_palette(); 
 		//std::vector<wxColourPickerCtrl*> color_pickres = {m_mode_simple, m_mode_advanced, m_mode_expert};
 		//for (size_t mode = 0; mode < color_pickres.size(); ++mode)
 			//update_color(color_pickres[mode], palette[mode]);
-		for (size_t mode = 0; mode < m_tag_color.size(); ++mode)
-			update_color(m_tag_color[0], palette[mode]);
+#endif
 	}
 
 	this->ShowModal();
 }
 
-static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
+static std::shared_ptr<ConfigOptionsGroup> create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
 {
 	wxPanel* tab = new wxPanel(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL);
 
@@ -301,7 +301,7 @@ void PreferencesDialog::append_bool_option( std::shared_ptr<ConfigOptionsGroup> 
 	m_optkey_to_optgroup[opt_key] = optgroup;
 
 	// fill data to the Search Dialog
-	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"), def);
 }
 
 void PreferencesDialog::append_int_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
@@ -324,7 +324,31 @@ void PreferencesDialog::append_int_option( std::shared_ptr<ConfigOptionsGroup> o
 	m_optkey_to_optgroup[opt_key] = optgroup;
 
 	// fill data to the Search Dialog
-	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"), def);
+}
+
+void PreferencesDialog::append_color_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								std::string color_str,
+								ConfigOptionMode mode)
+{
+	ConfigOptionDef def = {opt_key, coString};
+	def.label = label;
+	def.tooltip = tooltip;
+	def.mode = mode;
+	if (color_str[0] != '#') color_str = "#" + color_str;
+	def.set_default_value(new ConfigOptionString{ color_str });
+	Option option(def, opt_key);
+	option.opt.gui_type = ConfigOptionDef::GUIType::color;
+	optgroup->append_single_option_line(option);
+	
+	m_optkey_to_optgroup[opt_key] = optgroup;
+	m_values_need_restart.push_back("color_light");
+
+	// fill data to the Search Dialog
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"), def);
 }
 
 template<typename EnumType>
@@ -349,7 +373,7 @@ void PreferencesDialog::append_enum_option( std::shared_ptr<ConfigOptionsGroup> 
 	m_optkey_to_optgroup[opt_key] = optgroup;
 
 	// fill data to the Search Dialog
-	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"), def);
 }
 
 static void append_preferences_option_to_searcher(std::shared_ptr<ConfigOptionsGroup> optgroup,
@@ -357,7 +381,7 @@ static void append_preferences_option_to_searcher(std::shared_ptr<ConfigOptionsG
 												const wxString& label)
 {
 	// fill data to the Search Dialog
-	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+    wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"), {});
 	// apply sercher
 	wxGetApp().sidebar().get_searcher().append_preferences_option(Line(opt_key, label, ""));
 }
@@ -632,7 +656,7 @@ void PreferencesDialog::build()
 		m_optgroups_general.back()->append_single_option_line(option);
 		
 		// fill data to the Search Dialog
-		wxGetApp().sidebar().get_searcher().add_key("freecad_path", Preset::TYPE_PREFERENCES, m_optgroups_general.back()->config_category(), L("Preferences"));
+		wxGetApp().sidebar().get_searcher().add_key("freecad_path", Preset::TYPE_PREFERENCES, m_optgroups_general.back()->config_category(), L("Preferences"), def);
 	}
 
     activate_options_tab(m_optgroups_general.back(), m_optgroups_general.back()->parent()->GetSizer()->GetItemCount() > 1 ? 3 : 20);
@@ -765,7 +789,7 @@ void PreferencesDialog::build()
 			L("Use custom size for toolbar icons"),
 			L("If enabled, you can change size of toolbar icons manually."),
 			app_config->get_bool("use_custom_toolbar_size"));
-		create_icon_size_slider(m_optgroups_gui.back().get());
+		create_icon_size_slider(tabs->GetPage(2), m_optgroups_gui.back());
 		m_icon_size_sizer->ShowItems(app_config->get("use_custom_toolbar_size") == "1");
 		
 		append_int_option(m_optgroups_gui.back(), "tab_icon_size",
@@ -825,7 +849,7 @@ void PreferencesDialog::build()
 		m_optgroups_gui.back()->get_field("notify_release")->set_value(val, false);
 
 	//create layout options
-	create_settings_mode_widget(tabs->GetPage(2));
+	create_settings_mode_widget(tabs->GetPage(2), m_optgroups_gui.back());
 	//create ui_layout check
 	{
 		m_optgroups_gui.emplace_back(create_options_group(_L("Settings layout and colors"), tabs, 2));
@@ -871,33 +895,35 @@ void PreferencesDialog::build()
         def_combobox.tooltip = L("Choose the image to use as splashscreen");
         def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
         def_combobox.gui_flags = "show_value";
-        def_combobox.set_enum({
-			std::pair<std::string_view, std::string_view>{"default", L("Default")}, 
-			std::pair<std::string_view, std::string_view>{"icon", L("Icon")}, 
-			std::pair<std::string_view, std::string_view>{"random", L("Random")}
-			});
+		std::vector<std::pair<std::string,std::string>> enum_key_values = {
+			{"default", L("Default")}, 
+			{"icon", L("Icon")}, 
+			{"random", L("Random")}
+			};
         //get all images in the spashscreen dir
         for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
             if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
-                def_combobox.enum_values.push_back(dir_entry.path().filename().string());
-                def_combobox.enum_labels.push_back(dir_entry.path().stem().string());
+                enum_key_values.push_back({dir_entry.path().filename().string(), dir_entry.path().stem().string()});
             }
         }
+        def_combobox.set_enum_values(enum_key_values);
+		assert(def_combobox.enum_def->is_valid_open_enum());
         std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
-        if (std::find(def_combobox.enum_values.begin(), def_combobox.enum_values.end(), current_file_name) == def_combobox.enum_values.end())
-            current_file_name = def_combobox.enum_values[0];
+        if (std::find(def_combobox.enum_def->values().begin(), def_combobox.enum_def->values().end(), current_file_name) == def_combobox.enum_def->values().end()) {
+			assert(false);
+            current_file_name = def_combobox.enum_def->values()[0];
+			app_config->set(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer", current_file_name);
+        }
         def_combobox.set_default_value(new ConfigOptionStrings{ current_file_name });
         Option option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
         m_optgroups_gui.back()->append_single_option_line(option);
 		m_optkey_to_optgroup[def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer"] = m_optgroups_gui.back();
     }
-
-    def.label = L("Restore window position on start");
-    def.type = coBool;
-    def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
-    def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
-    option = Option(def, "restore_win_position");
-    m_optgroups_gui.back()->append_single_option_line(option);
+	
+	append_bool_option(m_optgroups_gui.back(), "restore_win_position",
+		L("Restore window position on start"),
+		L("If enabled, Slic3r will be open at the position it was closed"),
+		app_config->get_bool("restore_win_position"));
 
 #ifdef WIN32
     // Clear Undo / Redo stack on new project
@@ -951,8 +977,8 @@ void PreferencesDialog::build()
 
 		activate_options_tab(m_optgroup_other);
 
-		create_downloader_path_sizer();
-		create_settings_font_widget();
+		create_downloader_path_sizer(m_optgroup_other);
+		create_settings_font_widget(tabs->GetPage(tabs->GetPageCount()-1), m_optgroup_other);
 #endif // ENABLE_ENVIRONMENT_MAP
 	}
 
@@ -999,52 +1025,34 @@ void PreferencesDialog::build()
 	//TEXT 1.0f, 0.49f, 0.22f, 1.0f ff7d38 ; 0.26f, 0.55f, 1.0f, 1.0f 428cff
 
 	// PS 237 107 33 ; SuSi 33 114 235
-	def.label = L("Platter icons Color template");
-	def.type = coString;
-	def.tooltip = _u8L("Color template used by the icons on the platter.")
-		+ " " + _u8L("It may need a lighter color, as it's used to replace white on top of a dark background.")
-		+ "\n" + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed");
-	std::string color_str = app_config->get("color_light");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_light");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_colors.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_light");
+	append_color_option(m_optgroups_colors.back(), "color_light",
+		L("Platter icons Color template"),
+		_u8L("Color template used by the icons on the platter.") +" "+
+		_u8L("It may need a lighter color, as it's used to replace white on top of a dark background.") +"\n"+
+		_u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed"),
+		app_config->get("color_light"));
 
 	// PS 253 126 66 ; SuSi 66 141 253
-	def.label = L("Main Gui color template");
-	def.type = coString;
-	def.tooltip = _u8L("Main color template.")
-		+ " " + _u8L("If you use a color with higher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.")
-		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc");
-	color_str = app_config->get("color");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_colors.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color");
+	append_color_option(m_optgroups_colors.back(), "color",
+		L("Main Gui color template"),
+		_u8L("Main color template.") +" "+
+		_u8L("If you use a color with higher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.") +"\n"+
+		_u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc"),
+		app_config->get("color"));
 
 	// PS 254 172 139 ; SS 139 185 254
-	def.label = L("Text color template");
-	def.type = coString;
-	def.tooltip = _u8L("This template will be used for drawing button text on hover.")
-		+ " " + _u8L("It can be a good idea to use a bit darker color, as some hues can be a bit difficult to read.")
-		+ " " + _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad");
-	color_str = app_config->get("color_dark");
-	if (color_str[0] != '#') color_str = "#" + color_str;
-	def.set_default_value(new ConfigOptionString{ color_str });
-	option = Option(def, "color_dark");
-	option.opt.gui_type = ConfigOptionDef::GUIType::color;
-	m_optgroups_colors.back()->append_single_option_line(option);
-	m_values_need_restart.push_back("color_dark");
+	append_color_option(m_optgroups_colors.back(), "color_dark",
+		L("Text color template"),
+		_u8L("This template will be used for drawing button text on hover.") +" "+
+		_u8L("It can be a good idea to use a bit darker color, as some hues can be a bit difficult to read.") +"\n"+
+		_u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad"),
+		app_config->get("color_dark"));
 
 	activate_options_tab(m_optgroups_colors.back(), 3);
 
 	//create text options
-	create_settings_text_color_widget(tabs->GetPage(3));
-	create_settings_mode_color_widget(tabs->GetPage(3));
+	create_settings_text_color_widget(tabs->GetPage(3), m_optgroups_colors.back());
+	create_settings_mode_color_widget(tabs->GetPage(3), m_optgroups_colors.back());
 
 	// update alignment of the controls for all tabs
 	//update_ctrls_alignment();
@@ -1176,7 +1184,8 @@ void PreferencesDialog::accept(wxEvent&)
 #endif
 	auto it_auto_switch_preview = m_values.find("auto_switch_preview");
 	if (it_auto_switch_preview != m_values.end()) {
-		std::vector<std::string> values = def_combobox_auto_switch_preview.enum_values;
+		assert(def_combobox_auto_switch_preview.enum_def);
+		std::vector<std::string> values = def_combobox_auto_switch_preview.enum_def->values();
 		for(size_t i=0; i< values.size(); i++)
 		if (values[i] == it_auto_switch_preview->second)
 			it_auto_switch_preview->second = std::to_string(i);
@@ -1203,7 +1212,9 @@ void PreferencesDialog::accept(wxEvent&)
 		wxGetApp().set_label_clr_modified(m_mod_colour->GetColour());
 		wxGetApp().set_label_clr_default(m_def_colour->GetColour());
 		wxGetApp().set_label_clr_phony(m_phony_colour->GetColour());
+#ifdef GUI_TAG_PALETTE
 		wxGetApp().set_mode_palette(m_mode_palette);
+#endif
 	}
 
 	EndModal(wxID_OK);
@@ -1235,24 +1246,24 @@ void PreferencesDialog::revert(wxEvent&)
 	if (m_use_custom_toolbar_size != (get_app_config()->get_bool("use_custom_toolbar_size"))) {
 		app_config->set("use_custom_toolbar_size", m_use_custom_toolbar_size ? "1" : "0");
 
-		m_optgroup_gui->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
+		m_optkey_to_optgroup["use_custom_toolbar_size"]->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
 		m_icon_size_sizer->ShowItems(m_use_custom_toolbar_size);
-		refresh_og(m_optgroup_gui);
+		refresh_og(m_optkey_to_optgroup["use_custom_toolbar_size"]);
 	}
 
 	for (auto value : m_values) {
 		const std::string& key = value.first;
-
+		// special cases
 		if (key == "default_action_on_dirty_project") {
-			m_optgroup_general->set_value(key, app_config->get(key).empty());
+			m_optkey_to_optgroup[key]->set_value(key, app_config->get(key).empty());
 			continue;
 		}
 		if (key == "default_action_on_close_application" || key == "default_action_on_select_preset" || key == "default_action_on_new_project") {
-			m_optgroup_general->set_value(key, app_config->get(key) == "none");
+			m_optkey_to_optgroup[key]->set_value(key, app_config->get(key) == "none");
 			continue;
 		}
 		if (key == "notify_release") {
-			m_optgroup_gui->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)));
+			m_optkey_to_optgroup[key]->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)));
 			continue;
 		}
 		if (key == "old_settings_layout_mode") {
@@ -1270,23 +1281,30 @@ void PreferencesDialog::revert(wxEvent&)
 			m_settings_layout_changed = false;
 			continue;
 		}
-
-		for (auto opt_group : { m_optgroup_general, m_optgroup_camera, m_optgroup_gui, m_optgroup_other
-#ifdef _WIN32
-			, m_optgroup_dark_mode
-#endif // _WIN32
-#if ENABLE_ENVIRONMENT_MAP
-			, m_optgroup_render
-#endif // ENABLE_ENVIRONMENT_MAP
-			}) {
-			if (opt_group->set_value(key, app_config->get_bool(key)))
-				break;
-		}
 		if (key == "tabs_as_menu") {
 			m_rb_new_settings_layout_mode->Show(!app_config->get_bool(key));
-			refresh_og(m_optgroup_gui);
+			refresh_og(m_optkey_to_optgroup[key]);
 			continue;
 		}
+		//general case
+		Field* field = m_optkey_to_optgroup[key]->get_field(key);
+        if (field->m_opt.type == coBool) {
+			 m_optkey_to_optgroup[key]->set_value("",true);
+			field->set_value(app_config->get_bool(key), false);
+			continue;
+		}
+        if (field->m_opt.type == coString) {
+			std::string val = app_config->get(key);
+			if(field->m_opt.gui_type == ConfigOptionDef::GUIType::color)
+				if (val[0] != '#') val = "#" + val;
+			field->set_value(val, false);
+			continue;
+		}
+        if (field->m_opt.type == coInt) {
+			field->set_value(app_config->get_int(key), false);
+			continue;
+		}
+		assert(false);
 	}
 
 	clear_cache();
@@ -1335,7 +1353,7 @@ void PreferencesDialog::refresh_og(std::shared_ptr<ConfigOptionsGroup> og)
 //	this->layout();
 }
 
-void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
+void PreferencesDialog::create_icon_size_slider(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp)
 {
     const auto app_config = get_app_config();
 
@@ -1343,7 +1361,7 @@ void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
 
     m_icon_size_sizer = new wxBoxSizer(wxHORIZONTAL);
 
-	wxWindow* parent = container->parent();
+	wxWindow* parent = tab; //container->parent();
 	wxGetApp().UpdateDarkUI(parent);
 
     if (isOSX)
@@ -1394,15 +1412,15 @@ void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
         win->SetBackgroundStyle(wxBG_STYLE_PAINT);
     }
 
-	container->parent()->GetSizer()->Add(m_icon_size_sizer, 0, wxEXPAND | wxALL, em);
+	opt_grp->parent()->GetSizer()->Add(m_icon_size_sizer, 0, wxEXPAND | wxALL, em);
 }
 
-void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
+void PreferencesDialog::create_settings_mode_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp)
 {
 #ifdef _USE_CUSTOM_NOTEBOOK
 	bool disable_new_layout = wxGetApp().tabs_as_menu();
 #endif
-	wxWindow* parent = m_optgroup_gui->parent();
+	wxWindow* parent = tab;//opt_grp->parent();
 
 	wxString title = L("Layout Options");
     wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
@@ -1487,14 +1505,14 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
-	m_optgroups_gui.back()->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+	opt_grp->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
 	append_preferences_option_to_searcher(m_optgroups_gui.back(), opt_key, title);
 }
 
-void PreferencesDialog::create_settings_text_color_widget()
+void PreferencesDialog::create_settings_text_color_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp)
 {
-	wxWindow* parent = m_optgroups_gui.back()->parent();
+	wxWindow* parent = tab;//opt_grp->parent();
 	wxString title = L("Text colors");
 	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));	wxGetApp().UpdateDarkUI(stb);
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -1503,7 +1521,7 @@ void PreferencesDialog::create_settings_text_color_widget()
 	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
-	GUI_Descriptions::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
+	GUI_Descriptions::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_def_colour, &m_sys_colour, &m_mod_colour, &m_phony_colour);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
@@ -1511,13 +1529,13 @@ void PreferencesDialog::create_settings_text_color_widget()
 
 	m_optgroups_gui.back()->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcher(m_optgroups_gui.back(), opt_key, title);
+	append_preferences_option_to_searcher(opt_grp, opt_key, title);
 }
 
 
-void PreferencesDialog::create_settings_mode_color_widget()
+void PreferencesDialog::create_settings_mode_color_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp)
 {
-	wxWindow* parent = tab;// m_optgroups_gui.back()->parent();
+	wxWindow* parent = tab;//opt_grp->parent();
 
 	wxString title = L("Mode markers");
 	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
@@ -1530,20 +1548,30 @@ void PreferencesDialog::create_settings_mode_color_widget()
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
 
     // Mode color markers description
-	m_mode_palette = wxGetApp().get_mode_palette();
-	GUI_Descriptions::FillSizerWithModeColorDescriptions(stb_sizer, parent, { &m_mode_simple, &m_mode_advanced, &m_mode_expert }, m_mode_palette);
+	//check if we have enough colour picker
+	std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color;
+    for (AppConfig::Tag &tag : get_app_config()->tags()) {
+		//create nullptr if not present yet
+		if(m_tag_color.find(tag.tag) == m_tag_color.end())
+			m_tag_color[tag.tag] = nullptr;
+	}
+	//now tags is fixed for the end of this method
+    for (AppConfig::Tag &tag : get_app_config()->tags()) {
+		clr_pickers_2_color.emplace_back(&m_tag_color[tag.tag], tag);
+	}
+	GUI_Descriptions::FillSizerWithModeColorDescriptions(stb_sizer, parent, clr_pickers_2_color);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
 
-	m_optgroups_gui.back()->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
-	append_preferences_option_to_searcher(m_optgroups_gui.back(), opt_key, title);
+	opt_grp->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+	append_preferences_option_to_searcher(opt_grp, opt_key, title);
 }
 
-void PreferencesDialog::create_settings_font_widget()
+void PreferencesDialog::create_settings_font_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp)
 {
-	wxWindow* parent = m_optgroup_other->parent();
+	wxWindow* parent = tab; //opt_grp->parent();
 	wxGetApp().UpdateDarkUI(parent);
 
 	const wxString title = L("Application font size");
@@ -1566,14 +1594,14 @@ void PreferencesDialog::create_settings_font_widget()
 	, 8, wxGetApp().get_max_font_pt_size());
 	wxGetApp().UpdateDarkUI(size_sc);
 
-	auto apply_font = [this, font_example, opt_key, stb_sizer](const int val, const wxFont& font) {
+	auto apply_font = [this, font_example, opt_key, stb_sizer, opt_grp](const int val, const wxFont& font) {
 		font_example->SetFont(font);
 		m_values[opt_key] = format("%1%", val);
 		stb_sizer->Layout();
 #ifdef __linux__
-		CallAfter([this]() { refresh_og(m_optgroup_other); });
+		CallAfter([this]() { refresh_og(opt_grp); });
 #else
-		refresh_og(m_optgroup_other);
+		refresh_og(opt_grp);
 #endif
 	};
 
@@ -1611,12 +1639,12 @@ void PreferencesDialog::create_settings_font_widget()
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
 
-	m_optgroup_other->sizer->Add(sizer, 1, wxEXPAND | wxTOP, em_unit());
+	opt_grp->sizer->Add(sizer, 1, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
+	append_preferences_option_to_searcher(opt_grp, opt_key, title);
 }
 
-void PreferencesDialog::create_downloader_path_sizer()
+void PreferencesDialog::create_downloader_path_sizer(std::shared_ptr<ConfigOptionsGroup> opt_grp)
 {
 	wxWindow* parent = m_optgroup_other->parent();
 
@@ -1630,7 +1658,7 @@ void PreferencesDialog::create_downloader_path_sizer()
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(downloader, 1, wxALIGN_CENTER_VERTICAL);
 
-	m_optgroup_other->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+	opt_grp->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
 	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
 }
@@ -1642,19 +1670,16 @@ void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)
 			m_highlighter.init(blinker);
 			return;
 	}
-
-	for (auto opt_group : { m_optgroups_general, m_optgroup_camera, m_optgroups_gui, m_optgroup_other, m_optgroups_color
-
-#if ENABLE_ENVIRONMENT_MAP
-		, m_optgroup_render
-#endif // ENABLE_ENVIRONMENT_MAP
-		}) {
-		std::pair<OG_CustomCtrl*, bool*> ctrl = opt_group->get_custom_ctrl_with_blinking_ptr(opt_key, -1);
-		if (ctrl.first && ctrl.second) {
-			m_highlighter.init(ctrl);
-			break;
-		}
-	}
+	
+	assert(m_optkey_to_optgroup.find(opt_key) != m_optkey_to_optgroup.end()); 
+	assert(m_optkey_to_optgroup[opt_key]);
+    if (auto it = m_optkey_to_optgroup.find(opt_key); it != m_optkey_to_optgroup.end() && it->second) {
+        std::pair<OG_CustomCtrl *, bool *> ctrl = m_optkey_to_optgroup[opt_key]->get_custom_ctrl_with_blinking_ptr(opt_key, -1);
+        if (ctrl.first && ctrl.second) {
+            m_highlighter.init(ctrl);
+        } else
+            assert(false);
+    }
 }
 
 } // GUI

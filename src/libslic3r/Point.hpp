@@ -74,6 +74,8 @@ using Points3        = std::vector<Vec3crd>;
 using Pointfs        = std::vector<Vec2d>;
 using Vec2ds         = std::vector<Vec2d>;
 using Pointf3s       = std::vector<Vec3d>;
+// for storing product
+using P2             = Eigen::Matrix<Coord2, 2, 1, Eigen::DontAlign>;
 
 using VecOfPoints    = std::vector<Points, PointsAllocator<Points>>;
 
