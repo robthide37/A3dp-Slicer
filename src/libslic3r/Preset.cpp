@@ -732,7 +732,7 @@ static std::vector<std::string> s_Preset_print_options {
         "model_precision",
         "resolution",
         "resolution_internal",
-        "gcode_binary"
+        "gcode_binary",
         "gcode_resolution", //TODO what to do with it?
         "curve_smoothing_precision",
         "curve_smoothing_cutoff_dist",

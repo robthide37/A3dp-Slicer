@@ -2251,7 +2251,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         option.opt.set_enum_values(values_2_labels);
                         // set the first value as default
                         ConfigOption* default_opt = option.opt.create_default_option();
-                        default_opt->setInt(0); // should be genericenum, set to first.
+                        default_opt->set_int(0); // should be genericenum, set to first.
                         option.opt.set_default_value(default_opt);
                     } else if (boost::starts_with(params[i], "depends")) {
                         std::vector<std::string> depends_str;

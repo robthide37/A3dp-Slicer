@@ -6630,14 +6630,16 @@ void PrintConfigDef::init_fff_params()
     for (const char *opt_key : {
         // floats
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", 
+        "travel_max_lift",
         "deretract_speed", "retract_restart_extra", "retract_before_travel", "retract_lift_before_travel",
+        "retract_length_toolchange", "retract_restart_extra_toolchange",
         "wipe_extra_perimeter", "wipe_speed",
         "wipe_inside_depth", "wipe_inside_end", "wipe_inside_start",
         // bools
         "retract_layer_change", "wipe", "wipe_only_crossing",
         "travel_lift_before_obstacle", "travel_ramping_lift", "travel_slope",
         // percents
-        "retract_before_wipe",
+        "retract_before_wipe", "travel_slope",
         // floatsOrPercents
         "seam_gap"}) {
         auto it_opt = options.find(opt_key);

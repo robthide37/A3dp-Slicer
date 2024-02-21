@@ -51,7 +51,7 @@ namespace GUI{
  //}
 
 ModeButton::ModeButton(wxWindow *parent, const std::string &mode_name, int px_cnt)
-    : ScalableButton(parent, wxID_ANY, mode_name, _(mode_name), wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT, px_cnt),
+    : ScalableButton(parent, wxID_ANY, "mode_expert", _(mode_name), wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT, px_cnt),
       m_mode_name(mode_name)
 {
     update_bitmap();

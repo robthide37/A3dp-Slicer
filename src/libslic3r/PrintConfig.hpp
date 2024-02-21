@@ -1048,7 +1048,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionString,              feature_gcode))
     ((ConfigOptionFloat,               max_gcode_per_second))
-    ((ConfigOptionFloat,               max_print_speed))
+    ((ConfigOptionFloatOrPercent,      max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))
     ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_positive))
     ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_negative))
