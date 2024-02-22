@@ -266,7 +266,8 @@ private:
     std::string     preamble();
     std::string change_layer(
         coordf_t previous_layer_z,
-        coordf_t print_z
+        coordf_t print_z,
+        bool vase_mode
     );
     std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
     std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
