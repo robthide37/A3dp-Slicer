@@ -5519,7 +5519,7 @@ bool Plater::load_files(const wxArrayString& filenames)
         std::string filename = (*it).filename().string();
         if (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf")) {
             LoadType load_type = LoadType::Unknown;
-            if (!model().objects.empty()) {
+            if (!model().objects.empty() || wxGetApp().app_config->get("show_drop_project_dialog") == "1") {
                 if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string())) ||
                     (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf")))
                     load_type = LoadType::LoadGeometry;
