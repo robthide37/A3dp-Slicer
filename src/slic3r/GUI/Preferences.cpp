@@ -16,6 +16,7 @@
 #include "libslic3r/AppConfig.hpp"
 
 #include <wx/notebook.h>
+#include <wx/scrolwin.h>
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
@@ -127,10 +128,17 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_use_custom_toolbar_size	= get_app_config()->get_bool("use_custom_toolbar_size");
 
 	// set Field for notify_release to its value
-	if (m_optkey_to_optgroup.find("notify_release") != m_optkey_to_optgroup.end() && m_optkey_to_optgroup["notify_release"]->get_field("notify_release") != nullptr) {
-		boost::any val = s_keys_map_NotifyReleaseMode.at(wxGetApp().app_config->get("notify_release"));
-		m_optkey_to_optgroup["notify_release"]->get_field("notify_release")->set_value(val, false);
-	}
+	if (m_optkey_to_optgroup.find("notify_release") != m_optkey_to_optgroup.end())
+		if(auto field = m_optkey_to_optgroup["notify_release"]->get_field("notify_release"); field != nullptr) {
+			assert(s_keys_map_NotifyReleaseMode.find(wxGetApp().app_config->get("notify_release")) != s_keys_map_NotifyReleaseMode.end());
+			boost::any val;
+			if(s_keys_map_NotifyReleaseMode.find(wxGetApp().app_config->get("notify_release")) != s_keys_map_NotifyReleaseMode.end()) {
+				val = ConfigOptionEnum<NotifyReleaseMode>(NotifyReleaseMode(s_keys_map_NotifyReleaseMode.at(wxGetApp().app_config->get("notify_release")))).get_any();
+			} else {
+				val = ConfigOptionEnum<NotifyReleaseMode>(NotifyReleaseMode::NotifyReleaseNone).get_any();
+			}
+			field->set_any_value(val, false);
+		}
 	
 
 	if (wxGetApp().is_editor()) {
@@ -163,10 +171,11 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 
 	this->ShowModal();
 }
-
 static std::shared_ptr<ConfigOptionsGroup> create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
 {
-	wxPanel* tab = new wxPanel(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL);
+    //set inside a scrollable panel
+    wxScrolledWindow *tab = new wxScrolledWindow(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                                                 wxBK_LEFT | wxTAB_TRAVERSAL | wxVSCROLL);
 
 	tabs->AddPage(tab, _(title));
 	tab->SetFont(wxGetApp().normal_font());
@@ -181,6 +190,7 @@ static std::shared_ptr<ConfigOptionsGroup> create_options_tab(const wxString& ti
 	sizer->Add(scrolled, 1, wxEXPAND);
 	sizer->SetSizeHints(tab);
 	tab->SetSizer(sizer);
+    tab->SetScrollRate(0, 5);
 
 	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(scrolled);
 	optgroup->title_width = 40;
@@ -455,17 +465,19 @@ void PreferencesDialog::build()
         def_combobox_auto_switch_preview.set_enum_labels(ConfigOptionDef::GUIType::f_enum_open, 
         { _u8L("Don't switch"), _u8L("Switch when possible"), _u8L("Only if on platter"), _u8L("Only when GCode is ready") });
 		if (app_config->get("auto_switch_preview") == "0")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(0) });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_def->label(0) });
 		else if (app_config->get("auto_switch_preview") == "1")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(1) });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_def->label(1) });
 		else if (app_config->get("auto_switch_preview") == "2")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(2) });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_def->label(2) });
 		else if (app_config->get("auto_switch_preview") == "3")
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(3) });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_def->label(3) });
 		else
-			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ *def_combobox_auto_switch_preview.enum_def->enum_to_label(2) });
+			def_combobox_auto_switch_preview.set_default_value(new ConfigOptionStrings{ def_combobox_auto_switch_preview.enum_def->label(2) });
 		Option option = Option(def_combobox_auto_switch_preview, "auto_switch_preview");
 		m_optgroups_general.back()->append_single_option_line(option);
+		m_optkey_to_optgroup["auto_switch_preview"] = m_optgroups_general.back();
+		wxGetApp().sidebar().get_searcher().add_key("auto_switch_preview", Preset::TYPE_PREFERENCES, m_optgroups_general.back()->config_category(), L("Preferences"), def_combobox_auto_switch_preview);
 
 		// Please keep in sync with ConfigWizard
 		append_bool_option(m_optgroups_general.back(), "export_sources_full_pathnames",
@@ -551,6 +563,11 @@ void PreferencesDialog::build()
 			L("Show a Pop-up with the current material when exporting"),
             L("If you constantly forgot to select the right filament/material, check this option to have a really obtrusive reminder on each export."),
 			app_config->get_bool("check_material_export"));
+
+		append_bool_option(m_optgroups_general.back(), "show_unknown_setting",
+			L("Show ignored settings when loading a project or configuration"),
+            L("When loading a configuration, if it's coming from an earlier, a future or from another software, show the ignored settings that doesn't suit this version. Uncheck to remove this anoying pop-up."),
+			app_config->get_bool("show_unknown_setting"));
 
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Dialogs"), tabs, 0));
@@ -654,8 +671,7 @@ void PreferencesDialog::build()
 		//option.opt.full_width = true;
 		option.opt.width = 50;
 		m_optgroups_general.back()->append_single_option_line(option);
-		
-		// fill data to the Search Dialog
+		m_optkey_to_optgroup["freecad_path"] = m_optgroups_general.back();
 		wxGetApp().sidebar().get_searcher().add_key("freecad_path", Preset::TYPE_PREFERENCES, m_optgroups_general.back()->config_category(), L("Preferences"), def);
 	}
 
@@ -695,6 +711,11 @@ void PreferencesDialog::build()
 		L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M"),
 		app_config->get_bool("use_legacy_3DConnexion"));
 #endif // _WIN32 || __APPLE__
+
+	append_bool_option(m_optgroup_camera, "compress_png_texture",
+		L("Compress png textures"),
+		L("If your custom texture (in png format) is displayed black, then disable this option to remove the problematic optimisation."),
+		app_config->get_bool("compress_png_texture"));
 
 	activate_options_tab(m_optgroup_camera);
 
@@ -845,8 +866,15 @@ void PreferencesDialog::build()
 
 	if (is_editor) {
 		// set Field for notify_release to its value to activate the object
-		boost::any val = s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release"));
-		m_optgroups_gui.back()->get_field("notify_release")->set_value(val, false);
+		if (auto field = m_optgroups_gui.back()->get_field("notify_release"); field != nullptr) {
+			boost::any val;
+			if(s_keys_map_NotifyReleaseMode.find(wxGetApp().app_config->get("notify_release")) != s_keys_map_NotifyReleaseMode.end()) {
+				val = ConfigOptionEnum<NotifyReleaseMode>(NotifyReleaseMode(s_keys_map_NotifyReleaseMode.at(wxGetApp().app_config->get("notify_release")))).get_any();
+			} else {
+				val = ConfigOptionEnum<NotifyReleaseMode>(NotifyReleaseMode::NotifyReleaseNone).get_any();
+			}
+			field->set_any_value(val, false);
+		} else assert(false);
 
 	//create layout options
 	create_settings_mode_widget(tabs->GetPage(2), m_optgroups_gui.back());
@@ -859,15 +887,14 @@ void PreferencesDialog::build()
 		def_combobox.label = "_";
 		def_combobox.type = coStrings;
 		def_combobox.tooltip = L("Choose the gui package to use. It controls colors, settings layout, quick settings, tags (simple/expert).");
-		def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
-		def_combobox.gui_flags = "show_value";
 		def_combobox.full_width = true;
 		//get all available configs
 		std::vector<std::string> enum_values;
 		for (const AppConfig::LayoutEntry& layout : get_app_config()->get_ui_layouts()) {
 			enum_values.push_back(layout.name+": "+layout.description);
 		}
-		def_combobox.set_enum_values(enum_values);
+		def_combobox.set_enum_values(ConfigOptionDef::GUIType::select_close, enum_values);
+		def_combobox.gui_flags = "show_value";
 
 		AppConfig::LayoutEntry selected = get_app_config()->get_ui_layout();
 		def_combobox.set_default_value(new ConfigOptionStrings{ selected.name+": "+ selected.description });
@@ -875,6 +902,7 @@ void PreferencesDialog::build()
 		m_optgroups_gui.back()->append_single_option_line(option);
 		m_values_need_restart.push_back("ui_layout");
 		m_optkey_to_optgroup["ui_layout"] = m_optgroups_gui.back();
+		wxGetApp().sidebar().get_searcher().add_key("ui_layout", Preset::TYPE_PREFERENCES, m_optgroups_gui.back()->config_category(), L("Preferences"), def_combobox);
 		activate_options_tab(m_optgroups_gui.back(), 3);
 	}
 
@@ -893,8 +921,6 @@ void PreferencesDialog::build()
         def_combobox.label = L("Splash screen image");
         def_combobox.type = coStrings;
         def_combobox.tooltip = L("Choose the image to use as splashscreen");
-        def_combobox.gui_type = ConfigOptionDef::GUIType::f_enum_open;
-        def_combobox.gui_flags = "show_value";
 		std::vector<std::pair<std::string,std::string>> enum_key_values = {
 			{"default", L("Default")}, 
 			{"icon", L("Icon")}, 
@@ -906,7 +932,8 @@ void PreferencesDialog::build()
                 enum_key_values.push_back({dir_entry.path().filename().string(), dir_entry.path().stem().string()});
             }
         }
-        def_combobox.set_enum_values(enum_key_values);
+        def_combobox.set_enum_values(ConfigOptionDef::GUIType::select_close, enum_key_values);
+        def_combobox.gui_flags = "show_value";
 		assert(def_combobox.enum_def->is_valid_open_enum());
         std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
         if (std::find(def_combobox.enum_def->values().begin(), def_combobox.enum_def->values().end(), current_file_name) == def_combobox.enum_def->values().end()) {
@@ -917,7 +944,8 @@ void PreferencesDialog::build()
         def_combobox.set_default_value(new ConfigOptionStrings{ current_file_name });
         Option option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
         m_optgroups_gui.back()->append_single_option_line(option);
-		m_optkey_to_optgroup[def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer"] = m_optgroups_gui.back();
+		m_optkey_to_optgroup[is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer"] = m_optgroups_gui.back();
+		wxGetApp().sidebar().get_searcher().add_key(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer", Preset::TYPE_PREFERENCES, m_optgroups_gui.back()->config_category(), L("Preferences"), def_combobox);
     }
 	
 	append_bool_option(m_optgroups_gui.back(), "restore_win_position",
@@ -1073,6 +1101,7 @@ void PreferencesDialog::build()
 
 	SetSizer(sizer);
 	sizer->SetSizeHints(this);
+    this->layout();
 	this->CenterOnParent();
 }
 
@@ -1290,18 +1319,18 @@ void PreferencesDialog::revert(wxEvent&)
 		Field* field = m_optkey_to_optgroup[key]->get_field(key);
         if (field->m_opt.type == coBool) {
 			 m_optkey_to_optgroup[key]->set_value("",true);
-			field->set_value(app_config->get_bool(key), false);
+			field->set_any_value(ConfigOptionBool(app_config->get_bool(key)).get_any(), false);
 			continue;
 		}
         if (field->m_opt.type == coString) {
 			std::string val = app_config->get(key);
 			if(field->m_opt.gui_type == ConfigOptionDef::GUIType::color)
 				if (val[0] != '#') val = "#" + val;
-			field->set_value(val, false);
+			field->set_any_value(ConfigOptionString(val).get_any(), false);
 			continue;
 		}
         if (field->m_opt.type == coInt) {
-			field->set_value(app_config->get_int(key), false);
+			field->set_any_value(ConfigOptionInt(app_config->get_int(key)).get_any(), false);
 			continue;
 		}
 		assert(false);
@@ -1332,10 +1361,41 @@ void PreferencesDialog::on_sys_color_changed()
 
 void PreferencesDialog::layout()
 {
-    const int em = em_unit();
-
+    const int em        = em_unit();
     SetMinSize(wxSize(47 * em, 28 * em));
-    Fit();
+
+    // Fit(); is SetSize(GetBestSize) but GetBestSize doesn't work for scroll pane. we need GetBestVirtualSize over all scroll panes
+    wxSize best_size = this->GetBestSize();
+    // Get ScrollPanels for each tab
+    assert(!this->GetChildren().empty());
+    assert(!this->GetChildren().front()->GetChildren().empty());
+    if(this->GetChildren().empty() || this->GetChildren().front()->GetChildren().empty()) return;
+    std::vector<wxPanel*> panels;
+    for (auto c : this->GetChildren().front()->GetChildren()) {
+        if (wxPanel *panel = dynamic_cast<wxPanel *>(c); panel)
+            panels.push_back(panel);
+    }
+
+    if (!panels.empty()) {
+        // get a size where all tabs fit into
+        wxSize biggest_virtual_size = panels.front()->GetBestVirtualSize();
+        for (wxPanel *tab : panels) {
+            wxSize current_size    = tab->GetBestVirtualSize();
+            biggest_virtual_size.x = std::max(biggest_virtual_size.x, current_size.x);
+            biggest_virtual_size.y = std::max(biggest_virtual_size.y, current_size.y);
+        }
+        best_size = biggest_virtual_size;
+        //best_size += tab_inset;
+    }
+    // add space for buttons and insets of the main panel 
+    best_size += wxSize(3 * em, 12 * em);
+    // also reduce size to fit in screen if needed
+    wxDisplay display(wxDisplay::GetFromWindow(this));
+    wxRect    screen = display.GetClientArea();
+    best_size.x      = std::min(best_size.x, screen.width);
+    best_size.y      = std::min(best_size.y, screen.height);
+    // apply
+    SetSize(best_size);
 
     Refresh();
 }

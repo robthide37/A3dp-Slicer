@@ -38,12 +38,12 @@ coord_t get_skirt_inset(const Print &fffprint)
 
 coord_t brim_offset(const PrintObject &po)
 {
-    const float    brim_separation = po.config().brim_separation.getFloat();
-    const float    brim_width      = po.config().brim_width.getFloat();
+    const float    brim_separation = po.config().brim_separation.value;
+    const float    brim_width      = po.config().brim_width.value;
     const bool     has_outer_brim  = po.config().brim_width.value > 0;
 
     // How wide is the brim? (in scaled units)
-    return has_outer_brim ? scaled(brim_width + brim_separation) : 0;
+    return has_outer_brim ? scaled(brim_width /*+ brim_separation*/) : 0;
 }
 
 size_t model_instance_count (const Model &m)

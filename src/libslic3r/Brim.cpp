@@ -1267,13 +1267,11 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
         Polylines lines = intersection_pl(loops, to_polygons(mouse_ears_area));
         print.throw_if_canceled();
 
-        //reorder & extrude them
-        Polylines lines_sorted = reorder_brim_polyline(lines, out, flow);
-
         //push into extrusions
         extrusion_entities_append_paths(
-            out.set_entities(),
-            lines_sorted,
+            out,
+            //reorder & extrude them;
+            reorder_brim_polyline(lines, out, flow),
             ExtrusionAttributes{ExtrusionRole::Skirt,
                                 {float(flow.mm3_per_mm()), float(flow.width()),
                                     float(print.get_first_layer_height())}}

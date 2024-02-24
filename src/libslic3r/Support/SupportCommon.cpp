@@ -545,10 +545,10 @@ static Polylines draw_perimeters(const ExPolygon &expoly, double clip_length)
 }
 
 static inline void tree_supports_generate_paths(
-    ExtrusionEntitiesPtr    &dst,
-    const Polygons          &polygons,
-    const Flow              &flow, 
-    const SupportParameters &support_params)
+    ExtrusionEntityCollection &dst,
+    const Polygons            &polygons,
+    const Flow                &flow, 
+    const SupportParameters   &support_params)
 {
     // Offset expolygon inside, returns number of expolygons collected (0 or 1).
     // Vertices of output paths are marked with Z = source contour index of the expoly.
@@ -654,7 +654,7 @@ static inline void tree_supports_generate_paths(
                 ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
                 if (level2.size() == 1) {
                     Polylines polylines;
-                    extrusion_entities_append_paths(eec->set_entities(), draw_perimeters(expoly, clip_length), { ExtrusionRole::SupportMaterial, flow },
+                    extrusion_entities_append_paths(*eec, draw_perimeters(expoly, clip_length), { ExtrusionRole::SupportMaterial, flow },
                         // Disable reversal of the path, always start with the anchor, always print CCW.
                         false);
                     expoly = level2.front();
@@ -759,13 +759,13 @@ static inline void tree_supports_generate_paths(
             polylines.emplace_back(std::move(pl));
         }
 
-        ExtrusionEntitiesPtr &out = eec ? eec->set_entities() : dst;
+        ExtrusionEntityCollection &out = eec ? *eec : dst;
         extrusion_entities_append_paths(out, std::move(polylines), { ExtrusionRole::SupportMaterial, flow },
             // Disable reversal of the path, always start with the anchor, always print CCW.
             false);
         if (eec) {
             std::reverse(eec->set_entities().begin(), eec->set_entities().end());
-            dst.emplace_back(eec.release());
+            dst.append(ExtrusionEntitiesPtr{eec.release()});
         }
     }
 }
@@ -863,9 +863,7 @@ struct SupportGeneratorLayerExtruded
             *m_polygons_to_extrude = union_safety_offset(*m_polygons_to_extrude);
         }
         // 2) Merge the extrusions.
-        this->extrusions.set_entities().insert(this->extrusions.entities().end(), other.extrusions.entities().begin(),
-                                               other.extrusions.entities().end());
-        other.extrusions.set_entities().clear();
+        this->extrusions.append_move_from(other.extrusions);
         // 3) Merge the infill polygons.
         Slic3r::polygons_append(this->layer->polygons, std::move(other.layer->polygons));
         this->layer->polygons = union_safety_offset(this->layer->polygons);
@@ -1115,7 +1113,7 @@ void LoopInterfaceProcessor::generate(SupportGeneratorLayerExtruded &top_contact
 
     // Transform loops into ExtrusionPath objects.
     extrusion_entities_append_paths(
-        top_contact_layer.extrusions.set_entities(),
+        top_contact_layer.extrusions,
         std::move(loop_lines),
         { ExtrusionRole::SupportMaterialInterface, flow });
 }
@@ -1413,7 +1411,7 @@ static void modulate_extrusion_by_overlapping_layers(
     // If there are any non-consumed fragments, add them separately.
     //FIXME this shall not happen, if the Clipper works as expected and all paths split to fragments could be re-connected.
     for (ExtrusionPathFragment &fragment : path_fragments)
-        extrusion_entities_append_paths(extrusions_in_out.set_entities(), std::move(fragment.polylines), {extrusion_role, fragment.flow});
+        extrusion_entities_append_paths(extrusions_in_out, std::move(fragment.polylines), {extrusion_role, fragment.flow});
 }
 
 // Support layer that is covered by some form of dense interface.
@@ -1543,10 +1541,6 @@ void generate_support_toolpaths(
     LoopInterfaceProcessor loop_interface_processor(1.5 * support_params.support_material_interface_flow.scaled_width());
     loop_interface_processor.n_contact_loops = config.support_material_interface_contact_loops ? 1 : 0;
 
-    //std::vector<float>      angles { support_params.base_angle };
-    //if (config.support_material_pattern == smpRectilinearGrid)
-    //    angles.push_back(support_params.interface_angle);
-
     BoundingBox bbox_object(Point(-scale_(1.), -scale_(1.0)), Point(scale_(1.), scale_(1.)));
 
 //    const coordf_t link_max_length_factor = 3.;
@@ -1614,7 +1608,7 @@ void generate_support_toolpaths(
 #endif // NDEBUG
                 }
                 if (! tree_polygons.empty())
-                    tree_supports_generate_paths(support_layer.support_fills.set_entities(), tree_polygons, flow, support_params);
+                    tree_supports_generate_paths(support_layer.support_fills, tree_polygons, flow, support_params);
             }
 
             Fill *filler = filler_interface.get();
@@ -1697,7 +1691,7 @@ void generate_support_toolpaths(
 
     tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
         [&config, &slicing_params, &support_params, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor,
-            &bbox_object, /*&angles,*/ n_raft_layers, link_max_length_factor, &filler_first_layer, raft_top_interface_idx]
+            &bbox_object, n_raft_layers, link_max_length_factor, &filler_first_layer, raft_top_interface_idx]
             (const tbb::blocked_range<size_t>& range) {
         // Indices of the 1st layer in their respective container at the support layer height.
         size_t idx_layer_bottom_contact   = size_t(-1);
@@ -1705,7 +1699,6 @@ void generate_support_toolpaths(
         size_t idx_layer_intermediate     = size_t(-1);
         size_t idx_layer_interface        = size_t(-1);
         size_t idx_layer_base_interface   = size_t(-1);
-        const InfillPattern   fill_type_first_layer      = ipRectiWithPerimeter;
         std::unique_ptr<Fill> filler_interface           = std::unique_ptr<Fill>(Fill::new_from_type(support_params.contact_fill_pattern));
         std::unique_ptr<Fill> filler_intermediate_interface = std::unique_ptr<Fill>(Fill::new_from_type(ipRectilinear));
         // Filler for the raft contact layer
@@ -1749,7 +1742,9 @@ void generate_support_toolpaths(
 
             // compute if the support has to switch its angle
             float suppport_angle = support_params.base_angle;
-            if (support_params.base_angle_height > 0 && (int(support_layer.print_z / support_params.base_angle_height)) % 2 == 1) {
+            if (config.support_material_pattern.value == smpRectilinearGrid && support_layer_id % 2 == 1) {
+                suppport_angle = support_params.interface_angle;
+            } else if (support_params.base_angle_height > 0 && (int(support_layer.print_z / support_params.base_angle_height)) % 2 == 1) {
                 suppport_angle += float(M_PI) / 2;
             }
 
@@ -1843,7 +1838,7 @@ void generate_support_toolpaths(
                     float    supp_density = support_params.interface_density;
                     coordf_t filler_spacing;
                     // if first layer and solid first layer : draw concentric with 100% density
-                    if (support_layer.id() == 0) {
+                    if (support_layer.id() == 0 && layer_ex.layer->bottom_z <= 0) {
                         filler         = filler_first_layer.get();
                         supp_density   = float(config.raft_first_layer_density.get_abs_value(1.));
                         interface_flow = support_params.first_layer_flow;
@@ -1859,7 +1854,7 @@ void generate_support_toolpaths(
                         } else {
                             filler->angle  = interface_as_base ?
                                                  // If zero interface layers are configured, use the same angle as for the base layers.
-                                                suppport_angle : // angles[support_layer_id % angles.size()] :
+                                                suppport_angle :
                                                 // Use interface angle for the interface layers.
                                                 support_params.interface_angle + interface_angle_delta;
                             supp_density   = interface_as_base ? support_params.support_density : support_params.interface_density;
@@ -1944,7 +1939,7 @@ void generate_support_toolpaths(
                     filler_spacing          = flow.spacing();
                     filler->link_max_length = scale_t(filler_spacing * link_max_length_factor / density);
                 } else if (config.support_material_style.value == SupportMaterialStyle::smsOrganic) {
-                    tree_supports_generate_paths(base_layer.extrusions.set_entities(), base_layer.polygons_to_extrude(), flow, support_params);
+                    tree_supports_generate_paths(base_layer.extrusions, base_layer.polygons_to_extrude(), flow, support_params);
                     done = true;
                 } else {
                     filler->angle           = suppport_angle;

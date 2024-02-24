@@ -120,6 +120,8 @@ public:
     ExPolygons  no_overlap_expolygons;
     // in radians, ccw, 0 = East
     float       angle;
+    // to allow rectilinear to rotate 90deg on odd
+    float       can_angle_cross;
     // In scaled coordinates. Maximum lenght of a perimeter segment connecting two infill lines.
     // Used by the FillRectilinear2, FillGrid2, FillTriangles, FillStars and FillCubic.
     // If left to zero, the links will not be limited.
@@ -131,6 +133,9 @@ public:
 
     // Octree builds on mesh for usage in the adaptive cubic infill
     FillAdaptive::Octree* adapt_fill_octree = nullptr;
+#if _DEBUG
+    mutable double debug_verify_flow_mult = 0;
+#endif
 protected:
     // in unscaled coordinates, please use init (after settings all others settings) as some algos want to modify the value
     coordf_t    spacing_priv = -1.;
@@ -174,6 +179,7 @@ protected:
         overlap(0.),
         // Initial angle is undefined.
         angle(FLT_MAX),
+        can_angle_cross(true),
         link_max_length(0),
         loop_clipping(0),
         // The initial bounding box is empty, therefore undefined.
@@ -188,6 +194,7 @@ protected:
         ExPolygon                         /* expolygon */,
         Polylines                       & /* polylines_out */) const {
         BOOST_LOG_TRIVIAL(error)<<"Error, the fill isn't implemented";
+        assert(false);
     };
 
     // Used for concentric infill to generate ThickPolylines using Arachne.
@@ -197,9 +204,10 @@ protected:
                                       ExPolygon                      expolygon,
                                       ThickPolylines                &thick_polylines_out) const {
         BOOST_LOG_TRIVIAL(error) << "Error, the arachne fill isn't implemented";
+        assert(false);
     };
 
-    virtual float _layer_angle(size_t idx) const { return (idx & 1) ? float(M_PI/2.) : 0; }
+    virtual float _layer_angle(size_t idx) const { return can_angle_cross && (idx & 1) ? float(M_PI/2.) : 0; }
 
     virtual coord_t _line_spacing_for_density(float density) const;
 

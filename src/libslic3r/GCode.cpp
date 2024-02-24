@@ -65,7 +65,6 @@
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/regex.hpp>
 
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/cstdio.hpp>
@@ -696,6 +695,26 @@ namespace DoExport {
     }
 } // namespace DoExport
 
+
+void check_remaning_times(GCodeFlavor firmware, RemainingTimeType type, Print::StatusMonitor &monitor)
+{
+    if (type == RemainingTimeType::rtM73 || type == rtM73_M117 || type == rtM73_Quiet) {
+        if (!(firmware == gcfMarlinLegacy || firmware == gcfMarlinFirmware || firmware == gcfMakerWare ||
+                firmware == gcfKlipper || firmware == gcfRepRap))
+            monitor.active_step_add_warning(
+                PrintStateBase::WarningLevel::CRITICAL,
+                L("Your firmware doesn't allow to print the remaining times with M73."));
+    }
+    if ((type == rtM117 || type == rtM73_M117)) {
+        if (!(firmware == gcfMarlinLegacy || firmware == gcfMarlinFirmware || firmware == gcfMakerWare ||
+                firmware == gcfKlipper || firmware == gcfRepRap || firmware == gcfRepetier ||
+                firmware == gcfSmoothie))
+            monitor.active_step_add_warning(
+                PrintStateBase::WarningLevel::CRITICAL,
+                L("Your firmware doesn't allow to print the remaining times with M117."));
+    }
+}
+
 void GCodeGenerator::do_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
 {
 
@@ -742,6 +761,9 @@ void GCodeGenerator::do_export(Print* print, const char* path, GCodeProcessorRes
     GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor);
     if (! file.is_open())
         throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
+    
+    if(print->config().remaining_times)
+        check_remaning_times(print->config().gcode_flavor, print->config().remaining_times_type, monitor);
 
     try {
         this->_do_export(*print, file, thumbnail_cb);
@@ -1090,7 +1112,7 @@ std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Pri
 
 // set standby temp for extruders
 // Parse the custom G-code, try to find T, and add it if not present
-void GCodeGenerator::_init_multiextruders(const Print& print, GCodeOutputStream& file, GCodeWriter & writer, const ToolOrdering &tool_ordering, const std::string &custom_gcode )
+void GCodeGenerator::_init_multiextruders(const Print& print, std::string& out, GCodeWriter & writer, const ToolOrdering &tool_ordering, const std::string &custom_gcode )
 {
 
     //set standby temp for reprap
@@ -1100,9 +1122,7 @@ void GCodeGenerator::_init_multiextruders(const Print& print, GCodeOutputStream&
             if (standby_temp > 0) {
                 if (print.config().ooze_prevention.value)
                     standby_temp += print.config().standby_temperature_delta.value;
-                file.write_format("G10 P%d R%d ; sets the standby temperature\n",
-                    tool_id,
-                    standby_temp);
+                out.append("G10 P").append(std::to_string(tool_id)).append(" R").append(std::to_string(standby_temp)).append(" ; sets the standby temperature\n");
             }
         }
     }
@@ -1126,7 +1146,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     const Print &print = print_mod;
     Print::StatusMonitor status_monitor{print_mod};
 
-    const bool export_to_binary_gcode = print.full_print_config().option("gcode_binary")->getBool();
+    const bool export_to_binary_gcode = print.full_print_config().option("gcode_binary")->get_bool();
     // if exporting gcode in binary format: 
     // we generate here the data to be passed to the post-processor, who is responsible to export them to file 
     // 1) generate the thumbnails
@@ -1221,7 +1241,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
 
     //apply print config to m_config and m_writer, so we don't have to use print.config() instead
     // (and mostly to make m_writer.preamble() works)
-    this->apply_print_config(print.config());
+    this->apply_print_configs(print);
 
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
@@ -1236,6 +1256,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         m_find_replace = make_unique<GCodeFindReplace>(print.config());
         file.set_find_replace(m_find_replace.get(), false);
     }
+    file.set_only_ascii(print.config().gcode_ascii.value);
 
     // resets analyzer's tracking data
     m_last_height  = 0.f;
@@ -1310,31 +1331,45 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         m_pressure_equalizer = make_unique<PressureEqualizer>(print.config());
     m_enable_extrusion_role_markers = (bool)m_pressure_equalizer;
 
+    std::string preamble_to_put_start_layer = "";
+
+    // if thumbnail type of BTT_TFT, insert above header
+    // if not, it is inserted under the header in its normal spot
+    const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+    const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
+    if (!export_to_binary_gcode && thumbnails_format != nullptr && thumbnails_format->value == GCodeThumbnailsFormat::BIQU)
+        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
+            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
+            thumbnails_with_bed ? thumbnails_with_bed->value : false,
+            thumbnails_format->value,
+            true, 
+            [&file](const char *sz) { file.write(sz); },
+            [&print]() { print.throw_if_canceled(); });
+
     if (print.config().avoid_crossing_curled_overhangs){
         this->m_avoid_crossing_curled_overhangs.init_bed_shape(get_bed_shape(print.config()));
     }
-    
+
     if (!export_to_binary_gcode)
         // Write information on the generator.
         file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
-
+    
+    const ConfigOptionBool* thumbnails_end_file = print.full_print_config().option<ConfigOptionBool>("thumbnails_end_file");
     if (! export_to_binary_gcode) {
-        //print thumbnails at the start unless requested at the end.
-        const ConfigOptionBool* thumbnails_end_file = print.full_print_config().option<ConfigOptionBool>("thumbnails_end_file");
+    //print thumbnails at the start unless requested at the end.
         if(!thumbnails_end_file || !thumbnails_end_file->value) {
-            const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
-            const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+            const ConfigOptionBool* thumbnails_tag_with_format = print.full_print_config().option<ConfigOptionBool>("thumbnails_tag_format");
             // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
             // If "thumbnails_format" is not defined, export to PNG.
             GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
                 print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-                thumbnails_with_bed == nullptr ? false : thumbnails_with_bed->value,
+                thumbnails_with_bed ? thumbnails_with_bed->value : false,
                 thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+                thumbnails_tag_with_format ? thumbnails_tag_with_format->value : false,
                 [&file](const char* sz) { file.write(sz); },
                 [&print]() { print.throw_if_canceled(); });
-        }
-    }
+        }    }
 
     // Write notes (content of the Print Settings tab -> Notes)
     {
@@ -1413,7 +1448,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             }
         }
     }
-    if (print.config().complete_objects.value) {
+    if (print.config().complete_objects.value || print.config().parallel_objects_step.value > 0) {
         // Order object instances for sequential print.
         if(print.config().complete_objects_sort.value == cosObject)
             print_object_instances_ordering = sort_object_instances_by_model_order(print);
@@ -1627,21 +1662,22 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     std::string start_all_gcode = start_gcode + "\"n" + start_filament_gcode;
     // Set bed temperature if the start G-code does not contain any bed temp control G-codes.
     if((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && this->config().gcode_flavor != gcfKlipper && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_bed_temperature(file, print, start_all_gcode, initial_extruder_id, false);
+         this->_print_first_layer_bed_temperature(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, false);
 
     //init extruders
     if (!this->config().start_gcode_manual)
-        this->_init_multiextruders(print, file, m_writer, tool_ordering, start_gcode);
+        this->_init_multiextruders(print, preamble_to_put_start_layer, m_writer, tool_ordering, start_gcode);
 
     // Set extruder(s) temperature before and after start G-code.
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && (this->config().gcode_flavor != gcfKlipper || print.config().start_gcode.value.empty()) && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_extruder_temperatures(file, print, start_all_gcode, initial_extruder_id, false);
+        this->_print_first_layer_extruder_temperatures(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, false);
 
     // adds tag for processor
-    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), gcode_extrusion_role_to_string(GCodeExtrusionRole::Custom).c_str());
+    preamble_to_put_start_layer.append(";").append(GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role)).append(gcode_extrusion_role_to_string(GCodeExtrusionRole::Custom)).append("\n");
 
     // Write the custom start G-code
-    file.writeln(start_gcode);
+    preamble_to_put_start_layer.append(start_gcode).append("\n");
+
     m_last_pos_defined = false;
 
     //flush FanMover buffer to avoid modifying the start gcode if it's manual.
@@ -1650,13 +1686,14 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     }
 
     // Disable fan.
-    if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().disable_fan_first_layers.get_at(initial_extruder_id))
-        file.write(m_writer.set_fan(uint8_t(0), initial_extruder_id));
+    if ((initial_extruder_id != (uint16_t) -1) && !this->config().start_gcode_manual && print.config().disable_fan_first_layers.get_at(initial_extruder_id)) {
+        preamble_to_put_start_layer.append(m_writer.set_fan(uint8_t(0), initial_extruder_id));
+    }
 
     print.throw_if_canceled();
 
     // Set other general things.
-    file.write(this->preamble());
+    preamble_to_put_start_layer.append(this->preamble());
 
     // Calculate wiping points if needed
     DoExport::init_ooze_prevention(print, m_ooze_prevention);
@@ -1697,17 +1734,17 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                 // Set initial extruder only after custom start G-code.
                 // Ugly hack: Do not set the initial extruder if the extruder is primed using the MMU priming towers at the edge of the print bed.
                 if (!(has_wipe_tower && print.config().single_extruder_multi_material_priming)) {
-                    file.write(this->set_extruder(initial_extruder_id, 0.));
+                    preamble_to_put_start_layer.append(this->set_extruder(initial_extruder_id, 0.));
                 } else {
                     m_writer.toolchange(initial_extruder_id);
                 }
             } else {
                 // set writer to the tool as should be set in the start_gcode.
-                file.write(this->set_extruder(initial_extruder_id, 0., true));
+                preamble_to_put_start_layer.append(this->set_extruder(initial_extruder_id, 0., true));
             }
         } else {
             // if we are running a single-extruder setup, just set the extruder and "return nothing"
-            file.write(this->set_extruder(initial_extruder_id, 0.));
+            preamble_to_put_start_layer.append(this->set_extruder(initial_extruder_id, 0.));
         }
     } else {
         // the right tool should have been set by the user.
@@ -1719,9 +1756,9 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
 
     //write temps after custom gcodes to ensure the temperature are good. (after tool selection)
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().first_layer_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_extruder_temperatures(file, print, start_all_gcode, initial_extruder_id, true);
+        this->_print_first_layer_extruder_temperatures(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, true);
     if ((initial_extruder_id != (uint16_t)-1) && !this->config().start_gcode_manual && print.config().first_layer_bed_temperature.get_at(initial_extruder_id) != 0)
-        this->_print_first_layer_bed_temperature(file, print, start_all_gcode, initial_extruder_id, true);
+        this->_print_first_layer_bed_temperature(preamble_to_put_start_layer, print, start_all_gcode, initial_extruder_id, true);
     
     // Do all objects for each layer.
     if (initial_extruder_id != (uint16_t)-1) {
@@ -1743,29 +1780,12 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                 print.throw_if_canceled();
                 this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
                 if (finished_objects > 0) {
-                    // Move to the origin position for the copy we're going to print.
-                    // This happens before Z goes down to layer 0 again, so that no collision happens hopefully.
-                    m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
-                    m_avoid_crossing_perimeters.use_external_mp_once();
-                    set_extra_lift(m_last_layer_z, 0, print.config(), m_writer, initial_extruder_id);
-                    file.write(this->retract_and_wipe());
-                    std::string gcode;
-                    //go to origin of the next object (it's 0,0 because we shifted the origin to it)
-                    Polyline polyline = this->travel_to(gcode, Point(0, 0), ExtrusionRole::None);
-                    this->write_travel_to(gcode, polyline, "move to origin position for next object");
-                    file.write(gcode);
-                    m_enable_cooling_markers = true;
-                    // Disable motion planner when traveling to first object point.
-                    m_avoid_crossing_perimeters.disable_once();
-                    // Ff we are printing the bottom layer of an object, and we have already finished
-                    // another one, set first layer temperatures. This happens before the Z move
-                    // is triggered, so machine has more time to reach such temperatures.
-                    this->placeholder_parser().set("current_object_idx", int(finished_objects));
+                    _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
                     std::string between_objects_gcode = this->placeholder_parser_process("between_objects_gcode", print.config().between_objects_gcode.value, initial_extruder_id);
                     // Set first layer bed and extruder temperatures, don't wait for it to reach the temperature.
-                    this->_print_first_layer_bed_temperature(file, print, between_objects_gcode, initial_extruder_id, false);
-                    this->_print_first_layer_extruder_temperatures(file, print, between_objects_gcode, initial_extruder_id, false);
-                    file.writeln(between_objects_gcode);
+                    this->_print_first_layer_bed_temperature(preamble_to_put_start_layer, print, between_objects_gcode, initial_extruder_id, false);
+                    this->_print_first_layer_extruder_temperatures(preamble_to_put_start_layer, print, between_objects_gcode, initial_extruder_id, false);
+                    preamble_to_put_start_layer.append(between_objects_gcode).append("\n");
                 } else {
                     set_extra_lift(0, 0, print.config(), m_writer, initial_extruder_id);
                 }
@@ -1779,7 +1799,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                 // and export G-code into file.
                 this->process_layers(print, status_monitor, tool_ordering, collect_layers_to_print(object, status_monitor),
                                      *print_object_instance_sequential_active - object.instances().data(),
-                                     file);
+                                     preamble_to_put_start_layer, file);
                 ++finished_objects;
                 // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
                 // Reset it when starting another object from 1st layer.
@@ -1790,58 +1810,51 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         } else {
             /////////////////////////////////////////////// begin parallel_objects_step
             if (print.config().parallel_objects_step > 0 && !has_wipe_tower) {
-
-                float range = print.config().parallel_objects_step + EPSILON;
-                print_object_instances_ordering = sort_object_instances_by_model_order(print);
-                std::vector<const PrintInstance*>::const_iterator prev_object = print_object_instances_ordering.begin();
-
-                bool first_layer = true;
-            proceed_layers:
+                double range = std::min(print.config().parallel_objects_step, print.config().extruder_clearance_height) + EPSILON;
+                print_object_instances_ordering = chain_print_object_instances(print);
+                bool first_layers = true;
 
                 for (coordf_t Rstart = 0, Rend = range;; Rstart += range, Rend += range) {
+                proceed_layers:
                     bool is_layers = false;
-                    print_object_instance_sequential_active = print_object_instances_ordering.begin();
+                    for (auto it_print_object_instance = print_object_instances_ordering.begin();
+                         it_print_object_instance != print_object_instances_ordering.end();
+                         ++it_print_object_instance) {
+                        ObjectsLayerToPrint layers_to_print_range;
+                        const PrintObject &       object        = *(*it_print_object_instance)->print_object;
+                        ObjectsLayerToPrint object_layers = collect_layers_to_print(object, status_monitor);
 
-                    for (size_t i = 0; i < print.objects().size(); ++i, ++print_object_instance_sequential_active) {
-                        std::vector<std::pair<coordf_t, ObjectsLayerToPrint>> layers_to_print_range;
-                        {
-                            ObjectsLayerToPrint object_layers = collect_layers_to_print(*print.objects()[i], status_monitor);
-                            int                       layer_num     = 0;
-                            for (ObjectLayerToPrint& ltp : object_layers) {
-                                layer_num++;
-                                if (!first_layer && layer_num == 1)
-                                    continue;
+                        for (const ObjectLayerToPrint &ltp : object_layers) {
+                            if (ltp.print_z() < Rstart || ltp.print_z() >= Rend)
+                                continue;
 
-                                if (ltp.print_z() >= Rstart && ltp.print_z() < Rend) {
-                                    std::pair<coordf_t, ObjectsLayerToPrint> merged;
-                                    merged.first = ltp.print_z();
-                                    merged.second.push_back(std::move(ltp));
-                                    layers_to_print_range.emplace_back(merged);
-                                    if (first_layer)
-                                        break;
-                                }
-                            }
+                            if (!first_layers && ltp.layer()->id() == 0)
+                                continue;
+
+                            layers_to_print_range.push_back(ltp);
+                            if (first_layers)
+                                break;
                         }
 
-                        if (!layers_to_print_range.empty())
-                        {
-                            if (print_object_instance_sequential_active != prev_object) {
-                                this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
-                                std::string gcode;
-                                //go to origin of the next object (it's 0,0 because we shifted the origin to it)
-                                Polyline polyline = this->travel_to(gcode, Point(0, 0), ExtrusionRole::None);
-                                this->write_travel_to(gcode, polyline, "move to origin position for next object");
-                                file.write(gcode);
-                            }
-                            this->process_layers(print, status_monitor, tool_ordering, print_object_instances_ordering,
-                                                 layers_to_print_range,
-                                                 file);
-                            prev_object = print_object_instance_sequential_active;
+                        if (!layers_to_print_range.empty()) {
+                            this->set_origin(unscale((*it_print_object_instance)->shift));
+
+                            size_t finished_objects = 1 + (it_print_object_instance -
+                                                           print_object_instances_ordering.begin());
+                            if (finished_objects > 1)
+                                _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
+
+                            assert(!object.instances().empty());
+                            assert(*it_print_object_instance >= &*object.instances().begin() &&
+                                   *it_print_object_instance <= &*(object.instances().end()-1));
+                            this->process_layers(print, status_monitor, tool_ordering, layers_to_print_range,
+                                                 *it_print_object_instance - object.instances().data(),
+                                                 preamble_to_put_start_layer, file);
                             is_layers = true;
                         }
                     }
-                    if (first_layer) {
-                        first_layer = false;
+                    if (first_layers) {
+                        first_layers = false;
                         goto proceed_layers;
                     }
                     if (!is_layers) {
@@ -1898,7 +1911,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                 // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
                 // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
                 // and export G-code into file.
-                this->process_layers(print, status_monitor, tool_ordering, print_object_instances_ordering, layers_to_print, file);
+                this->process_layers(print, status_monitor, tool_ordering, print_object_instances_ordering, layers_to_print, preamble_to_put_start_layer, file);
                 if (m_wipe_tower)
                     // Purge the extruder, pull out the active filament.
                     file.write(m_wipe_tower->finalize(*this));
@@ -2005,23 +2018,41 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         }
         print.throw_if_canceled();
 
-        //print thumbnails at the end instead of the start if requested
-        //TODO in method to avoid code duplication
-        const ConfigOptionBool* thumbnails_end_file = print.full_print_config().option<ConfigOptionBool>("thumbnails_end_file");
-        if (thumbnails_end_file && thumbnails_end_file->value) {
-            const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
-            const ConfigOptionEnum<GCodeThumbnailsFormat>* thumbnails_format = print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
+        //print thumbnails at the end instead of the start if requested (unless BTT / biqu thumbnail)
+        if (!export_to_binary_gcode && thumbnails_end_file && thumbnails_end_file->value && (thumbnails_format == nullptr || thumbnails_format->value != GCodeThumbnailsFormat::BIQU)) {
+            const ConfigOptionBool* thumbnails_tag_with_format = print.full_print_config().option<ConfigOptionBool>("thumbnails_tag_format");
             // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
             // If "thumbnails_format" is not defined, export to PNG.
             GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, 
                 print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
-                thumbnails_with_bed==nullptr? false:thumbnails_with_bed->value,
+                thumbnails_with_bed ? thumbnails_with_bed->value : false,
                 thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+                thumbnails_tag_with_format ? thumbnails_tag_with_format->value: false,
                 [&file](const char* sz) { file.write(sz); },
                 [&print]() { print.throw_if_canceled(); });
         }
     }
     print.throw_if_canceled();
+}
+
+void GCodeGenerator::_move_to_print_object(std::string& gcode_out, const Print& print, size_t finished_objects, uint16_t initial_extruder_id)
+{
+    // Move to the origin position for the copy we're going to print.
+    // This happens before Z goes down to layer 0 again, so that no collision happens hopefully.
+    m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
+    m_avoid_crossing_perimeters.use_external_mp_once();
+    set_extra_lift(m_last_layer_z, 0, print.config(), m_writer, initial_extruder_id);
+    gcode_out.append(this->retract_and_wipe());
+    //go to origin of the next object (it's 0,0 because we shifted the origin to it)
+    Polyline polyline = this->travel_to(gcode_out, Point(0, 0), ExtrusionRole::Travel);
+    this->write_travel_to(gcode_out, polyline, "move to origin position for next object");
+    m_enable_cooling_markers = true;
+    // Disable motion planner when traveling to first object point.
+    m_avoid_crossing_perimeters.disable_once();
+    // Ff we are printing the bottom layer of an object, and we have already finished
+    // another one, set first layer temperatures. This happens before the Z move
+    // is triggered, so machine has more time to reach such temperatures.
+    this->placeholder_parser().set("current_object_idx", int(finished_objects));
 }
 
 // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
@@ -2033,6 +2064,7 @@ void GCodeGenerator::process_layers(
     const ToolOrdering                                                  &tool_ordering,
     const std::vector<const PrintInstance*>                             &print_object_instances_ordering,
     const std::vector<std::pair<coordf_t, ObjectsLayerToPrint>>         &layers_to_print,
+    std::string                                                         &preamble,
     GCodeOutputStream                                                   &output_stream)
 {
     // The pipeline is variable: The vase mode filter is optional.
@@ -2079,12 +2111,15 @@ void GCodeGenerator::process_layers(
             }
         });
     const auto generator = tbb::make_filter<size_t, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &status_monitor, &tool_ordering, &print_object_instances_ordering, &layers_to_print](
+        [this, &print, &status_monitor, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &preamble](
             size_t layer_to_print_idx) -> LayerResult {
             if (layer_to_print_idx == layers_to_print.size()) {
                 // Pressure equalizer need insert empty input. Because it returns one layer back.
                 // Insert NOP (no operation) layer;
-                return LayerResult::make_nop_layer_result();
+                LayerResult result = LayerResult::make_nop_layer_result();
+                result.gcode = preamble;
+                preamble.clear();
+                return result;
             } else {
                 CNumericLocalesSetter locales_setter;
                 const std::pair<coordf_t, ObjectsLayerToPrint> &layer = layers_to_print[layer_to_print_idx];
@@ -2092,8 +2127,12 @@ void GCodeGenerator::process_layers(
                 if (m_wipe_tower && layer_tools.has_wipe_tower)
                     m_wipe_tower->next_layer();
                 print.throw_if_canceled();
-                return this->process_layer(print, status_monitor, layer.second, layer_tools, 
-                    &layer == &layers_to_print.back(), &print_object_instances_ordering, size_t(-1));
+                LayerResult result = this->process_layer(print, status_monitor, layer.second, layer_tools,
+                                                         &layer == &layers_to_print.back(),
+                                                         &print_object_instances_ordering, size_t(-1));
+                result.gcode = preamble + result.gcode;
+                preamble.clear();
+                return result;
             }
         });
     // The pipeline is variable: The vase mode filter is optional.
@@ -2175,6 +2214,7 @@ void GCodeGenerator::process_layers(
     const ToolOrdering                      &tool_ordering,
     ObjectsLayerToPrint                      layers_to_print,
     const size_t                             single_object_idx,
+    std::string                             &preamble,
     GCodeOutputStream                       &output_stream)
 {
     // The pipeline is variable: The vase mode filter is optional.
@@ -2219,17 +2259,25 @@ void GCodeGenerator::process_layers(
             }
         });
     const auto generator = tbb::make_filter<size_t, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &status_monitor, &tool_ordering, &layers_to_print, single_object_idx](size_t layer_to_print_idx) -> LayerResult {
+        [this, &print, &status_monitor, &tool_ordering, &layers_to_print, single_object_idx, &preamble](size_t layer_to_print_idx) -> LayerResult {
             if (layer_to_print_idx == layers_to_print.size()) {
                 // Pressure equalizer need insert empty input. Because it returns one layer back.
                 // Insert NOP (no operation) layer;
-                return LayerResult::make_nop_layer_result();
+                LayerResult result = LayerResult::make_nop_layer_result();
+                result.gcode = preamble;
+                preamble.clear();
+                return result;
             } else {
                 CNumericLocalesSetter locales_setter;
                 ObjectLayerToPrint &layer = layers_to_print[layer_to_print_idx];
                 print.throw_if_canceled();
-                return this->process_layer(print, status_monitor, {std::move(layer)}, tool_ordering.tools_for_layer(layer.print_z()), 
-                    &layer == &layers_to_print.back(), nullptr, single_object_idx);
+                LayerResult result = this->process_layer(print, status_monitor, {std::move(layer)},
+                                                         tool_ordering.tools_for_layer(layer.print_z()),
+                                                         &layer == &layers_to_print.back(), nullptr,
+                                                         single_object_idx);
+                result.gcode = preamble + result.gcode;
+                preamble.clear();
+                return result;
             }
         });
     // The pipeline is variable: The vase mode filter is optional.
@@ -2531,7 +2579,7 @@ void GCodeGenerator::print_machine_envelope(GCodeOutputStream &file, const Print
 // Only do that if the start G-code does not already contain any M-code controlling an extruder temperature.
 // M140 - Set Bed Temperature
 // M190 - Set Bed Temperature and Wait
-void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
+void GCodeGenerator::_print_first_layer_bed_temperature(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
 {
     bool autoemit = print.config().autoemit_temperature_commands;
     // Initial bed temperature based on the first extruder.
@@ -2547,7 +2595,7 @@ void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file,
     // the custom start G-code emited these.
     std::string set_temp_gcode = m_writer.set_bed_temperature(temp, wait);
     if (autoemit && !temp_set_by_gcode)
-        file.write(set_temp_gcode);
+        out += (set_temp_gcode);
 }
 
 // Write 1st layer extruder temperatures into the G-code.
@@ -2555,7 +2603,7 @@ void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file,
 // M104 - Set Extruder Temperature
 // M109 - Set Extruder Temperature and Wait
 // RepRapFirmware: G10 Sxx
-void GCodeGenerator::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
+void GCodeGenerator::_print_first_layer_extruder_temperatures(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
 {
     bool autoemit = print.config().autoemit_temperature_commands;
     // Is the bed temperature set by the provided custom G-code?
@@ -2584,7 +2632,7 @@ void GCodeGenerator::_print_first_layer_extruder_temperatures(GCodeOutputStream 
                     else
                         temp = print.config().idle_temperature.get_at(tool.id());
                 if (temp > 0)
-                    file.write(m_writer.set_temperature(temp, false, tool.id()));
+                    out += (m_writer.set_temperature(temp, false, tool.id()));
             }
         }
         if (wait || print.config().single_extruder_multi_material.value) {
@@ -2593,7 +2641,7 @@ void GCodeGenerator::_print_first_layer_extruder_temperatures(GCodeOutputStream 
             if (temp == 0)
                 temp = print.config().temperature.get_at(first_printing_extruder_id);
             if (temp > 0)
-                file.write(m_writer.set_temperature(temp, wait, first_printing_extruder_id));
+                out += (m_writer.set_temperature(temp, wait, first_printing_extruder_id));
         }
     }
 }
@@ -2694,7 +2742,9 @@ namespace ProcessLayer
                     cfg.set_key_value("color_change_extruder", new ConfigOptionInt(m600_extruder_before_layer));
                     gcode += gcodegen.placeholder_parser_process("pause_print_gcode", GCodeWriter::get_default_pause_gcode(print.config()), current_extruder_id, &cfg);
                     gcode += "\n";
-                    gcode += "M117 Change filament for Extruder " + std::to_string(m600_extruder_before_layer) + "\n";
+                    if (auto flavor = print.config().gcode_flavor.value; 
+                        flavor == gcfKlipper || flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy || flavor == gcfRepetier || flavor == gcfSmoothie || flavor == gcfRepRap)
+                        gcode += "M117 Change filament for Extruder " + std::to_string(m600_extruder_before_layer) + "\n";
                 }
                 else {
                     if (GCodeWriter::get_default_color_change_gcode(print.config()).empty()) {
@@ -2726,7 +2776,9 @@ namespace ProcessLayer
                     gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Pause_Print) + "\n";
                     //! FIXME_in_fw show message during print pause
                     if (!pause_print_msg.empty())
-                        gcode += "M117 " + pause_print_msg + "\n";
+                        if (auto flavor = print.config().gcode_flavor.value; 
+                            flavor == gcfKlipper || flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy || flavor == gcfRepetier || flavor == gcfSmoothie || flavor == gcfRepRap)
+                            gcode += "M117 " + pause_print_msg + "\n";
                     gcode += gcodegen.placeholder_parser_process("pause_print_gcode", GCodeWriter::get_default_pause_gcode(print.config()), current_extruder_id);
                 }
                 else {
@@ -2836,7 +2888,7 @@ bool GCodeGenerator::line_distancer_is_required(const std::vector<uint16_t>& ext
 }
 
 // Matches "G92 E0" with various forms of writing the zero and with an optional comment.
-boost::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
+std::regex regex_g92e0_gcode{ "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
 
 // In sequential mode, process_layer is called once per each object and its copy,
 // therefore layers will contain a single entry and single_object_instance_idx will point to the copy of the object.
@@ -2888,6 +2940,7 @@ LayerResult GCodeGenerator::process_layer(
     uint16_t             first_extruder_id = layer_tools.extruders.front();
 
     // Initialize config with the 1st object to be printed at this layer.
+    m_config.apply(print.default_region_config(), true);
     m_config.apply(layer.object()->config(), true);
 
     // Check whether it is possible to apply the spiral vase logic for this layer.
@@ -2933,6 +2986,7 @@ LayerResult GCodeGenerator::process_layer(
     m_last_layer_z = static_cast<float>(print_z);
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
     m_last_height = height;
+    m_last_too_small.polyline.clear();
 
     // Set new layer - this will change Z and force a retraction if retract_layer_change is enabled.
     coordf_t previous_print_z = m_layer != nullptr ? m_layer->print_z : 0;
@@ -2983,8 +3037,8 @@ LayerResult GCodeGenerator::process_layer(
     }
 
     //put G92 E0 is relative extrusion
-    bool before_layer_gcode_resets_extruder = boost::regex_search(print.config().before_layer_gcode.value, regex_g92e0_gcode);
-    bool layer_gcode_resets_extruder = boost::regex_search(print.config().layer_gcode.value, regex_g92e0_gcode);
+    bool before_layer_gcode_resets_extruder = std::regex_search(print.config().before_layer_gcode.value, regex_g92e0_gcode);
+    bool layer_gcode_resets_extruder = std::regex_search(print.config().layer_gcode.value, regex_g92e0_gcode);
     if (m_config.use_relative_e_distances) {
         // See GH issues prusa#6336 #5073$
         if (!before_layer_gcode_resets_extruder && !layer_gcode_resets_extruder) {
@@ -3057,6 +3111,9 @@ LayerResult GCodeGenerator::process_layer(
             set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
 
         if (auto loops_it = skirt_loops_per_extruder.find(extruder_id); loops_it != skirt_loops_per_extruder.end()) {
+            //global skirt & brim use the global settings.
+            //m_config.apply(print.default_object_config(), true);
+            apply_print_configs(print);
             // before going to and from a global skirt, please ensure you are a a safe height
             set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
             const std::pair<size_t, size_t> loops = loops_it->second;
@@ -3073,6 +3130,7 @@ LayerResult GCodeGenerator::process_layer(
                     // Override of skirt extrusion parameters. extrude_skirt() will fill in the extrusion width.
                     ExtrusionFlow{ mm3_per_mm, 0., layer_skirt_flow.height() }, gcode, "skirt"sv);
             }
+            m_last_too_small.polyline.clear();
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
             if (first_layer && loops.first == 0)
@@ -3083,6 +3141,8 @@ LayerResult GCodeGenerator::process_layer(
 
         // Extrude brim with the extruder of the 1st region.
         if (! m_brim_done) {
+            //global skirt & brim use the global settings.
+            m_config.apply(print.default_object_config(), true);
             this->set_origin(0., 0.);
             m_avoid_crossing_perimeters.use_external_mp();
             m_region = nullptr;
@@ -3092,6 +3152,7 @@ LayerResult GCodeGenerator::process_layer(
                 set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, extruder_id);
                 gcode += this->extrude_entity({*brim_entity, false}, "Brim"sv);
             }
+            m_last_too_small.polyline.clear();
             m_brim_done = true;
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point.
@@ -3106,6 +3167,7 @@ LayerResult GCodeGenerator::process_layer(
             && extruder_id == layer_tools.extruders.front()) {
 
             const PrintObject *print_object = layers.front().object();
+            //object skirt & brim use the object settings.
             m_region = nullptr;
             set_region_for_extrude(print, print_object, gcode);
             this->set_origin(unscale(print_object->instances()[single_object_instance_idx].shift));
@@ -3117,6 +3179,7 @@ LayerResult GCodeGenerator::process_layer(
                 else
                     for (const ExtrusionEntity *ee : print_object->skirt().entities())
                         gcode += this->extrude_entity({*ee, false}, "");
+                m_last_too_small.polyline.clear();
             }
         }
         //extrude object-only brim (for sequential)
@@ -3124,15 +3187,17 @@ LayerResult GCodeGenerator::process_layer(
             && extruder_id == layer_tools.extruders.front()) {
 
             const PrintObject* print_object = layers.front().object();
+            //object skirt & brim use the object settings.
             m_region = nullptr;
             set_region_for_extrude(print, print_object, gcode);
             this->set_origin(unscale(print_object->instances()[single_object_instance_idx].shift));
             if (this->m_layer != nullptr && this->m_layer->id() == 0) {
                 m_avoid_crossing_perimeters.use_external_mp(true);
                 for (const ExtrusionEntity* ee : print_object->brim().entities())
-                    gcode += this->extrude_entity({*ee, false}, "brim"sv);
+                    gcode += this->extrude_entity({*ee, false}, "Brim"sv);
                 m_avoid_crossing_perimeters.use_external_mp(false);
                 m_avoid_crossing_perimeters.disable_once();
+                m_last_too_small.polyline.clear();
             }
             
         }
@@ -3296,7 +3361,7 @@ void GCodeGenerator::process_layer_single_object(
             if (const ExtrusionEntityCollection *coll = dynamic_cast<const ExtrusionEntityCollection *>(
                     print_args.print_instance.print_object.brim().entities()[print_args.print_instance.instance_id])) {
                 for (const ExtrusionEntity* ee : coll->entities())
-                    gcode += this->extrude_entity(ExtrusionEntityReference{*ee, false}, "brim"sv);
+                    gcode += this->extrude_entity(ExtrusionEntityReference{*ee, false}, "Brim"sv);
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             m_avoid_crossing_perimeters.disable_once();
@@ -3317,6 +3382,14 @@ void GCodeGenerator::process_layer_single_object(
                 this->extrude_perimeters(print_args, island, gcode);
                 this->extrude_infill(print_args, island, false, gcode);
                 this->extrude_ironing(print_args, island, gcode);
+
+                //clear any leftover
+                if(!m_last_too_small.empty()){
+                    // finish extrude the little thing that was left before us and incompatible with our next extrusion.
+                    ExtrusionPath to_finish = m_last_too_small;
+                    gcode += this->_extrude(m_last_too_small, m_last_description, m_last_speed_mm_per_sec);
+                    m_last_too_small.polyline.clear();
+                }
             }
         }
     }
@@ -3416,12 +3489,15 @@ void GCodeGenerator::emit_milling_commands(std::string& gcode, const ObjectsLaye
 
 // Check whether this ExtrusionEntityCollection should be printed now with extruder_id, given print_wipe_extrusions
 // (wipe extrusions are printed before regular extrusions).
-bool GCodeGenerator::shall_print_this_extrusion_collection(const ExtrudeArgs &print_args, const ExtrusionEntityCollection *eec, const PrintRegion &region) {
+bool GCodeGenerator::shall_print_this_extrusion_collection(const ExtrudeArgs &print_args, const ExtrusionEntityCollection *eec, const PrintRegion &region)
+{
 //    [extruder_id, instance_id = print_instance.instance_id, &layer_tools, is_anything_overridden, print_wipe_extrusions] -> bool
     assert(eec != nullptr);
-    if (eec->entities().empty())
+    if (eec->entities().empty()) {
+        assert(false);
         // This shouldn't happen. FIXME why? but first_point() would fail.
         return false;
+    }
     // This extrusion is part of certain Region, which tells us which extruder should be used for it:
     int correct_extruder_id = print_args.layer_tools.extruder(*eec, region);
     if (! print_args.layer_tools.has_extruder(correct_extruder_id)) {
@@ -3435,11 +3511,15 @@ bool GCodeGenerator::shall_print_this_extrusion_collection(const ExtrudeArgs &pr
         extruder_override_id < 0 && int(print_args.extruder_id) == correct_extruder_id;
 }
 
-void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
+void GCodeGenerator::apply_print_configs(const Print &print)
 {
-    m_writer.apply_print_config(print_config);
-    m_config.apply(print_config);
-    m_scaled_gcode_resolution = scaled<double>(print_config.gcode_resolution.value);
+    //apply also default region & object, just in case, as they won't be applied since the first extrusion on a region / the first layer process on an object
+    m_writer.apply_print_config(print.config());
+    m_writer.apply_print_region_config(print.default_region_config());
+    m_config.apply(print.config());
+    m_config.apply(print.default_object_config());
+    m_config.apply(print.default_region_config());
+    m_scaled_gcode_resolution = scale_d(print.config().gcode_resolution.value);
 }
 
 void GCodeGenerator::append_full_config(const Print &print, std::string &str)
@@ -3563,6 +3643,7 @@ Polygon Bed::get_inner_offset(const std::vector<Vec2d>& shape, const double padd
 } // end namespace GCode::Impl
 
 // for spiral vase
+//FIXME: use standard travel, and not these special "generate_travel_gcode" ones.
 std::optional<std::string> GCodeGenerator::get_helical_layer_change_gcode(
     const coordf_t previous_layer_z,
     const coordf_t print_z,
@@ -3756,8 +3837,8 @@ std::string GCodeGenerator::extrude_loop_vase(const ExtrusionLoop &original_loop
             Point c = a; a = b; b = c;
         }
         assert(ccw_angle_old_test(paths.front().first_point(), a, b) ==
-               angle_ccw(b - paths.front().first_point(), a - paths.front().first_point()));
-        double angle = angle_ccw(b-paths.front().first_point(),a-paths.front().first_point()) * 2 / 3;
+               abs_angle(angle_ccw( a - paths.front().first_point(),b - paths.front().first_point())));
+        double angle = abs_angle(angle_ccw(a-paths.front().first_point(),b-paths.front().first_point())) * 2 / 3;
 
         // turn left if contour, turn right if hole
         if (reverse_turn) angle *= -1;
@@ -3908,8 +3989,8 @@ std::string GCodeGenerator::extrude_loop_vase(const ExtrusionLoop &original_loop
             // swap points
             Point c = a; a = b; b = c;
         }
-        assert(ccw_angle_old_test(paths.front().first_point(), a, b) == angle_ccw(b - paths.front().first_point(), a - paths.front().first_point()));
-        double angle = angle_ccw(b - paths.front().first_point(), a - paths.front().first_point()) / 3;
+        assert(ccw_angle_old_test(paths.front().first_point(), a, b) == abs_angle(angle_ccw( a - paths.front().first_point(),b - paths.front().first_point())));
+        double angle = abs_angle(angle_ccw( a - paths.front().first_point(),b - paths.front().first_point())) / 3;
 
         // turn left if contour, turn right if hole
         if (reverse_turn) angle *= -1;
@@ -4185,17 +4266,17 @@ void GCodeGenerator::seam_notch(const ExtrusionLoop& original_loop,
         //check if the current angle isn't too sharp
         double check_angle = 0;
         if (end_point.distance_to_square(start_point) < SCALED_EPSILON * SCALED_EPSILON) {
-            assert(ccw_angle_old_test(start_point, prev_point, next_point) == angle_ccw(next_point-start_point, prev_point - start_point));
-            check_angle = angle_ccw(next_point-start_point, prev_point - start_point);
+            assert(ccw_angle_old_test(start_point, prev_point, next_point) == abs_angle(angle_ccw( prev_point -start_point,next_point- start_point)));
+            check_angle = abs_angle(angle_ccw( prev_point -start_point,next_point- start_point));
         } else {
-            assert(ccw_angle_old_test(end_point, prev_point, start_point) == angle_ccw(prev_point-end_point, start_point - end_point));
-            check_angle = angle_ccw(prev_point-end_point, start_point - end_point);
+            assert(ccw_angle_old_test(end_point, prev_point, start_point) == abs_angle(angle_ccw( start_point -end_point,prev_point- end_point)));
+            check_angle = abs_angle(angle_ccw( start_point -end_point,prev_point- end_point));
             if ((is_hole_loop ? -check_angle : check_angle) > this->m_config.seam_notch_angle.value * PI / 180.) {
                 BOOST_LOG_TRIVIAL(debug) << "notch abord: too big angle\n";
                 return;
             }
-            assert(ccw_angle_old_test(start_point, end_point, next_point) == angle_ccw(next_point - start_point, end_point - start_point));
-            check_angle = angle_ccw(next_point - start_point, end_point - start_point);
+            assert(ccw_angle_old_test(start_point, end_point, next_point) == abs_angle(angle_ccw( end_point - start_point,next_point - start_point)));
+            check_angle = abs_angle(angle_ccw( end_point - start_point,next_point - start_point));
         }
         assert(end_point != start_point);
         assert(end_point != next_point);
@@ -4432,8 +4513,8 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
             // swap points
             Point c = a; a = b; b = c;
         }
-        assert(ccw_angle_old_test(current_point, a, b) == angle_ccw(b-current_point, a-current_point));
-        double angle = angle_ccw(b-current_point, a-current_point) / 3;
+        assert(ccw_angle_old_test(current_point, a, b) == abs_angle(angle_ccw( a-current_point,b-current_point)));
+        double angle = abs_angle(angle_ccw( a-current_point,b-current_point)) / 3;
 
         // turn left if contour, turn right if hole
         if (is_hole_loop ? (!is_full_loop_ccw) : (is_full_loop_ccw)) angle *= -1;
@@ -4600,8 +4681,8 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
             // swap points
             Point c = a; a = b; b = c;
         }
-        assert(angle_ccw(b-current_point, a-current_point) == ccw_angle_old_test(current_point, a, b));
-        double angle = angle_ccw(b-current_point, a-current_point) / 3;
+        assert(abs_angle(angle_ccw( a-current_point,b-current_point)) == ccw_angle_old_test(current_point, a, b));
+        double angle = abs_angle(angle_ccw( a-current_point,b-current_point)) / 3;
         
         // turn left if contour, turn right if hole
         if (is_hole_loop ? is_full_loop_ccw : (!is_full_loop_ccw)) angle *= -1;
@@ -4837,7 +4918,7 @@ std::string GCodeGenerator::extrude_entity(const ExtrusionEntityReference &entit
 }
 
 void GCodeGenerator::use(const ExtrusionEntityCollection &collection) {
-    if (!collection.can_sort() || collection.role() == ExtrusionRole::Mixed || collection.entities().size() <= 1) {
+    if (!collection.can_sort() /*|| collection.role() == ExtrusionRole::Mixed*/ || collection.entities().size() <= 1) {
         for (const ExtrusionEntity* next_entity : collection.entities()) {
             next_entity->visit(*this);
         }
@@ -4994,7 +5075,9 @@ void GCodeGenerator::extrude_perimeters(const ExtrudeArgs &print_args, const Lay
     // identify the content of PrintRegion accross the whole print uniquely. Translate to a Print specific PrintRegion.
     const Print       &print  = *print_args.print_instance.print_object.print();
     m_region = &print.get_print_region(layerm.region().print_region_id());
+    set_region_for_extrude(print, nullptr, gcode);
     bool first = true;
+    std::vector<const ExtrusionEntity*> to_extrude;
     for (uint32_t perimeter_id : island.perimeters) {
         // Extrusions inside islands are expected to be ordered already.
         // Don't reorder them.
@@ -5006,12 +5089,13 @@ void GCodeGenerator::extrude_perimeters(const ExtrudeArgs &print_args, const Lay
             if (first) {
                 first = false;
                 // Apply region-specific settings
-                set_region_for_extrude(print, nullptr, gcode);
             }
-            for (const ExtrusionEntity *ee : *eec)
-                // Don't reorder, don't flip.
-                gcode += this->extrude_entity({ *ee, false }, comment_perimeter, -1.);
+            to_extrude.push_back(eec);
         }
+    }
+    ExtrusionEntityReferences chained = chain_extrusion_references(to_extrude, &m_last_pos);
+    for (const ExtrusionEntityReference &next_entity : chained) {
+        gcode += this->extrude_entity(next_entity, comment_perimeter, -1.);
     }
     m_region = nullptr;
     m_seam_perimeters = false;
@@ -5180,6 +5264,9 @@ void GCodeGenerator::GCodeOutputStream::write(const char *what)
     if (what != nullptr) {
         //FIXME don't allocate a string, maybe process a batch of lines?
         std::string gcode(m_find_replace ? m_find_replace->process_layer(what) : what);
+        if (m_only_ascii) {
+            remove_not_ascii(gcode);
+        }
         // writes string to file
         fwrite(gcode.c_str(), 1, gcode.size(), this->f);
         m_processor.process_buffer(gcode);
@@ -5252,8 +5339,8 @@ void GCodeGenerator::_extrude_line_cut_corner(std::string& gcode_str, const Line
     {
         if (line.a == line.b) return; //todo: investigate if it happens (it happens in perimeters)
         //check the angle
-        assert(ccw_angle_old_test(line.a, last_pos, line.b) == angle_ccw(line.b - line.a, last_pos - line.a));
-        double angle = line.a == last_pos ? PI : angle_ccw(line.b - line.a, last_pos - line.a);
+        assert(ccw_angle_old_test(line.a, last_pos, line.b) == abs_angle(angle_ccw( last_pos - line.a,line.b - line.a)));
+        double angle = line.a == last_pos ? PI : abs_angle(angle_ccw( last_pos - line.a,line.b - line.a));
         //convert the angle from the angle of the line to the angle of the "joint" (Circular segment)
         if (angle > PI) angle = angle - PI;
         else angle = PI - angle;
@@ -5798,12 +5885,11 @@ std::pair<double, double> GCodeGenerator::_compute_acceleration(const ExtrusionP
     return {acceleration, travel_acceleration};
 }
 
-
 void GCodeGenerator::cooldown_marker_init() {
     if (!_cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)].empty()) {
-        std::string allow_speed_change = ";CM_extrude_speed;_EXTRUDE_SET_SPEED";
+        std::string allow_speed_change = ";_EXTRUDE_SET_SPEED";
         //only change speed on external perimeter (and similar) speed if really necessary.
-        std::string maybe_allow_speed_change = ";CM_extrude_speed_external;_EXTRUDE_SET_SPEED_MAYBE";
+        std::string maybe_allow_speed_change = ";_EXTRUDE_SET_SPEED_MAYBE";
         _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::None)]                 = "";
         _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Perimeter)]            = allow_speed_change;
         _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)]    = maybe_allow_speed_change;
@@ -5825,7 +5911,6 @@ void GCodeGenerator::cooldown_marker_init() {
         _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Travel)]                   = maybe_allow_speed_change;
     }
 }
-
 
 std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std::string_view description_in, double speed) {
     std::string gcode;
@@ -6088,6 +6173,7 @@ Polyline GCodeGenerator::travel_to(std::string &gcode, const Point &point, Extru
     bool could_be_wipe_disabled       = false;
     // Save state of use_external_mp_once for the case that will be needed to call twice m_avoid_crossing_perimeters.travel_to.
     const bool used_external_mp_once  = m_avoid_crossing_perimeters.used_external_mp_once();
+    const bool used_disabled_once  = m_avoid_crossing_perimeters.disabled_once();
 
     //can use the avoid crossing algo?
     bool can_avoid_cross_peri = m_config.avoid_crossing_perimeters
@@ -6121,9 +6207,11 @@ Polyline GCodeGenerator::travel_to(std::string &gcode, const Point &point, Extru
             //if (could_be_wipe_disabled) {
             //    m_wipe.reset_path();
             //} else {
+            //check if it cross hull
                 auto result = diff_pl(Polylines{ travel }, to_polygons(m_layer->lslices));
-                if (result.empty())
+                if (result.empty()) {
                     m_wipe.reset_path();
+                }
             //}
         }
 
@@ -6143,6 +6231,9 @@ Polyline GCodeGenerator::travel_to(std::string &gcode, const Point &point, Extru
                  // If in the previous call of m_avoid_crossing_perimeters.travel_to was use_external_mp_once set to true restore this value for next call.
                 if (used_external_mp_once)
                     m_avoid_crossing_perimeters.use_external_mp_once();
+                if (used_disabled_once)
+                    m_avoid_crossing_perimeters.disable_once();
+
                 // Because of it, it is necessary to redo the thing
                 travel = m_avoid_crossing_perimeters.travel_to(*this, point);
                 updated_first_pos = true;
@@ -6160,6 +6251,25 @@ Polyline GCodeGenerator::travel_to(std::string &gcode, const Point &point, Extru
     }
     //if needed, write the gcode_label_objects_end then gcode_label_objects_start
     _add_object_change_labels(gcode);
+
+    //if needed, remove points to avoid surcharging the printer.
+    {
+        const coordf_t scaled_min_length         = scale_d(this->config().min_length.value);
+        const double   max_gcode_per_second      = this->config().max_gcode_per_second.value;
+        double         current_scaled_min_length = scaled_min_length;
+        if (max_gcode_per_second > 0) {
+            current_scaled_min_length = std::max(current_scaled_min_length, 
+                scale_t(m_config.get_computed_value("travel_speed")) / max_gcode_per_second);
+        }
+        if (current_scaled_min_length > 0) {
+            // it's an alternative to simplifed_path.simplify(scale_(this->config().min_length)); with more enphasis on
+            // the segment length that on the feature detail. because tolerance = min_length /10, douglas_peucker will
+            // erase more points if angles are shallower than 6° and then the '_plus' will kick in to keep a bit more. if
+            // angles are all bigger than 6°, then the douglas_peucker will do all the work.
+            // NOTE: okay to use set_points() as i have checked against the absence of arc.
+            travel.points = MultiPoint::douglas_peucker_plus(travel.points, current_scaled_min_length / 10, current_scaled_min_length);
+        }
+    }
 
     return travel;
 }
@@ -6780,7 +6890,7 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
             check_add_eol(gcode);
         }
         if (!no_toolchange) {
-            gcode+=toolchange(extruder_id, print_z);
+            gcode += toolchange(extruder_id, print_z);
         }else m_writer.toolchange(extruder_id);
         return gcode;
     }

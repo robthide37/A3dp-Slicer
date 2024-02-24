@@ -844,8 +844,7 @@ void PageMaterials::reload_presets()
 
 	list_printer->append(_L("(All)"), &EMPTY);
 
-    const AppConfig* app_config = wxGetApp().app_config;
-    if (materials->technology == T_FFF && app_config->get("no_templates") == "0")
+    if (materials->technology == T_FFF && get_app_config()->get("no_templates") == "0")
         list_printer->append(_L("(Templates)"), &TEMPLATES);
 
     //list_printer->SetLabelMarkup("<b>bald</b>");
@@ -1362,7 +1361,7 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     , version_check(true)
     , preset_update(true)
 {
-    const AppConfig *app_config = wxGetApp().app_config;
+    const AppConfig *app_config = get_app_config();
     auto boldfont = wxGetApp().bold_font();
 
     auto *box_slic3r = new wxCheckBox(this, wxID_ANY, _L("Check for application updates"));
@@ -1487,7 +1486,7 @@ void Worker::set_path_name(const std::string& name)
 PageDownloader::PageDownloader(ConfigWizard* parent)
     : ConfigWizardPage(parent, _L("Downloads from URL"), _L("Downloads"))
 {
-    const AppConfig* app_config = wxGetApp().app_config;
+    const AppConfig* app_config = get_app_config();
     auto boldfont = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     boldfont.SetWeight(wxFONTWEIGHT_BOLD);
 
@@ -1627,7 +1626,7 @@ void DownloaderUtils::Worker::deregister()
 }
 
 bool DownloaderUtils::Worker::on_finish() {
-    AppConfig* app_config = wxGetApp().app_config;
+    AppConfig* app_config = get_app_config();
     bool ac_value = app_config->get_bool("downloader_url_registered");
     BOOST_LOG_TRIVIAL(debug) << "PageDownloader::on_finish_downloader ac_value " << ac_value << " downloader_checked " << downloader_checked;
     if (ac_value && downloader_checked) {
@@ -2012,10 +2011,10 @@ void PageDiameters::apply_custom_config(DynamicPrintConfig &config)
     config.option("infill_extrusion_width")->set_phony(true);
     config.option("solid_infill_extrusion_width")->set_phony(true);
     config.option("top_infill_extrusion_width")->set_phony(true);
-    config.set_key_value("perimeter_extrusion_change_odd_layers", new ConfigOptionFloat(0));
-    config.set_key_value("external_perimeter_extrusion_change_odd_layers", new ConfigOptionFloat(0));
-    config.set_key_value("infill_extrusion_change_odd_layers", new ConfigOptionFloat(0));
-    config.set_key_value("solid_infill_extrusion_change_odd_layers", new ConfigOptionFloat(0));
+    config.set_key_value("perimeter_extrusion_change_odd_layers", new ConfigOptionFloatOrPercent(0, false));
+    config.set_key_value("external_perimeter_extrusion_change_odd_layers", new ConfigOptionFloatOrPercent(0, false));
+    config.set_key_value("infill_extrusion_change_odd_layers", new ConfigOptionFloatOrPercent(0, false));
+    config.set_key_value("solid_infill_extrusion_change_odd_layers", new ConfigOptionFloatOrPercent(0, false));
     config.update_phony({});
 }
 
@@ -2429,9 +2428,8 @@ void ConfigWizard::priv::load_pages()
         // Filaments & Materials
         if (any_fff_selected) { index->add_page(page_filaments); }
 
-        // Filaments page if only custom printer is selected 
-        const AppConfig* app_config = wxGetApp().app_config;
-        if (!any_fff_selected && (custom_printer_selected || custom_printer_in_bundle) && (app_config->get("no_templates") == "0")) {
+        // Filaments page if only custom printer is selected
+        if (!any_fff_selected && (custom_printer_selected || custom_printer_in_bundle) && (get_app_config()->get("no_templates") == "0")) {
             update_materials(T_ANY);
             index->add_page(page_filaments);
         }
@@ -2487,7 +2485,7 @@ void ConfigWizard::priv::load_vendors()
     bundles = BundleMap::load();
 
     // Load up the set of vendors / models / variants the user has had enabled up till now
-    AppConfig *app_config = wxGetApp().app_config;
+    AppConfig *app_config = get_app_config();
     appconfig_new.set_vendors(*app_config);
 
     for (const auto& printer : wxGetApp().preset_bundle->printers) {
@@ -3629,7 +3627,7 @@ bool ConfigWizard::run(RunReason reason, StartPage start_page)
 
     if (ShowModal() == wxID_OK) {
         bool apply_keeped_changes = false;
-        if (! p->apply_config(app.app_config, app.preset_bundle, app.preset_updater, apply_keeped_changes))
+        if (! p->apply_config(app.app_config.get(), app.preset_bundle.get(), app.preset_updater.get(), apply_keeped_changes))
             return false;
 
         if (apply_keeped_changes)

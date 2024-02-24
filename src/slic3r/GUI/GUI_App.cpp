@@ -857,7 +857,7 @@ void GUI_App::post_init()
         CallAfter([this] {
             // preset_updater->sync downloads profile updates on background so it must begin after config wizard finished.
             bool cw_showed = this->config_wizard_startup();
-            this->preset_updater->sync(preset_bundle, this);
+            this->preset_updater->sync(preset_bundle.get(), this);
             if (! cw_showed) {
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
@@ -898,13 +898,6 @@ GUI_App::GUI_App(EAppMode mode)
     m_app_updater = std::make_unique<AppUpdater>();
 }
 
-GUI_App::~GUI_App()
-{
-    delete app_config;
-    delete preset_bundle;
-    delete preset_updater;
-}
-
 // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
 // Otherwise HTML formatted for the system info dialog.
 std::string GUI_App::get_gl_info(bool for_github)
@@ -928,15 +921,45 @@ wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
 
 bool GUI_App::init_opengl()
 {
-    bool status = m_opengl_mgr.init_gl();
+    bool initialized = m_opengl_mgr.init_gl();
+    if (!m_opengl_initialized && initialized) {
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+        // Delayed init for x86
+#ifdef __APPLE__
+        // intel apple
+        hard_cpu = AppConfig::HardwareType::hCpuIntel;
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+        } catch (std::exception ex) {}
+#else
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+            if (boost::contains(gpu_vendor, "Nvidia") || boost::contains(gpu_vendor, "NVIDIA"))
+                hard_gpu = AppConfig::HardwareType::hGpuNvidia;
+            if (boost::contains(gpu_vendor, "Apple") || boost::contains(gpu_vendor, "APPLE")) {
+                assert(false); // apple gpu are only in _M_ARM64
+            }
+        } catch (std::exception ex) {}
+#endif
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+    }
     m_opengl_initialized = true;
-    return status;
+    return initialized;
 }
 
 // gets path to PrusaSlicer.ini, returns semver from first line comment
 static boost::optional<Semver> parse_semver_from_ini(std::string path)
 {
-    std::ifstream stream(path);
+    boost::nowide::ifstream stream(path);
     std::stringstream buffer;
     buffer << stream.rdbuf();
     std::string body = buffer.str();
@@ -995,9 +1018,27 @@ void GUI_App::init_app_config()
         m_datadir_redefined = true;
     }
 
-	if (!app_config)
-        app_config = new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer);
-
+	if (!app_config) {
+        app_config.reset(new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer));
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+#ifdef _M_ARM64
+#ifdef __APPLE__
+        // Arm apple
+        hard_cpu = AppConfig::HardwareType::hCpuApple;
+        hard_gpu = AppConfig::HardwareType::hGpuApple;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#else
+        // Arm
+        hard_cpu = AppConfig::HardwareType::hCpuArmGeneric;
+        hard_gpu = AppConfig::HardwareType::hGpuArmGeneric;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#endif
+#else
+        // x86 (not-apple)
+        //can't know the gpu before the openg init, so it's delayed. until it
+#endif
+    }
 	// load settings
 	m_app_conf_exists = app_config->exists();
 	if (m_app_conf_exists) {
@@ -1318,7 +1359,7 @@ bool GUI_App::on_init_inner()
         scrn->SetText(_L("Loading configuration")+ dots);
     }
 
-    preset_bundle = new PresetBundle();
+    preset_bundle.reset(new PresetBundle());
 
     // just checking for existence of Slic3r::data_dir is not enough : it may be an empty directory
     // supplied as argument to --datadir; in that case we should still run the wizard
@@ -1337,7 +1378,7 @@ bool GUI_App::on_init_inner()
             associate_stl_files();
 #endif // __WXMSW__
 
-        preset_updater = new PresetUpdater();
+        preset_updater.reset(new PresetUpdater());
         Bind(EVT_SLIC3R_VERSION_ONLINE, &GUI_App::on_version_read, this);
         Bind(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
             if (this->plater_ != nullptr && (m_app_updater->get_triggered_by_user() || app_config->get("notify_release") == "all")) {
@@ -1414,7 +1455,7 @@ bool GUI_App::on_init_inner()
     if (!delayed_error_load_presets.empty())
         show_error(nullptr, delayed_error_load_presets);
 
-    mainframe = new MainFrame(get_app_font_pt_size(app_config));
+    mainframe = new MainFrame(get_app_font_pt_size(app_config.get()));
     // hide settings tabs after first Layout
     if (is_editor())
         mainframe->select_tab(MainFrame::ETabType::LastPlater);
@@ -2084,7 +2125,7 @@ void GUI_App::recreate_GUI(const wxString& msg_name)
     this->init_app_config();
 
     MainFrame *old_main_frame = mainframe;
-    mainframe = new MainFrame(get_app_font_pt_size(app_config));
+    mainframe = new MainFrame(get_app_font_pt_size(app_config.get()));
     if (is_editor())
         // hide settings tabs after first Layout
         mainframe->select_tab(MainFrame::ETabType::LastPlater);
@@ -3250,9 +3291,8 @@ void GUI_App::OSXStoreOpenFiles(const wxArrayString &fileNames)
         // just G-codes were passed. Switch to G-code viewer mode.
         m_app_mode = EAppMode::GCodeViewer;
         unlock_lockfile(get_instance_hash_string() + ".lock", data_dir() + "/cache/");
-        if(app_config != nullptr)
-            delete app_config;
-        app_config = nullptr;
+        if(app_config)
+            app_config.reset();
         init_app_config();
     }
     wxApp::OSXStoreOpenFiles(fileNames);
@@ -3418,7 +3458,12 @@ wxString GUI_App::current_language_code_safe() const
 
 void GUI_App::open_web_page_localized(const std::string &http_address)
 {
-    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe(), nullptr, false);
+    wxString lng_param = wxString("lng=") + this->current_language_code_safe();
+
+    // Check if http_address already contains a query parameter
+    size_t query_pos = http_address.find('?');
+    open_browser_with_warning_dialog(wxString(http_address) + wxString(query_pos == std::string::npos ? "?" : "&") + lng_param,
+                                     nullptr, false);
 }
 
 // If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have a part(s).

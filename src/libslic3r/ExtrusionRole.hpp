@@ -161,6 +161,10 @@ GCodeExtrusionRole extrusion_role_to_gcode_extrusion_role(ExtrusionRole role);
 std::string        gcode_extrusion_role_to_string(GCodeExtrusionRole role);
 GCodeExtrusionRole string_to_gcode_extrusion_role(const std::string_view role);
 
+//for debug output
+std::string role_to_code(ExtrusionRole role);
+std::string looprole_to_code(ExtrusionLoopRole role);
+
 inline std::string er_to_string(ExtrusionRole role) { return gcode_extrusion_role_to_string(extrusion_role_to_gcode_extrusion_role(role)); }
 
 } // namespace Slic3r

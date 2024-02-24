@@ -197,19 +197,19 @@ public:
 
 std::unique_ptr<sla::RasterBase> SL1_SVGArchive::create_raster() const
 {
-    auto w = cfg().display_width.getFloat();
-    auto h = cfg().display_height.getFloat();
+    auto w = cfg().display_width.value;
+    auto h = cfg().display_height.value;
 
-    float precision_nm = scaled<float>(cfg().sla_output_precision.getFloat());
-    auto res_x = size_t(std::round(scaled(w) / precision_nm));
-    auto res_y = size_t(std::round(scaled(h) / precision_nm));
+    coordf_t precision_nm = scale_d(cfg().sla_output_precision.value);
+    auto res_x = size_t(std::round(scale_d(w) / precision_nm));
+    auto res_y = size_t(std::round(scale_d(h) / precision_nm));
 
     std::array<bool, 2> mirror;
 
-    mirror[X] = cfg().display_mirror_x.getBool();
-    mirror[Y] = cfg().display_mirror_y.getBool();
+    mirror[X] = cfg().display_mirror_x.value;
+    mirror[Y] = cfg().display_mirror_y.value;
 
-    auto ro = cfg().display_orientation.getInt();
+    auto ro = cfg().display_orientation.value;
     sla::RasterBase::Orientation orientation =
         ro == sla::RasterBase::roPortrait ? sla::RasterBase::roPortrait :
                                             sla::RasterBase::roLandscape;

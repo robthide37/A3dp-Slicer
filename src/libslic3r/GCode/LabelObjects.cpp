@@ -61,6 +61,7 @@ void LabelObjects::init(const Print& print)
     // respective ModelObject and ModelInstance so we can use them in the tags. This will maintain
     // indices even in case that some instances are rotated (those end up in different PrintObjects)
     // or when some are out of bed (these ModelInstances have no corresponding PrintInstances).
+    std::regex pattern("[^\\w]+", std::regex_constants::ECMAScript);
     int unique_id = 0;
     for (const auto& [model_object, print_instances] : model_object_to_print_instances) {
         const ModelObjectPtrs& model_objects = model_object->get_model()->objects;
@@ -71,7 +72,7 @@ void LabelObjects::init(const Print& print)
 
             // Now compose the name of the object and define whether indexing is 0 or 1-based.
             // name only composed of alphanumeric & '_'.
-            const std::string obj_name = boost::regex_replace(model_object->name, boost::regex("[^\\w]+"), std::string("_"));
+            const std::string obj_name = std::regex_replace(model_object->name, pattern, std::string("_"));
             std::string name = obj_name;
             if (m_label_objects_style == LabelObjectsStyle::Firmware) {
                 // use one-based indexing for objects and instances so indices match what we see in PrusaSlicer.

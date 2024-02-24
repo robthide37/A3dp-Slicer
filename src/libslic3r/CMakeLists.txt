@@ -133,6 +133,10 @@ set(SLIC3R_SOURCES
     Format/3mf.hpp
     Format/AMF.cpp
     Format/AMF.hpp
+    Format/BBConfig.cpp
+    Format/BBConfig.hpp
+    Format/bbs_3mf.hpp
+    Format/bbs_3mf.cpp
     Format/OBJ.cpp
     Format/OBJ.hpp
     Format/objparser.cpp

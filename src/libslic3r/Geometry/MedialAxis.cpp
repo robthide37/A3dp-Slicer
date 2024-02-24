@@ -1184,17 +1184,18 @@ get_coeff_from_angle_countour(Point& point, const ExPolygon& contour, coord_t mi
         }
     }
     //compute angle
-    assert(angle_ccw(point_after - point_nearest, point_before - point_nearest) == ccw_angle_old_test(point_nearest, point_before, point_after));
-    angle = angle_ccw(point_after - point_nearest, point_before - point_nearest);//point_nearest.ccw_angle(point_before, point_after);
-    if (angle >= PI) angle = 2 * PI - angle;  // smaller angle
+    assert(abs_angle(angle_ccw(point_before - point_nearest, point_after - point_nearest)) == ccw_angle_old_test(point_nearest, point_before, point_after));
+    angle = angle_ccw(point_before - point_nearest, point_after - point_nearest);//point_nearest.ccw_angle(point_before, point_after);if (angle >= PI) angle = 2 * PI - angle;
+    assert(angle < PI);
     //compute the diff from 90°
     angle = abs(angle - PI / 2);
     if (point_near.coincides_with_epsilon(point_nearest) && std::max(nearest_dist, near_dist) + SCALED_EPSILON < point_nearest.distance_to(point_near)) {
         //not only nearest
         Point point_before = id_near == 0 ? contour.contour.points.back() : contour.contour.points[id_near - 1];
         Point point_after = id_near == contour.contour.points.size() - 1 ? contour.contour.points.front() : contour.contour.points[id_near + 1];
-        double angle2 = std::min(angle_ccw(point_after - point_nearest, point_before - point_nearest), angle_ccw( point_before - point_nearest, point_after - point_nearest));
-        angle2 = abs(angle - PI / 2);
+        double angle2 = std::min(abs_angle(angle_ccw(point_before - point_nearest, point_after - point_nearest)), abs_angle(angle_ccw( point_after - point_nearest, point_before - point_nearest)));
+        assert(angle2 >= 0);
+        angle2 = abs(angle2 - PI / 2);
         angle = (angle + angle2) / 2;
     }
 
@@ -1244,12 +1245,10 @@ MedialAxis::fusion_curve(ThickPolylines& pp)
         //compute angle
         double coeff_contour_angle;
         {
-            Point &current     = this->m_expolygon.contour.points[closest_point_idx];
-            coeff_contour_angle = angle_ccw(this->m_expolygon.contour.points[next_idx] - current,
-                                            this->m_expolygon.contour.points[prev_idx] - current);
+            Point &current      = this->m_expolygon.contour.points[closest_point_idx];
+            coeff_contour_angle = angle_ccw(this->m_expolygon.contour.points[prev_idx] - current,
+                                            this->m_expolygon.contour.points[next_idx] - current);
         }
-            //.ccw_angle(, );
-        if (coeff_contour_angle >= PI) coeff_contour_angle = 2 * PI - coeff_contour_angle;  // smaller angle
         //compute the diff from 90°
         coeff_contour_angle = abs(coeff_contour_angle - PI / 2);
 
@@ -1419,11 +1418,11 @@ MedialAxis::fusion_corners(ThickPolylines& pp)
         if (crosspoint.size() != 2) continue;
 
         // check if i am at the external side of a curve
-        assert(angle_ccw(pp[crosspoint[0]].points[1] - polyline.points[0], polyline.points[1] -polyline.points[0]) == ccw_angle_old_test(polyline.points[0], polyline.points[1], pp[crosspoint[0]].points[1]));
-        double angle1 = angle_ccw(pp[crosspoint[0]].points[1] - polyline.points[0], polyline.points[1] -polyline.points[0]);//polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[0]].points[1]);
-        if (angle1 >= PI) angle1 = 2 * PI - angle1;  // smaller angle
-        double angle2 = angle_ccw(pp[crosspoint[1]].points[1] - polyline.points[0], polyline.points[1] - polyline.points[0]);
-        if (angle2 >= PI) angle2 = 2 * PI - angle2;  // smaller angle
+        assert(abs_angle(angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[0]].points[1] - polyline.points[0])) == ccw_angle_old_test(polyline.points[0], polyline.points[1], pp[crosspoint[0]].points[1]));
+        double angle1 = angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[0]].points[1] - polyline.points[0]);//polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[0]].points[1]); if (angle1 >= PI) angle1 = 2 * PI - angle1;
+        assert(angle1 < PI);
+        double angle2 = angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[1]].points[1] - polyline.points[0]); // polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[1]].points[1]); if (angle2 >= PI) angle2 = 2 * PI - angle2;
+        assert(angle2 < PI);
         if (angle1 + angle2 < PI) continue;
 
         //check if is smaller or the other ones are not endpoits
@@ -1600,8 +1599,8 @@ MedialAxis::extends_line(ThickPolyline& polyline, const ExPolygons& anchors, con
             Point p_maybe_inside = a.contour.centroid();
             coordf_t test_dist = new_bound.distance_to(p_maybe_inside) + new_back.distance_to(p_maybe_inside);
             //if (test_dist < m_max_width / 2 && (test_dist < shortest_dist || shortest_dist < 0)) {
-            double angle_test = angle_ccw(line.a - new_back, p_maybe_inside - new_back); //new_back.ccw_angle(p_maybe_inside, line.a);
-            if (angle_test > PI) angle_test = 2 * PI - angle_test;
+            double angle_test = angle_ccw(p_maybe_inside - new_back, line.a - new_back); //new_back.ccw_angle(p_maybe_inside, line.a); if (angle_test > PI) angle_test = 2 * PI - angle_test;
+            assert(angle_test < PI);
             if (test_dist < (coordf_t)this->m_max_width && test_dist<shortest_dist && abs(angle_test) > PI / 2) {
                 shortest_dist = test_dist;
                 best_anchor = p_maybe_inside;

@@ -109,4 +109,70 @@ GCodeExtrusionRole string_to_gcode_extrusion_role(const std::string_view role)
     return GCodeExtrusionRole::None;
 }
 
+std::string role_to_code(ExtrusionRole role)
+{
+    if (ExtrusionRole::None == role)
+        return L("None");
+    else if (ExtrusionRole::Perimeter == role)
+        return L("IPeri");
+    else if (ExtrusionRole::ExternalPerimeter == role)
+        return L("EPeri");
+    else if (ExtrusionRole::OverhangPerimeter == role)
+        return L("OPeri");
+    else if (ExtrusionRole::InternalInfill == role)
+        return L("IFill");
+    else if (ExtrusionRole::SolidInfill == role)
+        return L("SFill");
+    else if (ExtrusionRole::TopSolidInfill == role)
+        return L("TFill");
+    else if (ExtrusionRole::Ironing == role)
+        return L("Iron");
+    else if (ExtrusionRole::BridgeInfill == role)
+        return L("EBridge");
+    else if (ExtrusionRole::InternalBridgeInfill == role)
+        return L("IBridge");
+    else if (ExtrusionRole::ThinWall == role)
+        return L("ThinW");
+    else if (ExtrusionRole::GapFill == role)
+        return L("GFill");
+    else if (ExtrusionRole::Skirt == role)
+        return L("Skirt");
+    else if (ExtrusionRole::SupportMaterial == role)
+        return L("Supp");
+    else if (ExtrusionRole::SupportMaterialInterface == role)
+        return L("SuppI");
+    else if (ExtrusionRole::WipeTower == role)
+        return L("WTower");
+    else if (ExtrusionRole::Milling == role)
+        return L("Mill");
+    //else if (ExtrusionRole::Custom == role)
+    //    return L("Custom");
+    else if (ExtrusionRole::Mixed == role)
+        return L("Mixed");
+    else if (ExtrusionRole::Travel == role)
+        return L("Travel");
+    else
+        assert(false);
+    return "";
+}
+
+std::string looprole_to_code(ExtrusionLoopRole looprole)
+{
+    std::string code;
+    if(elrDefault == (looprole & elrDefault))
+        code += std::string("D");
+    if(elrInternal == (looprole & elrInternal))
+        code += std::string("Int");
+    if(elrSkirt == (looprole & elrSkirt))
+        code += std::string("Skirt");
+    if(elrHole == (looprole & elrHole))
+        code += std::string("Hole");
+    if(elrVase == (looprole & elrVase))
+        code += std::string("Vase");
+    if(elrFirstLoop == (looprole & elrFirstLoop))
+        code += std::string("First");
+
+    return code;
+}
+
 }

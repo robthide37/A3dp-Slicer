@@ -81,7 +81,7 @@ static SliceParams get_slice_params(const DynamicPrintConfig &cfg)
     if (!opt_layerh || !opt_init_layerh)
         throw MissingProfileError("Invalid SL1 / SL1S file");
 
-    return SliceParams{opt_layerh->getFloat(), opt_init_layerh->getFloat()};
+    return SliceParams{opt_layerh->value, opt_init_layerh->value};
 }
 
 ConfigSubstitutions import_sla_archive(const std::string       &zipfname,

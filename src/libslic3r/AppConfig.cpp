@@ -234,6 +234,9 @@ void AppConfig::set_defaults()
         if (get("check_blacklisted_library").empty())
             set("check_blacklisted_library", "1");
 #endif // _WIN32
+            //disable by default if amd graphic card detected, but can't know before the opengl is launched
+        //if (get("compress_png_texture").empty())
+            //set("compress_png_texture", (m_hardware&hGpuAmd) == hGpuAmd ? "0" : "1");
 
         // remove old 'use_legacy_opengl' parameter from this config, if present
         if (!get("use_legacy_opengl").empty())
@@ -265,6 +268,9 @@ void AppConfig::set_defaults()
 
         if (get("check_material_export").empty())
             set("check_material_export", "0");
+
+        if (get("show_unknown_setting").empty())
+            set("show_unknown_setting", "1");
 
         if (get("use_custom_toolbar_size").empty())
             set("use_custom_toolbar_size", "0");
@@ -332,7 +338,11 @@ void AppConfig::set_defaults()
             set("use_rich_tooltip", "0");
 
         if (get("hide_slice_tooltip").empty())
+#ifdef _WIN32
+            set("hide_slice_tooltip", "1");
+#else
             set("hide_slice_tooltip", "0");
+#endif // _WIN32
 
         if (get("show_layer_height_doubleslider").empty())
             set("show_layer_height_doubleslider", "1");
@@ -376,9 +386,6 @@ void AppConfig::set_defaults()
     if (get("show_splash_screen").empty())
         set("show_splash_screen", "1");
 
-    if (get("show_splash_screen").empty())
-        set("show_splash_screen", "1");
-
     if (get("restore_win_position").empty())
         set("restore_win_position", "1");       // allowed values - "1", "0", "crashed_at_..."
 
@@ -397,7 +404,7 @@ void AppConfig::set_defaults()
     {
 
         //try to load splashscreen from ui file
-        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", "benchy-splashscreen.jpg"}, {"splash_screen_gcodeviewer", "prusa-gcodepreview.jpg"} };
+        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", ""}, {"splash_screen_gcodeviewer", ""} };
         boost::property_tree::ptree tree_splashscreen;
         boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
         try {
@@ -425,11 +432,14 @@ void AppConfig::set_defaults()
         if (get("splash_screen_gcodeviewer").empty())
             set("splash_screen_gcodeviewer", "default");
 
-        if (!get("show_splash_screen_random").empty() && get("show_splash_screen_random") == "1") {
+        bool switch_to_random = get("show_splash_screen_random") == "1";
+        if (switch_to_random || key2splashscreen["splash_screen_editor"].empty())
             set("splash_screen_editor", "random");
+        if (switch_to_random || key2splashscreen["splash_screen_gcodeviewer"].empty())
+            set("splash_screen_gcodeviewer", "random");
+        if (switch_to_random)
             set("show_splash_screen_random", "0");
         }
-    }
 
 #ifdef _WIN32
     if (get("use_legacy_3DConnexion").empty())
@@ -496,6 +506,15 @@ void AppConfig::set_defaults()
     erase("", "object_settings_size");
 }
 
+void AppConfig::set_hardware_type(HardwareType hard) {
+    this->m_hardware = hard;
+    // Set default that depends on hardware type
+
+    //disable by default if amd graphic card detected, but can't know before the opengl is launched
+    if (get("compress_png_texture").empty() && (m_hardware&hHasGpu) != 0)
+        set("compress_png_texture", (m_hardware&hGpuAmd) == hGpuAmd ? "0" : "1");
+}
+
 void AppConfig::init_ui_layout() {
     boost::filesystem::path resources_dir_path = boost::filesystem::path(resources_dir()) / "ui_layout";
     if (!boost::filesystem::is_directory(resources_dir_path)) {
@@ -547,6 +566,7 @@ void AppConfig::init_ui_layout() {
     } else {
         get_versions(data_dir_path, datadir_map);
     }
+    // TODO test the version of the datadir_map layout to see if compatible
 
 
     //copy all resources that aren't in datadir or newer
@@ -554,48 +574,9 @@ void AppConfig::init_ui_layout() {
     bool find_current = false;
     std::string error_message;
     for (const auto& layout : resources_map) {
-        auto it_datadir_layout = datadir_map.find(layout.first);
-        if (it_datadir_layout != datadir_map.end()) {
-            // compare version
-            if (it_datadir_layout->second.version < layout.second.version) {
-                //erase and copy
-                for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(it_datadir_layout->second.path)) {
-                    boost::filesystem::remove_all(file.path());
-                }
-                for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
-                    if (copy_file_inner(file.path(), it_datadir_layout->second.path / file.path().filename(), error_message))
-                        throw FileIOError(error_message);
-                }
-                //update for saving
-                it_datadir_layout->second.version = layout.second.version;
-                it_datadir_layout->second.description = layout.second.description;
-            } else if (it_datadir_layout->second.version == layout.second.version) {
-                //if same verison, only erase files more recent
-                //this is useful when there is many rapid changes, to test modifications.
-                for (boost::filesystem::directory_entry& resources_file : boost::filesystem::directory_iterator(layout.second.path)) {
-                    boost::filesystem::path datadir_path = it_datadir_layout->second.path / resources_file.path().filename();
-                    std::time_t resources_last_mod = boost::filesystem::last_write_time(resources_file.path());
-                    std::time_t datadir_last_mod = boost::filesystem::last_write_time(datadir_path);
-                    if (datadir_last_mod < resources_last_mod) {
-                        boost::filesystem::remove_all(datadir_path);
-                        if (copy_file_inner(resources_file.path(), datadir_path, error_message))
-                            throw FileIOError(error_message);
-                    }
-                }
-
-            }
-        } else {
-            // Doesn't exists, copy
-            boost::filesystem::create_directory(data_dir_path / layout.second.path.filename());
-            for (boost::filesystem::directory_entry& file : boost::filesystem::directory_iterator(layout.second.path)) {
-                if (copy_file_inner(file.path(), data_dir_path / layout.second.path.filename() / file.path().filename(), error_message))
-                    throw FileIOError(error_message);
-            }
-            //update for saving
+        // don't use the datadir version, the one in my resources is the one adapated to my version.
             datadir_map[layout.first] = layout.second;
-            datadir_map[layout.first].path = data_dir_path / layout.second.path.filename();
         }
-    }
 
     //save installed
     for (const auto& layout : datadir_map) {
@@ -808,7 +789,9 @@ std::string AppConfig::load()
 void AppConfig::save()
 {
     if (! is_main_thread_active())
-            throw CriticalException("Calling AppConfig::save() from a worker thread!");
+            //in win11, it seems that the gui event thread isn't named 'slic3r_main'
+            BOOST_LOG_TRIVIAL(warning) << "AppConfig::save() from thread '" << (get_current_thread_name()?*get_current_thread_name():"UNKNOWN") << "' instead of 'slic3r_main'\n";
+            //throw CriticalException("Calling AppConfig::save() from a worker thread!");
 
     // The config is first written to a file with a PID suffix and then moved
     // to avoid race conditions with multiple instances of Slic3r

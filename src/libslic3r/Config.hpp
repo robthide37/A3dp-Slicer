@@ -105,6 +105,7 @@ extern bool         unescape_strings_cstyle(const std::string &str, std::vector<
 
 extern std::string  escape_ampersand(const std::string& str);
 
+constexpr char NIL_STR_VALUE[] = "nil";
 
 enum class OptionCategory : int
 {
@@ -375,10 +376,12 @@ using  ConfigOptionUniquePtr = std::unique_ptr<ConfigOption, ConfigOptionDeleter
 // This structure serves to inform the user about the substitutions having been done during file import.
 struct ConfigSubstitution {
     const ConfigOptionDef   *opt_def { nullptr };
+    std::string              old_name; // for when opt_def is nullptr (option not defined in this version)
     std::string              old_value;
     ConfigOptionUniquePtr    new_value;
     ConfigSubstitution() = default;
-    ConfigSubstitution(const ConfigOptionDef* def, std::string old, ConfigOptionUniquePtr&& new_v) : opt_def(def), old_value(old), new_value(std::move(new_v)) {}
+    ConfigSubstitution(const ConfigOptionDef* def, std::string old, ConfigOptionUniquePtr&& new_v) : opt_def(def), old_name(), old_value(old), new_value(std::move(new_v)) {}
+    ConfigSubstitution(std::string bad_key, std::string value) : opt_def(nullptr), old_name(bad_key), old_value(value), new_value() {}
 };
 
 using  ConfigSubstitutions = std::vector<ConfigSubstitution>;
@@ -388,17 +391,30 @@ using  ConfigSubstitutions = std::vector<ConfigSubstitution>;
 struct ConfigSubstitutionContext
 {
     ConfigSubstitutionContext(ForwardCompatibilitySubstitutionRule rl) : rule(rl) {}
-    bool empty() const throw() { return substitutions.empty(); }
 
     ForwardCompatibilitySubstitutionRule 	rule;
-    ConfigSubstitutions					    substitutions;
+    
+    bool empty() const throw() { return m_substitutions.empty(); }
+    const ConfigSubstitutions &get() const { return m_substitutions; }
+    ConfigSubstitutions data() && { return std::move(m_substitutions); }
+    void add(ConfigSubstitution&& substitution) { m_substitutions.push_back(std::move(substitution)); }
+    void emplace(std::string &&key, std::string &&value) { m_substitutions.emplace_back(std::move(key), std::move(value)); }
+    void emplace(const ConfigOptionDef* def, std::string &&old_value, ConfigOptionUniquePtr&& new_v) { m_substitutions.emplace_back(def, std::move(old_value), std::move(new_v)); }
+    void clear() { m_substitutions.clear(); }
+    void sort_and_remove_duplicates() { sort_remove_duplicates(m_substitutions); }
+
+private:
+    ConfigSubstitutions					    m_substitutions;
 };
 
 // A generic value of a configuration option.
 class ConfigOption {
 public:
-    // if true, this option doesn't need to be saved, it's a computed value from an other configOption.
-    // uint32_t because macos crash if it's a bool. and it doesn't change the size of the object because of alignment.
+    // Flags ta save some states into the option.
+    // note: uint32_t because macos crash if it's a bool. and it doesn't change the size of the object because of alignment.
+    // FCO_PHONY: if true, this option doesn't need to be saved (or with empty string), it's a computed value from an other ConfigOption.
+    // FCO_EXTRUDER_ARRAY: set if the ConfigDef has is_extruder_size(). Only apply to ConfigVectorBase and childs
+    // FCO_PLACEHOLDER_TEMP: for PlaceholderParser, to be able to recognise temporary fake ConfigOption (for default_XXX() macro)
     uint32_t flags;
     enum FlagsConfigOption : uint32_t {
         FCO_PHONY = 1,
@@ -417,11 +433,12 @@ public:
     virtual ConfigOption*       clone() const = 0;
     // Set a value from a ConfigOption. The two options should be compatible.
     virtual void                set(const ConfigOption *option) = 0;
-    virtual int32_t             getInt()        const { throw BadOptionTypeException("Calling ConfigOption::getInt on a non-int ConfigOption"); }
-    virtual double              getFloat()      const { throw BadOptionTypeException("Calling ConfigOption::getFloat on a non-float ConfigOption"); }
-    virtual bool                getBool()       const { throw BadOptionTypeException("Calling ConfigOption::getBool on a non-boolean ConfigOption");  }
-    virtual void                setInt(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::setInt on a non-int ConfigOption"); }
-    virtual boost::any          getAny()       const { throw BadOptionTypeException("Calling ConfigOption::getBool on a non-boolean ConfigOption"); }
+    virtual int32_t             get_int(size_t idx = 0)        const { throw BadOptionTypeException("Calling ConfigOption::get_int on a non-int ConfigOption"); }
+    virtual double              get_float(size_t idx = 0)      const { throw BadOptionTypeException("Calling ConfigOption::get_float on a non-float ConfigOption"); }
+    virtual bool                get_bool(size_t idx = 0)       const { throw BadOptionTypeException("Calling ConfigOption::get_bool on a non-boolean ConfigOption");  }
+    virtual void                set_enum_int(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::set_enum_int on a non-enum ConfigOption"); }
+    virtual boost::any          get_any(int32_t idx = -1)       const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
+    virtual void                set_any(boost::any, int32_t idx = -1) { throw BadOptionTypeException("Calling ConfigOption::set_any on a raw ConfigOption"); }
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }
     virtual size_t              hash()          const throw() = 0;
@@ -429,8 +446,8 @@ public:
     bool                        is_vector()     const { return ! this->is_scalar(); }
     // If this option is nullable, then it may have its value or values set to nil.
     virtual bool 				nullable()		const { return false; }
-    // A scalar is nil, or all values of a vector are nil.
-    virtual bool 				is_nil() 		const { return false; }
+    // A scalar is nil, or all values of a vector are nil if idx < 0.
+    virtual bool                is_nil(int32_t idx = -1) const { return false; }
     bool                        is_phony()      const { return (flags & FCO_PHONY) != 0; }
     void                        set_phony(bool phony) { if (phony) this->flags |= FCO_PHONY; else this->flags &= uint8_t(0xFF ^ FCO_PHONY); }
     // Is this option overridden by another option?
@@ -462,7 +479,8 @@ public:
     explicit ConfigOptionSingle(T value) : value(std::move(value)) {}
     explicit ConfigOptionSingle(T value, bool phony) : ConfigOption(phony), value(value) {}
     operator T() const { return this->value; }
-    virtual boost::any getAny() const { return boost::any(value); }
+    boost::any get_any(int32_t idx = -1) const override { return boost::any(value); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override { value = boost::any_cast<T>(anyval); }
     
     void set(const ConfigOption *rhs) override
     {
@@ -509,25 +527,25 @@ public:
     virtual void resize(size_t n, const ConfigOption *opt_default = nullptr) = 0;
     // Clear the values vector.
     virtual void clear() = 0;
+    // get the stored default value for filling empty vector.
+    // If you use it, double check if you shouldn't instead use the ConfigOptionDef.defaultvalue, which is the default value of a setting.
+    // currently, it's used to try to have a meaningful value for a Field if the default value is Nil (and to avoid cloning the option, clear it, asking for an item)
+    virtual boost::any get_default_value() const = 0;
 
     // Get size of this vector.
     virtual size_t size()  const = 0;
     // Is this vector empty?
     virtual bool   empty() const = 0;
-    // Is the value nil? That should only be possible if this->nullable().
-    virtual bool   is_nil(size_t idx) const = 0;
     // Get if the size of this vector is/should be the same as nozzle_diameter
     bool is_extruder_size() const { return (flags & FCO_EXTRUDER_ARRAY) != 0; }
     ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size) {
         if (is_extruder_size) this->flags |= FCO_EXTRUDER_ARRAY; else this->flags &= uint8_t(0xFF ^ FCO_EXTRUDER_ARRAY);
         return this;
     }
-    virtual double getFloat(size_t idx) const { throw BadOptionTypeException("Calling ConfigOption::getFloat(idx) on a non-numeric arrray ConfigOptionVectorBase"); }
 
     // We just overloaded and hid two base class virtual methods.
     // Let's show it was intentional (warnings).
     using ConfigOption::set;
-    using ConfigOption::is_nil;
 
 
 protected:
@@ -539,15 +557,26 @@ protected:
 template <class T>
 class ConfigOptionVector : public ConfigOptionVectorBase
 {
+private:
+    void set_default_from_values() {
+        assert(!values.empty());
+        if (!values.empty())
+            default_value = values.front();
+    }
+
+protected:
+    // this default is used to fill this vector when resized. It's not the default of a setting, for it please use the
+    // ConfigOptionDef.
+    T default_value;
 public:
+    std::vector<T> values;
+
     ConfigOptionVector() {}
     explicit ConfigOptionVector(T default_val) : default_value(default_val) {}
-    explicit ConfigOptionVector(size_t n, const T &value) : values(n, value) {}
-    explicit ConfigOptionVector(std::initializer_list<T> il) : values(std::move(il)) {}
-    explicit ConfigOptionVector(const std::vector<T> &values) : values(values) {}
-    explicit ConfigOptionVector(std::vector<T> &&values) : values(std::move(values)) {}
-    std::vector<T> values;
-    T default_value;
+    explicit ConfigOptionVector(size_t n, const T &value) : values(n, value), default_value(value) {}
+    explicit ConfigOptionVector(std::initializer_list<T> il) : values(std::move(il)) { set_default_from_values(); }
+    explicit ConfigOptionVector(const std::vector<T> &values) : values(values) { set_default_from_values(); }
+    explicit ConfigOptionVector(std::vector<T> &&values) : values(std::move(values)) { set_default_from_values(); }
     
     void set(const ConfigOption *rhs) override
     {
@@ -583,12 +612,10 @@ public:
     // This function is useful to split values from multiple extrder / filament settings into separate configurations.
     void set_at(const ConfigOption *rhs, size_t i, size_t j) override
     {
-        // It is expected that the vector value has at least one value, which is the default, if not overwritten.
-        assert(! this->values.empty());
+        // Fill with default value up to the needed position
         if (this->values.size() <= i) {
             // Resize this vector, fill in the new vector fields with the copy of the first field.
-            T v = this->values.front();
-            this->values.resize(i + 1, v);
+            this->values.resize(i + 1, this->default_value);
         }
         if (rhs->type() == this->type()) {
             // Assign the first value of the rhs vector.
@@ -603,12 +630,10 @@ public:
     }
     void set_at(T val, size_t i)
     {
-        // It is expected that the vector value has at least one value, which is the default, if not overwritten.
-        assert(!this->values.empty());
+        // Fill with default value up to the needed position
         if (this->values.size() <= i) {
             // Resize this vector, fill in the new vector fields with the copy of the first field.
-            T v = this->values.front();
-            this->values.resize(i + 1, v);
+            this->values.resize(i + 1, this->default_value);
         }
         this->values[i] = val;
     }
@@ -620,15 +645,22 @@ public:
     }
 
     T& get_at(size_t i) { return const_cast<T&>(std::as_const(*this).get_at(i)); }
-    virtual boost::any getAny() const { return boost::any(values); }
+    boost::any get_any(int32_t idx = -1) const override { return idx < 0 ? boost::any(values) : boost::any(get_at(idx)); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override
+    { 
+       if (idx < 0)
+            values = boost::any_cast<std::vector<T>>(anyval);
+        else
+            set_at(boost::any_cast<T>(anyval), idx);
+    }
 
-    // Resize this vector by duplicating the /*last*/first value.
+    // Resize this vector by duplicating the /*last*/first or default value.
     // If the current vector is empty, the default value is used instead.
     void resize(size_t n, const ConfigOption *opt_default = nullptr) override
     {
         assert(opt_default == nullptr || opt_default->is_vector());
 //        assert(opt_default == nullptr || dynamic_cast<ConfigOptionVector<T>>(opt_default));
-        assert(! this->values.empty() || opt_default != nullptr);
+       // assert(! this->values.empty() || opt_default != nullptr);
         if (n == 0)
             this->values.clear();
         else if (n < this->values.size())
@@ -639,12 +671,12 @@ public:
                     this->values.resize(n, this->default_value);
                 if (opt_default->type() != this->type())
                     throw ConfigurationError("ConfigOptionVector::resize(): Extending with an incompatible type.");
-                if(static_cast<const ConfigOptionVector<T>*>(opt_default)->values.empty())
-                    this->values.resize(n, this->default_value);
+                if(auto other = static_cast<const ConfigOptionVector<T>*>(opt_default); other->values.empty())
+                    this->values.resize(n, other->default_value);
                 else
-                    this->values.resize(n, static_cast<const ConfigOptionVector<T>*>(opt_default)->values.front());
+                    this->values.resize(n, other->values.front());
             } else {
-                // Resize by duplicating the last value.
+                // Resize by duplicating the /*last*/first value.
                 this->values.resize(n, this->values./*back*/front());
             }
         }
@@ -654,6 +686,10 @@ public:
     void   clear() override { this->values.clear(); }
     size_t size()  const override { return this->values.size(); }
     bool   empty() const override { return this->values.empty(); }
+    // get the stored default value for filling empty vector.
+    // If you use it, double check if you shouldn't instead use the ConfigOptionDef.defaultvalue, which is the default value of a setting.
+    // currently, it's used to try to have a meaningful value for a Field if the default value is Nil
+    boost::any get_default_value() const override { return boost::any(default_value); }
 
     bool operator==(const ConfigOption &rhs) const override
     {
@@ -720,10 +756,7 @@ public:
     		}
     	for (; i < rhs_vec->size(); ++ i)
     		if (! rhs_vec->is_nil(i)) {
-    			if (this->values.empty())
-    				this->values.resize(i + 1);
-    			else
-    				this->values.resize(i + 1, this->values.front());
+    			this->values.resize(i + 1, this->default_value);
     			this->values[i] = rhs_vec->values[i];
     			modified = true;
     		}
@@ -744,7 +777,7 @@ public:
 
     static ConfigOptionType static_type() { return coFloat; }
     ConfigOptionType        type()      const override { return static_type(); }
-    double                  getFloat()  const override { return this->value; }
+    double                  get_float(size_t idx = 0) const override { return this->value; }
     ConfigOption*           clone()     const override { return new ConfigOptionFloat(*this); }
     bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionFloat &rhs) const throw() { return this->value <  rhs.value; }
@@ -799,12 +832,27 @@ public:
     }
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
-    // Special "nil" value to be stored into the vector if this->supports_nil().
-    static double 			nil_value() { return std::numeric_limits<double>::quiet_NaN(); }
     // A scalar is nil, or all values of a vector are nil.
-    bool 					is_nil() const override { for (auto v : this->values) if (! std::isnan(v)) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return idx < values.size() ? std::isnan(this->values[idx]) : values.empty() ? std::isnan(this->default_value) : std::isnan(this->values.front()); }
-    virtual double          getFloat(size_t idx) const override { return values[idx]; }
+    bool is_nil(int32_t idx = -1) const override
+    {
+        if (idx < 0) {
+            for (double v : this->values)
+                if (!std::isnan(v) && v != NIL_VALUE())
+                    return false;
+            return true;
+        } else {
+            return idx < values.size() ? (std::isnan(this->values[idx]) || NIL_VALUE() == this->values[idx]) :
+                   values.empty()      ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
+                                         (std::isnan(this->values.front()) || NIL_VALUE() == this->values.front());
+        }
+    }
+    double                  get_float(size_t idx = 0) const override { return get_at(idx); }
+
+    static inline bool is_nil(const boost::any &to_check) {
+        return std::isnan(boost::any_cast<double>(to_check)) || boost::any_cast<double>(to_check) == NIL_VALUE();
+    }
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -837,9 +885,9 @@ public:
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
-        	if (item_str == "nil") {
+        	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-        			this->values.push_back(nil_value());
+        			this->values.push_back(NIL_VALUE());
         		else
         			throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
@@ -859,12 +907,15 @@ public:
     }
 
 protected:
+    // Special "nil" value to be stored into the vector if this->supports_nil().
+    //please use is_nil & create_nil, to better support nan
+    static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
 	void serialize_single_value(std::ostringstream &ss, const double v) const {
         	if (std::isfinite(v))
 	            ss << v;
-	        else if (std::isnan(v)) {
+	        else if (std::isnan(v) || v == NIL_VALUE()) {
         		if (NULLABLE)
-        			ss << "nil";
+        			ss << NIL_STR_VALUE;
         		else
                     throw ConfigurationError("Serializing NaN");
         	} else
@@ -875,7 +926,8 @@ protected:
     		if (v1.size() != v2.size())
     			return false;
     		for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-	    		if (! ((std::isnan(*it1) && std::isnan(*it2)) || *it1 == *it2))
+                if (!(((std::isnan(*it1) || *it1 == NIL_VALUE()) && (std::isnan(*it2) || *it2 == NIL_VALUE())) ||
+                      *it1 == *it2))
 	    			return false;
     		return true;
     	} else
@@ -885,8 +937,8 @@ protected:
     static bool vectors_lower(const std::vector<double> &v1, const std::vector<double> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(*it1));
-                auto null2 = int(std::isnan(*it2));
+                auto null1 = int(std::isnan(*it1) || *it1 == NIL_VALUE());
+                auto null2 = int(std::isnan(*it2) || *it2 == NIL_VALUE());
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -912,8 +964,8 @@ public:
     
     static ConfigOptionType static_type() { return coInt; }
     ConfigOptionType        type()   const override { return static_type(); }
-    int32_t                  getInt() const override { return this->value; }
-    void                    setInt(int32_t val) override { this->value = val; }
+    int32_t                 get_int(size_t idx = 0) const override { return this->value; }
+    double                  get_float(size_t idx = 0) const override { return this->value; }
     ConfigOption*           clone()  const override { return new ConfigOptionInt(*this); }
     bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->value == rhs.value; }
     
@@ -963,11 +1015,23 @@ public:
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
-    static int32_t			nil_value() { return std::numeric_limits<int32_t>::max(); }
+    static int32_t          NIL_VALUE() { return std::numeric_limits<int32_t>::max(); }
     // A scalar is nil, or all values of a vector are nil.
-    bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return idx < values.size() ? this->values[idx] == nil_value() : values.empty() ? this->default_value == nil_value() : this->values.front() == nil_value(); }
-    virtual double          getFloat(size_t idx) const override { return values[idx]; }
+    bool is_nil(int32_t idx = -1) const override
+    {
+        if (idx < 0) {
+            for (int32_t v : this->values)
+                if (v != NIL_VALUE())
+                    return false;
+            return true;
+        } else {
+            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
+                   values.empty()      ? NIL_VALUE() == this->default_value :
+                                         NIL_VALUE() == this->values.front();
+        }
+    }
+    int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
+    double                  get_float(size_t idx = 0) const override { return get_at(idx); }
 
     std::string serialize() const override
     {
@@ -1000,9 +1064,9 @@ public:
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
-        	if (item_str == "nil") {
+        	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-        			this->values.push_back(nil_value());
+                    this->values.push_back(NIL_VALUE());
         		else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
@@ -1017,9 +1081,9 @@ public:
 
 private:
 	void serialize_single_value(std::ostringstream &ss, const int32_t v) const {
-			if (v == nil_value()) {
+			if (v == NIL_VALUE()) {
         		if (NULLABLE)
-        			ss << "nil";
+        			ss << NIL_STR_VALUE;
         		else
                     throw ConfigurationError("Serializing NaN");
         	} else
@@ -1080,7 +1144,7 @@ public:
     ConfigOptionStrings&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionStrings &rhs) const throw() { return this->values == rhs.values; }
     bool                    operator< (const ConfigOptionStrings &rhs) const throw() { return this->values <  rhs.values; }
-    bool                    is_nil(size_t) const override { return false; }
+    bool                    is_nil(int32_t idx = 0) const override { return false; }
 
     std::string serialize() const override
     {
@@ -1169,7 +1233,7 @@ public:
             if (&v != &this->values.front())
             	ss << ",";
 			this->serialize_single_value(ss, v);
-			if (! std::isnan(v))
+			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
         }
         std::string str = ss.str();
@@ -1183,7 +1247,7 @@ public:
         for (const double v : this->values) {
             std::ostringstream ss;
 			this->serialize_single_value(ss, v);
-			if (! std::isnan(v))
+			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
 				ss << "%";
             vv.push_back(ss.str());
         }
@@ -1229,6 +1293,15 @@ public:
 
     double                      get_abs_value(double ratio_over) const 
         { return this->percent ? (ratio_over * this->value / 100) : this->value; }
+    double                      get_float(size_t idx = 0) const override { return get_abs_value(1.); }
+    // special case for get/set any: use a FloatOrPercent like for FloatsOrPercents, to have the is_percent
+    boost::any get_any(int32_t idx = 0) const override { return boost::any(FloatOrPercent{value, percent}); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override
+    {
+        auto fl_or_per = boost::any_cast<FloatOrPercent>(anyval);
+        this->value    = fl_or_per.value;
+        this->percent  = fl_or_per.percent;
+    }
 
     void set(const ConfigOption *rhs) override {
         if (rhs->type() != this->type())
@@ -1285,17 +1358,35 @@ public:
 
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool                    nullable() const override { return NULLABLE; }
-    // Special "nil" value to be stored into the vector if this->supports_nil().
-    static FloatOrPercent   nil_value() { return { std::numeric_limits<double>::quiet_NaN(), false }; }
     // A scalar is nil, or all values of a vector are nil.
-    bool                    is_nil() const override { for (auto v : this->values) if (! std::isnan(v.value)) return false; return true; }
-    bool                    is_nil(size_t idx) const override { return idx < values.size() ? std::isnan(this->values[idx].value) : values.empty() ? std::isnan(this->default_value.value) : std::isnan(this->values.front().value); }
+    bool is_nil(int32_t idx = -1) const override
+    {
+        if (idx < 0) {
+            for (const FloatOrPercent &v : this->values)
+                if (!(std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()))
+                    return false;
+            return true;
+        } else {
+            return idx < values.size() ? (std::isnan(this->values[idx].value) || NIL_VALUE() == this->values[idx]) :
+                   values.empty()      ? (std::isnan(this->default_value.value) || NIL_VALUE() == this->default_value) :
+                                         (std::isnan(this->values.front().value) || NIL_VALUE() == this->values.front());
+        }
+    }
     double                  get_abs_value(size_t i, double ratio_over) const {
         if (this->is_nil(i)) return 0;
         const FloatOrPercent& data = this->get_at(i);
         if (data.percent) return ratio_over * data.value / 100;
         return data.value;
     }
+    double                  get_float(size_t idx = 0) const override { return get_abs_value(idx, 1.); }
+
+    static inline bool is_nil(const boost::any &to_check) {
+        bool ok = std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value
+            || boost::any_cast<FloatOrPercent>(to_check).value > std::numeric_limits<float>::max();
+        return ok;
+    }
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -1328,9 +1419,9 @@ public:
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
             boost::trim(item_str);
-            if (item_str == "nil") {
+            if (item_str == NIL_STR_VALUE) {
                 if (NULLABLE)
-                    this->values.push_back(nil_value());
+                    this->values.push_back(NIL_VALUE());
                 else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
             } else {
@@ -1351,14 +1442,17 @@ public:
     }
 
 protected:
+    // Special "nil" value to be stored into the vector if this->supports_nil().
+    static FloatOrPercent   NIL_VALUE() { return FloatOrPercent{ std::numeric_limits<double>::max(), false }; }
+
     void serialize_single_value(std::ostringstream &ss, const FloatOrPercent &v) const {
             if (std::isfinite(v.value)) {
                 ss << v.value;
                 if (v.percent)
                     ss << "%";
-            } else if (std::isnan(v.value)) {
+            } else if (std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()) {
                 if (NULLABLE)
-                    ss << "nil";
+                    ss << NIL_STR_VALUE;
                 else
                     throw ConfigurationError("Serializing NaN");
             } else
@@ -1369,7 +1463,9 @@ protected:
             if (v1.size() != v2.size())
                 return false;
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-                if (! ((std::isnan(it1->value) && std::isnan(it2->value)) || *it1 == *it2))
+                if (!(((std::isnan(it1->value) || it1->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max()) &&
+                       (std::isnan(it2->value) || it2->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max())) ||
+                      *it1 == *it2))
                     return false;
             return true;
         } else
@@ -1379,8 +1475,8 @@ protected:
     static bool vectors_lower(const std::vector<FloatOrPercent> &v1, const std::vector<FloatOrPercent> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(it1->value));
-                auto null2 = int(std::isnan(it2->value));
+                auto null1 = int(std::isnan(it1->value) || it1->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max());
+                auto null2 = int(std::isnan(it2->value) || it2->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max());
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -1462,7 +1558,7 @@ public:
     bool                    operator==(const ConfigOptionPoints &rhs) const throw() { return this->values == rhs.values; }
     bool                    operator< (const ConfigOptionPoints &rhs) const throw() 
         { return std::lexicographical_compare(this->values.begin(), this->values.end(), rhs.values.begin(), rhs.values.end(), [](const auto &l, const auto &r){ return l < r; }); }
-    bool                    is_nil(size_t) const override { return false; }
+    bool                    is_nil(int32_t idx = 0) const override { return false; }
 
     std::string serialize() const override
     {
@@ -1571,7 +1667,9 @@ public:
     
     static ConfigOptionType static_type() { return coBool; }
     ConfigOptionType        type()      const override { return static_type(); }
-    bool                    getBool()   const override { return this->value; }
+    bool                    get_bool(size_t idx = 0) const override { return this->value; }
+    int32_t                 get_int(size_t idx = 0) const override { return this->value ? 1 : 0; }
+    double                  get_float(size_t idx = 0) const override { return this->value ? 1. : 0.; }
     ConfigOption*           clone()     const override { return new ConfigOptionBool(*this); }
     ConfigOptionBool&       operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionBool &rhs) const throw() { return this->value == rhs.value; }
@@ -1606,6 +1704,7 @@ class ConfigOptionBoolsTempl : public ConfigOptionVector<unsigned char>
 {
 public:
     ConfigOptionBoolsTempl() : ConfigOptionVector<unsigned char>() {}
+    explicit ConfigOptionBoolsTempl(bool default_value) : ConfigOptionVector<unsigned char>(default_value) {}
     explicit ConfigOptionBoolsTempl(size_t n, bool value) : ConfigOptionVector<unsigned char>(n, (unsigned char)value) {}
     explicit ConfigOptionBoolsTempl(std::initializer_list<bool> il) { values.reserve(il.size()); for (bool b : il) values.emplace_back((unsigned char)b); }
 	explicit ConfigOptionBoolsTempl(std::initializer_list<unsigned char> il) { values.reserve(il.size()); for (unsigned char b : il) values.emplace_back(b); }
@@ -1621,19 +1720,24 @@ public:
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
-    static unsigned char	nil_value() { return std::numeric_limits<unsigned char>::max(); }
+    static unsigned char    NIL_VALUE() { return std::numeric_limits<unsigned char>::max(); }
     // A scalar is nil, or all values of a vector are nil.
-    bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return idx < values.size() ? this->values[idx] == nil_value() : values.empty() ? this->default_value == nil_value() :  this->values.front() == nil_value(); }
-    virtual double          getFloat(size_t idx) const override { return values[idx] ? 1 : 0; }
-
-    bool& get_at(size_t i) {
-        assert(! this->values.empty());
-        return *reinterpret_cast<bool*>(&((i < this->values.size()) ? this->values[i] : this->values.front()));
+    bool is_nil(int32_t idx = -1) const override
+    {
+        if (idx < 0) {
+            for (uint8_t v : this->values)
+                if (v != NIL_VALUE())
+                    return false;
+            return true;
+        } else {
+            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
+                   values.empty()      ? NIL_VALUE() == this->default_value :
+                                         NIL_VALUE() == this->values.front();
     }
-
-    //FIXME this smells, the parent class has the method declared returning (unsigned char&).
-    bool get_at(size_t i) const { return ((i < this->values.size()) ? this->values[i] : this->values.front()) != 0; }
+    }
+    bool                    get_bool(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }
+    int32_t                 get_int(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0 ? 1 : 0; }
+    double                  get_float(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0 ? 1. : 0.; }
 
     std::string serialize() const override
     {
@@ -1667,9 +1771,9 @@ public:
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
         	unsigned char new_value = 0;
-        	if (item_str == "nil") {
+        	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-                    new_value = nil_value();
+                    new_value = NIL_VALUE();
         		else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else if (item_str == "1") {
@@ -1693,9 +1797,9 @@ public:
 
 protected:
 	void serialize_single_value(std::ostringstream &ss, const unsigned char v) const {
-        	if (v == nil_value()) {
+        	if (v == NIL_VALUE()) {
         		if (NULLABLE)
-        			ss << "nil";
+        			ss << NIL_STR_VALUE;
         		else
                     throw ConfigurationError("Serializing NaN");
         	} else
@@ -1729,22 +1833,25 @@ public:
     ConfigOptionEnum<T>&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionEnum<T> &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionEnum<T> &rhs) const throw() { return int(this->value) < int(rhs.value); }
-    int32_t                 getInt() const override { return (int32_t)this->value; }
-    void                    setInt(int val) override { this->value = T(val); }
+    int32_t                 get_int(size_t idx = 0) const override { return int32_t(this->value); }
+    void                    set_enum_int(int32_t val) override { this->value = T(val); }
+    // special case for get/set any: use a int like for ConfigOptionEnumGeneric, to simplify
+    boost::any get_any(int32_t idx = -1) const override { return boost::any(get_int()); }
+    void       set_any(boost::any anyval, int32_t idx = -1) override { set_enum_int(boost::any_cast<int32_t>(anyval)); }
 
     bool operator==(const ConfigOption &rhs) const override
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnum<T>: Comparing incompatible types");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        return this->value == (T)rhs.getInt();
+        return this->value == (T)rhs.get_int();
     }
 
     void set(const ConfigOption *rhs) override {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionEnum<T>: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        this->value = (T)rhs->getInt();
+        this->value = (T)rhs->get_int();
         this->flags = rhs->flags;
     }
 
@@ -1808,14 +1915,15 @@ public:
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnumGeneric: Comparing incompatible types");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        return this->value == rhs.getInt();
+        return this->value == rhs.get_int();
     }
 
+    void set_enum_int(int32_t val) override { this->value = val; }
     void set(const ConfigOption *rhs) override {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionEnumGeneric: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        this->value = rhs->getInt();
+        this->value = rhs->get_int();
         this->flags = rhs->flags;
     }
 
@@ -1863,83 +1971,28 @@ public:
 
     // Look up a closed enum value of this combo box based on an index of the combo box value / label.
     // Such a mapping should always succeed.
-    int index_to_enum(int index) const {
-        // It has to be a closed enum, thus values have to be defined.
-        assert(this->is_valid_closed_enum());
-        assert(index >= 0 && index < int(m_values.size()));
-        if (m_values_ordinary)
-            return index;
-        else {
-            auto it = m_enum_keys_map->find(m_values[index]);
-            assert(it != m_enum_keys_map->end());
-            return it->second;
-        }
-    }
+    int index_to_enum(int index) const;
 
     // Look up an index of value / label of this combo box based on enum value. 
     // Such a mapping may fail, thus an optional is returned.
-    std::optional<int> enum_to_index(int enum_val) const {
-        assert(this->is_valid_closed_enum());
-        assert(enum_val >= 0 && enum_val < int(m_enum_names->size()));
-        if (m_values_ordinary)
-            return { enum_val };
-        else {
-            auto it = std::find(m_values.begin(), m_values.end(), (*m_enum_names)[enum_val]);
-            return it == m_values.end() ? std::optional<int>{} : std::optional<int>{ int(it - m_values.begin()) };
-        }
-    }
+    std::optional<int> enum_to_index(int enum_val) const;
 
     // Look up an index of value / label of this combo box based on value string. 
-    std::optional<int> value_to_index(const std::string &value) const {
-        assert(this->is_valid_open_enum() || this->is_valid_closed_enum());
-        auto it = std::find(m_values.begin(), m_values.end(), value);
-        return it == m_values.end() ? 
-            std::optional<int>{} : std::optional<int>{ it - m_values.begin() };
-    }
+    std::optional<int> value_to_index(const std::string &value) const;
 
     // Look up an index of label of this combo box. Used for open enums.
-    std::optional<int> label_to_index(const std::string &value) const {
-        assert(is_valid_open_enum());
-        const auto &ls = this->labels();
-        auto it = std::find(ls.begin(), ls.end(), value);
-        return it == ls.end() ? 
-            std::optional<int>{} : std::optional<int>{ it - ls.begin() };
-    }
+    std::optional<int> label_to_index(const std::string &value) const;
 
-    std::optional<std::reference_wrapper<const std::string>> enum_to_value(int enum_val) const {
-        assert(this->is_valid_closed_enum());
-        auto opt = this->enum_to_index(enum_val);
-        return opt.has_value() ?
-            std::optional<std::reference_wrapper<const std::string>>{ this->value(*opt) } :
-            std::optional<std::reference_wrapper<const std::string>>{};
-    }
+    std::optional<std::reference_wrapper<const std::string>> enum_to_value(int enum_val) const;
 
-    std::optional<std::reference_wrapper<const std::string>> enum_to_label(int enum_val) const {
-        assert(this->is_valid_closed_enum());
-        auto opt = this->enum_to_index(enum_val);
-        return opt.has_value() ?
-            std::optional<std::reference_wrapper<const std::string>>{ this->label(*opt) } : 
-            std::optional<std::reference_wrapper<const std::string>>{};
-    }
+    std::optional<std::reference_wrapper<const std::string>> enum_to_label(int enum_val) const;
 
 #ifndef NDEBUG
-    bool is_valid_closed_enum() const {
-        return m_enum_names != nullptr && m_enum_keys_map != nullptr &&
-            ! m_values.empty() && (m_labels.empty() || m_values.size() == m_labels.size());
-    }
-    bool is_valid_open_enum() const {
-        return m_enum_names == nullptr && m_enum_keys_map == nullptr &&
-            (! m_values.empty() || ! m_labels.empty()) && (m_values.empty() || m_labels.empty() || m_values.size() == m_labels.size());
-    }
+    bool is_valid_closed_enum() const;
+    bool is_valid_open_enum() const;
 #endif // NDEBUG
 
-    void                    clear() {
-        m_values_ordinary = false;
-        m_enum_names      = nullptr;
-        m_enum_keys_map   = nullptr;
-        m_values.clear();
-        m_labels.clear();
-    }
+    void                    clear();
 
     ConfigOptionEnumDef*    clone() const { return new ConfigOptionEnumDef{ *this }; }
 
@@ -1949,58 +2002,24 @@ private:
 
     // Only allow ConfigOptionEnumDef() to be created from ConfigOptionDef.
     ConfigOptionEnumDef() = default;
+    ConfigOptionEnumDef(const ConfigOptionEnumDef &other) // default copy, but with a check for m_enum_names when it reference 'itself'
+        : m_values(other.m_values)
+        , m_labels(other.m_labels)
+        , m_values_ordinary(other.m_values_ordinary)
+        , m_enum_names(other.m_enum_names)
+        , m_enum_keys_map(other.m_enum_keys_map)
+    {
+        if (other.m_enum_names == &other.m_values) {
+            this->m_enum_names = &this->m_values;
+        }
+    }
 
-    void set_values(const std::vector<std::string> &v) {
-        m_values = v;
-        assert(m_labels.empty() || m_labels.size() == m_values.size());
-    }
-    void set_values(const std::initializer_list<std::string_view> il) {
-        m_values.clear();
-        m_values.reserve(il.size());
-        for (const std::string_view& p : il)
-            m_values.emplace_back(p);
-        assert(m_labels.empty() || m_labels.size() == m_values.size());
-    }
-    void set_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il) {
-        m_values.clear();
-        m_values.reserve(il.size());
-        m_labels.clear();
-        m_labels.reserve(il.size());
-        for (const std::pair<std::string_view, std::string_view>& p : il) {
-            m_values.emplace_back(p.first);
-            m_labels.emplace_back(p.second);
-        }
-    }
-    void set_values(const std::vector<std::pair<std::string, std::string>> il) {
-        m_values.clear();
-        m_values.reserve(il.size());
-        m_labels.clear();
-        m_labels.reserve(il.size());
-        for (const std::pair<std::string, std::string>& p : il) {
-            m_values.emplace_back(p.first);
-            m_labels.emplace_back(p.second);
-        }
-    }
-    void set_labels(const std::initializer_list<std::string_view> il) {
-        m_labels.clear();
-        m_labels.reserve(il.size());
-        for (const std::string_view& p : il)
-            m_labels.emplace_back(p);
-        assert(m_values.empty() || m_labels.size() == m_values.size());
-    }
-    void finalize_closed_enum() {
-        assert(this->is_valid_closed_enum());
-        // Check whether def.enum_values contains all the values of def.enum_keys_map and
-        // that they are sorted by their ordinary values.
-        m_values_ordinary = true;
-        for (const auto& [enum_name, enum_int] : *m_enum_keys_map) {
-            assert(enum_int >= 0);
-            if (enum_int >= int(this->values().size()) || this->value(enum_int) != enum_name) {
-                m_values_ordinary = false;
-                break;
-            }
-        }
-    }
+    void set_values(const std::vector<std::string> &v);
+    void set_values(const std::initializer_list<std::string_view> il);
+    void set_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il);
+    void set_values(const std::vector<std::pair<std::string, std::string>> il);
+    void set_labels(const std::initializer_list<std::string_view> il);
+    void finalize_closed_enum();
 
     std::vector<std::string>        m_values;
     std::vector<std::string>        m_labels;
@@ -2016,11 +2035,14 @@ private:
     }
 
     // For enums (when type == coEnum). Maps enums to enum names.
+    // These are stored in a global static const storage, defined in PrintConfig
+    // for scripted widget, there is no hardcoded storage, so m_enum_names is m_values and m_enum_keys_map is m_enum_keys_map_storage_for_script
     // Initialized by ConfigOptionEnum<xxx>::get_enum_names()
     const t_config_enum_names*  m_enum_names{ nullptr };
     // For enums (when type == coEnum). Maps enum_values to enums.
     // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
     const t_config_enum_values* m_enum_keys_map{ nullptr };
+    std::shared_ptr<t_config_enum_values> m_enum_keys_map_storage_for_script{ nullptr };
 };
 
 // Definition of a configuration value for the purpose of GUI presentation, editing, value mapping and config file handling.
@@ -2028,6 +2050,7 @@ class ConfigOptionDef
 {
 public:
     enum class GUIType {
+        // closed enum
         undefined,
         // Open enums, integer value could be one of the enumerated values or something else.
         i_enum_open,
@@ -2042,7 +2065,7 @@ public:
         // Static text
         legend,
         // Vector value, but edited as a single string.
-        one_string,
+        // one_string,// it's now the default for vector without any idx. If you want to edit the first value, set the idx to 0
         // Close parameter, string value could be one of the list values.
         select_close,
     };
@@ -2224,47 +2247,17 @@ public:
 
     // Definition of values / labels for a combo box.
     Slic3r::clonable_ptr<ConfigOptionEnumDef> enum_def;
-    
-    void set_enum_values(const std::vector<std::string> il) {
-        this->enum_def_new();
-        enum_def->set_values(il);
-    }
 
-    void set_enum_values(const std::initializer_list<std::string_view> il) {
-        this->enum_def_new();
-        enum_def->set_values(il);
-    }
+protected:
+    // Don't let these methods avaialable: the gui type isn't checked!
 
-    void set_enum_values(GUIType gui_type, const std::initializer_list<std::string_view> il) {
-        this->enum_def_new();
-        assert(is_gui_type_enum_open(gui_type));
-        this->gui_type = gui_type;
-        enum_def->set_values(il);
-    }
+    void set_enum_values(const std::vector<std::string> il);
 
-    void set_enum_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il) {
-        this->enum_def_new();
-        enum_def->set_values(il);
-    }
+    void set_enum_values(const std::initializer_list<std::string_view> il);
 
-    void set_enum_values(const std::vector<std::pair<std::string, std::string>> il) {
-        this->enum_def_new();
-        enum_def->set_values(il);
-    }
+    void set_enum_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il);
 
-    void set_enum_values(GUIType gui_type, const std::initializer_list<std::pair<std::string_view, std::string_view>> il) {
-        this->enum_def_new();
-        assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open);
-        this->gui_type = gui_type;
-        enum_def->set_values(il);
-    }
-
-    void set_enum_values(GUIType gui_type, const std::vector<std::pair<std::string, std::string>> il) {
-        this->enum_def_new();
-        assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open);
-        this->gui_type = gui_type;
-        enum_def->set_values(il);
-    }
+    void set_enum_values(const std::vector<std::pair<std::string, std::string>> il);
 
     template<typename Values, typename Labels>
     void set_enum_values(Values &&values, Labels &&labels) {
@@ -2273,12 +2266,18 @@ public:
         enum_def->set_labels(std::move(labels));
     }
 
-    void set_enum_labels(GUIType gui_type, const std::initializer_list<std::string_view> il) {
-        this->enum_def_new();
-        assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open || gui_type == ConfigOptionDef::GUIType::select_close);
-        this->gui_type = gui_type;
-        enum_def->set_labels(il);
-    }
+public:
+    void set_enum_values(GUIType gui_type, const std::initializer_list<std::string_view> il);
+
+    void set_enum_as_closed_for_scripted_enum(const std::vector<std::pair<std::string, std::string>> il);
+
+    void set_enum_values(GUIType gui_type, const std::initializer_list<std::pair<std::string_view, std::string_view>> il);
+
+    void set_enum_values(GUIType gui_type, const std::vector<std::pair<std::string, std::string>> il);
+
+    void set_enum_values(GUIType gui_type, const std::vector<std::string> il);
+
+    void set_enum_labels(GUIType gui_type, const std::initializer_list<std::string_view> il);
 
     template<typename EnumType>
     void set_enum(std::initializer_list<std::string_view> il) {
@@ -2304,9 +2303,7 @@ public:
         enum_def->set_enum_map<EnumType>();
     }
 
-    bool has_enum_value(const std::string &value) const {
-        return enum_def && enum_def->value_to_index(value).has_value();
-    }
+    bool has_enum_value(const std::string &value) const;
 
     // 0 is an invalid key.
     size_t 								serialization_key_ordinal = 0;
@@ -2537,6 +2534,10 @@ public:
     bool set_deserialize_nothrow(const t_config_option_key &opt_key_src, const std::string &value_src, ConfigSubstitutionContext& substitutions, bool append = false);
 	// May throw BadOptionTypeException() if the operation fails.
     void set_deserialize(const t_config_option_key &opt_key, const std::string &str, ConfigSubstitutionContext& config_substitutions, bool append = false);
+    void set_deserialize(const t_config_option_key &opt_key, const std::string &str){ //for tests
+        ConfigSubstitutionContext no_context(ForwardCompatibilitySubstitutionRule::Disable);
+        set_deserialize(opt_key, str, no_context);
+    }
     void set_deserialize_strict(const t_config_option_key &opt_key, const std::string &str, bool append = false)
         { ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Disable }; this->set_deserialize(opt_key, str, ctxt, append); }
     struct SetDeserializeItem {
@@ -2592,7 +2593,7 @@ public:
     // In ConfigManipulation::toggle_print_fff_options, it is called on option with type ConfigOptionEnumGeneric* and also ConfigOptionEnum*.
     // Thus the virtual method getInt() is used to retrieve the enum value.
     template<typename ENUM>
-    ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->getInt()); }
+    ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->get_int()); }
 
     bool                opt_bool(const t_config_option_key &opt_key) const                      { return this->option<ConfigOptionBool>(opt_key)->value != 0; }
     bool                opt_bool(const t_config_option_key &opt_key, size_t idx) const    { return this->option<ConfigOptionBools>(opt_key)->get_at(idx) != 0; }
@@ -2612,6 +2613,7 @@ public:
 	// Set all the nullable values to nils.
     void null_nullables();
 
+    static std::map<t_config_option_key, std::string> load_gcode_string_legacy(const char* str);
     static size_t load_from_gcode_string_legacy(ConfigBase& config, const char* str, ConfigSubstitutionContext& substitutions);
 
 private:
@@ -2732,6 +2734,7 @@ public:
     // Be careful, as this method does not test the existence of opt_key in this->def().
     bool                    set_key_value(const std::string &opt_key, ConfigOption *opt)
     {
+        assert(opt != nullptr);
         auto it = this->options.find(opt_key);
         if (it == this->options.end()) {
             this->options[opt_key].reset(opt);

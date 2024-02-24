@@ -36,6 +36,7 @@
 #include <boost/iostreams/tee.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/fstream.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
@@ -328,9 +329,9 @@ bool FreeCADDialog::load_text_from_file(const boost::filesystem::path &path) {
         try {
             std::locale loc = boost::locale::generator()("en_US.UTF-8");
             // Open the stream to 'lock' the file.
-            boost::filesystem::ifstream in;
+            boost::nowide::ifstream in;
             in.imbue(loc);
-            in.open(path);
+            in.open(path.string());
             // Obtain the size of the file.
             const uintmax_t sz = boost::filesystem::file_size(path);
             // Create a buffer.
@@ -375,9 +376,9 @@ bool FreeCADDialog::write_text_in_file(const wxString &towrite, const boost::fil
         boost::filesystem::create_directories(file.parent_path());
         std::locale loc = boost::locale::generator()("en_US.UTF-8");
         // Open the stream to 'lock' the file.
-        boost::filesystem::ofstream out;
+        boost::nowide::ofstream out;
         out.imbue(loc);
-        out.open(file);
+        out.open(file.string());
         out << towrite;
         out.close();
     }

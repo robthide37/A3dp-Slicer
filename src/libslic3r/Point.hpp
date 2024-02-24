@@ -146,6 +146,10 @@ inline double ccw_angle_old_test(const Vec2crd &me, const Vec2crd &p1, const Vec
 }
 #endif
 
+inline double abs_angle(double rad) {
+    return rad <= 0 ? rad + 2 * PI : rad;
+}
+
 // Angle from v1 to v2, returning double atan2(y, x) normalized to <-PI, PI>.
 template<typename Derived, typename Derived2>
 inline double angle_ccw(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBase<Derived2> &v2) {

@@ -12,11 +12,11 @@
 #include <deque>
 #include <sstream>
 #include <exception>
-#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/fstream.hpp>
 
 #include <curl/curl.h>
 
@@ -58,7 +58,7 @@ namespace Slic3r {
 						% error;
 			})
 			.on_complete([&](std::string body, unsigned /* http_status */) {
-				boost::filesystem::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
+				boost::nowide::fstream file(tmp_path.string(), std::ios::out | std::ios::binary | std::ios::trunc);
 				file.write(body.c_str(), body.size());
 				file.close();
 				boost::filesystem::rename(tmp_path, target_path);
@@ -155,12 +155,12 @@ struct Http::priv
 	std::string buffer;
 	// Used for storing file streams added as multipart form parts
 	// Using a deque here because unlike vector it doesn't ivalidate pointers on insertion
-	std::deque<fs::ifstream> form_files;
+	std::deque<boost::nowide::ifstream> form_files;
 	std::string postfields;
 	std::string error_buffer;    // Used for CURLOPT_ERRORBUFFER
 	size_t limit;
 	bool cancel;
-    std::unique_ptr<fs::ifstream> putFile;
+    std::unique_ptr<boost::nowide::ifstream> putFile;
 
 	std::thread io_thread;
 	Http::CompleteFn completefn;
@@ -282,7 +282,7 @@ int Http::priv::xfercb_legacy(void *userp, double dltotal, double dlnow, double 
 
 size_t Http::priv::form_file_read_cb(char *buffer, size_t size, size_t nitems, void *userp)
 {
-	auto stream = reinterpret_cast<fs::ifstream*>(userp);
+	auto stream = reinterpret_cast<boost::nowide::ifstream*>(userp);
 
 	try {
 		stream->read(buffer, size * nitems);
@@ -312,7 +312,7 @@ void Http::priv::form_add_file(const char *name, const fs::path &path, const cha
 		filename = path.string().c_str();
 	}
 
-	form_files.emplace_back(path, std::ios::in | std::ios::binary);
+	form_files.emplace_back(path.string(), std::ios::in | std::ios::binary);
 	auto &stream = form_files.back();
 	stream.seekg(0, std::ios::end);
 	size_t size = stream.tellg();
@@ -333,7 +333,7 @@ void Http::priv::form_add_file(const char *name, const fs::path &path, const cha
 //FIXME may throw! Is the caller aware of it?
 void Http::priv::set_post_body(const fs::path &path)
 {
-	std::ifstream file(path.string());
+	boost::nowide::ifstream file(path.string());
 	std::string file_content { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
 	postfields = std::move(file_content);
 }
@@ -348,7 +348,7 @@ void Http::priv::set_put_body(const fs::path &path)
 	boost::system::error_code ec;
 	boost::uintmax_t filesize = file_size(path, ec);
 	if (!ec) {
-        putFile = std::make_unique<fs::ifstream>(path, std::ios::binary);
+        putFile = std::make_unique<boost::nowide::ifstream>(path.string(), std::ios::binary);
         ::curl_easy_setopt(curl, CURLOPT_READDATA, (void *) (putFile.get()));
 		::curl_easy_setopt(curl, CURLOPT_INFILESIZE, filesize);
 	}

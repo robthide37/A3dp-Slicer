@@ -324,32 +324,48 @@ uint32_t GCodeWriter::get_acceleration() const
 }
 
 std::string GCodeWriter::write_acceleration(){
-    if (m_current_acceleration == m_last_acceleration || m_current_acceleration == 0)
+    bool need_write_travel_accel = (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) &&
+                                   m_current_travel_acceleration != m_last_travel_acceleration;
+    bool need_write_main_accel = m_current_acceleration != m_last_acceleration &&
+                                 m_current_acceleration != 0;
+    if (!need_write_main_accel && !need_write_travel_accel)
         return "";
 
     m_last_acceleration = m_current_acceleration;
+    m_last_travel_acceleration = m_current_travel_acceleration;
 
     std::ostringstream gcode;
 	//try to set only printing acceleration, travel should be untouched if possible
     if (FLAVOR_IS(gcfRepetier)) {
         // M201: Set max printing acceleration
-        gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M201 X" << m_current_acceleration << " Y" << m_current_acceleration;
     } else if(FLAVOR_IS(gcfSprinter)){
         // M204: Set printing acceleration
         // This is new MarlinFirmware with separated print/retraction/travel acceleration.
         // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
-        gcode << "M204 P" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M204 P" << m_current_acceleration;
     } else if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap)) {
         // M204: Set printing & travel acceleration
-        gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        if (m_current_acceleration > 0)
+            gcode << "M204 P" << m_current_acceleration << " T" << (m_current_travel_acceleration > 0 ? m_current_travel_acceleration : m_current_acceleration);
+        else if(m_current_travel_acceleration > 0)
+            gcode << "M204 T" << m_current_travel_acceleration;
     } else { // gcfMarlinLegacy
         // M204: Set default acceleration
-        gcode << "M204 S" << m_current_acceleration;
+        if (m_current_acceleration > 0)
+            gcode << "M204 S" << m_current_acceleration;
     }
-    if (this->config.gcode_comments) gcode << " ; adjust acceleration";
-    gcode << "\n";
-    
-    return gcode.str();
+    //if at least something, add comment and line return
+    if (gcode.tellp() != std::streampos(0)) {
+        if (this->config.gcode_comments)
+            gcode << " ; adjust acceleration";
+        gcode << "\n";
+        return gcode.str();
+    }
+    assert(gcode.str().empty());
+    return "";
 }
 
 std::string GCodeWriter::reset_e(bool force)
@@ -456,7 +472,7 @@ std::string GCodeWriter::set_speed(const double speed, const std::string_view co
     const double F = speed * 60;
     m_current_speed = speed;
     assert(F > 0.);
-    assert(F < 100000.);
+    assert(F < 10000000.);
     GCodeG1Formatter w(this->get_default_gcode_formatter());
     w.emit_f(F);
     w.emit_comment(this->config.gcode_comments, comment);
@@ -602,7 +618,7 @@ bool GCodeWriter::will_move_z(double z) const
         we don't perform an actual Z move. */
     if (m_lifted > 0) {
         double nominal_z = m_pos.z() - m_lifted;
-        if (z >= nominal_z + EPSILON && z <= m_pos.z() - EPSILON)
+        if (z >= nominal_z - EPSILON && z <= m_pos.z() + EPSILON)
             return false;
     }
     return true;
@@ -673,20 +689,23 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std
 std::string GCodeWriter::retract(bool before_wipe)
 {
     double factor = before_wipe ? m_tool->retract_before_wipe() : 1.;
-    assert(factor >= 0. && factor <= 1. + EPSILON);
+    assert((factor >= 0. || before_wipe) && factor <= 1. + EPSILON);
+    // if before_wipe but no retract_before_wipe, then no retract
+    if (factor == 0)
+        return "";
     //check for override
     if (config_region && config_region->print_retract_length >= 0) {
         return this->_retract(
             factor * config_region->print_retract_length,
             factor * m_tool->retract_restart_extra(),
-            NAN,
+            std::nullopt,
             "retract"
         );
     }
     return this->_retract(
         factor * m_tool->retract_length(),
         factor * m_tool->retract_restart_extra(),
-        NAN,
+        std::nullopt,
         "retract"
     );
 }
@@ -697,16 +716,17 @@ std::string GCodeWriter::retract_for_toolchange(bool before_wipe)
     assert(factor >= 0. && factor <= 1. + EPSILON);
     return this->_retract(
         factor * m_tool->retract_length_toolchange(),
-        NAN,
+        std::nullopt,
         factor * m_tool->retract_restart_extra_toolchange(),
         "retract for toolchange"
     );
 }
 
-std::string GCodeWriter::_retract(double length, double restart_extra, double restart_extra_toolchange, const std::string_view comment)
+std::string GCodeWriter::_retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange, const std::string_view comment)
 {
     assert(std::abs(length) < 10000.0);
-    assert(std::abs(restart_extra) < 10000.0);
+    assert(!restart_extra || std::abs(*restart_extra) < 10000.0);
+    assert(!restart_extra_toolchange || std::abs(*restart_extra_toolchange) < 10000.0);
 
     std::string gcode;
     
@@ -720,9 +740,17 @@ std::string GCodeWriter::_retract(double length, double restart_extra, double re
     if (this->config.use_volumetric_e) {
         double d = m_tool->filament_diameter();
         double area = d * d * PI/4;
+        assert(length * area < std::numeric_limits<int32_t>::max());
+        assert(length * area > 0);
+        assert(!restart_extra || *restart_extra * area < std::numeric_limits<int32_t>::max());
+        assert(!restart_extra || *restart_extra * area > -std::numeric_limits<int32_t>::max());
+        assert(!restart_extra_toolchange || *restart_extra_toolchange * area < std::numeric_limits<int32_t>::max());
+        assert(!restart_extra_toolchange || *restart_extra_toolchange * area > -std::numeric_limits<int32_t>::max());
         length = length * area;
-        restart_extra = restart_extra * area;
-        restart_extra_toolchange = restart_extra_toolchange * area;
+        if(restart_extra)
+            restart_extra = *restart_extra * area;
+        if(restart_extra_toolchange)
+            restart_extra_toolchange = *restart_extra_toolchange * area;
     }
     
     auto [dE, emit_E] = m_tool->retract(length, restart_extra, restart_extra_toolchange);
@@ -917,13 +945,13 @@ std::string GCodeWriter::set_fan(const uint8_t speed, uint16_t default_tool)
     return GCodeWriter::set_fan(this->config.gcode_flavor.value, this->config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, this->config.fan_percentage.value);
 }
 
-void GCodeFormatter::emit_axis(const char axis, const double v, size_t digits) {
+void GCodeFormatter::emit_axis(const char axis, const double value, size_t digits) {
     assert(digits <= 9);
     static constexpr const std::array<int, 10> pow_10{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
     *ptr_err.ptr++ = ' '; *ptr_err.ptr++ = axis;
 
     char *base_ptr = this->ptr_err.ptr;
-    auto  v_int    = int64_t(std::round(v * pow_10[digits]));
+    auto  v_int    = int64_t(std::round(value * pow_10[digits]));
     // Older stdlib on macOS doesn't support std::from_chars at all, so it is used boost::spirit::karma::generate instead of it.
     // That is a little bit slower than std::to_chars but not much.
 #ifdef __APPLE__
@@ -960,18 +988,26 @@ void GCodeFormatter::emit_axis(const char axis, const double v, size_t digits) {
         *(++this->ptr_err.ptr) = '0';
     this->ptr_err.ptr++;
 
-#if 0  // #ifndef NDEBUG
+#ifndef NDEBUG
     {
+        assert(this->ptr_err.ptr - base_ptr >= 1); // not empty
+        assert(v_int != 0 || (this->ptr_err.ptr - base_ptr == 1 && base_ptr[0] == '0')); //check zero
+        assert(value >= 0 || base_ptr[0] == '-' || v_int == 0 ); // minus if negative (and not zero)
+        assert(value < 0 || base_ptr[0] != '-'); // no minus if positive
+        assert(*(this->ptr_err.ptr-1) != '.'); // do not add an extra '.' at the end
+        char* position_dot = std::find(base_ptr, this->ptr_err.ptr, '.');
+        assert(position_dot == this->ptr_err.ptr || *(this->ptr_err.ptr-1) != '0'); // if has '.', do not end with a zero
+        assert(base_ptr[0] != '-' || this->ptr_err.ptr - base_ptr > 2 || (this->ptr_err.ptr - base_ptr == 2 && base_ptr[1] != '0')); // no "Z-0"
         // Verify that the optimized formatter produces the same result as the standard sprintf().
         double v1 = atof(std::string(base_ptr, this->ptr_err.ptr).c_str());
         char buf[2048];
-        sprintf(buf, "%.*lf", int(digits), v);
+        sprintf(buf, "%.*lf", int(digits), value);
         double v2 = atof(buf);
         // Numbers may differ when rounding at exactly or very close to 0.5 due to numerical issues when scaling the double to an integer.
         // Thus the complex assert.
 //        assert(v1 == v2);
-        assert(std::abs(v1 - v) * pow_10[digits] < 0.50001);
-        assert(std::abs(v2 - v) * pow_10[digits] < 0.50001);
+        assert(std::abs(v1 - value) * pow_10[digits] < 0.50001);
+        assert(std::abs(v2 - value) * pow_10[digits] < 0.50001);
     }
 #endif // NDEBUG
 }

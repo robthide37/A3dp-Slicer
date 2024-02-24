@@ -207,7 +207,7 @@ PresetUpdater::priv::priv()
 	, vendor_path(fs::path(Slic3r::data_dir()) / "vendor")
 	, cancel(false)
 {
-	set_download_prefs(GUI::wxGetApp().app_config);
+	set_download_prefs(GUI::wxGetApp().app_config.get());
 	// Install indicies from resources. Only installs those that are either missing or older than in resources.
 	check_install_indices();
 	// Load indices from the cache directory.
@@ -1170,7 +1170,7 @@ PresetUpdater::~PresetUpdater()
 
 void PresetUpdater::sync(const PresetBundle *preset_bundle, wxEvtHandler* evt_handler)
 {
-	p->set_download_prefs(GUI::wxGetApp().app_config);
+	p->set_download_prefs(GUI::wxGetApp().app_config.get());
 	if (!p->enabled_version_check && !p->enabled_config_update) { return; }
 
 	// Copy the whole vendors data for use in the background thread
@@ -1201,7 +1201,7 @@ void PresetUpdater::slic3r_update_notify()
 {
 	if (! p->enabled_version_check)
 		return;
-	auto* app_config = GUI::wxGetApp().app_config;
+	auto* app_config = GUI::wxGetApp().app_config.get();
 	const auto ver_online_str = app_config->get("version_online");
 	const auto ver_online = Semver::parse(ver_online_str);
 	const auto ver_online_seen = Semver::parse(app_config->get("version_online_seen"));
@@ -1229,7 +1229,7 @@ static bool reload_configs_update_gui()
 		return false;
 
 	// Reload global configuration
-	auto* app_config = GUI::wxGetApp().app_config;
+	auto* app_config = GUI::wxGetApp().app_config.get();
 	// System profiles should not trigger any substitutions, user profiles may trigger substitutions, but these substitutions
 	// were already presented to the user on application start up. Just do substitutions now and keep quiet about it.
 	// However throw on substitutions in system profiles, those shall never happen with system profiles installed over the air.

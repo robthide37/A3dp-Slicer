@@ -248,7 +248,13 @@ private:
     // sub-function of _traverse_and_join_loops, find the good splot to cut a loop to be able to join it with an other one
     PerimeterIntersectionPoint _get_nearest_point(const Parameters &params,
         const PerimeterGeneratorLoops &children, ExtrusionLoop &myPolylines, const coord_t dist_cut, const coord_t max_dist) const;
-
+    // for one_peri_on_top
+    void split_top_surfaces(const ExPolygons *lower_slices,
+                            const ExPolygons *upper_slices,
+                            const ExPolygons &orig_polygons,
+                            ExPolygons &      top_fills,
+                            ExPolygons &      non_top_polygons,
+                            ExPolygons &      fill_clip);
 
 };
 

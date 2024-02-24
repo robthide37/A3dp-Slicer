@@ -46,6 +46,8 @@ using t_back_to_init = std::function<void(const std::string&)>;
 
 wxString double_to_string(double const value, const int max_precision = 6);
 wxString get_points_string(const std::vector<Vec2d>& values);
+// return {invalid_val, out_of_range_val}
+std::pair<bool, bool> get_strings_points(const wxString &str, double min, double max, std::vector<Vec2d> &out_values);
 
 class UndoValueUIManager
 {
@@ -230,12 +232,15 @@ public:
 	// This is used to avoid recursive invocation of the field change/update by wxWidgets.
     bool			m_disable_change_event {false};
     bool			m_is_modified_value {false};
-	bool			m_is_nonsys_value {true};
+    bool            m_is_nonsys_value{true};
 
     /// Copy of ConfigOption for deduction purposes
     const ConfigOptionDef			m_opt {ConfigOptionDef()};
 	const t_config_option_key		m_opt_id;//! {""};
-	int								m_opt_idx = 0;
+	int								m_opt_idx = -1;
+
+	// for saving state
+    bool                            m_is_enable{true};
 
 	double							opt_height{ 0.0 };
 	bool							parent_is_custom_ctrl{ false };
@@ -243,7 +248,7 @@ public:
     /// Sets a value for this control.
     /// subclasses should overload with a specific version
     /// Postcondition: Method does not fire the on_change event.
-    virtual void		set_value(const boost::any& value, bool change_event) = 0;
+    virtual void        set_any_value(const boost::any &value, bool change_event) = 0;
     virtual void        set_last_meaningful_value() {}
     virtual void        set_na_value() {}
 
@@ -255,7 +260,11 @@ public:
     virtual void		disable() = 0;
 
 	/// Fires the enable or disable function, based on the input.
-    inline void			toggle(bool en) { en ? enable() : disable(); }
+    inline void			toggle(bool en) {
+		m_is_enable = en;
+		en ? enable() : disable();
+	}
+    inline bool is_enabled() const { return m_is_enable; }
 
 	virtual wxString	get_tooltip_text(const wxString& default_string);
 	// hack via richtooltip that are also hacked
@@ -274,8 +283,7 @@ public:
     virtual wxSizer*	getSizer()  { return nullptr; }
     virtual wxWindow*	getWindow() { return nullptr; }
 
-	bool				is_matched(const std::string& string, const std::string& pattern);
-	void				get_value_by_opt_type(wxString& str, const bool check_value = true);
+    bool is_matched(const std::string &string, const std::string &pattern);
 
     /// Factory method for generating new derived classes.
     template<class T>
@@ -300,8 +308,6 @@ public:
 protected:
 	// current value
 	boost::any			m_value;
-	// last meaningful value
-	boost::any			m_last_meaningful_value;
 	// last validated value
 	wxString			m_last_validated_value;
 
@@ -312,6 +318,23 @@ protected:
 	inline static bool warn_zero_gapfillspeed = false;
     
 	friend class OptionsGroup;
+};
+
+class TextField : public Field
+{
+    using Field::Field;
+protected:
+    TextField(const ConfigOptionDef &opt, const t_config_option_key &id) : Field(opt, id) {}
+    TextField(wxWindow *parent, const ConfigOptionDef &opt, const t_config_option_key &id) : Field(parent, opt, id)
+    {}
+    ~TextField() {}
+
+    void get_value_by_opt_type(wxString &str, const bool check_value = true);
+    bool get_vector_value(const wxString &str, ConfigOptionVectorBase &reader);
+    virtual void set_text_value(const std::string &str, bool change_event = false) = 0;
+
+    // last meaningful value (can be whatever the child class want it to be)
+    wxString m_last_meaningful_value;
 };
 
 /// Convenience function, accepts a const reference to t_field and checks to see whether 
@@ -326,16 +349,16 @@ inline bool is_sizer_field(const t_field& obj) { return !is_bad_field(obj) && ob
 
 using text_ctrl = ::TextInput; //wxTextCtrl
 
-class TextCtrl : public Field {
-    using Field::Field;
+class TextCtrl : public TextField {
+    using TextField::TextField;
 #ifdef __WXGTK__
 	bool	bChangedValueEvent = true;
     void    change_field_value(wxEvent& event);
 #endif //__WXGTK__
 
 public:
-	TextCtrl(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt,  id) {}
-	TextCtrl(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
+    TextCtrl(const ConfigOptionDef &opt, const t_config_option_key &id) : TextField(opt, id) {}
+	TextCtrl(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : TextField(parent, opt, id) {}
 	~TextCtrl() {}
 
     void BUILD() override;
@@ -344,12 +367,8 @@ public:
     void propagate_value();
     wxWindow* window {nullptr};
 
-    void	set_value(const std::string& value, bool change_event = false) {
-		m_disable_change_event = !change_event;
-        dynamic_cast<text_ctrl*>(window)->SetValue(wxString(value));
-		m_disable_change_event = false;
-    }
-	void	set_value(const boost::any& value, bool change_event = false) override;
+    void	set_text_value(const std::string &value, bool change_event = false) override;
+	void	set_any_value(const boost::any& value, bool change_event = false) override;
     void    set_last_meaningful_value() override;
     void	set_na_value() override;
 
@@ -365,6 +384,8 @@ public:
 class CheckBox : public Field {
 	using Field::Field;
     bool            m_is_na_val {false};
+    // last meaningful value (can be whatever the child class want it to be)
+    uint8_t         m_last_meaningful_value;
 public:
 	CheckBox(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
 	CheckBox(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
@@ -379,8 +400,8 @@ public:
 	wxWindow*		window{ nullptr };
 	void			BUILD() override;
 
-	void			set_value(const bool value, bool change_event = false);
-	void			set_value(const boost::any& value, bool change_event = false) override;
+	void			set_bool_value(const bool value, bool change_event = false);
+    void            set_any_value(const boost::any &value, bool change_event = false) override;
     void            set_last_meaningful_value() override;
 	void            set_na_value() override;
 	boost::any&		get_value() override;
@@ -401,25 +422,26 @@ class SpinCtrl : public Field {
 	using Field::Field;
 private:
 	static const int UNDEF_VALUE = INT_MIN;
+    int32_t          m_last_meaningful_value;
 
 public:
 	SpinCtrl(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id), tmp_value(UNDEF_VALUE) {}
 	SpinCtrl(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id), tmp_value(UNDEF_VALUE) {}
 	~SpinCtrl() {}
 
-	int				tmp_value;
+	int32_t         tmp_value;
 
 	wxWindow*		window{ nullptr };
 	void			BUILD() override;
     /// Propagate value from field to the OptionGroupe and Config after kill_focus/ENTER
     void	        propagate_value() ;
 /*
-    void			set_value(const std::string& value, bool change_event = false) {
+    void			set_text_value(const std::string& value, bool change_event = false) {
 		m_disable_change_event = !change_event;
 		dynamic_cast<::SpinInput*>(window)->SetValue(value);
 		m_disable_change_event = false;
     }
-    void			set_value(const boost::any& value, bool change_event = false) override {
+    void            set_any_value(const boost::any &value, bool change_event = false) override {
 		m_disable_change_event = !change_event;
 		tmp_value = boost::any_cast<int>(value);
         m_value = value;
@@ -427,7 +449,7 @@ public:
 		m_disable_change_event = false;
 	}
 */
-    void            set_value(const boost::any& value, bool change_event = false) override;
+    void            set_any_value(const boost::any& value, bool change_event = false) override;
     void            set_last_meaningful_value() override;
     void            set_na_value() override;
 
@@ -445,11 +467,13 @@ public:
 	wxWindow*		getWindow() override { return window; }
 };
 
-class Choice : public Field {
-	using Field::Field;
+class Choice : public TextField
+{
+	using TextField::TextField;
 public:
-	Choice(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
-	Choice(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
+    Choice(const ConfigOptionDef &opt, const t_config_option_key &id) : TextField(opt, id) {}
+    Choice(wxWindow *parent, const ConfigOptionDef &opt, const t_config_option_key &id) : TextField(parent, opt, id)
+    {}
 	~Choice() {}
 
 	wxWindow*		window{ nullptr };
@@ -466,8 +490,8 @@ public:
     int             m_last_selected   { wxNOT_FOUND };
 
 	void			set_selection();
-	void			set_value(const std::string& value, bool change_event = false);
-	void			set_value(const boost::any& value, bool change_event = false) override;
+    void            set_text_value(const std::string &value, bool change_event = false);
+    void            set_any_value(const boost::any &value, bool change_event = false) override;
 	void			set_values(const std::vector<std::string> &values);
 	void			set_values(const wxArrayString &values);
 	boost::any&		get_value() override;
@@ -493,12 +517,12 @@ public:
 	wxWindow*		window{ nullptr };
 	void			BUILD()  override;
 
-	void			set_value(const std::string& value, bool change_event = false) {
+	void			set_text_value(const std::string& value, bool change_event = false) {
 		m_disable_change_event = !change_event;
 		dynamic_cast<wxColourPickerCtrl*>(window)->SetColour(value);
 		m_disable_change_event = false;
 	 	}
-	void			set_value(const boost::any& value, bool change_event = false) override;
+    void            set_any_value(const boost::any &value, bool change_event = false) override;
 	boost::any&		get_value() override;
     void            msw_rescale() override;
     void            sys_color_changed() override;
@@ -523,8 +547,8 @@ public:
 	bool			value_was_changed(text_ctrl* win);
     // Propagate value from field to the OptionGroupe and Config after kill_focus/ENTER
     void            propagate_value(text_ctrl* win);
-	void			set_value(const Vec2d& value, bool change_event = false);
-	void			set_value(const boost::any& value, bool change_event = false) override;
+	void			set_vec2d_value(const Vec2d& value, bool change_event = false);
+    void            set_any_value(const boost::any &value, bool change_event = false) override;
 	boost::any&		get_value() override;
 
     void            msw_rescale() override;
@@ -551,12 +575,12 @@ public:
 	wxWindow*		window{ nullptr };
 	void			BUILD()  override;
 
-	void			set_value(const std::string& value, bool change_event = false) {
+	void			set_text_value(const std::string& value, bool change_event = false) {
 		m_disable_change_event = !change_event;
 		dynamic_cast<wxStaticText*>(window)->SetLabel(wxString::FromUTF8(value.data()));
 		m_disable_change_event = false;
 	}
-	void			set_value(const boost::any& value, bool change_event = false) override {
+	void			set_any_value(const boost::any& value, bool change_event = false) override {
 		m_disable_change_event = !change_event;
 		dynamic_cast<wxStaticText*>(window)->SetLabel(boost::any_cast<wxString>(value));
 		m_disable_change_event = false;
@@ -586,8 +610,8 @@ public:
 
 	void			BUILD()  override;
 
-	void			set_value(const int value, bool change_event = false);
-	void			set_value(const boost::any& value, bool change_event = false) override;
+	void			set_int_value(const int value, bool change_event = false);
+	void			set_any_value(const boost::any& value, bool change_event = false) override;
 	boost::any&		get_value() override;
 
 	void			enable() override {

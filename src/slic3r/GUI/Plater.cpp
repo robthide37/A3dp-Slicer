@@ -423,14 +423,14 @@ void FreqChangedParams::init()
     };
     
     std::vector<PageShp> pages;
-    if(tab_print  != nullptr) pages = tab_print->create_pages("freq_fff.ui");
+    if(tab_print  != nullptr) pages = tab_print->create_pages("freq_fff.ui", -1, Preset::Type::TYPE_FREQUENT_FFF);
     if (!pages.empty()) {
         m_og->set_config(config);
         m_og->hide_labels();
         m_og->m_on_change = Tab::set_or_add(m_og->m_on_change, [tab_print, this](t_config_option_key opt_key, boost::any value)
         //m_og->m_on_change = [tab_print, this](t_config_option_key opt_key, boost::any value)
             {
-                Option opt = this->m_og->get_option(opt_key);
+                Option opt = this->m_og->create_option_from_def(opt_key);
                 if (!opt.opt.is_script) {
                     tab_print->update_dirty();
                     tab_print->reload_config();
@@ -505,14 +505,14 @@ void FreqChangedParams::init()
     // Frequently changed parameters for SLA_technology
     tab_print = wxGetApp().get_tab(Preset::TYPE_SLA_PRINT);
     pages.clear();
-    if (tab_print != nullptr) pages = tab_print->create_pages("freq_sla.ui");
+    if (tab_print != nullptr) pages = tab_print->create_pages("freq_sla.ui", -1, Preset::Type::TYPE_FREQUENT_SLA);
     if (!pages.empty()) {
         std::shared_ptr<ConfigOptionsGroup> m_og_sla = m_og_other[ptSLA] = std::make_shared<ConfigOptionsGroup>(m_parent, "");
         m_og_sla->set_config(config);
         m_og_sla->hide_labels();
         m_og_sla->m_on_change = Tab::set_or_add(m_og_sla->m_on_change, [tab_print, this](t_config_option_key opt_key, boost::any value)
             {
-                Option opt = this->m_og_other[ptSLA]->get_option(opt_key);
+                Option opt = this->m_og_other[ptSLA]->create_option_from_def(opt_key);
                 if (!opt.opt.is_script) {
                     tab_print->update_dirty();
                     tab_print->reload_config();
@@ -1365,11 +1365,11 @@ void Sidebar::update_sliced_info_sizer()
             wxString str_total_cost = "N/A";
 
             DynamicPrintConfig* cfg = wxGetApp().get_tab(Preset::TYPE_SLA_MATERIAL)->get_config();
-            if (cfg->option("bottle_cost")->getFloat() > 0.0 &&
-                cfg->option("bottle_volume")->getFloat() > 0.0)
+            if (cfg->option("bottle_cost")->get_float() > 0.0 &&
+                cfg->option("bottle_volume")->get_float() > 0.0)
             {
-                double material_cost = cfg->option("bottle_cost")->getFloat() / 
-                                       cfg->option("bottle_volume")->getFloat();
+                double material_cost = cfg->option("bottle_cost")->get_float() / 
+                                       cfg->option("bottle_volume")->get_float();
                 str_total_cost = wxString::Format("%.3f", material_cost*(ps.objects_used_material + ps.support_used_material) / 1000);                
             }
             p->sliced_info->SetTextAndShow(siCost, str_total_cost, "Cost");
@@ -2665,7 +2665,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         config += std::move(config_loaded);
                     }
                     if (! config_substitutions.empty())
-                        show_substitutions_info(config_substitutions.substitutions, filename.string());
+                        show_substitutions_info(config_substitutions.get(), filename.string());
 
                     this->model.custom_gcode_per_print_z = model.custom_gcode_per_print_z;
                 }
@@ -2687,7 +2687,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         }
 
                         Preset::normalize(config);
-                        PresetBundle* preset_bundle = wxGetApp().preset_bundle;
+                        PresetBundle* preset_bundle = wxGetApp().preset_bundle.get();
                         preset_bundle->load_config_model(filename.string(), std::move(config));
                         q->notify_about_installed_presets();
 
@@ -5304,7 +5304,7 @@ void Plater::priv::undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator 
         this->undo_redo_stack().redo(model, this->view3D->get_canvas3d()->get_gizmos_manager(), it_snapshot->timestamp)) {
         if (printer_technology_changed) {
             // Switch to the other printer technology. Switch to the last printer active for that particular technology.
-            AppConfig *app_config = wxGetApp().app_config;
+            AppConfig *app_config = wxGetApp().app_config.get();
             app_config->set("presets", "printer", (new_printer_technology == ptFFF) ? m_last_fff_printer_profile_name : m_last_sla_printer_profile_name);
             //FIXME Why are we reloading the whole preset bundle here? Please document. This is fishy and it is unnecessarily expensive.
             // Anyways, don't report any config value substitutions, they have been already reported to the user at application start up.
@@ -6864,7 +6864,7 @@ static void alert_when_exporting_binary_gcode(bool binary_output, const std::str
       || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MK4")
       || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MK3.9")))
     {
-        AppConfig* app_config = wxGetApp().app_config;
+        AppConfig* app_config = get_app_config();
         wxWindow* parent = wxGetApp().mainframe;
         const std::string option_key = "dont_warn_about_firmware_version_when_exporting_binary_gcode";
 

@@ -700,10 +700,10 @@ void PrintObject::generate_support_spots()
         if (!this->shared_regions()->generated_support_points.has_value()) {
             PrintTryCancel                cancel_func = m_print->make_try_cancel();
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
-                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
-                                                 this->config().raft_layers.getInt(),
-                                                 float(this->config().brim_width.getFloat()),
-                                                 float(this->config().brim_width_interior.getFloat())};
+                                                 float(this->print()->m_config.get_computed_value("perimeter_acceleration")),
+                                                 this->config().raft_layers.value,
+                                                 float(this->config().brim_width.value),
+                                                 float(this->config().brim_width_interior.value)};
             auto [supp_points, partial_objects] = SupportSpotsGenerator::full_search(this, cancel_func, params);
             Transform3d po_transform            = this->trafo_centered();
             if (this->layer_count() > 0) {
@@ -811,18 +811,18 @@ void PrintObject::estimate_curled_extrusions()
     if (this->set_started(posEstimateCurledExtrusions)) {
         if (this->print()->config().avoid_crossing_curled_overhangs ||
             std::any_of(this->print()->m_print_regions.begin(), this->print()->m_print_regions.end(),
-                        [](const PrintRegion *region) { return region->config().enable_dynamic_overhang_speeds.getBool(); })) {
+                        [](const PrintRegion *region) { return region->config().enable_dynamic_overhang_speeds.value; })) {
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - start";
             m_print->set_status(88, _u8L("Estimating curled extrusions"));
 
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float                         support_flow_width = support_material_flow(this, this->config().layer_height).width();
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
-                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
-                                                 this->config().raft_layers.getInt(), 
-                                                 float(this->config().brim_width.getFloat()),
-                                                 float(this->config().brim_width_interior.getFloat())};
-            SupportSpotsGenerator::estimate_supports_malformations(this->support_layers(), support_flow_width, params);
+                                                 float(this->print()->m_config.get_computed_value("perimeter_acceleration")),
+                                                 this->config().raft_layers.value, 
+                                                 float(this->config().brim_width.value),
+                                                 float(this->config().brim_width_interior.value)};
+            SupportSpotsGenerator::estimate_supports_malformations(this->edit_support_layers(), support_flow_width, params);
             SupportSpotsGenerator::estimate_malformations(this->layers(), params);
             m_print->throw_if_canceled();
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - end";
@@ -839,7 +839,7 @@ void PrintObject::calculate_overhanging_perimeters()
         std::set<uint16_t>                      extruders;
         std::unordered_set<const PrintRegion *> regions_with_dynamic_speeds;
         for (const PrintRegion *pr : this->print()->m_print_regions) {
-            if (pr->config().enable_dynamic_overhang_speeds.getBool()) {
+            if (pr->config().enable_dynamic_overhang_speeds.value) {
                 regions_with_dynamic_speeds.insert(pr);
             }
             extruders.clear();
@@ -974,15 +974,14 @@ void PrintObject::clear_support_layers()
     m_support_layers.clear();
 }
 
-SupportLayer* PrintObject::add_support_layer(int id, int interface_id, coordf_t height, coordf_t print_z)
+void PrintObject::add_support_layer(int id, int interface_id, coordf_t height, coordf_t print_z)
 {
     m_support_layers.emplace_back(new SupportLayer(id, interface_id, this, height, print_z, -1));
-    return m_support_layers.back();
 }
 
-SupportLayerPtrs::iterator PrintObject::insert_support_layer(SupportLayerPtrs::const_iterator pos, size_t id, size_t interface_id, coordf_t height, coordf_t print_z, coordf_t slice_z)
+    SupportLayerPtrs::iterator PrintObject::insert_support_layer(SupportLayerPtrs::const_iterator pos, size_t id, size_t interface_id, coordf_t height, coordf_t print_z, coordf_t slice_z)
 {
-    return m_support_layers.insert(pos, new SupportLayer(id, interface_id, this, height, print_z, slice_z));
+        return m_support_layers.insert(pos, new SupportLayer(id, interface_id, this, height, print_z, slice_z));
 }
 
 // Called by Print::apply().
@@ -1178,7 +1177,9 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "solid_fill_pattern"
             || opt_key == "enforce_full_fill_volume"
             || opt_key == "fill_angle"
+            || opt_key == "fill_angle_cross"
             || opt_key == "fill_angle_increment"
+            || opt_key == "fill_angle_template"
             || opt_key == "fill_top_flow_ratio"
             || opt_key == "fill_smooth_width"
             || opt_key == "fill_smooth_distribution"
@@ -1262,7 +1263,8 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "min_bead_width") {
             steps.emplace_back(posSlice);
         } else if (
-               opt_key == "bridge_speed"
+               opt_key == "avoid_crossing_top"
+            || opt_key == "bridge_speed"
             || opt_key == "bridge_speed_internal"
             || opt_key == "enable_dynamic_overhang_speeds"
                 || opt_key == "overhang_speed_0"
@@ -1301,8 +1303,6 @@ bool PrintObject::invalidate_state_by_config_options(
             invalidated |= m_print->invalidate_step(psGCodeExport);
         } else if (
             opt_key == "brim_inside_holes"
-            || opt_key == "brim_width"
-            || opt_key == "brim_width_interior"
             || opt_key == "brim_ears"
             || opt_key == "brim_ears_detection_length"
             || opt_key == "brim_ears_max_angle"
@@ -1312,6 +1312,15 @@ bool PrintObject::invalidate_state_by_config_options(
             invalidated |= m_print->invalidate_step(psSkirtBrim);
             steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
+            steps.emplace_back(posSupportMaterial);
+        } else if (
+            opt_key == "brim_width"
+            || opt_key == "brim_width_interior") {
+            invalidated |= m_print->invalidate_step(psSkirtBrim);
+            // these two may change the ordering of first layer perimeters
+            steps.emplace_back(posPerimeters);
+            // Brim is printed below supports, support invalidates brim and skirt.
+            steps.emplace_back(posSupportSpotsSearch);
             steps.emplace_back(posSupportMaterial);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps
@@ -1546,7 +1555,7 @@ void PrintObject::tag_under_bridge() {
 
     for (const PrintRegion* region : this->m_print->print_regions_mutable()) {
         //count how many surface there are on each one
-        if (region->config().infill_dense.getBool() && region->config().fill_density < 40) {
+        if (region->config().infill_dense.get_bool() && region->config().fill_density < 40) {
             std::vector<LayerRegion*> layeridx2lregion;
             std::vector<Surfaces> new_surfaces; //surface store, as you can't modify them when working in //
             // store the LayerRegion on which we are working
@@ -3538,10 +3547,11 @@ static void apply_to_print_region_config(PrintRegionConfig &out, const DynamicPr
         if (it->first != key_extruder)
             if (ConfigOption* my_opt = out.option(it->first, false); my_opt != nullptr) {
                 if (one_of(it->first, keys_extruders)) {
+                    assert(dynamic_cast<ConfigOptionInt*>(my_opt));
                     // Ignore "default" extruders.
                     int extruder = static_cast<const ConfigOptionInt*>(it->second.get())->value;
                     if (extruder > 0)
-                        my_opt->setInt(extruder);
+                        static_cast<ConfigOptionInt *>(my_opt)->value = (extruder);
                 } else
                     my_opt->set(it->second.get());
             }

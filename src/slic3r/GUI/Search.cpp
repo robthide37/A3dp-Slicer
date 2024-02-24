@@ -41,21 +41,20 @@ namespace Search {
 
 static char marker_by_type(Preset::Type type, PrinterTechnology pt)
 {
-    switch(type) {
-    case Preset::TYPE_FFF_PRINT:
-    case Preset::TYPE_SLA_PRINT:
-        return ImGui::PrintIconMarker;
-    case Preset::TYPE_FFF_FILAMENT:
+    if (Preset::TYPE_FFF_FILAMENT == type) {
         return ImGui::FilamentIconMarker;
-    case Preset::TYPE_SLA_MATERIAL:
+    } else if (Preset::TYPE_SLA_MATERIAL == type) {
         return ImGui::MaterialIconMarker;
-    case Preset::TYPE_PRINTER:
+    } else if ((Preset::TYPE_PRINTER & type) == Preset::TYPE_PRINTER) {
         return pt == ptSLA ? ImGui::PrinterSlaIconMarker : ImGui::PrinterIconMarker;
-    case Preset::TYPE_PREFERENCES:
+    } else if ((Preset::TYPE_PREFERENCES & type) == Preset::TYPE_PREFERENCES) {
         return ImGui::PreferencesButton;
-    default:
-        return ' ';
-	}
+    } else if ((Preset::TYPE_PRINT1 & type) == Preset::TYPE_PRINT1 ||
+               (Preset::TYPE_FREQUENT & type) == Preset::TYPE_FREQUENT) {
+        return ImGui::PrintIconMarker;
+    }
+    assert(false);
+    return ImGui::PrintIconMarker;
 }
 
 std::string Option::opt_key_with_idx() const
@@ -532,6 +531,12 @@ void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode
     for (auto i : input_values)
         append_options(i.config, i.type);
 
+    for (Option &opt : script_options) {
+        if (Preset::get_tech(opt.type))
+            options.insert(options.end(), opt);
+    }
+    
+
     options.insert(options.end(), preferences_options.begin(), preferences_options.end());
 
     sort_options();
@@ -539,6 +544,41 @@ void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode
     search(search_line, true);
 }
 
+void OptionsSearcher::append_script_option(const ConfigOptionDef &opt,
+                                           Preset::Type       preset_type,
+                                           int16_t            idx)
+{
+    wxString label = opt.full_label;
+    if (label.IsEmpty())
+        label = opt.label;
+    if (label.IsEmpty())
+        return;
+    wxString tooltip = opt.tooltip;
+    wxString tooltip_lc = tooltip;
+    tooltip_lc.LowerCase();
+
+    std::string             key = get_key(opt.opt_key, preset_type);
+    const GroupAndCategory &gc  = get_group_and_category(key, opt.mode);
+    if (gc.group.IsEmpty() && gc.category.IsEmpty())
+        return; // have to do ConfigOptionGroup::register_to_search
+
+    script_options.emplace_back(Search::Option{
+        boost::nowide::widen(opt.opt_key),
+        preset_type,
+        idx,
+        opt.mode,
+        label.ToStdWstring(),
+        _(label).ToStdWstring(),
+        gc.group.ToStdWstring(),
+        _(gc.group).ToStdWstring(),
+        gc.category.ToStdWstring(),
+        _(gc.category).ToStdWstring(),
+        tooltip.ToStdWstring(),
+        _(tooltip).ToStdWstring(),
+        tooltip_lc.ToStdWstring(),
+        _(tooltip_lc).ToStdWstring(),
+    });
+}
 void OptionsSearcher::append_preferences_option(const GUI::Line& opt_line)
 {
     Preset::Type type = Preset::TYPE_PREFERENCES;
@@ -1031,9 +1071,11 @@ void SearchListModel::Clear()
 void SearchListModel::Prepend(const std::string& label)
 {
     const char icon_c = label.at(0);
-    int icon_idx = icon_idxs.at(icon_c);
-    wxString str = from_u8(label).Remove(0, 1);
+    wxString   str    = from_u8(label).Remove(0, 1);
 
+    int        icon_idx = 0; 
+    if(icon_c < icon_idxs.size())
+        icon_idx = icon_idxs.at(icon_c);
     m_values.emplace_back(str, icon_idx);
 
     RowPrepended();

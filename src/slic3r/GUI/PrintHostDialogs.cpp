@@ -55,7 +55,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
 #ifdef __APPLE__
     txt_filename->OSXDisableAllSmartSubstitutions();
 #endif
-    const AppConfig *app_config = wxGetApp().app_config;
+    const AppConfig *app_config = wxGetApp().app_config.get();
 
     auto *label_dir_hint = new wxStaticText(this, wxID_ANY, _L("Use forward slashes ( / ) as a directory separator if needed."));
     label_dir_hint->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
@@ -219,7 +219,7 @@ void PrintHostSendDialog::EndModal(int ret)
 		else
             path = path.SubString(0, last_slash);
                 
-		AppConfig *app_config = wxGetApp().app_config;
+		AppConfig *app_config = wxGetApp().app_config.get();
 		app_config->set("recent", CONFIG_KEY_PATH, into_u8(path));
 
         if (combo_groups != nullptr) {
@@ -546,7 +546,7 @@ void PrintHostQueueDialog::get_active_jobs(std::vector<std::pair<std::string, st
 void PrintHostQueueDialog::save_user_data(int udt)
 {
     const auto em = GetTextExtent("m").x;
-    auto *app_config = wxGetApp().app_config;
+    auto *app_config = wxGetApp().app_config.get();
     if (udt & UserDataType::UDT_SIZE) {
         
         app_config->set("print_host_queue_dialog_height", std::to_string(this->GetSize().x / em));
@@ -567,7 +567,7 @@ void PrintHostQueueDialog::save_user_data(int udt)
 }
 bool PrintHostQueueDialog::load_user_data(int udt, std::vector<int>& vector)
 {
-    auto* app_config = wxGetApp().app_config;
+    auto* app_config = wxGetApp().app_config.get();
     auto hasget = [app_config](const std::string& name, std::vector<int>& vector)->bool {
         if (app_config->has(name)) {
             std::string val = app_config->get(name);

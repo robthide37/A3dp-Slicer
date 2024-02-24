@@ -15,6 +15,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "libslic3r.h"
 
@@ -77,6 +78,13 @@ std::string debug_out_path(const char *name, ...);
 // A special type for strings encoded in the local Windows 8-bit code page.
 // This type is only needed for Perl bindings to relay to Perl that the string is raw, not UTF-8 encoded.
 typedef std::string local_encoded_string;
+
+// Convert an UTF-8 encoded string into local coding.
+// On Windows, the UTF-8 string is converted to a local 8-bit code page.
+// On OSX and Linux, this function does no conversion and returns a copy of the source string.
+extern local_encoded_string encode_path(const char *src);
+extern std::string decode_path(const char *src);
+extern std::string normalize_utf8_nfc(const char *src);
 
 // Returns next utf8 sequence length. =number of bytes in string, that creates together one utf-8 character. 
 // Starting at pos. ASCII characters returns 1. Works also if pos is in the middle of the sequence.

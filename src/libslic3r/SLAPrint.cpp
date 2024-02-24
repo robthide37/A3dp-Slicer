@@ -38,7 +38,7 @@ namespace Slic3r {
 
 bool is_zero_elevation(const SLAPrintObjectConfig &c)
 {
-    return c.pad_enable.getBool() && c.pad_around_object.getBool();
+    return c.pad_enable.value && c.pad_around_object.value;
 }
 
 // Compile the argument for support creation from the static print config.
@@ -46,62 +46,62 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
 {
     sla::SupportTreeConfig scfg;
 
-    scfg.enabled = c.supports_enable.getBool();
+    scfg.enabled = c.supports_enable.value;
     scfg.tree_type = c.support_tree_type.value;
 
     switch(scfg.tree_type) {
     case sla::SupportTreeType::Default: {
-        scfg.head_front_radius_mm = 0.5*c.support_head_front_diameter.getFloat();
-        double pillar_r = 0.5 * c.support_pillar_diameter.getFloat();
+        scfg.head_front_radius_mm = 0.5*c.support_head_front_diameter.value;
+        double pillar_r = 0.5 * c.support_pillar_diameter.value;
         scfg.head_back_radius_mm = pillar_r;
         scfg.head_fallback_radius_mm =
-            0.01 * c.support_small_pillar_diameter_percent.getFloat() * pillar_r;
-        scfg.head_penetration_mm = c.support_head_penetration.getFloat();
-        scfg.head_width_mm = c.support_head_width.getFloat();
+            0.01 * c.support_small_pillar_diameter_percent.value * pillar_r;
+        scfg.head_penetration_mm = c.support_head_penetration.value;
+        scfg.head_width_mm = c.support_head_width.value;
         scfg.object_elevation_mm = is_zero_elevation(c) ?
-                                       0. : c.support_object_elevation.getFloat();
-        scfg.bridge_slope = c.support_critical_angle.getFloat() * PI / 180.0 ;
-        scfg.max_bridge_length_mm = c.support_max_bridge_length.getFloat();
-        scfg.max_pillar_link_distance_mm = c.support_max_pillar_link_distance.getFloat();
+                                       0. : c.support_object_elevation.value;
+        scfg.bridge_slope = c.support_critical_angle.value * PI / 180.0 ;
+        scfg.max_bridge_length_mm = c.support_max_bridge_length.value;
+        scfg.max_pillar_link_distance_mm = c.support_max_pillar_link_distance.value;
         scfg.pillar_connection_mode = c.support_pillar_connection_mode.value;
-        scfg.ground_facing_only = c.support_buildplate_only.getBool();
-        scfg.pillar_widening_factor = c.support_pillar_widening_factor.getFloat();
-        scfg.base_radius_mm = 0.5*c.support_base_diameter.getFloat();
-        scfg.base_height_mm = c.support_base_height.getFloat();
+        scfg.ground_facing_only = c.support_buildplate_only.value;
+        scfg.pillar_widening_factor = c.support_pillar_widening_factor.value;
+        scfg.base_radius_mm = 0.5*c.support_base_diameter.value;
+        scfg.base_height_mm = c.support_base_height.value;
         scfg.pillar_base_safety_distance_mm =
-            c.support_base_safety_distance.getFloat() < EPSILON ?
-                scfg.safety_distance_mm : c.support_base_safety_distance.getFloat();
+            c.support_base_safety_distance.value < EPSILON ?
+                scfg.safety_distance_mm : c.support_base_safety_distance.value;
 
-        scfg.max_bridges_on_pillar = unsigned(c.support_max_bridges_on_pillar.getInt());
-        scfg.max_weight_on_model_support = c.support_max_weight_on_model.getFloat();
+        scfg.max_bridges_on_pillar = unsigned(c.support_max_bridges_on_pillar.value);
+        scfg.max_weight_on_model_support = c.support_max_weight_on_model.value;
         break;
     }
     case sla::SupportTreeType::Branching:
         [[fallthrough]];
     case sla::SupportTreeType::Organic:{
-        scfg.head_front_radius_mm = 0.5*c.branchingsupport_head_front_diameter.getFloat();
-        double pillar_r = 0.5 * c.branchingsupport_pillar_diameter.getFloat();
+        scfg.head_front_radius_mm = 0.5*c.branchingsupport_head_front_diameter.value;
+        double pillar_r = 0.5 * c.branchingsupport_pillar_diameter.value;
         scfg.head_back_radius_mm = pillar_r;
         scfg.head_fallback_radius_mm =
-            0.01 * c.branchingsupport_small_pillar_diameter_percent.getFloat() * pillar_r;
-        scfg.head_penetration_mm = c.branchingsupport_head_penetration.getFloat();
-        scfg.head_width_mm = c.branchingsupport_head_width.getFloat();
+            0.01 * c.branchingsupport_small_pillar_diameter_percent.value * pillar_r;
+        scfg.head_penetration_mm = c.branchingsupport_head_penetration.value;
+        scfg.head_width_mm = c.branchingsupport_head_width.value;
         scfg.object_elevation_mm = is_zero_elevation(c) ?
-                                       0. : c.branchingsupport_object_elevation.getFloat();
-        scfg.bridge_slope = c.branchingsupport_critical_angle.getFloat() * PI / 180.0 ;
-        scfg.max_bridge_length_mm = c.branchingsupport_max_bridge_length.getFloat();
-        scfg.max_pillar_link_distance_mm = c.branchingsupport_max_pillar_link_distance.getFloat();
+                                       0. : c.branchingsupport_object_elevation.value;
+        scfg.bridge_slope = c.branchingsupport_critical_angle.value * PI / 180.0 ;
+        scfg.max_bridge_length_mm = c.branchingsupport_max_bridge_length.value;
+        scfg.max_pillar_link_distance_mm = c.branchingsupport_max_pillar_link_distance.value;
         scfg.pillar_connection_mode = c.branchingsupport_pillar_connection_mode.value;
-        scfg.ground_facing_only = c.branchingsupport_buildplate_only.getBool();
-        scfg.pillar_widening_factor = c.branchingsupport_pillar_widening_factor.getFloat();
-        scfg.base_radius_mm = 0.5*c.branchingsupport_base_diameter.getFloat();
-        scfg.base_height_mm = c.branchingsupport_base_height.getFloat();
+        scfg.ground_facing_only = c.branchingsupport_buildplate_only.value;
+        scfg.pillar_widening_factor = c.branchingsupport_pillar_widening_factor.value;
+        scfg.base_radius_mm = 0.5*c.branchingsupport_base_diameter.value;
+        scfg.base_height_mm = c.branchingsupport_base_height.value;
         scfg.pillar_base_safety_distance_mm =
-            c.branchingsupport_base_safety_distance.getFloat() < EPSILON ?
-                scfg.safety_distance_mm : c.branchingsupport_base_safety_distance.getFloat();
+            c.branchingsupport_base_safety_distance.value < EPSILON ?
+                scfg.safety_distance_mm : c.branchingsupport_base_safety_distance.value;
 
-        scfg.max_bridges_on_pillar = unsigned(c.branchingsupport_max_bridges_on_pillar.getInt());
-        scfg.max_weight_on_model_support = c.branchingsupport_max_weight_on_model.getFloat();
+        scfg.max_bridges_on_pillar = unsigned(c.branchingsupport_max_bridges_on_pillar.value);
+        scfg.max_weight_on_model_support = c.branchingsupport_max_weight_on_model.value;
         break;
     }
     }
@@ -116,12 +116,11 @@ sla::PadConfig::EmbedObject builtin_pad_cfg(const SLAPrintObjectConfig& c)
     ret.enabled = is_zero_elevation(c);
     
     if(ret.enabled) {
-        ret.everywhere           = c.pad_around_object_everywhere.getBool();
-        ret.object_gap_mm        = c.pad_object_gap.getFloat();
-        ret.stick_width_mm       = c.pad_object_connector_width.getFloat();
-        ret.stick_stride_mm      = c.pad_object_connector_stride.getFloat();
-        ret.stick_penetration_mm = c.pad_object_connector_penetration
-                                       .getFloat();
+        ret.everywhere           = c.pad_around_object_everywhere.value;
+        ret.object_gap_mm        = c.pad_object_gap.value;
+        ret.stick_width_mm       = c.pad_object_connector_width.value;
+        ret.stick_stride_mm      = c.pad_object_connector_stride.value;
+        ret.stick_penetration_mm = c.pad_object_connector_penetration.value;
     }
     
     return ret;
@@ -131,12 +130,12 @@ sla::PadConfig make_pad_cfg(const SLAPrintObjectConfig& c)
 {
     sla::PadConfig pcfg;
     
-    pcfg.wall_thickness_mm = c.pad_wall_thickness.getFloat();
-    pcfg.wall_slope = c.pad_wall_slope.getFloat() * PI / 180.0;
+    pcfg.wall_thickness_mm = c.pad_wall_thickness.value;
+    pcfg.wall_slope = c.pad_wall_slope.value * PI / 180.0;
     
-    pcfg.max_merge_dist_mm = c.pad_max_merge_distance.getFloat();
-    pcfg.wall_height_mm = c.pad_wall_height.getFloat();
-    pcfg.brim_size_mm = c.pad_brim_size.getFloat();
+    pcfg.max_merge_dist_mm = c.pad_max_merge_distance.value;
+    pcfg.wall_height_mm = c.pad_wall_height.value;
+    pcfg.brim_size_mm = c.pad_brim_size.value;
     
     // set builtin pad implicitly ON
     pcfg.embed_object = builtin_pad_cfg(c);
@@ -556,7 +555,7 @@ std::pair<PrintBase::PrintValidationError, std::string> SLAPrint::validate(std::
     for(SLAPrintObject * po : m_objects) {
 
         const ModelObject *mo = po->model_object();
-        bool supports_en = po->config().supports_enable.getBool();
+        bool supports_en = po->config().supports_enable.value;
 
         if(supports_en &&
            mo->sla_points_status == sla::PointsStatus::UserModified &&
@@ -589,16 +588,16 @@ std::pair<PrintBase::PrintValidationError, std::string> SLAPrint::validate(std::
         if (!pval.empty()) return { PrintBase::PrintValidationError::pveWrongSettings, pval };
     }
 
-    double expt_max = m_printer_config.max_exposure_time.getFloat();
-    double expt_min = m_printer_config.min_exposure_time.getFloat();
-    double expt_cur = m_material_config.exposure_time.getFloat();
+    double expt_max = m_printer_config.max_exposure_time.value;
+    double expt_min = m_printer_config.min_exposure_time.value;
+    double expt_cur = m_material_config.exposure_time.value;
 
     if (expt_cur < expt_min || expt_cur > expt_max)
         return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("Exposition time is out of printer profile bounds.") };
 
-    double iexpt_max = m_printer_config.max_initial_exposure_time.getFloat();
-    double iexpt_min = m_printer_config.min_initial_exposure_time.getFloat();
-    double iexpt_cur = m_material_config.initial_exposure_time.getFloat();
+    double iexpt_max = m_printer_config.max_initial_exposure_time.value;
+    double iexpt_min = m_printer_config.min_initial_exposure_time.value;
+    double iexpt_cur = m_material_config.initial_exposure_time.value;
 
     if (iexpt_cur < iexpt_min || iexpt_cur > iexpt_max)
         return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("Initial exposition time is out of printer profile bounds.") };
@@ -794,6 +793,7 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "thumbnails_color",
         "thumbnails_custom_color",
         "thumbnails_end_file",
+        "thumbnails_tag_format",
         "thumbnails_with_bed",
         "thumbnails_with_support"
     };
@@ -980,11 +980,11 @@ bool SLAPrintObject::invalidate_all_steps()
 double SLAPrintObject::get_elevation() const {
     if (is_zero_elevation(m_config)) return 0.;
 
-    bool en = m_config.supports_enable.getBool();
+    bool en = m_config.supports_enable.value;
 
-    double ret = en ? m_config.support_object_elevation.getFloat() : 0.;
+    double ret = en ? m_config.support_object_elevation.value : 0.;
 
-    if(m_config.pad_enable.getBool()) {
+    if(m_config.pad_enable.value) {
         // Normally the elevation for the pad itself would be the thickness of
         // its walls but currently it is half of its thickness. Whatever it
         // will be in the future, we provide the config to the get_pad_elevation
@@ -1006,7 +1006,7 @@ double SLAPrintObject::get_current_elevation() const
     if(!has_supports && !has_pad)
         return 0;
     else if(has_supports && !has_pad) {
-        return m_config.support_object_elevation.getFloat();
+        return m_config.support_object_elevation.value;
     }
 
     return get_elevation();
@@ -1067,7 +1067,7 @@ const ExPolygons &SliceRecord::get_slice(SliceOrigin o) const
 
 const TriangleMesh& SLAPrintObject::support_mesh() const
 {
-    if (m_config.supports_enable.getBool() &&
+    if (m_config.supports_enable.value &&
         is_step_done(slaposSupportTree) &&
         m_supportdata)
         return m_supportdata->tree_mesh;
@@ -1077,7 +1077,7 @@ const TriangleMesh& SLAPrintObject::support_mesh() const
 
 const TriangleMesh& SLAPrintObject::pad_mesh() const
 {
-    if(m_config.pad_enable.getBool() && is_step_done(slaposPad) && m_supportdata)
+    if(m_config.pad_enable.value && is_step_done(slaposPad) && m_supportdata)
         return m_supportdata->pad_mesh;
 
     return EMPTY_MESH;

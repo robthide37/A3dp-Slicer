@@ -154,7 +154,7 @@ public:
     Point place_seam(const Layer *layer, const ExtrusionLoop &loop, const uint16_t print_object_instance_idx, const Point &last_pos) const;
 
 private:
-    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info, bool is_all_random);
+    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info, SeamPosition configured_seam_preference);
     void calculate_candidates_visibility(const PrintObject *po,
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs_and_layer_embedding(const PrintObject *po);

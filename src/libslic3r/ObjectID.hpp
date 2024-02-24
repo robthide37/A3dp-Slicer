@@ -82,7 +82,7 @@ protected:
     // Override this method if a ObjectBase derived class owns other ObjectBase derived instances.
     virtual void assign_new_unique_ids_recursive() { this->set_new_unique_id(); }
 
-private:
+//private:
     ObjectID                m_id;
 
 	static inline ObjectID  generate_new_id() { return ObjectID(++ s_last_id); }

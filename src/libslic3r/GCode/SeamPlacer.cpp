@@ -411,77 +411,104 @@ struct GlobalModelInfo {
 ;
 
 //Extract perimeter polygons of the given layer
-Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerRegion*> &corresponding_regions_out, bool allrandom) {
+Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerRegion*> &corresponding_regions_out, SeamPosition configured_seam_preference, PerimeterGeneratorType perimeter_type) {
     
 
     Polygons polygons;
     class PerimeterCopy : public ExtrusionVisitorConst {
         Polygons* polygons;
-        std::vector<const LayerRegion*>* corresponding_regions_out;
-        LayerRegion* current_layer_region;
-        bool allrandom;
+        std::vector<const LayerRegion*>& m_corresponding_regions_out;
+        const LayerRegion* current_layer_region;
+        SeamPosition configured_seam_preference;
+        PerimeterGeneratorType perimeter_type;
     public:
-        PerimeterCopy(std::vector<const LayerRegion*>* regions_out, Polygons* polys, bool allrandom)
-            : corresponding_regions_out(regions_out), allrandom(allrandom), polygons(polys) {
+        bool also_overhangs = false;
+        bool also_thin_walls = false;
+        PerimeterCopy(std::vector<const LayerRegion*>& regions_out, Polygons* polys, SeamPosition configured_seam, PerimeterGeneratorType perimeter_type)
+            : m_corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polygons(polys), perimeter_type(perimeter_type) {
         }
-        virtual void default_use(const ExtrusionEntity& entity) { };
-        virtual void use(const ExtrusionLoop& loop) override {
-            ExtrusionRole role = loop.role();
-            for (const ExtrusionPath& path : loop.paths) {
-                if (path.role() ==  ExtrusionRole::ExternalPerimeter) {
-                    role =  ExtrusionRole::ExternalPerimeter;
+        virtual void default_use(const ExtrusionEntity& entity) {};
+        virtual void use(const ExtrusionPath &path) override {
+            if (perimeter_type == PerimeterGeneratorType::Arachne && path.role() != ExtrusionRole::ThinWall) {
+                path.polygons_covered_by_width(*polygons, SCALED_EPSILON);
+                while (m_corresponding_regions_out.size() < polygons->size()) {
+                    m_corresponding_regions_out.push_back(current_layer_region);
                 }
             }
-
-            if (role ==  ExtrusionRole::ExternalPerimeter || (role.is_perimeter() && allrandom))
-                { // for random seam alignment, extract all perimeters
+        }
+        virtual void use(const ExtrusionLoop& loop) override {
+            if (   (configured_seam_preference == spAllRandom && !loop.paths.empty() && loop.paths.front().role().is_perimeter())
+                || (also_thin_walls && loop.role() == ExtrusionRole::ThinWall)) {
                 Points p;
                 loop.collect_points(p);
                 polygons->emplace_back(std::move(p));
-                corresponding_regions_out->push_back(current_layer_region);
+                m_corresponding_regions_out.push_back(current_layer_region);
+                return;
+            } else {
+                Points p;
+                for (const ExtrusionPath &path : loop.paths) {
+                    if (path.role() == ExtrusionRole::ExternalPerimeter) {
+                        path.collect_points(p);
+                    }
+                    if (path.role() == ExtrusionRole::OverhangPerimeter &&
+                        also_overhangs) { // TODO find a way to search for external overhangs only
+                        path.collect_points(p);
+                    }
+                    //if (path.role() == ExtrusionRole::erThinWall && also_thin_walls) {
+                    //    path.collect_points(p); // TODO: 2.7: reactivate when it's possible to distinguish between thinwalltravel & thinextrusions
+                    // // currently, only looking for thinwall-only loop
+                    //}
+                }
+
+                if (!p.empty()) { // for random seam alignment, extract all perimeters
+                    polygons->emplace_back(std::move(p));
+                    m_corresponding_regions_out.push_back(current_layer_region);
+                }
             }
         }
-        virtual void use(const ExtrusionEntityCollection& collection) override {
-            for (const ExtrusionEntity* entity : collection.entities()) {
-                entity->visit(*this);
+        virtual void use(const ExtrusionMultiPath& collection) override {
+            
+            if (perimeter_type == PerimeterGeneratorType::Arachne) {
+                Polygons polys;
+                for (const ExtrusionPath& path : collection.paths) {
+                    path.polygons_covered_by_width(polys, SCALED_EPSILON);
+                }
+                polys = union_(polys);
+                append(*polygons, polys);
+                while (m_corresponding_regions_out.size() < polygons->size()) {
+                    m_corresponding_regions_out.push_back(current_layer_region);
+                }
             }
         }
-    } visitor(&corresponding_regions_out, &polygons, allrandom);
+        void set_current_layer_region(const LayerRegion *set) { current_layer_region = set; }
+    } visitor(corresponding_regions_out, &polygons, configured_seam_preference, perimeter_type);
 
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters()) {
-            if (ex_entity->is_collection()) { //collection of inner, outer, and overhang perimeters
+            visitor.set_current_layer_region(layer_region);
+            assert(ex_entity->is_collection()); //collection of inner, outer, and overhang perimeters
+            ex_entity->visit(visitor);
+            if (polygons.empty()) {
+                // maybe only thin walls?
+                visitor.also_thin_walls = true;
                 ex_entity->visit(visitor);
-/*
-                for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities()) {
-                    ExtrusionRole role = perimeter->role();
-                    if (perimeter->is_loop()) {
-                        for (const ExtrusionPath &path : static_cast<const ExtrusionLoop*>(perimeter)->paths) {
-                            if (path.role() == ExtrusionRole::ExternalPerimeter) {
-                                role = ExtrusionRole::ExternalPerimeter;
-                            }
-                        }
-                    }
-
-                    if (role == ExtrusionRole::ExternalPerimeter) {
+                if (polygons.empty()) {
+                    // can happen if the external is fully an overhang
+                    visitor.also_overhangs = true;
+                    ex_entity->visit(visitor);
+                    visitor.also_overhangs = false;
+                    if (polygons.empty()) {
+                        // shouldn't happen
+                        ex_entity->visit(visitor);
+                        assert(ex_entity->role() == ExtrusionRole::ThinWall); // no loops
+                        // what to do in this case?
                         Points p;
-                        perimeter->collect_points(p);
+                        ex_entity->collect_points(p);
                         polygons.emplace_back(std::move(p));
                         corresponding_regions_out.push_back(layer_region);
                     }
                 }
-*/
-                if (polygons.empty()) {
-                    Points p;
-                    ex_entity->collect_points(p);
-                    polygons.emplace_back(std::move(p));
-                    corresponding_regions_out.push_back(layer_region);
-                }
-            } else {
-                Points p;
-                ex_entity->collect_points(p);
-                polygons.emplace_back(std::move(p));
-                corresponding_regions_out.push_back(layer_region);
+                visitor.also_thin_walls = false;
             }
         }
     }
@@ -491,7 +518,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
         polygons.emplace_back(Points{ { 0, 0 } });
         corresponding_regions_out.push_back(nullptr);
     }
-
+    assert(corresponding_regions_out.size() == polygons.size());
     return polygons;
 }
 
@@ -804,8 +831,8 @@ struct SeamComparator {
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
     // should return if a is better seamCandidate than b
-    bool is_first_better(const SeamCandidate &a, const SeamCandidate &b, const Vec2f &preffered_location = Vec2f { 0.0f,
-            0.0f }) const {
+    bool is_first_better(const SeamCandidate &a, const SeamCandidate &b, const Vec2f &preffered_location = Vec2f { 0.0f, 0.0f}) const
+    {
         if ((setup == SeamPosition::spAligned || setup == SeamPosition::spExtremlyAligned) && a.central_enforcer != b.central_enforcer) {
             return a.central_enforcer;
         }
@@ -1067,13 +1094,13 @@ void pick_random_seam_point(const std::vector<SeamCandidate> &perimeter_points, 
 // Parallel process and extract each perimeter polygon of the given print object.
 // Gather SeamCandidates of each layer into vector and build KDtree over them
 // Store results in the SeamPlacer variables m_seam_per_object
-void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info, bool is_all_random) {
+void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info, SeamPosition configured_seam_preference) {
     using namespace SeamPlacerImpl;
     PrintObjectSeamData &seam_data = m_seam_per_object.emplace(po, PrintObjectSeamData { }).first->second;
     seam_data.layers.resize(po->layer_count());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [po, &global_model_info, &seam_data, is_all_random]
+            [po, &global_model_info, &seam_data, configured_seam_preference]
             (tbb::blocked_range<size_t> r) {
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     PrintObjectSeamData::LayerSeams &layer_seams = seam_data.layers[layer_idx];
@@ -1081,7 +1108,7 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerI
                     auto unscaled_z = layer->slice_z;
                     std::vector<const LayerRegion*> regions;
                     //NOTE corresponding region ptr may be null, if the layer has zero perimeters
-                    Polygons polygons = extract_perimeter_polygons(layer, regions, is_all_random);
+                    Polygons polygons = extract_perimeter_polygons(layer, regions, configured_seam_preference, po->config().perimeter_generator.value);
                     for (size_t poly_index = 0; poly_index < polygons.size(); ++poly_index) {
                         process_perimeter_polygon(polygons[poly_index], unscaled_z,
                                 regions[poly_index], global_model_info, layer_seams);
@@ -1583,7 +1610,7 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
             throw_if_canceled_func();
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: start";
-            gather_seam_candidates(po, global_model_info, configured_seam_preference == spAllRandom);
+            gather_seam_candidates(po, global_model_info, configured_seam_preference);
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: end";
             throw_if_canceled_func();

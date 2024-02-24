@@ -85,7 +85,7 @@ void fill_iniconf(ConfMap &m, const SLAPrint &print)
     double used_material = (stats.objects_used_material +
                             stats.support_used_material) / 1000;
     
-    int num_fade = print.default_object_config().faded_layers.getInt();
+    int num_fade = print.default_object_config().faded_layers.value;
     num_fade = num_fade >= 0 ? num_fade : 0;
     
     m["usedMaterial"] = std::to_string(used_material);
@@ -138,15 +138,15 @@ std::unique_ptr<sla::RasterBase> SL1Archive::create_raster() const
     sla::PixelDim   pxdim;
     std::array<bool, 2>         mirror;
 
-    double w  = m_cfg.display_width.getFloat();
-    double h  = m_cfg.display_height.getFloat();
-    auto   pw = size_t(m_cfg.display_pixels_x.getInt());
-    auto   ph = size_t(m_cfg.display_pixels_y.getInt());
+    double w  = m_cfg.display_width.value;
+    double h  = m_cfg.display_height.value;
+    auto   pw = size_t(m_cfg.display_pixels_x.value);
+    auto   ph = size_t(m_cfg.display_pixels_y.value);
 
-    mirror[X] = m_cfg.display_mirror_x.getBool();
-    mirror[Y] = m_cfg.display_mirror_y.getBool();
+    mirror[X] = m_cfg.display_mirror_x.value;
+    mirror[Y] = m_cfg.display_mirror_y.value;
     
-    auto ro = m_cfg.display_orientation.getInt();
+    auto ro = m_cfg.display_orientation.value;
     sla::RasterBase::Orientation orientation =
         ro == sla::RasterBase::roPortrait ? sla::RasterBase::roPortrait :
                                             sla::RasterBase::roLandscape;
@@ -160,7 +160,7 @@ std::unique_ptr<sla::RasterBase> SL1Archive::create_raster() const
     pxdim = sla::PixelDim{w / pw, h / ph};
     sla::RasterBase::Trafo tr{orientation, mirror};
 
-    double gamma = m_cfg.gamma_correction.getFloat();
+    double gamma = m_cfg.gamma_correction.value;
 
     return sla::create_raster_grayscale_aa(res, pxdim, gamma, tr);
 }

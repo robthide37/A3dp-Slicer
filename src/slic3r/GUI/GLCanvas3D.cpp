@@ -254,8 +254,8 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas)
         assert(extruders_min_height->values.size() == extruders_max_height->values.size());
         assert(extruders_min_height->values.size() == nozzle_diameter->values.size());
         for (size_t idx_extruder = 0; idx_extruder < extruders_min_height->values.size(); ++idx_extruder) {
-            min_height = std::min(min_height, float(extruders_min_height->get_abs_value(idx_extruder, nozzle_diameter->getFloat(idx_extruder))));
-            max_height = std::max(max_height, float(extruders_max_height->get_abs_value(idx_extruder, nozzle_diameter->getFloat(idx_extruder))));
+            min_height = std::min(min_height, float(extruders_min_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
+            max_height = std::max(max_height, float(extruders_max_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
         }
         min_height = check_z_step(min_height, z_step);
         max_height = check_z_step(max_height, z_step);
@@ -1429,7 +1429,7 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas *canvas, Bed3D &bed)
       m_labels(*this),
       m_slope(m_volumes),
       m_sla_view(*this),
-      m_arrange_settings_db{wxGetApp().app_config},
+      m_arrange_settings_db{get_app_config()},
       m_arrange_settings_dialog{wxGetApp().imgui(), &m_arrange_settings_db}
 {
     if (m_canvas != nullptr) {
@@ -3673,7 +3673,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_dirty = true;
     };
 
-    auto* app_config = GUI::wxGetApp().app_config;
+    auto* app_config = get_app_config();
     bool focus_platter_on_mouse = app_config->get("focus_platter_on_mouse") == "1";
     if (m_gizmos.on_mouse(evt)) {
         if (focus_platter_on_mouse) {
@@ -6999,7 +6999,7 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
                 if (!print_object->brim().empty())
                     for (const PrintInstance& inst : print_object->instances()) {
                         if (!print_object->brim().empty()) volume = ensure_volume_is_ready(volume, init_data);
-                        _3DScene::extrusionentity_to_verts(print_object->brim(), print_zs[i], inst.shift, init_data);
+                        _3DScene::extrusionentity_to_verts(print_object->brim(), print_zs[i], print->config().complete_objects? inst.shift : Point(0, 0), init_data);
                     }
                 if (print_object->skirt_first_layer())
                     for (const PrintInstance& inst : print_object->instances()) {
@@ -7018,7 +7018,7 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
             if ( !print_object->skirt().empty() && (i != 0 || !print_object->skirt_first_layer()))
                 for (const PrintInstance& inst : print_object->instances()) {
                     if (!print_object->skirt().empty()) volume = ensure_volume_is_ready(volume, init_data);
-                    _3DScene::extrusionentity_to_verts(print_object->skirt(), print_zs[i], inst.shift, init_data);
+                    _3DScene::extrusionentity_to_verts(print_object->skirt(), print_zs[i], print->config().complete_objects? inst.shift : Point(0, 0), init_data);
                 }
         }
     }
@@ -7312,16 +7312,18 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject &               
                         for (const ExtrusionEntity *ee : layerm->fills()) {
                             // fill represents infill extrusions of a single island.
                             const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
-                            if (fill != nullptr && !fill->entities().empty())
+                            if (fill != nullptr && !fill->entities().empty()) {
+                                bool has_solid_infill = HasRoleVisitor::search(fill->entities(), HasSolidInfillVisitor{});
                                 _3DScene::extrusionentity_to_verts(*fill, float(layer->print_z), copy,
                                                                    select_geometry(idx_layer,
-                                                                                   fill->entities().front()->role().is_solid_infill() ?
+                                                                                   has_solid_infill ?
                                                                                        layerm->region().config().solid_infill_extruder :
                                                                                        layerm->region().config().infill_extruder,
-                                                                                   fill->entities().front()->role().is_solid_infill() ?
+                                                                                   has_solid_infill ?
                                                                                        GCodeExtrusionRole::SolidInfill :
                                                                                        GCodeExtrusionRole::InternalInfill),
                                                                    feature_to_geometry_map);
+                            }
                         }
                     }
                 }

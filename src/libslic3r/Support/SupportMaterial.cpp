@@ -423,7 +423,7 @@ void PrintObjectSupportMaterial::generate(PrintObject &object)
 #endif /* SLIC3R_DEBUG */
 
     // Generate the actual toolpaths and save them into each layer.
-    generate_support_toolpaths(object.support_layers(), *m_object_config, m_support_params, *m_slicing_params, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
+    generate_support_toolpaths(object.edit_support_layers(), *m_object_config, m_support_params, *m_slicing_params, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
 
 #ifdef SLIC3R_DEBUG
     {
@@ -1016,6 +1016,7 @@ namespace SupportMaterialInternal {
                     return true;
             } else {
                 assert(! ee->is_loop());
+                // TODO: a bit dangerous, is there possible to have a bridge infill with mixed role?
                 if (ee->role().is_bridge())
                     return true;
             }
@@ -2482,7 +2483,7 @@ void PrintObjectSupportMaterial::generate_base_layers(
                 // Following cases are recognized:
                 // 1) top.bottom_z >= base.top_z -> No overlap, no trimming needed.
                 // 2) base.bottom_z >= top.print_z -> No overlap, no trimming needed.
-                // 3) base.print_z > top.print_z  && base.bottom_z >= top.bottom_z -> Overlap, which will be solved inside generate_toolpaths() by reducing the base layer height where it overlaps the top layer. No trimming needed here.
+                // 3) base.print_z > top.print_z  && base.bottom_z >= top.bottom_z -> Overlap, which will be solved inside generate_support_toolpaths() by reducing the base layer height where it overlaps the top layer. No trimming needed here.
                 // 4) base.print_z > top.bottom_z && base.bottom_z < top.bottom_z -> Base overlaps with top.bottom_z. This must not happen.
                 // 5) base.print_z <= top.print_z  && base.bottom_z >= top.bottom_z -> Base is fully inside top. Trim base by top.
                 idx_top_contact_above = idx_lower_or_equal(top_contacts, idx_top_contact_above, 
@@ -2519,7 +2520,7 @@ void PrintObjectSupportMaterial::generate_base_layers(
                 // Following cases are recognized:
                 // 1) bottom.bottom_z >= base.top_z -> No overlap, no trimming needed.
                 // 2) base.bottom_z >= bottom.print_z -> No overlap, no trimming needed.
-                // 3) base.print_z > bottom.bottom_z && base.bottom_z < bottom.bottom_z -> Overlap, which will be solved inside generate_toolpaths() by reducing the bottom layer height where it overlaps the base layer. No trimming needed here.
+                // 3) base.print_z > bottom.bottom_z && base.bottom_z < bottom.bottom_z -> Overlap, which will be solved inside generate_support_toolpaths() by reducing the bottom layer height where it overlaps the base layer. No trimming needed here.
                 // 4) base.print_z > bottom.print_z  && base.bottom_z >= bottom.print_z -> Base overlaps with bottom.print_z. This must not happen.
                 // 5) base.print_z <= bottom.print_z && base.bottom_z >= bottom.bottom_z -> Base is fully inside top. Trim base by top.
                 idx_bottom_contact_overlapping = idx_lower_or_equal(bottom_contacts, idx_bottom_contact_overlapping, 

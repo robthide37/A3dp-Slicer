@@ -1512,7 +1512,7 @@ ConfigSubstitutions load_from_slic3r_gcode_file(const std::string& filename, Dyn
     if (key_value_pairs < 80)
         throw Slic3r::RuntimeError(format("Suspiciously low number of configuration values extracted from %1%: %2%", filename, key_value_pairs));
 
-    return std::move(substitutions_ctxt.substitutions);
+    return std::move(substitutions_ctxt).data();
 }
 
 void GCodeProcessor::apply_config_superslicer(const std::string& filename)
@@ -1531,7 +1531,7 @@ void GCodeProcessor::apply_config_prusaslicer(const std::string& filename)
     // Showing substitution log or errors may make sense, but we are not really reading many values from the G-code config,
     // thus a probability of incorrect substitution is low and the G-code viewer is a consumer-only anyways.
     load_from_slic3r_gcode_file(filename, config, ForwardCompatibilitySubstitutionRule::EnableSilent);
-    config.convert_from_prusa();
+    config.convert_from_prusa(true);
     apply_config(config);
 }
 

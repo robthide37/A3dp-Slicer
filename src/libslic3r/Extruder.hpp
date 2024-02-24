@@ -10,6 +10,8 @@
 #ifndef slic3r_Extruder_hpp_
 #define slic3r_Extruder_hpp_
 
+#include <optional>
+
 #include "libslic3r.h"
 #include "GCode/GcodeFormatter.hpp"
 #include "Point.hpp"
@@ -39,7 +41,7 @@ public:
     // second - number to emit to G-code: This may be delta for relative mode or a distance from last reset_E() for absolute mode.
     // They also quantize the E axis to G-code resolution.
     virtual std::pair<double, double> extrude(double dE);
-    virtual std::pair<double, double> retract(double retract_length, double restart_extra, double restart_extra_from_toolchange);
+    virtual std::pair<double, double> retract(double retract_length, std::optional<double> restart_extra, std::optional<double> restart_extra_from_toolchange);
     virtual std::pair<double, double> unretract();
     virtual void                      reset_retract();
     virtual bool                      need_unretract();
