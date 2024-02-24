@@ -1248,16 +1248,18 @@ static inline std::vector<const PrintInstance*> sort_object_instances_by_max_y(c
             instances.emplace_back(&object->instances()[i]);
             // Calculate the convex hull of a printable object. 
             Polygon poly = object->model_object()->convex_hull_2d(
-                Geometry::assemble_transform(Vec3d::Zero(),
-                    object->instances()[i].model_instance->get_rotation(), 
-                    object->instances()[i].model_instance->get_scaling_factor(), 
-                    object->instances()[i].model_instance->get_mirror()));
-            poly.translate(object->instances()[i].shift - object->center_offset());
-            coord_t min_y = poly.first_point().y();
-            for (const Point& point : poly.points)
-                if (point.y() < min_y)
-                    min_y = point.y();
-            map_min_y[instances.back()] = min_y;
+                object->trafo()
+                // already in object->trafo()
+                //* Geometry::assemble_transform(Vec3d::Zero(),
+                //    object->instances()[i].model_instance->get_rotation(), 
+                //    object->instances()[i].model_instance->get_scaling_factor(), 
+                //    object->instances()[i].model_instance->get_mirror())
+            );
+            BoundingBox bb(poly.points);
+            Vec2crd offset = object->instances()[i].shift - object->center_offset();
+            bb.translate(offset.x(), offset.y());
+            std::cout<<"bbobj (mod*inst) "<<i<<" : x:"<<unscaled(bb.min.x())<<"->"<<unscaled(bb.max.x())<<" ; y:"<<unscaled(bb.min.y())<<"->"<<unscaled(bb.max.y())<<"\n";
+            map_min_y[instances.back()] = bb.min.y();
         }
     }
     std::sort(instances.begin(), instances.end(), [&map_min_y](const PrintInstance* po1, const PrintInstance* po2) { return map_min_y[po1] < map_min_y[po2]; });
