@@ -120,17 +120,19 @@ public:
     enum Type : uint8_t
     {
         TYPE_INVALID = 0,
-        TYPE_PRINT1 = 1 << 0,
-        TYPE_MATERIAL = 1 << 1,
-        TYPE_PRINTER = 1 << 2,
+        TYPE_FFF = 1 << 0,
+        TYPE_SLA = 1 << 1,
+        TYPE_PRINT1 = 1 << 2,
+        TYPE_MATERIAL = 1 << 3,
+        TYPE_PRINTER = 1 << 4,
+
         TYPE_TAB = TYPE_PRINT1 | TYPE_MATERIAL | TYPE_PRINTER,
-        TYPE_FFF = 1 << 3,
         TYPE_FFF_PRINT = TYPE_FFF | TYPE_PRINT1,
         TYPE_FFF_FILAMENT = TYPE_FFF | TYPE_MATERIAL,
-        TYPE_SLA = 1 << 4,
         TYPE_SLA_PRINT = TYPE_SLA | TYPE_PRINT1,
         TYPE_SLA_MATERIAL = TYPE_SLA | TYPE_MATERIAL,
         TYPE_TECHNOLOGY = TYPE_FFF | TYPE_SLA,
+
 
         TYPE_FREQUENT     = 1 << 5,
         TYPE_FREQUENT_FFF = TYPE_FFF | TYPE_FREQUENT,

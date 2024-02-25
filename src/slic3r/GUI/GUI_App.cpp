@@ -1966,7 +1966,6 @@ const std::string GUI_App::get_html_bg_color(wxWindow* html_parent)
 std::string GUI_App::get_first_mode_btn_color(ConfigOptionMode mode_id) const
 {
     assert(0 <= size_t(mode_id));
-    assert(size_t(mode_id)< get_app_config()->tags().size());
                            
     for (const AppConfig::Tag& tag : get_app_config()->tags()) {
         // get the first good tag.

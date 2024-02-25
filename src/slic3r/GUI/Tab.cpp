@@ -1475,7 +1475,7 @@ void Tab::activate_option(const std::string& opt_key, const wxString& category)
     auto set_focus = [](wxWindow* win) {
         win->SetFocus();
 #ifdef WIN32
-        if (wxTextCtrl* text = dynamic_cast<wxTextCtrl*>(win))
+        if (TextInput* text = dynamic_cast<TextInput*>(win))
             text->SetSelection(-1, -1);
         else if (wxSpinCtrl* spin = dynamic_cast<wxSpinCtrl*>(win))
             spin->SetSelection(-1, -1);
@@ -2284,23 +2284,18 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     } else if (boost::starts_with(params[i], "int")) {
                         option.opt.type = coInt;
                         option.opt.set_default_value(new ConfigOptionInt(0));
-                        fct_add_enum(params[i], ConfigOptionDef::GUIType::i_enum_open);
                     } else if (boost::starts_with(params[i], "float_or_percent")) {
                         option.opt.type = coFloatOrPercent;
                         option.opt.set_default_value(new ConfigOptionFloatOrPercent(0.f, false));
-                        fct_add_enum(params[i], ConfigOptionDef::GUIType::f_enum_open);
                     } else if (boost::starts_with(params[i], "float")) {
                         option.opt.type = coFloat;
                         option.opt.set_default_value(new ConfigOptionFloat(0.));
-                        fct_add_enum(params[i], ConfigOptionDef::GUIType::f_enum_open);
                     } else if (boost::starts_with(params[i], "percent")) {
                         option.opt.type = coPercent;
                         option.opt.set_default_value(new ConfigOptionPercent(0));
-                        fct_add_enum(params[i], ConfigOptionDef::GUIType::f_enum_open);
                     } else if (boost::starts_with(params[i], "string")) {
                         option.opt.type = coString;
                         option.opt.set_default_value(new ConfigOptionString(""));
-                        fct_add_enum(params[i], ConfigOptionDef::GUIType::select_open);
                     } else if (boost::starts_with(params[i], "enum")) {
                         option.opt.type = coEnum;
                         std::vector<std::string> enum_strs;
@@ -2480,6 +2475,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 current_page->descriptions.push_back("top_bottom_shell");
             } else if (boost::starts_with(full_line, "parent_preset_description")) {
                 build_preset_description_line(current_group.get());
+                current_page->descriptions.push_back("parent_preset");
             } else if (boost::starts_with(full_line, "cooling_description")) {
                 TabFilament *tab = nullptr;
                 if ((tab = dynamic_cast<TabFilament *>(this)) == nullptr)
@@ -3031,17 +3027,17 @@ PageShp TabFilament::create_filament_overrides_page()
     return page;
 }
 
-std::optional<ConfigOptionsGroupShp> get_option_group(const Page* page, const std::string& title) {
-    //don't use that, group title can change!
-    assert(false);
+std::optional<ConfigOptionsGroupShp> get_option_group_for_filament_overrides(const Page* page, const std::string& title) {
     auto og_it = std::find_if(
         page->m_optgroups.begin(), page->m_optgroups.end(),
         [&](const ConfigOptionsGroupShp& og) {
             return og->title == title;
         }
     );
-    if (og_it == page->m_optgroups.end())
+    if (og_it == page->m_optgroups.end()) {
+        assert(false);
         return {};
+    }
     return *og_it;
 }
 
@@ -3072,7 +3068,7 @@ void TabFilament::update_filament_overrides_page()
     );
 
     for (const auto&[title, keys] : fff_filament_override_option_keys) {
-        std::optional<ConfigOptionsGroupShp> optgroup{get_option_group(page, title)};
+        std::optional<ConfigOptionsGroupShp> optgroup{get_option_group_for_filament_overrides(page, title)};
         if (!optgroup) {
             continue;
         }
@@ -5804,42 +5800,42 @@ void TabPrinter::update_machine_limits_description(const MachineLimitsUsage usag
         wxColour color = (std::set<uint8_t>{gcfKlipper, gcfMach3, gcfMachinekit, gcfMakerWare, gcfSailfish, gcfTeacup}.count(flavor) > 0) ? grey_color : black_color;
             for (const std::string& axis : axes) {
                 field = m_active_page->get_field("machine_max_feedrate_" + axis, 0);
-                if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+                if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
             }
         color = (std::set<uint8_t>{gcfKlipper, gcfSmoothie, gcfMach3, gcfMachinekit, gcfMakerWare, gcfSailfish, gcfTeacup}.count(flavor) > 0) ? grey_color : black_color;
             for (const std::string& axis : axes) {
                 field = m_active_page->get_field("machine_max_acceleration_" + axis, 0);
-                if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+                if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
             }
         color = (std::set<uint8_t>{gcfSmoothie, gcfMach3, gcfMachinekit, gcfMakerWare, gcfSailfish, gcfTeacup}.count(flavor) > 0) ? grey_color : black_color;
         {
             field = m_active_page->get_field("machine_max_acceleration_extruding", 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
         color = (flavor != gcfMarlinLegacy && flavor != gcfMarlinFirmware) ? grey_color : black_color;
         {
             field = m_active_page->get_field("machine_max_acceleration_retracting", 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
         color = (std::set<uint8_t>{gcfSmoothie, gcfMach3, gcfMachinekit, gcfMakerWare, gcfSailfish, gcfTeacup}.count(flavor) > 0) ? grey_color : black_color;
         {
             field = m_active_page->get_field("machine_max_acceleration_travel", 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
         color = (std::set<uint8_t>{gcfKlipper, gcfMach3, gcfMachinekit, gcfMakerWare, gcfSailfish, gcfTeacup}.count(flavor) > 0) ? grey_color : black_color;
             for (const std::string& axis : axes) {
                 field = m_active_page->get_field("machine_max_jerk_" + axis, 0);
-                if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+                if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
             }
         color = (flavor != gcfMarlinLegacy && m_last_gcode_flavor != gcfMarlinFirmware && flavor != gcfRepRap) ? grey_color : black_color;
         {
             field = m_active_page->get_field("machine_min_extruding_rate", 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
         color = (flavor != gcfMarlinLegacy && m_last_gcode_flavor != gcfMarlinFirmware) ? grey_color : black_color;
         {
             field = m_active_page->get_field("machine_min_travel_rate", 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
     } else {
         Field* field;
@@ -5847,26 +5843,26 @@ void TabPrinter::update_machine_limits_description(const MachineLimitsUsage usag
         const wxColour color = wxGetApp().get_label_clr_default();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
         for (const std::string& axis : axes) {
             field = m_active_page->get_field("machine_max_feedrate_" + axis, 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
         for (const std::string& axis : axes) {
             field = m_active_page->get_field("machine_max_acceleration_" + axis, 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
         field = m_active_page->get_field("machine_max_acceleration_extruding", 0);
-        if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+        if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         field = m_active_page->get_field("machine_max_acceleration_retracting", 0);
-        if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+        if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         field = m_active_page->get_field("machine_max_acceleration_travel", 0);
-        if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+        if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         for (const std::string& axis : axes) {
             field = m_active_page->get_field("machine_max_jerk_" + axis, 0);
-            if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+            if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         }
         field = m_active_page->get_field("machine_min_extruding_rate", 0);
-        if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+        if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
         field = m_active_page->get_field("machine_min_travel_rate", 0);
-        if (field) dynamic_cast<wxTextCtrl*>(field->getWindow())->SetForegroundColour(color);
+        if (field) dynamic_cast<TextInput*>(field->getWindow())->SetForegroundColour(color);
     }
 }
 

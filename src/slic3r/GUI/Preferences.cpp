@@ -148,7 +148,7 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
 
 		for (const std::string& opt_key : {"suppress_hyperlinks", "downloader_url_registered"})
-			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
+			m_optkey_to_optgroup[opt_key]->set_value(opt_key, app_config->get_bool(opt_key));
 
 		for (const std::string& opt_key : { "default_action_on_close_application"
 										   ,"default_action_on_new_project"
@@ -673,6 +673,17 @@ void PreferencesDialog::build()
 		m_optgroups_general.back()->append_single_option_line(option);
 		m_optkey_to_optgroup["freecad_path"] = m_optgroups_general.back();
 		wxGetApp().sidebar().get_searcher().add_key("freecad_path", Preset::TYPE_PREFERENCES, m_optgroups_general.back()->config_category(), L("Preferences"), def);
+		
+
+		append_bool_option(m_optgroups_general.back(), "downloader_url_registered",
+			L("Allow downloads from Printables.com"),
+			L("If enabled, Slic3r will be allowed to download from Printables.com"),
+			app_config->get_bool("downloader_url_registered"));
+
+		activate_options_tab(m_optgroups_general.back());
+
+		create_downloader_path_sizer(m_optgroups_general.back());
+		create_settings_font_widget(tabs->GetPage(tabs->GetPageCount()-1), m_optgroups_general.back());
 	}
 
     activate_options_tab(m_optgroups_general.back(), m_optgroups_general.back()->parent()->GetSizer()->GetItemCount() > 1 ? 3 : 20);
@@ -981,32 +992,6 @@ void PreferencesDialog::build()
 			app_config->get_bool("use_environment_map"));
 
 		activate_options_tab(m_optgroup_render);
-
-		m_optgroup_other = create_options_tab(L("Other"), tabs);
-		m_optgroup_other->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
-			if (opt_key == "suppress_hyperlinks")
-				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
-			else
-				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
-		};
-
-
-		append_bool_option(m_optgroup_other, "suppress_hyperlinks",
-			L("Suppress to open hyperlink in browser"),
-			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
-			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
-			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
-			app_config->get_bool("suppress_hyperlinks"));
-		
-		append_bool_option(m_optgroup_other, "downloader_url_registered",
-			L("Allow downloads from Printables.com"),
-			L("If enabled, PrusaSlicer will be allowed to download from Printables.com"),
-			app_config->get_bool("downloader_url_registered"));
-
-		activate_options_tab(m_optgroup_other);
-
-		create_downloader_path_sizer(m_optgroup_other);
-		create_settings_font_widget(tabs->GetPage(tabs->GetPageCount()-1), m_optgroup_other);
 #endif // ENABLE_ENVIRONMENT_MAP
 	}
 
@@ -1706,7 +1691,7 @@ void PreferencesDialog::create_settings_font_widget(wxWindow* tab, std::shared_p
 
 void PreferencesDialog::create_downloader_path_sizer(std::shared_ptr<ConfigOptionsGroup> opt_grp)
 {
-	wxWindow* parent = m_optgroup_other->parent();
+	wxWindow* parent = opt_grp->parent();
 
 	wxString title = L("Download path");
 	std::string opt_key = "url_downloader_dest";
@@ -1720,7 +1705,7 @@ void PreferencesDialog::create_downloader_path_sizer(std::shared_ptr<ConfigOptio
 
 	opt_grp->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
+	append_preferences_option_to_searcher(opt_grp, opt_key, title);
 }
 
 void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)

@@ -10302,12 +10302,16 @@ OtherPresetsConfigDef::OtherPresetsConfigDef()
 
 
 static std::map<t_custom_gcode_key, t_config_option_keys> s_CustomGcodeSpecificPlaceholders{
-    {"start_filament_gcode",    {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id"}},
-    {"end_filament_gcode",      {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id"}},
-    {"end_gcode",               {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id"}},
-    {"before_layer_gcode",      {"layer_num", "layer_z", "max_layer_z"}},
-    {"layer_gcode",             {"layer_num", "layer_z", "max_layer_z"}},
+    {"start_filament_gcode",    {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id", "previous_extruder", "next_extruder"}},
+    {"end_filament_gcode",      {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id", "previous_extruder", "next_extruder"}},
+    {"milling_toolchange_start_gcode", {"layer_num", "layer_z", "previous_layer_z", "max_layer_z", "previous_extruder", "next_extruder"}},
+    {"milling_toolchange_end_gcode",   {"layer_num", "layer_z", "previous_layer_z", "max_layer_z", "previous_extruder", "next_extruder"}},
+    {"end_gcode",               {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id", "previous_extruder", "next_extruder"}},
+    {"before_layer_gcode",      {"layer_num", "layer_z", "previous_layer_z", "max_layer_z"}},
+    {"layer_gcode",             {"layer_num", "layer_z", "previous_layer_z", "max_layer_z"}},
+    {"feature_gcode",           {"layer_num", "layer_z", "max_layer_z", "previous_extrusion_role", "next_extrusion_role", /*deprecated*/"extrusion_role", "last_extrusion_role" /*deprecated*/}},
     {"toolchange_gcode",        {"layer_num", "layer_z", "max_layer_z", "previous_extruder", "next_extruder", "toolchange_z"}},
+    // {"between_objects_gcode, {}}
 };
 
 const std::map<t_custom_gcode_key, t_config_option_keys>& custom_gcode_specific_placeholders()
@@ -10333,15 +10337,18 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
 
     def = this->add("filament_extruder_id", coInt);
     def->label = L("Current extruder index");
-    def->tooltip = L("Zero-based index of currently used extruder (i.e. first extruder has index 0).");
+    def->tooltip = L("Zero-based index of currently used extruder (i.e. first extruder has index 0)."
+        "\nWith multiple extruders, an extra 'end_filament_gcode' is applied at the end of the print for each extruder. In this case, 'filament_extruder_id' will be the index of the extruder to 'finalize'.");
 
     def = this->add("previous_extruder", coInt);
     def->label = L("Previous extruder");
-    def->tooltip = L("Index of the extruder that is being unloaded. The index is zero based (first extruder has index 0).");
+    def->tooltip = L("Index of the extruder that is being unloaded. The index is zero based (first extruder has index 0). -1 if there is no extruder before (like in the start gcode)."
+        "\nWith multiple extruders, an extra 'end_filament_gcode' is applied at the end of the print for each extruder. In this case, 'previous_extruder' will be the index of the last extruder used.");
 
     def = this->add("next_extruder", coInt);
     def->label = L("Next extruder");
-    def->tooltip = L("Index of the extruder that is being loaded. The index is zero based (first extruder has index 0).");
+    def->tooltip = L("Index of the extruder that is being loaded. The index is zero based (first extruder has index 0). -1 if there is no extruder after (like in the end gcode)."
+        "\nWith multiple extruders, an extra 'end_filament_gcode' is applied at the end of the print for each extruder. In this case, 'next_extruder' will be -1.");
 
     def = this->add("toolchange_z", coFloat);
     def->label = L("Toolchange Z");

@@ -1933,23 +1933,30 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
 
     // Process filament-specific gcode in extruder order.
     if (initial_extruder_id != (uint16_t)-1) {
+        uint16_t current_extruder_id = m_writer.tool()->id();
         DynamicConfig config;
         config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
         config.set_key_value("layer_z", new ConfigOptionFloat(m_writer.get_position().z() - m_config.z_offset.value));
         config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
-        config.set_key_value("current_extruder_id", new ConfigOptionInt((int)m_writer.tool()->id()));
-        if (m_writer.tool_is_extruder()) {
-            if (print.config().single_extruder_multi_material) {
+        config.set_key_value("filament_extruder_id", new ConfigOptionInt(current_extruder_id));
+        config.set_key_value("previous_extruder", new ConfigOptionInt(current_extruder_id));
+        config.set_key_value("next_extruder", new ConfigOptionInt(-1));
+        if (print.config().single_extruder_multi_material) {
+            if (m_writer.tool_is_extruder()) {
                 // Process the end_filament_gcode for the active filament only.
-                int extruder_id = m_writer.tool()->id();
-                config.set_key_value("filament_extruder_id", new ConfigOptionInt(extruder_id));
-                file.writeln(this->placeholder_parser_process("end_filament_gcode", print.config().end_filament_gcode.get_at(extruder_id), extruder_id, &config));
-            } else {
-                for (const std::string& end_gcode : print.config().end_filament_gcode.values) {
-                    int extruder_id = (uint16_t)(&end_gcode - &print.config().end_filament_gcode.get_at(0));
+                file.writeln(this->placeholder_parser_process("end_filament_gcode",
+                                                              print.config().end_filament_gcode.get_at(current_extruder_id),
+                                                              current_extruder_id, &config));
+            }
+        } else {
+            //for all extruder used in this print
+            for (uint16_t extruder_id : print.tool_ordering().all_extruders()) {
+                //only for extruders
+                if (std::find(m_writer.extruder_ids().begin(),m_writer.extruder_ids().end(), extruder_id) != m_writer.extruder_ids().end() ) {
+                    //write end flament gcode.
+                    const std::string& end_gcode = print.config().end_filament_gcode.values[extruder_id];
                     config.set_key_value("filament_extruder_id", new ConfigOptionInt(extruder_id));
-                    config.set_key_value("previous_extruder", new ConfigOptionInt(extruder_id));
-                    config.set_key_value("next_extruder", new ConfigOptionInt(0));
+                    config.set_key_value("previous_extruder", new ConfigOptionInt(current_extruder_id));
                     file.writeln(this->placeholder_parser_process("end_filament_gcode", end_gcode, extruder_id, &config));
                 }
             }
@@ -3441,6 +3448,7 @@ void GCodeGenerator::emit_milling_commands(std::string& gcode, const ObjectsLaye
                 config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
                 config.set_key_value("previous_layer_z", new ConfigOptionFloat(previous_print_z));
                 config.set_key_value("layer_z", new ConfigOptionFloat(m_layer->print_z));
+                config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
                 // Process the start_mill_gcode for the new filament.
                 gcode += this->placeholder_parser_process("milling_toolchange_start_gcode", start_mill_gcode, current_extruder_filament, &config);
                 check_add_eol(gcode);
@@ -3473,6 +3481,7 @@ void GCodeGenerator::emit_milling_commands(std::string& gcode, const ObjectsLaye
                 config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
                 config.set_key_value("previous_layer_z", new ConfigOptionFloat(previous_print_z));
                 config.set_key_value("layer_z", new ConfigOptionFloat(m_layer->print_z));
+                config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
                 // Process the end_mill_gcode for the new filament.
                 gcode += this->placeholder_parser_process("milling_toolchange_start_gcode", end_mill_gcode, current_extruder_filament, &config);
                 check_add_eol(gcode);
@@ -6051,9 +6060,12 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
     if (grole != m_last_extrusion_role && !m_config.feature_gcode.value.empty()) {
         DynamicConfig config;
         config.set_key_value("extrusion_role", new ConfigOptionString(gcode_extrusion_role_to_string(grole)));
+        config.set_key_value("next_extrusion_role", new ConfigOptionString(gcode_extrusion_role_to_string(grole)));
+        config.set_key_value("previous_extrusion_role", new ConfigOptionString(gcode_extrusion_role_to_string(m_last_extrusion_role)));
         config.set_key_value("last_extrusion_role", new ConfigOptionString(gcode_extrusion_role_to_string(m_last_extrusion_role)));
         config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index + 1));
         config.set_key_value("layer_z", new ConfigOptionFloat(m_layer == nullptr ? m_last_height : m_layer->print_z));
+        config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
         gcode += this->placeholder_parser_process("feature_gcode",
             m_config.feature_gcode.value, m_writer.tool()->id(), &config)
             + "\n";
@@ -6883,7 +6895,6 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
             config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
             config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(extruder_id)));
             config.set_key_value("previous_extruder", new ConfigOptionInt((int)extruder_id));
-            config.set_key_value("current_extruder", new ConfigOptionInt((int)extruder_id));
             config.set_key_value("next_extruder", new ConfigOptionInt((int)extruder_id));
             // Process the start_filament_gcode for the new filament.
             gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id, &config);
@@ -6894,6 +6905,9 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
         }else m_writer.toolchange(extruder_id);
         return gcode;
     }
+    
+    // get current extruder id
+    uint16_t old_extruder_id = uint16_t(m_writer.tool() != nullptr ? m_writer.tool()->id() : -1);
 
     // prepend retraction on the current extruder
     std::string gcode = this->retract_and_wipe(true);
@@ -6904,17 +6918,16 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
     if (m_writer.tool() != nullptr) {
         // Process the custom end_filament_gcode. set_extruder() is only called if there is no wipe tower
         // so it should not be injected twice.
-        uint16_t            old_extruder_id     = m_writer.tool()->id();
         const std::string  &end_filament_gcode  = m_config.end_filament_gcode.get_at(old_extruder_id);
         if (! end_filament_gcode.empty()) {
             DynamicConfig config;
             config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
             config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
             config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
-            config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(m_writer.tool() != nullptr ? m_writer.tool()->id() : -1)));
-            config.set_key_value("previous_extruder", new ConfigOptionInt((int)(m_writer.tool() != nullptr ? m_writer.tool()->id() : -1)));
+            config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(old_extruder_id)));
+            config.set_key_value("previous_extruder", new ConfigOptionInt((int)old_extruder_id));
             config.set_key_value("next_extruder", new ConfigOptionInt((int)extruder_id));
-            gcode += placeholder_parser_process("end_filament_gcode", end_filament_gcode, old_extruder_id, &config);
+            gcode += placeholder_parser_process("end_filament_gcode", end_filament_gcode, old_extruder_id >= 0 ? old_extruder_id : extruder_id, &config);
             check_add_eol(gcode);
         }
     }
@@ -6949,7 +6962,7 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
         config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
         config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
         config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(extruder_id)));
-        config.set_key_value("previous_extruder", new ConfigOptionInt((int)(m_writer.tool() != nullptr ? m_writer.tool()->id() : -1)));
+        config.set_key_value("previous_extruder", new ConfigOptionInt((int)old_extruder_id));
         config.set_key_value("next_extruder", new ConfigOptionInt((int)extruder_id));
         // Process the start_filament_gcode for the new filament.
         gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id, &config);

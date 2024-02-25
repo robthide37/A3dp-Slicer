@@ -102,26 +102,26 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
 {
     wxString out;
     // -1 is disable, 0 or 1 is "no fan". (and 1 will be "low fan" in the future)
-    const int    min_fan_speed             = preset_printer.config.opt_int("fan_printer_min_speed");
-    const int    default_fan_speed         = preset_fil.config.opt_int("default_fan_speed");
-    const int    max_fan_speed             = preset_fil.config.opt_int("max_fan_speed", 0);
-    const int    peri_fan_speed            = preset_fil.config.opt_int("perimeter_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("perimeter_fan_speed");
-    const int    ext_peri_fan_speed        = preset_fil.config.opt_int("external_perimeter_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("external_perimeter_fan_speed");
-    const int    infill_fan_speed          = preset_fil.config.opt_int("infill_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("infill_fan_speed");
-    const int    solid_fan_speed           = preset_fil.config.opt_int("solid_infill_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("solid_infill_fan_speed");
-    const int    top_fan_speed             = preset_fil.config.opt_int("top_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("top_fan_speed");
-    const int    support_fan_speed         = preset_fil.config.opt_int("support_material_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("support_material_fan_speed");
-    const int    supp_inter_fan_speed      = preset_fil.config.opt_int("support_material_interface_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("support_material_interface_fan_speed");
-    const int    bridge_fan_speed          = preset_fil.config.opt_int("bridge_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("bridge_fan_speed");
-    const int    bridge_internal_fan_speed = preset_fil.config.opt_int("bridge_internal_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("bridge_internal_fan_speed");
-    const int    overhangs_fan_speed       = preset_fil.config.opt_int("overhangs_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("overhangs_fan_speed");
-    const int    gap_fill_fan_speed        = preset_fil.config.opt_int("gap_fill_fan_speed", 0) == 1 ? 0 : preset_fil.config.opt_int("gap_fill_fan_speed");
-    const int    disable_fan_first_layers  = preset_fil.config.opt_int("disable_fan_first_layers", 0);
-    const int    full_fan_speed_layer      = preset_fil.config.opt_int("full_fan_speed_layer", 0);
-    const float  slowdown_below_layer_time = preset_fil.config.opt_float("slowdown_below_layer_time", 0);
-    const int    min_print_speed           = int(preset_fil.config.opt_float("min_print_speed", 0) + 0.5);
-    const int    max_speed_reduc           = int(preset_fil.config.opt_float("max_speed_reduction", 0));
-    const float  fan_below_layer_time      = preset_fil.config.opt_float("fan_below_layer_time", 0);
+    const int    min_fan_speed             = preset_printer.config.option("fan_printer_min_speed")->get_int();
+    const int    default_fan_speed         = preset_fil.config.option("default_fan_speed")->get_int();
+    const int    max_fan_speed             = preset_fil.config.option("max_fan_speed")->get_int();
+    const int    peri_fan_speed            = preset_fil.config.option("perimeter_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("perimeter_fan_speed")->get_int();
+    const int    ext_peri_fan_speed        = preset_fil.config.option("external_perimeter_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("external_perimeter_fan_speed")->get_int();
+    const int    infill_fan_speed          = preset_fil.config.option("infill_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("infill_fan_speed")->get_int();
+    const int    solid_fan_speed           = preset_fil.config.option("solid_infill_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("solid_infill_fan_speed")->get_int();
+    const int    top_fan_speed             = preset_fil.config.option("top_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("top_fan_speed")->get_int();
+    const int    support_fan_speed         = preset_fil.config.option("support_material_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("support_material_fan_speed")->get_int();
+    const int    supp_inter_fan_speed      = preset_fil.config.option("support_material_interface_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("support_material_interface_fan_speed")->get_int();
+    const int    bridge_fan_speed          = preset_fil.config.option("bridge_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("bridge_fan_speed")->get_int();
+    const int    bridge_internal_fan_speed = preset_fil.config.option("bridge_internal_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("bridge_internal_fan_speed")->get_int();
+    const int    overhangs_fan_speed       = preset_fil.config.option("overhangs_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("overhangs_fan_speed")->get_int();
+    const int    gap_fill_fan_speed        = preset_fil.config.option("gap_fill_fan_speed")->get_int() == 1 ? 0 : preset_fil.config.option("gap_fill_fan_speed")->get_int();
+    const int    disable_fan_first_layers  = preset_fil.config.option("disable_fan_first_layers")->get_int();
+    const int    full_fan_speed_layer      = preset_fil.config.option("full_fan_speed_layer")->get_int();
+    const float  slowdown_below_layer_time = preset_fil.config.option("slowdown_below_layer_time")->get_float();
+    const int    min_print_speed           = int(preset_fil.config.option("min_print_speed")->get_float() + 0.5);
+    const int    max_speed_reduc           = int(preset_fil.config.option("max_speed_reduction")->get_float());
+    const float  fan_below_layer_time      = preset_fil.config.option("fan_below_layer_time")->get_float();
 
     //if (preset.config.opt_bool("cooling", 0)) {
     if (default_fan_speed < 0)
@@ -327,11 +327,11 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
     auto feature_extruder_active = [idx_extruder, num_extruders](int i) {
         return i <= 0 || i > num_extruders || idx_extruder == -1 || idx_extruder == i - 1;
     };
-    bool perimeter_extruder_active                  = feature_extruder_active(print_config.opt_int("perimeter_extruder"));
-    bool infill_extruder_active                     = feature_extruder_active(print_config.opt_int("infill_extruder"));
-    bool solid_infill_extruder_active               = feature_extruder_active(print_config.opt_int("solid_infill_extruder"));
-    bool support_material_extruder_active           = feature_extruder_active(print_config.opt_int("support_material_extruder"));
-    bool support_material_interface_extruder_active = feature_extruder_active(print_config.opt_int("support_material_interface_extruder"));
+    bool perimeter_extruder_active                  = feature_extruder_active(print_config.option("perimeter_extruder")->get_int());
+    bool infill_extruder_active                     = feature_extruder_active(print_config.option("infill_extruder")->get_int());
+    bool solid_infill_extruder_active               = feature_extruder_active(print_config.option("solid_infill_extruder")->get_int());
+    bool support_material_extruder_active           = feature_extruder_active(print_config.option("support_material_extruder")->get_int());
+    bool support_material_interface_extruder_active = feature_extruder_active(print_config.option("support_material_interface_extruder")->get_int());
 
     // Current filament values
     double filament_diameter                = filament_config.opt_float("filament_diameter", 0);
@@ -514,7 +514,7 @@ std::string PresetHints::recommended_thin_wall_thickness(const PresetBundle& pre
     const DynamicPrintConfig& printer_config = preset_bundle.printers.get_edited_preset().config;
 
     float   layer_height = float(print_config.opt_float("layer_height"));
-    int     num_perimeters = print_config.opt_int("perimeters");
+    int     num_perimeters = print_config.option("perimeters")->get_int();
     bool    thin_walls = print_config.opt_bool("thin_walls");
     float   nozzle_diameter = float(printer_config.opt_float("nozzle_diameter", 0));
 
@@ -611,8 +611,8 @@ std::string PresetHints::top_bottom_shell_thickness_explanation(const PresetBund
 
     std::string out;
 
-    int     top_solid_layers                = print_config.opt_int("top_solid_layers");
-    int     bottom_solid_layers             = print_config.opt_int("bottom_solid_layers");
+    int     top_solid_layers                = print_config.option("top_solid_layers")->get_int();
+    int     bottom_solid_layers             = print_config.option("bottom_solid_layers")->get_int();
     bool    has_top_layers 					= top_solid_layers > 0;
     bool    has_bottom_layers 				= bottom_solid_layers > 0;
     double  top_solid_min_thickness        	= print_config.opt_float("top_solid_min_thickness");

@@ -139,6 +139,8 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
 
     m_triangles.reset();
     m_gridlines.reset();
+    m_gridlines_big.reset();
+    m_gridlines_small.reset();
     m_contourlines.reset();
     m_texture.reset();
     m_model.reset();

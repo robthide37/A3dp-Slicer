@@ -393,7 +393,8 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
     wxString text_value;
     bool     has_nil = false;
     auto deserialize = [&text_value, &value, &opt, &has_nil](ConfigOptionVectorBase &&writer, bool check_nil = true) {
-        writer.set_any(value, -1);
+        //TODO: test (this codepath isn't used yet)
+        writer.set_any(value, 0); // serialize one value into this empty vector, so first item
         text_value = writer.serialize();
         if (check_nil && opt.nullable)
             has_nil = (text_value.Replace(NIL_STR_VALUE, na_value()) > 0);
@@ -409,13 +410,19 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
     switch (opt.type) {
     case coFloats: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionFloats{});
+            if(opt.nullable)
+                deserialize(ConfigOptionFloatsNullable{});
+            else
+                deserialize(ConfigOptionFloats{});
             break;
         }
     }
     case coPercents: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionPercents{});
+            if(opt.nullable)
+                deserialize(ConfigOptionPercentsNullable{});
+            else
+                deserialize(ConfigOptionPercents{});
             break;
         }
         if (opt.nullable && ConfigOptionFloatsNullable::is_nil(value)) {
@@ -462,7 +469,10 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
     }
     case coFloatsOrPercents: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionFloatsOrPercents{});
+            if (opt.nullable)
+                deserialize(ConfigOptionFloatsOrPercentsNullable{});
+            else
+                deserialize(ConfigOptionFloatsOrPercents{});
             break;
         }
         if (opt.nullable && ConfigOptionFloatsOrPercentsNullable::is_nil(value)) {
@@ -480,7 +490,10 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
     }
     case coBools: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionBools{});
+            if (opt.nullable)
+                deserialize(ConfigOptionBoolsNullable{});
+            else
+                deserialize(ConfigOptionBools{});
         } else {
             if (opt.nullable && boost::any_cast<uint8_t>(value) == ConfigOptionBoolsNullable::NIL_VALUE()) {
                 text_value = na_value();
@@ -499,7 +512,10 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
     }
     case coInts: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionInts{});
+            if(opt.nullable)
+                deserialize(ConfigOptionIntsNullable{});
+            else
+                deserialize(ConfigOptionInts{});
             break;
         }
         if (opt.nullable && boost::any_cast<int32_t>(value) == ConfigOptionIntsNullable::NIL_VALUE()) {

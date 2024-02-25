@@ -13,7 +13,7 @@ group:Temperature °C
 		setting:id$0:temperature
 	end_line
 	line:toggle$idle_temperature:toggle_default$30:Idle temperature
-		setting:idle_temperature
+		setting:id$0:idle_temperature
 	line:Bed
 		setting:id$0:first_layer_bed_temperature
 		setting:id$0:label:Other layers:bed_temperature
@@ -57,11 +57,11 @@ group:Fan speed - default
 		
 group:Dynamic Overhangs fan speeds
 	line:Enable fan speed for a % overlap
-		setting:label$_:enable_dynamic_fan_speeds
-		setting:label$0% (bridge):overhang_fan_speed_0
-		setting:label$25%:overhang_fan_speed_1
-		setting:label$50%:overhang_fan_speed_2
-		setting:label$75%:overhang_fan_speed_3
+		setting:id$0:label$_:enable_dynamic_fan_speeds
+		setting:id$0:label$0% (bridge):overhang_fan_speed_0
+		setting:id$0:label$25%:overhang_fan_speed_1
+		setting:id$0:label$50%:overhang_fan_speed_2
+		setting:id$0:label$75%:overhang_fan_speed_3
 	end_line
 group:Short layer time - began to increase base fan speed
 	setting:id$0:fan_below_layer_time
@@ -104,9 +104,9 @@ group:Toolchange parameters with single extruder MM printers
 	setting:id$0:filament_wipe_advanced_pigment
 	filament_ramming_parameters
 group:Toolchange parameters with multi extruder MM printers
-    setting:filament_multitool_ramming
-    setting:filament_multitool_ramming_volume
-    setting:filament_multitool_ramming_flow
+    setting:id$0:filament_multitool_ramming
+    setting:id$0:filament_multitool_ramming_volume
+    setting:id$0:filament_multitool_ramming_flow
 
 filament_overrides_page
 
