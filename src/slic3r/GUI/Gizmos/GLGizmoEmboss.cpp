@@ -564,12 +564,12 @@ void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
             // unselect object
             return close();
 
-        const GLVolumePtrs &gl_volumes = m_parent.get_volumes().volumes;
+        const GLVolumeUPtrs &gl_volumes = m_parent.get_volumes().volumes;
         auto hovered_idx_ = static_cast<size_t>(hovered_idx);
         if (hovered_idx_ >= gl_volumes.size())
             return close();
         
-        const GLVolume *gl_volume = gl_volumes[hovered_idx_];
+        const GLVolume *gl_volume = gl_volumes[hovered_idx_].get();
         if (gl_volume == nullptr)
             return close();
 
@@ -590,11 +590,11 @@ void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
             // Potentionaly move with camera (drag)
             return;
 
-        const GLVolumePtrs &gl_volumes = m_parent.get_volumes().volumes;
+        const GLVolumeUPtrs &gl_volumes = m_parent.get_volumes().volumes;
         auto hovered_idx_ = static_cast<size_t>(hovered_idx);
         if (hovered_idx_ >= gl_volumes.size())
             return;
-        const GLVolume *gl_volume = gl_volumes[hovered_idx_];
+        const GLVolume *gl_volume = gl_volumes[hovered_idx_].get();
         if (gl_volume == nullptr)
             return;
         const ModelVolume *volume = get_model_volume(*gl_volume, m_parent.get_model()->objects);
@@ -617,11 +617,11 @@ void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
             // Potentionaly move with camera (drag)
             return;
 
-        const GLVolumePtrs &gl_volumes = m_parent.get_volumes().volumes;
+        const GLVolumeUPtrs &gl_volumes = m_parent.get_volumes().volumes;
         auto hovered_idx_ = static_cast<size_t>(hovered_idx);
         if (hovered_idx_ >= gl_volumes.size())
             return;
-        const GLVolume *gl_volume = gl_volumes[hovered_idx_];
+        const GLVolume *gl_volume = gl_volumes[hovered_idx_].get();
         if (gl_volume == nullptr)
             return;
         const ModelVolume *volume = get_model_volume(*gl_volume, m_parent.get_model()->objects);

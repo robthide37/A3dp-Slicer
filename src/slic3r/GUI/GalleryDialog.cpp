@@ -299,8 +299,7 @@ static void generate_thumbnail_from_model(const std::string& filename)
     model.center_instances_around_point(to_2d(wxGetApp().plater()->build_volume().bounding_volume().center()));
 
     GLVolumeCollection volumes;
-    volumes.volumes.push_back(new GLVolume());
-    GLVolume* volume = volumes.volumes.back();
+    GLVolume* volume = volumes.volumes.emplace_back(new GLVolume()).get();
     volume->model.init_from(model.mesh());
     volume->set_instance_transformation(model.objects[0]->instances[0]->get_transformation());
     volume->set_volume_transformation(model.objects[0]->volumes[0]->get_transformation());

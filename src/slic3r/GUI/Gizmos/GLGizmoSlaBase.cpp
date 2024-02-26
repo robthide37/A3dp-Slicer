@@ -78,7 +78,7 @@ void GLGizmoSlaBase::update_volumes()
         const double current_elevation = po->get_current_elevation();
 
         auto add_volume = [this, object_idx, instance_idx, &inst_trafo, current_elevation](const TriangleMesh& mesh, int volume_id, bool add_mesh_raycaster = false) {
-            GLVolume* volume = m_volumes.volumes.emplace_back(new GLVolume());
+            GLVolume* volume = m_volumes.volumes.emplace_back(new GLVolume()).get();
             volume->model.init_from(mesh);
             volume->set_instance_transformation(inst_trafo);
             volume->set_sla_shift_z(current_elevation);
@@ -120,7 +120,7 @@ void GLGizmoSlaBase::update_volumes()
             const GLVolume* v = selection.get_volume(idx);
             if (!v->is_modifier) {
                 m_volumes.volumes.emplace_back(new GLVolume());
-                GLVolume* new_volume = m_volumes.volumes.back();
+                GLVolume* new_volume = m_volumes.volumes.back().get();
                 const TriangleMesh& mesh = mo->volumes[v->volume_idx()]->mesh();
                 new_volume->model.init_from(mesh);
                 new_volume->set_instance_transformation(v->get_instance_transformation());
@@ -153,7 +153,7 @@ void GLGizmoSlaBase::render_volumes()
         clipping_plane.set_offset(FLT_MAX);
     m_volumes.set_clipping_plane(clipping_plane.get_data());
 
-    for (GLVolume* v : m_volumes.volumes) {
+    for (const std::unique_ptr<GLVolume> &v : m_volumes.volumes) {
         v->is_active = m_show_sla_supports || (!v->is_sla_pad() && !v->is_sla_support());
     }
 
@@ -164,7 +164,7 @@ void GLGizmoSlaBase::render_volumes()
 void GLGizmoSlaBase::register_volume_raycasters_for_picking()
 {
     for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
-        const GLVolume* v = m_volumes.volumes[i];
+        const GLVolume* v = m_volumes.volumes[i].get();
         if (!v->is_sla_pad() && !v->is_sla_support())
             m_volume_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, VOLUME_RAYCASTERS_BASE_ID + (int)i, *v->mesh_raycaster, v->world_matrix()));
     }

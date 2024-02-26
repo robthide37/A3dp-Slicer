@@ -110,7 +110,7 @@ public:
     void apply_projection(double left, double right, double bottom, double top, double near_z, double far_z);
 
     void zoom_to_box(const BoundingBoxf3& box, double margin_factor = DefaultZoomToBoxMarginFactor);
-    void zoom_to_volumes(const GLVolumePtrs& volumes, double margin_factor = DefaultZoomToVolumesMarginFactor);
+    void zoom_to_volumes(const std::vector<GLVolume*>& volumes, double margin_factor = DefaultZoomToVolumesMarginFactor);
 
 #if ENABLE_CAMERA_STATISTICS
     void debug_render() const;
@@ -146,7 +146,7 @@ private:
     // the camera MUST be outside of the bounding box in eye coordinate of the given box
     std::pair<double, double> calc_tight_frustrum_zs_around(const BoundingBoxf3& box);
     double calc_zoom_to_bounding_box_factor(const BoundingBoxf3& box, double margin_factor = DefaultZoomToBoxMarginFactor) const;
-    double calc_zoom_to_volumes_factor(const GLVolumePtrs& volumes, Vec3d& center, double margin_factor = DefaultZoomToVolumesMarginFactor) const;
+    double calc_zoom_to_volumes_factor(const std::vector<GLVolume*>& volumes, Vec3d& center, double margin_factor = DefaultZoomToVolumesMarginFactor) const;
     void set_distance(double distance);
 
     void set_default_orientation();

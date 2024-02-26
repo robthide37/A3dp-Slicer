@@ -836,8 +836,8 @@ void ArcPolyline::split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const
 
     //find the line to split at
     Geometry::ArcWelder::PathSegmentProjection result = Geometry::ArcWelder::point_to_path_projection(m_path, point);
-    assert(result.center == Point(0, 0) && this->m_path[result.segment_id].radius == 0);
-    assert(result.center != Point(0, 0) && this->m_path[result.segment_id].radius != 0);
+    assert(result.center != Point(0, 0) || this->m_path[result.segment_id].radius == 0); // if no radius, then no center
+    assert(result.center == Point(0, 0) || this->m_path[result.segment_id].radius != 0); // if center defined, then the radius isn't null
     //split and update point
     p1.clear();
     p1.m_path.reserve(result.segment_id + 1);

@@ -223,7 +223,7 @@ namespace GUI {
         size_t indices_size_bytes() const { return indices_count() * Geometry::index_stride_bytes(m_render_data.geometry); }
 
         const Geometry& get_geometry() const { return m_render_data.geometry; }
-
+        
         void init_from(Geometry&& data);
 #if ENABLE_SMOOTH_NORMALS
         void init_from(const TriangleMesh& mesh, bool smooth_normals = false);

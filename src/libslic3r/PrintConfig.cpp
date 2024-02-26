@@ -10331,6 +10331,10 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     def->label = L("Layer Z");
     def->tooltip = L("Height of the current layer above the print bed, measured to the top of the layer.");
 
+    def = this->add("previous_layer_z", coFloat);
+    def->label = L("Previous Layer Z");
+    def->tooltip = L("Height of the previous layer.");
+
     def = this->add("max_layer_z", coFloat);
     def->label = L("Maximal layer Z");
     def->tooltip = L("Height of the last layer above the print bed.");

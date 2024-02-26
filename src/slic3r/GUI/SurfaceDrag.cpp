@@ -518,11 +518,11 @@ bool start_dragging(const Vec2d                &mouse_pos,
     const GLVolume &gl_volume = *gl_volume_ptr;
 
     // is selected volume closest hovered?
-    const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
+    const GLVolumeUPtrs &gl_volumes = canvas.get_volumes().volumes;
     if (int hovered_idx = canvas.get_first_hover_volume_idx(); hovered_idx < 0)
         return false;
     else if (auto hovered_idx_ = static_cast<size_t>(hovered_idx);
-             hovered_idx_ >= gl_volumes.size() || gl_volumes[hovered_idx_] != gl_volume_ptr)
+             hovered_idx_ >= gl_volumes.size() || gl_volumes[hovered_idx_].get() != gl_volume_ptr)
         return false;
 
     const ModelObjectPtrs &objects = canvas.get_model()->objects;
@@ -691,7 +691,7 @@ bool dragging(const Vec2d                 &mouse_pos,
         fix, surface_drag.instance_inv, surface_drag.start_angle, up_limit);
 
     // Update transformation for all instances
-    for (GLVolume *vol : canvas.get_volumes().volumes) {
+    for (const std::unique_ptr<GLVolume> &vol : canvas.get_volumes().volumes) {
         if (vol->object_idx() != surface_drag.gl_volume->object_idx() || 
             vol->volume_idx() != surface_drag.gl_volume->volume_idx())
             continue;

@@ -269,7 +269,7 @@ void Camera::zoom_to_box(const BoundingBoxf3& box, double margin_factor)
     }
 }
 
-void Camera::zoom_to_volumes(const GLVolumePtrs& volumes, double margin_factor)
+void Camera::zoom_to_volumes(const std::vector<GLVolume*>& volumes, double margin_factor)
 {
     Vec3d center;
     const double zoom = calc_zoom_to_volumes_factor(volumes, center, margin_factor);
@@ -466,7 +466,7 @@ double Camera::calc_zoom_to_bounding_box_factor(const BoundingBoxf3& box, double
     return std::min((double)m_viewport[2] / dx, (double)m_viewport[3] / dy);
 }
 
-double Camera::calc_zoom_to_volumes_factor(const GLVolumePtrs& volumes, Vec3d& center, double margin_factor) const
+double Camera::calc_zoom_to_volumes_factor(const std::vector<GLVolume*>& volumes, Vec3d& center, double margin_factor) const
 {
     if (volumes.empty())
         return -1.0;

@@ -7,6 +7,7 @@
 
 #include "libslic3r/Geometry.hpp"
 #include "GUI_Geometry.hpp"
+#include "3DScene.hpp"
 #include "CoordAxes.hpp"
 
 #include <set>
@@ -26,6 +27,7 @@ class DynamicPrintConfig;
 class GLShaderProgram;
 class BuildVolume;
 
+using GLVolumeUPtrs = std::vector<std::unique_ptr<GLVolume>>;
 using GLVolumePtrs = std::vector<GLVolume*>;
 using ModelObjectPtrs = std::vector<ModelObject*>;
 
@@ -119,7 +121,7 @@ private:
     };
 
     // Volumes owned by GLCanvas3D.
-    GLVolumePtrs* m_volumes;
+    GLVolumeCollection* m_volumes;
     // Model, not owned.
     Model* m_model;
 
@@ -174,7 +176,7 @@ private:
 public:
     Selection();
 
-    void set_volumes(GLVolumePtrs* volumes);
+    void set_volumes(GLVolumeCollection &volumes);
     bool init();
 
     bool is_enabled() const { return m_enabled; }

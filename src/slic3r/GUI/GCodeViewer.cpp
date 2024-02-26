@@ -2878,7 +2878,7 @@ void GCodeViewer::load_shells(const Print& print)
         if (slicing_parameters.object_print_z_min != 0.0) {
             const Vec3d z_offset = slicing_parameters.object_print_z_min * Vec3d::UnitZ();
             for (size_t i = current_volumes_count; i < m_shells.volumes.volumes.size(); ++i) {
-                GLVolume* v = m_shells.volumes.volumes[i];
+                GLVolume* v = m_shells.volumes.volumes[i].get();
                 v->set_volume_offset(v->get_volume_offset() + z_offset);
             }
         }
@@ -2888,10 +2888,10 @@ void GCodeViewer::load_shells(const Print& print)
 
     // remove modifiers, non-printable and out-of-bed volumes
     while (true) {
-        GLVolumePtrs::iterator it = std::find_if(m_shells.volumes.volumes.begin(), m_shells.volumes.volumes.end(),
-            [](GLVolume* volume) { return volume->is_modifier || !volume->printable || volume->is_outside; });
+        auto it = std::find_if(m_shells.volumes.volumes.begin(), m_shells.volumes.volumes.end(),
+            [](const std::unique_ptr<GLVolume> &volume) { return volume->is_modifier || !volume->printable || volume->is_outside; });
         if (it != m_shells.volumes.volumes.end()) {
-            delete *it;
+            //delete *it;
             m_shells.volumes.volumes.erase(it);
         }
         else
@@ -2901,9 +2901,9 @@ void GCodeViewer::load_shells(const Print& print)
     // removes volumes which are completely below bed
     int i = 0;
     while (i < (int)m_shells.volumes.volumes.size()) {
-        GLVolume* v = m_shells.volumes.volumes[i];
+        const std::unique_ptr<GLVolume> &v = m_shells.volumes.volumes[i];
         if (v->transformed_bounding_box().max.z() < SINKING_MIN_Z_THRESHOLD + EPSILON) {
-            delete v;
+            //delete v;
             m_shells.volumes.volumes.erase(m_shells.volumes.volumes.begin() + i);
             --i;
         }
@@ -2911,7 +2911,7 @@ void GCodeViewer::load_shells(const Print& print)
     }
 
     // search for sinking volumes and replace their mesh with the part of it with positive z
-    for (GLVolume* v : m_shells.volumes.volumes) {
+    for (const std::unique_ptr<GLVolume> &v : m_shells.volumes.volumes) {
         if (v->is_sinking()) {
             TriangleMesh mesh(wxGetApp().plater()->model().objects[v->object_idx()]->volumes[v->volume_idx()]->mesh());
             mesh.transform(v->world_matrix(), true);
@@ -2924,7 +2924,7 @@ void GCodeViewer::load_shells(const Print& print)
         }
     }
 
-    for (GLVolume* volume : m_shells.volumes.volumes) {
+    for (const std::unique_ptr<GLVolume> &volume : m_shells.volumes.volumes) {
         volume->zoom_to_volumes = false;
         volume->color.a(0.25f);
         volume->force_native_color = true;
@@ -2932,7 +2932,7 @@ void GCodeViewer::load_shells(const Print& print)
     }
 
     m_shells_bounding_box.reset();
-    for (const GLVolume* volume : m_shells.volumes.volumes) {
+    for (const std::unique_ptr<GLVolume> &volume : m_shells.volumes.volumes) {
         m_shells_bounding_box.merge(volume->transformed_bounding_box());
     }
 
@@ -2955,7 +2955,7 @@ void GCodeViewer::load_wipetower_shell(const Print& print)
             if (depth != 0.) {
                 m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, z_and_depth_pairs,
                     max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle, false, brim_width);
-                GLVolume* volume = m_shells.volumes.volumes.back();
+                const std::unique_ptr<GLVolume> &volume = m_shells.volumes.volumes.back();
                 volume->color.a(0.25f);
                 volume->force_native_color = true;
                 volume->set_render_color(true);

@@ -340,7 +340,7 @@ public:
     size_t 				total_memory_used() const { return this->cpu_memory_used() + this->gpu_memory_used(); }
 };
 
-typedef std::vector<GLVolume*> GLVolumePtrs;
+typedef std::vector<std::unique_ptr<GLVolume>> GLVolumeUPtrs;
 typedef std::pair<GLVolume*, std::pair<unsigned int, double>> GLVolumeWithIdAndZ;
 typedef std::vector<GLVolumeWithIdAndZ> GLVolumeWithIdAndZList;
 
@@ -396,7 +396,8 @@ private:
     bool m_use_raycasters{ true };
 
 public:
-    GLVolumePtrs volumes;
+    // TODO: protect it for const-correctness.
+    std::vector<std::unique_ptr<GLVolume>> volumes;
 
     GLVolumeCollection() { set_default_slope_normal_z(); }
     ~GLVolumeCollection() { clear(); }
@@ -437,10 +438,11 @@ public:
         std::function<bool(const GLVolume&)> filter_func = std::function<bool(const GLVolume&)>()) const;
 
     // Clear the geometry
-    void clear() { for (auto *v : volumes) delete v; volumes.clear(); }
+    void clear() { volumes.clear(); }
+    std::vector<GLVolume*> get_volumes() { std::vector<GLVolume*> coll; for(std::unique_ptr<GLVolume> &vol : volumes) coll.push_back(vol.get()); return coll; }
 
     bool empty() const { return volumes.empty(); }
-    void set_range(double low, double high) { for (GLVolume* vol : this->volumes) vol->set_range(low, high); }
+    void set_range(double low, double high) { for (std::unique_ptr<GLVolume> &vol : this->volumes) vol->set_range(low, high); }
 
     void set_use_raycasters(bool value) { m_use_raycasters = value; }
     void set_print_volume(const PrintVolume& print_volume) { m_print_volume = print_volume; }
@@ -488,7 +490,7 @@ private:
     GLVolumeCollection& operator=(const GLVolumeCollection &);
 };
 
-GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCollection::ERenderType type, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func = nullptr);
+GLVolumeWithIdAndZList volumes_to_render(const std::vector<std::unique_ptr<GLVolume>>& volumes, GLVolumeCollection::ERenderType type, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func = nullptr);
 
 struct _3DScene
 {

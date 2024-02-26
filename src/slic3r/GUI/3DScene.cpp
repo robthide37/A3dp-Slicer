@@ -698,13 +698,13 @@ GLVolume* GLVolumeCollection::new_nontoolpath_volume(const ColorRGBA& rgba)
     return out;
 }
 
-GLVolumeWithIdAndZList volumes_to_render(const GLVolumePtrs& volumes, GLVolumeCollection::ERenderType type, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func)
+GLVolumeWithIdAndZList volumes_to_render(const std::vector<std::unique_ptr<GLVolume>>& volumes, GLVolumeCollection::ERenderType type, const Transform3d& view_matrix, std::function<bool(const GLVolume&)> filter_func)
 {
     GLVolumeWithIdAndZList list;
     list.reserve(volumes.size());
 
     for (unsigned int i = 0; i < (unsigned int)volumes.size(); ++i) {
-        GLVolume* volume = volumes[i];
+        GLVolume* volume = volumes[i].get();
         bool is_transparent = volume->render_color.is_transparent();
         if (((type == GLVolumeCollection::ERenderType::Opaque && !is_transparent) ||
              (type == GLVolumeCollection::ERenderType::Transparent && is_transparent) ||
@@ -858,7 +858,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
 void GLVolumeCollection::reset_outside_state()
 {
-    for (GLVolume* volume : this->volumes) {
+    for (const std::unique_ptr<GLVolume> &volume : this->volumes) {
         if (volume != nullptr)
             volume->is_outside = false;
     }
@@ -904,7 +904,7 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
         }
     }
 
-    for (GLVolume* volume : volumes) {
+    for (const std::unique_ptr<GLVolume> &volume : volumes) {
         if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->is_sla_pad() || volume->is_sla_support())
             continue;
 
@@ -922,7 +922,7 @@ std::vector<double> GLVolumeCollection::get_current_print_zs(bool active_only) c
 {
     // Collect layer top positions of all volumes.
     std::vector<double> print_zs;
-    for (GLVolume *vol : this->volumes)
+    for (const std::unique_ptr<GLVolume> &vol : this->volumes)
     {
         if (!active_only || vol->is_active)
             append(print_zs, vol->print_zs);
@@ -948,7 +948,7 @@ std::vector<double> GLVolumeCollection::get_current_print_zs(bool active_only) c
 size_t GLVolumeCollection::cpu_memory_used() const 
 {
 	size_t memsize = sizeof(*this) + this->volumes.capacity() * sizeof(GLVolume);
-	for (const GLVolume *volume : this->volumes)
+	for (const std::unique_ptr<GLVolume> &volume : this->volumes)
 		memsize += volume->cpu_memory_used();
 	return memsize;
 }
@@ -956,7 +956,7 @@ size_t GLVolumeCollection::cpu_memory_used() const
 size_t GLVolumeCollection::gpu_memory_used() const 
 {
 	size_t memsize = 0;
-	for (const GLVolume *volume : this->volumes)
+	for (const std::unique_ptr<GLVolume> &volume : this->volumes)
 		memsize += volume->gpu_memory_used();
 	return memsize;
 }

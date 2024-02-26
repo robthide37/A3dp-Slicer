@@ -111,9 +111,9 @@ Selection::Selection()
 }
 
 
-void Selection::set_volumes(GLVolumePtrs* volumes)
+void Selection::set_volumes(GLVolumeCollection &volumes)
 {
-    m_volumes = volumes;
+    m_volumes = &volumes;
     update_valid();
 }
 
@@ -137,10 +137,10 @@ void Selection::set_model(Model* model)
 
 void Selection::add(unsigned int volume_idx, bool as_single_selection, bool check_for_already_contained)
 {
-    if (!m_valid || (unsigned int)m_volumes->size() <= volume_idx)
+    if (!m_valid || (unsigned int)m_volumes->volumes.size() <= volume_idx)
         return;
 
-    const GLVolume* volume = (*m_volumes)[volume_idx];
+    const GLVolume* volume = (m_volumes->volumes)[volume_idx].get();
 
     if (wxGetApp().plater()->printer_technology() == ptSLA && volume->is_modifier &&
         m_model->objects[volume->object_idx()]->volumes[volume->volume_idx()]->is_modifier())
@@ -196,7 +196,7 @@ void Selection::add(unsigned int volume_idx, bool as_single_selection, bool chec
 
 void Selection::remove(unsigned int volume_idx)
 {
-    if (!m_valid || (unsigned int)m_volumes->size() <= volume_idx)
+    if (!m_valid || (unsigned int)m_volumes->volumes.size() <= volume_idx)
         return;
 
     if (!contains_volume(volume_idx))
@@ -204,7 +204,7 @@ void Selection::remove(unsigned int volume_idx)
 
     wxGetApp().plater()->take_snapshot(_L("Selection-Remove"), UndoRedo::SnapshotType::Selection);
 
-    GLVolume* volume = (*m_volumes)[volume_idx];
+    GLVolume* volume = (m_volumes->volumes)[volume_idx].get();
 
     switch (m_mode)
     {
@@ -325,8 +325,8 @@ void Selection::remove_volume(unsigned int object_idx, unsigned int volume_idx)
     if (!m_valid)
         return;
 
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        GLVolume* v = (*m_volumes)[i];
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        GLVolume* v = (m_volumes->volumes)[i].get();
         if (v->object_idx() == (int)object_idx && v->volume_idx() == (int)volume_idx)
             do_remove_volume(i);
     }
@@ -350,7 +350,7 @@ void Selection::add_volumes(EMode mode, const std::vector<unsigned int>& volume_
 
     m_mode = mode;
     for (unsigned int i : volume_idxs) {
-        if (i < (unsigned int)m_volumes->size())
+        if (i < (unsigned int)m_volumes->volumes.size())
             do_add_volume(i);
     }
 
@@ -365,7 +365,7 @@ void Selection::remove_volumes(EMode mode, const std::vector<unsigned int>& volu
 
     m_mode = mode;
     for (unsigned int i : volume_idxs) {
-        if (i < (unsigned int)m_volumes->size())
+        if (i < (unsigned int)m_volumes->volumes.size())
             do_remove_volume(i);
     }
 
@@ -379,8 +379,8 @@ void Selection::add_all()
         return;
 
     unsigned int count = 0;
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        if (!(*m_volumes)[i]->is_wipe_tower)
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        if (!(m_volumes->volumes)[i].get()->is_wipe_tower)
             ++count;
     }
 
@@ -392,8 +392,8 @@ void Selection::add_all()
     m_mode = Instance;
     clear();
 
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        if (!(*m_volumes)[i]->is_wipe_tower)
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        if (!(m_volumes->volumes)[i].get()->is_wipe_tower)
             do_add_volume(i);
     }
 
@@ -425,10 +425,10 @@ void Selection::set_deserialized(EMode mode, const std::vector<std::pair<size_t,
 
     m_mode = mode;
     for (unsigned int i : m_list)
-        (*m_volumes)[i]->selected = false;
+        (m_volumes->volumes)[i].get()->selected = false;
     m_list.clear();
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++ i)
-		if (std::binary_search(volumes_and_instances.begin(), volumes_and_instances.end(), (*m_volumes)[i]->geometry_id))
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++ i)
+		if (std::binary_search(volumes_and_instances.begin(), volumes_and_instances.end(), (m_volumes->volumes)[i].get()->geometry_id))
 			do_add_volume(i);
     update_type();
     set_bounding_boxes_dirty();
@@ -444,7 +444,7 @@ void Selection::clear(bool is_destroying)
 
     // ensure that the volumes get the proper color before next call to render (expecially needed for transparent volumes)
     for (unsigned int i : m_list) {
-        GLVolume& volume = *(*m_volumes)[i];
+        GLVolume& volume = *(m_volumes->volumes)[i].get();
         volume.selected = false;
         volume.set_render_color(volume.color.is_transparent());
     }
@@ -474,8 +474,8 @@ void Selection::instances_changed(const std::vector<size_t> &instance_ids_select
 
     const PrinterTechnology pt = wxGetApp().plater()->printer_technology();
 
-    for (unsigned int volume_idx = 0; volume_idx < (unsigned int)m_volumes->size(); ++ volume_idx) {
-        const GLVolume *volume = (*m_volumes)[volume_idx];
+    for (unsigned int volume_idx = 0; volume_idx < (unsigned int)m_volumes->volumes.size(); ++ volume_idx) {
+        const GLVolume *volume = (m_volumes->volumes)[volume_idx].get();
         if (pt == ptSLA && volume->is_modifier &&
             m_model->objects[volume->object_idx()]->volumes[volume->volume_idx()]->is_modifier())
             continue;
@@ -497,7 +497,7 @@ void Selection::volumes_changed(const std::vector<size_t> &map_volume_old_to_new
     for (unsigned int idx : m_list)
         if (map_volume_old_to_new[idx] != size_t(-1)) {
             unsigned int new_idx = (unsigned int)map_volume_old_to_new[idx];
-            (*m_volumes)[new_idx]->selected = true;
+            (m_volumes->volumes)[new_idx].get()->selected = true;
             list_new.insert(new_idx);
         }
     m_list = std::move(list_new);
@@ -514,7 +514,7 @@ bool Selection::is_any_connector() const
         const ModelVolumePtrs& obj_volumes = m_model->objects[obj_idx]->volumes;
         for (size_t vol_idx = 0; vol_idx < obj_volumes.size(); vol_idx++)
             if (obj_volumes[vol_idx]->is_cut_connector())
-                for (const GLVolume* v  : *m_volumes)
+                for (const std::unique_ptr<GLVolume> &v  : m_volumes->volumes)
                     if (v->object_idx() == obj_idx && v->volume_idx() == (int)vol_idx && v->selected)
                         return true;
     }
@@ -542,11 +542,11 @@ bool Selection::is_single_full_instance() const
     if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
         return false;
 
-    int instance_idx = (*m_volumes)[*m_list.begin()]->instance_idx();
+    int instance_idx = (m_volumes->volumes)[*m_list.begin()].get()->instance_idx();
 
     std::set<int> volumes_idxs;
     for (unsigned int i : m_list) {
-        const GLVolume* v = (*m_volumes)[i];
+        const GLVolume* v = (m_volumes->volumes)[i].get();
         if (object_idx != v->object_idx() || instance_idx != v->instance_idx())
             return false;
 
@@ -570,7 +570,7 @@ bool Selection::is_sla_compliant() const
 //        return false;
 
 //    for (unsigned int i : m_list) {
-//        if ((*m_volumes)[i]->is_modifier)
+//        if ((m_volumes->volumes)[i].get()->is_modifier)
 //            return false;
 //    }
 
@@ -582,7 +582,7 @@ bool Selection::is_single_text() const
     if (!is_single_volume_or_modifier())
       return false;
 
-    const GLVolume* gl_volume = (*m_volumes)[*m_list.begin()];
+    const GLVolume* gl_volume = (m_volumes->volumes)[*m_list.begin()].get();
     const ModelVolume* model_volume = m_model->objects[gl_volume->object_idx()]->volumes[gl_volume->volume_idx()];
     
     return model_volume && model_volume->text_configuration.has_value();
@@ -610,7 +610,7 @@ bool Selection::contains_any_volume(const std::vector<unsigned int>& volume_idxs
 
 bool Selection::contains_sinking_volumes(bool ignore_modifiers) const
 {
-    for (const GLVolume* v : *m_volumes) {
+    for (const std::unique_ptr<GLVolume> &v : m_volumes->volumes) {
         if (!ignore_modifiers || !v->is_modifier) {
             if (v->is_sinking())
                 return true;
@@ -657,12 +657,12 @@ const Selection::InstanceIdxsList& Selection::get_instance_idxs() const
 
 const GLVolume* Selection::get_volume(unsigned int volume_idx) const
 {
-    return (m_valid && (volume_idx < (unsigned int)m_volumes->size())) ? (*m_volumes)[volume_idx] : nullptr;
+    return (m_valid && (volume_idx < (unsigned int)m_volumes->volumes.size())) ? (m_volumes->volumes)[volume_idx].get() : nullptr;
 }
 
 GLVolume* Selection::get_volume(unsigned int volume_idx)
 {
-    return (m_valid && (volume_idx < (unsigned int)m_volumes->size())) ? (*m_volumes)[volume_idx] : nullptr;
+    return (m_valid && (volume_idx < (unsigned int)m_volumes->volumes.size())) ? (m_volumes->volumes)[volume_idx].get() : nullptr;
 }
 
 const BoundingBoxf3& Selection::get_bounding_box() const
@@ -672,7 +672,7 @@ const BoundingBoxf3& Selection::get_bounding_box() const
         *bbox = BoundingBoxf3();
         if (m_valid) {
             for (unsigned int i : m_list) {
-                (*bbox)->merge((*m_volumes)[i]->transformed_convex_hull_bounding_box());
+                (*bbox)->merge((m_volumes->volumes)[i].get()->transformed_convex_hull_bounding_box());
             }
         }
     }
@@ -688,7 +688,7 @@ const BoundingBoxf3& Selection::get_unscaled_instance_bounding_box() const
         *bbox = BoundingBoxf3();
         if (m_valid) {
             for (unsigned int i : m_list) {
-                const GLVolume& volume = *(*m_volumes)[i];
+                const GLVolume& volume = *(m_volumes->volumes)[i].get();
                 if (volume.is_modifier)
                     continue;
                 Transform3d trafo = volume.get_instance_transformation().get_matrix_no_scaling_factor() * volume.get_volume_transformation().get_matrix();
@@ -709,7 +709,7 @@ const BoundingBoxf3& Selection::get_scaled_instance_bounding_box() const
         *bbox = BoundingBoxf3();
         if (m_valid) {
             for (unsigned int i : m_list) {
-                const GLVolume& volume = *(*m_volumes)[i];
+                const GLVolume& volume = *(m_volumes->volumes)[i].get();
                 if (volume.is_modifier)
                     continue;
                 Transform3d trafo = volume.get_instance_transformation().get_matrix() * volume.get_volume_transformation().get_matrix();
@@ -730,7 +730,7 @@ const BoundingBoxf3& Selection::get_full_unscaled_instance_bounding_box() const
         *bbox = BoundingBoxf3();
         if (m_valid) {
             for (unsigned int i : m_list) {
-                const GLVolume& volume = *(*m_volumes)[i];
+                const GLVolume& volume = *(m_volumes->volumes)[i].get();
                 Transform3d trafo = volume.get_instance_transformation().get_matrix_no_scaling_factor() * volume.get_volume_transformation().get_matrix();
                 trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
@@ -749,7 +749,7 @@ const BoundingBoxf3& Selection::get_full_scaled_instance_bounding_box() const
         *bbox = BoundingBoxf3();
         if (m_valid) {
             for (unsigned int i : m_list) {
-                const GLVolume& volume = *(*m_volumes)[i];
+                const GLVolume& volume = *(m_volumes->volumes)[i].get();
                 Transform3d trafo = volume.get_instance_transformation().get_matrix() * volume.get_volume_transformation().get_matrix();
                 trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
@@ -768,7 +768,7 @@ const BoundingBoxf3& Selection::get_full_unscaled_instance_local_bounding_box() 
         *bbox = BoundingBoxf3();
         if (m_valid) {
             for (unsigned int i : m_list) {
-                const GLVolume& volume = *(*m_volumes)[i];
+                const GLVolume& volume = *(m_volumes->volumes)[i].get();
                 Transform3d trafo = volume.get_volume_transformation().get_matrix();
                 trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
@@ -924,7 +924,7 @@ const std::pair<Vec3d, double> Selection::get_bounding_sphere() const
         std::vector<Point> points;
         if (m_valid) {
             for (unsigned int i : m_list) {
-                const GLVolume& volume = *(*m_volumes)[i];
+                const GLVolume& volume = *(m_volumes->volumes)[i].get();
                 const TriangleMesh* hull = volume.convex_hull();
                 const indexed_triangle_set& its = (hull != nullptr) ?
                     hull->its : m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh().its;
@@ -963,7 +963,7 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
            transformation_type.local());
 
     for (unsigned int i : m_list) {
-        GLVolume& v = *(*m_volumes)[i];
+        GLVolume& v = *(m_volumes->volumes)[i].get();
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         if (m_mode == Instance && !is_wipe_tower()) {
             assert(is_from_fully_selected_instance(i));
@@ -1014,7 +1014,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
 
     for (unsigned int i : m_list) {
         Transform3d rotation_matrix = Geometry::rotation_transform(rotation);
-        GLVolume& v = *(*m_volumes)[i];
+        GLVolume& v = *(m_volumes->volumes)[i].get();
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
         if (m_mode == Instance && !is_wipe_tower()) {
@@ -1116,7 +1116,7 @@ void Selection::flattening_rotate(const Vec3d& normal)
         return;
 
     for (unsigned int i : m_list) {
-        GLVolume& v = *(*m_volumes)[i];
+        GLVolume& v = *(m_volumes->volumes)[i].get();
         // Normal transformed from the object coordinate space to the world coordinate space.
         const Geometry::Transformation& old_inst_trafo = v.get_instance_transformation();
         const Vec3d tnormal = old_inst_trafo.get_matrix().matrix().block(0, 0, 3, 3).inverse().transpose() * normal;
@@ -1198,7 +1198,7 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         Points points;
         double max_z = 0.0;
         for (unsigned int i : m_list) {
-            const GLVolume& v = *(*m_volumes)[i];
+            const GLVolume& v = *(m_volumes->volumes)[i].get();
             TriangleMesh hull_3d = *v.convex_hull();
             hull_3d.transform(v.world_matrix());
             max_z = std::max(max_z, hull_3d.bounding_box().size().z());
@@ -1236,7 +1236,7 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         // remove SLA auxiliary volumes from the selection to ensure that the proper bounding box is calculated
         std::vector<unsigned int> to_remove;
         for (unsigned int i : m_list) {
-            if ((*m_volumes)[i]->volume_idx() < 0)
+            if ((m_volumes->volumes)[i].get()->volume_idx() < 0)
                 to_remove.push_back(i);
         }
 
@@ -1301,7 +1301,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& world_trans
     }
 
     for (unsigned int i : m_list) {
-        GLVolume& v = *(*m_volumes)[i];
+        GLVolume& v = *(m_volumes->volumes)[i].get();
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
 
@@ -1357,7 +1357,7 @@ void Selection::reset_skew()
         return;
 
     for (unsigned int i : m_list) {
-        GLVolume& v = *(*m_volumes)[i];
+        GLVolume& v = *(m_volumes->volumes)[i].get();
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         Geometry::Transformation inst_trafo = volume_data.get_instance_transform();
         Geometry::Transformation vol_trafo = volume_data.get_volume_transform();
@@ -1417,7 +1417,7 @@ void Selection::translate(unsigned int object_idx, unsigned int instance_idx, co
         return;
 
     for (unsigned int i : m_list) {
-        GLVolume& v = *(*m_volumes)[i];
+        GLVolume& v = *(m_volumes->volumes)[i].get();
         if (v.object_idx() == (int)object_idx && v.instance_idx() == (int)instance_idx)
             v.set_instance_transformation(Geometry::translation_transform(displacement) * v.get_instance_transformation().get_matrix());
     }
@@ -1426,23 +1426,23 @@ void Selection::translate(unsigned int object_idx, unsigned int instance_idx, co
     done.insert(m_list.begin(), m_list.end());
 
     for (unsigned int i : m_list) {
-        if (done.size() == m_volumes->size())
+        if (done.size() == m_volumes->volumes.size())
             break;
 
-        if ((*m_volumes)[i]->is_wipe_tower)
+        if ((m_volumes->volumes)[i].get()->is_wipe_tower)
             continue;
 
-        const int object_idx = (*m_volumes)[i]->object_idx();
+        const int object_idx = (m_volumes->volumes)[i].get()->object_idx();
 
         // Process unselected volumes of the object.
-        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
-            if (done.size() == m_volumes->size())
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->volumes.size(); ++j) {
+            if (done.size() == m_volumes->volumes.size())
                 break;
 
             if (done.find(j) != done.end())
                 continue;
 
-            GLVolume& v = *(*m_volumes)[j];
+            GLVolume& v = *(m_volumes->volumes)[j].get();
             if (v.object_idx() != object_idx || v.instance_idx() != (int)instance_idx)
                 continue;
 
@@ -1542,7 +1542,7 @@ void Selection::erase()
         std::map<int, int> volumes_in_obj;
 
         for (auto i : m_list) {
-            const auto gl_vol = (*m_volumes)[i];
+            const auto gl_vol = (m_volumes->volumes)[i].get();
             const auto glv_obj_idx = gl_vol->object_idx();
             const auto model_object = m_model->objects[glv_obj_idx];
 
@@ -1592,7 +1592,7 @@ void Selection::erase()
     else {
         std::set<std::pair<int, int>> volumes_idxs;
         for (unsigned int i : m_list) {
-            const GLVolume* v = (*m_volumes)[i];
+            const GLVolume* v = (m_volumes->volumes)[i].get();
             // Only remove volumes associated with ModelVolumes from the object list.
             // Temporary meshes (SLA supports or pads) are not managed by the object list.
             if (v->volume_idx() >= 0)
@@ -1676,8 +1676,8 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     if (!boost::starts_with(sidebar_field, "layer")) {
         shader->set_uniform("emission_factor", 0.05f);
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
-            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
-            axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
+            orient_matrix = (m_volumes->volumes)[*m_list.begin()].get()->get_instance_transformation().get_rotation_matrix();
+            axes_center = (m_volumes->volumes)[*m_list.begin()].get()->get_instance_offset();
         }
         else if (is_single_volume_or_modifier()) {
             if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
@@ -1686,14 +1686,14 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
                     orient_matrix.translation() = Vec3d::Zero();
                 }
                 else {
-                    orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
-                    axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
+                    orient_matrix = (m_volumes->volumes)[*m_list.begin()].get()->get_instance_transformation().get_rotation_matrix();
+                    axes_center = (m_volumes->volumes)[*m_list.begin()].get()->get_instance_offset();
                 }
             }
         }
         else {
             if (requires_local_axes())
-                orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
+                orient_matrix = (m_volumes->volumes)[*m_list.begin()].get()->get_instance_transformation().get_rotation_matrix();
         }
     }
 
@@ -1752,7 +1752,7 @@ void Selection::copy_to_clipboard()
 
         for (unsigned int i : m_list) {
             // Copy the ModelVolumes only for the selected GLVolumes of the 1st selected instance.
-            const GLVolume* volume = (*m_volumes)[i];
+            const GLVolume* volume = (m_volumes->volumes)[i].get();
             if (volume->object_idx() == object.first && volume->instance_idx() == *object.second.begin()) {
                 int volume_idx = volume->volume_idx();
                 if (0 <= volume_idx && volume_idx < (int)src_object->volumes.size()) {
@@ -1799,8 +1799,8 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_object(unsigned int ob
 
     const PrinterTechnology pt = wxGetApp().plater()->printer_technology();
 
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        const GLVolume* v = (*m_volumes)[i];
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        const GLVolume* v = (m_volumes->volumes)[i].get();
         if (v->object_idx() == (int)object_idx) {
             if (pt == ptSLA && v->is_modifier &&
                 m_model->objects[object_idx]->volumes[v->volume_idx()]->is_modifier())
@@ -1815,8 +1815,8 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_object(unsigned int ob
 std::vector<unsigned int> Selection::get_volume_idxs_from_instance(unsigned int object_idx, unsigned int instance_idx) const
 {
     std::vector<unsigned int> idxs;
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        const GLVolume* v = (*m_volumes)[i];
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        const GLVolume* v = (m_volumes->volumes)[i].get();
         if (v->object_idx() == (int)object_idx && v->instance_idx() == (int)instance_idx)
             idxs.push_back(i);
     }
@@ -1827,8 +1827,8 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_volume(unsigned int ob
 {
     std::vector<unsigned int> idxs;
 
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        const GLVolume* v = (*m_volumes)[i];
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        const GLVolume* v = (m_volumes->volumes)[i].get();
         if (v->object_idx() == (int)object_idx && v->volume_idx() == (int)volume_idx) {
             if ((int)instance_idx != -1 && v->instance_idx() == (int)instance_idx)
                 idxs.push_back(i);
@@ -1868,7 +1868,7 @@ std::set<unsigned int> Selection::get_object_idxs() const
     std::set<unsigned int> idxs;
 
     for (unsigned int i : m_list)
-        idxs.emplace((*m_volumes)[i]->object_idx());
+        idxs.emplace((m_volumes->volumes)[i].get()->object_idx());
 
     return idxs;
 }
@@ -1884,7 +1884,7 @@ void Selection::update_type()
     m_type = Mixed;
 
     for (unsigned int i : m_list) {
-        const GLVolume* volume = (*m_volumes)[i];
+        const GLVolume* volume = (m_volumes->volumes)[i].get();
         int obj_idx = volume->object_idx();
         int inst_idx = volume->instance_idx();
         ObjectIdxsToInstanceIdxsMap::iterator obj_it = m_cache.content.find(obj_idx);
@@ -1902,7 +1902,7 @@ void Selection::update_type()
         if (m_list.empty())
             m_type = Empty;
         else if (m_list.size() == 1) {
-            const GLVolume* first = (*m_volumes)[*m_list.begin()];
+            const GLVolume* first = (m_volumes->volumes)[*m_list.begin()].get();
             if (first->is_wipe_tower)
                 m_type = WipeTower;
             else if (first->is_modifier) {
@@ -1933,7 +1933,7 @@ void Selection::update_type()
             unsigned int sla_volumes_count = 0;
             // Note: sla_volumes_count is a count of the selected sla_volumes per object instead of per instance, like a model_volumes_count is
             for (unsigned int i : m_list) {
-                if ((*m_volumes)[i]->volume_idx() < 0)
+                if ((m_volumes->volumes)[i].get()->volume_idx() < 0)
                     ++sla_volumes_count;
             }
 
@@ -1958,7 +1958,7 @@ void Selection::update_type()
                     else {
                         unsigned int modifiers_count = 0;
                         for (unsigned int i : m_list) {
-                            if ((*m_volumes)[i]->is_modifier)
+                            if ((m_volumes->volumes)[i].get()->is_modifier)
                                 ++modifiers_count;
                         }
 
@@ -1995,7 +1995,7 @@ void Selection::update_type()
 
     int object_idx = get_object_idx();
     int instance_idx = get_instance_idx();
-    for (GLVolume* v : *m_volumes) {
+    for (const std::unique_ptr<GLVolume> &v : m_volumes->volumes) {
         v->disabled = requires_disable ? (v->object_idx() != object_idx) || (v->instance_idx() != instance_idx) : false;
     }
 
@@ -2088,8 +2088,8 @@ void Selection::set_caches()
 {
     m_cache.volumes_data.clear();
     m_cache.sinking_volumes.clear();
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        const GLVolume& v = *(*m_volumes)[i];
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        const GLVolume& v = *(m_volumes->volumes)[i].get();
         m_cache.volumes_data.emplace(i, VolumeCache(v.get_volume_transformation(), v.get_instance_transformation()));
         if (v.is_sinking())
             m_cache.sinking_volumes.push_back(i);
@@ -2101,7 +2101,7 @@ void Selection::set_caches()
 void Selection::do_add_volume(unsigned int volume_idx)
 {
     m_list.insert(volume_idx);
-    GLVolume* v = (*m_volumes)[volume_idx];
+    GLVolume* v = (m_volumes->volumes)[volume_idx].get();
     v->selected = true;
     if (v->hover == GLVolume::HS_Select || v->hover == GLVolume::HS_Deselect)
         v->hover = GLVolume::HS_Hover;
@@ -2111,7 +2111,7 @@ void Selection::do_add_volumes(const std::vector<unsigned int>& volume_idxs)
 {
     for (unsigned int i : volume_idxs)
     {
-        if (i < (unsigned int)m_volumes->size())
+        if (i < (unsigned int)m_volumes->volumes.size())
             do_add_volume(i);
     }
 }
@@ -2124,13 +2124,13 @@ void Selection::do_remove_volume(unsigned int volume_idx)
 
     m_list.erase(v_it);
 
-    (*m_volumes)[volume_idx]->selected = false;
+    (m_volumes->volumes)[volume_idx].get()->selected = false;
 }
 
 void Selection::do_remove_instance(unsigned int object_idx, unsigned int instance_idx)
 {
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        GLVolume* v = (*m_volumes)[i];
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        GLVolume* v = (m_volumes->volumes)[i].get();
         if (v->object_idx() == (int)object_idx && v->instance_idx() == (int)instance_idx)
             do_remove_volume(i);
     }
@@ -2138,8 +2138,8 @@ void Selection::do_remove_instance(unsigned int object_idx, unsigned int instanc
 
 void Selection::do_remove_object(unsigned int object_idx)
 {
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        GLVolume* v = (*m_volumes)[i];
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->volumes.size(); ++i) {
+        GLVolume* v = (m_volumes->volumes)[i].get();
         if (v->object_idx() == (int)object_idx)
             do_remove_volume(i);
     }
@@ -2155,14 +2155,14 @@ void Selection::render_synchronized_volumes()
     Transform3d trafo;
 
     for (unsigned int i : m_list) {
-        const GLVolume& volume = *(*m_volumes)[i];
+        const GLVolume& volume = *(m_volumes->volumes)[i].get();
         int object_idx = volume.object_idx();
         int volume_idx = volume.volume_idx();
-        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->volumes.size(); ++j) {
             if (i == j)
                 continue;
 
-            const GLVolume& v = *(*m_volumes)[j];
+            const GLVolume& v = *(m_volumes->volumes)[j].get();
             if (v.object_idx() != object_idx || v.volume_idx() != volume_idx)
                 continue;
 
@@ -2508,7 +2508,7 @@ void Selection::render_debug_window() const
     imgui.begin(std::string("Selection matrices"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
     auto volume_name = [this](size_t id) {
-        const GLVolume& v = *(*m_volumes)[id];
+        const GLVolume& v = *(m_volumes->volumes)[id].get();
         return m_model->objects[v.object_idx()]->volumes[v.volume_idx()]->name;
     };
 
@@ -2521,7 +2521,7 @@ void Selection::render_debug_window() const
     if (ImGui::BeginCombo("Volumes", volume_name(current_vol_idx).c_str())) {
         size_t count = 0;
         for (unsigned int id : m_list) {
-            const GLVolume& v = *(*m_volumes)[id];
+            const GLVolume& v = *(m_volumes->volumes)[id].get();
             const bool is_selected = (current_cmb_idx == count);
             if (ImGui::Selectable(volume_name(id).c_str(), is_selected)) {
                 current_cmb_idx = count;
@@ -2718,9 +2718,9 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
     std::set<unsigned int> done;  // prevent processing volumes twice
     done.insert(m_list.begin(), m_list.end());
     for (unsigned int i : m_list) {
-        if (done.size() == m_volumes->size())
+        if (done.size() == m_volumes->volumes.size())
             break;
-        const GLVolume* volume_i = (*m_volumes)[i];
+        const GLVolume* volume_i = (m_volumes->volumes)[i].get();
         if (volume_i->is_wipe_tower)
             continue;
 
@@ -2732,12 +2732,12 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
 //        bool               mirrored = curr_inst_trafo_i.linear().determinant() * old_inst_trafo_i.linear().determinant() < 0;
 
         // Process unselected instances.
-        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
-            if (done.size() == m_volumes->size())
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->volumes.size(); ++j) {
+            if (done.size() == m_volumes->volumes.size())
                 break;
             if (done.find(j) != done.end())
                 continue;
-            GLVolume* volume_j = (*m_volumes)[j];
+            GLVolume* volume_j = (m_volumes->volumes)[j].get();
             if (volume_j->object_idx() != object_idx || volume_j->instance_idx() == instance_idx)
                 continue;
             const Transform3d& old_inst_trafo_j = m_cache.volumes_data[j].get_instance_transform().get_matrix();
@@ -2758,14 +2758,14 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
         }
     }
 #ifndef NDEBUG
-    verify_instances_rotation_synchronized(*m_model, *m_volumes);
+    verify_instances_rotation_synchronized(*m_model, m_volumes->get_volumes());
 #endif /* NDEBUG */
 }
 
 void Selection::synchronize_unselected_volumes()
 {
     for (unsigned int i : m_list) {
-        const GLVolume* volume = (*m_volumes)[i];
+        const GLVolume* volume = (m_volumes->volumes)[i].get();
         if (volume->is_wipe_tower)
             continue;
 
@@ -2774,11 +2774,11 @@ void Selection::synchronize_unselected_volumes()
         const Geometry::Transformation& trafo = volume->get_volume_transformation();
 
         // Process unselected volumes.
-        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->volumes.size(); ++j) {
             if (j == i)
                 continue;
 
-            GLVolume* v = (*m_volumes)[j];
+            GLVolume* v = (m_volumes->volumes)[j].get();
             if (v->object_idx() != object_idx || v->volume_idx() != volume_idx)
                 continue;
 
@@ -2792,8 +2792,8 @@ void Selection::ensure_on_bed()
     typedef std::map<std::pair<int, int>, double> InstancesToZMap;
     InstancesToZMap instances_min_z;
 
-    for (size_t i = 0; i < m_volumes->size(); ++i) {
-        GLVolume* volume = (*m_volumes)[i];
+    for (size_t i = 0; i < m_volumes->volumes.size(); ++i) {
+        GLVolume* volume = (m_volumes->volumes)[i].get();
         if (!volume->is_wipe_tower && !volume->is_modifier && 
             std::find(m_cache.sinking_volumes.begin(), m_cache.sinking_volumes.end(), i) == m_cache.sinking_volumes.end()) {
             const double min_z = volume->transformed_convex_hull_bounding_box().min.z();
@@ -2806,7 +2806,7 @@ void Selection::ensure_on_bed()
         }
     }
 
-    for (GLVolume* volume : *m_volumes) {
+    for (const std::unique_ptr<GLVolume> &volume : m_volumes->volumes) {
         std::pair<int, int> instance = std::make_pair(volume->object_idx(), volume->instance_idx());
         InstancesToZMap::iterator it = instances_min_z.find(instance);
         if (it != instances_min_z.end())
@@ -2819,8 +2819,8 @@ void Selection::ensure_not_below_bed()
     typedef std::map<std::pair<int, int>, double> InstancesToZMap;
     InstancesToZMap instances_max_z;
 
-    for (size_t i = 0; i < m_volumes->size(); ++i) {
-        GLVolume* volume = (*m_volumes)[i];
+    for (size_t i = 0; i < m_volumes->volumes.size(); ++i) {
+        GLVolume* volume = (m_volumes->volumes)[i].get();
         if (!volume->is_wipe_tower && !volume->is_modifier) {
             const double max_z = volume->transformed_convex_hull_bounding_box().max.z();
             const std::pair<int, int> instance = std::make_pair(volume->object_idx(), volume->instance_idx());
@@ -2834,7 +2834,7 @@ void Selection::ensure_not_below_bed()
 
     if (is_any_volume()) {
         for (unsigned int i : m_list) {
-            GLVolume& volume = *(*m_volumes)[i];
+            GLVolume& volume = *(m_volumes->volumes)[i].get();
             const std::pair<int, int> instance = std::make_pair(volume.object_idx(), volume.instance_idx());
             InstancesToZMap::const_iterator it = instances_max_z.find(instance);
             const double z_shift = SINKING_MIN_Z_THRESHOLD - it->second;
@@ -2843,7 +2843,7 @@ void Selection::ensure_not_below_bed()
         }
     }
     else {
-        for (GLVolume* volume : *m_volumes) {
+        for (const std::unique_ptr<GLVolume> &volume : m_volumes->volumes) {
             const std::pair<int, int> instance = std::make_pair(volume->object_idx(), volume->instance_idx());
             InstancesToZMap::const_iterator it = instances_max_z.find(instance);
             if (it != instances_max_z.end() && it->second < SINKING_MIN_Z_THRESHOLD)
@@ -2858,16 +2858,16 @@ bool Selection::is_from_fully_selected_instance(unsigned int volume_idx) const
     {
         int obj_idx;
         int inst_idx;
-        GLVolumePtrs& volumes;
+        GLVolumeCollection& volumes;
 
-        SameInstance(int obj_idx, int inst_idx, GLVolumePtrs& volumes) : obj_idx(obj_idx), inst_idx(inst_idx), volumes(volumes) {}
-        bool operator () (unsigned int i) { return (volumes[i]->volume_idx() >= 0) && (volumes[i]->object_idx() == obj_idx) && (volumes[i]->instance_idx() == inst_idx); }
+        SameInstance(int obj_idx, int inst_idx, GLVolumeCollection& volumes) : obj_idx(obj_idx), inst_idx(inst_idx), volumes(volumes) {}
+        bool operator () (unsigned int i) { return (volumes.volumes[i]->volume_idx() >= 0) && (volumes.volumes[i]->object_idx() == obj_idx) && (volumes.volumes[i]->instance_idx() == inst_idx); }
     };
 
-    if ((unsigned int)m_volumes->size() <= volume_idx)
+    if ((unsigned int)m_volumes->volumes.size() <= volume_idx)
         return false;
 
-    GLVolume* volume = (*m_volumes)[volume_idx];
+    GLVolume* volume = (m_volumes->volumes)[volume_idx].get();
     int object_idx = volume->object_idx();
     if ((int)m_model->objects.size() <= object_idx)
         return false;

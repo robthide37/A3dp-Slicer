@@ -4137,7 +4137,7 @@ void Plater::priv::set_current_panel(wxTitledPanel* panel)
         if (p != current_panel)
             p->Hide();
     }
-
+    
     panel_sizer->Layout();
 
     if(old_panel)

@@ -577,10 +577,10 @@ private:
     {
     public:
         explicit SLAView(GLCanvas3D& parent) : m_parent(parent) {}
-        void detect_type_from_volumes(const GLVolumePtrs& volumes);
+        void detect_type_from_volumes(const GLVolumeUPtrs& volumes);
         void set_type(ESLAViewType type);
         void set_type(const GLVolume::CompositeID& id, ESLAViewType type);
-        void update_volumes_visibility(GLVolumePtrs& volumes);
+        void update_volumes_visibility(GLVolumeUPtrs& volumes);
         void update_instances_cache(const std::vector<std::pair<GLVolume::CompositeID, GLVolume::CompositeID>>& new_to_old_ids_map);
         void render_switch_button();
 

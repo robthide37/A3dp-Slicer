@@ -326,7 +326,7 @@ RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::A
         return {};
     const std::vector<std::shared_ptr<SceneRaycasterItem>> &casters = *scene_casters;
 
-    const GLVolumePtrs    &gl_volumes = canvas.get_volumes().volumes;
+    const GLVolumeUPtrs    &gl_volumes = canvas.get_volumes().volumes;
     const ModelObjectPtrs &objects    = canvas.get_model()->objects;
 
     RaycastManager::Meshes meshes;
@@ -337,7 +337,7 @@ RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::A
         auto index_ = static_cast<size_t>(index);
         if(index_ >= gl_volumes.size())
             continue;
-        const GLVolume *gl_volume = gl_volumes[index_];
+        const GLVolume *gl_volume = gl_volumes[index_].get();
         if (gl_volume == nullptr)
             continue;
         const ModelVolume *volume = get_model_volume(*gl_volume, objects);
