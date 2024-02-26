@@ -2953,6 +2953,8 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
                     (ej.p.x() != extrusion_path.back().x() || ej.p.y() != extrusion_path.back().y()))
                     extrusion_path.emplace_back(ej.p.x(), ej.p.y(), ej.w);
             }
+            if(extrusion->is_closed)
+                assert((extrusion_path.front() - extrusion_path.back()).norm() < SCALED_EPSILON);
             paths = this->create_overhangs(extrusion_path, role, is_external);
             
             // Reapply the nearest point search for starting point.

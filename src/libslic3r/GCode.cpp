@@ -1777,18 +1777,14 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
 
     m_last_pos_defined = false;
 
-    //flush FanMover buffer to avoid modifying the start gcode if it's manual.
-    if (this->config().start_gcode_manual && this->m_fan_mover.get() != nullptr) {
-        file.write(this->m_fan_mover.get()->process_gcode("", true));
-    }
-
     // Process filament-specific gcode.
    /* if (has_wipe_tower) {
         // Wipe tower will control the extruder switching, it will call the start_filament_gcode.
     } else {
             DynamicConfig config;
             config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(initial_extruder_id)));
-            file.writeln(this->placeholder_parser_process("start_filament_gcode", print.config().start_filament_gcode.values[initial_extruder_id], initial_extruder_id, &config));
+            file.preamble_to_put_start_layer.append(this->placeholder_parser_process("start_filament_gcode", print.config().start_filament_gcode.values[initial_extruder_id], initial_extruder_id, &config));
+            preamble_to_put_start_layer.append("\n");
     }
 */
 
@@ -1976,9 +1972,9 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 // Prusa Multi-Material wipe tower.
                 if (has_wipe_tower && !layers_to_print.empty()) {
                     m_wipe_tower.reset(new WipeTowerIntegration(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get()));
-                    file.write(m_writer.travel_to_z(first_layer_height + m_config.z_offset.value, "Move to the first layer height"));
+                    preamble_to_put_start_layer.append(m_writer.travel_to_z(first_layer_height + m_config.z_offset.value, "Move to the first layer height"));
                     if (print.config().single_extruder_multi_material_priming) {
-                        file.write(m_wipe_tower->prime(*this));
+                        preamble_to_put_start_layer.append(m_wipe_tower->prime(*this));
                         // Verify, whether the print overaps the priming extrusions.
                         BoundingBoxf bbox_print(get_print_extrusions_extents(print));
                         coordf_t twolayers_printz = ((layers_to_print.size() == 1) ? layers_to_print.front() : layers_to_print[1]).first + EPSILON;
@@ -1990,15 +1986,15 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                         bool overlap = bbox_prime.overlap(bbox_print);
 
                         if (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware) {
-                            file.write(this->retract());
-                            file.write("M300 S800 P500\n"); // Beep for 500ms, tone 800Hz.
+                            preamble_to_put_start_layer.append(this->retract());
+                            preamble_to_put_start_layer.append("M300 S800 P500\n"); // Beep for 500ms, tone 800Hz.
                             if (overlap) {
                                 // Wait for the user to remove the priming extrusions.
-                                file.write("M1 Remove priming towers and click button.\n");
+                                preamble_to_put_start_layer.append("M1 Remove priming towers and click button.\n");
                             } else {
                                 // Just wait for a bit to let the user check, that the priming succeeded.
                                 //TODO Add a message explaining what the printer is waiting for. This needs a firmware fix.
-                                file.write("M1 S10\n");
+                                preamble_to_put_start_layer.append("M1 S10\n");
                             }
                         } else {
                             // This is not Marlin, M1 command is probably not supported.
