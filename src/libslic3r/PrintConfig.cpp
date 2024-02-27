@@ -4096,7 +4096,7 @@ void PrintConfigDef::init_fff_params()
         " You have to set perimeter_overlap and external_perimeter_overlap to 100%, or this setting has no effect."
         " 0: no effect, 50%: half of the nozzle will be over an already extruded perimeter while extruding a new one"
         ", unless it's an external one)."
-        "\nIt's very experimental, please report about the usefulness. It may be removed if there is no use for it.");
+        "\nNote: it needs the external and perimeter overlap to be at 100% and to print the external perimeter first.");
     def->sidetext = L("%");
     def->min = 0;
     def->max = 50;

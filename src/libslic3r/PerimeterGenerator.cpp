@@ -670,7 +670,7 @@ void PerimeterGenerator::process()
         && this->ext_perimeter_flow.spacing_ratio() == 1
         && this->config->external_perimeters_first
         && this->object_config->perimeter_bonding.value > 0) {
-        this->infill_gap = (1 - this->object_config->perimeter_bonding.get_abs_value(1)) * ext_perimeter_spacing;
+        this->infill_gap = (this->object_config->perimeter_bonding.get_abs_value(1)) * ext_perimeter_spacing;
         this->ext_perimeter_spacing2 -= infill_gap;
     }
 
