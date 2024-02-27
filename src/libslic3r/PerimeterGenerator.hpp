@@ -86,6 +86,7 @@ public:
     const PrintObjectConfig     *object_config;
     const PrintConfig           *print_config;
     bool                         use_arachne = false;
+    std::function<void()>        throw_if_canceled = []() {};
     // Outputs:
     ExtrusionEntityCollection   *loops;
     ExtrusionEntityCollection   *gap_fill;

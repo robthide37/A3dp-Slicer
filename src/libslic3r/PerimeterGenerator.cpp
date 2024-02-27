@@ -211,6 +211,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
     // only_one_perimeter_top, from orca
     std::vector<Arachne::VariableWidthLines> out_shell;
     if (loop_number > 0 && this->config->only_one_perimeter_top && !surface.has_mod_bridge() && upper_slices != nullptr) {
+        this->throw_if_canceled();
         // Check if current layer has surfaces that are not covered by upper layer (i.e., top surfaces)
         ExPolygons non_top_polygons;
         ExPolygons fill_clip;
@@ -287,6 +288,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
     const coordf_t max_dist = bb.min.distance_to_square(bb.max);
     //detect astray points and delete them
     for (Arachne::VariableWidthLines &perimeter : perimeters) {
+        this->throw_if_canceled();
         for (auto it_extrusion = perimeter.begin(); it_extrusion != perimeter.end();) {
             Point last_point = bb.min;
             for (auto it_junction = it_extrusion->junctions.begin(); it_junction != it_extrusion->junctions.end();) {
@@ -385,6 +387,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
     ordered_extrusions.reserve(all_extrusions.size());
 
     while (ordered_extrusions.size() < all_extrusions.size()) {
+        this->throw_if_canceled();
         size_t best_candidate = 0;
         double best_distance_sqr = std::numeric_limits<double>::max();
         bool   is_best_closed = false;
@@ -476,7 +479,8 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
             }
         }
     }
-
+    
+        this->throw_if_canceled();
     if (ExtrusionEntityCollection extrusion_coll = _traverse_extrusions(ordered_extrusions); !extrusion_coll.empty()) {
         extrusion_coll.set_can_sort_reverse(false, false);
         this->loops->append(extrusion_coll);
@@ -746,6 +750,7 @@ void PerimeterGenerator::process()
             }
         }
     }
+    this->throw_if_canceled();
 
     // have to grown the perimeters if mill post-process
     MillingPostProcess miller(this->slices, this->lower_slices, config, object_config, print_config);
@@ -788,6 +793,7 @@ void PerimeterGenerator::process()
         } else {
             surface_process_result = process_classic(loop_number, surface);
         }
+        this->throw_if_canceled();
 
 
         // create one more offset to be used as boundary for fill
@@ -851,7 +857,8 @@ void PerimeterGenerator::process()
             // intersect(growth(surface_process_result.inner_perimeter-gap) , surface_process_result.inner_perimeter), so you have the (surface_process_result.inner_perimeter - small gap) but without voids betweeng gap & surface_process_result.inner_perimeter
             infill_exp = intersection_ex(infill_exp, infill_exp_no_gap);
         }
-
+        
+        this->throw_if_canceled();
         //if any top_fills, grow them by ext_perimeter_spacing/2 to have the real un-anchored fill
         ExPolygons top_infill_exp = intersection_ex(surface_process_result.fill_clip, offset_ex(surface_process_result.top_fills, double(this->get_ext_perimeter_spacing() / 2)));
         if (!surface_process_result.top_fills.empty()) {
@@ -1130,7 +1137,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             }
         }
 
-
+        this->throw_if_canceled();
         // Add perimeters on overhangs : initialization
         ExPolygons overhangs_unsupported;
         if ((this->config->extra_perimeters_overhangs || (this->config->overhangs_reverse && this->layer->id() % 2 == 1))
@@ -1191,6 +1198,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
         ExPolygons no_last_gapfill;
         // we loop one time more than needed in order to find gaps after the last perimeter was applied
         for (int perimeter_idx = 0;; ++perimeter_idx) {  // outer loop is 0
+            this->throw_if_canceled();
 
             // We can add more perimeters if there are uncovered overhangs
             // improvement for future: find a way to add perimeters only where it's needed.
@@ -1696,6 +1704,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
         const double minarea = scale_d(scale_d(this->config->gap_fill_min_area.get_abs_value(unscaled((double)perimeter_width) * unscaled((double)perimeter_width))));
         // check each gapfill area to see if it's printable.
         for (const ExPolygon& expoly : gaps_ex_to_test) {
+            this->throw_if_canceled();
             //remove too small gaps that are too hard to fill.
             //ie one that are smaller than an extrusion with width of min and a length of max.
             if (expoly.area() > minarea) {

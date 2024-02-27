@@ -255,6 +255,7 @@ void Layer::make_perimeters()
             
             // make perimeters
             SurfaceCollection fill_surfaces;
+            this->m_object->print()->throw_if_canceled();
             layerm_config->make_perimeters(new_slices, &fill_surfaces);
 
             // assign fill_surfaces to each LayerRegion
