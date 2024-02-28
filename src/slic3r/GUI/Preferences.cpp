@@ -668,7 +668,20 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "show_layer_time_doubleslider");
 		m_optgroups_gui.back()->append_single_option_line(option);
 	}
+	
 
+	def.label = L("Decimals for gcode viewer colors");
+	def.type = coInt;
+	def.tooltip = L("On the gcode viewer window, how many decimals are used to separate colors?"
+					" It's used for height, width, volumetric rate, section. Default is 2.");
+	def.set_default_value(new ConfigOptionInt{ atoi(app_config->get("gcodeviewer_decimals").c_str()) });
+	option = Option(def, "gcodeviewer_decimals");
+	option.opt.min = 0;
+	option.opt.max = 5;
+	option.opt.width = 6;
+	m_optgroups_gui.back()->append_single_option_line(option);
+	// as it's quite hard to detect a change and then clean & reload the gcode data... then asking for relaod is easier.
+	m_values_need_restart.push_back("gcodeviewer_decimals");
 
 
 	activate_options_tab(m_optgroups_gui.back(), 3);
