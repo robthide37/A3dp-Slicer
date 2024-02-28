@@ -62,7 +62,6 @@ struct SurfaceFillParams : FillParams
 
         RETURN_COMPARE_NON_EQUAL(anchor_length);
         RETURN_COMPARE_NON_EQUAL(fill_exactly);
-        RETURN_COMPARE_NON_EQUAL(flow.width());
         RETURN_COMPARE_NON_EQUAL(flow.height());
         RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter());
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, flow.bridge());
@@ -80,7 +79,10 @@ struct SurfaceFillParams : FillParams
             RETURN_COMPARE_NON_EQUAL(config->bridge_speed_internal);
             RETURN_COMPARE_NON_EQUAL(config->gap_fill_speed);
             RETURN_COMPARE_NON_EQUAL(config->print_extrusion_multiplier);
+            RETURN_COMPARE_NON_EQUAL(max_sparse_infill_spacing);
         }
+        if (config == nullptr || rhs.config == nullptr || max_sparse_infill_spacing == 0)
+            RETURN_COMPARE_NON_EQUAL(flow.width());
         assert(*this == rhs);
         return false;
     }
@@ -116,6 +118,7 @@ struct SurfaceFillParams : FillParams
                 this->fill_exactly          == rhs.fill_exactly     &&
                 this->flow                  == rhs.flow             &&
                 this->role                  == rhs.role             &&
+                this->max_sparse_infill_spacing == rhs.max_sparse_infill_spacing &&
                 this->priority              == rhs.priority;
     }
 };
@@ -282,17 +285,18 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                     //FIXME FLOW decide what to use
                     // Internal infill. Calculating infill line spacing independent of the current layer height and 1st layer status,
                     // so that internall infill will be aligned over all layers of the current region.
-                    //params.spacing = layerm.region().flow(*layer.object(), frInfill, layer.object()->config().layer_height, false).spacing();
+                    //params.spacing = layerm.region().flow(*layer.object(), frInfill, layer.heigh, false).spacing();
                     // it's internal infill, so we can calculate a generic flow spacing 
                     // for all layers, for avoiding the ugly effect of
                     // misaligned infill on first layer because of different extrusion width and
                     // layer height
-                    params.spacing = layerm.region().flow(
+                    Flow infill_flow = layerm.region().flow(
                             *layer.object(),
                             frInfill,
-                            layer.object()->config().layer_height.value,  // TODO: handle infill_every_layers?
+                            layer.height,  // TODO: handle infill_every_layers?
                             layer.id()
-                        ).spacing();
+                        );
+                    params.spacing = infill_flow.spacing();
 
                     // Anchor a sparse infill to inner perimeters with the following anchor length:
                     params.anchor_length = float(region_config.infill_anchor);
@@ -302,6 +306,16 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                     if (region_config.infill_anchor_max.percent)
                         params.anchor_length_max = float(params.anchor_length_max * 0.01 * params.spacing);
                     params.anchor_length = std::min(params.anchor_length, params.anchor_length_max);
+                    
+                    //sparse infill, compute the max width if needed
+                    if (region_config.fill_aligned_z) {
+                        //don't use fill_aligned_z if the pattern can't use it.
+                        if (params.pattern != ipHilbertCurve && params.pattern != ipArchimedeanChords &&
+                            params.pattern != ipOctagramSpiral && params.pattern != ipScatteredRectilinear &&
+                            params.pattern != ipLightning) {
+                            params.max_sparse_infill_spacing = unscaled(layer.object()->get_sparse_max_spacing());
+                        }
+                    }
                 }
 
                 auto it_params = set_surface_params.find(params);
@@ -805,6 +819,7 @@ void Layer::make_ironing()
     };
 
     std::vector<IroningParams> by_extruder;
+    // not using layer.height?
     double default_layer_height = this->object()->config().layer_height;
 
     for (LayerRegion *layerm : m_regions)

@@ -2277,6 +2277,17 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionString(L("(Unknown)")));
     def->cli = ConfigOptionDef::nocli;
 
+    def = this->add("fill_aligned_z", coBool);
+    def->label = L("Align sparse infill in z");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("The voids of the pattern of sparse infill grows with the extrusion width, to keep the same percentage of fill."
+                    " With this setting set to true, the algorithms will now only use the highest sparse infill width avaialble to create the pattern."
+                    " This way, the pattern can still be aligned even if the width is changing (from first layer width, from a modifier, from aanother extruder with different diameter)."
+                    "\nExperimental: works only for infill that won't depends on the fill area. So for infill where it's not useful (Hilbert, Archimedean, Octagram, Scattered, Lightning), this setting is disabled."
+                    "\n This setting is useful for rectilinear, monotonic, grid, trianlge, star, cubic, gyroid, honeycomb, 3D honeycomb, adaptative cubic, support cubic patterns.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("fill_angle", coFloat);
     def->label = L("Fill");
     def->full_label = L("Fill angle");
@@ -8093,6 +8104,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_use_fast_skinnydip",
 "filament_use_skinnydip",
 "filament_wipe_advanced_pigment",
+"fill_aligned_z",
 "fill_angle_increment",
 "fill_smooth_distribution",
 "fill_smooth_width",

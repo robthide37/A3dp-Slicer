@@ -830,6 +830,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 only_one_perimeter_first_layer))
     ((ConfigOptionBool,                 only_one_perimeter_top))
     ((ConfigOptionBool,                 only_one_perimeter_top_other_algo))
+    ((ConfigOptionBool,                 fill_aligned_z))
     ((ConfigOptionFloat,                fill_angle))
     ((ConfigOptionBool,                 fill_angle_cross))
     ((ConfigOptionFloat,                fill_angle_increment))

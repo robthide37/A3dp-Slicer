@@ -15,7 +15,7 @@ FillConcentric::init_spacing(coordf_t spacing, const FillParams &params)
 {
     Fill::init_spacing(spacing, params);
     if (params.density > 0.9999f && !params.dont_adjust) {
-        this->spacing_priv = unscaled(this->_adjust_solid_spacing(bounding_box.size()(0), _line_spacing_for_density(params.density)));
+        this->spacing_priv = unscaled(this->_adjust_solid_spacing(bounding_box.size()(0), _line_spacing_for_density(params)));
     }
 }
 
@@ -30,7 +30,7 @@ FillConcentric::_fill_surface_single(
     // no rotation is supported for this infill pattern
     BoundingBox bounding_box = expolygon.contour.bounding_box();
     
-    coord_t distance = _line_spacing_for_density(params.density);
+    coord_t distance = _line_spacing_for_density(params);
     if (params.density > 0.9999f && !params.dont_adjust) {
         //it's == Slic3r::FillConcentric::_adjust_solid_spacing(bounding_box.size()(0), _line_spacing_for_density(params.density)) because of the init_spacing()
         distance = scale_t(this->get_spacing());
@@ -115,7 +115,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
         // no rotation is supported for this infill pattern
         BoundingBox bounding_box = expolygon.contour.bounding_box();
 
-        coord_t distance = _line_spacing_for_density(params.density);
+        coord_t distance = _line_spacing_for_density(params);
         if (params.density > 0.9999f && !params.dont_adjust) {
             distance = scale_t(this->get_spacing());
         }

@@ -107,14 +107,14 @@ namespace Slic3r {
         return status;
     }
 
-std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions() const
+    std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions() const
     {
-    std::vector<std::reference_wrapper<const PrintRegion>> out;
-    out.reserve(m_shared_regions->all_regions.size());
-    for (const std::unique_ptr<Slic3r::PrintRegion> &region : m_shared_regions->all_regions)
-        out.emplace_back(*region.get());
-    return out;
-            }
+        std::vector<std::reference_wrapper<const PrintRegion>> out;
+        out.reserve(m_shared_regions->all_regions.size());
+        for (const std::unique_ptr<Slic3r::PrintRegion> &region : m_shared_regions->all_regions)
+            out.emplace_back(*region.get());
+        return out;
+    }
 
 
 
@@ -541,7 +541,43 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         } // for each layer
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
+
+        //compute m_max_sparse_spacing for fill_aligned_z
+        _compute_max_sparse_spacing();
+
         this->set_done(posPrepareInfill);
+    }
+
+    void PrintObject::_compute_max_sparse_spacing()
+    {
+        m_max_sparse_spacing = 0;
+        std::atomic_int64_t max_sparse_spacing;
+        //tbb::parallel_for(
+        //    tbb::blocked_range<size_t>(0, m_layers.size()),
+        //    [this, &max_sparse_spacing](const tbb::blocked_range<size_t>& range) {
+        //for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+        for (size_t layer_idx = 0; layer_idx < m_layers.size(); ++layer_idx) {
+            m_print->throw_if_canceled();
+            const Layer *layer = m_layers[layer_idx];
+            for (const LayerRegion *layerm : layer->regions()) {
+                // check if region has sparse infill.
+                for (const Surface &surface : layerm->fill_surfaces.surfaces) {
+                    if (surface.has_fill_sparse()) {
+                        coord_t spacing = layerm->region().flow(*this, frInfill, layer->height, layer->id()).scaled_spacing();
+                        // update atomic to max
+                        int64_t prev_value = max_sparse_spacing.load();
+                        std::cout<<"will update "<<max_sparse_spacing.load()<<"=="<<prev_value<<" to "<<spacing<<"\n";
+                        while (prev_value < int64_t(spacing) &&
+                               !max_sparse_spacing.compare_exchange_weak(prev_value, int64_t(spacing))) {
+                            std::cout<<"can't update "<<max_sparse_spacing<<"\n";
+                        }
+                        std::cout<<"it ahs been updated to "<<max_sparse_spacing.load()<<" from "<<prev_value<<" -> "<<spacing<<"\n";
+                    }
+                }
+            }
+        }
+        //});     
+        m_max_sparse_spacing = max_sparse_spacing.load();
     }
 
     void PrintObject::infill()
@@ -955,6 +991,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "bridge_fill_pattern"
                 || opt_key == "solid_fill_pattern"
                 || opt_key == "enforce_full_fill_volume"
+                || opt_key == "fill_aligned_z"
                 || opt_key == "fill_angle"
                 || opt_key == "fill_angle_cross"
                 || opt_key == "fill_angle_increment"

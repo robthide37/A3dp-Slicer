@@ -310,9 +310,11 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
 
 
 
-coord_t Fill::_line_spacing_for_density(float density) const
+coord_t Fill::_line_spacing_for_density(const FillParams& params) const
 {
-    return scale_t(this->get_spacing() / density);
+    if(params.max_sparse_infill_spacing > 0)
+        return scale_t(params.max_sparse_infill_spacing / params.density);
+    return scale_t(this->get_spacing() / params.density);
 }
 
 //FIXME: add recent improvmeent from perimetergenerator: avoid thick gapfill
@@ -3174,7 +3176,7 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 #endif // INFILL_DEBUG_OUTPUT
 
     const double        line_half_width = 0.5 * scale_(spacing);
-    const double        line_spacing    = scale_(spacing) / params.density;
+    const double        line_spacing    = ((params.max_sparse_infill_spacing > 0) ? params.max_sparse_infill_spacing : spacing) / params.density;
     const double        min_arch_length = 1.3 * line_spacing;
     const double        trim_length     = line_half_width * 0.3;
 

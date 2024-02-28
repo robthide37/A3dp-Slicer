@@ -507,6 +507,7 @@ static std::vector<std::string> s_Preset_print_options {
         "ironing_speed",
         "ironing_spacing",
         "ironing_angle",
+        "fill_aligned_z",
         "fill_angle",
         "fill_angle_cross",
         "fill_angle_increment",
