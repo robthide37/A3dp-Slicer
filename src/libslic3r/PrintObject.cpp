@@ -2304,9 +2304,11 @@ bool PrintObject::invalidate_state_by_config_options(
                 if (layer_it == m_layers.begin())
                     continue;
 
-            Layer       *layer       = *layer_it;
-            LayerRegion *layerm      = layer->m_regions[region_id];
-            Flow         bridge_flow = layerm->bridging_flow(frSolidInfill);
+                Layer       *layer       = *layer_it;
+                LayerRegion *layerm      = layer->m_regions[region_id];
+                const Flow         bridge_flow = layerm->bridging_flow(frSolidInfill);
+                const float        bridge_height = std::max(float(layer->height + EPSILON), bridge_flow.height());
+                const coord_t      bridge_width = bridge_flow.scaled_width();
 
                 // extract the stInternalSolid surfaces that might be transformed into bridges
                 Polygons internal_solid;
@@ -2320,7 +2322,7 @@ bool PrintObject::invalidate_state_by_config_options(
                     Polygons to_bridge_pp = internal_solid;
 
                     // iterate through lower layers spanned by bridge_flow
-                    double bottom_z = layer->print_z - bridge_flow.height() - EPSILON;
+                    double bottom_z = layer->print_z - (bridge_flow.height()+0.1) - EPSILON;
                     //TODO take into account sparse ratio! double protrude_by = bridge_flow.height - layer->height;
                     for (int i = int(layer_it - m_layers.begin()) - 1; i >= 0; --i) {
                         const Layer* lower_layer = m_layers[i];
@@ -2347,7 +2349,7 @@ bool PrintObject::invalidate_state_by_config_options(
                     {
                         to_bridge.clear();
                         //choose between two offsets the one that split the less the surface.
-                        float min_width = float(bridge_flow.scaled_width()) * 3.f;
+                        float min_width = float(bridge_width) * 3.f;
                         // opening : offset2-+
                         ExPolygons to_bridgeOK = opening_ex(to_bridge_pp, min_width, min_width);
                         for (ExPolygon& expolys_to_check_for_thin : union_ex(to_bridge_pp)) {
@@ -2356,7 +2358,7 @@ bool PrintObject::invalidate_state_by_config_options(
                             ExPolygons not_bridge = diff_ex(ExPolygons{ expolys_to_check_for_thin }, collapsed);
                             int try1_count = bridge.size() + not_bridge.size();
                             if (try1_count > 1) {
-                                min_width = float(bridge_flow.scaled_width()) * 1.5f;
+                                min_width = float(bridge_width) * 1.5f;
                                 collapsed = offset2_ex(ExPolygons{ expolys_to_check_for_thin }, -min_width, +min_width * 1.5f);
                                 ExPolygons bridge2 = intersection_ex(collapsed, ExPolygons{ expolys_to_check_for_thin });
                                 not_bridge = diff_ex(ExPolygons{ expolys_to_check_for_thin }, collapsed);
