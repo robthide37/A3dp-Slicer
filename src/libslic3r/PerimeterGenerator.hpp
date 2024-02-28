@@ -146,8 +146,6 @@ private:
     coord_t ext_perimeter_width; coord_t get_ext_perimeter_width() { return ext_perimeter_width; }
     coord_t ext_perimeter_spacing; coord_t get_ext_perimeter_spacing() { return ext_perimeter_spacing; }
     coord_t ext_perimeter_spacing2; coord_t get_ext_perimeter_spacing2() { return ext_perimeter_spacing2; }
-    coord_t gap_fill_spacing; coord_t get_gap_fill_spacing() { return gap_fill_spacing; }
-    coord_t gap_fill_spacing_external; coord_t get_gap_fill_spacing_external() { return gap_fill_spacing_external; }
     coord_t infill_gap; coord_t get_infill_gap() { return infill_gap; }
     coord_t solid_infill_spacing; coord_t get_solid_infill_spacing() { return solid_infill_spacing; }
     bool round_peri;

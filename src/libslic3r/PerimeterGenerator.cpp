@@ -654,12 +654,6 @@ void PerimeterGenerator::process()
     // overhang perimeters
     this->m_mm3_per_mm_overhang = this->overhang_flow.mm3_per_mm();
 
-    //gap fill
-    this->gap_fill_spacing_external = this->config->gap_fill_overlap.get_abs_value(this->ext_perimeter_flow.with_spacing_ratio_from_width(1).scaled_spacing())
-        + this->ext_perimeter_flow.scaled_width() * (1 - this->config->gap_fill_overlap.get_abs_value(1.));
-    this->gap_fill_spacing = this->config->gap_fill_overlap.get_abs_value(this->perimeter_flow.with_spacing_ratio_from_width(1).scaled_spacing())
-        + this->perimeter_flow.scaled_width() * (1 - this->config->gap_fill_overlap.get_abs_value(1.));
-
     // solid infill
     this->solid_infill_spacing = this->solid_infill_flow.scaled_spacing();
 
@@ -1442,11 +1436,11 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         (round_peri ? min_round_spacing : 3));
                     if (perimeter_idx == 1) {
                         append(gaps, diff_ex(
-                            offset_ex(last, -0.5f * gap_fill_spacing_external),
+                            offset_ex(last, -0.5f * this->get_ext_perimeter_spacing()),
                             no_last_gapfill));  // safety offset
                     } else {
                         append(gaps, diff_ex(
-                            offset_ex(last, -0.5f * gap_fill_spacing),
+                            offset_ex(last, -0.5f * this->get_perimeter_spacing()),
                             no_last_gapfill));  // safety offset
                     }
                 }
@@ -1770,11 +1764,12 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             md.build(polylines);
         }
         // create extrusion from lines
+        Flow gap_fill_flow = Flow::new_from_width(this->perimeter_flow.width(), this->perimeter_flow.nozzle_diameter(),this->perimeter_flow.height(), this->config->gap_fill_overlap.get_abs_value(1.), false);
         if (!polylines.empty()) {
             this->gap_fill->append(Geometry::thin_variable_width(
                 polylines,
                 erGapFill, 
-                this->solid_infill_flow, 
+                gap_fill_flow, 
                 scale_t(this->print_config->resolution_internal),
                 true));
             /*  Make sure we don't infill narrow parts that are already gap-filled
