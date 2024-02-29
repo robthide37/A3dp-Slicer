@@ -1025,6 +1025,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("colorprint_heights", coFloats);
     def->label = L("Colorprint height");
     def->category = OptionCategory::slicing;
+    def->mode = comExpert | comPrusa; // note: hidden setting
     def->tooltip = L("Heights at which a filament change is to occur. ");
     def->set_default_value(new ConfigOptionFloats { });
 
@@ -1063,9 +1064,11 @@ void PrintConfigDef::init_fff_params()
     def = this->add("compatible_printers_condition_cummulative", coStrings);
     def->set_default_value(new ConfigOptionStrings());
     def->cli = ConfigOptionDef::nocli;
+    def->mode = comNone | comPrusa; // note: hidden setting
     def = this->add("compatible_prints_condition_cummulative", coStrings);
     def->set_default_value(new ConfigOptionStrings());
     def->cli = ConfigOptionDef::nocli;
+    def->mode = comNone | comPrusa; // note: hidden setting
 
     def = this->add("complete_objects", coBool);
     def->label = L("Complete individual objects");
@@ -1221,6 +1224,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Default filament profile");
     def->tooltip = L("Default filament profile associated with the current printer profile. "
                    "On selection of the current printer profile, this filament profile will be activated.");
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionStrings());
     def->cli = ConfigOptionDef::nocli;
 
@@ -1242,6 +1246,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Default print profile");
     def->tooltip = L("Default print profile associated with the current printer profile. "
                    "On selection of the current printer profile, this print profile will be activated.");
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
 
@@ -1675,6 +1680,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::extruders;
     def->tooltip = L("The extruder to use (unless more specific extruder settings are specified). "
         "This value overrides perimeter and infill extruders, but not the support extruders.");
+    def->mode = comAdvancedE | comPrusa; // note: hidden setting
     def->min = 0;  // 0 = inherit defaults
     def->enum_labels.push_back(L("default"));  // override label for item 0
     def->enum_labels.push_back("1");
@@ -1779,6 +1785,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::extruders;
     def->tooltip = L("Use this option to set the axis letter associated with your printer's extruder "
                    "(usually E but some printers use A).");
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString("E"));
 
     def = this->add("extrusion_multiplier", coFloats);
@@ -2270,10 +2277,12 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats { 0. });
 
     def = this->add("filament_settings_id", coStrings);
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionStrings { "" });
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("filament_vendor", coString);
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString(L("(Unknown)")));
     def->cli = ConfigOptionDef::nocli;
 
@@ -2451,7 +2460,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("The first layer will be grown / shrunk in the XY plane by the configured value "
         "to compensate for the 1st layer squish aka an Elephant Foot effect. (should be negative = inwards)");
     def->sidetext = L("mm");
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comAdvancedE | comSuSi | comPrusa; // just a rename & inverted of prusa 's elefant_foot
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("first_layer_size_compensation_layers", coInt);
@@ -4305,12 +4314,13 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min = 0;
     def->max = 100;
-    def->mode = comSimpleAE | comSuSi;
+    def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("printer_model", coString);
     def->label = L("Printer type");
     def->tooltip = L("Type of the printer.");
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
 
@@ -4327,24 +4337,29 @@ void PrintConfigDef::init_fff_params()
     def = this->add("printer_vendor", coString);
     def->label = L("Printer vendor");
     def->tooltip = L("Name of the printer vendor.");
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("printer_variant", coString);
     def->label = L("Printer variant");
     def->tooltip = L("Name of the printer variant. For example, the printer variants may be differentiated by a nozzle diameter.");
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("print_settings_id", coString);
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("printer_settings_id", coString);
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("physical_printer_settings_id", coString);
+    def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
 
@@ -5791,6 +5806,7 @@ void PrintConfigDef::init_fff_params()
                    "is slightly above the number of available cores/processors.");
     def->readonly = true;
     def->min = 1;
+    def->mode = comExpert | comPrusa; // note: hidden setting (and should be a preference)
     {
         int threads = (unsigned int)boost::thread::hardware_concurrency();
         def->set_default_value(new ConfigOptionInt(threads > 0 ? threads : 2));
@@ -8064,7 +8080,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "curve_smoothing_angle_convex",
 "curve_smoothing_cutoff_dist",
 "curve_smoothing_precision",
-//"default_fan_speed", used to convert to min_fan_speed & fan_always_on
 "default_speed",
 "enforce_full_fill_volume",
 "exact_last_layer_height",
@@ -8072,6 +8087,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "external_perimeter_acceleration",
 "external_perimeter_cut_corners",
 "external_perimeter_extrusion_spacing",
+"external_perimeter_extrusion_change_odd_layers",
 "external_perimeter_fan_speed",
 "external_perimeter_overlap",
 "external_perimeters_hole",
@@ -8089,6 +8105,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "fan_speedup_time",
 "feature_gcode",
 "filament_cooling_zone_pause",
+"filament_custom_variables",
 "filament_dip_extraction_speed",
 "filament_dip_insertion_speed",
 "filament_enable_toolchange_part_fan",
@@ -8106,6 +8123,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_wipe_advanced_pigment",
 "fill_aligned_z",
 "fill_angle_increment",
+"fill_angle_cross",
+"fill_angle_template",
 "fill_smooth_distribution",
 "fill_smooth_width",
 "fill_top_flow_ratio",
@@ -8128,20 +8147,29 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "gap_fill_min_width",
 "gap_fill_overlap",
 "gcode_filename_illegal_char",
+"gcode_precision_e",
+"gcode_precision_xyz",
 "hole_size_compensation",
 "hole_size_threshold",
 "hole_to_polyhole_threshold",
 "hole_to_polyhole_twisted",
 "hole_to_polyhole",
 "infill_connection",
+"infill_connection_bottom",
 "infill_connection_bridge",
+"infill_connection_solid",
+"infill_connection_top",
 "infill_dense_algo",
 "infill_dense",
+"infill_extrusion_change_odd_layers",
 "infill_extrusion_spacing",
 "infill_fan_speed",
+"init_z_rotate",
 "ironing_acceleration",
+"ironing_angle",
 "lift_min",
 "machine_max_acceleration_travel",
+"max_gcode_per_second",
 "max_speed_reduction",
 "milling_after_z",
 "milling_cutter",
@@ -8166,10 +8194,11 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "overhangs_fan_speed",
 "overhangs_reverse_threshold",
 "overhangs_reverse",
-"overhangs_speed",
 "overhangs_speed_enforce",
 "overhangs_width_speed",
+"parallel_objects_step",
 "perimeter_bonding",
+"perimeter_extrusion_change_odd_layers",
 "perimeter_extrusion_spacing",
 "perimeter_fan_speed",
 "perimeter_loop_seam",
@@ -8177,20 +8206,26 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "perimeter_overlap",
 "perimeter_round_corners",
 "print_extrusion_multiplier",
+"print_custom_variables",
 "print_retract_length",
 "print_retract_lift",
 "print_temperature",
+"printer_custom_variables",
 "printhost_client_cert",
 "printhost_client_cert_password",
 "raft_layer_height",
 "raft_interface_layer_height",
 "remaining_times_type",
+"resolution_internal",
 "retract_lift_first_layer",
 "retract_lift_top",
 "retract_lift_before_travel",
 "seam_angle_cost",
 "seam_gap",
 "seam_gap_external",
+"solid_over_perimeters",
+"filament_seam_gap", // filament override
+"filament_seam_gap_external", // filament override
 "seam_notch_all",
 "seam_notch_angle",
 "seam_notch_inner",
@@ -8203,6 +8238,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "small_perimeter_max_length",
 "small_perimeter_min_length",
 "solid_fill_pattern",
+"solid_infill_extrusion_change_odd_layers",
 "solid_infill_acceleration",
 "solid_infill_extrusion_spacing",
 "solid_infill_fan_speed",
@@ -8253,8 +8289,24 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "wipe_inside_start",
 "wipe_only_crossing",
 "wipe_speed",
+"filament_wipe_extra_perimeter", // filament override
+"filament_wipe_inside_depth", // filament override
+"filament_wipe_inside_end", // filament override
+"filament_wipe_inside_start", // filament override
+"filament_wipe_only_crossing", // filament override
+"filament_wipe_speed", // filament override
+"wipe_tower_speed",
+"wipe_tower_wipe_starting_speed",
+"xy_size_compensation",
 "xy_inner_size_compensation",
 "z_step",
+};
+
+std::unordered_set<std::string> prusa_export_to_change_keys =
+{
+"default_fan_speed", // used to convert to min_fan_speed & fan_always_on
+"overhangs_width",
+"overhangs_speed",
 };
 
 std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf) {
@@ -8264,7 +8316,13 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
     if (prusa_export_to_remove_keys.find(opt_key) != prusa_export_to_remove_keys.end()) {
         opt_key = "";
         value = "";
-    } else if (opt_key.find("_pattern") != std::string::npos) {
+        return new_entries;
+    }
+    if (!opt_key.empty() && prusa_export_to_change_keys.find(opt_key) == prusa_export_to_change_keys.end()) {
+        auto mode = all_conf.def()->get(opt_key)->mode;
+        assert( (mode & comPrusa) == comPrusa);
+    }
+    if (opt_key.find("_pattern") != std::string::npos) {
         if ("smooth" == value || "smoothtriple" == value || "smoothhilbert" == value || "rectiwithperimeter" == value || "scatteredrectilinear" == value || "rectilineargapfill" == value || "sawtooth" == value) {
             value = "rectilinear";
         } else if ("concentricgapfill" == value) {
@@ -8434,6 +8492,7 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         }
     }
     // --end-- custom gcode: --end--
+
 
     return new_entries;
 }
@@ -9246,7 +9305,7 @@ std::string validate(const FullPrintConfig& cfg)
         if (cfg.extra_perimeters || cfg.extra_perimeters_overhangs || cfg.extra_perimeters_odd_layers)
             return "Can't make more than one perimeter when spiral vase mode is enabled";
         if (cfg.overhangs_reverse)
-            return "Can't reverse the direction of the perimeter every layer when spiral vase mode is enabled";
+            return "Can't reverse the direction of the overhangs every layer when spiral vase mode is enabled";
     }
 
     // extrusion widths
