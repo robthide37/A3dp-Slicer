@@ -629,6 +629,11 @@ struct HasInfillVisitor : public HasRoleVisitor{
 struct HasSolidInfillVisitor : public HasRoleVisitor{
     void default_use(const ExtrusionEntity &entity) override { found = is_solid_infill(entity.role()); };
 };
+struct HasThisRoleVisitor : public HasRoleVisitor{
+    ExtrusionRole role_to_find;
+    HasThisRoleVisitor(ExtrusionRole role) : role_to_find(role) {}
+    void default_use(const ExtrusionEntity &entity) override { found = entity.role() == role_to_find; };
+};
 
 
 //call simplify for all paths.

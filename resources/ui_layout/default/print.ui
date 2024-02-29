@@ -66,6 +66,7 @@ group:label_width$12:Overhangs
 	line:Extrusion direction
 		setting:sidetext_width$2:overhangs_reverse
 		setting:label_width$12:width$5:overhangs_reverse_threshold
+		setting:label$All perimeters:sidetext_width$2:perimeter_reverse
 	end_line
 group:sidetext_width$5:Advanced
 	setting:width$25:no_perimeter_unsupported_algo

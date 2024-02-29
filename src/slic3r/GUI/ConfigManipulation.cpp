@@ -338,7 +338,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool have_perimeters = config->opt_int("perimeters") > 0;
     for (auto el : { "ensure_vertical_shell_thickness", "external_perimeter_speed", "extra_perimeters", "extra_perimeters_odd_layers",
         "external_perimeters_first", "external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing","external_perimeter_extrusion_change_odd_layers",
-        "overhangs","perimeter_speed",
+        "overhangs", "perimeter_speed", "perimeter_reverse",
         "seam_position", "small_perimeter_speed", "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
         "perimeter_generator", "seam_notch_all", "seam_notch_inner", "seam_notch_outer"})
         toggle_field(el, have_perimeters);
@@ -356,13 +356,15 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("perimeter_bonding", config->opt_bool("external_perimeters_first") && !have_arachne && config->option("perimeter_overlap")->get_float() == 100.f && config->option("external_perimeter_overlap")->get_float() == 100.f);
 
     for (auto el : {"perimeter_loop", "extra_perimeters_overhangs", "no_perimeter_unsupported_algo",
-        "thin_perimeters", "overhangs_reverse", "perimeter_round_corners"})
+        "thin_perimeters", "perimeter_round_corners"})
         toggle_field(el, have_perimeters && !have_arachne);
 
     toggle_field("only_one_perimeter_top", have_perimeters);
     toggle_field("only_one_perimeter_first_layer", config->opt_int("perimeters") > 1);
     toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0);
-    toggle_field("overhangs_reverse_threshold", have_perimeters && config->opt_bool("overhangs_reverse"));
+    bool have_overhangs_reverse = have_perimeters && !have_arachne && !config->opt_bool("perimeter_reverse");
+    toggle_field("overhangs_reverse", have_overhangs_reverse);
+    toggle_field("overhangs_reverse_threshold", have_overhangs_reverse && config->opt_bool("overhangs_reverse"));
     toggle_field("overhangs_speed_enforce", have_perimeters && !config->opt_bool("perimeter_loop"));
     toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top"));
     toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->get_float() != 0 && !have_arachne);

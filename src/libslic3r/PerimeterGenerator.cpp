@@ -56,7 +56,6 @@ namespace Slic3r {
 //    }
 //};
 
-
 PerimeterGeneratorLoops get_all_Childs(PerimeterGeneratorLoop loop) {
     PerimeterGeneratorLoops ret;
     for (PerimeterGeneratorLoop &child : loop.children) {
@@ -2863,10 +2862,15 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
             assert(thin_walls.empty());
             ExtrusionEntityCollection children = this->_traverse_loops(loop.children, thin_walls, has_overhang ? 1 : count_since_overhang < 0 ? -1 : (count_since_overhang+1));
             coll[idx.first] = nullptr;
+            bool has_steep_overhangs_this_loop = false;
+            if (loop.is_steep_overhang && this->layer->id() % 2 == 1 && !config->perimeter_reverse) {
+                has_steep_overhangs_this_loop = HasRoleVisitor::search(*eloop, HasThisRoleVisitor{erOverhangPerimeter});
+            }
             if ((loop.is_contour && !reverse_contour) || (!loop.is_contour && reverse_hole)) {
                 //note: this->layer->id() % 2 == 1 already taken into account in the is_steep_overhang compute (to save time).
                 // if contour: reverse if steep_overhang & odd. if hole: the opposite
-                if ((loop.is_steep_overhang && this->layer->id() % 2 == 1) == loop.is_contour)
+                bool clockwise = ((config->perimeter_reverse || has_steep_overhangs_this_loop) && this->layer->id() % 2 == 1) == loop.is_contour;
+                if (clockwise)
                     eloop->make_clockwise();
                 else
                     eloop->make_counter_clockwise();
@@ -2885,8 +2889,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
                     coll_out.append(*eloop);
                 }
             } else {
+                bool counter_clockwise = ((config->perimeter_reverse || has_steep_overhangs_this_loop) && this->layer->id() % 2 == 1) != loop.is_contour;
                 // if hole: reverse if steep_overhang & odd. if contour: the opposite
-                if ((loop.is_steep_overhang && this->layer->id() % 2 == 1) != loop.is_contour)
+                if (counter_clockwise)
                     eloop->make_counter_clockwise();
                 else
                     eloop->make_clockwise();
@@ -3039,7 +3044,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
                 ExtrusionLoop extrusion_loop(std::move(paths), loop_role);
                 // Restore the orientation of the extrusion loop.
                 //TODO: use if (loop.is_steep_overhang && this->layer->id() % 2 == 1) to make_clockwise => need to detect is_steep_overhang on the arachne path
-                if (pg_extrusion.is_contour)
+                if ((config->perimeter_reverse /*|| pg_extrusion.is_steep_overhang*/ && this->layer->id() % 2 == 1) == pg_extrusion.is_contour)
                     extrusion_loop.make_counter_clockwise();
                 else
                     extrusion_loop.make_clockwise();

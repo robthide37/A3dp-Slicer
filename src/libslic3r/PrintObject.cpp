@@ -852,6 +852,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "perimeter_extrusion_change_odd_layers"
                 || opt_key == "perimeter_extrusion_spacing"
                 || opt_key == "perimeter_extrusion_width"
+                || opt_key == "perimeter_reverse"
                 || opt_key == "infill_overlap"
                 || opt_key == "thin_perimeters"
                 || opt_key == "thin_perimeters_all"
