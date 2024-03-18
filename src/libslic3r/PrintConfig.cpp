@@ -8524,6 +8524,39 @@ DynamicPrintConfig* DynamicPrintConfig::new_from_defaults_keys(const std::vector
     return out;
 }
 
+const ConfigOption *MultiPtrPrintConfig::optptr(const t_config_option_key &opt_key) const
+{
+    for (auto conf : storages) {
+        assert(conf->exists());
+        const ConfigOption *opt = conf->optptr(opt_key);
+        if (opt)
+            return opt;
+    }
+    return nullptr;
+}
+ConfigOption *MultiPtrPrintConfig::optptr(const t_config_option_key &opt_key, bool create)
+{
+    assert(!create);
+    for (auto conf : storages) {
+        assert(conf->exists());
+        ConfigOption *opt = conf->optptr(opt_key);
+        if (opt)
+            return opt;
+    }
+    return nullptr;
+}
+t_config_option_keys MultiPtrPrintConfig::keys() const
+{
+    assert(false);
+    // shouldn't need ot call that
+    t_config_option_keys keys;
+    for (auto conf : storages) {
+        assert(conf->exists());
+        append(keys, conf->keys());
+    }
+    return keys;
+}
+
 PrinterTechnology printer_technology(const ConfigBase& cfg)
 {
     const ConfigOptionEnum<PrinterTechnology>* opt = cfg.option<ConfigOptionEnum<PrinterTechnology>>("printer_technology");

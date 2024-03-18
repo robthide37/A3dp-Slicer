@@ -2245,8 +2245,9 @@ public:
     // but it carries the defaults of the configuration values.
     
     ConfigBase() = default;
+#ifndef _DEBUG
     ~ConfigBase() override = default;
-
+#endif
     // to get to the config more generic than this one, if available
     const ConfigBase* parent = nullptr;
 
@@ -2381,6 +2382,13 @@ public:
 
     static std::map<t_config_option_key, std::string> load_gcode_string_legacy(const char* str);
     static size_t load_from_gcode_string_legacy(ConfigBase& config, const char* str, ConfigSubstitutionContext& substitutions);
+
+#ifdef _DEBUG
+    //little dirty test to be sure it exists (not needed, but it's good for testing)
+    int32_t m_exists = 0x55555555;
+    bool    exists() { return m_exists == 0x55555555; }
+    ~ConfigBase() override { m_exists = 0; }
+#endif
 
 private:
     // Set a configuration value from a string.
