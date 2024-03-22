@@ -231,6 +231,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
         int bitmap_width = 0;
         auto load_bitmap = [](const wxString& bitmap_file, wxBitmap& bitmap, int& bitmap_width)->bool {
         if (wxFileExists(bitmap_file)) {
+            BOOST_LOG_TRIVIAL(debug) << "Loading (PrinterPicker) image for wizard: '"<<bitmap_file<<"'";
             bitmap.LoadFile(bitmap_file, wxBITMAP_TYPE_PNG);
             bitmap_width = bitmap.GetWidth();
                 return true;

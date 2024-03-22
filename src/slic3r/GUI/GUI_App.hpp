@@ -268,7 +268,7 @@ public:
     bool            switch_language();
     bool            load_language(wxString language, bool initial);
 
-    Tab*            get_tab(Preset::Type type);
+    Tab*            get_tab(Preset::Type type, bool only_completed = true);
     ConfigOptionMode get_mode();
     void            save_mode(const ConfigOptionMode mode) ;
     void            update_mode();

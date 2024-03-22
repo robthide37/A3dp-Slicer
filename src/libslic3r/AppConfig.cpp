@@ -302,6 +302,9 @@ void AppConfig::set_defaults()
         if (get("font_size").empty())
             set("font_size", "0");
 
+        if (get("gcodeviewer_decimals").empty())
+            set("gcodeviewer_decimals", "2");
+
         //get default color from the ini file
 
         //try to load colors from ui file

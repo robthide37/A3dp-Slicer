@@ -513,7 +513,8 @@ void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode
     current_tags = tags_in;
 
     for (auto i : input_values)
-        append_options(i.config, i.type);
+        if(i.config != nullptr)
+            append_options(i.config, i.type);
 
     for (Option &opt : script_options) {
         if (Preset::get_tech(opt.type))

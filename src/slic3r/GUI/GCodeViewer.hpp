@@ -264,6 +264,7 @@ class GCodeViewer
             float get_absolute_min() const { return m_full_precision_min; }
             bool   is_log_scale() const { return m_log_scale; }
             bool   set_log_scale(bool log_scale);
+            bool   can_have_outliers(float ratio) const;
             bool   has_outliers() const;
             float  get_ratio_outliers() const { return m_ratio_outlier; }
             bool   set_ratio_outliers(float ratio);
@@ -277,29 +278,29 @@ class GCodeViewer
         struct Ranges
         {
             // Color mapping by layer height.
-            Range height{3, false};
+            Range height;
             // Color mapping by extrusion width.
-            Range width{3};
+            Range width;
             // Color mapping by feedrate.
-            Range feedrate{1};
+            Range feedrate;
             // Color mapping by fan speed.
-            Range fan_speed{0};
+            Range fan_speed;
             // Color mapping by volumetric extrusion rate.
-            Range volumetric_rate{3};
+            Range volumetric_rate;
             // Color mapping by volumetric extrusion mm3/mm.
-            Range volumetric_flow{3};
+            Range volumetric_flow;
             // Color mapping by extrusion temperature.
-            Range temperature{0};
+            Range temperature;
             // Color mapping by layer time.
-            Range layer_duration{0, true};
+            Range layer_duration;
             // Color mapping by time.
-            Range elapsed_time{0,true};
+            Range elapsed_time;
 
             Range* get(EViewType type);
             
             std::pair<std::string, std::string> min_max_cstr_id[size_t(EViewType::Count)];
 
-            Ranges();
+            Ranges(uint8_t max_decimals);
 
             void reset() {
                 height.reset();
@@ -316,6 +317,8 @@ class GCodeViewer
 
         unsigned int role_visibility_flags{ 0 };
         Ranges ranges;
+
+        Extrusions();
 
         void reset_role_visibility_flags() {
             role_visibility_flags = 0;

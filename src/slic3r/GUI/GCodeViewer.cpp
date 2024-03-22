@@ -261,10 +261,31 @@ void GCodeViewer::Extrusions::Range::update_from(const float f_value)
 
     // note: not needed to clear caches, as update isn't called after chache creation and there is always a reset before
 }
+
 bool GCodeViewer::Extrusions::Range::has_outliers() const
 {
     bool   has_outliers = false;
     size_t min_count    = this->m_ratio_outlier * total_count / 20;
+    for (size_t idx = 0; idx < 19; ++idx) {
+        if (counts[idx] > 0) {
+            has_outliers = counts[idx] <= min_count;
+            break;
+        }
+    }
+    if (!has_outliers)
+        for (size_t idx = 19; idx > 0; --idx) {
+            if (counts[idx] > 0) {
+                has_outliers = counts[idx] <= min_count;
+                break;
+            }
+        }
+    return has_outliers;
+}
+
+bool GCodeViewer::Extrusions::Range::can_have_outliers(float ratio) const
+{
+    bool   has_outliers = false;
+    size_t min_count    = ratio * total_count / 20;
     for (size_t idx = 0; idx < 19; ++idx) {
         if (counts[idx] > 0) {
             has_outliers = counts[idx] <= min_count;
@@ -620,11 +641,33 @@ GCodeViewer::Extrusions::Range* GCodeViewer::Extrusions::Ranges::get(EViewType t
 }
 
 
-GCodeViewer::Extrusions::Ranges::Ranges(){
+GCodeViewer::Extrusions::Ranges::Ranges(uint8_t max_decimals) : 
+            // Color mapping by layer height.
+            height(max_decimals, false),
+            // Color mapping by extrusion width.
+            width(max_decimals),
+            // Color mapping by feedrate.
+            feedrate(std::min(max_decimals, uint8_t(1))),
+            // Color mapping by fan speed.
+            fan_speed(0),
+            // Color mapping by volumetric extrusion rate.
+            volumetric_rate(max_decimals),
+            // Color mapping by volumetric extrusion mm3/mm.
+            volumetric_flow(max_decimals),
+            // Color mapping by extrusion temperature.
+            temperature(0),
+            // Color mapping by layer time.
+            layer_duration(0, true),
+            // Color mapping by time.
+            elapsed_time(0,true) {
     for (size_t i = 0; i < size_t(EViewType::Count); i++) {
         this->min_max_cstr_id[i] = std::pair<std::string, std::string>{std::string("##min") + std::to_string(i), std::string("##max") + std::to_string(i)};
     }
 }
+
+
+
+GCodeViewer::Extrusions::Extrusions() : ranges(std::max(0, std::min(6, atoi(Slic3r::GUI::get_app_config()->get("gcodeviewer_decimals").c_str())))) {}
 
 GCodeViewer::SequentialRangeCap::~SequentialRangeCap() {
     if (ibo > 0)
@@ -3521,8 +3564,8 @@ void GCodeViewer::render_legend(float& legend_height)
     const PrintEstimatedStatistics::Mode& time_mode = m_print_statistics.modes[static_cast<size_t>(m_time_estimate_mode)];
     bool show_estimated_time = time_mode.time > 0.0f && (m_view_type == EViewType::FeatureType ||
         (m_view_type == EViewType::ColorPrint && !time_mode.custom_gcode_times.empty()));
-    bool show_switch_show_outliers = (m_view_type == EViewType::VolumetricFlow || m_view_type == EViewType::VolumetricRate) && range && range->has_outliers();
-    bool show_switch_log_scale = (m_view_type == EViewType::LayerTime);
+    bool show_switch_show_outliers = range && range->can_have_outliers(0.01f);
+    bool show_switch_log_scale = (m_view_type == EViewType::LayerTime) && (!range || !range->is_discrete_mode());
     bool show_min_max_field = range && (range->get_user_min() || range->get_user_max() || range->count_discrete() > 5);
     bool show_min_max_field_same_line = (m_view_type == EViewType::VolumetricFlow || m_view_type == EViewType::VolumetricRate || m_view_type == EViewType::LayerTime || m_view_type == EViewType::Chronology);
     bool show_switch_discrete = range && range->count_discrete() > 2 && range->count_discrete() <= Range_Colors_Details.size();
@@ -4356,29 +4399,40 @@ void GCodeViewer::render_legend(float& legend_height)
         }
         std::string min_label = _u8L("min");
         std::string max_label = _u8L("max");
-        float max_label_size = std::max(imgui.calc_text_size(min_label).x, imgui.calc_text_size(min_label).y);
-        max_label_size += imgui.scaled(1.f);
-        // draw text
-        ImGui::AlignTextToFramePadding();
-        imgui.text(min_label);
-        if (show_min_max_field_same_line)
+        
+        if (show_min_max_field_same_line) {
+            // draw min
+            imgui.text(min_label);
             ImGui::SameLine();
-        else
-            ImGui::SameLine(max_label_size);
-        ImGui::PushItemWidth(imgui.get_style_scaling() * size);
-        ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].first.c_str(), &mod_min, 0.0f, 0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
-        if (show_min_max_field_same_line)
+            ImGui::PushItemWidth(imgui.get_style_scaling() * size);
+            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].second.c_str(), &mod_max, 0.0f,
+                              0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
+            // draw max
             ImGui::SameLine();
-        else
-            ImGui::AlignTextToFramePadding();
-        imgui.text(max_label);
-        if (show_min_max_field_same_line)
+            imgui.text(max_label);
             ImGui::SameLine();
-        else
-            ImGui::SameLine(max_label_size);
-        ImGui::PushItemWidth(imgui.get_style_scaling() * size);
-        ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].second.c_str(), &mod_max, 0.0f, 0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
+            ImGui::PushItemWidth(imgui.get_style_scaling() * size);
+            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].first.c_str(), &mod_min, 0.0f,
+                              0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
 
+        } else {
+            float label_size = std::max(imgui.calc_text_size(min_label).x, imgui.calc_text_size(min_label).y);
+            label_size += imgui.scaled(1.f);
+            // draw max
+            imgui.text(max_label);
+            ImGui::SameLine(label_size);
+            ImGui::PushItemWidth(imgui.get_style_scaling() * size);
+            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].second.c_str(), &mod_max, 0.0f,
+                              0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
+            // draw min
+            ImGui::AlignTextToFramePadding();
+            imgui.text(min_label);
+            ImGui::SameLine(label_size);
+            ImGui::PushItemWidth(imgui.get_style_scaling() * size);
+            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].first.c_str(), &mod_min, 0.0f,
+                              0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
+        }
+        // refresh?
         if (mod_min != old_min)
             if(range->set_user_min(mod_min))
                 need_refresh_render_paths = true;

@@ -1003,11 +1003,17 @@ std::pair<OG_CustomCtrl*, bool*> ConfigOptionsGroup::get_custom_ctrl_with_blinki
 
 // Change an option on m_config, possibly call ModelConfig::touch().
 void ConfigOptionsGroup::change_opt_value(const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
-
 {
-    const_cast<DynamicConfig&>(*m_config).option(opt_key)->set_any(value, opt_index);
-	if (m_modelconfig)
-		m_modelconfig->touch();
+    if (m_config_mutable) {
+        ConfigOption *opt = m_config_mutable->option(opt_key);
+        assert(opt);
+        if(opt)
+            opt->set_any(value, opt_index);
+        assert(!m_modelconfig);
+    } else {
+        assert(m_modelconfig);
+        m_modelconfig->set_any(opt_key, value, opt_index);
+    }
 }
 
 wxString OptionsGroup::get_url(const std::string& path_end)

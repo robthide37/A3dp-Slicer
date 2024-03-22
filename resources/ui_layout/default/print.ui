@@ -66,6 +66,7 @@ group:label_width$12:Overhangs
 	line:Extrusion direction
 		setting:sidetext_width$2:overhangs_reverse
 		setting:label_width$12:width$5:overhangs_reverse_threshold
+		setting:label$All perimeters:sidetext_width$2:perimeter_reverse
 	end_line
 group:sidetext_width$5:Advanced
 	setting:width$25:no_perimeter_unsupported_algo
@@ -169,6 +170,7 @@ group:title_width$0:Infill
 		setting:tags$Advanced$Expert$Prusa:label_left:label_width$6:label$Sparse:width$8:sidetext_width$1:fill_density
 		setting:tags$Advanced$Expert$Prusa:label_width$0:label$_:fill_pattern
 		setting:label$_:width$18:infill_connection
+        setting:label$Aligned:fill_aligned_z
 	end_line
 	line:_
 		setting:label$Connection length:label_width$25:sidetext_width$7:width$12:infill_anchor_max

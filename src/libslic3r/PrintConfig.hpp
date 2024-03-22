@@ -404,6 +404,27 @@ public:
     std::set<const DynamicPrintConfig*> update_phony(const std::vector<DynamicPrintConfig*> config_collection, bool exclude_default_extrusion = false);
 };
 
+// An indirection to a bunch of Config
+class MultiPtrPrintConfig : public virtual ConfigBase
+{
+public:
+    MultiPtrPrintConfig() = default;
+    
+    // Overrides ConfigBase::def(). Static configuration definition. Any value stored into this ConfigBase shall have its definition here.
+    const ConfigDef*    def() const override { return &print_config_def; }
+
+    // Overrides ConfigResolver::optptr().
+    const ConfigOption*     optptr(const t_config_option_key &opt_key) const override;
+    // Overrides ConfigBase::optptr(). Find ando/or create a ConfigOption instance for a given name.
+    ConfigOption*           optptr(const t_config_option_key &opt_key, bool create = false) override;
+    // Overrides ConfigBase::keys(). Collect names of all configuration values maintained by this configuration store.
+    t_config_option_keys    keys() const override;
+
+    
+    std::vector<ConfigBase*> storages;
+private:
+};
+
 void handle_legacy_sla(DynamicPrintConfig& config);
 
 class StaticPrintConfig : public StaticConfig
@@ -830,6 +851,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 only_one_perimeter_first_layer))
     ((ConfigOptionBool,                 only_one_perimeter_top))
     ((ConfigOptionBool,                 only_one_perimeter_top_other_algo))
+    ((ConfigOptionBool,                 fill_aligned_z))
     ((ConfigOptionFloat,                fill_angle))
     ((ConfigOptionBool,                 fill_angle_cross))
     ((ConfigOptionFloat,                fill_angle_increment))
@@ -902,6 +924,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 perimeter_loop))
     ((ConfigOptionEnum<SeamPosition>,   perimeter_loop_seam))
     ((ConfigOptionPercent,              perimeter_overlap))
+    ((ConfigOptionBool,                 perimeter_reverse))
     ((ConfigOptionFloatOrPercent,       perimeter_speed))
     // Total number of perimeters.
     ((ConfigOptionInt,                  perimeters))
@@ -1637,6 +1660,15 @@ public:
     bool         set_key_value(const std::string &opt_key, ConfigOption *opt) { bool out = m_data.set_key_value(opt_key, opt); this->touch(); return out; }
     template<typename T>
     void         set(const std::string &opt_key, T value) { m_data.set(opt_key, value, true); this->touch(); }
+    void set_any(const std::string &opt_key, boost::any value, int16_t extruder_id)
+    {
+        ConfigOption *opt = m_data.option(opt_key, true);
+        assert(opt);
+        if (opt) {
+            opt->set_any(value, extruder_id);
+            this->touch();
+        }
+    }
     void         set_deserialize(const t_config_option_key &opt_key, const std::string &str, ConfigSubstitutionContext &substitution_context, bool append = false)
         { m_data.set_deserialize(opt_key, str, substitution_context, append); this->touch(); }
     bool         erase(const t_config_option_key &opt_key) { bool out = m_data.erase(opt_key); if (out) this->touch(); return out; }
