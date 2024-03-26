@@ -552,11 +552,11 @@ namespace Slic3r {
     {
         m_max_sparse_spacing = 0;
         std::atomic_int64_t max_sparse_spacing;
-        //tbb::parallel_for(
-        //    tbb::blocked_range<size_t>(0, m_layers.size()),
-        //    [this, &max_sparse_spacing](const tbb::blocked_range<size_t>& range) {
-        //for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
-        for (size_t layer_idx = 0; layer_idx < m_layers.size(); ++layer_idx) {
+        tbb::parallel_for(
+            tbb::blocked_range<size_t>(0, m_layers.size()),
+            [this, &max_sparse_spacing](const tbb::blocked_range<size_t>& range) {
+        for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+        //for (size_t layer_idx = 0; layer_idx < m_layers.size(); ++layer_idx) {
             m_print->throw_if_canceled();
             const Layer *layer = m_layers[layer_idx];
             for (const LayerRegion *layerm : layer->regions()) {
@@ -566,17 +566,14 @@ namespace Slic3r {
                         coord_t spacing = layerm->region().flow(*this, frInfill, layer->height, layer->id()).scaled_spacing();
                         // update atomic to max
                         int64_t prev_value = max_sparse_spacing.load();
-                        std::cout<<"will update "<<max_sparse_spacing.load()<<"=="<<prev_value<<" to "<<spacing<<"\n";
                         while (prev_value < int64_t(spacing) &&
                                !max_sparse_spacing.compare_exchange_weak(prev_value, int64_t(spacing))) {
-                            std::cout<<"can't update "<<max_sparse_spacing<<"\n";
                         }
-                        std::cout<<"it ahs been updated to "<<max_sparse_spacing.load()<<" from "<<prev_value<<" -> "<<spacing<<"\n";
                     }
                 }
             }
         }
-        //});     
+        });     
         m_max_sparse_spacing = max_sparse_spacing.load();
     }
 

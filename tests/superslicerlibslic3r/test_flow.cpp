@@ -27,6 +27,7 @@ SCENARIO("Extrusion width specifics", "[!mayfail]") {
         config.set_key_value("perimeters", new ConfigOptionInt{3});
         config.set_key_value("fill_density", new ConfigOptionPercent{40});
         config.set_key_value("first_layer_height", new ConfigOptionFloatOrPercent{100, true});
+        config.set_key_value("extruder", new ConfigOptionInt{0});
 
         WHEN("first layer width set to 2mm") {
             Slic3r::Model model;
@@ -46,10 +47,11 @@ SCENARIO("Extrusion width specifics", "[!mayfail]") {
             Slic3r::Test::gcode(gcode_filepath, print);
 			GCodeReader parser {Slic3r::GCodeReader()};
             const double layer_height = config.opt_float("layer_height");
+            const double first_layer_height = config.get_computed_value("first_layer_height");
             std::string gcode_from_file= read_to_string(gcode_filepath);
-            parser.parse_buffer(gcode_from_file, [&E_per_mm_bottom, layer_height] (Slic3r::GCodeReader& self, const Slic3r::GCodeReader::GCodeLine& line)
+            parser.parse_buffer(gcode_from_file, [&E_per_mm_bottom, layer_height, first_layer_height] (Slic3r::GCodeReader& self, const Slic3r::GCodeReader::GCodeLine& line)
             {
-                if (self.z() == Approx(layer_height).margin(0.01)) { // only consider first layer
+                if (self.z() <= first_layer_height + 0.01) { // only consider first layer
                     if (line.extruding(self) && line.dist_XY(self) > 0) {
                         E_per_mm_bottom.emplace_back(line.dist_E(self) / line.dist_XY(self));
                     }
@@ -104,30 +106,33 @@ SCENARIO(" Bridge flow specifics.", "[!mayfail]") {
 /// Test the expected behavior for auto-width, 
 /// spacing, etc
 SCENARIO("Flow: Flow math for non-bridges", "[!mayfail]") {
-    auto width_0 = ConfigOptionFloatOrPercent(1.0, false);
-    auto spacing_0 = ConfigOptionFloatOrPercent(1.0, false,true);
+    auto width_0 = ConfigOptionFloatOrPercent(0.0, false);
+    auto spacing_0 = ConfigOptionFloatOrPercent(0.0, false,true);
     GIVEN("Nozzle Diameter of 0.4, a desired width of 1mm and layer height of 0.5") {
         auto width_1 = ConfigOptionFloatOrPercent(1.0, false);
         auto spacing_1 = ConfigOptionFloatOrPercent(1.0, false,true);
         float spacing {0.4f};
         float nozzle_diameter {0.4f};
         float bridge_flow {1.0f};
-        float layer_height {0.5f};
+        float layer_height {0.25f};
+        float spacing_ratio = 1.0f;
+
+        assert(layer_height < nozzle_diameter);
 
         // Spacing for non-bridges is has some overlap
         THEN("External perimeter flow has a default spacing fixed to 1.05*nozzle_diameter") {
-            Flow flow = Flow::new_from_config_width(frExternalPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, 0.0f);
+            Flow flow = Flow::new_from_config_width(frExternalPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, spacing_ratio);
             REQUIRE(flow.spacing() == Approx((1.05f*nozzle_diameter) - layer_height * (1.0 - PI / 4.0)));
         }
 
         THEN("Internal perimeter flow has a default spacing fixed to 1.125*nozzle_diameter") {
-            Flow flow {Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, 0.0f)};
+            Flow flow {Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, spacing_ratio)};
             REQUIRE(flow.spacing() == Approx((1.125*nozzle_diameter) - layer_height * (1.0 - PI / 4.0)));
         }
         THEN("Spacing for supplied width is 0.8927f") {
-            Flow flow {Flow::new_from_config_width(frExternalPerimeter, width_1, spacing_1, nozzle_diameter, layer_height, 0.0f)};
+            Flow flow {Flow::new_from_config_width(frExternalPerimeter, width_1, spacing_1, nozzle_diameter, layer_height, spacing_ratio)};
             REQUIRE(flow.spacing() == Approx(width_1.get_abs_value(1.f) - layer_height * (1.0 - PI / 4.0)));
-            flow = Flow::new_from_config_width(frPerimeter, width_1, spacing_1, nozzle_diameter, layer_height, 0.0f);
+            flow = Flow::new_from_config_width(frPerimeter, width_1, spacing_1, nozzle_diameter, layer_height, spacing_ratio);
             REQUIRE(flow.spacing() == Approx(width_1.get_abs_value(1.f) - layer_height * (1.0 - PI / 4.0)));
         }
     }
@@ -135,25 +140,26 @@ SCENARIO("Flow: Flow math for non-bridges", "[!mayfail]") {
     GIVEN("Nozzle Diameter of 0.25 with extreme width") {
         float nozzle_diameter {0.25f};
         float layer_height {0.5f};
+        float spacing_ratio {1.0f};
         WHEN("layer height is set to 0.15") {
-            layer_height = 5.f;
+            layer_height = 0.15f;
             THEN("Max width is respected.") {
-                auto flow {Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, 0.0f)};
+                auto flow {Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, spacing_ratio)};
                 REQUIRE(flow.width() <= Approx(1.4*nozzle_diameter));
             }
             THEN("Min width is respected") {
-                auto flow{ Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, 0.0f) };
+                auto flow{ Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, spacing_ratio) };
                 REQUIRE(flow.width() >= Approx(1.05*nozzle_diameter));
             }
         }
         WHEN("Layer height is set to 0.3") {
             layer_height = 0.01f;
             THEN("Max width is respected.") {
-                auto flow{ Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, 0.0f) };
+                auto flow{ Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, spacing_ratio) };
                 REQUIRE(flow.width() <= Approx(1.4*nozzle_diameter));
             }
             THEN("Min width is respected.") {
-                auto flow{ Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, 0.0f) };
+                auto flow{ Flow::new_from_config_width(frPerimeter, width_0, spacing_0, nozzle_diameter, layer_height, spacing_ratio) };
                 REQUIRE(flow.width() >= Approx(1.05*nozzle_diameter));
             }
         }
@@ -185,8 +191,8 @@ SCENARIO("Flow: Flow math for bridges", "[!mayfail]") {
         float nozzle_diameter {0.4f};
         float spacing_ratio {1.0f};
         float layer_height {0.5f};
-        WHEN("Flow role is frExternalPerimeter") {
-            auto flow {Flow::new_from_config_width(frExternalPerimeter, width, spacing, nozzle_diameter, layer_height, spacing_ratio)};
+        WHEN("via bridging_flow()") {
+            auto flow {Flow::bridging_flow(nozzle_diameter, nozzle_diameter)};
             THEN("Bridge width is same as nozzle diameter") {
                 REQUIRE(flow.width() == Approx(nozzle_diameter));
             }
@@ -194,32 +200,6 @@ SCENARIO("Flow: Flow math for bridges", "[!mayfail]") {
                 REQUIRE(flow.spacing() == Approx(nozzle_diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter));
             }
         }
-        WHEN("Flow role is frInfill") {
-            auto flow {Flow::new_from_config_width(frInfill, width, spacing, nozzle_diameter, layer_height, spacing_ratio)};
-            THEN("Bridge width is same as nozzle diameter") {
-                REQUIRE(flow.width() == Approx(nozzle_diameter));
-            }
-            THEN("Bridge spacing is same as nozzle diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter") {
-                REQUIRE(flow.spacing() == Approx(nozzle_diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter));
-            }
-        }
-        WHEN("Flow role is frPerimeter") {
-            auto flow {Flow::new_from_config_width(frPerimeter, width, spacing, nozzle_diameter, layer_height, spacing_ratio)};
-            THEN("Bridge width is same as nozzle diameter") {
-                REQUIRE(flow.width() == Approx(nozzle_diameter));
-            }
-            THEN("Bridge spacing is same as nozzle diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter") {
-                REQUIRE(flow.spacing() == Approx(nozzle_diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter));
-            }
-        }
-        WHEN("Flow role is frSupportMaterial") {
-            auto flow {Flow::new_from_config_width(frSupportMaterial, width, spacing, nozzle_diameter, layer_height, spacing_ratio)};
-            THEN("Bridge width is same as nozzle diameter") {
-                REQUIRE(flow.width() == Approx(nozzle_diameter));
-            }
-            THEN("Bridge spacing is same as nozzle diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter") {
-                REQUIRE(flow.spacing() == Approx(nozzle_diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter));
-            }
-        }
+        REQUIRE(Flow::bridge_extrusion_spacing(nozzle_diameter) == Approx(nozzle_diameter + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter));
     }
 }
