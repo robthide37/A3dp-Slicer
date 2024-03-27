@@ -3275,6 +3275,7 @@ void PrintConfigDef::init_fff_params()
     // and it contains a sum of "inherits" values over the print and filament profiles.
     def = this->add("inherits_cummulative", coStrings);
     def->set_default_value(new ConfigOptionStrings());
+    def->mode = comPrusa;
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("interface_shells", coBool);

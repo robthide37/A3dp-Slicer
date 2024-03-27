@@ -621,6 +621,7 @@ double Print::get_object_first_layer_height(const PrintObject& object) const {
             object_first_layer_height = std::min(object_first_layer_height, object.config().first_layer_height.get_abs_value(nozzle_diameter));
         }
     }
+    assert(object_first_layer_height < 1000000000);
     return object_first_layer_height;
 }
 

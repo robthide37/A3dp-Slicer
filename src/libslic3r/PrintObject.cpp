@@ -2692,6 +2692,7 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
                 object_first_layer_height = std::fmin(object_first_layer_height, config().first_layer_height.get_abs_value(nozzle_diameter));
             }
         }
+        assert(object_first_layer_height < 1000000000);
         return object_first_layer_height;
     }
 

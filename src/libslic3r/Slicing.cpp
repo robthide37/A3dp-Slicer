@@ -88,22 +88,29 @@ std::shared_ptr<SlicingParameters> SlicingParameters::create_from_config(
     // if the first_layer_height setting depends of the nozzle width, use the first one. Apply the z_step
 
     //get object first layer height
-    coordf_t first_layer_height = object_config.first_layer_height.value;
+    double first_layer_height = object_config.first_layer_height.value;
     if (object_config.first_layer_height.percent) {
         first_layer_height = 1000000000.;
         for (uint16_t extruder_id : object_extruders) {
             if (print_config.nozzle_diameter.size() <= extruder_id)
                 break;
-            coordf_t nozzle_diameter = print_config.nozzle_diameter.values[extruder_id];
+            double nozzle_diameter = print_config.nozzle_diameter.values[extruder_id];
             first_layer_height = std::min(first_layer_height, object_config.first_layer_height.get_abs_value(nozzle_diameter));
         }
         if (first_layer_height == 1000000000.)
             first_layer_height = 0;
     }
-
-    if (first_layer_height == 0)
+    
+    first_layer_height = check_z_step(first_layer_height, print_config.z_step);
+    assert(first_layer_height > 0);
+    for (uint16_t extruder_id : object_extruders)
+        assert(first_layer_height >=
+               print_config.min_layer_height.get_abs_value(extruder_id, print_config.nozzle_diameter.get_at(extruder_id)) - EPSILON);
+    if (first_layer_height <= EPSILON)
         object_config.layer_height.value;
     first_layer_height = check_z_step(first_layer_height, print_config.z_step);
+    assert(first_layer_height > 0);
+
     // If object_config.support_material_extruder == 0 resp. object_config.support_material_interface_extruder == 0,
     // print_config.nozzle_diameter.get_at(size_t(-1)) returns the 0th nozzle diameter,
     // which is consistent with the requirement that if support_material_extruder == 0 resp. support_material_interface_extruder == 0,
