@@ -449,7 +449,10 @@ group:Overlap
 		setting:label_width$7:label$External:external_perimeter_overlap
 		setting:label_width$7:label$Gap Fill:gap_fill_overlap
 	end_line
-	setting:width$4:solid_infill_overlap
+    line:Solid infill ovelrap
+        setting:label$Inside:width$4:solid_infill_overlap
+        setting:label$Top:width$4:top_solid_infill_overlap
+	end_line
 	line:Bridge lines density
 		setting:label_width$7:bridge_overlap_min
 		setting:label_width$7:bridge_overlap

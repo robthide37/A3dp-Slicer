@@ -959,6 +959,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       top_infill_extrusion_spacing))
     ((ConfigOptionInt,                  top_solid_layers))
     ((ConfigOptionFloat,                top_solid_min_thickness))
+    ((ConfigOptionPercent,              top_solid_infill_overlap))
     ((ConfigOptionFloatOrPercent,       top_solid_infill_speed))
     ((ConfigOptionBool,                 wipe_into_infill))
         
