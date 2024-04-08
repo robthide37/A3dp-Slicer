@@ -1035,6 +1035,7 @@ bool OptionsGroup::launch_browser(const std::string& path_end)
 static const std::vector<std::string> option_without_field = {
     "bed_shape",
     "filament_ramming_parameters",
+    "extruder_extrusion_multiplier_speed",
     "gcode_substitutions",
     "compatible_prints",
     "compatible_printers"

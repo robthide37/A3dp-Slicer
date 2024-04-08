@@ -95,6 +95,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/GLTexture.cpp
     GUI/GLToolbar.hpp
     GUI/GLToolbar.cpp
+    GUI/GraphDialog.hpp
+    GUI/GraphDialog.cpp
     GUI/GCodeViewer.hpp
     GUI/GCodeViewer.cpp    
     GUI/Preferences.cpp

@@ -1747,6 +1747,14 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionStrings{ "" });
 
+    def = this->add("extruder_extrusion_multiplier_speed", coStrings);
+    def->label = L("Extrusion multipler");
+    def->tooltip = L("This string is edited by a Dialog and contains extusion multiplier for different speeds.");
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionStrings { "0 1 1 1 1 1 1 1 1 1 1 1|"
+       " 10 1. 20 1. 30 1. 40 1. 60 1. 80 1. 120 1. 160 1. 240 1. 320 1. 480 1. 640 1. 960 1. 1280 1." });
+
     def = this->add("extruder_offset", coPoints);
     def->label = L("Extruder offset");
     def->category = OptionCategory::extruders;
@@ -6606,6 +6614,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "default_filament_profile",
         "deretract_speed",
         "extruder_colour",
+        "extruder_extrusion_multiplier_speed",
         "extruder_fan_offset",
         "extruder_offset",
         "extruder_temperature_offset",
@@ -8194,6 +8203,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "external_perimeters_vase",
 "extra_perimeters_odd_layers",
 "extra_perimeters_overhangs",
+"extruder_extrusion_multiplier_speed",
 "extruder_fan_offset",
 "extruder_temperature_offset",
 "extrusion_spacing",
@@ -8249,6 +8259,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "gcode_precision_e",
 "gcode_precision_xyz",
 "hole_size_compensation",
+"hole_size_compensations_curve",
 "hole_size_threshold",
 "hole_to_polyhole_threshold",
 "hole_to_polyhole_twisted",

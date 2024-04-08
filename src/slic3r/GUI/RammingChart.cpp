@@ -8,7 +8,6 @@
 
 wxDEFINE_EVENT(EVT_WIPE_TOWER_CHART_CHANGED, wxCommandEvent);
 
-
 void Chart::draw() {
     wxAutoBufferedPaintDC dc(this); // unbuffered DC caused flickering on win
 
@@ -26,7 +25,8 @@ void Chart::draw() {
     dc.DrawRectangle(m_rect);
     
     if (visible_area.m_width < 0.499) {
-        dc.DrawText(_(L("NO RAMMING AT ALL")),wxPoint(m_rect.GetLeft()+m_rect.GetWidth()/2-legend_side,m_rect.GetBottom()-m_rect.GetHeight()/2));
+        dc.DrawText(m_no_point_legend, wxPoint(m_rect.GetLeft() + m_rect.GetWidth() / 2 - legend_side,
+                                                     m_rect.GetBottom() - m_rect.GetHeight() / 2));
         return;
     }
     
@@ -35,19 +35,19 @@ void Chart::draw() {
         for (unsigned int i=0;i<m_line_to_draw.size()-2;++i) {
             int color = 510*((m_rect.GetBottom()-(m_line_to_draw)[i])/double(m_rect.GetHeight()));
             dc.SetPen( wxPen( wxColor(std::min(255,color),255-std::max(color-255,0),0), 1 ) );
-            dc.DrawLine(m_rect.GetLeft()+1+i,(m_line_to_draw)[i],m_rect.GetLeft()+1+i,m_rect.GetBottom());        
+            dc.DrawLine(m_rect.GetLeft()+1+i, (m_line_to_draw)[i], m_rect.GetLeft()+1+i, m_rect.GetBottom());        
         }
 #ifdef _WIN32
         dc.SetPen(wxPen(GetForegroundColour()));
 #else
         dc.SetPen( wxPen( wxColor(0,0,0), 1 ) );
 #endif
-        for (unsigned int i=0;i<m_line_to_draw.size()-2;++i) {
+        for (unsigned int i=0; i<m_line_to_draw.size()-2; ++i) {
             if (splines)
-                dc.DrawLine(m_rect.GetLeft()+i,(m_line_to_draw)[i],m_rect.GetLeft()+i+1,(m_line_to_draw)[i+1]);
+                dc.DrawLine(m_rect.GetLeft()+i,  (m_line_to_draw)[i], m_rect.GetLeft()+i+1, (m_line_to_draw)[i+1]);
             else {
-                dc.DrawLine(m_rect.GetLeft()+i,(m_line_to_draw)[i],m_rect.GetLeft()+i+1,(m_line_to_draw)[i]);
-                dc.DrawLine(m_rect.GetLeft()+i+1,(m_line_to_draw)[i],m_rect.GetLeft()+i+1,(m_line_to_draw)[i+1]);
+                dc.DrawLine(m_rect.GetLeft()+i,  (m_line_to_draw)[i], m_rect.GetLeft()+i+1, (m_line_to_draw)[i]);
+                dc.DrawLine(m_rect.GetLeft()+i+1,(m_line_to_draw)[i], m_rect.GetLeft()+i+1, (m_line_to_draw)[i+1]);
             }
         }
     }
@@ -59,68 +59,117 @@ void Chart::draw() {
 #else
         dc.SetPen( wxPen( wxColor(0,0,0), 1 ) );
 #endif
-    for (auto& button : m_buttons)
+    for (auto& button : m_buttons) {
         //dc.DrawRectangle(math_to_screen(button.get_pos())-wxPoint(side/2.,side/2.), wxSize(side,side));
         dc.DrawCircle(math_to_screen(button.get_pos()),side/2.);
         //dc.DrawRectangle(math_to_screen(button.get_pos()-wxPoint2DDouble(0.125,0))-wxPoint(0,5),wxSize(50,10));
+    }
 
     // draw x-axis:
     float last_mark = -10000;
-    for (float math_x=int(visible_area.m_x*10)/10 ; math_x < (visible_area.m_x+visible_area.m_width) ; math_x+=0.1f) {
+    for (float math_x = int(visible_area.m_x * 10) / 10; math_x < (visible_area.m_x + visible_area.m_width); math_x += m_x_legend_incr) {
         int x = math_to_screen(wxPoint2DDouble(math_x,visible_area.m_y)).x;
         int y = m_rect.GetBottom();
         if (x-last_mark < legend_side) continue;
         dc.DrawLine(x,y+3,x,y-3);
-        dc.DrawText(wxString().Format(wxT("%.1f"), math_x),wxPoint(x-scale_unit,y+0.5*scale_unit));
+        if (m_x_legend_incr == int(m_x_legend_incr)) {
+            dc.DrawText(wxString()<<int(math_x), wxPoint(x - scale_unit, y + 0.5 * scale_unit));
+        } else if (m_x_legend_incr*10 == int(m_x_legend_incr*10)){
+            dc.DrawText(Slic3r::to_string_nozero(math_x, 1), wxPoint(x - scale_unit, y + 0.5 * scale_unit));
+        } else if (m_x_legend_incr*100 == int(m_x_legend_incr*100)){
+            dc.DrawText(Slic3r::to_string_nozero(math_x, 2), wxPoint(x - scale_unit, y + 0.5 * scale_unit));
+        } else if (m_x_legend_incr*1000 == int(m_x_legend_incr*1000)){
+            dc.DrawText(Slic3r::to_string_nozero(math_x, 3), wxPoint(x - scale_unit, y + 0.5 * scale_unit));
+        } else {
+            dc.DrawText(wxString().Format(wxT("%f"), math_x), wxPoint(x - scale_unit, y + 0.5 * scale_unit));
+        }
         last_mark = x;
     }
     
     // draw y-axis:
     last_mark=10000;
-    for (int math_y=visible_area.m_y ; math_y < (visible_area.m_y+visible_area.m_height) ; math_y+=1) {
+    for (float math_y = visible_area.m_y; math_y < (visible_area.m_y + visible_area.m_height); math_y += m_y_legend_incr) {
         int y = math_to_screen(wxPoint2DDouble(visible_area.m_x,math_y)).y;
         int x = m_rect.GetLeft();
-        if (last_mark-y < legend_side) continue;    
+        if (last_mark-y < legend_side / 2) continue;    
         dc.DrawLine(x-3,y,x+3,y);
-        dc.DrawText(wxString()<<math_y,wxPoint(x-2*scale_unit,y-0.5*scale_unit));
+        if (m_y_legend_incr == int(m_y_legend_incr)) {
+            dc.DrawText(wxString()<<int(math_y), wxPoint(x - 2 * scale_unit, y - 0.5 * scale_unit));
+        } else if (m_y_legend_incr*10 == int(m_y_legend_incr*10)){
+            dc.DrawText(Slic3r::to_string_nozero(math_y, 1), wxPoint(x - 2 * scale_unit, y - 0.5 * scale_unit));
+        } else if (m_y_legend_incr*100 == int(m_y_legend_incr*100)){
+            dc.DrawText(Slic3r::to_string_nozero(math_y, 2), wxPoint(x - 2.5 * scale_unit, y - 0.5 * scale_unit));
+        } else if (m_y_legend_incr*1000 == int(m_y_legend_incr*1000)){
+            dc.DrawText(Slic3r::to_string_nozero(math_y, 3), wxPoint(x - 3 * scale_unit, y - 0.5 * scale_unit));
+        } else {
+            dc.DrawText(wxString().Format(wxT("%f"), math_y), wxPoint(x - 4 * scale_unit, y - 0.5 * scale_unit));
+        }
         last_mark = y;
     }
     
     // axis labels:
-    wxString label = _(L("Time")) + " ("+_(L("s"))+")";
     int text_width = 0;
     int text_height = 0;
-    dc.GetTextExtent(label,&text_width,&text_height);
-    dc.DrawText(label,wxPoint(0.5*(m_rect.GetRight()+m_rect.GetLeft())-text_width/2.f, m_rect.GetBottom()+0.5*legend_side));
-    label = _(L("Volumetric speed")) + " (" + _(L("mm³/s")) + ")";
-    dc.GetTextExtent(label,&text_width,&text_height);
-    dc.DrawRotatedText(label,wxPoint(0,0.5*(m_rect.GetBottom()+m_rect.GetTop())+text_width/2.f),90);
+    dc.GetTextExtent(m_x_legend, &text_width, &text_height);
+    dc.DrawText(m_x_legend, wxPoint(0.5*(m_rect.GetRight()+m_rect.GetLeft())-text_width/2.f, m_rect.GetBottom()+0.5*legend_side));
+    dc.GetTextExtent(m_y_legend, &text_width, &text_height);
+    dc.DrawRotatedText(m_y_legend, wxPoint(0,0.5*(m_rect.GetBottom()+m_rect.GetTop())+text_width/2.f), 90);
+
+    // drag value
+    if (m_dragged) {
+        // get values
+        float pos_x = float(m_dragged->get_pos().m_x);
+        float pos_y = float(m_dragged->get_pos().m_y);
+        // show on bottom right
+        // TODO: compute legend height instead of '3 * scale_unit'
+        wxPoint ptx = math_to_screen(wxPoint2DDouble(visible_area.m_x + visible_area.m_width, visible_area.m_y));
+        wxPoint pty = math_to_screen(wxPoint2DDouble(visible_area.m_x + visible_area.m_width, visible_area.m_y));
+        ptx.x -= 1*legend_side;
+        ptx.y -= 1*legend_side;
+        pty.x -= 1*legend_side;
+        pty.y -= 0.5*legend_side;
+        dc.DrawText(wxString().Format(wxT("x: %.3f"), pos_x), ptx);
+        dc.DrawText(wxString().Format(wxT("y: %.3f"), pos_y), pty);
+    }
 }
 
 void Chart::mouse_right_button_clicked(wxMouseEvent& event) {
-    if (!manual_points_manipulation)
+    if (!m_manual_points_manipulation)
         return;
     wxPoint point = event.GetPosition();
     int button_index = which_button_is_clicked(point);
-    if (button_index != -1 && m_buttons.size()>2) {
-        m_buttons.erase(m_buttons.begin()+button_index);
+    if (button_index != -1 && m_buttons.size() > 2) {
+        m_buttons.erase(m_buttons.begin() + button_index);
+        recalculate_line();
+    } else {
+        // create a new point
+        wxPoint point = event.GetPosition();
+        if (!m_rect.Contains(point)) // the click is outside the chart
+            return;
+        wxPoint2DDouble dblpoint = screen_to_math(point);
+        // trunc by precision
+        dblpoint.m_x = int((dblpoint.m_x + this->m_x_legend_incr / 2) / this->m_x_legend_incr) * this->m_x_legend_incr;
+        dblpoint.m_y = int((dblpoint.m_y + this->m_y_legend_incr / 2) / this->m_y_legend_incr) * this->m_y_legend_incr;
+        //check it doesn't exist
+        for (const ButtonToDrag &bt : m_buttons)
+            if(bt.get_pos().m_x == dblpoint.m_x)
+                return;
+        m_buttons.push_back(dblpoint);
+        std::sort(m_buttons.begin(), m_buttons.end());
         recalculate_line();
     }
 }
-    
-
 
 void Chart::mouse_clicked(wxMouseEvent& event) {
     wxPoint point = event.GetPosition();
     int button_index = which_button_is_clicked(point);
     if ( button_index != -1) {
         m_dragged = &m_buttons[button_index];
-        m_previous_mouse = point;            
+        m_previous_mouse = point;
+        Refresh();
     }
 }
-    
-    
-    
+
 void Chart::mouse_moved(wxMouseEvent& event) {
     if (!event.Dragging() || !m_dragged) return;
     wxPoint pos = event.GetPosition();    
@@ -129,18 +178,17 @@ void Chart::mouse_moved(wxMouseEvent& event) {
     if (!(rect.Contains(pos))) {  // the mouse left chart area
         mouse_left_window(event);
         return;
-    }    
+    }
     int delta_x = pos.x - m_previous_mouse.x;
     int delta_y = pos.y - m_previous_mouse.y;
-    m_dragged->move(fixed_x?0:double(delta_x)/m_rect.GetWidth() * visible_area.m_width,-double(delta_y)/m_rect.GetHeight() * visible_area.m_height); 
+    m_dragged->move(fixed_x ? 0 : double(delta_x) / m_rect.GetWidth() * visible_area.m_width,
+                    -double(delta_y) / m_rect.GetHeight() * visible_area.m_height); 
     m_previous_mouse = pos;
     recalculate_line();
 }
 
-
-
 void Chart::mouse_double_clicked(wxMouseEvent& event) {
-    if (!manual_points_manipulation)
+    if (!m_manual_points_manipulation)
         return;
     wxPoint point = event.GetPosition();
     if (!m_rect.Contains(point))     // the click is outside the chart
@@ -151,8 +199,23 @@ void Chart::mouse_double_clicked(wxMouseEvent& event) {
     return;
 }
 
-
-
+void Chart::mouse_left_window(wxMouseEvent &e)
+{
+    mouse_released(e);
+}        
+void Chart::mouse_released(wxMouseEvent &)
+{
+    if (m_dragged != nullptr) {
+        if (!fixed_x) {
+            float m_x = int((m_dragged->get_pos().m_x + this->m_x_legend_incr / 2) / this->m_x_legend_incr) * this->m_x_legend_incr;
+            m_dragged->move(m_x - m_dragged->get_pos().m_x, 0);
+        }
+        float m_y = int((m_dragged->get_pos().m_y + this->m_y_legend_incr / 2) / this->m_y_legend_incr) * this->m_y_legend_incr;
+        m_dragged->move(0, m_y - m_dragged->get_pos().m_y);
+        m_dragged = nullptr;
+        recalculate_line();
+    }
+}
 
 void Chart::recalculate_line() {
     m_line_to_draw.clear();
@@ -247,15 +310,22 @@ void Chart::recalculate_line() {
             m_line_to_draw.back() = std::min(m_line_to_draw.back(), m_rect.GetBottom()-1);
             m_total_volume += (m_rect.GetBottom() - m_line_to_draw.back()) * (visible_area.m_width / m_rect.GetWidth()) * (visible_area.m_height / m_rect.GetHeight());
         }
+    } else if (points.size() == 1) {
+        
+        for (int x=m_rect.GetLeft(); x<=m_rect.GetRight() ; ++x) {
+            float x_math = screen_to_math(wxPoint(x,0)).m_x;
+            m_line_to_draw.push_back(math_to_screen(wxPoint2DDouble(x_math,m_buttons[0].get_pos().m_y)).y);
+            m_line_to_draw.back() = std::max(m_line_to_draw.back(), m_rect.GetTop()-1);
+            m_line_to_draw.back() = std::min(m_line_to_draw.back(), m_rect.GetBottom()-1);
+            m_total_volume += (m_rect.GetBottom() - m_line_to_draw.back()) * (visible_area.m_width / m_rect.GetWidth()) * (visible_area.m_height / m_rect.GetHeight());
+        }
     }
 
     wxPostEvent(this->GetParent(), wxCommandEvent(EVT_WIPE_TOWER_CHART_CHANGED));
     Refresh();
 }
 
-
-
-std::vector<float> Chart::get_ramming_speed(float sampling) const {
+std::vector<float> Chart::get_speed(float sampling) const {
     std::vector<float> speeds_out;
     
     const int number_of_samples = std::round( visible_area.m_width / sampling);
@@ -270,16 +340,21 @@ std::vector<float> Chart::get_ramming_speed(float sampling) const {
     return speeds_out;
 }
 
-
 std::vector<std::pair<float,float>> Chart::get_buttons() const {
     std::vector<std::pair<float, float>> buttons_out;
     for (const auto& button : m_buttons)
         buttons_out.push_back(std::make_pair(float(button.get_pos().m_x),float(button.get_pos().m_y)));
     return buttons_out;
 }
-    
-    
-    
+
+
+void Chart::set_buttons(std::vector<std::pair<float, float>> new_buttons) {
+    m_buttons.clear();
+    for (std::pair<float, float> &new_button : new_buttons) {
+        m_buttons.emplace_back(wxPoint2DDouble(new_button.first, new_button.second));
+    }
+    recalculate_line();
+}
 
 BEGIN_EVENT_TABLE(Chart, wxWindow)
 EVT_MOTION(Chart::mouse_moved)
