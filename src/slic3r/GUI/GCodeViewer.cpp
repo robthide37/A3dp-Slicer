@@ -4405,14 +4405,14 @@ void GCodeViewer::render_legend(float& legend_height)
             imgui.text(min_label);
             ImGui::SameLine();
             ImGui::PushItemWidth(imgui.get_style_scaling() * size);
-            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].second.c_str(), &mod_max, 0.0f,
+            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].second.c_str(), &mod_min, 0.0f,
                               0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
             // draw max
             ImGui::SameLine();
             imgui.text(max_label);
             ImGui::SameLine();
             ImGui::PushItemWidth(imgui.get_style_scaling() * size);
-            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].first.c_str(), &mod_min, 0.0f,
+            ImGui::InputFloat(m_extrusions.ranges.min_max_cstr_id[size_t(m_view_type)].first.c_str(), &mod_max, 0.0f,
                               0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal, 0.f);
 
         } else {
