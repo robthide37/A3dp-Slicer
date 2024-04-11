@@ -145,7 +145,7 @@ std::shared_ptr<SlicingParameters> SlicingParameters::create_from_config(
     params.max_layer_height = std::numeric_limits<double>::max();
     params.max_suport_layer_height = 0;
     params.min_suport_layer_height = 0;
-    params.exact_last_layer_height = object_config.exact_last_layer_height.value;
+    // params.exact_last_layer_height = object_config.exact_last_layer_height.value;
     if (object_config.support_material.value || params.base_raft_layers > 0 || object_config.support_material_enforce_layers > 0) {
         // Has some form of support. Add the support layers to the minimum / maximum layer height limits.
         if (object_config.support_material_extruder > 0)
@@ -806,32 +806,33 @@ std::vector<coordf_t> generate_object_layers(
     }
 
     // Adjust the last layer to align with the top object layer exactly
-    if (out.size() > 0 && slicing_params.object_print_z_height() != out[out.size() - 1] && slicing_params.exact_last_layer_height) {
-        float neededPrintZ = slicing_params.object_print_z_height();
-        int idx_layer = out.size() / 2 - 1;
-        float diffZ = neededPrintZ - out[idx_layer * 2 + 1];
-        while (diffZ > EPSILON || diffZ < -EPSILON && idx_layer >= 0){
-            float newH = out[idx_layer * 2 + 1] - out[idx_layer * 2];
-            if (diffZ > 0){
-                newH = std::min((float)slicing_params.max_layer_height, newH + diffZ);
-            } else{
-                newH = std::max((float)slicing_params.min_layer_height, newH + diffZ);
-            }
-            out[idx_layer * 2 + 1] = neededPrintZ;
-            out[idx_layer * 2] = neededPrintZ - newH;
+    // FIXME
+    // if (out.size() > 0 && slicing_params.object_print_z_height() != out[out.size() - 1] && slicing_params.exact_last_layer_height) {
+        // float neededPrintZ = slicing_params.object_print_z_height();
+        // int idx_layer = out.size() / 2 - 1;
+        // float diffZ = neededPrintZ - out[idx_layer * 2 + 1];
+        // while (diffZ > EPSILON || diffZ < -EPSILON && idx_layer >= 0){
+            // float newH = out[idx_layer * 2 + 1] - out[idx_layer * 2];
+            // if (diffZ > 0){
+                // newH = std::min((float)slicing_params.max_layer_height, newH + diffZ);
+            // } else{
+                // newH = std::max((float)slicing_params.min_layer_height, newH + diffZ);
+            // }
+            // out[idx_layer * 2 + 1] = neededPrintZ;
+            // out[idx_layer * 2] = neededPrintZ - newH;
 
-            //next item
-            neededPrintZ = out[idx_layer * 2];
-            idx_layer--;
-            if (idx_layer >= 0){
-                diffZ = neededPrintZ - out[idx_layer * 2 + 1];
-            } else{
-                //unlikely to happen. note: can create a layer outside the min/max bounds. 
-                diffZ = 0;
-                out[idx_layer * 2] = 0;
-            }
-        }
-    }
+            // //next item
+            // neededPrintZ = out[idx_layer * 2];
+            // idx_layer--;
+            // if (idx_layer >= 0){
+                // diffZ = neededPrintZ - out[idx_layer * 2 + 1];
+            // } else{
+                // //unlikely to happen. note: can create a layer outside the min/max bounds. 
+                // diffZ = 0;
+                // out[idx_layer * 2] = 0;
+            // }
+        // }
+    // }
 
 #ifdef _DEBUG
     for (size_t i = 0; i < out.size(); i++)

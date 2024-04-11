@@ -891,7 +891,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 opt_key == "layer_height"
                 || opt_key == "first_layer_height"
                 || opt_key == "mmu_segmented_region_max_width"
-                || opt_key == "exact_last_layer_height"
+                // || opt_key == "exact_last_layer_height"
                 || opt_key == "raft_contact_distance"
                 || opt_key == "raft_interface_layer_height"
                 || opt_key == "raft_layers"
