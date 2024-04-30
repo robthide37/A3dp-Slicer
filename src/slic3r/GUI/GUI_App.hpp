@@ -274,6 +274,7 @@ public:
     void html_dialog();
     void bed_leveling_dialog();
     void flow_ratio_dialog();
+    void flow_speed_dialog();
     void filament_temperature_dialog();
     void bridge_tuning_dialog();
     void over_bridge_dialog();
@@ -288,12 +289,6 @@ public:
     bool m_adding_script_handler{false};
     bool is_adding_script_handler() { return m_adding_script_handler; }
     void set_adding_script_handler(bool status) { m_adding_script_handler = status; }
-
-    // CR-3D Calibration Dialogs
-    void calibration_cr3d_cube_dialog();
-    void calibration_cr3d_samplecard_dialog();
-    void calibration_cr3d_masterspool_dialog();
-    void calibration_cr3d_idex_dialog();
 
     // void            support_tuning(); //have to do multiple, in a submenu
     void load_project(wxWindow *parent, wxString &input_file) const;

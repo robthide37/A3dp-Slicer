@@ -49,6 +49,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/CalibrationCubeDialog.hpp
     GUI/CalibrationFlowDialog.cpp
     GUI/CalibrationFlowDialog.hpp
+    GUI/CalibrationFlowSpeedDialog.cpp
+    GUI/CalibrationFlowSpeedDialog.hpp
     GUI/A3DPWebView.cpp
     GUI/A3DPWebView.hpp
 

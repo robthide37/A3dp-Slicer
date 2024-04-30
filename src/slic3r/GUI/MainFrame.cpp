@@ -2183,8 +2183,10 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(m_calibration_menu, wxID_ANY, _(L("Bed/Extruder leveling")), _(L("Create a test print to help you to level your printer bed.")),
             [this](wxCommandEvent&) { wxGetApp().bed_leveling_dialog(); });
         m_calibration_menu->AppendSeparator();
-        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Filament Flow calibration")), _(L("Create a test print to help you to set your filament extrusion multiplier.")),
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Filament Flow calibration")), _(L("Create a test print to help you to set your filament extrusion multiplier (visual inspection).")),
             [this](wxCommandEvent&) { wxGetApp().flow_ratio_dialog(); });
+        append_menu_item(m_calibration_menu, wxID_ANY, _(L("Extruder Flow calibration")), _(L("Create a test print to help you to set your extruder extrusion multiplier curve for a range of speed (precision scale needed).")),
+            [this](wxCommandEvent&) { wxGetApp().flow_speed_dialog(); });
         append_menu_item(m_calibration_menu, wxID_ANY, _(L("Filament temperature calibration")), _(L("Create a test print to help you to set your filament temperature.")),
             [this](wxCommandEvent&) { wxGetApp().filament_temperature_dialog(); });
         append_menu_item(m_calibration_menu, wxID_ANY, _(L("Extruder retraction calibration")), _(L("Create a test print to help you to set your retraction length.")),
