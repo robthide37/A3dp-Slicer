@@ -19,5 +19,10 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:
+        name: nightly_macos_arm_debug.dmg
+        path: build/${{ github.event.repository.name }}.dmg
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
         name: rc_arm_macos.tar
         path: build/${{ github.event.repository.name }}.tar
