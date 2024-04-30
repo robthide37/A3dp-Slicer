@@ -77,7 +77,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         && config->opt_bool("support_material") == false
         && config->opt_int("support_material_enforce_layers") == 0
         && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Classic
-        && config->opt_bool("exact_last_layer_height") == false
+        // && config->opt_bool("exact_last_layer_height") == false
         && config->opt_bool("ensure_vertical_shell_thickness") == true
         && config->opt_bool("infill_dense") == false
         && config->opt_bool("extra_perimeters") == false
@@ -97,7 +97,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             "- no support material\n"
             "- Ensure vertical shell thickness enabled\n"
             "- disabled 'no solid infill over perimeters'\n"
-            "- unchecked 'exact last layer height'\n"
+            // "- unchecked 'exact last layer height'\n"
             "- unchecked 'dense infill'\n"
             "- unchecked 'extra perimeters'"
             "- unchecked 'gap fill after last perimeter'"
@@ -123,8 +123,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("support_material_enforce_layers"))
                 new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
-            else if (this->local_config->get().optptr("exact_last_layer_height"))
-                new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
+            // else if (this->local_config->get().optptr("exact_last_layer_height"))
+                // new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("ensure_vertical_shell_thickness"))
                 new_conf.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionBool(true));
             else if (this->local_config->get().optptr("infill_dense"))
@@ -154,7 +154,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("perimeter_generator", new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Classic));
             new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
-            new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
+            // new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
             new_conf.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionBool(true));
             new_conf.set_key_value("infill_dense", new ConfigOptionBool(false));
             new_conf.set_key_value("extra_perimeters", new ConfigOptionBool(false));

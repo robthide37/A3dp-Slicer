@@ -516,7 +516,7 @@ public:
     virtual bool   empty() const = 0;
     // Get if the size of this vector is/should be the same as nozzle_diameter
     bool is_extruder_size() const { return (flags & FCO_EXTRUDER_ARRAY) != 0; }
-    ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size) {
+    ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size = true) {
         if (is_extruder_size) this->flags |= FCO_EXTRUDER_ARRAY; else this->flags &= uint8_t(0xFF ^ FCO_EXTRUDER_ARRAY);
         return this;
     }

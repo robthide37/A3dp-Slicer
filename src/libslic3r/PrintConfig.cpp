@@ -3275,6 +3275,7 @@ void PrintConfigDef::init_fff_params()
     // and it contains a sum of "inherits" values over the print and filament profiles.
     def = this->add("inherits_cummulative", coStrings);
     def->set_default_value(new ConfigOptionStrings());
+    def->mode = comPrusa;
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("interface_shells", coBool);
@@ -3400,12 +3401,12 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionString(""));
 
-    def = this->add("exact_last_layer_height", coBool);
-    def->label = L("Exact last layer height");
-    def->category = OptionCategory::perimeter;
-    def->tooltip = L("This setting controls the height of last object layers to put the last layer at the exact highest height possible. Experimental.");
-    def->mode = comHidden;
-    def->set_default_value(new ConfigOptionBool(false));
+    // def = this->add("exact_last_layer_height", coBool);
+    // def->label = L("Exact last layer height");
+    // def->category = OptionCategory::perimeter;
+    // def->tooltip = L("This setting controls the height of last object layers to put the last layer at the exact highest height possible. Experimental.");
+    // def->mode = comHidden;
+    // def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("remaining_times", coBool);
     def->label = L("Supports remaining times");
@@ -7686,6 +7687,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         "seal_position", "vibration_limit", "bed_size",
         "print_center", "g0", "threads", "pressure_advance", "wipe_tower_per_color_wipe",
         "cooling", "serial_port", "serial_speed",
+        "exact_last_layer_height",
         // Introduced in some PrusaSlicer 2.3.1 alpha, later renamed or removed.
         "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
         // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
@@ -8090,7 +8092,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "curve_smoothing_precision",
 "default_speed",
 "enforce_full_fill_volume",
-"exact_last_layer_height",
+// "exact_last_layer_height",
 "external_infill_margin",
 "external_perimeter_acceleration",
 "external_perimeter_cut_corners",
@@ -8731,7 +8733,7 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionBool>("support_material", true)->value = false;
             this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;
-            this->opt<ConfigOptionBool>("exact_last_layer_height", true)->value = false;
+            // this->opt<ConfigOptionBool>("exact_last_layer_height", true)->value = false;
             this->opt<ConfigOptionBool>("ensure_vertical_shell_thickness", true)->value = false;
             this->opt<ConfigOptionBool>("infill_dense", true)->value = false;
             this->opt<ConfigOptionBool>("extra_perimeters", true)->value = false;

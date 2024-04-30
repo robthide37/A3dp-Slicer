@@ -567,6 +567,9 @@ void Tab::OnActivate()
 
 void Tab::update_label_colours()
 {
+    if (!this->completed())
+        return;
+
     if (m_sys_label_clr == wxGetApp().get_label_clr_sys() 
         && m_modified_label_clr == wxGetApp().get_label_clr_modified()
         && m_default_label_clr == wxGetApp().get_label_clr_default()

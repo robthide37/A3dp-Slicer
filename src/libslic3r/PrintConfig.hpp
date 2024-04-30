@@ -720,7 +720,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 clip_multipart_objects))
     ((ConfigOptionBool,                 dont_support_bridges))
     ((ConfigOptionPercent,              external_perimeter_cut_corners))
-    ((ConfigOptionBool,                 exact_last_layer_height))
+    //((ConfigOptionBool,                 exact_last_layer_height))
     ((ConfigOptionFloatOrPercent,       extrusion_width))
     ((ConfigOptionFloatOrPercent,       extrusion_spacing))
     ((ConfigOptionFloatOrPercent,       first_layer_acceleration_over_raft))
