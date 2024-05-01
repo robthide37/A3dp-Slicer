@@ -14,7 +14,7 @@ jobs:
     runs-on: windows-2019
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v2
     - uses: ilammy/msvc-dev-cmd@v1
     - name: mkdir in deps
       run: mkdir deps/build
@@ -34,7 +34,7 @@ jobs:
     needs: build_dep
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v2
     - uses: ilammy/msvc-dev-cmd@v1
     - name: update submodule profiles
       working-directory: ./resources/profiles
