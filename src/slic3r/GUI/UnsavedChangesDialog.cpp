@@ -1338,7 +1338,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
                 // When founded option isn't the correct one.
                 // It can be for dirty_options: "default_print_profile", "printer_model", "printer_settings_id",
                 // because of they don't exist in searcher
-                assert(false);
+                assert((std::set<std::string>{"default_print_profile", "printer_model", "printer_settings_id", "filament_settings_id", "print_settings_id", "inherits"}).count(opt_key) > 0);
                 continue;
             }
 
