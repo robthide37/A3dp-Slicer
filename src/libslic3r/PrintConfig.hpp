@@ -1171,6 +1171,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloatOrPercent,       bridge_internal_acceleration))
     ((ConfigOptionInts,                 bridge_fan_speed))
     ((ConfigOptionInts,                 bridge_internal_fan_speed))
+    ((ConfigOptionFloatOrPercent,       bridge_precision))
     ((ConfigOptionFloatOrPercent,       brim_acceleration))
     ((ConfigOptionInts,                 chamber_temperature))
     ((ConfigOptionBool,                 complete_objects))

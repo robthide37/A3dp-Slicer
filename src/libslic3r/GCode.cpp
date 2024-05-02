@@ -3634,9 +3634,11 @@ LayerResult GCode::process_layer(
 
     // set area used in this layer
     double layer_area = 0;
-    for (const LayerToPrint &print_layer : layers)
-        for (auto poly : print_layer.layer()->lslices)
-            layer_area += poly.area();
+    for (const LayerToPrint &print_layer : layers) {
+        assert(print_layer.layer());
+        if (print_layer.layer())
+            for (auto poly : print_layer.layer()->lslices) layer_area += poly.area();
+    }
     layer_area = unscaled(unscaled(layer_area));
     status_monitor.stats().layer_area_stats.emplace_back(print_z, layer_area);
 

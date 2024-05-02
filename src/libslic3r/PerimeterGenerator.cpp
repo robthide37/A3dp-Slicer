@@ -921,11 +921,13 @@ void PerimeterGenerator::processs_no_bridge(Surfaces& all_surfaces) {
                         //a detector per island
                         ExPolygons bridgeable;
                         for (ExPolygon unsupported : unsupported_filtered) {
-                            BridgeDetector detector{ unsupported,
+                            BridgeDetector detector( unsupported,
                                 lower_island.expolygons,
-                                perimeter_spacing };
+                                this->overhang_flow.scaled_spacing(),
+                                scale_t(this->print_config->bridge_precision.get_abs_value(this->overhang_flow.spacing())),
+                                this->layer->id());
                             if (detector.detect_angle(Geometry::deg2rad(this->config->bridge_angle.value)))
-                                expolygons_append(bridgeable, union_ex(detector.coverage(-1, true)));
+                                expolygons_append(bridgeable, union_ex(detector.coverage()));
                         }
                         if (!bridgeable.empty()) {
                             //check if we get everything or just the bridgeable area
@@ -1390,11 +1392,13 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& contour_count, int
                 const ExPolygonCollection lower_island(diff_ex(last, overhangs_unsupported));
                 ExPolygons bridgeable;
                 for (ExPolygon unsupported : overhangs_unsupported) {
-                    BridgeDetector detector{ unsupported,
+                    BridgeDetector detector( unsupported,
                         lower_island.expolygons,
-                        perimeter_spacing };
+                        this->overhang_flow.scaled_spacing(),
+                        scale_t(this->print_config->bridge_precision.get_abs_value(this->overhang_flow.spacing())),
+                        this->layer->id());
                     if (detector.detect_angle(Geometry::deg2rad(this->config->bridge_angle.value)))
-                        expolygons_append(bridgeable, union_ex(detector.coverage(-1, true)));
+                        expolygons_append(bridgeable, union_ex(detector.coverage()));
                 }
                 if (!bridgeable.empty()) {
                     //simplify to avoid most of artefacts from printing lines.

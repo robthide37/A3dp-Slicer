@@ -816,6 +816,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionPercent(100));
 
+    def = this->add("bridge_precision", coFloatOrPercent);
+    def->label = L("Bridge precision");
+    def->category = OptionCategory::slicing;
+    def->tooltip = L("This is the precision of the bridge detection. If you put it too low, the bridge detection will be very inneficient."
+                    "\nCan be a % of the bridge spacing.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(25, true));
+
     def = this->add("bridge_overlap_min", coPercent);
     def->label = L("Min");
     def->full_label = L("Min bridge density");
@@ -3108,7 +3118,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Connected to outer perimeters"));
     def->enum_labels.push_back(L("Not connected"));
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionEnum<InfillConnection>(icConnected));
+    def->set_default_value(new ConfigOptionEnum<InfillConnection>(icNotConnected));
 
     def = this->add("infill_connection_solid", coEnum);
     def->label = L("Connection of solid infill lines");
@@ -8167,6 +8177,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "bridge_fill_pattern",
 "bridge_internal_acceleration",
 "bridge_internal_fan_speed",
+"bridge_precision",
 "bridge_overlap",
 "bridge_overlap_min",
 "bridge_speed_internal",
@@ -8302,6 +8313,9 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "over_bridge_flow_ratio",
 "overhangs_acceleration",
 "overhangs_fan_speed",
+"overhangs_max_slope",
+"overhangs_bridge_threshold",
+"overhangs_bridge_upper_layers",
 "overhangs_reverse_threshold",
 "overhangs_reverse",
 "overhangs_speed_enforce",

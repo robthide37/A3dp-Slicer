@@ -248,7 +248,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
             ) {
             steps.emplace_back(psSkirtBrim);
         } else if (
-               opt_key == "filament_shrink"
+               opt_key == "bridge_precision"
+            || opt_key == "filament_shrink"
             || opt_key == "first_layer_height"
             || opt_key == "nozzle_diameter"
             || opt_key == "model_precision"

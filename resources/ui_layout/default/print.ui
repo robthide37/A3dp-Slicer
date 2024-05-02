@@ -135,6 +135,7 @@ group:Filtering
 	setting:resolution_internal
 	setting:model_precision
 	setting:slice_closing_radius
+	setting:bridge_precision
 # gcode_resolution
 group:Modifying slices
 	line:Curve smoothing

@@ -80,7 +80,7 @@ public:
     Layer                       *layer;
     Flow                         perimeter_flow;
     Flow                         ext_perimeter_flow;
-    Flow                         overhang_flow;
+    Flow                         overhang_flow; // ie bridging flow
     Flow                         solid_infill_flow;
     const PrintRegionConfig     *config;
     const PrintObjectConfig     *object_config;
