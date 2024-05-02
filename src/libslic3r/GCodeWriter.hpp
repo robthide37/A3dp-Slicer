@@ -18,14 +18,7 @@ protected:
 public:
     bool multiple_extruders;
     
-    GCodeWriter() : 
-        multiple_extruders(false), m_extrusion_axis("E"), m_tool(nullptr),
-        m_single_extruder_multi_material(false),
-        m_last_acceleration(0), m_current_acceleration(0), m_current_speed(0),
-        m_last_bed_temperature(0), m_last_bed_temperature_reached(true), 
-        m_lifted(0),
-        m_current_pressure_advance(0), m_last_pressure_advance(0)
-        {}
+    GCodeWriter() {}
     void                reset();
 
     Tool*               tool()             { return m_tool; }
@@ -105,27 +98,27 @@ private:
 	// Extruders are sorted by their ID, so that binary search is possible.
     std::vector<Extruder> m_extruders;
     std::vector<Mill> m_millers;
-    std::string     m_extrusion_axis;
-    bool            m_single_extruder_multi_material;
-    Tool*           m_tool;
-    double          m_last_pressure_advance;
-    double          m_current_pressure_advance;
-    uint32_t        m_last_acceleration;
-    uint32_t        m_last_travel_acceleration;
-    uint32_t        m_current_acceleration;
-    uint32_t        m_current_travel_acceleration;
-    double          m_current_speed;
-    uint8_t         m_last_fan_speed; // note: it's not something you should be using. It's only for the not-static set_fan/get_fan for gcode modification in a single thread post-processing thing.
-    int16_t         m_last_temperature;
-    int16_t         m_last_temperature_with_offset;
-    int16_t         m_last_bed_temperature;
-    bool            m_last_bed_temperature_reached;
+    std::string     m_extrusion_axis = "E";
+    bool            m_single_extruder_multi_material = false;
+    Tool*           m_tool = nullptr;
+    double          m_last_pressure_advance = 0;
+    double          m_current_pressure_advance = 0;
+    uint32_t        m_last_acceleration = 0;
+    uint32_t        m_last_travel_acceleration = 0;
+    uint32_t        m_current_acceleration = 0;
+    uint32_t        m_current_travel_acceleration = 0;
+    double          m_current_speed = 0;
+    uint8_t         m_last_fan_speed = 0;
+    int16_t         m_last_temperature = 0;
+    int16_t         m_last_temperature_with_offset = 0;
+    int16_t         m_last_bed_temperature = 0;
+    bool            m_last_bed_temperature_reached = true;
     // if positive, it's set, and the next lift wil have this extra lift
     double          m_extra_lift = 0;
     // current lift, to remove from m_pos to have the current height.
-    double          m_lifted;
+    double          m_lifted = 0;
     Vec3d           m_pos = Vec3d::Zero();
-
+    
     std::string _travel_to_z(double z, const std::string &comment);
     std::string _retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange, const std::string &comment);
 

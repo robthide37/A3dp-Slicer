@@ -79,6 +79,16 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     }
     for (size_t i = 0; i < 6; i++)
         model.objects[objs_idx[i]]->scale(xyz_scale * 1.5f, xyz_scale * 1.5f, xyz_scale);
+    
+    // it's rotated but not around the good origin: correct that
+    double init_z_rotate_angle = Geometry::deg2rad(plat->config()->opt_float("init_z_rotate"));
+    Matrix3d rot_matrix = Eigen::Quaterniond(Eigen::AngleAxisd(init_z_rotate_angle, Vec3d{0,0,1})).toRotationMatrix();
+    auto     translate_from_rotation = [&rot_matrix, &model, &objs_idx](int idx, Vec3d &&translation) {
+            ModelVolume *vol = model.objects[objs_idx[idx]]->volumes[model.objects[objs_idx[idx]]->volumes.size()-1];
+            Geometry::Transformation trsf = vol->get_transformation();
+            trsf.set_offset(rot_matrix * translation - translation + trsf.get_offset());
+            vol->set_transformation(trsf);
+        };
 
     //add sub-part after scale
     const ConfigOptionFloatOrPercent* first_layer_height = print_config->option<ConfigOptionFloatOrPercent>("first_layer_height");
@@ -86,11 +96,12 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     float zshift =  0.8 * (1 - xyz_scale);
     for (size_t i = 0; i < 6; i++) {
         model.objects[objs_idx[i]]->rotate(PI / 2, { 0,0,1 });
-        ModelObject* obj = add_part(model.objects[objs_idx[i]], (boost::filesystem::path(Slic3r::resources_dir()) /"calibration" / "bridge_flow" / ("f"+std::to_string(100 + i * 5)+".amf")).string(), Vec3d{ 0, 10 * xyz_scale ,zshift }, Vec3d{ 1, 1, patch_zscale });
+        add_part(model.objects[objs_idx[i]], (boost::filesystem::path(Slic3r::resources_dir()) /"calibration" / "bridge_flow" / ("f"+std::to_string(100 + i * 5)+".amf")).string(), Vec3d{ 0, 10 * xyz_scale ,zshift }, Vec3d{ 1, 1, patch_zscale });
+            translate_from_rotation(i, Vec3d{ 0, 10 * xyz_scale ,zshift });
     }
 
     /// --- translate ---;
-    bool has_to_arrange = false;
+    bool has_to_arrange = init_z_rotate_angle != 0;
     const ConfigOptionFloat* extruder_clearance_radius = print_config->option<ConfigOptionFloat>("extruder_clearance_radius");
     const ConfigOptionPoints* bed_shape = printer_config->option<ConfigOptionPoints>("bed_shape");
     const float brim_width = print_config->option<ConfigOptionFloat>("brim_width")->get_float();

@@ -251,7 +251,6 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     m_choice_view_label[GCodeViewer::EViewType::FanSpeed] = m_width_screen == tiny ? _L("Fan") : _L("Fan speed");
     m_choice_view_label[GCodeViewer::EViewType::Temperature] = m_width_screen == tiny ? _L("Temp") : _L("Temperature");
     m_choice_view_label[GCodeViewer::EViewType::LayerTime] = m_width_screen == tiny ? _L("time") : _L("Layer time");
-    m_choice_view_label[GCodeViewer::EViewType::LayerTimeLog] = m_width_screen == tiny ? _L("Log time") : _L("Layer time (log)");
     m_choice_view_label[GCodeViewer::EViewType::Chronology] = m_width_screen == tiny ? _L("Chrono") : _L("Chronology");
     m_choice_view_label[GCodeViewer::EViewType::VolumetricRate] = m_width_screen == tiny ? _L("Vol. flow") : _L("Volumetric flow rate");
     m_choice_view_label[GCodeViewer::EViewType::VolumetricFlow] = _L("Section");
@@ -630,13 +629,6 @@ wxBoxSizer* Preview::create_layers_slider_sizer()
     Bind(DoubleSlider::wxCUSTOMEVT_TICKSCHANGED, [this](wxEvent&) {
         Model& model = wxGetApp().plater()->model();
         Info custom_gcode_per_print_z = m_layers_slider->GetTicksValues();
-        //remove z-shift from gcode output
-        const float z_shift = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_float("z_offset");
-        if (can_display_gcode() && z_shift != 0 && ForceState::ForceExtrusions != current_force_state) {
-            for (CustomGCode::Item& tick : custom_gcode_per_print_z.gcodes) {
-                tick.print_z -= z_shift;
-            }
-        }
         model.custom_gcode_per_print_z = custom_gcode_per_print_z;
         m_schedule_background_process();
 
@@ -717,17 +709,6 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     else {
         ticks_info_from_model.mode = CustomGCode::Mode::SingleExtruder;
         ticks_info_from_model.gcodes = m_canvas->get_custom_gcode_per_print_z();
-    }
-    // Add offset from printer z offset
-    if (wxGetApp().preset_bundle && wxGetApp().preset_bundle->printers.get_edited_preset().config.option("z_offset"))
-    {
-        //add z-shift from gcode output
-        const float z_shift = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_float("z_offset");
-        if (can_display_gcode() && z_shift != 0 && ForceState::ForceExtrusions != current_force_state) {
-            for (CustomGCode::Item& tick : ticks_info_from_model.gcodes) {
-                tick.print_z += z_shift;
-            }
-        }
     }
     //check incoherencies
     check_layers_slider_values(ticks_info_from_model.gcodes, layers_z);

@@ -1009,7 +1009,7 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
         PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
         for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty()) {
+            if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty()) {
                 const Preset& preset = tab->get_presets()->get_edited_preset();
                 if (preset.is_system || preset.is_default || preset.is_external)
                     types_for_save.emplace_back(preset.type);
@@ -1234,7 +1234,7 @@ void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent
         PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
         int presets_cnt = 0;
         for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+            if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty())
                 presets_cnt++;
         m_action_line->SetLabel((header.IsEmpty() ? "" : header + "\n\n") + 
                                 _L_PLURAL("The following preset was modified",
@@ -1271,7 +1271,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
         PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
         for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+            if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty())
                 presets_list.emplace_back(tab->get_presets());
     }
     else
@@ -1438,7 +1438,7 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
 
 static PresetCollection* get_preset_collection(Preset::Type type, PresetBundle* preset_bundle = nullptr) {
     if (!preset_bundle)
-        preset_bundle = wxGetApp().preset_bundle;
+        preset_bundle = wxGetApp().preset_bundle.get();
     return  type == Preset::Type::TYPE_FFF_PRINT        ? &preset_bundle->fff_prints :
             type == Preset::Type::TYPE_SLA_PRINT        ? &preset_bundle->sla_prints :
             type == Preset::Type::TYPE_FFF_FILAMENT     ? &preset_bundle->filaments :

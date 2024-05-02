@@ -309,8 +309,9 @@ class PrintConfigDef : public ConfigDef
 {
 public:
     PrintConfigDef();
-
-    static void handle_legacy(t_config_option_key& opt_key, std::string& value);
+    
+    static void handle_legacy(t_config_option_key& opt_key, std::string& value, bool remove_unkown_keys = true);
+    static bool is_defined(t_config_option_key& opt_key);
     static std::map<std::string, std::string> to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
     static std::map<std::string, std::string> from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
 
@@ -397,7 +398,8 @@ public:
     void                to_prusa(t_config_option_key& opt_key, std::string& value) const override
         { PrintConfigDef::to_prusa(opt_key, value, *this); }
     // utilities to help convert from prusa config.
-    void                convert_from_prusa();
+    // if with_phony, then the phony settigns will be set to phony if needed.
+    void                convert_from_prusa(bool with_phony);
 
     /// <summary>
     /// callback to changed other settings that are linked (like width & spacing)
@@ -406,6 +408,27 @@ public:
     /// <return> configs that have at least a change</param>
     std::set<const DynamicPrintConfig*> value_changed(const t_config_option_key& opt_key, const std::vector<DynamicPrintConfig*> config_collection);
     std::set<const DynamicPrintConfig*> update_phony(const std::vector<DynamicPrintConfig*> config_collection, bool exclude_default_extrusion = false);
+};
+
+// An indirection to a bunch of Config
+class MultiPtrPrintConfig : public virtual ConfigBase
+{
+public:
+    MultiPtrPrintConfig() = default;
+    
+    // Overrides ConfigBase::def(). Static configuration definition. Any value stored into this ConfigBase shall have its definition here.
+    const ConfigDef*    def() const override { return &print_config_def; }
+
+    // Overrides ConfigResolver::optptr().
+    const ConfigOption*     optptr(const t_config_option_key &opt_key) const override;
+    // Overrides ConfigBase::optptr(). Find ando/or create a ConfigOption instance for a given name.
+    ConfigOption*           optptr(const t_config_option_key &opt_key, bool create = false) override;
+    // Overrides ConfigBase::keys(). Collect names of all configuration values maintained by this configuration store.
+    t_config_option_keys    keys() const override;
+
+    
+    std::vector<ConfigBase*> storages;
+private:
 };
 
 void handle_legacy_sla(DynamicPrintConfig& config);
@@ -698,11 +721,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<InfillPattern>,  brim_ears_pattern))
     ((ConfigOptionBool,                 brim_per_object))
     ((ConfigOptionFloat,                brim_separation))
+    ((ConfigOptionFloatOrPercent,       brim_speed))
     //((ConfigOptionEnum<BrimType>,       brim_type))
     ((ConfigOptionBool,                 clip_multipart_objects))
     ((ConfigOptionBool,                 dont_support_bridges))
     ((ConfigOptionPercent,              external_perimeter_cut_corners))
-    ((ConfigOptionBool,                 exact_last_layer_height))
+    //((ConfigOptionBool,                 exact_last_layer_height))
     ((ConfigOptionFloatOrPercent,       extrusion_width))
     ((ConfigOptionFloatOrPercent,       extrusion_spacing))
     ((ConfigOptionFloatOrPercent,       first_layer_acceleration_over_raft))
@@ -800,6 +824,7 @@ PRINT_CONFIG_CLASS_DEFINE(
 PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
+    ((ConfigOptionBool,                 avoid_crossing_top))
     ((ConfigOptionFloat,                bridge_angle))
     ((ConfigOptionEnum<InfillPattern>,  bridge_fill_pattern))
     ((ConfigOptionEnum<BridgeType>,     bridge_type))
@@ -813,7 +838,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       bridged_infill_margin))
     ((ConfigOptionFloatOrPercent,       bridge_speed))
     ((ConfigOptionFloatOrPercent,       bridge_speed_internal))
-    ((ConfigOptionFloatOrPercent,       brim_speed))
     ((ConfigOptionFloat,                curve_smoothing_precision))
     ((ConfigOptionFloat,                curve_smoothing_cutoff_dist))
     ((ConfigOptionFloat,                curve_smoothing_angle_convex))
@@ -837,6 +861,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 only_one_perimeter_first_layer))
     ((ConfigOptionBool,                 only_one_perimeter_top))
     ((ConfigOptionBool,                 only_one_perimeter_top_other_algo))
+    ((ConfigOptionBool,                 fill_aligned_z))
     ((ConfigOptionFloat,                fill_angle))
     ((ConfigOptionBool,                 fill_angle_cross))
     ((ConfigOptionFloat,                fill_angle_increment))
@@ -909,6 +934,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 perimeter_loop))
     ((ConfigOptionEnum<SeamPosition>,   perimeter_loop_seam))
     ((ConfigOptionPercent,              perimeter_overlap))
+    ((ConfigOptionBool,                 perimeter_reverse))
     ((ConfigOptionFloatOrPercent,       perimeter_speed))
     // Total number of perimeters.
     ((ConfigOptionInt,                  perimeters))
@@ -1069,6 +1095,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatsOrPercents,    filament_thin_walls_pa))
     ((ConfigOptionFloatsOrPercents,    filament_top_solid_infill_pa))
     ((ConfigOptionFloatsOrPercents,    filament_travel_pa))
+    ((ConfigOptionBool,                gcode_ascii))
     ((ConfigOptionBool,                gcode_comments))
     ((ConfigOptionString,              gcode_filename_illegal_char))
     ((ConfigOptionEnum<GCodeFlavor>,   gcode_flavor))
@@ -1670,6 +1697,15 @@ public:
     bool         set_key_value(const std::string &opt_key, ConfigOption *opt) { bool out = m_data.set_key_value(opt_key, opt); this->touch(); return out; }
     template<typename T>
     void         set(const std::string &opt_key, T value) { m_data.set(opt_key, value, true); this->touch(); }
+    void set_any(const std::string &opt_key, boost::any value, int16_t extruder_id)
+    {
+        ConfigOption *opt = m_data.option(opt_key, true);
+        assert(opt);
+        if (opt) {
+            opt->set_any(value, extruder_id);
+            this->touch();
+        }
+    }
     void         set_deserialize(const t_config_option_key &opt_key, const std::string &str, ConfigSubstitutionContext &substitution_context, bool append = false)
         { m_data.set_deserialize(opt_key, str, substitution_context, append); this->touch(); }
     bool         erase(const t_config_option_key &opt_key) { bool out = m_data.erase(opt_key); if (out) this->touch(); return out; }
@@ -1684,6 +1720,7 @@ public:
     auto                        cend() const { return m_data.cend(); }
     t_config_option_keys        keys() const { return m_data.keys(); }
     bool                        has(const t_config_option_key& opt_key) const { return m_data.has(opt_key); }
+    const ConfigDef*            def() const { return m_data.def(); }
     bool                        operator==(const ModelConfig& other) const { return m_data.equals(other.m_data); }
     bool                        operator!=(const ModelConfig& other) const { return !this->operator==(other); }
     const ConfigOption*         option(const t_config_option_key &opt_key) const { return m_data.option(opt_key); }
@@ -1704,7 +1741,8 @@ public:
 
 
     // utilities to help convert from prusa config.
-    void convert_from_prusa(const DynamicPrintConfig& global_config);
+    // if with_phony, then the phony settigns will be set to phony if needed.
+    void convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony);
 
 private:
     friend class cereal::access;
@@ -1716,6 +1754,19 @@ private:
     static uint64_t             s_last_timestamp;
 };
 
+
+
+void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+                                  ModelConfig &                              config,
+                                  const DynamicPrintConfig &                 global_config,
+                                  ConfigSubstitutionContext &                config_substitutions,
+                                  bool                                       with_phony,
+                                  bool                                       check_prusa);
+void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> settings,
+                                  DynamicPrintConfig &                       config,
+                                  ConfigSubstitutionContext &                config_substitutions,
+                                  bool                                       with_phony,
+                                  bool                                       check_prusa);
 
 
 } // namespace Slic3r

@@ -107,7 +107,7 @@ struct PresetWithVendorProfile {
 // because Preset and the ConfigWizard hold pointers to VendorProfiles.
 // XXX: maybe set is enough (cf. changes in Wizard)
 typedef std::map<std::string, VendorProfile> VendorMap;
-
+class _BBS_3MF_Importer;
 class Preset
 {
 public:
@@ -142,6 +142,7 @@ public:
         return PrinterTechnology::ptUnknown;
     }
     static std::string type_name(Type t);
+    static Type        type_from_name(std::string name);
 
     Type                type        = TYPE_INVALID;
 
@@ -272,6 +273,7 @@ protected:
 
     friend class        PresetCollection;
     friend class        PresetBundle;
+    friend class        _BBS_3MF_Importer;
 };
 
 bool is_compatible_with_print  (const PresetWithVendorProfile &preset, const PresetWithVendorProfile &active_print, const PresetWithVendorProfile &active_printer);

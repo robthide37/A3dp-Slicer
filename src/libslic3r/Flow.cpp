@@ -80,10 +80,6 @@ double Flow::extrusion_width(const std::string& opt_key, const ConfigOptionFloat
     }
 
     if (opt->percent) {
-        auto opt_key_layer_height = first_layer ? "first_layer_height" : "layer_height";
-        auto opt_layer_height = config.option(opt_key_layer_height);
-        if (opt_layer_height == nullptr)
-            throw_on_missing_variable(opt_key, opt_key_layer_height);
         // first_layer_height depends on first_printing_extruder
         auto opt_nozzle_diameters = config.option<ConfigOptionFloats>("nozzle_diameter");
         if (opt_nozzle_diameters == nullptr)
@@ -287,6 +283,14 @@ Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, flo
     if (role == frExternalPerimeter) {
         config_width = print_config.opt<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_width");
         config_spacing = print_config.opt<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_spacing");
+        // external peri spacing is only half spacing -> transform it into a full spacing
+        if (!config_spacing.is_phony() && !config_spacing.value == 0) {
+            double raw_spacing = config_spacing.get_abs_value(nozzle_diameter);
+            config_spacing.percent = false;
+            config_spacing.value = rounded_rectangle_extrusion_spacing(
+                rounded_rectangle_extrusion_width_from_spacing(raw_spacing, layer_height, 0.5f),
+                layer_height, 1.f);
+        }
         overlap = (float)print_config.get_abs_value("external_perimeter_overlap", 1.0);
     } else if (role == frPerimeter) {
         config_width = print_config.opt<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");
@@ -526,12 +530,12 @@ float Flow::rounded_rectangle_extrusion_spacing(float width, float height, float
 #endif
 }
 
-float Flow::rounded_rectangle_extrusion_width_from_spacing(float spacing, float height, float m_spacing_ratio)
+float Flow::rounded_rectangle_extrusion_width_from_spacing(float spacing, float height, float spacing_ratio)
 {
 #ifdef HAS_PERIMETER_LINE_OVERLAP
     return (spacing + PERIMETER_LINE_OVERLAP_FACTOR * height * (1. - 0.25 * PI) * spacing_ratio);
 #else
-    return float(spacing + height * (1. - 0.25 * PI) * m_spacing_ratio);
+    return float(spacing + height * (1. - 0.25 * PI) * spacing_ratio);
 #endif
 }
 

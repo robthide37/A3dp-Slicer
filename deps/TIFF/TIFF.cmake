@@ -6,7 +6,7 @@ if (APPLE)
     if (${CMAKE_OSX_ARCHITECTURES} MATCHES "arm")
         prusaslicer_add_cmake_project(TIFF
             URL https://gitlab.com/libtiff/libtiff/-/archive/v4.3.0/libtiff-v4.3.0.zip
-            URL_HASH SHA256=a1db6826ea1b8b08eaf168973abb29b8a143fb744c1b24cc6967cb12f5e6e81f
+            URL_HASH SHA256=4fca1b582c88319f3ad6ecd5b46320eadaf5eb4ef6f6c32d44caaae4a03d0726
             DEPENDS ${ZLIB_PKG} ${PNG_PKG} dep_JPEG
             CMAKE_ARGS
                 -Dlzma:BOOL=OFF

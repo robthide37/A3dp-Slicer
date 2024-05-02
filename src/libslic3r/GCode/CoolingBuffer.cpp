@@ -449,6 +449,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_G3;
         if (line.type) {
             // G0, G1 or G92
+            if (m_config.use_relative_e_distances.value)
+                // Reset extruder accumulator.
+                current_pos[3] = 0.f;
             // Parse the G-code line.
             std::vector<float> new_pos(current_pos);
             const char *c = sline.data() + 3;
@@ -496,9 +499,6 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             }
             if ((line.type & CoolingLine::TYPE_G92) == 0) {
                 // G0 or G1. Calculate the duration.
-                if (m_config.use_relative_e_distances.value)
-                    // Reset extruder accumulator.
-                    current_pos[3] = 0.f;
                 float dif[4];
                 for (size_t i = 0; i < 4; ++ i)
                     dif[i] = new_pos[i] - current_pos[i];
@@ -962,7 +962,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 double t = (layer_time - slowdown_below_layer_time) / (fan_below_layer_time - slowdown_below_layer_time);
                 for (size_t etype_idx = 0; etype_idx < etype_can_increase_fan.size(); etype_idx++) {
                     uint16_t idx = etype_can_increase_fan[etype_idx];
-                    if (fan_speeds[idx] < max_fan_speed) // don't reduce speed if max speed is lower.
+                    if (fan_speeds[idx] < max_fan_speed) // if max speed is lower, this will reduce speed, so don't do it.
                         fan_speeds[idx] = std::clamp(int(t * fan_speeds[idx] + (1. - t) * max_fan_speed + 0.5), 0, 255);
                 }
             }

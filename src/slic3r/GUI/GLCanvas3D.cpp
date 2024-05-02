@@ -1076,7 +1076,7 @@ void GLCanvas3D::set_last_arrange_settings(float new_value) {
     }
     ptr->previously_used_distance = new_value;
 
-    auto& appcfg = wxGetApp().app_config;
+    AppConfig *appcfg = wxGetApp().app_config.get();
     std::string dist_key = "min_object_distance", rot_key = "enable_rotation";
     dist_key += postfix;
     rot_key += postfix;
@@ -3139,7 +3139,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_dirty = true;
     };
 
-    auto* app_config = GUI::wxGetApp().app_config;
+    auto* app_config = GUI::wxGetApp().app_config.get();
     bool focus_platter_on_mouse = app_config->get("focus_platter_on_mouse") == "1";
     if (m_gizmos.on_mouse(evt)) {
         if (focus_platter_on_mouse) {
@@ -6307,16 +6307,18 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                         for (const ExtrusionEntity *ee : layerm->fills.entities()) {
                             // fill represents infill extrusions of a single island.
                             const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
-                            if (fill != nullptr && !fill->entities().empty())
+                            if (fill != nullptr && !fill->entities().empty()) {
+                                bool has_solid_infill = HasRoleVisitor::search(fill->entities(), HasSolidInfillVisitor{});
                                 _3DScene::extrusionentity_to_verts(*fill, 
                                     float(layer->print_z), 
                                     copy,
 	                                volume(idx_layer, 
-                                        is_solid_infill(fill->entities().front()->role()) ?
+                                        has_solid_infill ?
                                             layerm->region().config().solid_infill_extruder :
                                             layerm->region().config().infill_extruder,
-                                        is_solid_infill(fill->entities().front()->role()) ? 4 : 3),
+                                        has_solid_infill ? 4 : 3),
                                     feature_to_volume_map);
+                            }
                         }
                     }
                 }

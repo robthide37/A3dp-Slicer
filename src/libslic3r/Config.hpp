@@ -357,10 +357,12 @@ using  ConfigOptionUniquePtr = std::unique_ptr<ConfigOption, ConfigOptionDeleter
 // This structure serves to inform the user about the substitutions having been done during file import.
 struct ConfigSubstitution {
     const ConfigOptionDef   *opt_def { nullptr };
+    std::string              old_name; // for when opt_def is nullptr (option not defined in this version)
     std::string              old_value;
     ConfigOptionUniquePtr    new_value;
     ConfigSubstitution() = default;
-    ConfigSubstitution(const ConfigOptionDef* def, std::string old, ConfigOptionUniquePtr&& new_v) : opt_def(def), old_value(old), new_value(std::move(new_v)) {}
+    ConfigSubstitution(const ConfigOptionDef* def, std::string old, ConfigOptionUniquePtr&& new_v) : opt_def(def), old_name(), old_value(old), new_value(std::move(new_v)) {}
+    ConfigSubstitution(std::string bad_key, std::string value) : opt_def(nullptr), old_name(bad_key), old_value(value), new_value() {}
 };
 
 using  ConfigSubstitutions = std::vector<ConfigSubstitution>;
@@ -370,17 +372,30 @@ using  ConfigSubstitutions = std::vector<ConfigSubstitution>;
 struct ConfigSubstitutionContext
 {
     ConfigSubstitutionContext(ForwardCompatibilitySubstitutionRule rl) : rule(rl) {}
-    bool empty() const throw() { return substitutions.empty(); }
 
     ForwardCompatibilitySubstitutionRule 	rule;
-    ConfigSubstitutions					    substitutions;
+    
+    bool empty() const throw() { return m_substitutions.empty(); }
+    const ConfigSubstitutions &get() const { return m_substitutions; }
+    ConfigSubstitutions data() && { return std::move(m_substitutions); }
+    void add(ConfigSubstitution&& substitution) { m_substitutions.push_back(std::move(substitution)); }
+    void emplace(std::string &&key, std::string &&value) { m_substitutions.emplace_back(std::move(key), std::move(value)); }
+    void emplace(const ConfigOptionDef* def, std::string &&old_value, ConfigOptionUniquePtr&& new_v) { m_substitutions.emplace_back(def, std::move(old_value), std::move(new_v)); }
+    void clear() { m_substitutions.clear(); }
+    void sort_and_remove_duplicates() { sort_remove_duplicates(m_substitutions); }
+
+private:
+    ConfigSubstitutions					    m_substitutions;
 };
 
 // A generic value of a configuration option.
 class ConfigOption {
 public:
-    // if true, this option doesn't need to be saved, it's a computed value from an other configOption.
-    // uint32_t because macos crash if it's a bool. and it doesn't change the size of the object because of alignment.
+    // Flags ta save some states into the option.
+    // note: uint32_t because macos crash if it's a bool. and it doesn't change the size of the object because of alignment.
+    // FCO_PHONY: if true, this option doesn't need to be saved (or with empty string), it's a computed value from an other ConfigOption.
+    // FCO_EXTRUDER_ARRAY: set if the ConfigDef has is_extruder_size(). Only apply to ConfigVectorBase and childs
+    // FCO_PLACEHOLDER_TEMP: for PlaceholderParser, to be able to recognise temporary fake ConfigOption (for default_XXX() macro)
     uint32_t flags;
     enum FlagsConfigOption : uint32_t {
         FCO_PHONY = 1,
@@ -504,7 +519,7 @@ public:
     virtual bool   empty() const = 0;
     // Get if the size of this vector is/should be the same as nozzle_diameter
     bool is_extruder_size() const { return (flags & FCO_EXTRUDER_ARRAY) != 0; }
-    ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size) {
+    ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size = true) {
         if (is_extruder_size) this->flags |= FCO_EXTRUDER_ARRAY; else this->flags &= uint8_t(0xFF ^ FCO_EXTRUDER_ARRAY);
         return this;
     }
@@ -1329,7 +1344,7 @@ public:
     {
         if (idx < 0) {
             for (const FloatOrPercent &v : this->values)
-                if (! std::isnan(v.value) || v != NIL_VALUE())
+                if (!(std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()))
                     return false;
             return true;
         } else {
@@ -1347,7 +1362,9 @@ public:
     double                  get_float(size_t idx = 0) const override { return get_abs_value(idx, 1.); }
 
     static inline bool is_nil(const boost::any &to_check) {
-        return std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value;
+        bool ok = std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value
+            || boost::any_cast<FloatOrPercent>(to_check).value > std::numeric_limits<float>::max();
+        return ok;
     }
     // don't use it to compare, use is_nil() to check.
     static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
@@ -1414,7 +1431,7 @@ protected:
                 ss << v.value;
                 if (v.percent)
                     ss << "%";
-            } else if (std::isnan(v.value) || v.value == NIL_VALUE().value) {
+            } else if (std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()) {
                 if (NULLABLE)
                     ss << NIL_STR_VALUE;
                 else
@@ -1427,8 +1444,8 @@ protected:
             if (v1.size() != v2.size())
                 return false;
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-                if (!(((std::isnan(it1->value) || it1->value == NIL_VALUE().value) &&
-                       (std::isnan(it2->value) || it2->value == NIL_VALUE().value)) ||
+                if (!(((std::isnan(it1->value) || it1->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max()) &&
+                       (std::isnan(it2->value) || it2->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max())) ||
                       *it1 == *it2))
                     return false;
             return true;
@@ -1439,8 +1456,8 @@ protected:
     static bool vectors_lower(const std::vector<FloatOrPercent> &v1, const std::vector<FloatOrPercent> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(it1->value) || it1->value == NIL_VALUE().value);
-                auto null2 = int(std::isnan(it2->value) || it2->value == NIL_VALUE().value);
+                auto null1 = int(std::isnan(it1->value) || it1->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max());
+                auto null2 = int(std::isnan(it2->value) || it2->value == NIL_VALUE().value || it1->value > std::numeric_limits<float>::max());
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -2231,8 +2248,9 @@ public:
     // but it carries the defaults of the configuration values.
     
     ConfigBase() = default;
+#ifndef _DEBUG
     ~ConfigBase() override = default;
-
+#endif
     // to get to the config more generic than this one, if available
     const ConfigBase* parent = nullptr;
 
@@ -2324,6 +2342,10 @@ public:
     bool set_deserialize_nothrow(const t_config_option_key &opt_key_src, const std::string &value_src, ConfigSubstitutionContext& substitutions, bool append = false);
 	// May throw BadOptionTypeException() if the operation fails.
     void set_deserialize(const t_config_option_key &opt_key, const std::string &str, ConfigSubstitutionContext& config_substitutions, bool append = false);
+    void set_deserialize(const t_config_option_key &opt_key, const std::string &str){ //for tests
+        ConfigSubstitutionContext no_context(ForwardCompatibilitySubstitutionRule::Disable);
+        set_deserialize(opt_key, str, no_context);
+    }
     void set_deserialize_strict(const t_config_option_key &opt_key, const std::string &str, bool append = false)
         { ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Disable }; this->set_deserialize(opt_key, str, ctxt, append); }
     struct SetDeserializeItem {
@@ -2361,7 +2383,15 @@ public:
 	// Set all the nullable values to nils.
     void null_nullables();
 
+    static std::map<t_config_option_key, std::string> load_gcode_string_legacy(const char* str);
     static size_t load_from_gcode_string_legacy(ConfigBase& config, const char* str, ConfigSubstitutionContext& substitutions);
+
+#ifdef _DEBUG
+    //little dirty test to be sure it exists (not needed, but it's good for testing)
+    int32_t m_exists = 0x55555555;
+    bool    exists() { return m_exists == 0x55555555; }
+    ~ConfigBase() override { m_exists = 0; }
+#endif
 
 private:
     // Set a configuration value from a string.

@@ -789,7 +789,7 @@ void GUI_App::post_init()
             return;
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
-            this->preset_updater->sync(preset_bundle);
+            this->preset_updater->sync(preset_bundle.get());
             if (! cw_showed) {
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
@@ -832,18 +832,6 @@ GUI_App::GUI_App(EAppMode mode)
     m_imgui.reset(new ImGuiWrapper{});
 }
 
-GUI_App::~GUI_App()
-{
-    if (app_config != nullptr)
-        delete app_config;
-
-    if (preset_bundle != nullptr)
-        delete preset_bundle;
-
-    if (preset_updater != nullptr)
-        delete preset_updater;
-}
-
 // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
 // Otherwise HTML formatted for the system info dialog.
 std::string GUI_App::get_gl_info(bool for_github)
@@ -858,13 +846,43 @@ wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
 
 bool GUI_App::init_opengl()
 {
-#ifdef __linux__
-    bool status = m_opengl_mgr.init_gl();
-    m_opengl_initialized = true;
-    return status;
+    bool initialized = m_opengl_mgr.init_gl();
+    if (!m_opengl_initialized && initialized) {
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+        // Delayed init for x86
+#ifdef __APPLE__
+        // intel apple
+        hard_cpu = AppConfig::HardwareType::hCpuIntel;
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+        } catch (std::exception ex) {}
 #else
-    return m_opengl_mgr.init_gl();
+        try {
+            std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
+            if (boost::contains(gpu_vendor, "Intel") || boost::contains(gpu_vendor, "INTEL"))
+                hard_gpu = AppConfig::HardwareType::hGpuIntel;
+            if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
+                hard_gpu = AppConfig::HardwareType::hGpuAmd;
+            if (boost::contains(gpu_vendor, "Nvidia") || boost::contains(gpu_vendor, "NVIDIA"))
+                hard_gpu = AppConfig::HardwareType::hGpuNvidia;
+            if (boost::contains(gpu_vendor, "Apple") || boost::contains(gpu_vendor, "APPLE")) {
+                assert(false); // apple gpu are only in _M_ARM64
+            }
+        } catch (std::exception ex) {}
 #endif
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+    }
+#ifdef __linux__
+    m_opengl_initialized = true;
+#else
+    m_opengl_initialized = initialized;
+#endif
+    return initialized;
 }
 
 // gets path to PrusaSlicer.ini, returns semver from first line comment
@@ -927,9 +945,27 @@ void GUI_App::init_app_config()
         m_datadir_redefined = true;
     }
 
-	if (!app_config)
-        app_config = new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer);
-
+	if (!app_config) {
+        app_config.reset(new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer));
+        AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
+        AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
+#ifdef _M_ARM64
+#ifdef __APPLE__
+        // Arm apple
+        hard_cpu = AppConfig::HardwareType::hCpuApple;
+        hard_gpu = AppConfig::HardwareType::hGpuApple;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#else
+        // Arm
+        hard_cpu = AppConfig::HardwareType::hCpuArmGeneric;
+        hard_gpu = AppConfig::HardwareType::hGpuArmGeneric;
+        app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
+#endif
+#else
+        // x86 (not-apple)
+        //can't know the gpu before the openg init, so it's delayed. until it
+#endif
+    }
 	// load settings
 	m_app_conf_exists = app_config->exists();
 	if (m_app_conf_exists) {
@@ -1233,7 +1269,7 @@ bool GUI_App::on_init_inner()
         scrn->SetText(_L("Loading configuration")+ dots);
     }
 
-    preset_bundle = new PresetBundle();
+    preset_bundle.reset(new PresetBundle());
 
     // just checking for existence of Slic3r::data_dir is not enough : it may be an empty directory
     // supplied as argument to --datadir; in that case we should still run the wizard
@@ -1252,7 +1288,7 @@ bool GUI_App::on_init_inner()
             associate_stl_files();
 #endif // __WXMSW__
 
-        preset_updater = new PresetUpdater();
+        preset_updater.reset(new PresetUpdater());
         Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
         app_config->set("version_online", into_u8(evt.GetString()));
         app_config->save();
@@ -2289,6 +2325,15 @@ bool GUI_App::load_language(wxString language, bool initial)
         {
 	    	// Allocating a temporary locale will switch the default wxTranslations to its internal wxTranslations instance.
 	    	wxLocale temp_locale;
+#ifdef __WXOSX__
+            // ysFIXME - temporary workaround till it isn't fixed in wxWidgets:
+            // Use English as an initial language, because of under OSX it try to load "inappropriate" language for wxLANGUAGE_DEFAULT.
+            // For example in our case it's trying to load "en_CZ" and as a result PrusaSlicer catch warning message.
+            // But wxWidgets guys work on it.
+            temp_locale.Init(wxLANGUAGE_ENGLISH);
+#else
+            temp_locale.Init();
+#endif // __WXOSX__
 	    	// Set the current translation's language to default, otherwise GetBestTranslation() may not work (see the wxWidgets source code).
 	    	wxTranslations::Get()->SetLanguage(wxLANGUAGE_DEFAULT);
 	    	// Let the wxFileTranslationsLoader enumerate all translation dictionaries for PrusaSlicer
@@ -2397,11 +2442,11 @@ bool GUI_App::load_language(wxString language, bool initial)
 	return true;
 }
 
-Tab* GUI_App::get_tab(Preset::Type type)
+Tab* GUI_App::get_tab(Preset::Type type, bool only_completed)
 {
     for (Tab* tab: tabs_list)
         if (tab->type() == type)
-            return tab->completed() ? tab : nullptr; // To avoid actions with no-completed Tab
+            return tab->completed() || !only_completed ? tab : nullptr; // To avoid actions with no-completed Tab
     return nullptr;
 }
 
@@ -2581,8 +2626,9 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                 // the dialog needs to be destroyed before the call to recreate_GUI()
                 // or sometimes the application crashes into wxDialogBase() destructor
                 // so we put it into an inner scope
-            PreferencesDialog dlg(mainframe);
-            dlg.ShowModal();
+                PreferencesDialog dlg(mainframe);
+              try{
+                dlg.ShowModal();
                 app_layout_changed = dlg.settings_layout_changed();
                 if (dlg.seq_top_layer_only_changed())
                     this->plater_->refresh_print();
@@ -2603,6 +2649,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                         associate_gcode_files();
                 }
 #endif // _WIN32
+              } catch (std::exception e) {}
             }
             if (app_layout_changed) {
                 // hide full main_sizer for mainFrame
@@ -2710,7 +2757,7 @@ bool GUI_App::has_unsaved_preset_changes() const
 {
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
     for (const Tab* const tab : tabs_list) {
-        if (tab->supports_printer_technology(printer_technology) && tab->saved_preset_is_dirty())
+        if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->saved_preset_is_dirty())
             return true;
     }
     return false;
@@ -2720,7 +2767,7 @@ bool GUI_App::has_current_preset_changes() const
 {
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
     for (const Tab* const tab : tabs_list) {
-        if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+        if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty())
             return true;
         }
     return false;
@@ -2730,7 +2777,7 @@ void GUI_App::update_saved_preset_from_current_preset()
     {
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
     for (Tab* tab : tabs_list) {
-        if (tab->supports_printer_technology(printer_technology))
+        if (tab->supports_printer_technology(printer_technology) && tab->completed())
             tab->update_saved_preset_from_current_preset();
     }
 }
@@ -2740,8 +2787,10 @@ std::vector<const PresetCollection*> GUI_App::get_active_preset_collections() co
     std::vector<const PresetCollection*> ret;
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
     for (const Tab* tab : tabs_list)
-        if (tab->supports_printer_technology(printer_technology))
+        if (tab->supports_printer_technology(printer_technology) && tab->completed()) {
+            assert(tab->get_presets());
             ret.push_back(tab->get_presets());
+        }
     return ret;
 }
 
@@ -2827,7 +2876,7 @@ bool GUI_App::check_and_keep_current_preset_changes(const wxString& caption, con
 
             PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
             for (const Tab* const tab : tabs_list) {
-                if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+                if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty())
                     tab->m_presets->discard_current_changes();
             }
             load_current_presets(false);
@@ -2942,7 +2991,7 @@ void GUI_App::load_current_presets(bool check_printer_presets_ /*= true*/)
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
 	this->plater()->set_printer_technology(printer_technology);
     for (Tab *tab : tabs_list)
-		if (tab->supports_printer_technology(printer_technology)) {
+		if (tab->supports_printer_technology(printer_technology) && tab->get_presets()) {
 			if (tab->type() == Preset::TYPE_PRINTER) {
 				static_cast<TabPrinter*>(tab)->update_pages();
 				// Mark the plater to update print bed by tab->load_current_preset() from Plater::on_config_change().
@@ -2973,9 +3022,8 @@ void GUI_App::OSXStoreOpenFiles(const wxArrayString &fileNames)
         // just G-codes were passed. Switch to G-code viewer mode.
         m_app_mode = EAppMode::GCodeViewer;
         unlock_lockfile(get_instance_hash_string() + ".lock", data_dir() + "/cache/");
-        if(app_config != nullptr)
-            delete app_config;
-        app_config = nullptr;
+        if(app_config)
+            app_config.reset();
         init_app_config();
     }
     wxApp::OSXStoreOpenFiles(fileNames);

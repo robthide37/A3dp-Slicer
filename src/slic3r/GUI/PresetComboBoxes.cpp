@@ -69,13 +69,12 @@ namespace GUI {
  * For this purpose control drawing methods and
  * control size calculation methods (virtual) are overridden.
  **/
-
 PresetComboBox::PresetComboBox(wxWindow* parent, Preset::Type preset_type, const wxSize& size, PresetBundle* preset_bundle/* = nullptr*/) :
     BitmapComboBox(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, size, 0, nullptr, wxCB_READONLY),
     m_type(preset_type),
     m_last_selected(wxNOT_FOUND),
     m_em_unit(em_unit(this)),
-    m_preset_bundle(preset_bundle ? preset_bundle : wxGetApp().preset_bundle)
+    m_preset_bundle(preset_bundle ? preset_bundle : wxGetApp().preset_bundle.get())
 {
     switch (m_type)
     {
@@ -106,21 +105,40 @@ PresetComboBox::PresetComboBox(wxWindow* parent, Preset::Type preset_type, const
     }
     default: break;
     }
+    
+    init();
+}
 
+PresetComboBox::PresetComboBox(Tab *parent, const wxSize &size) :
+    BitmapComboBox(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, size, 0, nullptr, wxCB_READONLY),
+    m_type(parent->type()),
+    m_last_selected(wxNOT_FOUND),
+    m_em_unit(em_unit(this)),
+    m_preset_bundle(parent->m_preset_bundle ? parent->m_preset_bundle : wxGetApp().preset_bundle.get())
+{
+    m_collection = parent->get_presets();
+    assert(m_collection != nullptr);
+    m_main_bitmap_name = parent->icon_name(16, ptFFF);
+
+    init();
+}
+
+void PresetComboBox::init()
+{
     m_bitmapCompatible   = ScalableBitmap(this, "flag_green");
     m_bitmapIncompatible = ScalableBitmap(this, "flag_red");
 
     // parameters for an icon's drawing
     fill_width_height();
 
-    Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& e) {
+    Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent &e) {
         if (m_suppress_change)
             e.StopPropagation();
         else
             e.Skip();
     });
-    Bind(wxEVT_COMBOBOX_DROPDOWN, [this](wxCommandEvent&) { m_suppress_change = false; });
-    Bind(wxEVT_COMBOBOX_CLOSEUP,  [this](wxCommandEvent&) { m_suppress_change = true;  });
+    Bind(wxEVT_COMBOBOX_DROPDOWN, [this](wxCommandEvent &) { m_suppress_change = false; });
+    Bind(wxEVT_COMBOBOX_CLOSEUP, [this](wxCommandEvent &) { m_suppress_change = true; });
 
     Bind(wxEVT_COMBOBOX, &PresetComboBox::OnSelect, this);
 }
@@ -942,6 +960,11 @@ void PlaterPresetComboBox::msw_rescale()
 
 TabPresetComboBox::TabPresetComboBox(wxWindow* parent, Preset::Type preset_type) :
     PresetComboBox(parent, preset_type, wxSize(35 * wxGetApp().em_unit(), -1))
+{
+}
+
+TabPresetComboBox::TabPresetComboBox(Tab* parent) :
+    PresetComboBox(parent, wxSize(35 * wxGetApp().em_unit(), -1))
 {
 }
 

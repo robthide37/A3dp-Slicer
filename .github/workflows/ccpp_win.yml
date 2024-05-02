@@ -6,12 +6,9 @@ on:
       - Nigthly
       - nightly_dev
       - nightly_master
-      - debug_win
       - supermerill-Main
 
 jobs:
-  build_dep:
-    runs-on: windows-2019
 
     steps:
     - uses: actions/checkout@v2
@@ -53,8 +50,20 @@ jobs:
       run: dir deps
     - name: echo dir deps destdir
       run: dir deps/destdir
-    - name: mkdir
-      run: mkdir build
+    - run: mkdir msgfmt_bin
+    - name: copy gettext
+      working-directory: ./msgfmt_bin
+      shell: powershell
+      run: '(new-object System.Net.WebClient).DownloadFile("https://github.com/supermerill/SuperSlicer_deps/releases/download/gettext/gettext-tools-static-0.18.1.1.zip", "gettext.zip")'
+    - name: unzip
+      working-directory: ./msgfmt_bin
+      shell: cmd
+      run: '"C:/Program Files/7-Zip/7z.exe" x gettext.zip'
+    - name: add msgfmt to path
+      shell: powershell
+      working-directory: msgfmt_bin
+      run: echo "$pwd;" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - run: mkdir build
     - name: cmake
       working-directory: ./build
       run: cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="d:\a\${{ github.event.repository.name }}\${{ github.event.repository.name }}\deps\destdir\usr\local"
