@@ -69,6 +69,8 @@ public:
     Point centroid() const;
     Points concave_points(double angle = PI) const;
     Points convex_points(double angle = PI) const;
+    std::vector<size_t> concave_points_idx(double angle = PI) const;
+    std::vector<size_t> convex_points_idx(double angle = PI) const;
     // Projection of a point onto the polygon.
     Point point_projection(const Point &point) const;
     std::vector<float> parameter_by_length() const;

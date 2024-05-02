@@ -135,7 +135,7 @@ group:Filtering
 	setting:resolution_internal
 	setting:model_precision
 	setting:slice_closing_radius
-	setting:bridge_precision
+    setting:bridge_precision
 # gcode_resolution
 group:Modifying slices
 	line:Curve smoothing
@@ -161,6 +161,11 @@ group:Modifying slices
 		setting:sidetext_width$5:hole_to_polyhole_threshold
 		setting:hole_to_polyhole_twisted
 	end_line
+    line:Overhangs cut
+        setting:overhangs_max_slope
+        setting:overhangs_bridge_threshold
+        setting:overhangs_bridge_upper_layers
+    end_line
 group:Other
 	setting:slicing_mode
 	setting:clip_multipart_objects
