@@ -214,12 +214,9 @@ void FanMover::_remove_slow_fan(int16_t min_speed, float past_sec) {
 }
 
 std::string FanMover::_set_fan(int16_t speed) {
-    const Tool* tool = m_writer.get_tool(m_current_extruder < 20 ? m_current_extruder : 0);
-    std::string str = GCodeWriter::set_fan(m_writer.config.gcode_flavor.value, m_writer.config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, m_writer.config.fan_percentage.value);
-    if(!tool){
-        BOOST_LOG_TRIVIAL(error) << "Error: FanMover trying to set fan without any tool.\n";
-        m_currrent_extruder = 0;
-    }
+    assert(m_current_extruder < 200);
+    assert(speed < 256 && speed >= 0);
+    std::string str  = GCodeWriter::set_fan(m_writer.gcode_config(), m_current_extruder < 200 ? m_current_extruder : 0, uint8_t(speed));
     if(!str.empty() && str.back() == '\n')
         return str.substr(0,str.size()-1);
     return str;
@@ -282,7 +279,7 @@ void FanMover::_process_ACTIVATE_EXTRUDER(const std::string_view cmd)
             std::string_view extruder_name = cmd.substr(extruder_pos_start, extruder_pos_end-extruder_pos_start);
             // we have a "name". It may be whatever or "extruder" + X
             for (const Extruder &extruder : m_writer.extruders()) {
-                if (m_writer.config.tool_name.values[extruder.id()] == extruder_name) {
+                if (m_writer.gcode_config().tool_name.values[extruder.id()] == extruder_name) {
                     m_current_extruder = static_cast<uint16_t>(extruder.id());
                     return;
                 }

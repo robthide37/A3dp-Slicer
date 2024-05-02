@@ -354,7 +354,7 @@ std::string GCodeWriter::write_acceleration(){
     }
     //if at least something, add comment
     if (gcode.tellp() != std::streampos(0)) {
-        if (this->config.gcode_comments)
+        if (this->m_config.gcode_comments)
             gcode << " ; adjust acceleration";
         gcode << "\n";
     }
