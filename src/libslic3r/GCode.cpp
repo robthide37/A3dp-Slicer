@@ -2255,20 +2255,17 @@ void GCode::process_layers(
             [this, &fan_mover = this->m_fan_mover, &config = this->config(), &writer = this->m_writer](std::string in)->std::string {
         CNumericLocalesSetter locales_setter;
 
-        if (config.fan_speedup_time.value != 0 || config.fan_kickstart.value > 0) {
-            if (fan_mover.get() == nullptr)
-                fan_mover.reset(new Slic3r::FanMover(
-                    writer,
-                    std::abs((float)config.fan_speedup_time.value),
-                    config.fan_speedup_time.value > 0,
-                    config.use_relative_e_distances.value,
-                    config.fan_speedup_overhangs.value,
-                    (float)config.fan_kickstart.value));
-            //flush as it's a whole layer
-            this->m_throw_if_canceled();
-            return fan_mover->process_gcode(in, true);
-        }
-        return in;
+        if (fan_mover.get() == nullptr)
+            fan_mover.reset(new Slic3r::FanMover(
+                writer,
+                std::abs((float)config.fan_speedup_time.value),
+                config.fan_speedup_time.value > 0,
+                config.use_relative_e_distances.value,
+                config.fan_speedup_overhangs.value,
+                (float)config.fan_kickstart.value));
+        //flush as it's a whole layer
+        this->m_throw_if_canceled();
+        return fan_mover->process_gcode(in, true);
     });
 
     // It registers a handler that sets locales to "C" before any TBB thread starts participating in tbb::parallel_pipeline.
@@ -2365,21 +2362,17 @@ void GCode::process_layers(
 
     const auto fan_mover = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
         [this, &fan_mover = this->m_fan_mover, &config = this->config(), &writer = this->m_writer](std::string in)->std::string {
-
-        if (config.fan_speedup_time.value != 0 || config.fan_kickstart.value > 0) {
-            if (fan_mover.get() == nullptr)
-                fan_mover.reset(new Slic3r::FanMover(
-                    writer,
-                    std::abs((float)config.fan_speedup_time.value),
-                    config.fan_speedup_time.value > 0,
-                    config.use_relative_e_distances.value,
-                    config.fan_speedup_overhangs.value,
-                    (float)config.fan_kickstart.value));
-            this->m_throw_if_canceled();
-            //flush as it's a whole layer
-            return fan_mover->process_gcode(in, true);
-        }
-        return in;
+        if (fan_mover.get() == nullptr)
+            fan_mover.reset(new Slic3r::FanMover(
+                writer,
+                std::abs((float)config.fan_speedup_time.value),
+                config.fan_speedup_time.value > 0,
+                config.use_relative_e_distances.value,
+                config.fan_speedup_overhangs.value,
+                (float)config.fan_kickstart.value));
+        this->m_throw_if_canceled();
+        //flush as it's a whole layer
+        return fan_mover->process_gcode(in, true);
     });
 
     // It registers a handler that sets locales to "C" before any TBB thread starts participating in tbb::parallel_pipeline.
