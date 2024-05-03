@@ -950,6 +950,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       solid_infill_speed))
     ((ConfigOptionPercent,              solid_infill_overlap))
     ((ConfigOptionInt,                  solid_over_perimeters))
+    ((ConfigOptionInt,                  print_first_layer_temperature))
     ((ConfigOptionInt,                  print_temperature))
     ((ConfigOptionPercent,              thin_perimeters))
     ((ConfigOptionPercent,              thin_perimeters_all))

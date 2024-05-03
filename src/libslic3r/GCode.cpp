@@ -3444,7 +3444,10 @@ LayerResult GCode::process_layer(
                     m_layer = layer_to_print.support_layer;
                     m_object_layer_over_raft = false;
                     if (m_config.print_temperature > 0)
-                        gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                        if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                            gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                        else
+                            gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
                     else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                             gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
                     else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
@@ -5049,7 +5052,10 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
             m_writer.apply_print_region_config(m_region->config());
             m_seam_placer.external_perimeters_first = m_region->config().external_perimeters_first.value;
             if (m_config.print_temperature > 0)
-                gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                else
+                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                 gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) { // don't set it if disabled
@@ -5077,7 +5083,10 @@ std::string GCode::extrude_infill(const Print& print, const std::vector<ObjectBy
             m_config.apply(m_region->config());
             m_writer.apply_print_region_config(m_region->config());
             if (m_config.print_temperature > 0)
-                gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                else
+                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                     gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
@@ -5103,7 +5112,10 @@ std::string GCode::extrude_ironing(const Print& print, const std::vector<ObjectB
             m_config.apply(m_region->config());
             m_writer.apply_print_region_config(m_region->config());
             if (m_config.print_temperature > 0)
-                gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                else
+                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                     gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0)

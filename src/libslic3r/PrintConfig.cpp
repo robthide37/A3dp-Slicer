@@ -5796,6 +5796,15 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::filament;
     def->tooltip = L("Override the temperature of the extruder. Avoid making too many changes, it won't stop for cooling/heating. 0 to disable. May only work on Height range modifiers.");
     def->mode = comExpert | comSuSi;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("print_first_layer_temperature", coInt);
+    def->label = L("Temperature");
+    def->category = OptionCategory::filament;
+    def->tooltip = L("Override the temperature of the extruder (for the first layer). Avoid making too many changes, it won't stop for cooling/heating. 0 to disable (using print_temperature if defined). May only work on Height range modifiers.");
+    def->mode = comExpert | comSuSi;
+    def->min = 0;
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("print_retract_lift", coFloat);
@@ -8367,6 +8376,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "perimeter_reverse",
 "perimeter_round_corners",
 "print_extrusion_multiplier",
+"print_first_layer_temperature",
 "print_custom_variables",
 "print_retract_length",
 "print_retract_lift",
