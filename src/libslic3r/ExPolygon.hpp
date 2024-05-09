@@ -221,6 +221,8 @@ inline Polylines to_polylines(ExPolygons &&src)
 
 inline Polygons to_polygons(const ExPolygon &src)
 {
+    assert(src.contour.is_counter_clockwise());
+    assert(src.holes.empty() || src.holes.front().is_clockwise());
     Polygons polygons;
     polygons.reserve(src.holes.size() + 1);
     polygons.push_back(src.contour);
@@ -233,6 +235,8 @@ inline Polygons to_polygons(const ExPolygons &src)
     Polygons polygons;
     polygons.reserve(number_polygons(src));
     for (const ExPolygon& ex_poly : src) {
+        assert(ex_poly.contour.is_counter_clockwise());
+        assert(ex_poly.holes.empty() || ex_poly.holes.front().is_clockwise());
         polygons.push_back(ex_poly.contour);
         polygons.insert(polygons.end(), ex_poly.holes.begin(), ex_poly.holes.end());
     }
@@ -241,6 +245,8 @@ inline Polygons to_polygons(const ExPolygons &src)
 
 inline ConstPolygonPtrs to_polygon_ptrs(const ExPolygon &src)
 {
+    assert(src.contour.is_counter_clockwise());
+    assert(src.holes.empty() || src.holes.front().is_clockwise());
     ConstPolygonPtrs polygons;
     polygons.reserve(src.holes.size() + 1);
     polygons.emplace_back(&src.contour);
@@ -254,6 +260,8 @@ inline ConstPolygonPtrs to_polygon_ptrs(const ExPolygons &src)
     ConstPolygonPtrs polygons;
     polygons.reserve(number_polygons(src));
     for (const ExPolygon &expoly : src) {
+        assert(expoly.contour.is_counter_clockwise());
+        assert(expoly.holes.empty() || expoly.holes.front().is_clockwise());
         polygons.emplace_back(&expoly.contour);
         for (const Polygon &hole : expoly.holes)
             polygons.emplace_back(&hole);
@@ -276,6 +284,8 @@ inline Polygons to_polygons(ExPolygons &&src)
     Polygons polygons;
     polygons.reserve(number_polygons(src));
     for (ExPolygons::iterator it = src.begin(); it != src.end(); ++it) {
+        assert(it->contour.is_counter_clockwise());
+        assert(it->holes.empty() || it->holes.front().is_clockwise());
         polygons.push_back(std::move(it->contour));
         std::move(std::begin(it->holes), std::end(it->holes), std::back_inserter(polygons));
         it->holes.clear();
@@ -287,8 +297,10 @@ inline ExPolygons to_expolygons(const Polygons &polys)
 {
     ExPolygons ex_polys;
     ex_polys.assign(polys.size(), ExPolygon());
-    for (size_t idx = 0; idx < polys.size(); ++idx)
+    for (size_t idx = 0; idx < polys.size(); ++idx) {
+        assert(polys[idx].is_counter_clockwise());
         ex_polys[idx].contour = polys[idx];
+    }
     return ex_polys;
 }
 
@@ -296,13 +308,17 @@ inline ExPolygons to_expolygons(Polygons &&polys)
 {
     ExPolygons ex_polys;
     ex_polys.assign(polys.size(), ExPolygon());
-    for (size_t idx = 0; idx < polys.size(); ++idx)
+    for (size_t idx = 0; idx < polys.size(); ++idx) {
+        assert(polys[idx].is_counter_clockwise());
         ex_polys[idx].contour = std::move(polys[idx]);
+    }
     return ex_polys;
 }
 
 inline void polygons_append(Polygons &dst, const ExPolygon &src) 
 { 
+    assert(src.contour.is_counter_clockwise());
+    assert(src.holes.empty() || src.holes.front().is_clockwise());
     dst.reserve(dst.size() + src.holes.size() + 1);
     dst.push_back(src.contour);
     dst.insert(dst.end(), src.holes.begin(), src.holes.end());
@@ -312,6 +328,8 @@ inline void polygons_append(Polygons &dst, const ExPolygons &src)
 { 
     dst.reserve(dst.size() + number_polygons(src));
     for (ExPolygons::const_iterator it = src.begin(); it != src.end(); ++ it) {
+        assert(it->contour.is_counter_clockwise());
+        assert(it->holes.empty() || it->holes.front().is_clockwise());
         dst.push_back(it->contour);
         dst.insert(dst.end(), it->holes.begin(), it->holes.end());
     }
@@ -319,6 +337,8 @@ inline void polygons_append(Polygons &dst, const ExPolygons &src)
 
 inline void polygons_append(Polygons &dst, ExPolygon &&src)
 { 
+    assert(src.contour.is_counter_clockwise());
+    assert(src.holes.empty() || src.holes.front().is_clockwise());
     dst.reserve(dst.size() + src.holes.size() + 1);
     dst.push_back(std::move(src.contour));
     std::move(std::begin(src.holes), std::end(src.holes), std::back_inserter(dst));
@@ -329,6 +349,8 @@ inline void polygons_append(Polygons &dst, ExPolygons &&src)
 { 
     dst.reserve(dst.size() + number_polygons(src));
     for (ExPolygons::iterator it = src.begin(); it != src.end(); ++ it) {
+        assert(it->contour.is_counter_clockwise());
+        assert(it->holes.empty() || it->holes.front().is_clockwise());
         dst.push_back(std::move(it->contour));
         std::move(std::begin(it->holes), std::end(it->holes), std::back_inserter(dst));
         it->holes.clear();

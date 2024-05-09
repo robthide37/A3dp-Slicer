@@ -2255,20 +2255,17 @@ void GCode::process_layers(
             [this, &fan_mover = this->m_fan_mover, &config = this->config(), &writer = this->m_writer](std::string in)->std::string {
         CNumericLocalesSetter locales_setter;
 
-        if (config.fan_speedup_time.value != 0 || config.fan_kickstart.value > 0) {
-            if (fan_mover.get() == nullptr)
-                fan_mover.reset(new Slic3r::FanMover(
-                    writer,
-                    std::abs((float)config.fan_speedup_time.value),
-                    config.fan_speedup_time.value > 0,
-                    config.use_relative_e_distances.value,
-                    config.fan_speedup_overhangs.value,
-                    (float)config.fan_kickstart.value));
-            //flush as it's a whole layer
-            this->m_throw_if_canceled();
-            return fan_mover->process_gcode(in, true);
-        }
-        return in;
+        if (fan_mover.get() == nullptr)
+            fan_mover.reset(new Slic3r::FanMover(
+                writer,
+                std::abs((float)config.fan_speedup_time.value),
+                config.fan_speedup_time.value > 0,
+                config.use_relative_e_distances.value,
+                config.fan_speedup_overhangs.value,
+                (float)config.fan_kickstart.value));
+        //flush as it's a whole layer
+        this->m_throw_if_canceled();
+        return fan_mover->process_gcode(in, true);
     });
 
     // It registers a handler that sets locales to "C" before any TBB thread starts participating in tbb::parallel_pipeline.
@@ -2365,21 +2362,17 @@ void GCode::process_layers(
 
     const auto fan_mover = tbb::make_filter<std::string, std::string>(slic3r_tbb_filtermode::serial_in_order,
         [this, &fan_mover = this->m_fan_mover, &config = this->config(), &writer = this->m_writer](std::string in)->std::string {
-
-        if (config.fan_speedup_time.value != 0 || config.fan_kickstart.value > 0) {
-            if (fan_mover.get() == nullptr)
-                fan_mover.reset(new Slic3r::FanMover(
-                    writer,
-                    std::abs((float)config.fan_speedup_time.value),
-                    config.fan_speedup_time.value > 0,
-                    config.use_relative_e_distances.value,
-                    config.fan_speedup_overhangs.value,
-                    (float)config.fan_kickstart.value));
-            this->m_throw_if_canceled();
-            //flush as it's a whole layer
-            return fan_mover->process_gcode(in, true);
-        }
-        return in;
+        if (fan_mover.get() == nullptr)
+            fan_mover.reset(new Slic3r::FanMover(
+                writer,
+                std::abs((float)config.fan_speedup_time.value),
+                config.fan_speedup_time.value > 0,
+                config.use_relative_e_distances.value,
+                config.fan_speedup_overhangs.value,
+                (float)config.fan_kickstart.value));
+        this->m_throw_if_canceled();
+        //flush as it's a whole layer
+        return fan_mover->process_gcode(in, true);
     });
 
     // It registers a handler that sets locales to "C" before any TBB thread starts participating in tbb::parallel_pipeline.
@@ -2958,9 +2951,9 @@ LayerResult GCode::process_layer(
         return result;
 
     // Extract 1st object_layer and support_layer of this set of layers with an equal print_z.
-    coordf_t             print_z       = layer.print_z;
-    bool                 first_layer   = layer.id() == 0;
-    uint16_t         first_extruder_id = layer_tools.extruders.front();
+    coordf_t print_z           = layer.print_z;
+    bool     first_layer       = layer.id() == 0;
+    uint16_t first_extruder_id = layer_tools.extruders.front();
 
     // Initialize config with the 1st object to be printed at this layer.
     m_config.apply(print.default_region_config(), true);
@@ -3444,7 +3437,10 @@ LayerResult GCode::process_layer(
                     m_layer = layer_to_print.support_layer;
                     m_object_layer_over_raft = false;
                     if (m_config.print_temperature > 0)
-                        gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                        if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                            gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                        else
+                            gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
                     else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                             gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
                     else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
@@ -3631,6 +3627,16 @@ LayerResult GCode::process_layer(
 
     file.write(gcode);
 #endif
+
+    // set area used in this layer
+    double layer_area = 0;
+    for (const LayerToPrint &print_layer : layers) {
+        assert(print_layer.layer());
+        if (print_layer.layer())
+            for (auto poly : print_layer.layer()->lslices) layer_area += poly.area();
+    }
+    layer_area = unscaled(unscaled(layer_area));
+    status_monitor.stats().layer_area_stats.emplace_back(print_z, layer_area);
 
     BOOST_LOG_TRIVIAL(trace) << "Exported layer " << layer.id() << " print_z " << print_z <<
     log_memory_info();
@@ -3896,11 +3902,7 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
             }
 
             // calculate extrusion length per distance unit
-            double e_per_mm_per_height = (path->mm3_per_mm / this->m_layer->height)
-                * m_writer.tool()->e_per_mm3()
-                * this->config().print_extrusion_multiplier.get_abs_value(1);
-            if (m_writer.extrusion_axis().empty())
-                e_per_mm_per_height = 0;
+            double e_per_mm_per_height = compute_e_per_mm(path->mm3_per_mm);
             //extrude
             {
                 std::string comment = m_config.gcode_comments ? description : "";
@@ -4890,10 +4892,7 @@ std::string GCode::extrude_multi_path3D(const ExtrusionMultiPath3D &multipath3D,
         gcode += this->_before_extrude(path, description, speed);
 
         // calculate extrusion length per distance unit
-        double e_per_mm = path.mm3_per_mm
-            * m_writer.tool()->e_per_mm3()
-            * this->config().print_extrusion_multiplier.get_abs_value(1);
-        if (m_writer.extrusion_axis().empty()) e_per_mm = 0;
+        double e_per_mm = compute_e_per_mm(path.mm3_per_mm);
         double path_length = 0.;
         {
             std::string comment = m_config.gcode_comments ? description : "";
@@ -5007,10 +5006,7 @@ std::string GCode::extrude_path_3D(const ExtrusionPath3D &path, const std::strin
     std::string gcode = this->_before_extrude(path, description, speed);
 
     // calculate extrusion length per distance unit
-    double e_per_mm = path.mm3_per_mm
-        * m_writer.tool()->e_per_mm3()
-        * this->config().print_extrusion_multiplier.get_abs_value(1);
-    if (m_writer.extrusion_axis().empty()) e_per_mm = 0;
+    double e_per_mm = compute_e_per_mm(path.mm3_per_mm);
     double path_length = 0.;
     {
         std::string comment = m_config.gcode_comments ? description : "";
@@ -5049,7 +5045,10 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
             m_writer.apply_print_region_config(m_region->config());
             m_seam_placer.external_perimeters_first = m_region->config().external_perimeters_first.value;
             if (m_config.print_temperature > 0)
-                gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                else
+                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                 gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) { // don't set it if disabled
@@ -5077,7 +5076,10 @@ std::string GCode::extrude_infill(const Print& print, const std::vector<ObjectBy
             m_config.apply(m_region->config());
             m_writer.apply_print_region_config(m_region->config());
             if (m_config.print_temperature > 0)
-                gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                else
+                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                     gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
@@ -5103,7 +5105,10 @@ std::string GCode::extrude_ironing(const Print& print, const std::vector<ObjectB
             m_config.apply(m_region->config());
             m_writer.apply_print_region_config(m_region->config());
             if (m_config.print_temperature > 0)
-                gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
+                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+                else
+                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                     gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
             else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0)
@@ -5333,9 +5338,46 @@ void GCode::_extrude_line_cut_corner(std::string& gcode_str, const Line& line, c
                 comment);
         }
 
-        //relance
+        // relance
         last_pos = line.a;
     }
+}
+
+double GCode::compute_e_per_mm(double path_mm3_per_mm) {
+    // no e if no extrusion axis
+    if (m_writer.extrusion_axis().empty())
+        return 0;
+    // compute
+    double e_per_mm = path_mm3_per_mm
+        * m_writer.tool()->e_per_mm3() // inside is the filament_extrusion_multiplier
+        * this->config().print_extrusion_multiplier.get_abs_value(1);
+    // extrusion mult per speed
+    std::string str = this->config().extruder_extrusion_multiplier_speed.get_at(this->m_writer.tool()->id());
+    if (str.size() > 2 && !(str.at(0) == '0' && str.at(1) == ' ')) {
+        assert(e_per_mm > 0);
+        double current_speed = this->writer().get_speed();
+        std::vector<double> extrusion_mult;
+        std::stringstream stream{str};
+        double parsed            = 0.f;
+        while (stream >> parsed)
+            extrusion_mult.push_back(parsed);
+        int idx_before = int(current_speed/10);
+        if (idx_before >= extrusion_mult.size() - 1) {
+            // last or after the last
+            e_per_mm *= extrusion_mult.back();
+        } else {
+            assert(idx_before + 1 < extrusion_mult.size());
+            float percent_before = 1 - (current_speed/10 - idx_before);
+            double mult = extrusion_mult[idx_before] * percent_before;
+            mult += extrusion_mult[idx_before+1] * (1-percent_before);
+            e_per_mm *= (mult / 2);
+        }
+        assert(e_per_mm > 0);
+    }
+    // first layer mult
+    if (this->m_layer->bottom_z() < EPSILON)
+        e_per_mm *= this->config().first_layer_flow_ratio.get_abs_value(1);
+    return e_per_mm;
 }
 
 std::string GCode::_extrude(const ExtrusionPath &path, const std::string &description, double speed) {
@@ -5352,11 +5394,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string &descri
     };
 
     // calculate extrusion length per distance unit
-    double e_per_mm = path.mm3_per_mm
-        * m_writer.tool()->e_per_mm3()
-        * this->config().print_extrusion_multiplier.get_abs_value(1);
-    if (m_layer->bottom_z() < EPSILON) e_per_mm *= this->config().first_layer_flow_ratio.get_abs_value(1);
-    if (m_writer.extrusion_axis().empty()) e_per_mm = 0;
+    double e_per_mm = compute_e_per_mm(path.mm3_per_mm);
     path.polyline.ensure_fitting_result_valid();
     if (path.polyline.lines().size() > 0) {
         std::string comment = m_config.gcode_comments ? descr : "";
@@ -6002,24 +6040,24 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
         && !m_avoid_crossing_perimeters.disabled_once()
         && m_avoid_crossing_perimeters.is_init()
         && !(m_config.avoid_crossing_not_first_layer && this->on_first_layer());
-
+    
     // check / compute avoid_crossing_perimeters
-    bool will_cross_perimeter = this->can_cross_perimeter(travel, can_avoid_cross_peri);
-
-    // if a retraction would be needed (with a low min_dist threshold), try to use avoid_crossing_perimeters to plan a
-    // multi-hop travel path inside the configuration space
-    if (will_cross_perimeter && this->needs_retraction(travel, role, scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) * 3)
-        && can_avoid_cross_peri) {
-        this->m_throw_if_canceled();
-        travel = m_avoid_crossing_perimeters.travel_to(*this, point, &could_be_wipe_disabled);
+    bool may_need_avoid_crossing = can_avoid_cross_peri && this->needs_retraction(travel, role, scale_d(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) * 3);
+    
+    if (may_need_avoid_crossing) {
+        // if a retraction would be needed (with a low min_dist threshold), try to use avoid_crossing_perimeters to
+        // plan a multi-hop travel path inside the configuration space
+        if (this->can_cross_perimeter(travel, can_avoid_cross_peri)) {
+            this->m_throw_if_canceled();
+            travel = m_avoid_crossing_perimeters.travel_to(*this, point, &could_be_wipe_disabled);
+        }
     }
-    if(can_avoid_cross_peri)
-        will_cross_perimeter = this->can_cross_perimeter(travel, false);
 
     // check whether a straight travel move would need retraction
     bool needs_retraction = this->needs_retraction(travel, role);
-    if (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0))
-        needs_retraction = needs_retraction && will_cross_perimeter;
+    if (m_config.only_retract_when_crossing_perimeters &&
+        !(m_config.enforce_retract_first_layer && m_layer_index == 0))
+        needs_retraction = needs_retraction && can_avoid_cross_peri && this->can_cross_perimeter(travel, false);
 
     // Re-allow avoid_crossing_perimeters for the next travel moves
     m_avoid_crossing_perimeters.reset_once_modifiers();
@@ -6031,10 +6069,39 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
             //    m_wipe.reset_path();
             //} else {
             //check if it cross hull
-                auto result = diff_pl(Polylines{ travel }, to_polygons(m_layer->lslices));
-                if (result.empty()) {
-                    m_wipe.reset_path();
+
+            //TODO: add bbox cache & checks like for can_cross_perimeter
+            bool has_intersect = false;
+            for (const ExPolygon &expoly : m_layer->lslices) {
+                // first, check if it's inside the contour (still, it can go over holes)
+                Polylines diff_result = diff_pl(travel, expoly.contour);
+                if (diff_result.size() == 1 && diff_result.front() == travel)
+                    // not inside/cross this contour, try another one.
+                    continue;
+                if (!diff_result.empty()) {
+                    //it's crossing this contour!
+                    has_intersect = true;
+                } else {
+                    // it's inside this contour, does it cross a hole?
+                    Line  travel_line;
+                    Point whatever;
+                    for (size_t idx_travel = travel.size() - 1; idx_travel > 0; --idx_travel) {
+                        travel_line.a = travel.points[idx_travel];
+                        travel_line.b = travel.points[idx_travel - 1];
+                        for (const Polygon &hole : expoly.holes) {
+                            if (hole.first_intersection(travel_line, &whatever) ||
+                                Line(hole.first_point(), hole.last_point()).intersection(travel_line, &whatever)) {
+                                has_intersect = true;
+                                break;
+                            }
+                        }
+                    }
                 }
+                break;
+            }
+            if (!has_intersect) {
+                m_wipe.reset_path();
+            }
             //}
         }
 
@@ -6198,46 +6265,83 @@ bool GCode::needs_retraction(const Polyline& travel, ExtrusionRole role /*=erNon
 
 bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
 {
-    if(m_layer != nullptr)
-    if ( ( (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0)) && m_config.fill_density.value > 0) || m_config.avoid_crossing_perimeters)
-         {
-        //test && m_layer->any_internal_region_slice_contains(travel)
-        // Skip retraction if travel is contained in an internal slice *and*
-        // internal infill is enabled (so that stringing is entirely not visible).
-        //note: any_internal_region_slice_contains() is potentionally very slow, it shall test for the bounding boxes first.
-        //bool inside = false;
-        //BoundingBox bbtravel(travel.points);
-        //for (const BoundingBox &bbox : m_layer->lslices_bboxes) {
-        //    inside = bbox.overlap(bbtravel);
-        //    if(inside) break;
-        //}
-        ////have to do a bit more work to be sure
-        //if (inside) {
-            //contained inside at least one bb
-            //construct m_layer_slices_offseted if needed
+    if (m_layer != nullptr)
+        if (((m_config.only_retract_when_crossing_perimeters &&
+              !(m_config.enforce_retract_first_layer && m_layer_index == 0)) &&
+             m_config.fill_density.value > 0) ||
+            m_config.avoid_crossing_perimeters) {
+            // FROM 2.7
             if (m_layer_slices_offseted.layer != m_layer) {
-                m_layer_slices_offseted.layer = m_layer;
+                m_layer_slices_offseted.layer    = m_layer;
                 m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4));
-                m_layer_slices_offseted.slices = m_layer->lslices;
-                m_layer_slices_offseted.slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
-                //remove top surfaces
-                for (const LayerRegion* reg : m_layer->regions()) {
+                ExPolygons slices                = m_layer->lslices;
+                ExPolygons slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
+                // remove top surfaces
+                for (const LayerRegion *reg : m_layer->regions()) {
                     m_throw_if_canceled();
-                    m_layer_slices_offseted.slices_offsetted = diff_ex(m_layer_slices_offseted.slices_offsetted, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
-                    m_layer_slices_offseted.slices = diff_ex(m_layer_slices_offseted.slices, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
+                    slices_offsetted = diff_ex(slices_offsetted, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
+                    slices           = diff_ex(slices, to_expolygons(reg->fill_surfaces.filter_by_type_flag(SurfaceType::stPosTop)));
                 }
-                
+                // create bb for speeding things up.
+                m_layer_slices_offseted.slices.clear();
+                for (ExPolygon &ex : slices) {
+                    BoundingBox bb{ex.contour.points};
+                    // simplify as much as possible
+                    for (ExPolygon &ex_simpl : ex.simplify(m_layer_slices_offseted.diameter)) {
+                        m_layer_slices_offseted.slices.emplace_back(std::move(ex_simpl), std::move(bb));
+                    }
+                }
+                m_layer_slices_offseted.slices_offsetted.clear();
+                for (ExPolygon &ex : slices_offsetted) {
+                    BoundingBox bb{ex.contour.points};
+                    for (ExPolygon &ex_simpl : ex.simplify(m_layer_slices_offseted.diameter)) {
+                        m_layer_slices_offseted.slices_offsetted.emplace_back(std::move(ex_simpl), std::move(bb));
+                    }
+                }
             }
             // test if a expoly contains the entire travel
-            for (const ExPolygon &poly :
+            for (const std::pair<ExPolygon, BoundingBox> &expoly_2_bb :
                  offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices) {
-                    m_throw_if_canceled();
-                if (poly.contains(travel)) {
-                    return false;
+                // first check if it's roughtly inside the bb, to reject quickly.
+                if (travel.size() > 1 && expoly_2_bb.second.contains(travel.front()) &&
+                    expoly_2_bb.second.contains(travel.back()) &&
+                    expoly_2_bb.second.contains(travel.points[travel.size() / 2])) {
+                    // first, check if it's inside the contour (still, it can go over holes)
+                    Polylines diff_result = diff_pl(travel, expoly_2_bb.first.contour);
+                    if (diff_result.size() == 1 && diff_result.front() == travel)
+                    //if (!diff_pl(travel, expoly_2_bb.first.contour).empty())
+                        continue;
+                    //second, check if it's crossing this contour
+                    if (!diff_result.empty()) {
+                        //has_intersect = true;
+                        return true;
+                    }
+                    // third, check if it's going over a hole
+                    // TODO: kdtree to get the ones interesting
+                    //bool  has_intersect = false;
+                    Line  travel_line;
+                    Point whatever;
+                    for (const Polygon &hole : expoly_2_bb.first.holes) {
+                        m_throw_if_canceled();
+                        for (size_t idx_travel = travel.size() - 1; idx_travel > 0; --idx_travel) {
+                            travel_line.a = travel.points[idx_travel];
+                            travel_line.b = travel.points[idx_travel - 1];
+                            if (hole.first_intersection(travel_line, &whatever) ||
+                                Line(hole.first_point(), hole.last_point()).intersection(travel_line, &whatever)) {
+                                //has_intersect = true;
+                                //break;
+                                return true;
+                            }
+                        }
+                        //if (has_intersect)
+                        //    break;
+                    }
+                    // if inside contour and does not inersect hole -> inside expoly, you don't need to avoid.
+                    //if (!has_intersect)
+                        return false;
                 }
             }
-        //}
-    }
+        }
 
     // retract if only_retract_when_crossing_perimeters is disabled or doesn't apply
     return true;

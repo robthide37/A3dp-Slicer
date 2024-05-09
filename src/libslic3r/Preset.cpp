@@ -449,7 +449,10 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
 
 static std::vector<std::string> s_Preset_print_options {
         "layer_height", 
-        "first_layer_height", "perimeters", "spiral_vase",
+        "first_layer_height",
+        "perimeters",
+        "perimeters_hole",
+        "spiral_vase",
         "slice_closing_radius",
         "slicing_mode",
         "top_solid_layers",
@@ -472,6 +475,9 @@ static std::vector<std::string> s_Preset_print_options {
         "thin_perimeters", "thin_perimeters_all",
         "overhangs_speed",
         "overhangs_speed_enforce",
+        "overhangs_max_slope",
+        "overhangs_bridge_threshold",
+        "overhangs_bridge_upper_layers",
         "overhangs_width",
         "overhangs_width_speed", 
         "overhangs_reverse",
@@ -515,6 +521,8 @@ static std::vector<std::string> s_Preset_print_options {
         "fill_angle_template",
         "bridge_angle",
         "solid_infill_below_area",
+        "solid_infill_below_layer_area",
+        "solid_infill_below_width",
         "only_retract_when_crossing_perimeters", "enforce_retract_first_layer",
         "infill_first",
         "avoid_crossing_perimeters_max_detour",
@@ -659,6 +667,7 @@ static std::vector<std::string> s_Preset_print_options {
         "bridge_flow_ratio",
         "bridge_type",
         "solid_infill_overlap",
+        "top_solid_infill_overlap",
         "infill_anchor",
         "infill_anchor_max",
         "clip_multipart_objects",
@@ -703,12 +712,14 @@ static std::vector<std::string> s_Preset_print_options {
         "model_precision",
         "resolution",
         "resolution_internal",
+        "bridge_precision",
         "gcode_resolution", //TODO what to do with it?
         "curve_smoothing_precision",
         "curve_smoothing_cutoff_dist",
         "curve_smoothing_angle_convex",
         "curve_smoothing_angle_concave",
         "print_extrusion_multiplier",
+        "print_first_layer_temperature",
         "print_retract_length",
         "print_temperature",
         "print_retract_lift",
@@ -1543,7 +1554,9 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
             && (ignore_phony || !(this_opt->is_phony() && other_opt->is_phony()))
             && ((*this_opt != *other_opt) || (this_opt->is_phony() != other_opt->is_phony())))
         {
-            if (opt_key == "bed_shape" || opt_key == "compatible_prints" || opt_key == "compatible_printers" || opt_key == "filament_ramming_parameters" || opt_key == "gcode_substitutions") {
+            //if (opt_key == "bed_shape" || opt_key == "compatible_prints" || opt_key == "compatible_printers" ||
+            //    opt_key == "filament_ramming_parameters" || opt_key == "gcode_substitutions") {
+            if (this_opt->is_vector() && !(static_cast<const ConfigOptionVectorBase *>(this_opt)->is_extruder_size())) {
                 // Scalar variable, or a vector variable, which is independent from number of extruders,
                 // thus the vector is presented to the user as a single input.
                 // Merill: these are 'button' special settings.

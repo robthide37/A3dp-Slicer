@@ -12,6 +12,7 @@
 #include "slic3r/Utils/PrintHost.hpp"
 #include "BonjourDialog.hpp"
 #include "WipeTowerDialog.hpp"
+#include "GraphDialog.hpp"
 #include "ButtonsDescription.hpp"
 #include "Search.hpp"
 #include "OG_CustomCtrl.hpp"
@@ -1286,10 +1287,10 @@ void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index/*
 // update the preset selection boxes (the dirty flags)
 // If value is saved before calling this function, put saved_value = true,
 // and value can be some random value because in this case it will not been used
-void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bool saved_value /*= false*/)
+void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bool saved_value /*= false*/, int16_t extruder_id /*-1*/)
 {
     if (!saved_value)
-        m_config_base->option(opt_key)->set_any(value, -1); // change_opt_value(*m_config, opt_key, value);
+        m_config_base->option(opt_key)->set_any(value, extruder_id); // change_opt_value(*m_config, opt_key, value);
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
         // Don't select another profile if this profile happens to become incompatible.
@@ -2532,8 +2533,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 current_group->append_line(current_line);
                 current_page->descriptions.push_back("post_process_explanation");
             } else if (boost::starts_with(full_line, "filament_ramming_parameters")) {
-                Line thisline = current_group->create_single_option_line(
-                    "filament_ramming_parameters"); // { _(L("Ramming")), "" };
+                Line thisline = current_group->create_single_option_line("filament_ramming_parameters");
+                // { _(L("Ramming")), "" };
                 thisline.widget = [this](wxWindow *parent) {
                     auto ramming_dialog_btn = new wxButton(parent, wxID_ANY, _(L("Ramming settings")) + dots,
                                                            wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
@@ -2545,7 +2546,28 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     ramming_dialog_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent &e) {
                         RammingDialog dlg(this, (m_config_base->option<ConfigOptionStrings>("filament_ramming_parameters"))->get_at(0));
                         if (dlg.ShowModal() == wxID_OK)
-                            (m_config_base->option<ConfigOptionStrings>("filament_ramming_parameters"))->get_at(0) = dlg.get_parameters();
+                            //(m_config_base->option<ConfigOptionStrings>("filament_ramming_parameters"))->get_at(0) = dlg.get_parameters();
+                            load_key_value("filament_ramming_parameters", dlg.get_parameters(), false, 0);
+                    }));
+                    return sizer;
+                };
+                current_group->append_line(thisline);
+            } else if (boost::starts_with(full_line, "extruder_extrusion_multiplier_speed")) {
+                // don't forget the idx_page as it's on the extruder page.
+                Line thisline = current_group->create_single_option_line("extruder_extrusion_multiplier_speed", "", idx_page);
+                thisline.widget = [this](wxWindow *parent) {
+                    auto dialog_btn = new wxButton(parent, wxID_ANY, _L("Extrusion multiplier per speed") + dots,
+                                                           wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+                    dialog_btn->SetFont(Slic3r::GUI::wxGetApp().normal_font());
+                    wxGetApp().UpdateDarkUI(dialog_btn);
+                    auto sizer = new wxBoxSizer(wxHORIZONTAL);
+                    sizer->Add(dialog_btn);
+
+                    dialog_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent &e) {
+                        GraphDialog dlg(this, (m_config_base->option<ConfigOptionStrings>("extruder_extrusion_multiplier_speed"))->get_at(0));
+                        if (dlg.ShowModal() == wxID_OK)
+                            //(m_config_base->option<ConfigOptionStrings>("extruder_extrusion_multiplier_speed"))->get_at(0) = dlg.get_parameters();
+                            load_key_value("extruder_extrusion_multiplier_speed", dlg.get_parameters(), false, 0);
                     }));
                     return sizer;
                 };

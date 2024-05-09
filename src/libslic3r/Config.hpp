@@ -413,6 +413,7 @@ public:
     virtual void                set(const ConfigOption *option) = 0;
     virtual int32_t             get_int(size_t idx = 0)        const { throw BadOptionTypeException("Calling ConfigOption::get_int on a non-int ConfigOption"); }
     virtual double              get_float(size_t idx = 0)      const { throw BadOptionTypeException("Calling ConfigOption::get_float on a non-float ConfigOption"); }
+    virtual bool                is_percent(size_t idx = 0)     const { return false;  }
     virtual bool                get_bool(size_t idx = 0)       const { throw BadOptionTypeException("Calling ConfigOption::get_bool on a non-boolean ConfigOption");  }
     virtual void                set_enum_int(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::set_enum_int on a non-enum ConfigOption"); }
     virtual boost::any          get_any(int32_t idx = -1)       const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
@@ -1159,8 +1160,9 @@ public:
     ConfigOptionPercent&    operator= (const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionPercent &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionPercent &rhs) const throw() { return this->value <  rhs.value; }
-
+    
     double                  get_abs_value(double ratio_over) const { return ratio_over * this->value / 100.; }
+    bool                    is_percent(size_t idx = 0) const override { return true; }
     
     std::string serialize() const override 
     {
@@ -1203,6 +1205,7 @@ public:
     bool                    operator==(const ConfigOptionPercentsTempl &rhs) const throw() { return ConfigOptionFloatsTempl<NULLABLE>::vectors_equal(this->values, rhs.values); }
     bool                    operator< (const ConfigOptionPercentsTempl &rhs) const throw() { return ConfigOptionFloatsTempl<NULLABLE>::vectors_lower(this->values, rhs.values); }
     double                  get_abs_value(size_t i, double ratio_over) const { return this->is_nil(i) ? 0 : ratio_over * this->get_at(i) / 100; }
+    bool                    is_percent(size_t idx = 0) const override { return true; }
 
     std::string serialize() const override
     {
@@ -1272,6 +1275,7 @@ public:
     double                      get_abs_value(double ratio_over) const 
         { return this->percent ? (ratio_over * this->value / 100) : this->value; }
     double                      get_float(size_t idx = 0) const override { return get_abs_value(1.); }
+    bool                        is_percent(size_t idx = 0) const override { return this->percent;  }
     // special case for get/set any: use a FloatOrPercent like for FloatsOrPercents, to have the is_percent
     boost::any get_any(int32_t idx = 0) const override { return boost::any(FloatOrPercent{value, percent}); }
     void       set_any(boost::any anyval, int32_t idx = -1) override
@@ -1357,6 +1361,12 @@ public:
         return data.value;
     }
     double                  get_float(size_t idx = 0) const override { return get_abs_value(idx, 1.); }
+    bool                    is_percent(size_t idx = 0) const override
+    {
+        if (this->is_nil(idx))
+            return false;
+        return this->get_at(idx).percent;
+    }
 
     static inline bool is_nil(const boost::any &to_check) {
         bool ok = std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value

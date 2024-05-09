@@ -80,7 +80,7 @@ public:
     Layer                       *layer;
     Flow                         perimeter_flow;
     Flow                         ext_perimeter_flow;
-    Flow                         overhang_flow;
+    Flow                         overhang_flow; // ie bridging flow
     Flow                         solid_infill_flow;
     const PrintRegionConfig     *config;
     const PrintObjectConfig     *object_config;
@@ -153,7 +153,7 @@ private:
     ExPolygons unmillable;
     coord_t mill_extra_size;
 
-    ProcessSurfaceResult process_classic(int& loop_number, const Surface& surface);
+    ProcessSurfaceResult process_classic(int& contour_count, int& holes_count, const Surface& surface);
     ProcessSurfaceResult process_arachne(int& loop_number, const Surface& surface);
     
     void        processs_no_bridge(Surfaces& all_surfaces);

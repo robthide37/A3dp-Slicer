@@ -2,6 +2,7 @@
 page:Perimeters & Shell:shell
 group:Vertical shells
 	setting:width$6:perimeters
+	setting:width$6:perimeters_hole
 	setting:tags$Simple$Expert$SuSi:script:float:depends$perimeter_spacing$external_perimeter_spacing:label$Wall Thickness:tooltip$Change the perimeter extrusion widths to ensure that there is an exact number of perimeters for this wall thickness value. It won't put the perimeter width below the nozzle diameter, and up to double.\nNote that the value displayed is just a view of the current perimeter thickness, like the info text below. The number of perimeters used to compute this value is one loop, or the custom variable 'wall_thickness_lines' (advanced mode) if defined.\nIf the value is too low, it will revert the widths to the saved value.\nIf the value is set to 0, it will show 0.:s_wall_thickness
 	setting:spiral_vase
 	recommended_thin_wall_thickness_description
@@ -134,6 +135,7 @@ group:Filtering
 	setting:resolution_internal
 	setting:model_precision
 	setting:slice_closing_radius
+    setting:bridge_precision
 # gcode_resolution
 group:Modifying slices
 	line:Curve smoothing
@@ -159,6 +161,11 @@ group:Modifying slices
 		setting:sidetext_width$5:hole_to_polyhole_threshold
 		setting:hole_to_polyhole_twisted
 	end_line
+    line:Overhangs cut
+        setting:overhangs_max_slope
+        setting:overhangs_bridge_threshold
+        setting:overhangs_bridge_upper_layers
+    end_line
 group:Other
 	setting:slicing_mode
 	setting:clip_multipart_objects
@@ -211,7 +218,11 @@ group:sidetext_width$5:Infill angle
 #	setting:fill_angle_template
 group:sidetext_width$5:Advanced
 	setting:solid_infill_every_layers
-	setting:solid_infill_below_area
+	line:Solid infill is area below
+        setting:label$From region:solid_infill_below_area
+        setting:label$From the whole layer:solid_infill_below_layer_area
+	end_line
+    setting:solid_infill_below_width
 	line:Anchor solid infill by X mm
 		setting:label_width$8:width$5:external_infill_margin
 		setting:label_width$6:width$5:bridged_infill_margin
@@ -444,7 +455,10 @@ group:Overlap
 		setting:label_width$7:label$External:external_perimeter_overlap
 		setting:label_width$7:label$Gap Fill:gap_fill_overlap
 	end_line
-	setting:width$4:solid_infill_overlap
+    line:Solid infill ovelrap
+        setting:label$Inside:width$4:solid_infill_overlap
+        setting:label$Top:width$4:top_solid_infill_overlap
+	end_line
 	line:Bridge lines density
 		setting:label_width$7:bridge_overlap_min
 		setting:label_width$7:bridge_overlap

@@ -392,8 +392,10 @@ private:
     // Has any support (not counting the raft).
     ExPolygons _shrink_contour_holes(double contour_delta, double default_delta, double convex_delta, const ExPolygons& input) const;
     void _transform_hole_to_polyholes();
+    void _min_overhang_threshold();
     ExPolygons _smooth_curves(const ExPolygons &input, const PrintRegionConfig &conf) const;
     void detect_surfaces_type();
+    void apply_solid_infill_below_layer_area();
     void process_external_surfaces();
     void discover_vertical_shells();
     void bridge_over_infill();
@@ -498,6 +500,7 @@ struct PrintStatistics
     std::string                     initial_filament_type;
     std::string                     printing_filament_types;
     std::map<size_t, double>        filament_stats;
+    std::vector<std::pair<double, float>> layer_area_stats; // print_z to area
 
     // Config with the filled in print statistics.
     DynamicConfig           config() const;

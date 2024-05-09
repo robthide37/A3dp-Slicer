@@ -391,7 +391,9 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
                     BridgeDetector bd(
                         initial,
                         lower_layer->lslices,
-                        this->flow(frInfill).scaled_width()
+                        this->bridging_flow(frInfill).scaled_spacing(),
+                        scale_t(this->layer()->object()->print()->config().bridge_precision.get_abs_value(this->bridging_flow(frInfill).spacing())),
+                        this->layer()->id()
                     );
                     #ifdef SLIC3R_DEBUG
                     printf("Processing bridge at layer %zu:\n", this->layer()->id());
@@ -517,12 +519,53 @@ void LayerRegion::prepare_fill_surfaces()
     }
         
     // turn too small internal regions into solid regions according to the user setting
-    if (! spiral_vase && this->region().config().fill_density.value > 0) {
+    if (!spiral_vase && this->region().config().fill_density.value > 0) {
+        // apply solid_infill_below_area
         // scaling an area requires two calls!
         double min_area = scale_(scale_(this->region().config().solid_infill_below_area.value));
-        for (Surfaces::iterator surface = this->fill_surfaces.surfaces.begin(); surface != this->fill_surfaces.surfaces.end(); ++surface) {
+        for (Surfaces::iterator surface = this->fill_surfaces.surfaces.begin();
+             surface != this->fill_surfaces.surfaces.end(); ++surface) {
             if (surface->has_fill_sparse() && surface->has_pos_internal() && surface->area() <= min_area)
                 surface->surface_type = stPosInternal | stDensSolid;
+        }
+        // also Apply solid_infill_below_width
+        double   spacing            = this->flow(frSolidInfill).spacing();
+        coordf_t scaled_spacing     = scale_d(spacing);
+        coordf_t min_half_width = scale_d(this->region().config().solid_infill_below_width.get_abs_value(spacing)) / 2;
+        if (min_half_width > 0) {
+            Surfaces srfs_to_add;
+            for (Surfaces::iterator surface = this->fill_surfaces.surfaces.begin();
+                 surface != this->fill_surfaces.surfaces.end(); ++surface) {
+                if (surface->has_fill_sparse() && surface->has_pos_internal()) {
+                    // try to collapse the surface
+                    // grow it a bit more to have an easy time to intersect
+                    ExPolygons results = offset2_ex({surface->expolygon}, -min_half_width - SCALED_EPSILON,
+                                                    min_half_width + SCALED_EPSILON +
+                                                        std::min(scaled_spacing / 5, min_half_width / 5));
+                    // TODO: find a way to have both intersect & cut
+                    ExPolygons cut = diff_ex(ExPolygons{surface->expolygon}, results);
+                    ExPolygons intersect = intersection_ex(ExPolygons{surface->expolygon}, results);
+                    if (intersect.size() == 1 && cut.empty())
+                        continue;
+                    if (!intersect.empty()) {
+                        //not possible ot have multiple intersect no cut from a single expoly.
+                        assert(!cut.empty());
+                        surface->expolygon = std::move(intersect[0]);
+                        for (int i = 1; i < intersect.size(); i++) {
+                            srfs_to_add.emplace_back(*surface, std::move(intersect[i]));
+                        }
+                        for (ExPolygon& expoly : cut) {
+                            srfs_to_add.emplace_back(*surface, std::move(expoly));
+                            srfs_to_add.back().surface_type = stPosInternal | stDensSolid;
+                        }
+                    } else {
+                        //no intersec => all in solid
+                        assert(cut.size() == 1);
+                        surface->surface_type = stPosInternal | stDensSolid;
+                    }
+                }
+            }
+            append(this->fill_surfaces.surfaces, std::move(srfs_to_add));
         }
     }
 

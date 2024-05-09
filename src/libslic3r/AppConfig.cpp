@@ -476,6 +476,9 @@ void AppConfig::set_defaults()
         if (get("show_layer_time_doubleslider").empty())
             set("show_layer_time_doubleslider", "0");
 
+        if (get("show_layer_area_doubleslider").empty())
+            set("show_layer_area_doubleslider", "0");
+
 	} else {
 #ifdef _WIN32
         if (get("associate_gcode").empty())

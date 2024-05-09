@@ -656,16 +656,23 @@ void PreferencesDialog::build(size_t selected_tab)
 
 		def.label = L("Show layer height on the scroll bar");
 		def.type = coBool;
-		def.tooltip = L("Add the layer height (first number in parentheses) next to a widget of the layer double-scrollbar.");
+		def.tooltip = L("Add the layer height (first number after the layer z position) next to a widget of the layer double-scrollbar.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("show_layer_height_doubleslider") == "1" });
 		option = Option(def, "show_layer_height_doubleslider");
 		m_optgroups_gui.back()->append_single_option_line(option);
 
 		def.label = L("Show layer time on the scroll bar");
 		def.type = coBool;
-		def.tooltip = L("Add the layer height (before the layer count in parentheses) next to a widget of the layer double-scrollbar.");
+		def.tooltip = L("Add the layer time (after the layer height, or if it's hidden after the layer z position) next to a widget of the layer double-scrollbar.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("show_layer_time_doubleslider") == "1" });
 		option = Option(def, "show_layer_time_doubleslider");
+		m_optgroups_gui.back()->append_single_option_line(option);
+
+		def.label = L("Show layer area on the scroll bar");
+		def.type = coBool;
+		def.tooltip = L("Add the layer area (the number just below the layer id) next to a widget of the layer double-scrollbar.");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("show_layer_area_doubleslider") == "1" });
+		option = Option(def, "show_layer_area_doubleslider");
 		m_optgroups_gui.back()->append_single_option_line(option);
 	}
 	

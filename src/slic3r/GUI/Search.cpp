@@ -152,6 +152,8 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
     const ConfigDef* defs = config->def();
     auto emplace_option = [this, type](const std::string grp_key, const int16_t idx)
     {
+        assert(groups_and_categories.find(grp_key) == groups_and_categories.end()
+            || !groups_and_categories[grp_key].empty());
         for (const GroupAndCategory& gc : groups_and_categories[grp_key]) {
             if (gc.group.IsEmpty() || gc.category.IsEmpty())
                 return;
@@ -159,6 +161,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
             Option option = create_option(gc.gui_opt.opt_key, idx, type, gc);
             if (!option.label.empty()) {
                 options.push_back(std::move(option));
+                sorted = false;
             }
 
             //wxString suffix;
@@ -508,6 +511,7 @@ void OptionsSearcher::check_and_update(PrinterTechnology pt_in, ConfigOptionMode
         return;
 
     options.clear();
+    sorted = false;
 
     printer_technology = pt_in;
     current_tags = tags_in;
@@ -573,6 +577,18 @@ const Option& OptionsSearcher::get_option(const std::string& opt_key, Preset::Ty
     size_t pos_hash = opt_key.find('#');
     if (pos_hash == std::string::npos) {
         auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type, idx }));
+#ifdef _DEBUG
+        if (options[it - options.begin()].opt_key_with_idx() != opt_key) {
+            std::wstring wopt_key = boost::nowide::widen(opt_key);
+            for (const Option &opt : options) {
+                if (opt.key == wopt_key) {
+                    if (opt.type == type) {
+                        std::cout << "found\n";
+                    }
+                }
+            }
+        }
+#endif
         assert(it != options.end());
         return options[it - options.begin()];
     } else {
@@ -580,6 +596,17 @@ const Option& OptionsSearcher::get_option(const std::string& opt_key, Preset::Ty
         std::string opt_idx = opt_key.substr(pos_hash + 1);
         idx = atoi(opt_idx.c_str());
         auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(raw_opt_key), type, idx }));
+#ifdef _DEBUG
+        if (options[it - options.begin()].opt_key_with_idx() != opt_key) {
+            for (const Option &opt : options) {
+                if (opt.opt_key_with_idx() == opt_key) {
+                    if (opt.type == type) {
+                        std::cout << "found\n";
+                    }
+                }
+            }
+        }
+#endif
         assert(it != options.end());
         return options[it - options.begin()];
     }

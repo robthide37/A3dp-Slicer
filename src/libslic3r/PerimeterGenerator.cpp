@@ -263,13 +263,13 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
 
     const Polygons last_p = to_polygons(last);
     Arachne::WallToolPaths wallToolPaths(last_p, this->get_ext_perimeter_spacing(), this->get_ext_perimeter_width(), 
-        this->get_perimeter_spacing(), this->get_perimeter_width(), loop_number + 1, coord_t(0), 
+        this->get_perimeter_spacing(), this->get_perimeter_width(), loop_number, coord_t(0), 
         this->layer->height, *this->object_config, *this->print_config);
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
 #if _DEBUG
-    for (auto periemter : perimeters) {
-        for (Arachne::ExtrusionLine &extrusion : periemter) {
+    for (auto perimeter : perimeters) {
+        for (Arachne::ExtrusionLine &extrusion : perimeter) {
             if (extrusion.isZeroLength())
                 continue;
             for (Slic3r::Arachne::ExtrusionJunction &junction : extrusion.junctions) {
@@ -324,7 +324,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
         perimeters.insert(perimeters.begin(), out_shell.begin(), out_shell.end());
     }
 
-    loop_number = int(perimeters.size()) - 1;
+    loop_number = int(perimeters.size());
 
 #ifdef ARACHNE_DEBUG
         {
@@ -490,10 +490,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(int& loop_number, const
     if (offset_ex(infill_contour, -float(spacing / 2.)).empty())
         infill_contour.clear(); // Infill region is too small, so let's filter it out.
 
-    result.inner_perimeter = (loop_number < 0) ? infill_contour :
-        (loop_number == 0)
-        ? offset_ex(infill_contour, ext_perimeter_spacing / 2)
-        : offset_ex(infill_contour, perimeter_spacing / 2);
+    result.inner_perimeter = infill_contour;
 
     return result;
 }
@@ -683,7 +680,7 @@ void PerimeterGenerator::process()
     // internal flow which is unrelated. <- i don't undertand, so revert to ext_perimeter_spacing2
     //const coord_t min_spacing     = (coord_t)( perimeter_spacing      * (1 - 0.05/*INSET_OVERLAP_TOLERANCE*/) );
     //const coord_t ext_min_spacing = (coord_t)( ext_perimeter_spacing2  * (1 - 0.05/*INSET_OVERLAP_TOLERANCE*/) );
-    // now the tolerance is built in thin_periemter settings
+    // now the tolerance is built in thin_perimeter settings
 
     // prepare grown lower layer slices for overhang detection
     if (this->lower_slices != NULL && (this->config->overhangs_width.value > 0 || this->config->overhangs_width_speed.value > 0)) {
@@ -765,26 +762,41 @@ void PerimeterGenerator::process()
     int surface_idx = 0;
     const int extra_odd_perimeter = (config->extra_perimeters_odd_layers && layer->id() % 2 == 1 ? 1 : 0);
     for (const Surface& surface : all_surfaces) {
-        // detect how many perimeters must be generated for this island
-        int        loop_number = this->config->perimeters + surface.extra_perimeters - 1 + extra_odd_perimeter;  // 0-indexed loops
         surface_idx++;
 
-        if (print_config->spiral_vase) {
-            if (layer->id() >= config->bottom_solid_layers) {
-                loop_number = 0;
-            }
-        }
+        // detect how many perimeters must be generated for this island
+        int nb_loop_contour = this->config->perimeters;
+        if (nb_loop_contour > 0)
+            nb_loop_contour += extra_odd_perimeter + surface.extra_perimeters;
+        int nb_loop_holes = this->config->perimeters_hole;
+        if (nb_loop_holes > 0)
+            nb_loop_holes += extra_odd_perimeter + surface.extra_perimeters;
+        
+        if (nb_loop_contour < 0)
+            nb_loop_contour = std::max(0, nb_loop_holes);
+        if (nb_loop_holes < 0)
+            nb_loop_holes = std::max(0, nb_loop_contour);
 
-        if ((layer->id() == 0 && this->config->only_one_perimeter_first_layer) || (this->config->only_one_perimeter_top && loop_number > 0 && this->upper_slices == NULL)) {
-            loop_number = 0;
+            if (print_config->spiral_vase) {
+                if (layer->id() >= config->bottom_solid_layers) {
+                    nb_loop_contour = 1;
+                    nb_loop_holes = 0;
+                }
+            }
+
+        if ((layer->id() == 0 && this->config->only_one_perimeter_first_layer) ||
+            (this->config->only_one_perimeter_top && this->upper_slices == NULL)) {
+            nb_loop_contour = std::min(nb_loop_contour, 1);
+            nb_loop_holes = std::min(nb_loop_holes, 1);
         }
 
         ProcessSurfaceResult surface_process_result;
         //core generation
-        if (use_arachne) {
-            surface_process_result = process_arachne(loop_number, surface);
+        if (use_arachne && nb_loop_holes == nb_loop_contour) {
+            surface_process_result = process_arachne(nb_loop_contour, surface);
+            nb_loop_holes = nb_loop_contour; // nb_loop_contour is in/out
         } else {
-            surface_process_result = process_classic(loop_number, surface);
+            surface_process_result = process_classic(nb_loop_contour, nb_loop_holes, surface);
         }
         this->throw_if_canceled();
 
@@ -793,17 +805,9 @@ void PerimeterGenerator::process()
         // we offset by half the perimeter spacing (to get to the actual infill boundary)
         // and then we offset back and forth by half the infill spacing to only consider the
         // non-collapsing regions
-        coord_t inset = 0;
         coord_t infill_peri_overlap = 0;
         // only apply infill overlap if we actually have one perimeter
-        if (loop_number >= 0) {
-            // half infill / perimeter
-            inset = (loop_number == 0) ?
-                // one loop
-                this->get_ext_perimeter_spacing() / 2 :
-                // two or more loops?
-                this->get_perimeter_spacing() / 2;
-            //infill_peri_overlap = scale_t(this->config->get_abs_value("infill_overlap", unscale<coordf_t>(perimeter_spacing + solid_infill_spacing) / 2));
+        if (nb_loop_contour > 0 || nb_loop_holes > 0) {
             //give the overlap size to let the infill do his overlap
             //add overlap if at least one perimeter
             coordf_t perimeter_spacing_for_encroach = 0;
@@ -818,37 +822,31 @@ void PerimeterGenerator::process()
             infill_peri_overlap = scale_t(this->config->get_abs_value("infill_overlap", perimeter_spacing_for_encroach));
         }
 
-        //remove gapfill from last
-        ExPolygons last_no_gaps = (surface_process_result.gap_srf.empty()) ? surface_process_result.inner_perimeter : diff_ex(surface_process_result.inner_perimeter, surface_process_result.gap_srf);
-
         // simplify infill contours according to resolution
         Polygons not_filled_p;
-        for (ExPolygon& ex : last_no_gaps)
+        for (const ExPolygon& ex : surface_process_result.inner_perimeter)
             ex.simplify_p(scale_t(std::max(this->print_config->resolution.value, print_config->resolution_internal / 4)), &not_filled_p);
         ExPolygons not_filled_exp = union_ex(not_filled_p);
         // collapse too narrow infill areas
         coord_t min_perimeter_infill_spacing = (coord_t)(this->get_solid_infill_spacing() * (1. - INSET_OVERLAP_TOLERANCE));
         ExPolygons infill_exp;
+        infill_exp = offset2_ex(not_filled_exp,
+            double(- min_perimeter_infill_spacing / 2 + infill_peri_overlap - this->get_infill_gap()),
+            double(min_perimeter_infill_spacing / 2));
         //special branch if gap : don't inset away from gaps!
-        if (surface_process_result.gap_srf.empty()) {
+        ExPolygons gap_fill_exps;
+        if (!surface_process_result.gap_srf.empty()) {
+            //not_filled_exp = union_ex(not_filled_p);
             infill_exp = offset2_ex(not_filled_exp,
-                double(-inset - min_perimeter_infill_spacing / 2 + infill_peri_overlap - this->get_infill_gap()),
+                double(- min_perimeter_infill_spacing / 2 + infill_peri_overlap - this->get_infill_gap()),
                 double(min_perimeter_infill_spacing / 2));
-        } else {
-            //store the infill_exp but not offseted, it will be used as a clip to remove the gapfill portion
-            const ExPolygons infill_exp_no_gap = offset2_ex(not_filled_exp,
-                double(-inset - min_perimeter_infill_spacing / 2 + infill_peri_overlap - this->get_infill_gap()),
-                double(inset + min_perimeter_infill_spacing / 2 - infill_peri_overlap + this->get_infill_gap()));
-            //redo the same as not_filled_exp but with last instead of last_no_gaps
+            //remove gaps surfaces
             not_filled_p.clear();
-            for (ExPolygon& ex : surface_process_result.inner_perimeter)
+            for (ExPolygon& ex : surface_process_result.gap_srf)
                 ex.simplify_p(scale_t(std::max(this->print_config->resolution.value, print_config->resolution_internal / 4)), &not_filled_p);
-            not_filled_exp = union_ex(not_filled_p);
-            infill_exp = offset2_ex(not_filled_exp,
-                double(-inset - min_perimeter_infill_spacing / 2 + infill_peri_overlap - this->get_infill_gap()),
-                double(min_perimeter_infill_spacing / 2));
-            // intersect(growth(surface_process_result.inner_perimeter-gap) , surface_process_result.inner_perimeter), so you have the (surface_process_result.inner_perimeter - small gap) but without voids betweeng gap & surface_process_result.inner_perimeter
-            infill_exp = intersection_ex(infill_exp, infill_exp_no_gap);
+            gap_fill_exps = union_ex(not_filled_p);
+            gap_fill_exps = offset_ex(gap_fill_exps, -infill_peri_overlap);
+            infill_exp = diff_ex(infill_exp, gap_fill_exps);
         }
         
         this->throw_if_canceled();
@@ -865,12 +863,15 @@ void PerimeterGenerator::process()
             if (min_perimeter_infill_spacing / 2 > infill_peri_overlap)
                 polyWithoutOverlap = offset2_ex(
                     not_filled_exp,
-                    double(-inset - infill_gap - min_perimeter_infill_spacing / 2 + infill_peri_overlap),
+                    double(- infill_gap - min_perimeter_infill_spacing / 2 + infill_peri_overlap),
                     double(min_perimeter_infill_spacing / 2 - infill_peri_overlap));
             else
                 polyWithoutOverlap = offset_ex(
                     not_filled_exp,
-                    double(-inset - this->get_infill_gap()));
+                    double(- this->get_infill_gap()));
+            if (!gap_fill_exps.empty()) {
+                polyWithoutOverlap = diff_ex(polyWithoutOverlap, gap_fill_exps);
+            }
             if (!surface_process_result.top_fills.empty()) {
                 polyWithoutOverlap = union_ex(polyWithoutOverlap, top_infill_exp);
             }
@@ -920,11 +921,13 @@ void PerimeterGenerator::processs_no_bridge(Surfaces& all_surfaces) {
                         //a detector per island
                         ExPolygons bridgeable;
                         for (ExPolygon unsupported : unsupported_filtered) {
-                            BridgeDetector detector{ unsupported,
+                            BridgeDetector detector( unsupported,
                                 lower_island.expolygons,
-                                perimeter_spacing };
+                                this->overhang_flow.scaled_spacing(),
+                                scale_t(this->print_config->bridge_precision.get_abs_value(this->overhang_flow.spacing())),
+                                this->layer->id());
                             if (detector.detect_angle(Geometry::deg2rad(this->config->bridge_angle.value)))
-                                expolygons_append(bridgeable, union_ex(detector.coverage(-1, true)));
+                                expolygons_append(bridgeable, union_ex(detector.coverage()));
                         }
                         if (!bridgeable.empty()) {
                             //check if we get everything or just the bridgeable area
@@ -1103,7 +1106,243 @@ void PerimeterGenerator::processs_no_bridge(Surfaces& all_surfaces) {
     }
 }
 
-ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const Surface& surface)
+Polygons get_contours(const ExPolygons &expolys) {
+    Polygons polys;
+    for (const ExPolygon &expoly : expolys) {
+        assert(expoly.contour.is_counter_clockwise());
+        polys.push_back(expoly.contour);
+    }
+    return polys;
+}
+
+Polygons as_contour(const Polygons &holes) {
+    Polygons out;
+    for (const Polygon &hole : holes) {
+        assert(hole.is_clockwise());
+        out.push_back(hole);
+        out.back().make_counter_clockwise();
+    }
+    return out;
+}
+
+Polygons get_holes_as_contour(const ExPolygon &expoly) {
+    Polygons polys;
+    for(const Polygon hole : expoly.holes){
+        assert(hole.is_clockwise());
+        polys.push_back(hole);
+        polys.back().make_counter_clockwise();
+    }
+    return polys;
+}
+
+Polygons get_holes_as_contour(const ExPolygons &expolys) {
+    Polygons polys;
+    for(const ExPolygon &expoly : expolys) 
+        for(const Polygon hole : expoly.holes){
+            assert(hole.is_clockwise());
+            polys.push_back(hole);
+            polys.back().make_counter_clockwise();
+        }
+    return polys;
+}
+
+// expolygon representing the perimeter path
+struct ExPolygonAsynch
+{
+    enum ExPolygonAsynchType {
+        epatGrowHole,
+        epatShrinkContour
+    };
+    ExPolygonAsynchType type;
+    ExPolygon expoly;
+    // shrink the contour by this value to get the end of the spacing (should be negative, to shrink from centerline or edge)
+    coordf_t  offset_contour_inner;
+    // shrink the contour by this value to get the external shell (the spacing position) (can be negative to grow from centreline, and be positive to shrink from surface polygon)
+    coordf_t  offset_contour_outer;
+    // grow the holes by this value to get the end of the spacing (should be negative, to grow from centerline or edge)
+    coordf_t  offset_holes_inner;
+    // grow the holes by this value to get the external shell (the spacing position) (should be the same value as offset_contour_outer)
+    coordf_t  offset_holes_outer;
+    
+};
+
+// next_onion can be partially filled
+void grow_holes_only(std::vector<ExPolygonAsynch> &unmoveable_contours,
+                     ExPolygons &                      next_onion,
+                     coordf_t                          spacing,
+                     coordf_t                          overlap_spacing,
+                     bool                              round_peri,
+                     float                             min_round_spacing = 3.f)
+{
+    assert(spacing > 0);
+    assert(overlap_spacing >= 0);
+    Polygons new_contours;
+    for (size_t idx_unmoveable = 0; idx_unmoveable < unmoveable_contours.size(); ++idx_unmoveable) {
+        ExPolygonAsynch & unmoveable_contour = unmoveable_contours[idx_unmoveable];
+        assert(unmoveable_contour.type == ExPolygonAsynch::ExPolygonAsynchType::epatGrowHole);
+        ExPolygon &expoly = unmoveable_contour.expoly;
+        assert(unmoveable_contour.offset_holes_inner <= 0);
+        // grow fake contours, can now have fake holes and/or less fake contours.
+        Polygons ok_holes = offset(get_holes_as_contour(expoly),
+                                   -unmoveable_contour.offset_holes_inner + spacing / 2 + overlap_spacing,
+                                        (round_peri ? ClipperLib::JoinType::jtRound :
+                                                        ClipperLib::JoinType::jtMiter),
+                                        (round_peri ? min_round_spacing : 3));
+        for (size_t i = 0; i < ok_holes.size(); ++i) {
+            if (ok_holes[i].is_clockwise()) {
+                // hole, it's a new peri, move it.
+                new_contours.push_back(std::move(ok_holes[i]));
+                ok_holes.erase(ok_holes.begin() + i);
+                new_contours.back().make_counter_clockwise();
+                i--;
+            }
+        }
+        ok_holes = union_(ok_holes);
+        for (const Polygon &p : ok_holes) assert(p.is_counter_clockwise());
+        //shrink contour, can now be multiple contour.
+        coordf_t computed_offset = unmoveable_contour.offset_contour_inner;
+        computed_offset -= spacing / 2;
+        computed_offset -= overlap_spacing;
+        Polygons ex_contour_offset = offset(Polygons{expoly.contour}, computed_offset);
+        bool ex_contour_offset_now_fake_hole = false;
+        for (size_t idx_hole = 0; idx_hole < ok_holes.size(); ++idx_hole) {
+            const Polygon &hole = ok_holes[idx_hole];
+            assert(hole.is_counter_clockwise());
+            // Check if it can fuse with contour
+            // TODO: bounding box for quicker cut search
+            auto it_contour_candidate_for_fuse = ex_contour_offset.begin();
+            Polygons fused_contour;
+            while (it_contour_candidate_for_fuse != ex_contour_offset.end()) {
+                ExPolygons result = diff_ex(Polygons{*it_contour_candidate_for_fuse}, Polygons{hole});
+                // Only two options here, it can fuse and then there is 1 or more contour, no holes.
+                // Or it don't touch the contour and so nothing happen. (the hole can be inside or outside)
+                // SO, we can check it it slip or if the contour has been modified
+                if (result.size() > 1 || (result.size() == 1 && result.front().contour != *it_contour_candidate_for_fuse)) {
+                    for (ExPolygon &expoly : result) assert(expoly.holes.empty());
+                    // now use this one.
+                    append(fused_contour, to_polygons(result));
+                    ex_contour_offset_now_fake_hole = true;
+                    // remove from useful holes
+                    ok_holes.erase(ok_holes.begin() + idx_hole);
+                    idx_hole--;
+                    it_contour_candidate_for_fuse = ex_contour_offset.erase(it_contour_candidate_for_fuse);
+                } else {
+                    ++it_contour_candidate_for_fuse;
+                }
+            }
+            if(!fused_contour.empty())
+                append(ex_contour_offset, std::move(fused_contour));
+        }
+        // if moved from unmoveable_contours to growing_contours, then move the expoly
+        if (ex_contour_offset_now_fake_hole) {
+            // add useful holes to the contours, and push them
+            if (overlap_spacing != 0)
+                append(next_onion, offset_ex(diff_ex(ex_contour_offset, ok_holes), overlap_spacing));
+            else
+                append(next_onion, diff_ex(ex_contour_offset, ok_holes));
+            // remove from unmoveable
+            unmoveable_contours.erase(unmoveable_contours.begin() + idx_unmoveable);
+            idx_unmoveable--;
+        } else {
+            // update holes
+            // shrink to centerline
+            if (overlap_spacing != 0)
+                ok_holes = offset(ok_holes, -overlap_spacing);
+            /*test*/ for (const Polygon &p : ok_holes) assert(p.is_counter_clockwise());
+            ExPolygons new_unmoveable = diff_ex(Polygons{unmoveable_contour.expoly.contour}, ok_holes);
+            // check if size is good. It's not possible to split the peri: it isn't srhunk, and holes intersect are alreedy detected (not unmoveable anymore)
+            assert(new_unmoveable.size() <= 1);
+            if (new_unmoveable.empty()) {
+                // remove from unmoveable
+                unmoveable_contours.erase(unmoveable_contours.begin() + idx_unmoveable);
+                idx_unmoveable--;
+            } else if(new_unmoveable.size() == 1){
+                // update
+                unmoveable_contour.expoly = new_unmoveable.front();
+                unmoveable_contour.offset_holes_inner = -spacing / 2;
+                unmoveable_contour.offset_holes_outer = spacing / 2;
+            } else {
+                assert(false);
+                //add all
+                for(ExPolygon & new_expoly : new_unmoveable)
+                    unmoveable_contours.push_back({unmoveable_contour.type, new_expoly, unmoveable_contour.offset_contour_inner,
+                                                   unmoveable_contour.offset_contour_outer, -spacing / 2,
+                                                   spacing / 2});
+                // remove from unmoveable
+                unmoveable_contours.erase(unmoveable_contours.begin() + idx_unmoveable);
+                idx_unmoveable--;
+            }
+        }
+    }
+}
+
+
+// next_onion can be partially filled
+void grow_contour_only(std::vector<ExPolygonAsynch> &unmoveable_holes, coordf_t spacing, coordf_t overlap_spacing, bool round_peri, float min_round_spacing = 3.f) {
+    assert(spacing > 0);
+    assert(overlap_spacing >= 0);
+    Polygons new_contours;
+    // mutable size to allow insert at the same time.
+    size_t unmoveable_holes_size = unmoveable_holes.size();
+    for (size_t idx_unmoveable = 0; idx_unmoveable < unmoveable_holes_size; ++idx_unmoveable) {
+        ExPolygonAsynch & unmoveable_hole = unmoveable_holes[idx_unmoveable];
+        assert(unmoveable_hole.type == ExPolygonAsynch::ExPolygonAsynchType::epatShrinkContour);
+        ExPolygon &expoly = unmoveable_hole.expoly;
+        // shrink contour, can now have more contours.
+        assert(unmoveable_hole.offset_contour_inner <=0);
+        Polygons ok_contours = offset(expoly.contour, unmoveable_hole.offset_contour_inner - spacing/2 - overlap_spacing,
+                                        (round_peri ? ClipperLib::JoinType::jtRound :
+                                                        ClipperLib::JoinType::jtMiter),
+                                        (round_peri ? min_round_spacing : 3));
+        //we shrunk -> new peri can appear, holes can disapear, but there is already none.
+        for (const Polygon &p : ok_contours) assert(p.is_counter_clockwise());
+        //grow holes to right size
+        assert(-unmoveable_hole.offset_holes_inner + spacing/2 - overlap_spacing > 0);
+        Polygons original_holes = get_holes_as_contour(expoly);
+        Polygons offsetted_holes = offset(original_holes, -unmoveable_hole.offset_holes_inner + spacing/2 + overlap_spacing);
+        // remove fake periemter, i don't want them.
+        for (size_t i = 0; i < offsetted_holes.size(); ++i) {
+            if (offsetted_holes[i].is_clockwise()) {
+                offsetted_holes.erase(offsetted_holes.begin() + i);
+                new_contours.back().make_counter_clockwise();
+                i--;
+            }
+        }
+        offsetted_holes = union_(offsetted_holes);
+        for (const Polygon &p : offsetted_holes) assert(p.is_counter_clockwise());
+
+        for (Polygon simple_contour : ok_contours) {
+            // remove holes
+            ExPolygons test_expoly = diff_ex(Polygons{simple_contour}, offsetted_holes);
+            if (overlap_spacing != 0) {
+                test_expoly = offset_ex(test_expoly, overlap_spacing);
+            }
+            if (test_expoly.size() == 1) {
+                // no merge, then i can use the right hole size
+                ExPolygons new_unmoveable_hole = diff_ex(Polygons{test_expoly[0].contour}, original_holes);
+                // diff with smaller holes, so it has to be only one contour.
+                assert(new_unmoveable_hole.size() == 1);
+                expoly                               = new_unmoveable_hole[0];
+                unmoveable_hole.offset_contour_inner = -spacing / 2;
+                unmoveable_hole.offset_contour_outer = spacing / 2;
+            } else {
+                // a hole cut it, or clear it.
+                for (ExPolygon &new_expoly : test_expoly) {
+                    ExPolygons new_unmoveable_holes = diff_ex(Polygons{new_expoly.contour}, original_holes);
+                    for(ExPolygon & new_unmoveable_hole : new_unmoveable_holes)
+                        unmoveable_holes.push_back({unmoveable_hole.type, new_unmoveable_hole, -spacing / 2, spacing / 2,
+                                                unmoveable_hole.offset_holes_inner, unmoveable_hole.offset_holes_outer});
+                }
+                unmoveable_holes.erase(unmoveable_holes.begin() + idx_unmoveable);
+                idx_unmoveable--;
+                unmoveable_holes_size--;
+            }
+        }
+        //we shrink periemter, so it doesn't create holes, so we don't have anythign to add to next_onion.
+    }
+}
+
+ProcessSurfaceResult PerimeterGenerator::process_classic(int& contour_count, int& holes_count, const Surface& surface)
 {
     ProcessSurfaceResult results;
     ExPolygons gaps;
@@ -1114,7 +1353,11 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
     ExPolygons last    = union_ex(surface.expolygon.simplify_p((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution)));
     double last_area   = -1;
 
-    if (loop_number >= 0) {
+    // list of Expolygons where contour or holes aren't growing.
+    std::vector<ExPolygonAsynch> last_asynch;
+    bool last_asynch_initialized = false;
+
+    if (contour_count > 0 || holes_count > 0) {
 
         //increase surface for milling_post-process
         if (this->mill_extra_size > SCALED_EPSILON) {
@@ -1149,11 +1392,13 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                 const ExPolygonCollection lower_island(diff_ex(last, overhangs_unsupported));
                 ExPolygons bridgeable;
                 for (ExPolygon unsupported : overhangs_unsupported) {
-                    BridgeDetector detector{ unsupported,
+                    BridgeDetector detector( unsupported,
                         lower_island.expolygons,
-                        perimeter_spacing };
+                        this->overhang_flow.scaled_spacing(),
+                        scale_t(this->print_config->bridge_precision.get_abs_value(this->overhang_flow.spacing())),
+                        this->layer->id());
                     if (detector.detect_angle(Geometry::deg2rad(this->config->bridge_angle.value)))
-                        expolygons_append(bridgeable, union_ex(detector.coverage(-1, true)));
+                        expolygons_append(bridgeable, union_ex(detector.coverage()));
                 }
                 if (!bridgeable.empty()) {
                     //simplify to avoid most of artefacts from printing lines.
@@ -1184,9 +1429,9 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             }
         }
 
-        // In case no perimeters are to be generated, loop_number will equal to -1.            
-        std::vector<PerimeterGeneratorLoops> contours(loop_number + 1);    // depth => loops
-        std::vector<PerimeterGeneratorLoops> holes(loop_number + 1);       // depth => loops
+        // In case no perimeters are to be generated, contour_count / holes_count will equal to 0.            
+        std::vector<PerimeterGeneratorLoops> contours(contour_count);    // depth => loops
+        std::vector<PerimeterGeneratorLoops> holes(holes_count);       // depth => loops
         ThickPolylines thin_walls_thickpolys;
         ExPolygons no_last_gapfill;
         // we loop one time more than needed in order to find gaps after the last perimeter was applied
@@ -1218,48 +1463,68 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             }
 
             // Calculate next onion shell of perimeters.
-            //this variable stored the next onion
+            // this variable stored the next onion
             ExPolygons next_onion;
+            // like next_onion, but with all polygons, even ones that didn't grow and so won't be added as periemter
+            ExPolygons area_used;
+            ExPolygons* all_next_onion = &next_onion;
+
             if (perimeter_idx == 0) {
                 // compute next onion
                     // the minimum thickness of a single loop is:
                     // ext_width/2 + ext_spacing/2 + spacing/2 + width/2
-                if (thin_perimeter > 0.98) {
-                    next_onion = offset_ex(
-                        last,
-                        -(float)(ext_perimeter_width / 2),
-                        ClipperLib::JoinType::jtMiter,
-                        3);
-                } else if (thin_perimeter > 0.01) {
-                    next_onion = offset2_ex(
-                        last,
-                        -(float)(ext_perimeter_width / 2 + (1 - thin_perimeter) * ext_perimeter_spacing / 2 - 1),
-                        +(float)((1 - thin_perimeter) * ext_perimeter_spacing / 2 - 1),
-                        ClipperLib::JoinType::jtMiter,
-                        3);
+                coordf_t good_spacing    = ext_perimeter_width / 2;
+                coordf_t overlap_spacing = (1 - thin_perimeter) * ext_perimeter_spacing / 2;
+                if (holes_count == 0 || contour_count == 0) {
+
+                    if (holes_count == 0) {
+                        for (ExPolygon &expoly : last) { 
+                            last_asynch.push_back(ExPolygonAsynch{ExPolygonAsynch::ExPolygonAsynchType::epatShrinkContour, expoly,
+                                // inner_offset                                                 outer_offset (go spacing limit)
+                                -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2, -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2,
+                                -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2, -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2});
+                        }
+                        last_asynch_initialized = true;
+                        grow_contour_only(last_asynch, get_perimeter_spacing(), 0 /*no overlap for external*/, false /*no round peri for external*/);
+                    } else {
+                        for (ExPolygon &expoly : last) { 
+                            last_asynch.push_back(ExPolygonAsynch{ExPolygonAsynch::ExPolygonAsynchType::epatGrowHole, expoly,
+                                // inner_offset                                                 outer_offset (go spacing limit)
+                                -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2, -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2,
+                                -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2, -coordf_t(this->get_perimeter_width() - get_perimeter_spacing())/2});
+                        }
+                        last_asynch_initialized = true;
+                        grow_holes_only(last_asynch, next_onion, get_perimeter_spacing(), 0 /*no overlap for external*/, false /*no round peri for external*/);
+                    }
                 } else {
-                    next_onion = offset2_ex(
-                        last,
-                        -(float)(ext_perimeter_width / 2 + ext_perimeter_spacing / 2 - 1),
-                        +(float)(ext_perimeter_spacing / 2 + 1),
-                        ClipperLib::JoinType::jtMiter,
-                        3);
+                    if (thin_perimeter > 0.98) {
+                        next_onion = offset_ex(last, -(float) (ext_perimeter_width / 2),
+                                               ClipperLib::JoinType::jtMiter, 3);
+                    } else {
+                        coordf_t good_spacing    = ext_perimeter_width / 2;
+                        coordf_t overlap_spacing = (1 - thin_perimeter) * ext_perimeter_spacing / 2;
+                        next_onion               = offset2_ex(last, -(float) (good_spacing + overlap_spacing - 1),
+                                                +(float) (overlap_spacing + 1), ClipperLib::JoinType::jtMiter, 3);
+                    }
+                    if (thin_perimeter < 0.7) {
+                        // offset2_ex can create artifacts, if too big. see superslicer#2428
+                        next_onion = intersection_ex(next_onion, offset_ex(last, -(float) (ext_perimeter_width / 2),
+                                                                           ClipperLib::JoinType::jtMiter, 3));
+                    }
                 }
-                if (thin_perimeter < 0.7) {
-                    //offset2_ex can create artifacts, if too big. see superslicer#2428
-                    next_onion = intersection_ex(next_onion,
-                        offset_ex(
-                            last,
-                            -(float)(ext_perimeter_width / 2),
-                            ClipperLib::JoinType::jtMiter,
-                            3));
+                
+                bool special_area = contour_count == 0 || holes_count == 0;
+                if (special_area && (this->config->thin_walls || m_spiral_vase)) {
+                    area_used = next_onion;
+                    for(auto& expolycontainer : last_asynch)
+                        area_used.push_back(expolycontainer.expoly);
+                    all_next_onion = &area_used;
                 }
-
-
                 // look for thin walls
                 if (this->config->thin_walls) {
+
                     // detect edge case where a curve can be split in multiple small chunks.
-                    if (allow_perimeter_anti_hysteresis) {
+                    if (allow_perimeter_anti_hysteresis && !special_area) {
                         std::vector<float> divs = { 2.1f, 1.9f, 2.2f, 1.75f, 1.5f }; //don't go too far, it's not possible to print thin wall after that
                         size_t idx_div = 0;
                         while (next_onion.size() > last.size() && idx_div < divs.size()) {
@@ -1280,7 +1545,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                     // (actually, something larger than that still may exist due to mitering or other causes)
                     coord_t min_width = scale_t(this->config->thin_walls_min_width.get_abs_value(this->ext_perimeter_flow.nozzle_diameter()));
 
-                    ExPolygons no_thin_zone = offset_ex(next_onion, double(ext_perimeter_width / 2), jtSquare);
+                    ExPolygons no_thin_zone = offset_ex(*all_next_onion, double(ext_perimeter_width / 2), jtSquare);
                     // medial axis requires non-overlapping geometry
                     ExPolygons thin_zones = diff_ex(last, no_thin_zone, ApplySafetyOffset::Yes);
                     //don't use offset2_ex, because we don't want to merge the zones that have been separated.
@@ -1328,7 +1593,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                     // use perimeters to extrude area that can't be printed by thin walls
                     // it's a bit like re-add thin area into perimeter area.
                     // it can over-extrude a bit, but it's for a better good.
-                    {
+                    if(!special_area) {
                         if (thin_perimeter > 0.98)
                             next_onion = union_ex(next_onion, offset_ex(diff_ex(last, thins, ApplySafetyOffset::Yes),
                                 -(float)(ext_perimeter_width / 2),
@@ -1355,9 +1620,10 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         next_onion = intersection_ex(next_onion_temp, last);
                     }
                 }
-                if (m_spiral_vase && next_onion.size() > 1) {
+                if (m_spiral_vase && all_next_onion->size() > 1) {
+                    assert(contour_count > 0);
                     // Remove all but the largest area polygon.
-                    keep_largest_contour_only(next_onion);
+                    keep_largest_contour_only(*all_next_onion);
                 }
             } else {
                 //FIXME Is this offset correct if the line width of the inner perimeters differs
@@ -1366,7 +1632,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                 if (thin_perimeter <= 0.98) {
                     // This path will ensure, that the perimeters do not overfill, as in 
                     // prusa3d/Slic3r GH #32, but with the cost of rounding the perimeters
-                    // excessively, creating gaps, which then need to be filled in by the not very 
+                    // excessively, creating gaps, which then need to be filled in by the not very
                     // reliable gap fill algorithm.
                     // Also the offset2(perimeter, -x, x) may sometimes lead to a perimeter, which is larger than
                     // the original.
@@ -1377,22 +1643,20 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         (round_peri ? min_round_spacing : 3));
                     if (allow_perimeter_anti_hysteresis) {
                         // now try with different min spacing if we fear some hysteresis
-                        //TODO, do that for each polygon from last, instead to do for all of them in one go.
+                        // TODO, do that for each polygon from last, instead to do for all of them in one go.
                         ExPolygons no_thin_onion = offset_ex(last, double(-good_spacing));
                         if (last_area < 0) {
                             last_area = 0;
-                            for (const ExPolygon& expoly : last) {
-                                last_area += expoly.area();
-                            }
+                            for (const ExPolygon &expoly : last) { last_area += expoly.area(); }
                         }
                         double new_area = 0;
-                        for (const ExPolygon& expoly : next_onion) {
-                            new_area += expoly.area();
-                        }
+                        for (const ExPolygon &expoly : next_onion) { new_area += expoly.area(); }
 
-                        std::vector<float> divs{ 1.8f, 1.6f }; //don't over-extrude, so don't use divider >2
-                        size_t idx_div = 0;
-                        while ((next_onion.size() > no_thin_onion.size() || (new_area != 0 && last_area > new_area * 100)) && idx_div < divs.size()) {
+                        std::vector<float> divs{1.8f, 1.6f}; // don't over-extrude, so don't use divider >2
+                        size_t             idx_div = 0;
+                        while ((next_onion.size() > no_thin_onion.size() ||
+                                (new_area != 0 && last_area > new_area * 100)) &&
+                               idx_div < divs.size()) {
                             float div = divs[idx_div];
                             //use a sightly bigger spacing to try to drastically improve the split, that can lead to very thick gapfill
                             ExPolygons next_onion_secondTry = offset2_ex(
@@ -1405,9 +1669,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                             } else if (next_onion.size() > next_onion_secondTry.size() || last_area > new_area * 100) {
                                 // don't get it if it's too small
                                 double area_new = 0;
-                                for (const ExPolygon& expoly : next_onion_secondTry) {
-                                    area_new += expoly.area();
-                                }
+                                for (const ExPolygon &expoly : next_onion_secondTry) { area_new += expoly.area(); }
                                 if (last_area > area_new * 100 || new_area == 0) {
                                     next_onion = next_onion_secondTry;
                                 }
@@ -1423,14 +1685,42 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         (round_peri ? ClipperLib::JoinType::jtRound : ClipperLib::JoinType::jtMiter),
                         (round_peri ? min_round_spacing : 3));
                 }
+                
+                std::vector<ExPolygonAsynch> *touse;
+                std::vector<ExPolygonAsynch> copy;
+                if (perimeter_idx < std::max(contour_count, holes_count)) {
+                    touse = &last_asynch;
+                } else {
+                    // for gap fill only: use a copy
+                    copy = last_asynch;
+                    touse = &copy;
+                }
+                if (contour_count > perimeter_idx && holes_count <= perimeter_idx) {
+                    grow_contour_only(*touse, good_spacing, (1 - thin_perimeter) * perimeter_spacing / 2,
+                                        round_peri, min_round_spacing);
+                }
+                if (holes_count > perimeter_idx && contour_count <= perimeter_idx) {
+                    grow_holes_only(*touse, next_onion, good_spacing,
+                                    (1 - thin_perimeter) * perimeter_spacing / 2, round_peri, min_round_spacing);
+                }
+
+                bool special_area = contour_count == 0 || holes_count == 0;
+                if (special_area && (this->config->thin_walls || m_spiral_vase)) {
+                    area_used = next_onion;
+                    for (auto &expolycontainer : *touse) area_used.push_back(expolycontainer.expoly);
+                    all_next_onion = &area_used;
+                }
+
+
                 // look for gaps
                 if (this->config->gap_fill_enabled.value
                     //check if we are going to have an other perimeter
-                    && (perimeter_idx <= loop_number || has_overhang || next_onion.empty() || (this->config->gap_fill_last.value && perimeter_idx == loop_number + 1))) {
+                    && (perimeter_idx < std::max(contour_count, holes_count) || has_overhang || all_next_onion->empty() ||
+                        (this->config->gap_fill_last.value && perimeter_idx == std::max(contour_count, holes_count)))) {
                     // not using safety offset here would "detect" very narrow gaps
                     // (but still long enough to escape the area threshold) that gap fill
                     // won't be able to fill but we'd still remove from infill area
-                    no_last_gapfill = offset_ex(next_onion, 0.5f * good_spacing + 10,
+                    no_last_gapfill = offset_ex(*all_next_onion, 0.5f * good_spacing + 10,
                         (round_peri ? ClipperLib::JoinType::jtRound : ClipperLib::JoinType::jtMiter),
                         (round_peri ? min_round_spacing : 3));
                     if (perimeter_idx == 1) {
@@ -1455,15 +1745,29 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             //    svg.Close();
             //}
 
-            if (next_onion.empty()) {
+            if (next_onion.empty() && last_asynch.empty()) {
                 // Store the number of loops actually generated.
-                loop_number = perimeter_idx - 1;
+                if (perimeter_idx < contour_count) {
+                    assert(contours.size() == contour_count);
+                    for(size_t i = perimeter_idx; i<contours.size(); i++)
+                        assert(contours[perimeter_idx].empty());
+                    contour_count = perimeter_idx;
+                    contours.resize(contour_count);
+                }
+                if (perimeter_idx < holes_count) {
+                    assert(holes.size() == holes_count);
+                    for(size_t i = perimeter_idx; i<holes.size(); i++)
+                        assert(holes[perimeter_idx].empty());
+                    holes_count = perimeter_idx;
+                    holes.resize(holes_count);
+                }
                 // No region left to be filled in.
                 last.clear();
                 break;
-            } else if (perimeter_idx > loop_number) {
+            } else if (perimeter_idx >= std::max(contour_count, holes_count)) {
                 if (has_overhang) {
-                    loop_number++;
+                    contour_count++;
+                    holes_count++; //TODO: only increase the ones that are needed (or just use 2.7)
                     contours.emplace_back();
                     holes.emplace_back();
                 } else {
@@ -1471,33 +1775,89 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                     break;
                 }
             }
+            if (contour_count <= perimeter_idx && !next_onion.empty()) {
+                assert(contour_count <= perimeter_idx);
+                assert(holes_count > perimeter_idx);
+                //assert(contours.size() == perimeter_idx);
+                contour_count = perimeter_idx + 1;
+                while (contours.size() < contour_count) {
+                    contours.emplace_back();
+                }
+            }
+            
+            assert(contours.size() == contour_count);
+            assert(holes.size() == holes_count);
 
-            // fuzzify
+            // fuzzify params
             const bool fuzzify_contours = this->config->fuzzy_skin != FuzzySkinType::None && perimeter_idx == 0 && this->layer->id() > 0;
             const bool fuzzify_holes = this->config->fuzzy_skin == FuzzySkinType::Shell && perimeter_idx == 0 && this->layer->id() > 0 ;
             const bool fuzzify_all = this->config->fuzzy_skin == FuzzySkinType::All && this->layer->id() > 0 ;
+
+            //push last_asynch or next_onion into contours & holes
+            if (!last_asynch.empty()) {
+                // we already put the last hole, now add contours.
+                for (auto &exp : last_asynch) {
+                    if (exp.type == ExPolygonAsynch::epatShrinkContour) {
+                        assert(next_onion.empty());
+                        assert(exp.expoly.contour.is_counter_clockwise());
+                        if (exp.expoly.contour.length() > SCALED_EPSILON) // TODO: atleastLength
+                            contours[perimeter_idx].emplace_back(exp.expoly.contour, perimeter_idx, true,
+                                                                 has_steep_overhang, fuzzify_contours || fuzzify_all);
+                    } else {
+                        // we already put the last contour, now add holes
+                        // contours from hole collapse is added via next_onion
+                        assert(exp.type == ExPolygonAsynch::epatGrowHole);
+                        for (auto &hole : exp.expoly.holes) {
+                            assert(hole.is_clockwise());
+                            if(hole.length() > SCALED_EPSILON) // TODO: atleastLength
+                                holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang,
+                                                              fuzzify_contours || fuzzify_all);
+                        }
+                    }
+                }
+            }
             for (const ExPolygon& expolygon : next_onion) {
                 //TODO: add width here to allow variable width (if we want to extrude a sightly bigger perimeter, see thin wall)
-                contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang, fuzzify_contours || fuzzify_all);
-                if (!expolygon.holes.empty()) {
+                if(contour_count > perimeter_idx && expolygon.contour.length() > SCALED_EPSILON) // TODO: atleastLength
+                    contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang, fuzzify_contours || fuzzify_all);
+                if (!expolygon.holes.empty() && holes_count > perimeter_idx) {
                     holes[perimeter_idx].reserve(holes[perimeter_idx].size() + expolygon.holes.size());
                     for (const Polygon& hole : expolygon.holes)
-                        holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes || fuzzify_all);
+                        if(hole.length() > SCALED_EPSILON) // TODO: atleastLength
+                            holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes || fuzzify_all);
                 }
             }
 
             //simplify the loop to avoid artifacts when shrinking almost-0 segments
             resolution = get_resolution(perimeter_idx + 1, false, &surface);
             last.clear();
-            for(ExPolygon& exp : next_onion)
+            for (ExPolygon &exp : next_onion)
                 exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), &last);
 
             // store surface for top infill if only_one_perimeter_top
-            if (perimeter_idx == 0 && (config->only_one_perimeter_top && this->upper_slices != NULL)) {
+            if (perimeter_idx == 0 && (config->only_one_perimeter_top && this->upper_slices != NULL)
+                && contour_count > 1 && holes_count > 1) {
                 ExPolygons next;
                 split_top_surfaces(this->lower_slices, this->upper_slices, last, results.top_fills, next,
                                    results.fill_clip);
                 last = next;
+            }
+            
+            //if next turn we are in asynch mode, move from last to last_asynch
+            if ( !last_asynch_initialized && (
+                (holes_count == perimeter_idx + 1 && contour_count > perimeter_idx + 1) ||
+                (contour_count == perimeter_idx + 1 && holes_count > perimeter_idx + 1))) {
+                coordf_t last_spacing = perimeter_idx == 0 ? get_ext_perimeter_spacing() / 2 :
+                                                             get_perimeter_spacing() / 2;
+                // populate last_asynch from last
+                for (ExPolygon &expoly : last) {
+                    last_asynch.push_back(
+                        {holes_count == perimeter_idx + 1 ? ExPolygonAsynch::ExPolygonAsynchType::epatShrinkContour :
+                                                            ExPolygonAsynch::ExPolygonAsynchType::epatGrowHole,
+                         std::move(expoly), -last_spacing, last_spacing, -last_spacing, last_spacing});
+                }
+                last.clear();
+                last_asynch_initialized = true;
             }
         }
 
@@ -1506,7 +1866,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
         // check for extracting extra perimeters from gapfill
         if (!gaps.empty()) {
             // if needed, add it to the first empty contour list
-            const size_t contours_size = loop_number + 1;
+            const size_t contours_size = contour_count;
+            assert(contours.size() == contour_count);
             //first, find loops and try to extract a perimeter from them.
             for (size_t gap_idx = 0; gap_idx < gaps.size(); gap_idx++) {
                 ExPolygon& expoly = gaps[gap_idx];
@@ -1517,11 +1878,12 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                     if (contour_expolygon.size() == 1 && !contour_expolygon.front().holes.empty()) {
                         //OK
                         // update list & variable to let the new perimeter be taken into account
-                        loop_number = contours_size;
+                        contour_count = contours_size + 1;
                         if (contours_size >= contours.size()) {
                             contours.emplace_back();
                             holes.emplace_back();
                         }
+                        assert(contours.size() == contour_count);
                         //Add the new perimeter
                         contours[contours_size].emplace_back(contour_expolygon.front().contour, contours_size, true, has_steep_overhang, fuzzify_gapfill);
                         //create the new gapfills
@@ -1538,15 +1900,17 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                 }
             }
         }
-
+        assert(contours.size() == contour_count);
+        assert(holes.size() == holes_count);
         // nest loops: holes first
-        for (int d = 0; d <= loop_number; ++d) {
+        for (int d = 0; d < holes_count; ++d) {
             PerimeterGeneratorLoops& holes_d = holes[d];
             // loop through all holes having depth == d
             for (int hole_idx = 0; hole_idx < (int)holes_d.size(); ++hole_idx) {
                 const PerimeterGeneratorLoop& loop = holes_d[hole_idx];
+                assert(loop.polygon.length() > SCALED_EPSILON);
                 // find the hole loop that contains this one, if any
-                for (int t = d + 1; t <= loop_number; ++t) {
+                for (int t = d + 1; t < holes_count; ++t) {
                     for (int j = 0; j < (int)holes[t].size(); ++j) {
                         PerimeterGeneratorLoop& candidate_parent = holes[t][j];
                         if (candidate_parent.polygon.contains(loop.polygon.first_point())) {
@@ -1558,7 +1922,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                     }
                 }
                 // if no hole contains this hole, find the contour loop that contains it
-                for (int t = loop_number; t >= 0; --t) {
+                for (int t = contours.size() - 1; t >= 0; --t) {
                     for (int j = 0; j < (int)contours[t].size(); ++j) {
                         PerimeterGeneratorLoop& candidate_parent = contours[t][j];
                         if (candidate_parent.polygon.contains(loop.polygon.first_point())) {
@@ -1569,15 +1933,22 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         }
                     }
                 }
+                // no perimeter, then add the hole like a perimeter.
+                while(d >= contours.size())
+                    contours.emplace_back();
+                contours[d].push_back(loop);
+                holes_d.erase(holes_d.begin() + hole_idx);
+                --hole_idx;
             NEXT_LOOP:;
             }
         }
         // nest contour loops
-        for (int d = loop_number; d >= 1; --d) {
+        for (int d = contours.size() - 1; d >= 1; --d) {
             PerimeterGeneratorLoops& contours_d = contours[d];
             // loop through all contours having depth == d
             for (int contour_idx = 0; contour_idx < (int)contours_d.size(); ++contour_idx) {
                 const PerimeterGeneratorLoop& loop = contours_d[contour_idx];
+                assert(loop.polygon.length() > SCALED_EPSILON);
                 // find the contour loop that contains it
                 for (int t = d - 1; t >= 0; --t) {
                     for (size_t j = 0; j < contours[t].size(); ++j) {
@@ -1590,45 +1961,62 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         }
                     }
                 }
+                //can't find one, put in front
+                if (contours.front().empty()) {
+                    contours.front().push_back(loop);
+                } else {
+                    contours.front().front().children.push_back(loop);
+                }
+                contours_d.erase(contours_d.begin() + contour_idx);
+                --contour_idx;
             NEXT_CONTOUR:;
             }
         }
+        //remove all empty perimeters
+        while(contours.size() > 1 && contours.front().empty())
+            contours.erase(contours.begin());
+        // fuse all unfused 
         // at this point, all loops should be in contours[0] (= contours.front() )
+        // or no perimeters nor holes have been generated, too small area.
+
+        assert(contours.empty() || contours.front().size() >= 1);
         // collection of loops to add into loops
         ExtrusionEntityCollection peri_entities;
-        if (config->perimeter_loop.value) {
-            //onlyone_perimeter = >fusion all perimeterLoops
-            for (PerimeterGeneratorLoop& loop : contours.front()) {
-                ExtrusionLoop extr_loop = this->_traverse_and_join_loops(loop, get_all_Childs(loop), loop.polygon.points.front());
-                //ExtrusionLoop extr_loop = this->_traverse_and_join_loops_old(loop, loop.polygon.points.front(), true);
-                if (extr_loop.paths.back().polyline.back() != extr_loop.paths.front().polyline.front()) {
-                    extr_loop.paths.back().polyline.append(extr_loop.paths.front().polyline.front());
-                    assert(false);
+        if (!contours.empty()) {
+            if (config->perimeter_loop.value) {
+                // onlyone_perimeter = >fusion all perimeterLoops
+                for (PerimeterGeneratorLoop &loop : contours.front()) {
+                    ExtrusionLoop extr_loop = this->_traverse_and_join_loops(loop, get_all_Childs(loop),
+                                                                             loop.polygon.points.front());
+                    // ExtrusionLoop extr_loop = this->_traverse_and_join_loops_old(loop, loop.polygon.points.front(), true);
+                    if (extr_loop.paths.back().polyline.back() != extr_loop.paths.front().polyline.front()) {
+                        extr_loop.paths.back().polyline.append(extr_loop.paths.front().polyline.front());
+                        assert(false);
+                    }
+                    peri_entities.append(extr_loop);
                 }
-                peri_entities.append(extr_loop);
-            }
 
-            // append thin walls
-            if (!thin_walls_thickpolys.empty()) {
+                // append thin walls
+                if (!thin_walls_thickpolys.empty()) {
+                    if (this->object_config->thin_walls_merge) {
+                        _merge_thin_walls(peri_entities, thin_walls_thickpolys);
+                    } else {
+                        peri_entities.append(
+                            Geometry::thin_variable_width(thin_walls_thickpolys, erThinWall, this->ext_perimeter_flow,
+                                                          std::max(ext_perimeter_width / 4,
+                                                                   scale_t(this->print_config->resolution)),
+                                                          false));
+                    }
+                    thin_walls_thickpolys.clear();
+                }
+            } else {
                 if (this->object_config->thin_walls_merge) {
+                    ThickPolylines no_thin_walls;
+                    peri_entities = this->_traverse_loops(contours.front(), no_thin_walls);
                     _merge_thin_walls(peri_entities, thin_walls_thickpolys);
                 } else {
-                    peri_entities.append(Geometry::thin_variable_width(
-                        thin_walls_thickpolys, 
-                        erThinWall, 
-                        this->ext_perimeter_flow, 
-                        std::max(ext_perimeter_width / 4, scale_t(this->print_config->resolution)),
-                        false));
+                    peri_entities = this->_traverse_loops(contours.front(), thin_walls_thickpolys);
                 }
-                thin_walls_thickpolys.clear();
-            }
-        } else {
-            if (this->object_config->thin_walls_merge) {
-                ThickPolylines no_thin_walls;
-                peri_entities = this->_traverse_loops(contours.front(), no_thin_walls);
-                _merge_thin_walls(peri_entities, thin_walls_thickpolys);
-            } else {
-                peri_entities = this->_traverse_loops(contours.front(), thin_walls_thickpolys);
             }
         }
 #if _DEBUG
@@ -1785,7 +2173,46 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
         }
     }
 
-    results.inner_perimeter = last;
+    if (contour_count == 0 && holes_count == 0) {
+        // for the infill shell, move it a little bit inside so the extrusion tip don't go over the sides.
+        results.inner_perimeter = offset_ex(last, -(this->get_perimeter_width() - get_perimeter_spacing()) / 2);
+    } else {
+        coordf_t last_spacing = std::max(contour_count, holes_count) == 1 ?
+                                                      get_ext_perimeter_spacing() / 2 :
+                                                      get_perimeter_spacing() / 2;
+        results.inner_perimeter = offset_ex(last, -last_spacing);
+        if (!last_asynch.empty()) {
+            // merge with last_async
+            for (auto &exp : last_asynch) {
+                if (exp.offset_contour_inner == exp.offset_holes_inner) {
+                    append(results.inner_perimeter, offset_ex(exp.expoly, exp.offset_contour_inner));
+                } else {
+                    // offset contour & holes separatly
+                    // first holes:
+                    assert(exp.offset_holes_inner <= 0);
+                    Polygons holes = offset(get_holes_as_contour(exp.expoly), -exp.offset_holes_inner);
+                    // we are growing (fake) perimeter, so it can creates holes.
+                    for (size_t i = 0; i < holes.size(); ++i) {
+                        Polygon &fakeperi = holes[i];
+                        if (fakeperi.is_clockwise()) {
+                            // put real perimeters in results.inner_perimeter
+                            fakeperi.make_counter_clockwise();
+                            results.inner_perimeter.push_back(ExPolygon(fakeperi));
+                            holes.erase(holes.begin() + i);
+                            i--;
+                        }
+                    }
+                    // now shrink perimeter
+                    Polygons perimeters = offset(exp.expoly.contour, exp.offset_contour_inner);
+                    // as it shrink, it can creates more perimeter, not a big deal.
+                    for (auto &p : perimeters) assert(p.is_counter_clockwise());
+                    
+                    // now diff and add
+                    append(results.inner_perimeter, diff_ex(perimeters, holes));
+                }
+            }
+        }
+    }
 
     return results;
 }
@@ -3222,7 +3649,7 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
                 entity->visit(*this);
         }
     };
-    //max dist to branch: ~half external periemeter width
+    //max dist to branch: ~half external perimeter width
     coord_t max_width = this->ext_perimeter_flow.scaled_width();
     SearchBestPoint searcher;
     ThickPolylines not_added;
