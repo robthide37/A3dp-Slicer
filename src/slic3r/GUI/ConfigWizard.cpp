@@ -1898,8 +1898,8 @@ const std::string& Materials::get_vendor(const Preset *preset) const
 const std::string& Materials::get_filament_type(const Preset *preset)
 {
     const auto *opt = preset->config.opt<ConfigOptionStrings>("filament_type");
-    if (opt != nullptr && opt->values.size() > 0) {
-        return opt->values[0];
+    if (opt != nullptr && opt->size() > 0) {
+        return opt->get_at(0);
     } else {
         return UNKNOWN;
     }

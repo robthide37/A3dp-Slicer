@@ -417,7 +417,7 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
             ConfigOptionStrings reader;
             reader.set_any(value, opt_idx);
             std::string good_str;
-            for (std::string &s : reader.values) {
+            for (std::string s : reader.get_values()) {
                 //ensure the separator isn't inside, not escaped.
                 if (s.find((opt.multiline ? '\n' : ';')) != std::string::npos) {
                     if (opt.multiline) {
@@ -554,7 +554,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
         if (m_opt_idx < 0) {
             ConfigOptionInts reader;
             need_update = get_vector_value(str, reader);
-            m_value     = reader.values;
+            m_value     = reader.get_values();
             break;
         } // else: one int on m_opt_idx, done below
     case coInt: {
@@ -566,7 +566,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
         if (m_opt_idx < 0) {
             ConfigOptionBools reader;
             need_update = get_vector_value(str, reader);
-            m_value     = reader.values;
+            m_value     = reader.get_values();
             break;
         } // else: one bool on m_opt_idx, done below
     case coBool: {
@@ -584,7 +584,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
         if (m_opt_idx < 0) {
             ConfigOptionFloats reader;
             need_update = get_vector_value(str, reader);
-            m_value     = reader.values;
+            m_value     = reader.get_values();
             break;
         }
     case coPercent:
@@ -708,7 +708,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
         if (m_opt_idx < 0) { // not used yet
             ConfigOptionFloatsOrPercents reader;
             need_update = get_vector_value(str, reader);
-            m_value     = reader.values;
+            m_value     = reader.get_values();
             break;
         }
     case coFloatOrPercent: {
@@ -722,7 +722,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
                         const DynamicPrintConfig &printer_config =
                             wxGetApp().preset_bundle->printers.get_edited_preset().config;
                         const std::vector<double> &nozzle_diameters =
-                            printer_config.option<ConfigOptionFloats>("nozzle_diameter")->values;
+                            printer_config.option<ConfigOptionFloats>("nozzle_diameter")->get_values();
                         double nozzle_diameter = 0;
                         for (double diameter : nozzle_diameters)
                             nozzle_diameter = std::max(nozzle_diameter, diameter);
@@ -801,7 +801,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
                                 const DynamicPrintConfig &printer_config =
                                     wxGetApp().preset_bundle->printers.get_edited_preset().config;
                                 const std::vector<double> &nozzle_diameters =
-                                    printer_config.option<ConfigOptionFloats>("nozzle_diameter")->values;
+                                    printer_config.option<ConfigOptionFloats>("nozzle_diameter")->get_values();
                                 double nozzle_diameter = 0;
                                 for (double diameter : nozzle_diameters)
                                     nozzle_diameter = std::max(nozzle_diameter, diameter);

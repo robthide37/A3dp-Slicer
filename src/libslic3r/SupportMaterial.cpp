@@ -360,7 +360,7 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
     m_support_params.support_layer_height_min = 1000000.;
     const ConfigOptionFloatsOrPercents& min_layer_height = m_print_config->min_layer_height;
     const ConfigOptionFloats& nozzle_diameter = m_print_config->nozzle_diameter;
-    for (int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id) {
+    for (int extr_id = 0; extr_id < min_layer_height.size(); ++extr_id) {
         double min_from_extr = min_layer_height.get_abs_value(extr_id, nozzle_diameter.get_at(extr_id));
         if(min_from_extr > 0)
             m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, min_from_extr);
@@ -370,7 +370,7 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
             m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, layer->height);
     }
     if (m_support_params.support_layer_height_min >= 1000000.) {
-        for (int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id) {
+        for (int extr_id = 0; extr_id < min_layer_height.size(); ++extr_id) {
             m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, nozzle_diameter.get_at(extr_id) / 10);
         }
     }

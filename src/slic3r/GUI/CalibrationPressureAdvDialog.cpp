@@ -364,8 +364,8 @@ struct ExtrusionSettings {// think a struct is better instead of all the maps ?
     // --- scale ---
     //models is created for nozzles from 0.1-2mm walls should be nozzle_size*4 spaced, scale xy model by widths down is futher
     const ConfigOptionFloats* nozzle_diameter_config = printer_config->option<ConfigOptionFloats>("nozzle_diameter");
-    assert(nozzle_diameter_config->values.size() > 0);
-    double nozzle_diameter = nozzle_diameter_config->values[0];//get extruderID too?
+    assert(nozzle_diameter_config->size() > 0);
+    double nozzle_diameter = nozzle_diameter_config->get_at(0);//get extruderID too?
     double first_layer_height = print_config->get_abs_value("first_layer_height", nozzle_diameter);
     double base_layer_height = print_config->get_computed_value("layer_height",0);
     GCodeFlavor flavor = printer_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;

@@ -438,9 +438,9 @@ void FreqChangedParams::init()
                         ->Bind(wxEVT_BUTTON, ([parent](wxCommandEvent &e) {
                                    auto &project_config = wxGetApp().preset_bundle->project_config;
                                    const std::vector<double> &init_matrix =
-                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_matrix"))->values;
+                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_matrix"))->get_values();
                                    const std::vector<double> &init_extruders =
-                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_extruders"))->values;
+                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_extruders"))->get_values();
 
                                    const std::vector<std::string> extruder_colours =
                                        wxGetApp().plater()->get_extruder_colors_from_plater_config();
@@ -451,10 +451,10 @@ void FreqChangedParams::init()
                                    if (dlg.ShowModal() == wxID_OK) {
                                        std::vector<float> matrix    = dlg.get_matrix();
                                        std::vector<float> extruders = dlg.get_extruders();
-                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_matrix"))->values =
-                                           std::vector<double>(matrix.begin(), matrix.end());
-                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_extruders"))
-                                           ->values = std::vector<double>(extruders.begin(), extruders.end());
+                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_matrix"))->set(
+                                           std::vector<double>(matrix.begin(), matrix.end()));
+                                       (project_config.option<ConfigOptionFloats>("wiping_volumes_extruders"))->set(
+                                          std::vector<double>(extruders.begin(), extruders.end()));
                                        wxGetApp().plater()->update_project_dirty_from_presets();
                                        wxPostEvent(parent, SimpleEvent(EVT_SCHEDULE_BACKGROUND_PROCESS, parent));
                                    }
@@ -968,7 +968,7 @@ void Sidebar::update_presets(Preset::Type preset_type)
     case Preset::TYPE_FFF_FILAMENT: 
     {
         const size_t extruder_cnt = print_tech != ptFFF ? 1 :
-                                dynamic_cast<ConfigOptionFloats*>(preset_bundle.printers.get_edited_preset().config.option("nozzle_diameter"))->values.size();
+                                dynamic_cast<ConfigOptionFloats*>(preset_bundle.printers.get_edited_preset().config.option("nozzle_diameter"))->size();
         const size_t filament_cnt = p->combos_filament.size() > extruder_cnt ? extruder_cnt : p->combos_filament.size();
 
         if (filament_cnt == 1) {
@@ -2460,7 +2460,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     auto *nozzle_dmrs = config->opt<ConfigOptionFloats>("nozzle_diameter");
 
-    bool one_by_one = input_files.size() == 1 || printer_technology == ptSLA; // || nozzle_dmrs->values.size() <= 1; // removed by bb (toa llow multi-import on a single extruder printer.
+    bool one_by_one = input_files.size() == 1 || printer_technology == ptSLA; // || nozzle_dmrs->size() <= 1; // removed by bb (toa llow multi-import on a single extruder printer.
     if (! one_by_one) {
         for (const auto &path : input_files) {
             if (std::regex_match(path.string(), pattern_bundle)) {
@@ -2724,7 +2724,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         "the file be loaded as a single object having multiple parts?") + "\n",
                         _L("Multi-part object detected"), wxICON_WARNING | wxYES | wxNO);
                     if (msg_dlg.ShowModal() == wxID_YES) {
-                        model.convert_multipart_object(nozzle_dmrs->values.size());
+                        model.convert_multipart_object(nozzle_dmrs->size());
                     }
                 }
             }
@@ -2773,14 +2773,14 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     if (new_model != nullptr && new_model->objects.size() > 1) {
         //wxMessageDialog msg_dlg(q, _L(
-        MessageDialog msg_dlg(q, nozzle_dmrs->values.size() > 1 ? _L(
+        MessageDialog msg_dlg(q, nozzle_dmrs->size() > 1 ? _L(
                 "Multiple objects were loaded for a multi-material printer.\n"
                 "Instead of considering them as multiple objects, should I consider\n"
                 "these files to represent a single object having multiple parts?") + "\n":
                 _L("Load these files as a single object with multiple parts?\n"),
                 _L("Multi-part object detected"), wxICON_WARNING | wxYES | wxNO);
         if (msg_dlg.ShowModal() == wxID_YES) {
-            new_model->convert_multipart_object(nozzle_dmrs->values.size());
+            new_model->convert_multipart_object(nozzle_dmrs->size());
         }
 
         auto loaded_idxs = load_model_objects(new_model->objects);
@@ -2880,7 +2880,7 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
     coord_t min_obj_distance = static_cast<coord_t>(6/SCALING_FACTOR);
     const auto *bed_shape_opt = config->opt<ConfigOptionPoints>("bed_shape");
     assert(bed_shape_opt);
-    auto& bedpoints = bed_shape_opt->values;
+    auto& bedpoints = bed_shape_opt->get_values();
     Polyline bed; bed.points.reserve(bedpoints.size());
     for(auto& v : bedpoints) bed.append(Point::new_scale(v(0), v(1)));
 
@@ -5915,9 +5915,9 @@ void Plater::export_gcode(bool prefer_removable)
         std::string str_material = "";
         if (printer_technology() == ptFFF) {
             const ConfigOptionStrings* filaments = fff_print().full_print_config().opt<ConfigOptionStrings>("filament_settings_id");
-            assert(filaments->values.size() == fff_print().config().filament_type.values.size());
-            for (int i = 0; i < filaments->values.size(); i++) {
-                str_material += "\n" + format(_L("'%1%' of type %2%"), filaments->values[i], fff_print().config().filament_type.values[i]);
+            assert(filaments->size() == fff_print().config().filament_type.size());
+            for (int i = 0; i < filaments->size(); i++) {
+                str_material += "\n" + format(_L("'%1%' of type %2%"), filaments->get_at(i), fff_print().config().filament_type.get_at(i));
             }
         } else if (printer_technology() == ptSLA) {
             str_material = format(_L(" resin '%1%'"), sla_print().full_print_config().opt_string("sla_material_settings_id"));
@@ -6705,7 +6705,7 @@ bool Plater::update_filament_colors_in_full_config()
     for (const std::string& filament_preset : filament_presets)
         filament_colors.push_back(filaments.find_preset(filament_preset, true)->config.opt_string("filament_colour", (unsigned)0));
 
-    p->config->option<ConfigOptionStrings>("filament_colour")->values = filament_colors;
+    p->config->option<ConfigOptionStrings>("filament_colour")->set(filament_colors);
     return true;
 }
 
@@ -6716,7 +6716,7 @@ void Plater::on_config_change(const DynamicConfig &config)
     std::vector<std::string> diff = p->config->diff(config);
     for (const std::string& opt_key : diff) {
         if (opt_key == "nozzle_diameter") {
-            if (p->config->option<ConfigOptionFloats>(opt_key)->values.size() > config.option<ConfigOptionFloats>(opt_key)->values.size()) {
+            if (p->config->option<ConfigOptionFloats>(opt_key)->size() > config.option<ConfigOptionFloats>(opt_key)->size()) {
                 //lower number of extuders, please don't try to display the old gcode.
                 p->reset_gcode_toolpaths();
                 p->gcode_result.reset();
@@ -6759,7 +6759,7 @@ void Plater::on_config_change(const DynamicConfig &config)
         }
         else if(opt_key == "extruder_colour") {
             update_scheduled = true;
-            if (p->config->option<ConfigOptionStrings>("filament_colour")->values.size() < config.option<ConfigOptionStrings>(opt_key)->values.size()) {
+            if (p->config->option<ConfigOptionStrings>("filament_colour")->size() < config.option<ConfigOptionStrings>(opt_key)->size()) {
                 const std::vector<std::string> filament_presets = wxGetApp().preset_bundle->filament_presets;
                 const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
                 std::vector<std::string> filament_colors;
@@ -6768,7 +6768,7 @@ void Plater::on_config_change(const DynamicConfig &config)
                 for (const std::string& filament_preset : filament_presets)
                     filament_colors.push_back(filaments.find_preset(filament_preset, true)->config.opt_string("filament_colour", (unsigned)0));
 
-                p->config->option<ConfigOptionStrings>("filament_colour")->values = filament_colors;
+                p->config->option<ConfigOptionStrings>("filament_colour")->set(filament_colors);
             }
             p->sidebar->obj_list()->update_extruder_colors();
         }
@@ -6797,7 +6797,7 @@ void Plater::on_config_change(const DynamicConfig &config)
 
 void Plater::set_bed_shape() const
 {
-    set_bed_shape(p->config->option<ConfigOptionPoints>("bed_shape")->values,
+    set_bed_shape(p->config->option<ConfigOptionPoints>("bed_shape")->get_values(),
         p->config->option<ConfigOptionFloat>("max_print_height")->value,
         p->config->option<ConfigOptionString>("bed_custom_texture")->value,
         p->config->option<ConfigOptionString>("bed_custom_model")->value);
@@ -6814,7 +6814,7 @@ void Plater::force_filament_colors_update()
     DynamicPrintConfig* config = p->config;
     const std::vector<std::string> filament_presets = wxGetApp().preset_bundle->filament_presets;
     if (filament_presets.size() > 1 && 
-        p->config->option<ConfigOptionStrings>("filament_colour")->values.size() == filament_presets.size())
+        p->config->option<ConfigOptionStrings>("filament_colour")->size() == filament_presets.size())
     {
         const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
         std::vector<std::string> filament_colors;
@@ -6823,8 +6823,8 @@ void Plater::force_filament_colors_update()
         for (const std::string& filament_preset : filament_presets)
             filament_colors.push_back(filaments.find_preset(filament_preset, true)->config.opt_string("filament_colour", (unsigned)0));
 
-        if (config->option<ConfigOptionStrings>("filament_colour")->values != filament_colors) {
-            config->option<ConfigOptionStrings>("filament_colour")->values = filament_colors;
+        if (config->option<ConfigOptionStrings>("filament_colour")->get_values() != filament_colors) {
+            config->option<ConfigOptionStrings>("filament_colour")->set(filament_colors);
             update_scheduled = true;
         }
     }
@@ -6861,11 +6861,11 @@ std::vector<std::string> Plater::get_extruder_colors_from_plater_config(const GC
         if (!config->has("extruder_colour")) // in case of a SLA print
             return extruder_colors;
 
-        extruder_colors = (config->option<ConfigOptionStrings>("extruder_colour"))->values;
+        extruder_colors = (config->option<ConfigOptionStrings>("extruder_colour"))->get_values();
         if (!wxGetApp().plater())
             return extruder_colors;
 
-        const std::vector<std::string>& filament_colours = (p->config->option<ConfigOptionStrings>("filament_colour"))->values;
+        const std::vector<std::string>& filament_colours = (p->config->option<ConfigOptionStrings>("filament_colour"))->get_values();
         for (size_t i = 0; i < extruder_colors.size(); ++i)
             if (extruder_colors[i] == "" && i < filament_colours.size())
                 extruder_colors[i] = filament_colours[i];

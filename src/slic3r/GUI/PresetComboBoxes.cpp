@@ -699,7 +699,7 @@ void PlaterPresetComboBox::change_extruder_color()
             // get current color
             DynamicPrintConfig* cfg = wxGetApp().get_tab(Preset::TYPE_PRINTER)->get_config();
             auto colors = static_cast<ConfigOptionStrings*>(cfg->option("extruder_colour")->clone());
-            wxColour clr(colors->values[m_extruder_idx]);
+            wxColour clr(colors->get_at(m_extruder_idx));
             if (!clr.IsOk())
                 clr = wxColour(0,0,0); // Don't set alfa to transparence
 
@@ -711,7 +711,7 @@ void PlaterPresetComboBox::change_extruder_color()
             dialog.CenterOnParent();
             if (dialog.ShowModal() == wxID_OK)
             {
-                colors->values[m_extruder_idx] = dialog.GetColourData().GetColour().GetAsString(wxC2S_HTML_SYNTAX).ToStdString();
+                colors->set_at(dialog.GetColourData().GetColour().GetAsString(wxC2S_HTML_SYNTAX).ToStdString(), m_extruder_idx);
 
                 DynamicPrintConfig cfg_new = *cfg;
                 cfg_new.set_key_value("extruder_colour", colors);

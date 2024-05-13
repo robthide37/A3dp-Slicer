@@ -448,11 +448,11 @@ std::string GCodeWriter::toolchange(uint16_t tool_id)
     if (this->multiple_extruders) {
         if (FLAVOR_IS(gcfKlipper)) {
             //check if we can use the tool_name field or not
-            if (tool_id > 0 && tool_id < this->config.tool_name.values.size() && !this->config.tool_name.values[tool_id].empty()
+            if (tool_id > 0 && tool_id < this->config.tool_name.size() && !this->config.tool_name.get_at(tool_id).empty()
                 // NOTE: this will probably break if there's more than 10 tools, as it's relying on the
                 // ASCII character table.
-                && this->config.tool_name.values[tool_id][0] != static_cast<char>(('0' + tool_id))) {
-                gcode << this->toolchange_prefix() << this->config.tool_name.values[tool_id];
+                && this->config.tool_name.get_at(tool_id)[0] != static_cast<char>(('0' + tool_id))) {
+                gcode << this->toolchange_prefix() << this->config.tool_name.get_at(tool_id);
             } else {
                 gcode << this->toolchange_prefix() << "extruder";
                 if (tool_id > 0)

@@ -319,8 +319,8 @@ void Layer::make_milling_post_process() {
                 if (config.milling_post_process == other_config.milling_post_process
                     && config.milling_extra_size == other_config.milling_extra_size
                     && (config.milling_after_z == other_config.milling_after_z ||
-                        this->bottom_z() > std::min(config.milling_after_z.get_abs_value(this->object()->print()->config().milling_diameter.values[0]),
-                            other_config.milling_after_z.get_abs_value(this->object()->print()->config().milling_diameter.values[0])))) {
+                        this->bottom_z() > std::min(config.milling_after_z.get_abs_value(this->object()->print()->config().milling_diameter.get_at(0)),
+                            other_config.milling_after_z.get_abs_value(this->object()->print()->config().milling_diameter.get_at(0))))) {
                     layerms.push_back(other_layerm);
                     done[it - m_regions.begin()] = true;
                 }

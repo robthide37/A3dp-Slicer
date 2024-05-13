@@ -615,7 +615,7 @@ double Print::get_object_first_layer_height(const PrintObject& object) const {
         }
         object_first_layer_height = 1000000000;
         for (uint16_t extruder_id : object_extruders) {
-            double nozzle_diameter = config().nozzle_diameter.values[extruder_id];
+            double nozzle_diameter = config().nozzle_diameter.get_at(extruder_id);
             object_first_layer_height = std::min(object_first_layer_height, object.config().first_layer_height.get_abs_value(nozzle_diameter));
         }
     }
@@ -974,7 +974,7 @@ Flow Print::brim_flow(size_t extruder_id, const PrintObjectConfig& brim_config) 
         *Flow::extrusion_spacing_option("brim", tempConf),
         (float)m_config.nozzle_diameter.get_at(extruder_id),
         (float)get_first_layer_height(),
-        (extruder_id < m_config.nozzle_diameter.values.size()) ? brim_config.get_computed_value("filament_max_overlap", extruder_id) : 1
+        (extruder_id < m_config.nozzle_diameter.size()) ? brim_config.get_computed_value("filament_max_overlap", extruder_id) : 1
     );
 }
 
@@ -993,7 +993,7 @@ Flow Print::skirt_flow(size_t extruder_id, bool first_layer/*=false*/) const
         }
         //get object first layer extruder diam
         for (uint16_t extruder_id : object_extruders) {
-            double nozzle_diameter = config().nozzle_diameter.values[extruder_id];
+            double nozzle_diameter = config().nozzle_diameter.get_at(extruder_id);
             max_nozzle_diam = std::max(max_nozzle_diam, nozzle_diameter);
         }
     }
@@ -1027,7 +1027,7 @@ void Print::auto_assign_extruders(ModelObject* model_object) const
     if (model_object->volumes.size() < 2)
         return;
     
-//    size_t extruders = m_config.nozzle_diameter.values.size();
+//    size_t extruders = m_config.nozzle_diameter.size();
     for (size_t volume_id = 0; volume_id < model_object->volumes.size(); ++ volume_id) {
         ModelVolume *volume = model_object->volumes[volume_id];
         //FIXME Vojtech: This assigns an extruder ID even to a modifier volume, if it has a material assigned.
@@ -1551,7 +1551,7 @@ bool Print::has_wipe_tower() const
     return 
         ! m_config.spiral_vase.value &&
         m_config.wipe_tower.value && 
-        m_config.nozzle_diameter.values.size() > 1;
+        m_config.nozzle_diameter.size() > 1;
 }
 
 const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt, double nozzle_diameter) const
@@ -1576,7 +1576,7 @@ void Print::_make_wipe_tower()
         return;
 
     // Get wiping matrix to get number of extruders and convert vector<double> to vector<float>:
-    std::vector<float> wiping_matrix(cast<float>(m_config.wiping_volumes_matrix.values));
+    std::vector<float> wiping_matrix(cast<float>(m_config.wiping_volumes_matrix.get_values()));
     // Extract purging volumes for each extruder pair:
     std::vector<std::vector<float>> wipe_volumes;
     const unsigned int number_of_extruders = (unsigned int)(sqrt(wiping_matrix.size())+EPSILON);

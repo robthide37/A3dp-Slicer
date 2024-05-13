@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 #include "libslic3r.h"
 #include "clonable_ptr.hpp"
@@ -18,6 +19,7 @@
 
 #include <boost/any.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/format/format_fwd.hpp>
 #include <boost/functional/hash.hpp>
@@ -76,8 +78,10 @@ typedef std::vector<std::string>    t_config_option_keys;
 
 extern std::string  escape_string_cstyle(const std::string &str);
 extern std::string  escape_strings_cstyle(const std::vector<std::string> &strs);
+extern std::string  escape_strings_cstyle(const std::vector<std::string> &strs, const std::vector<bool> &enables);
 extern bool         unescape_string_cstyle(const std::string &str, std::string &out);
-extern bool         unescape_strings_cstyle(const std::string &str, std::vector<std::string> &out);
+extern bool         unescape_strings_cstyle(const std::string &str, std::vector<std::string> &out_values);
+extern bool         unescape_strings_cstyle(const std::string &str, std::vector<std::string> &out_values, std::vector<bool> &out_enables);
 
 extern std::string  escape_ampersand(const std::string& str);
 
@@ -393,15 +397,16 @@ public:
     // FCO_PHONY: if true, this option doesn't need to be saved (or with empty string), it's a computed value from an other ConfigOption.
     // FCO_EXTRUDER_ARRAY: set if the ConfigDef has is_extruder_size(). Only apply to ConfigVectorBase and childs
     // FCO_PLACEHOLDER_TEMP: for PlaceholderParser, to be able to recognise temporary fake ConfigOption (for default_XXX() macro)
+    // FCO_ENABLED: to see if this option is activated or disabled ( same as 0 or -1 value in the old way) (for single-value options only)
     uint32_t flags;
     enum FlagsConfigOption : uint32_t {
         FCO_PHONY = 1,
         FCO_EXTRUDER_ARRAY = 1 << 1,
         FCO_PLACEHOLDER_TEMP = 1 << 2,
+        FCO_ENABLED = 1 << 3,
     };
 
-    ConfigOption() : flags(uint32_t(0)) {}
-    ConfigOption(bool phony) : flags(phony ? uint32_t(FlagsConfigOption::FCO_PHONY) : uint32_t(0)) {}
+    ConfigOption() : flags(uint32_t(FCO_ENABLED)) { assert(this->flags != 0); }
 
     virtual ~ConfigOption() {}
 
@@ -416,8 +421,17 @@ public:
     virtual bool                is_percent(size_t idx = 0)     const { return false;  }
     virtual bool                get_bool(size_t idx = 0)       const { throw BadOptionTypeException("Calling ConfigOption::get_bool on a non-boolean ConfigOption");  }
     virtual void                set_enum_int(int32_t /* val */) { throw BadOptionTypeException("Calling ConfigOption::set_enum_int on a non-enum ConfigOption"); }
-    virtual boost::any          get_any(int32_t idx = -1)       const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
+    virtual boost::any          get_any(int32_t idx = -1)      const { throw BadOptionTypeException("Calling ConfigOption::get_any on a raw ConfigOption"); }
     virtual void                set_any(boost::any, int32_t idx = -1) { throw BadOptionTypeException("Calling ConfigOption::set_any on a raw ConfigOption"); }
+    virtual bool                is_enabled(size_t idx = -1)    const { return (flags & FCO_ENABLED) != 0; }
+    virtual ConfigOption *set_enabled(bool enabled, size_t idx = -1)
+    {
+        if (enabled)
+            this->flags |= FCO_ENABLED;
+        else
+            this->flags &= uint32_t(0xFF ^ FCO_ENABLED);
+        return this;
+    }
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }
     virtual size_t              hash()          const throw() = 0;
@@ -428,12 +442,12 @@ public:
     // A scalar is nil, or all values of a vector are nil if idx < 0.
     virtual bool                is_nil(int32_t idx = -1) const { return false; }
     bool                        is_phony()      const { return (flags & FCO_PHONY) != 0; }
-    void                        set_phony(bool phony) { if (phony) this->flags |= FCO_PHONY; else this->flags &= uint8_t(0xFF ^ FCO_PHONY); }
+    ConfigOption*               set_phony(bool phony) { if (phony) this->flags |= FCO_PHONY; else this->flags &= uint8_t(0xFF ^ FCO_PHONY); return this; }
     // Is this option overridden by another option?
     // An option overrides another option if it is not nil and not equal.
     virtual bool 				overriden_by(const ConfigOption *rhs) const {
     	assert(! this->nullable() && ! rhs->nullable());
-    	return *this != *rhs;
+        return *this != *rhs && this->is_enabled() == rhs->is_enabled();
     }
     // Apply an override option, possibly a nullable one.
     virtual bool 				apply_override(const ConfigOption *rhs) { 
@@ -456,7 +470,6 @@ class ConfigOptionSingle : public ConfigOption {
 public:
     T value;
     explicit ConfigOptionSingle(T value) : value(value) {}
-    explicit ConfigOptionSingle(T value, bool phony) : ConfigOption(phony), value(value) {}
     operator T() const { return this->value; }
     boost::any get_any(int32_t idx = -1) const override { return boost::any(value); }
     void       set_any(boost::any anyval, int32_t idx = -1) override { value = boost::any_cast<T>(anyval); }
@@ -475,14 +488,23 @@ public:
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Comparing incompatible types");
         assert(dynamic_cast<const ConfigOptionSingle<T>*>(&rhs));
-        return this->value == static_cast<const ConfigOptionSingle<T>*>(&rhs)->value;
+        return this->value == static_cast<const ConfigOptionSingle<T>*>(&rhs)->value 
+            && this->is_enabled() == rhs.is_enabled()
+            && this->is_phony() == rhs.is_phony();
+        // should compare all flags?
     }
 
     bool operator==(const T &rhs) const throw() { return this->value == rhs; }
     bool operator!=(const T &rhs) const throw() { return this->value != rhs; }
     bool operator< (const T &rhs) const throw() { return this->value < rhs; }
 
-    size_t hash() const throw() override { return std::hash<T>{}(this->value); }
+    size_t hash() const throw() override {
+        std::hash<T> hasher;
+        size_t seed = 0;
+        boost::hash_combine(seed, this->is_enabled());
+        boost::hash_combine(seed, hasher(this->value));
+        return seed;
+    }
 
 private:
 	friend class cereal::access;
@@ -492,6 +514,8 @@ private:
 // Value of a vector valued option (bools, ints, floats, strings, points)
 class ConfigOptionVectorBase : public ConfigOption {
 public:
+    virtual std::string         serialize() const override = 0;
+    virtual bool                deserialize(const std::string &str, bool append = false) override = 0;
     // Currently used only to initialize the PlaceholderParser.
     virtual std::vector<std::string> vserialize() const = 0;
     // Set from a vector of ConfigOptions. 
@@ -519,6 +543,35 @@ public:
     bool is_extruder_size() const { return (flags & FCO_EXTRUDER_ARRAY) != 0; }
     ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size = true) {
         if (is_extruder_size) this->flags |= FCO_EXTRUDER_ARRAY; else this->flags &= uint8_t(0xFF ^ FCO_EXTRUDER_ARRAY);
+        assert(this->flags != 0);
+        return this;
+    }
+
+    
+    bool is_enabled(size_t idx = 0) const override {
+        assert (m_enabled.size() == size());
+        return idx >= 0 && idx < m_enabled.size() ? m_enabled[idx] : ConfigOption::is_enabled();
+    }
+    
+    bool has_same_enabled(const ConfigOptionVectorBase &rhs) const
+    {
+        return this->m_enabled == rhs.m_enabled;
+    }
+    ConfigOption *set_enabled(bool enabled, size_t idx = 0) override
+    {
+        assert (m_enabled.size() == size());
+        // reset evrything, use the default.
+        if (idx < 0) {
+            for(size_t i=0; i<this->m_enabled.size(); ++i)
+                this->m_enabled[i] = enabled;
+            ConfigOption::set_enabled(enabled);
+            return this;
+        }
+        // can't enable something that doesn't exist
+        if(idx >= size())
+            return this;
+        // set our value
+        m_enabled[idx] = enabled;
         return this;
     }
 
@@ -528,8 +581,23 @@ public:
 
 
 protected:
+    // Is the size of the vector, so every bit is set.
+    // If at least one is true, then the default (from configoption flag) is also true, else false.
+    std::vector<bool> m_enabled;
     // Used to verify type compatibility when assigning to / from a scalar ConfigOption.
     ConfigOptionType scalar_type() const { return static_cast<ConfigOptionType>(this->type() - coVectorType); }
+
+    void set_default_enabled()
+    {
+        if (!m_enabled.empty()) {
+            bool has_enabled = false;
+            for (size_t i = 0; !has_enabled && i < m_enabled.size(); ++i) { has_enabled = m_enabled[i]; }
+            ConfigOption::set_enabled(has_enabled);
+        }
+    }
+    
+	friend class cereal::access;
+	template<class Archive> void serialize(Archive & ar) { ar(this->flags); ar(this->m_enabled); }
 };
 
 // Value of a vector valued option (bools, ints, floats, strings, points), template
@@ -538,32 +606,36 @@ class ConfigOptionVector : public ConfigOptionVectorBase
 {
 private:
     void set_default_from_values() {
-        assert(!values.empty());
-        if (!values.empty())
-            default_value = values.front();
+        assert(!m_values.empty());
+        if (!m_values.empty())
+            default_value = m_values.front();
     }
 
 protected:
     // this default is used to fill this vector when resized. It's not the default of a setting, for it please use the
-    // ConfigOptionDef.
+    // ConfigOptionDef. It's not even serialized or put in the undo/redo.
     T default_value;
+    std::vector<T> m_values;
 public:
-    std::vector<T> values;
 
     ConfigOptionVector() {}
-    explicit ConfigOptionVector(const T& default_val) : default_value(default_val) {}
-    explicit ConfigOptionVector(size_t n, const T &value) : values(n, value), default_value(value) {}
-    explicit ConfigOptionVector(std::initializer_list<T> il) : values(std::move(il)) { set_default_from_values(); }
-    explicit ConfigOptionVector(const std::vector<T> &values) : values(values) { set_default_from_values(); }
-    explicit ConfigOptionVector(std::vector<T> &&values) : values(std::move(values)) { set_default_from_values(); }
-    
+    explicit ConfigOptionVector(const T& default_val) : default_value(default_val) { assert (m_enabled.size() == size()); }
+    explicit ConfigOptionVector(size_t n, const T &value) : m_values(n, value), default_value(value) { this->m_enabled.resize(m_values.size(), ConfigOption::is_enabled()); assert (m_enabled.size() == size()); }
+    explicit ConfigOptionVector(std::initializer_list<T> il) : m_values(std::move(il)) { set_default_from_values(); this->m_enabled.resize(m_values.size(), ConfigOption::is_enabled()); assert (m_enabled.size() == size()); }
+    explicit ConfigOptionVector(const std::vector<T> &values) : m_values(values) { set_default_from_values(); this->m_enabled.resize(m_values.size(), ConfigOption::is_enabled()); assert (m_enabled.size() == size()); }
+    explicit ConfigOptionVector(std::vector<T> &&values) : m_values(std::move(values)) { set_default_from_values(); this->m_enabled.resize(m_values.size(), ConfigOption::is_enabled()); assert (m_enabled.size() == size()); }
+
+    const std::vector<T> &get_values() const { return m_values; }
+
     void set(const ConfigOption *rhs) override
     {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionVector: Assigning an incompatible type");
         assert(dynamic_cast<const ConfigOptionVector<T>*>(rhs));
-        this->values = static_cast<const ConfigOptionVector<T>*>(rhs)->values;
+        this->m_values = static_cast<const ConfigOptionVector<T>*>(rhs)->m_values;
+        this->m_enabled = static_cast<const ConfigOptionVector<T>*>(rhs)->m_enabled;
         this->flags = rhs->flags;
+        assert (m_enabled.size() == this->m_values.size());
     }
 
     // Set from a vector of ConfigOptions. 
@@ -572,19 +644,44 @@ public:
     // This function is useful to collect values for multiple extrder / filament settings.
     void set(const std::vector<const ConfigOption*> &rhs) override
     {
-        this->values.clear();
-        this->values.reserve(rhs.size());
+        this->m_values.clear();
+        this->m_values.reserve(rhs.size());
+        this->m_enabled.clear();
+        this->m_enabled.reserve(rhs.size());
         for (const ConfigOption *opt : rhs) {
             if (opt->type() == this->type()) {
+                assert(dynamic_cast<const ConfigOptionVector<T>*>(opt) != nullptr);
                 auto other = static_cast<const ConfigOptionVector<T>*>(opt);
-                if (other->values.empty())
+                if (other->m_values.empty())
                     throw ConfigurationError("ConfigOptionVector::set(): Assigning from an empty vector");
-                this->values.emplace_back(other->values.front());
-            } else if (opt->type() == this->scalar_type())
-                this->values.emplace_back(static_cast<const ConfigOptionSingle<T>*>(opt)->value);
+                this->m_values.emplace_back(other->get_at(0));
+                this->m_enabled.push_back(other->is_enabled(0));
+                if (other->is_enabled(0))
+                    ConfigOption::set_enabled(true);
+            } else if (opt->type() == this->scalar_type()) {
+                this->m_values.emplace_back(static_cast<const ConfigOptionSingle<T> *>(opt)->value);
+                this->m_enabled.push_back(opt->is_enabled());
+                if (opt->is_enabled())
+                    ConfigOption::set_enabled(true);
+            }
             else
                 throw ConfigurationError("ConfigOptionVector::set():: Assigning an incompatible type");
         }
+        assert (m_enabled.size() == size());
+    }
+
+    // Set from a vector of values, all enabled (if default is enabled)
+    void set(const std::vector<T> &rhs)
+    {
+        this->m_values.clear();
+        this->m_values.reserve(rhs.size());
+        this->m_enabled.clear();
+        this->m_enabled.reserve(rhs.size());
+        for (const T &val : rhs) {
+            this->m_values.push_back(val);
+            this->m_enabled.push_back(ConfigOption::is_enabled());
+        }
+        assert (m_enabled.size() == size());
     }
 
     // Set a single vector item from either a scalar option or the first value of a vector option.vector of ConfigOptions. 
@@ -592,45 +689,60 @@ public:
     void set_at(const ConfigOption *rhs, size_t i, size_t j) override
     {
         // Fill with default value up to the needed position
-        if (this->values.size() <= i) {
+        if (this->m_values.size() <= i) {
             // Resize this vector, fill in the new vector fields with the copy of the first field.
-            this->values.resize(i + 1, this->default_value);
+            this->m_values.resize(i + 1, this->default_value);
+            this->m_enabled.resize(i + 1, ConfigOption::is_enabled());
         }
         if (rhs->type() == this->type()) {
             // Assign the first value of the rhs vector.
             auto other = static_cast<const ConfigOptionVector<T>*>(rhs);
-            if (other->values.empty())
+            if (other->empty())
                 throw ConfigurationError("ConfigOptionVector::set_at(): Assigning from an empty vector");
-            this->values[i] = other->get_at(j);
-        } else if (rhs->type() == this->scalar_type())
-            this->values[i] = static_cast<const ConfigOptionSingle<T>*>(rhs)->value;
+            this->m_values[i] = other->get_at(j);
+            this->m_enabled[i] = other->is_enabled(j);
+            ConfigOption::set_enabled(other->is_enabled(-1));
+        } else if (rhs->type() == this->scalar_type()) {
+            auto other = static_cast<const ConfigOptionSingle<T>*>(rhs);
+            this->m_values[i] = other->value;
+            this->m_enabled[i] = other->is_enabled();
+            set_default_enabled();
+        }
         else
             throw ConfigurationError("ConfigOptionVector::set_at(): Assigning an incompatible type");
+        assert (m_enabled.size() == size());
     }
     void set_at(T val, size_t i)
     {
         // Fill with default value up to the needed position
-        if (this->values.size() <= i) {
+        if (this->m_values.size() <= i) {
             // Resize this vector, fill in the new vector fields with the copy of the first field.
-            this->values.resize(i + 1, this->default_value);
+            this->m_values.resize(i + 1, this->default_value);
+            this->m_enabled.resize(i + 1, ConfigOption::is_enabled());
         }
-        this->values[i] = val;
+        this->m_values[i] = val;
+        assert (m_enabled.size() == size());
     }
 
     const T& get_at(size_t i) const
     {
-        //assert(! this->values.empty());
-        return (i < this->values.size()) ? this->values[i] : (this->values.empty()? default_value : this->values.front());
+        //assert(! this->m_values.empty());
+        assert (m_enabled.size() == size());
+        return (i < this->m_values.size()) ? this->m_values[i] :
+                                             (this->m_values.empty() ? default_value : this->m_values.front());
     }
 
     T& get_at(size_t i) { return const_cast<T&>(std::as_const(*this).get_at(i)); }
-    boost::any get_any(int32_t idx = -1) const override { return idx < 0 ? boost::any(values) : boost::any(get_at(idx)); }
+    boost::any get_any(int32_t idx = -1) const override { return idx < 0 ? boost::any(this->m_values) : boost::any(get_at(idx)); }
     void       set_any(boost::any anyval, int32_t idx = -1) override
     { 
-       if (idx < 0)
-            values = boost::any_cast<std::vector<T>>(anyval);
-        else
-            set_at(boost::any_cast<T>(anyval), idx);
+       if (idx < 0) {
+            this->m_values = boost::any_cast<std::vector<T>>(anyval);
+            this->m_enabled.resize(this->m_values.size(), ConfigOption::is_enabled());
+       } else {
+           set_at(boost::any_cast<T>(anyval), idx);
+       }
+        assert (m_enabled.size() == size());
     }
 
     // Resize this vector by duplicating the /*last*/first or default value.
@@ -638,33 +750,57 @@ public:
     void resize(size_t n, const ConfigOption *opt_default = nullptr) override
     {
         assert(opt_default == nullptr || opt_default->is_vector());
+        assert(n >= 0);
 //        assert(opt_default == nullptr || dynamic_cast<ConfigOptionVector<T>>(opt_default));
-       // assert(! this->values.empty() || opt_default != nullptr);
-        if (n == 0)
-            this->values.clear();
-        else if (n < this->values.size())
-            this->values.erase(this->values.begin() + n, this->values.end());
-        else if (n > this->values.size()) {
-            if (this->values.empty()) {
+       // assert(! this->m_values.empty() || opt_default != nullptr);
+        if (n == 0) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        } else if (n < this->m_values.size()) {
+            assert (this->m_enabled.size() == this->m_values.size());
+            this->m_values.erase(this->m_values.begin() + n, this->m_values.end());
+            this->m_enabled.erase(this->m_enabled.begin() + n, this->m_enabled.end());
+        } else if (n > this->m_values.size()) {
+            if (this->m_values.empty()) {
                 if (opt_default == nullptr)
-                    this->values.resize(n, this->default_value);
-                if (opt_default->type() != this->type())
+                    this->m_values.resize(n, this->default_value);
+                else if (opt_default->type() != this->type())
                     throw ConfigurationError("ConfigOptionVector::resize(): Extending with an incompatible type.");
-                if(auto other = static_cast<const ConfigOptionVector<T>*>(opt_default); other->values.empty())
-                    this->values.resize(n, other->default_value);
+                else if(auto other = static_cast<const ConfigOptionVector<T>*>(opt_default); other->m_values.empty())
+                    this->m_values.resize(n, other->default_value);
                 else
-                    this->values.resize(n, other->values.front());
+                    this->m_values.resize(n, other->get_at(0));
             } else {
-                // Resize by duplicating the /*last*/first value.
-                this->values.resize(n, this->values./*back*/front());
+                // Resize by duplicating the first value.
+                this->m_values.resize(n, this->get_at(0));
             }
+            this->m_enabled.resize(n, ConfigOption::is_enabled());
         }
+        assert(m_enabled.size() == size());
+    }
+
+    // Resize this vector by duplicating the given value
+    void resize(size_t n, const T &resize_value)
+    {
+        assert(n >= 0);
+        if (n == 0) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        } else if (n < this->m_values.size()) {
+            assert(this->m_enabled.size() == this->m_values.size());
+            this->m_values.erase(this->m_values.begin() + n, this->m_values.end());
+            this->m_enabled.erase(this->m_enabled.begin() + n, this->m_enabled.end());
+        } else if (n > this->m_values.size()) {
+            this->m_values.resize(n, resize_value);
+            this->m_enabled.resize(n, ConfigOption::is_enabled());
+        }
+        assert(m_enabled.size() == size());
     }
 
     // Clear the values vector.
-    void   clear() override { this->values.clear(); }
-    size_t size()  const override { return this->values.size(); }
-    bool   empty() const override { return this->values.empty(); }
+    void   clear() override { this->m_values.clear(); this->m_enabled.clear(); }
+    size_t size()  const override { return this->m_values.size(); }
+    bool   empty() const override { return this->m_values.empty(); }
     // get the stored default value for filling empty vector.
     // If you use it, double check if you shouldn't instead use the ConfigOptionDef.defaultvalue, which is the default value of a setting.
     // currently, it's used to try to have a meaningful value for a Field if the default value is Nil
@@ -675,22 +811,26 @@ public:
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionVector: Comparing incompatible types");
         assert(dynamic_cast<const ConfigOptionVector<T>*>(&rhs));
-        return this->values == static_cast<const ConfigOptionVector<T>*>(&rhs)->values;
+        return this->has_same_enabled(*static_cast<const ConfigOptionVector<T> *>(&rhs)) &&
+               this->m_values == static_cast<const ConfigOptionVector<T> *>(&rhs)->m_values;
     }
 
-    bool operator==(const std::vector<T> &rhs) const throw() { return this->values == rhs; }
-    bool operator!=(const std::vector<T> &rhs) const throw() { return this->values != rhs; }
+    bool operator==(const std::vector<T> &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->m_values == rhs; }
+    bool operator!=(const std::vector<T> &rhs) const throw() { return this->is_enabled() != rhs.is_enabled() || this->m_values != rhs; }
 
     size_t hash() const throw() override {
         std::hash<T> hasher;
+        std::hash<bool> hasher_b;
         size_t seed = 0;
-        for (const auto &v : this->values)
+        for (const auto &v : this->m_values)
             boost::hash_combine(seed, hasher(v));
+        for (bool b : this->m_enabled)
+            boost::hash_combine(seed, hasher_b(b));
         return seed;
     }
 
     // Is this option overridden by another option?
-    // An option overrides another option if it is not nil and not equal.
+    // An option overrides another option if it is not nil and not equal
     bool overriden_by(const ConfigOption *rhs) const override {
         if (this->nullable())
         	throw ConfigurationError("Cannot override a nullable ConfigOption.");
@@ -699,11 +839,12 @@ public:
     	auto rhs_vec = static_cast<const ConfigOptionVector<T>*>(rhs);
     	if (! rhs->nullable())
     		// Overridding a non-nullable object with another non-nullable object.
-    		return this->values != rhs_vec->values;
+    		return this->m_values != rhs_vec->m_values && this->m_enabled != rhs_vec->m_enabled;
     	size_t i = 0;
     	size_t cnt = std::min(this->size(), rhs_vec->size());
     	for (; i < cnt; ++ i)
-    		if (! rhs_vec->is_nil(i) && this->values[i] != rhs_vec->values[i])
+            if (! rhs_vec->is_nil(i) &&
+                (this->m_values[i] != rhs_vec->m_values[i] || this->is_enabled(i) != rhs_vec->is_enabled(i)))
     			return true;
     	for (; i < rhs_vec->size(); ++ i)
     		if (! rhs_vec->is_nil(i))
@@ -719,8 +860,9 @@ public:
 		auto rhs_vec = static_cast<const ConfigOptionVector<T>*>(rhs);
 		if (! rhs->nullable()) {
     		// Overridding a non-nullable object with another non-nullable object.
-    		if (this->values != rhs_vec->values) {
-    			this->values = rhs_vec->values;
+    		if (this->m_values != rhs_vec->m_values || this->m_enabled != rhs_vec->m_enabled) {
+    			this->m_values = rhs_vec->m_values;
+    			this->m_enabled = rhs_vec->m_enabled;
     			return true;
     		}
     		return false;
@@ -729,14 +871,16 @@ public:
     	size_t cnt = std::min(this->size(), rhs_vec->size());
     	bool   modified = false;
     	for (; i < cnt; ++ i)
-    		if (! rhs_vec->is_nil(i) && this->values[i] != rhs_vec->values[i]) {
-    			this->values[i] = rhs_vec->values[i];
+    		if (! rhs_vec->is_nil(i) && this->m_values[i] != rhs_vec->m_values[i]) {
+    			this->m_values[i] = rhs_vec->m_values[i];
+    			this->m_enabled[i] = rhs_vec->m_enabled[i];
     			modified = true;
     		}
     	for (; i < rhs_vec->size(); ++ i)
     		if (! rhs_vec->is_nil(i)) {
-    			this->values.resize(i + 1, this->default_value);
-    			this->values[i] = rhs_vec->values[i];
+    			this->m_values.resize(i + 1, this->default_value);
+    			this->m_values[i] = rhs_vec->m_values[i];
+    			this->m_enabled[i] = rhs_vec->m_enabled[i];
     			modified = true;
     		}
         return modified;
@@ -744,7 +888,7 @@ public:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive & ar) { ar(this->flags); ar(this->values); }
+	template<class Archive> void serialize(Archive & ar) { ar(this->m_values); ar(cereal::base_class<ConfigOptionVectorBase>(this)); }
 };
 
 class ConfigOptionFloat : public ConfigOptionSingle<double>
@@ -752,18 +896,19 @@ class ConfigOptionFloat : public ConfigOptionSingle<double>
 public:
     ConfigOptionFloat() : ConfigOptionSingle<double>(0) {}
     explicit ConfigOptionFloat(double _value) : ConfigOptionSingle<double>(_value) {}
-    explicit ConfigOptionFloat(double _value, bool _phony) : ConfigOptionSingle<double>(_value, _phony) {}
 
     static ConfigOptionType static_type() { return coFloat; }
     ConfigOptionType        type()      const override { return static_type(); }
     double                  get_float(size_t idx = 0) const override { return this->value; }
     ConfigOption*           clone()     const override { return new ConfigOptionFloat(*this); }
-    bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionFloat &rhs) const throw() { return this->value <  rhs.value; }
+    bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator<(const ConfigOptionFloat &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     
     std::string serialize() const override
     {
         std::ostringstream ss;
+        if (!this->is_enabled())
+            ss << "!";
         ss << this->value;
         return ss.str();
     }
@@ -771,7 +916,12 @@ public:
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
-        std::istringstream iss(str);
+        if (!str.empty() && str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
+        std::istringstream iss(this->is_enabled() ? str : str.substr(1));
         iss >> this->value;
         return !iss.fail();
     }
@@ -800,29 +950,36 @@ public:
 
     static ConfigOptionType static_type() { return coFloats; }
     ConfigOptionType        type()  const override { return static_type(); }
-    ConfigOption*           clone() const override { return new ConfigOptionFloatsTempl(*this); }
-    bool                    operator==(const ConfigOptionFloatsTempl &rhs) const throw() { return vectors_equal(this->values, rhs.values); }
-    bool                    operator< (const ConfigOptionFloatsTempl &rhs) const throw() { return vectors_lower(this->values, rhs.values); }
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionFloatsTempl(*this); }
+    bool                    operator==(const ConfigOptionFloatsTempl &rhs) const throw()
+    {
+        return this->m_enabled == rhs.m_enabled && vectors_equal(this->m_values, rhs.m_values);
+    }
+    bool operator<(const ConfigOptionFloatsTempl &rhs) const throw()
+    {
+        return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && vectors_lower(this->m_values, rhs.m_values));
+    }
     bool 					operator==(const ConfigOption &rhs) const override {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionFloatsTempl: Comparing incompatible types");
         assert(dynamic_cast<const ConfigOptionVector<double>*>(&rhs));
-        return vectors_equal(this->values, static_cast<const ConfigOptionVector<double>*>(&rhs)->values);
+        return this->has_same_enabled(*static_cast<const ConfigOptionVector<double> *>(&rhs)) &&
+               vectors_equal(this->m_values, static_cast<const ConfigOptionVector<double> *>(&rhs)->get_values());
     }
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
     // A scalar is nil, or all values of a vector are nil.
-    bool is_nil(int32_t idx = -1) const override
+    bool                    is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
-            for (double v : this->values)
+            for (double v : this->m_values)
                 if (!std::isnan(v) && v != NIL_VALUE())
                     return false;
             return true;
         } else {
-            return idx < int32_t(values.size()) ? (std::isnan(this->values[idx]) || NIL_VALUE() == this->values[idx]) :
-                   values.empty()               ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
-                                                  (std::isnan(this->values.front()) || NIL_VALUE() == this->values.front());
+            return idx < int32_t(this->size()) ? (std::isnan(this->m_values[idx]) || NIL_VALUE() == this->m_values[idx]) :
+                   this->empty()               ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
+                                                 (std::isnan(this->m_values.front()) || NIL_VALUE() == this->m_values.front());
         }
     }
     double                  get_float(size_t idx = 0) const override { return get_at(idx); }
@@ -835,22 +992,24 @@ public:
 
     std::string serialize() const override
     {
+        assert(this->m_values.size() == this->m_enabled.size());
         std::ostringstream ss;
-        for (const double &v : this->values) {
-            if (&v != &this->values.front())
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
+            if (idx > 0)
                 ss << ",";
-            serialize_single_value(ss, v);
+            this->serialize_single_value(ss, this->m_values[idx], this->m_enabled[idx]);
         }
         return ss.str();
     }
     
     std::vector<std::string> vserialize() const override
     {
+        assert(this->m_values.size() == this->m_enabled.size());
         std::vector<std::string> vv;
-        vv.reserve(this->values.size());
-        for (const double v : this->values) {
+        vv.reserve(this->m_values.size());
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
             std::ostringstream ss;
-        	serialize_single_value(ss, v);
+            this->serialize_single_value(ss, this->m_values[idx], this->m_enabled[idx]);
             vv.push_back(ss.str());
         }
         return vv;
@@ -858,30 +1017,42 @@ public:
 
     bool deserialize(const std::string &str, bool append = false) override
     {
-        if (! append)
-            this->values.clear();
+        if (!append) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        }
         std::istringstream is(str);
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
+            bool enabled = true;
+            if (!item_str.empty() && item_str.front() == '!') {
+                enabled = false;
+                item_str = item_str.substr(1);
+                boost::trim(item_str);
+            }
         	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-        			this->values.push_back(NIL_VALUE());
+        			this->m_values.push_back(NIL_VALUE());
         		else
         			throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
 	            std::istringstream iss(item_str);
 	            double value;
 	            iss >> value;
-	            this->values.push_back(value);
+	            this->m_values.push_back(value);
 	        }
+            this->m_enabled.push_back(enabled);
         }
+        set_default_enabled();
+        assert(this->m_values.size() == this->m_enabled.size());
         return true;
     }
 
     ConfigOptionFloatsTempl& operator=(const ConfigOption *opt)
     {   
         this->set(opt);
+        assert(this->m_values.size() == this->m_enabled.size());
         return *this;
     }
 
@@ -889,16 +1060,18 @@ protected:
     // Special "nil" value to be stored into the vector if this->supports_nil().
     //please use is_nil & create_nil, to better support nan
     static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
-	void serialize_single_value(std::ostringstream &ss, const double v) const {
-        	if (std::isfinite(v))
-	            ss << v;
-	        else if (std::isnan(v) || v == NIL_VALUE()) {
-        		if (NULLABLE)
-        			ss << NIL_STR_VALUE;
-        		else
-                    throw ConfigurationError("Serializing NaN");
-        	} else
-                throw ConfigurationError("Serializing invalid number");
+    void serialize_single_value(std::ostringstream &ss, const double v, const bool enabled) const {
+        if (!enabled)
+            ss << "!";
+        if (std::isfinite(v))
+            ss << v;
+        else if (std::isnan(v) || v == NIL_VALUE()) {
+            if (NULLABLE)
+                ss << NIL_STR_VALUE;
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            throw ConfigurationError("Serializing invalid number");
 	}
     static bool vectors_equal(const std::vector<double> &v1, const std::vector<double> &v2) {
     	if (NULLABLE) {
@@ -946,11 +1119,14 @@ public:
     int32_t                 get_int(size_t idx = 0) const override { return this->value; }
     double                  get_float(size_t idx = 0) const override { return this->value; }
     ConfigOption*           clone()  const override { return new ConfigOptionInt(*this); }
-    bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->value == rhs.value; }
+    bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator<(const ConfigOptionInt &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     
     std::string serialize() const override 
     {
         std::ostringstream ss;
+        if (!this->is_enabled())
+            ss << "!";
         ss << this->value;
         return ss.str();
     }
@@ -958,7 +1134,12 @@ public:
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
-        std::istringstream iss(str);
+        if (!str.empty() && str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
+        std::istringstream iss(this->is_enabled() ? str : str.substr(1));
         iss >> this->value;
         return !iss.fail();
     }
@@ -987,10 +1168,10 @@ public:
 
     static ConfigOptionType static_type() { return coInts; }
     ConfigOptionType        type()  const override { return static_type(); }
-    ConfigOption*           clone() const override { return new ConfigOptionIntsTempl(*this); }
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionIntsTempl(*this); }
     ConfigOptionIntsTempl&  operator= (const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionIntsTempl &rhs) const throw() { return this->values == rhs.values; }
-    bool                    operator< (const ConfigOptionIntsTempl &rhs) const throw() { return this->values <  rhs.values; }
+    bool                    operator==(const ConfigOptionIntsTempl &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
+    bool                    operator< (const ConfigOptionIntsTempl &rhs) const throw() { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool                    nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
@@ -999,14 +1180,14 @@ public:
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
-            for (int32_t v : this->values)
+            for (int32_t v : this->m_values)
                 if (v != NIL_VALUE())
                     return false;
             return true;
         } else {
-            return idx < int32_t(values.size()) ? NIL_VALUE() == this->values[idx] :
-                   values.empty()               ? NIL_VALUE() == this->default_value :
-                                                  NIL_VALUE() == this->values.front();
+            return idx < int32_t(this->size()) ? NIL_VALUE() == this->m_values[idx] :
+                   this->empty()               ? NIL_VALUE() == this->default_value :
+                                                 NIL_VALUE() == this->get_at(0);
         }
     }
     int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
@@ -1015,10 +1196,10 @@ public:
     std::string serialize() const override
     {
         std::ostringstream ss;
-        for (const int32_t &v : this->values) {
-            if (&v != &this->values.front())
-            	ss << ",";
-            serialize_single_value(ss, v);
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
+            if (idx > 0)
+                ss << ",";
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
         }
         return ss.str();
     }
@@ -1026,10 +1207,10 @@ public:
     std::vector<std::string> vserialize() const override
     {
         std::vector<std::string> vv;
-        vv.reserve(this->values.size());
-        for (const int32_t v : this->values) {
+        vv.reserve(this->m_values.size());
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
             std::ostringstream ss;
-        	serialize_single_value(ss, v);
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
             vv.push_back(ss.str());
         }
         return vv;
@@ -1037,36 +1218,49 @@ public:
     
     bool deserialize(const std::string &str, bool append = false) override
     {
-        if (! append)
-            this->values.clear();
+        if (!append) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        }
         std::istringstream is(str);
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
-        	boost::trim(item_str);
+            bool enabled = true;
+            boost::trim(item_str);
+            if (!item_str.empty() && item_str.front() == '!') {
+                enabled  = false;
+                item_str = item_str.substr(1);
+                boost::trim(item_str);
+            }
         	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-                    this->values.push_back(NIL_VALUE());
+                    this->m_values.push_back(NIL_VALUE());
         		else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
 	            std::istringstream iss(item_str);
 	            int32_t value;
 	            iss >> value;
-	            this->values.push_back(value);
+	            this->m_values.push_back(value);
 	        }
+            this->m_enabled.push_back(enabled);
         }
+        set_default_enabled();
+        assert(this->m_values.size() == this->m_enabled.size());
         return true;
     }
 
 private:
-	void serialize_single_value(std::ostringstream &ss, const int32_t v) const {
-			if (v == NIL_VALUE()) {
-        		if (NULLABLE)
-        			ss << NIL_STR_VALUE;
-        		else
-                    throw ConfigurationError("Serializing NaN");
-        	} else
-        		ss << v;
+	void serialize_single_value(std::ostringstream &ss, const int32_t v, bool enabled) const {
+        if (!enabled)
+            ss << "!";
+		if (v == NIL_VALUE()) {
+        	if (NULLABLE)
+        		ss << NIL_STR_VALUE;
+        	else
+                throw ConfigurationError("Serializing NaN");
+        } else
+        	ss << v;
 	}
 
 	friend class cereal::access;
@@ -1086,19 +1280,26 @@ public:
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionString(*this); }
     ConfigOptionString&     operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionString &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionString &rhs) const throw() { return this->value <  rhs.value; }
+    bool                    operator==(const ConfigOptionString &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionString &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     bool 					empty() const { return this->value.empty(); }
 
     std::string serialize() const override
     { 
+        if (!this->is_enabled())
+            return std::string("!") + escape_string_cstyle(this->value);
         return escape_string_cstyle(this->value); 
     }
 
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
-        return unescape_string_cstyle(str, this->value);
+        if (!str.empty() && str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
+        return unescape_string_cstyle(this->is_enabled() ? str : str.substr(1), this->value);
     }
 
 private:
@@ -1113,33 +1314,46 @@ public:
     ConfigOptionStrings() : ConfigOptionVector<std::string>() {}
     explicit ConfigOptionStrings(const std::string& value) : ConfigOptionVector<std::string>(value) {}
     explicit ConfigOptionStrings(size_t n, const std::string& value) : ConfigOptionVector<std::string>(n, value) {}
+    explicit ConfigOptionStrings(std::initializer_list<std::string> il) : ConfigOptionVector<std::string>(std::move(il)) {}
     explicit ConfigOptionStrings(const std::vector<std::string> &values) : ConfigOptionVector<std::string>(values) {}
     explicit ConfigOptionStrings(std::vector<std::string> &&values) : ConfigOptionVector<std::string>(std::move(values)) {}
-    explicit ConfigOptionStrings(std::initializer_list<std::string> il) : ConfigOptionVector<std::string>(std::move(il)) {}
 
     static ConfigOptionType static_type() { return coStrings; }
     ConfigOptionType        type()  const override { return static_type(); }
-    ConfigOption*           clone() const override { return new ConfigOptionStrings(*this); }
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionStrings(*this); }
     ConfigOptionStrings&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionStrings &rhs) const throw() { return this->values == rhs.values; }
-    bool                    operator< (const ConfigOptionStrings &rhs) const throw() { return this->values <  rhs.values; }
+    bool                    operator==(const ConfigOptionStrings &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
+    bool                    operator< (const ConfigOptionStrings &rhs) const throw() { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
     bool                    is_nil(int32_t idx = 0) const override { return false; }
 
     std::string serialize() const override
     {
-        return escape_strings_cstyle(this->values);
+        if (this->m_enabled.empty() && !this->m_values.empty()) {
+            std::vector<bool> filled;
+            filled.resize(this->m_values.size(), ConfigOption::is_enabled(0));
+            return escape_strings_cstyle(this->m_values, filled);
+        }
+        return escape_strings_cstyle(this->m_values, this->m_enabled);
     }
     
     std::vector<std::string> vserialize() const override
     {
-        return this->values;
+        return this->m_values;
     }
     
     bool deserialize(const std::string &str, bool append = false) override
     {
-        if (! append)
-            this->values.clear();
-        return unescape_strings_cstyle(str, this->values);
+        if (!append) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        }
+        assert(this->m_enabled.size() == this->m_values.size());
+        bool success =  unescape_strings_cstyle(str, this->m_values, this->m_enabled);
+        if (success) {
+            set_default_enabled();
+        }
+        assert(this->m_values.size() == this->m_enabled.size());
+        return success;
     }
 
 private:
@@ -1152,14 +1366,13 @@ class ConfigOptionPercent : public ConfigOptionFloat
 public:
     ConfigOptionPercent() : ConfigOptionFloat(0) {}
     explicit ConfigOptionPercent(double _value) : ConfigOptionFloat(_value) {}
-    explicit ConfigOptionPercent(double _value, bool _phony) : ConfigOptionFloat(_value, _phony) {}
     
     static ConfigOptionType static_type() { return coPercent; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionPercent(*this); }
     ConfigOptionPercent&    operator= (const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionPercent &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionPercent &rhs) const throw() { return this->value <  rhs.value; }
+    bool                    operator==(const ConfigOptionPercent &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionPercent &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     
     double                  get_abs_value(double ratio_over) const { return ratio_over * this->value / 100.; }
     bool                    is_percent(size_t idx = 0) const override { return true; }
@@ -1167,6 +1380,8 @@ public:
     std::string serialize() const override 
     {
         std::ostringstream ss;
+        if (!this->is_enabled())
+            ss << "!";
         ss << this->value;
         std::string s(ss.str());
         s += "%";
@@ -1176,8 +1391,13 @@ public:
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
+        if (!str.empty() && str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
         // don't try to parse the trailing % since it's optional
-        std::istringstream iss(str);
+        std::istringstream iss(this->is_enabled() ? str : str.substr(1));
         iss >> this->value;
         return !iss.fail();
     }
@@ -1200,22 +1420,28 @@ public:
 
     static ConfigOptionType static_type() { return coPercents; }
     ConfigOptionType        type()  const override { return static_type(); }
-    ConfigOption*           clone() const override { return new ConfigOptionPercentsTempl(*this); }
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionPercentsTempl(*this); }
     ConfigOptionPercentsTempl& operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionPercentsTempl &rhs) const throw() { return ConfigOptionFloatsTempl<NULLABLE>::vectors_equal(this->values, rhs.values); }
-    bool                    operator< (const ConfigOptionPercentsTempl &rhs) const throw() { return ConfigOptionFloatsTempl<NULLABLE>::vectors_lower(this->values, rhs.values); }
+    bool operator==(const ConfigOptionPercentsTempl &rhs) const throw()
+    {
+        return this->m_enabled == rhs.m_enabled && ConfigOptionFloatsTempl<NULLABLE>::vectors_equal(this->m_values, rhs.m_values);
+    }
+    bool operator<(const ConfigOptionPercentsTempl &rhs) const throw()
+    {
+        return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && ConfigOptionFloatsTempl<NULLABLE>::vectors_lower(this->m_values, rhs.m_values));
+    }
     double                  get_abs_value(size_t i, double ratio_over) const { return this->is_nil(i) ? 0 : ratio_over * this->get_at(i) / 100; }
     bool                    is_percent(size_t idx = 0) const override { return true; }
 
     std::string serialize() const override
     {
         std::ostringstream ss;
-        for (const double &v : this->values) {
-            if (&v != &this->values.front())
-            	ss << ",";
-			this->serialize_single_value(ss, v);
-			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
-				ss << "%";
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
+            if (idx > 0)
+                ss << ",";
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
+            if (! (std::isnan(this->m_values[idx]) || this->m_values[idx] == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+                ss << "%";
         }
         std::string str = ss.str();
         return str;
@@ -1224,12 +1450,12 @@ public:
     std::vector<std::string> vserialize() const override
     {
         std::vector<std::string> vv;
-        vv.reserve(this->values.size());
-        for (const double v : this->values) {
+        vv.reserve(this->m_values.size());
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
             std::ostringstream ss;
-			this->serialize_single_value(ss, v);
-			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
-				ss << "%";
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
+            if (! (std::isnan(this->m_values[idx]) || this->m_values[idx] == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+                ss << "%";
             vv.push_back(ss.str());
         }
         return vv;
@@ -1252,7 +1478,6 @@ public:
     bool percent;
     ConfigOptionFloatOrPercent() : ConfigOptionPercent(0), percent(false) {}
     explicit ConfigOptionFloatOrPercent(double _value, bool _percent) : ConfigOptionPercent(_value), percent(_percent) {}
-    explicit ConfigOptionFloatOrPercent(double _value, bool _percent, bool _phony) : ConfigOptionPercent(_value, _phony), percent(_percent) {}
 
     static ConfigOptionType     static_type() { return coFloatOrPercent; }
     ConfigOptionType            type()  const override { return static_type(); }
@@ -1266,11 +1491,14 @@ public:
         return *this == *static_cast<const ConfigOptionFloatOrPercent*>(&rhs);
     }
     bool operator==(const ConfigOptionFloatOrPercent &rhs) const throw()
-        { return this->value == rhs.value && this->percent == rhs.percent; }
+        { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value && this->percent == rhs.percent; }
     size_t                      hash() const throw() override 
         { size_t seed = std::hash<double>{}(this->value); return this->percent ? seed ^ 0x9e3779b9 : seed; }
-    bool                        operator< (const ConfigOptionFloatOrPercent &rhs) const throw() 
-        { return this->value < rhs.value || (this->value == rhs.value && int(this->percent) < int(rhs.percent)); }
+    bool                        operator< (const ConfigOptionFloatOrPercent &rhs) const throw() {
+        bool this_enabled = this->is_enabled();
+        bool rhs_enabled = this->is_enabled();
+        return std::tie(this_enabled, this->value, this->percent) < std::tie(rhs_enabled, rhs.value, rhs.percent);
+    }
 
     double                      get_abs_value(double ratio_over) const 
         { return this->percent ? (ratio_over * this->value / 100) : this->value; }
@@ -1295,6 +1523,8 @@ public:
     std::string serialize() const override
     {
         std::ostringstream ss;
+        if (!this->is_enabled())
+            ss << "!";
         ss << this->value;
         std::string s(ss.str());
         if (this->percent) s += "%";
@@ -1304,8 +1534,13 @@ public:
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
+        if (!str.empty() && str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
         this->percent = str.find_first_of("%") != std::string::npos;
-        std::istringstream iss(str);
+        std::istringstream iss(this->is_enabled() ? str : str.substr(1));
         iss >> this->value;
         return !iss.fail();
     }
@@ -1328,30 +1563,38 @@ public:
 
     static ConfigOptionType static_type() { return coFloatsOrPercents; }
     ConfigOptionType        type()  const override { return static_type(); }
-    ConfigOption*           clone() const override { return new ConfigOptionFloatsOrPercentsTempl(*this); }
-    bool                    operator==(const ConfigOptionFloatsOrPercentsTempl &rhs) const throw() { return vectors_equal(this->values, rhs.values); }
-    bool                    operator==(const ConfigOption &rhs) const override {
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionFloatsOrPercentsTempl(*this); }
+    bool                    operator==(const ConfigOptionFloatsOrPercentsTempl &rhs) const throw()
+    {
+        return this->m_enabled == rhs.m_enabled && vectors_equal(this->m_values, rhs.m_values);
+    }
+    bool                    operator==(const ConfigOption &rhs) const override
+    {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionFloatsOrPercentsTempl: Comparing incompatible types");
-        assert(dynamic_cast<const ConfigOptionVector<FloatOrPercent>*>(&rhs));
-        return vectors_equal(this->values, static_cast<const ConfigOptionVector<FloatOrPercent>*>(&rhs)->values);
+        assert(dynamic_cast<const ConfigOptionVector<FloatOrPercent> *>(&rhs));
+        return this->has_same_enabled(*static_cast<const ConfigOptionVector<FloatOrPercent> *>(&rhs)) &&
+               vectors_equal(this->m_values, static_cast<const ConfigOptionVector<FloatOrPercent> *>(&rhs)->get_values());
     }
-    bool                    operator< (const ConfigOptionFloatsOrPercentsTempl &rhs) const throw() { return vectors_lower(this->values, rhs.values); }
+    bool                    operator<(const ConfigOptionFloatsOrPercentsTempl &rhs) const throw()
+    {
+        return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && vectors_lower(this->m_values, rhs.m_values));
+    }
 
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool                    nullable() const override { return NULLABLE; }
     // A scalar is nil, or all values of a vector are nil.
-    bool is_nil(int32_t idx = -1) const override
+    bool                    is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
-            for (const FloatOrPercent &v : this->values)
+            for (const FloatOrPercent &v : this->m_values)
                 if (!(std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()))
                     return false;
             return true;
         } else {
-            return idx < int32_t(values.size()) ? (std::isnan(this->values[idx].value) || NIL_VALUE() == this->values[idx]) :
-                   values.empty()               ? (std::isnan(this->default_value.value) || NIL_VALUE() == this->default_value) :
-                                                  (std::isnan(this->values.front().value) || NIL_VALUE() == this->values.front());
+            return idx < int32_t(this->size()) ? (std::isnan(this->m_values[idx].value) || NIL_VALUE() == this->m_values[idx]) :
+                   this->empty()               ? (std::isnan(this->default_value.value) || NIL_VALUE() == this->default_value) :
+                                                 (std::isnan(this->m_values.front().value) || NIL_VALUE() == this->m_values.front());
         }
     }
     double                  get_abs_value(size_t i, double ratio_over) const {
@@ -1379,10 +1622,10 @@ public:
     std::string serialize() const override
     {
         std::ostringstream ss;
-        for (const FloatOrPercent &v : this->values) {
-            if (&v != &this->values.front())
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
+            if (idx > 0)
                 ss << ",";
-            serialize_single_value(ss, v);
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
         }
         return ss.str();
     }
@@ -1390,10 +1633,10 @@ public:
     std::vector<std::string> vserialize() const override
     {
         std::vector<std::string> vv;
-        vv.reserve(this->values.size());
-        for (const FloatOrPercent &v : this->values) {
+        vv.reserve(this->m_values.size());
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
             std::ostringstream ss;
-            serialize_single_value(ss, v);
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
             vv.push_back(ss.str());
         }
         return vv;
@@ -1401,15 +1644,23 @@ public:
 
     bool deserialize(const std::string &str, bool append = false) override
     {
-        if (! append)
-            this->values.clear();
+        if (!append) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        }
         std::istringstream is(str);
         std::string item_str;
         while (std::getline(is, item_str, ',')) {
             boost::trim(item_str);
+            bool enabled = true;
+            if (!item_str.empty() && item_str.front() == '!') {
+                enabled = false;
+                item_str = item_str.substr(1);
+        	    boost::trim(item_str);
+            }
             if (item_str == NIL_STR_VALUE) {
                 if (NULLABLE)
-                    this->values.push_back(NIL_VALUE());
+                    this->m_values.push_back(NIL_VALUE());
                 else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
             } else {
@@ -1417,9 +1668,12 @@ public:
                 std::istringstream iss(item_str);
                 double value;
                 iss >> value;
-                this->values.push_back({ value, percent });
+                this->m_values.push_back({ value, percent });
             }
+            this->m_enabled.push_back(enabled);
         }
+        set_default_enabled();
+        assert(this->m_values.size() == this->m_enabled.size());
         return true;
     }
 
@@ -1433,18 +1687,20 @@ protected:
     // Special "nil" value to be stored into the vector if this->supports_nil().
     static FloatOrPercent   NIL_VALUE() { return FloatOrPercent{ std::numeric_limits<double>::max(), false }; }
 
-    void serialize_single_value(std::ostringstream &ss, const FloatOrPercent &v) const {
-            if (std::isfinite(v.value)) {
-                ss << v.value;
-                if (v.percent)
-                    ss << "%";
-            } else if (std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()) {
-                if (NULLABLE)
-                    ss << NIL_STR_VALUE;
-                else
-                    throw ConfigurationError("Serializing NaN");
-            } else
-                throw ConfigurationError("Serializing invalid number");
+    void serialize_single_value(std::ostringstream &ss, const FloatOrPercent &v, bool enabled) const {
+        if (!enabled)
+            ss << "!";
+        if (std::isfinite(v.value)) {
+            ss << v.value;
+            if (v.percent)
+                ss << "%";
+        } else if (std::isnan(v.value) || v.value == NIL_VALUE().value || v.value > std::numeric_limits<float>::max()) {
+            if (NULLABLE)
+                ss << NIL_STR_VALUE;
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            throw ConfigurationError("Serializing invalid number");
     }
     static bool vectors_equal(const std::vector<FloatOrPercent> &v1, const std::vector<FloatOrPercent> &v2) {
         if (NULLABLE) {
@@ -1491,12 +1747,14 @@ public:
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionPoint(*this); }
     ConfigOptionPoint&      operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionPoint &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionPoint &rhs) const throw() { return this->value <  rhs.value; }
+    bool                    operator==(const ConfigOptionPoint &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionPoint &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value <  rhs.value); }
 
     std::string serialize() const override
     {
         std::ostringstream ss;
+        if (!this->is_enabled())
+            ss << "!";
         ss << this->value(0);
         ss << "x";
         ss << this->value(1);
@@ -1506,8 +1764,14 @@ public:
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
+        if (!str.empty() && str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
+
         Vec2d point(Vec2d::Zero());
-        std::istringstream iss(str);
+        std::istringstream iss(this->is_enabled() ? str : str.substr(1));
         std::string coord_str;
         char sep = 'x';
         // compatibility withy old ',' separator
@@ -1541,21 +1805,29 @@ public:
 
     static ConfigOptionType static_type() { return coPoints; }
     ConfigOptionType        type()  const override { return static_type(); }
-    ConfigOption*           clone() const override { return new ConfigOptionPoints(*this); }
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionPoints(*this); }
     ConfigOptionPoints&     operator= (const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionPoints &rhs) const throw() { return this->values == rhs.values; }
+    bool                    operator==(const ConfigOptionPoints &rhs) const throw()
+    {
+        return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values;
+    }
     bool                    operator< (const ConfigOptionPoints &rhs) const throw() 
-        { return std::lexicographical_compare(this->values.begin(), this->values.end(), rhs.values.begin(), rhs.values.end(), [](const auto &l, const auto &r){ return l < r; }); }
+    { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled &&
+               std::lexicographical_compare(this->m_values.begin(), this->m_values.end(), rhs.m_values.begin(),
+                                            rhs.m_values.end(), [](const auto &l, const auto &r) { return l < r; }));
+    }
     bool                    is_nil(int32_t idx = 0) const override { return false; }
 
     std::string serialize() const override
     {
         std::ostringstream ss;
-        for (Pointfs::const_iterator it = this->values.begin(); it != this->values.end(); ++it) {
-            if (it - this->values.begin() != 0) ss << ",";
-            ss << (*it)(0);
+        for (size_t idx = 0 ; idx < this->m_values.size(); ++idx) {
+            if (idx != 0) ss << ",";
+            if (!m_enabled[idx])
+                ss << "!";
+            ss << this->m_values[idx].x();
             ss << "x";
-            ss << (*it)(1);
+            ss << this->m_values[idx].y();
         }
         return ss.str();
     }
@@ -1563,7 +1835,7 @@ public:
     std::vector<std::string> vserialize() const override
     {
         std::vector<std::string> vv;
-        for (Pointfs::const_iterator it = this->values.begin(); it != this->values.end(); ++it) {
+        for (Pointfs::const_iterator it = this->m_values.begin(); it != this->m_values.end(); ++it) {
             std::ostringstream ss;
             ss << *it;
             vv.push_back(ss.str());
@@ -1573,11 +1845,19 @@ public:
     
     bool deserialize(const std::string &str, bool append = false) override
     {
-        if (! append)
-            this->values.clear();
+        if (!append) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        }
         std::istringstream is(str);
         std::string point_str;
         while (std::getline(is, point_str, ',')) {
+        	boost::trim(point_str);
+            bool enabled = true;
+            if (!point_str.empty() && point_str.front() == '!') {
+                enabled = false;
+                point_str = point_str.substr(1);
+            }
             Vec2d point(Vec2d::Zero());
             std::istringstream iss(point_str);
             std::string coord_str;
@@ -1587,8 +1867,11 @@ public:
                     std::istringstream(coord_str) >> point(1);
                 }
             }
-            this->values.push_back(point);
+            this->m_values.push_back(point);
+            this->m_enabled.push_back(enabled);
         }
+        set_default_enabled();
+        assert(this->m_values.size() == this->m_enabled.size());
         return true;
     }
 
@@ -1596,16 +1879,16 @@ private:
 	friend class cereal::access;
 	template<class Archive> void save(Archive& archive) const {
         archive(flags);
-		size_t cnt = this->values.size();
+		size_t cnt = this->m_values.size();
 		archive(cnt);
-		archive.saveBinary((const char*)this->values.data(), sizeof(Vec2d) * cnt);
+		archive.saveBinary((const char*)this->m_values.data(), sizeof(Vec2d) * cnt);
 	}
 	template<class Archive> void load(Archive& archive) {
         archive(flags);
 		size_t cnt;
 		archive(cnt);
-		this->values.assign(cnt, Vec2d());
-		archive.loadBinary((char*)this->values.data(), sizeof(Vec2d) * cnt);
+		this->m_values.assign(cnt, Vec2d());
+		archive.loadBinary((char*)this->m_values.data(), sizeof(Vec2d) * cnt);
 	}
 };
 
@@ -1619,13 +1902,19 @@ public:
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionPoint3(*this); }
     ConfigOptionPoint3&     operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionPoint3 &rhs) const throw() { return this->value == rhs.value; }
+    bool                    operator==(const ConfigOptionPoint3 &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                    operator< (const ConfigOptionPoint3 &rhs) const throw() 
-        { return this->value.x() < rhs.value.x() || (this->value.x() == rhs.value.x() && (this->value.y() < rhs.value.y() || (this->value.y() == rhs.value.y() && this->value.z() < rhs.value.z()))); }
+    {
+        bool this_enabled = this->is_enabled();
+        bool rhs_enabled  = this->is_enabled();
+        return std::tie(this_enabled, this->value.x(), this->value.y()) < std::tie(rhs_enabled, rhs.value.x(), rhs.value.y());
+    }
 
     std::string serialize() const override
     {
         std::ostringstream ss;
+        if (!this->is_enabled())
+            ss << "!";
         ss << this->value(0);
         ss << ",";
         ss << this->value(1);
@@ -1634,9 +1923,17 @@ public:
         return ss.str();
     }
     
-    bool deserialize(const std::string &str, bool append = false) override
+    bool deserialize(const std::string &str_raw, bool append = false) override
     {
         UNUSED(append);
+        if (!str_raw.empty() && str_raw.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
+        
+        Vec2d point(Vec2d::Zero());
+        std::string str = (this->is_enabled() ? str_raw : str_raw.substr(1));
         char dummy;
         return sscanf(str.data(), " %lf , %lf , %lf %c", &this->value(0), &this->value(1), &this->value(2), &dummy) == 3 ||
                sscanf(str.data(), " %lf x %lf x %lf %c", &this->value(0), &this->value(1), &this->value(2), &dummy) == 3;
@@ -1660,22 +1957,29 @@ public:
     double                  get_float(size_t idx = 0) const override { return this->value ? 1. : 0.; }
     ConfigOption*           clone()     const override { return new ConfigOptionBool(*this); }
     ConfigOptionBool&       operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionBool &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionBool &rhs) const throw() { return int(this->value) < int(rhs.value); }
+    bool                    operator==(const ConfigOptionBool &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() &&this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionBool &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && int(this->value) < int(rhs.value)); }
 
     std::string serialize() const override
     {
-        return std::string(this->value ? "1" : "0");
+        return std::string(this->is_enabled() ? "" : "!") + std::string(this->value ? "1" : "0");
     }
     
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
-        if (str == "1") {
+        if (str.empty())
+            return false;
+        if (str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
+        if (str.back() == '1') {
             this->value = true;
             return true;
         }
-        if (str == "0") {
+        if (str.back() == '0') {
             this->value = false;
             return true;
         }
@@ -1694,17 +1998,29 @@ public:
     ConfigOptionBoolsTempl() : ConfigOptionVector<unsigned char>() {}
     explicit ConfigOptionBoolsTempl(bool default_value) : ConfigOptionVector<unsigned char>(default_value) {}
     explicit ConfigOptionBoolsTempl(size_t n, bool value) : ConfigOptionVector<unsigned char>(n, (unsigned char)value) {}
-    explicit ConfigOptionBoolsTempl(std::initializer_list<bool> il) { values.reserve(il.size()); for (bool b : il) values.emplace_back((unsigned char)b); }
-	explicit ConfigOptionBoolsTempl(std::initializer_list<unsigned char> il) { values.reserve(il.size()); for (unsigned char b : il) values.emplace_back(b); }
+    explicit ConfigOptionBoolsTempl(std::initializer_list<bool> il)
+    {
+        this->m_values.reserve(il.size());
+        for (bool b : il) this->m_values.emplace_back((unsigned char) b);
+        this->m_enabled.resize(this->m_values.size(), ConfigOption::is_enabled());
+        assert(m_enabled.size() == size());
+    }
+    explicit ConfigOptionBoolsTempl(std::initializer_list<unsigned char> il)
+    {
+        this->m_values.reserve(il.size());
+        for (unsigned char b : il) this->m_values.emplace_back(b);
+        this->m_enabled.resize(this->m_values.size(), ConfigOption::is_enabled());
+        assert(m_enabled.size() == size());
+    }
 	explicit ConfigOptionBoolsTempl(const std::vector<unsigned char>& vec) : ConfigOptionVector<unsigned char>(vec) {}
 	explicit ConfigOptionBoolsTempl(std::vector<unsigned char>&& vec) : ConfigOptionVector<unsigned char>(std::move(vec)) {}
 
     static ConfigOptionType static_type() { return coBools; }
     ConfigOptionType        type()  const override { return static_type(); }
-    ConfigOption*           clone() const override { return new ConfigOptionBoolsTempl(*this); }
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionBoolsTempl(*this); }
     ConfigOptionBoolsTempl& operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionBoolsTempl &rhs) const throw() { return this->values == rhs.values; }
-    bool                    operator< (const ConfigOptionBoolsTempl &rhs) const throw() { return this->values <  rhs.values; }
+    bool                    operator==(const ConfigOptionBoolsTempl &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
+    bool                    operator< (const ConfigOptionBoolsTempl &rhs) const throw() { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values <  rhs.m_values); }
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
@@ -1713,14 +2029,14 @@ public:
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
-            for (uint8_t v : this->values)
+            for (uint8_t v : this->m_values)
                 if (v != NIL_VALUE())
                     return false;
             return true;
         } else {
-            return idx < int32_t(values.size()) ? NIL_VALUE() == this->values[idx] :
-                   values.empty()               ? NIL_VALUE() == this->default_value :
-                                                  NIL_VALUE() == this->values.front();
+            return idx < int32_t(this->size()) ? NIL_VALUE() == this->m_values[idx] :
+                   this->empty()               ? NIL_VALUE() == this->default_value :
+                                                 NIL_VALUE() == this->m_values.front();
         }
     }
     bool                    get_bool(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }
@@ -1730,20 +2046,20 @@ public:
     std::string serialize() const override
     {
         std::ostringstream ss;
-        for (const unsigned char &v : this->values) {
-            if (&v != &this->values.front())
-            	ss << ",";
-			this->serialize_single_value(ss, v);
-		}
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
+            if (idx > 0)
+                ss << ",";
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
+        }
         return ss.str();
     }
     
     std::vector<std::string> vserialize() const override
     {
         std::vector<std::string> vv;
-        for (const unsigned char v : this->values) {
-			std::ostringstream ss;
-			this->serialize_single_value(ss, v);
+        for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
+            std::ostringstream ss;
+            this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
             vv.push_back(ss.str());
         }
         return vv;
@@ -1751,13 +2067,21 @@ public:
 
     ConfigHelpers::DeserializationResult deserialize_with_substitutions(const std::string &str, bool append, ConfigHelpers::DeserializationSubstitution substitution)
     {
-        if (! append)
-            this->values.clear();
+        if (!append) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        }
         std::istringstream is(str);
         std::string item_str;
         bool substituted = false;
         while (std::getline(is, item_str, ',')) {
         	boost::trim(item_str);
+            bool enabled = true;
+            if (!item_str.empty() && item_str.front() == '!') {
+                enabled = false;
+                item_str = item_str.substr(1);
+                boost::trim(item_str);
+            }
         	unsigned char new_value = 0;
         	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
@@ -1773,8 +2097,11 @@ public:
         		substituted = true;
         	} else
         		return ConfigHelpers::DeserializationResult::Failed;
-            this->values.push_back(new_value);
+            this->m_values.push_back(new_value);
+            this->m_enabled.push_back(enabled);
         }
+        set_default_enabled();
+        assert(this->m_values.size() == this->m_enabled.size());
         return substituted ? ConfigHelpers::DeserializationResult::Substituted : ConfigHelpers::DeserializationResult::Loaded;
     }
 
@@ -1784,15 +2111,17 @@ public:
     }
 
 protected:
-	void serialize_single_value(std::ostringstream &ss, const unsigned char v) const {
-        	if (v == NIL_VALUE()) {
-        		if (NULLABLE)
-        			ss << NIL_STR_VALUE;
-        		else
-                    throw ConfigurationError("Serializing NaN");
-        	} else
-        		ss << (v ? "1" : "0");
-	}
+    void serialize_single_value(std::ostringstream &ss, const unsigned char v, bool enabled) const {
+        if (!enabled)
+            ss << "!";
+        if (v == NIL_VALUE()) {
+            if (NULLABLE)
+                ss << NIL_STR_VALUE;
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            ss << (v ? "1" : "0");
+    }
 
 private:
 	friend class cereal::access;
@@ -1819,8 +2148,8 @@ public:
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionEnum<T>(*this); }
     ConfigOptionEnum<T>&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                    operator==(const ConfigOptionEnum<T> &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionEnum<T> &rhs) const throw() { return int(this->value) < int(rhs.value); }
+    bool                    operator==(const ConfigOptionEnum<T> &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionEnum<T> &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && int(this->value) < int(rhs.value)); }
     int32_t                 get_int(size_t idx = 0) const override { return int32_t(this->value); }
     void                    set_enum_int(int32_t val) override { this->value = T(val); }
     // special case for get/set any: use a int like for ConfigOptionEnumGeneric, to simplify
@@ -1832,7 +2161,7 @@ public:
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnum<T>: Comparing incompatible types");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        return this->value == (T)rhs.get_int();
+        return this->is_enabled() == rhs.is_enabled() && this->value == (T)rhs.get_int();
     }
 
     void set(const ConfigOption *rhs) override {
@@ -1847,13 +2176,18 @@ public:
     {
         const t_config_enum_names& names = ConfigOptionEnum<T>::get_enum_names();
         assert(static_cast<int>(this->value) < int(names.size()));
-        return names[static_cast<int>(this->value)];
+        return std::string(this->is_enabled() ? "" : "!") + names[static_cast<int>(this->value)];
     }
 
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
-        return from_string(str, this->value);
+        if (!str.empty() && str.front() == '!') {
+            this->set_enabled(false);
+        } else {
+            this->set_enabled(true);
+        }
+        return from_string(this->is_enabled() ? str : str.substr(1), this->value);
     }
 
     static bool has(T value) 
@@ -1895,15 +2229,15 @@ public:
     ConfigOptionType            type()  const override { return static_type(); }
     ConfigOption*               clone() const override { return new ConfigOptionEnumGeneric(*this); }
     ConfigOptionEnumGeneric&    operator= (const ConfigOption *opt) { this->set(opt); return *this; }
-    bool                        operator==(const ConfigOptionEnumGeneric &rhs) const throw() { return this->value == rhs.value; }
-    bool                        operator< (const ConfigOptionEnumGeneric &rhs) const throw() { return this->value <  rhs.value; }
+    bool                        operator==(const ConfigOptionEnumGeneric &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                        operator< (const ConfigOptionEnumGeneric &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value <  rhs.value); }
 
     bool operator==(const ConfigOption &rhs) const override
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnumGeneric: Comparing incompatible types");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        return this->value == rhs.get_int();
+        return this->is_enabled() == rhs.is_enabled() && this->value == rhs.get_int();
     }
 
     void set_enum_int(int32_t val) override { this->value = val; }
@@ -1917,10 +2251,13 @@ public:
 
     std::string serialize() const override
     {
+        std::string prefix;
+        if (!this->is_enabled())
+            prefix = "!";
         for (const auto &kvp : *this->keys_map)
             if (kvp.second == this->value) 
-                return kvp.first;
-        return std::string();
+                return prefix + kvp.first;
+        return prefix;
     }
 
     bool deserialize(const std::string &str, bool append = false) override
@@ -2093,6 +2430,8 @@ public:
     bool                                readonly        = false;
     // Can be phony. if not present at laoding, mark it as phony. Also adapt the gui to look for phony status.
     bool                                can_phony       = false;
+    // Can be enabled/disabled by a check box.
+    bool                                can_enable      = false;
     // Height of a multiline GUI text box.
     int                                 height          = -1;
     // Optional width of an input field.
@@ -2137,6 +2476,8 @@ public:
     std::vector<std::string>            depends_on; // from Option
 
     bool has_enum_value(const std::string &value) const {
+        if (!value.empty() && value.front() == '!')
+            return has_enum_value(value.substr(1));
         for (const std::string &v : enum_values)
             if (v == value)
                 return true;

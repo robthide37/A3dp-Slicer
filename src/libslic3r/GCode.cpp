@@ -630,15 +630,15 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
         double support_layer_height_min = 1000000.;
         const ConfigOptionFloatsOrPercents& min_layer_height = object.print()->config().min_layer_height;
         const ConfigOptionFloats& nozzle_diameter = object.print()->config().nozzle_diameter;
-        for(int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id)
-            support_layer_height_min = std::min(support_layer_height_min, std::max(nozzle_diameter.values[extr_id]/40, min_layer_height.get_abs_value(extr_id, nozzle_diameter.values[extr_id])));
+        for(int extr_id = 0; extr_id < min_layer_height.size(); ++extr_id)
+            support_layer_height_min = std::min(support_layer_height_min, std::max(nozzle_diameter.get_at(extr_id)/40, min_layer_height.get_abs_value(extr_id, nozzle_diameter.get_at(extr_id))));
         gap_over_supports += support_layer_height_min;
     }*/
 
     std::vector<std::pair<double, double>> warning_ranges;
 
     //check for max nozzle diameter
-    const std::vector<double>& nozzle_diameters = object.print()->config().nozzle_diameter.values;
+    const std::vector<double>& nozzle_diameters = object.print()->config().nozzle_diameter.get_values();
     std::set<uint16_t> exctruder_ids = object.object_extruders();
     double max_nozzle = 0;
     for (uint16_t id : exctruder_ids) {
@@ -884,28 +884,28 @@ namespace DoExport {
         if (ret.size() < MAX_TAGS_COUNT) check(_(L("Pause Print G-code")), GCodeWriter::get_default_pause_gcode(config));
         if (ret.size() < MAX_TAGS_COUNT) check(_(L("Template Custom G-code")), config.template_custom_gcode.value);
         if (ret.size() < MAX_TAGS_COUNT) {
-            for (const std::string& value : config.start_filament_gcode.values) {
+            for (const std::string& value : config.start_filament_gcode.get_values()) {
                 check(_(L("Filament Start G-code")), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }
         }
         if (ret.size() < MAX_TAGS_COUNT) {
-            for (const std::string& value : config.end_filament_gcode.values) {
+            for (const std::string& value : config.end_filament_gcode.get_values()) {
                 check(_(L("Filament End G-code")), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }
         }
         if (ret.size() < MAX_TAGS_COUNT) {
-            for (const std::string& value : print.config().milling_toolchange_start_gcode.values) {
+            for (const std::string& value : print.config().milling_toolchange_start_gcode.get_values()) {
                 check(_(L("Milling Start G-code")), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }
         }
         if (ret.size() < MAX_TAGS_COUNT) {
-            for (const std::string& value : print.config().milling_toolchange_end_gcode.values) {
+            for (const std::string& value : print.config().milling_toolchange_end_gcode.get_values()) {
                 check(_(L("Milling End G-code")), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
@@ -1431,7 +1431,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         m_processor.process_string(gcode,  this->m_throw_if_canceled);
     }
 
-    if (! print.config().gcode_substitutions.values.empty()) {
+    if (! print.config().gcode_substitutions.empty()) {
         m_find_replace = make_unique<GCodeFindReplace>(print.config());
         file.set_find_replace(m_find_replace.get(), false);
     }
@@ -1506,7 +1506,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     const ConfigOptionBool* thumbnails_with_bed = print.full_print_config().option<ConfigOptionBool>("thumbnails_with_bed");
     if (thumbnails_format != nullptr && thumbnails_format->value == GCodeThumbnailsFormat::BIQU)
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
-            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
+            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->get_values(),
             thumbnails_with_bed ? thumbnails_with_bed->value : false,
             thumbnails_format->value,
             true, 
@@ -1524,7 +1524,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
         // If "thumbnails_format" is not defined, export to PNG.
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb,
-            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
+            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->get_values(),
             thumbnails_with_bed ? thumbnails_with_bed->value : false,
             thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
             thumbnails_tag_with_format ? thumbnails_tag_with_format->value : false,
@@ -1671,7 +1671,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     std::vector<const PrintInstance*> 					print_object_instances_ordering;
     std::vector<const PrintInstance*>::const_iterator 	print_object_instance_sequential_active;
     bool has_milling = false;
-    if (!config().milling_diameter.values.empty()) {
+    if (!config().milling_diameter.empty()) {
         for (const PrintObject* obj : print.objects()) {
             for (const Layer *layer : obj->layers()) {
                 for (const LayerRegion *lr : layer->regions()) {
@@ -1767,7 +1767,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     m_placeholder_parser.set("total_toolchanges", std::max(0, print.wipe_tower_data().number_of_toolchanges)); // Check for negative toolchanges (single extruder mode) and set to 0 (no tool change).
     m_placeholder_parser.set("bounding_box", new ConfigOptionFloats({ global_bounding_box.min.x(), global_bounding_box.min.y(), global_bounding_box.min.z(), global_bounding_box.max.x(), global_bounding_box.max.y(), global_bounding_box.max.z() }));
     {
-        BoundingBoxf bbox(print.config().bed_shape.values);
+        BoundingBoxf bbox(print.config().bed_shape.get_values());
         m_placeholder_parser.set("print_bed_min",  new ConfigOptionFloats({ bbox.min.x(), bbox.min.y() }));
         m_placeholder_parser.set("print_bed_max",  new ConfigOptionFloats({ bbox.max.x(), bbox.max.y() }));
         m_placeholder_parser.set("print_bed_size", new ConfigOptionFloats({ bbox.size().x(), bbox.size().y() }));
@@ -1779,10 +1779,10 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         // therefore it does NOT encompass the initial purge line.
         // It does NOT encompass MMU/MMU2 starting (wipe) areas.
         auto pts = std::make_unique<ConfigOptionPoints>();
-        pts->values.reserve(print.first_layer_convex_hull().size());
-        for (const Point &pt : print.first_layer_convex_hull().points)
-            pts->values.emplace_back(unscale(pt));
-        BoundingBoxf bbox(pts->values);
+        pts->resize(print.first_layer_convex_hull().size());
+        for (size_t idx = 0; idx < print.first_layer_convex_hull().points.size(); ++idx)
+            pts->set_at(unscale(print.first_layer_convex_hull().points[idx]), idx);
+        BoundingBoxf bbox(pts->get_values());
         m_placeholder_parser.set("first_layer_print_convex_hull", pts.release());
         m_placeholder_parser.set("first_layer_print_min",  new ConfigOptionFloats({ bbox.min.x(), bbox.min.y() }));
         m_placeholder_parser.set("first_layer_print_max",  new ConfigOptionFloats({ bbox.max.x(), bbox.max.y() }));
@@ -1840,9 +1840,9 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         BoundingBoxf bbox = bbvisitor.get_bb();
         Polygon first_layer_hull = bbvisitor.get_hull();
         auto pts = std::make_unique<ConfigOptionPoints>();
-        pts->values.reserve(first_layer_hull.size());
-        for (const Point& pt : first_layer_hull.points)
-            pts->values.emplace_back(unscale(pt));
+        pts->resize(first_layer_hull.size());
+        for (size_t idx = 0; idx < first_layer_hull.points.size(); ++idx)
+            pts->set_at(unscale(first_layer_hull.points[idx]), idx);
         m_placeholder_parser.set("first_layer_print_convex_hull", pts.release());
         m_placeholder_parser.set("first_layer_print_min", new ConfigOptionFloats({ bbox.min.x(), bbox.min.y() }));
         m_placeholder_parser.set("first_layer_print_max", new ConfigOptionFloats({ bbox.max.x(), bbox.max.y() }));
@@ -1896,7 +1896,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
     } else {
             DynamicConfig config;
             config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(initial_extruder_id)));
-            file.preamble_to_put_start_layer.append(this->placeholder_parser_process("start_filament_gcode", print.config().start_filament_gcode.values[initial_extruder_id], initial_extruder_id, &config));
+            file.preamble_to_put_start_layer.append(this->placeholder_parser_process("start_filament_gcode", print.config().start_filament_gcode.get_at(initial_extruder_id), initial_extruder_id, &config));
             preamble_to_put_start_layer.append("\n");
     }
 */
@@ -2164,7 +2164,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                 config.set_key_value("filament_extruder_id", new ConfigOptionInt(extruder_id));
                 file.writeln(this->placeholder_parser_process("end_filament_gcode", print.config().end_filament_gcode.get_at(extruder_id), extruder_id, &config));
             } else {
-                for (const std::string& end_gcode : print.config().end_filament_gcode.values) {
+                for (const std::string& end_gcode : print.config().end_filament_gcode.get_values()) {
                     int extruder_id = (uint16_t)(&end_gcode - &print.config().end_filament_gcode.get_at(0));
                     config.set_key_value("filament_extruder_id", new ConfigOptionInt(extruder_id));
                     config.set_key_value("previous_extruder", new ConfigOptionInt(extruder_id));
@@ -2228,7 +2228,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
         // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
         // If "thumbnails_format" is not defined, export to PNG.
         GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, 
-            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->values,
+            print.full_print_config().option<ConfigOptionPoints>("thumbnails")->get_values(),
             thumbnails_with_bed ? thumbnails_with_bed->value : false,
             thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
             thumbnails_tag_with_format ? thumbnails_tag_with_format->value: false,
@@ -2523,8 +2523,8 @@ std::string GCode::placeholder_parser_process(const std::string &name, const std
             }
         };
         if (current_extruder_id >= 0 && current_extruder_id < config().filament_colour.size()) {
-            func_add_colour("filament_colour_int", config().filament_colour.values[current_extruder_id]);
-            func_add_colour("extruder_colour_int", config().extruder_colour.values[current_extruder_id]);
+            func_add_colour("filament_colour_int", config().filament_colour.get_at(current_extruder_id));
+            func_add_colour("extruder_colour_int", config().extruder_colour.get_at(current_extruder_id));
         }
 
         // should be the same as Vec2d gcode_pos = point_to_gcode(m_last_pos);
@@ -3694,7 +3694,7 @@ LayerResult GCode::process_layer(
 
 
     //add milling post-process if enabled
-    if (!config().milling_diameter.values.empty()) {
+    if (!config().milling_diameter.empty()) {
         bool milling_ok = false;
         for (const LayerToPrint& ltp : layers) {
             if (ltp.object_layer != nullptr) {
@@ -3714,7 +3714,7 @@ LayerResult GCode::process_layer(
             //switch to mill
             gcode += "; milling ok\n";
             uint32_t current_extruder_filament = m_writer.tool()->id();
-            uint32_t milling_extruder_id = uint32_t(config().nozzle_diameter.values.size());
+            uint32_t milling_extruder_id = uint32_t(config().nozzle_diameter.size());
             m_writer.toolchange(milling_extruder_id);
             m_placeholder_parser.set("current_extruder", milling_extruder_id);
             // Append the filament start G-code.

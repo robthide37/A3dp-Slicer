@@ -153,8 +153,8 @@ float compute_fill_angle(const PrintRegionConfig &region_config, size_t layer_id
     float angle = 0;
     if (!region_config.fill_angle_template.empty()) {
         // fill pattern: replace fill angle
-        size_t idx   = layer_id % region_config.fill_angle_template.values.size();
-        angle = region_config.fill_angle_template.values[idx];
+        size_t idx   = layer_id % region_config.fill_angle_template.size();
+        angle = region_config.fill_angle_template.get_at(idx);
     } else {
         angle = region_config.fill_angle.value;
     }
@@ -923,7 +923,7 @@ void Layer::make_ironing()
 
         // Create the ironing extrusions for regions <i, j)
         ExPolygons ironing_areas;
-        double nozzle_dmr = this->object()->print()->config().nozzle_diameter.values[ironing_params.extruder - 1];
+        double nozzle_dmr = this->object()->print()->config().nozzle_diameter.get_at(ironing_params.extruder - 1);
         const PrintRegionConfig& region_config = ironing_params.layerm->region().config();
         if (ironing_params.just_infill) {
             // Just infill.

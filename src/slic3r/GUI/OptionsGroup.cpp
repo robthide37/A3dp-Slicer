@@ -697,10 +697,10 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
     auto it_opt_map = m_opt_map.find(opt_key);
 	if (opt_key == "extruders_count") {
 		auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("nozzle_diameter"));
-		value = int(nozzle_diameter->values.size());
+		value = int(nozzle_diameter->size());
 	} else if (opt_key == "milling_count") {
 		auto   *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
-		value = int(milling_diameter->values.size());
+		value = int(milling_diameter->size());
 	} else if (it_opt != m_options.end() && it_opt->second.opt.is_script) {
         // when a scripted key is reset, reset its deps
         // call the reset function if it exits

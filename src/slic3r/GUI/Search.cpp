@@ -70,10 +70,10 @@ template<class T>
 void change_opt_key(std::string& opt_key, DynamicPrintConfig* config, int& cnt)
 {
     T* opt_cur = static_cast<T*>(config->option(opt_key));
-    cnt = opt_cur->values.size();
+    cnt = opt_cur->size();
     return;
 
-    if (opt_cur->values.size() > 0)
+    if (opt_cur->size() > 0)
         opt_key += "#" + std::to_string(0);
 }
 
@@ -127,10 +127,10 @@ static std::string get_key(const std::string& opt_key, Preset::Type type)
 void change_opt_keyFoP(std::string& opt_key, DynamicPrintConfig* config, int& cnt)
 {
     ConfigOptionFloatsOrPercents* opt_cur = static_cast<ConfigOptionFloatsOrPercents*>(config->option(opt_key));
-    cnt = opt_cur->values.size();
+    cnt = opt_cur->size();
     return;
 
-    if (opt_cur->values.size() > 0)
+    if (opt_cur->size() > 0)
         opt_key += "#" + std::to_string(0);
 }
 const GroupAndCategory& OptionsSearcher::get_group_and_category(const std::string& opt_key, ConfigOptionMode tags) const

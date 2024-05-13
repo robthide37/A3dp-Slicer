@@ -1339,7 +1339,7 @@ FillLightning::GeneratorPtr PrintObject::prepare_lightning_infill_data()
                                                     //check if small enough
                                                     double max_nozzle_diam = 0;
                                                     for (uint16_t extruder_id : object_extruders()) {
-                                                        max_nozzle_diam = std::max(max_nozzle_diam, print()->config().nozzle_diameter.values[extruder_id]);
+                                                        max_nozzle_diam = std::max(max_nozzle_diam, print()->config().nozzle_diameter.get_at(extruder_id));
                                                     }
                                                     coordf_t min_width = scale_d(max_nozzle_diam) / region->config().fill_density.get_abs_value(1.);
                                                     ExPolygons smalls = offset_ex(intersect, -min_width);
@@ -2660,7 +2660,7 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
         if (config().first_layer_height.percent) {
             object_first_layer_height = 1000000000;
             for (uint16_t extruder_id : object_extruders()) {
-                double nozzle_diameter = print()->config().nozzle_diameter.values[extruder_id];
+                double nozzle_diameter = print()->config().nozzle_diameter.get_at(extruder_id);
                 object_first_layer_height = std::fmin(object_first_layer_height, config().first_layer_height.get_abs_value(nozzle_diameter));
             }
         }

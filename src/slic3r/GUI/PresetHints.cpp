@@ -569,7 +569,7 @@ std::string PresetHints::recommended_extrusion_width(const PresetBundle& preset_
     const DynamicPrintConfig& print_config = preset_bundle.fff_prints.get_edited_preset().config;
     const DynamicPrintConfig& printer_config = preset_bundle.printers.get_edited_preset().config;
 
-    int nb_nozzles = printer_config.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
+    int nb_nozzles = printer_config.option<ConfigOptionFloats>("nozzle_diameter")->size();
 
     double nozzle_diameter = 0;
     for(int i=0; i< nb_nozzles; i++)

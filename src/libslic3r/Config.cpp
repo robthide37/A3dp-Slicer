@@ -96,11 +96,17 @@ std::string escape_string_cstyle(const std::string &str)
 
 std::string escape_strings_cstyle(const std::vector<std::string> &strs)
 {
+    return escape_strings_cstyle(strs, {});
+}
+
+std::string escape_strings_cstyle(const std::vector<std::string> &strs, const std::vector<bool> &enables)
+{
+    assert(strs.size() == enables.size() || enables.empty());
     // 1) Estimate the output buffer size to avoid buffer reallocation.
     size_t outbuflen = 0;
     for (size_t i = 0; i < strs.size(); ++ i)
-        // Reserve space for every character escaped + quotes + semicolon.
-        outbuflen += strs[i].size() * 2 + 3;
+        // Reserve space for every character escaped + quotes + semicolon + enable.
+        outbuflen += strs[i].size() * 2 + ((enables.empty() || enables[i]) ? 3 : 4);
     // 2) Fill in the buffer.
     std::vector<char> out(outbuflen, 0);
     char *outptr = out.data();
@@ -108,6 +114,8 @@ std::string escape_strings_cstyle(const std::vector<std::string> &strs)
         if (j > 0)
             // Separate the strings.
             (*outptr ++) = ';';
+        if (!(enables.empty() || enables[j]))
+            (*outptr ++) = '!';
         const std::string &str = strs[j];
         // Is the string simple or complex? Complex string contains spaces, tabs, new lines and other
         // escapable characters. Empty string shall be quoted as well, if it is the only string in strs.
@@ -168,7 +176,12 @@ bool unescape_string_cstyle(const std::string &str, std::string &str_out)
     return true;
 }
 
-bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &out)
+bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &out_values)
+{
+    std::vector<bool> useless;
+    return unescape_strings_cstyle(str, out_values, useless);
+}
+bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &out_values, std::vector<bool> &out_enables)
 {
     if (str.empty())
         return true;
@@ -181,6 +194,11 @@ bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &o
             if (++ i == str.size())
                 return true;
             c = str[i];
+        }
+        bool enable = true;
+        if (c == '!') {
+            enable = false;
+            c = str[++i];
         }
         // Start of a word.
         std::vector<char> buf;
@@ -218,7 +236,8 @@ bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &o
             }
         }
         // Store the string into the output vector.
-        out.push_back(std::string(buf.data(), buf.size()));
+        out_values.push_back(std::string(buf.data(), buf.size()));
+        out_enables.push_back(enable);
         if (i == str.size())
             return true;
         // Skip white spaces.
@@ -233,7 +252,8 @@ bool unescape_strings_cstyle(const std::string &str, std::vector<std::string> &o
             return false;
         if (++ i == str.size()) {
             // Emit one additional empty string.
-            out.push_back(std::string());
+            out_values.push_back(std::string());
+            out_enables.push_back(true);
             return true;
         }
     }
@@ -666,7 +686,7 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
             if (optdef->default_value) {
                 // Default value for vectors of booleans used in a "per extruder" context, thus the default contains just a single value.
                 assert(dynamic_cast<const ConfigOptionVector<unsigned char>*>(optdef->default_value.get()));
-                auto &values = static_cast<const ConfigOptionVector<unsigned char>*>(optdef->default_value.get())->values;
+                const auto &values = static_cast<const ConfigOptionVector<unsigned char>*>(optdef->default_value.get())->get_values();
                 if (values.size() == 1 && values.front() == 1)
                     default_value = ConfigHelpers::DeserializationSubstitution::DefaultsToTrue;
             }
@@ -800,8 +820,8 @@ double ConfigBase::get_computed_value(const t_config_option_key &opt_key, int ex
                 return vector_opt->get_float(idx);
             if (raw_opt->type() == coFloatsOrPercents) {
                 const ConfigOptionFloatsOrPercents* opt_fl_per = static_cast<const ConfigOptionFloatsOrPercents*>(raw_opt);
-                if (!opt_fl_per->values[idx].percent)
-                    return opt_fl_per->values[idx].value;
+                if (!opt_fl_per->get_at(idx).percent)
+                    return opt_fl_per->get_at(idx).value;
 
                 const ConfigOptionDef* opt_def = this->get_option_def(opt_key);
                 if (opt_def == nullptr) // maybe a placeholder?
@@ -1439,7 +1459,7 @@ bool DynamicConfig::read_cli(int argc, const char* const argv[], t_config_option
             // Vector values will be chained. Repeated use of a parameter will append the parameter or parameters
             // to the end of the value.
             if (opt_base->type() == coBools && value.empty())
-                static_cast<ConfigOptionBools*>(opt_base)->values.push_back(!no);
+                static_cast<ConfigOptionBools*>(opt_base)->set_at(!no, opt_vector->size());
             else
                 // Deserialize any other vector value (ConfigOptionInts, Floats, Percents, Points) the same way
                 // they get deserialized from an .ini file. For ConfigOptionStrings, that means that the C-style unescape

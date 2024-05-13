@@ -202,10 +202,10 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 			break;
 		case coBools:
 			if (conf_substitution.new_value->nullable())
-				for (const char v : static_cast<const ConfigOptionBoolsNullable*>(conf_substitution.new_value.get())->values)
+				for (const char v : static_cast<const ConfigOptionBoolsNullable*>(conf_substitution.new_value.get())->get_values())
 					new_val += std::string(v == ConfigOptionBoolsNullable::NIL_VALUE() ? "nil" : v ? "true" : "false") + ", ";
 			else
-				for (const char v : static_cast<const ConfigOptionBools*>(conf_substitution.new_value.get())->values)
+				for (const char v : static_cast<const ConfigOptionBools*>(conf_substitution.new_value.get())->get_values())
 					new_val += std::string(v ? "true" : "false") + ", ";
 			if (! new_val.empty())
 				new_val.erase(new_val.begin() + new_val.size() - 2, new_val.end());

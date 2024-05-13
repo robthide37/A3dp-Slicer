@@ -279,7 +279,7 @@ void FanMover::_process_ACTIVATE_EXTRUDER(const std::string_view cmd)
             std::string_view extruder_name = cmd.substr(extruder_pos_start, extruder_pos_end-extruder_pos_start);
             // we have a "name". It may be whatever or "extruder" + X
             for (const Extruder &extruder : m_writer.extruders()) {
-                if (m_writer.config.tool_name.values[extruder.id()] == extruder_name) {
+                if (m_writer.config.tool_name.get_at(extruder.id()) == extruder_name) {
                     m_current_extruder = static_cast<uint16_t>(extruder.id());
                     return;
                 }
