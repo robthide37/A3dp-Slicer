@@ -4841,8 +4841,8 @@ void GCode::add_wipe_points(const std::vector<THING>& paths) {
                 break; // Do not perform a wipe on bridges.
 
             assert(it->polyline.size() >= 2);
-            assert(m_wipe.path.points.back() == it->last_point());
-            if (m_wipe.path.points.back() != it->last_point())
+            assert(m_wipe.path.points.back().coincides_with_epsilon(it->last_point()));
+            if (!m_wipe.path.points.back().coincides_with_epsilon(it->last_point()))
                 break; // ExtrusionMultiPath is interrupted in some place.
 
             m_wipe.path.points.insert(m_wipe.path.points.end(), it->polyline.get_points().rbegin() + 1, it->polyline.get_points().rend());
