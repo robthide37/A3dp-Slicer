@@ -8375,6 +8375,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "perimeter_overlap",
 "perimeter_reverse",
 "perimeter_round_corners",
+"perimeters_hole",
 "print_extrusion_multiplier",
 "print_first_layer_temperature",
 "print_custom_variables",
