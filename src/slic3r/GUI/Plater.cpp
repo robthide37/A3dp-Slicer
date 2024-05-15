@@ -373,6 +373,9 @@ void FreqChangedParams::init()
 {
     DynamicPrintConfig*	config = &wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
     Tab* tab_freq_fff = wxGetApp().get_tab(Preset::TYPE_FREQUENT_FFF, false);
+    assert(dynamic_cast<TabFrequent*>(tab_freq_fff));
+    if (!dynamic_cast<TabFrequent *>(tab_freq_fff))
+        return;
 
     /* Not a best solution, but
      * Temporary workaround for right border alignment
@@ -399,7 +402,7 @@ void FreqChangedParams::init()
                 if (opt_def && !opt_def->opt.is_script) {
                     tab_freq_fff->update_dirty();
                     tab_freq_fff->reload_config();
-                    tab_freq_fff->update();
+                    static_cast<TabFrequent*>(tab_freq_fff)->update_changed_setting(opt_key);
                 }
             });
         assert(tab_freq_fff->get_page_count() == 1);
@@ -6666,7 +6669,7 @@ bool Plater::update_filament_colors_in_full_config()
     return true;
 }
 
-void Plater::on_config_change(const DynamicPrintConfig &config)
+void Plater::on_config_change(const DynamicConfig &config)
 {
     bool update_scheduled = false;
     bool bed_shape_changed = false;
