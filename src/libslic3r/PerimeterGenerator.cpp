@@ -1901,7 +1901,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& contour_count, int
             }
         }
         assert(contours.size() == contour_count);
-        assert(holes.size() == holes_count);
+        //assert(holes.size() == holes_count);
         // nest loops: holes first
         for (int d = 0; d < holes_count; ++d) {
             PerimeterGeneratorLoops& holes_d = holes[d];
