@@ -1267,8 +1267,8 @@ void WipeTower::toolchange_Wipe(
     if (this->m_config->filament_max_speed.get_at(this->m_current_tool) > 0) {
         max_speed = float(this->m_config->filament_max_speed.get_at(this->m_current_tool));
     }
-    const float target_speed = std::min(max_speed, (is_first_layer() ? m_first_layer_speed : m_speed) * 60.f);
-    float wipe_speed = std::min(max_speed, std::min(target_speed, float(m_config->wipe_tower_wipe_starting_speed.get_abs_value(target_speed))));
+    const float target_speed = std::min(max_speed, (is_first_layer() ? m_first_layer_speed : m_speed));
+    float wipe_speed = std::min(max_speed, float(m_config->wipe_tower_wipe_starting_speed.get_abs_value(target_speed)));
     if (wipe_speed <= 0) {
         wipe_speed = target_speed;
     }

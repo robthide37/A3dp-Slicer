@@ -6251,10 +6251,10 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(80.));
 
     def = this->add("wipe_tower_wipe_starting_speed", coFloatOrPercent);
-    def->label = L("Wipe tower starting speed");
+    def->label = L("Wipe tower wipe starting speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Start of the wiping speed ramp up (for wipe tower)."
-        "\nCan be a % of the 'Wipe tower speed'."
+        "\nCan be a % of the 'Wipe tower main speed'."
         "\nSet to 0 to disable.");
     def->sidetext = L("mm/s or %");
     def->mode = comAdvancedE | comSuSi;
@@ -7817,11 +7817,13 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             || opt_key == "solid_fill_pattern" || opt_key == "bridge_fill_pattern" || opt_key == "support_material_interface_pattern"))
         value = "monotonic";
     // some changes has occurs between rectilineargapfill and monotonicgapfill. Set them at the right value for each type
-    if (value == "rectilineargapfill" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern"))
+    if (value == "rectilineargapfill" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern") )
         value = "monotonicgapfill";
-    if (value == "monotonicgapfill" && (opt_key == "solid_fill_pattern"))
-        value = "rectilineargapfill";
-    
+    if (opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern")
+        if (value == "rectilineargapfill")
+            value = "rectilinear";
+        else if (value == "monotonicgapfill")
+            value = "monotonic";
 
     if (ignore.find(opt_key) != ignore.end()) {
         opt_key = "";
@@ -8375,6 +8377,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "perimeter_overlap",
 "perimeter_reverse",
 "perimeter_round_corners",
+"perimeters_hole",
 "print_extrusion_multiplier",
 "print_first_layer_temperature",
 "print_custom_variables",

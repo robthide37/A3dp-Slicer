@@ -873,9 +873,9 @@ std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comm
     std::ostringstream gcode;
 
     //add fan_offset
-    int8_t fan_speed = int8_t(std::min(uint8_t(100), speed));
+    int16_t fan_speed = int8_t(std::min(uint8_t(100), speed));
     fan_speed += tool_fan_offset;
-    fan_speed = std::max(int8_t(0), std::min(int8_t(100), fan_speed));
+    fan_speed = std::max(int16_t(0), std::min(int16_t(100), fan_speed));
     const double fan_baseline = (is_fan_percentage ? 100.0 : 255.0);
 
     // write it
