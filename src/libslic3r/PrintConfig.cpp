@@ -6251,10 +6251,10 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(80.));
 
     def = this->add("wipe_tower_wipe_starting_speed", coFloatOrPercent);
-    def->label = L("Wipe tower starting speed");
+    def->label = L("Wipe tower wipe starting speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Start of the wiping speed ramp up (for wipe tower)."
-        "\nCan be a % of the 'Wipe tower speed'."
+        "\nCan be a % of the 'Wipe tower main speed'."
         "\nSet to 0 to disable.");
     def->sidetext = L("mm/s or %");
     def->mode = comAdvancedE | comSuSi;
