@@ -630,6 +630,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
                 //adjust the bridge density
                 if (surface_fill.params.flow.bridge() && surface_fill.params.density > 0.99 /*&& layerm->region()->config().bridge_overlap.get_abs_value(1) != 1*/) {
+                    // bridge have their own spacing, don't try to align it with normal infill.
+                    surface_fill.params.max_sparse_infill_spacing = 0;
                     ////varies the overlap to have the best coverage for the bridge
                     //surface_fill.params.density *= float(layerm->region()->config().bridge_overlap.get_abs_value(1));
                     double min_spacing = 0.999 * surface_fill.params.spacing / surface_fill.params.config->bridge_overlap.get_abs_value(surface_fill.params.density);
@@ -716,7 +718,8 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     double area = unscaled(unscaled(real_surface));
                     assert(compute_volume.volume <= area * surface_fill.params.layer_height * 1.001 || f->debug_verify_flow_mult <= 0.8);
                     if(compute_volume.volume > 0) //can fail for thin regions
-                        assert(compute_volume.volume >= area * surface_fill.params.layer_height * 0.999 || f->debug_verify_flow_mult >= 1.3 || area < std::max(1.,surface_fill.params.config->solid_infill_below_area.value));
+                        assert(compute_volume.volume >= area * surface_fill.params.layer_height * 0.999 || f->debug_verify_flow_mult >= 1.3 || f->debug_verify_flow_mult == 0 // sawtooth output more filament,as it's 3D (debug_verify_flow_mult==0)
+                            || area < std::max(1.,surface_fill.params.config->solid_infill_below_area.value) || area < std::max(1.,surface_fill.params.config->solid_infill_below_layer_area.value));
                 }
 #endif
             }
