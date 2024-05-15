@@ -7701,11 +7701,13 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             || opt_key == "solid_fill_pattern" || opt_key == "bridge_fill_pattern" || opt_key == "support_material_interface_pattern"))
         value = "monotonic";
     // some changes has occurs between rectilineargapfill and monotonicgapfill. Set them at the right value for each type
-    if (value == "rectilineargapfill" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern"))
+    if (value == "rectilineargapfill" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern") )
         value = "monotonicgapfill";
-    if (value == "monotonicgapfill" && (opt_key == "solid_fill_pattern"))
-        value = "rectilineargapfill";
-    
+    if (opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern")
+        if (value == "rectilineargapfill")
+            value = "rectilinear";
+        else if (value == "monotonicgapfill")
+            value = "monotonic";
 
     if (ignore.find(opt_key) != ignore.end()) {
         opt_key = "";
