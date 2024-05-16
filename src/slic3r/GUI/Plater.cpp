@@ -1340,28 +1340,36 @@ void Sidebar::update_sliced_info_sizer()
             //if multiple filament/extruderss, then print them all
             if (ps.filament_stats.size() > 1 || ps.color_extruderid_to_used_filament.size() > 0) {
                 new_label += ":";
+                const std::vector<std::string>& filament_presets = wxGetApp().preset_bundle->filament_presets;
+                const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
                 //for each extruder
-                for (auto filament : ps.filament_stats) {
+                for (auto [filament_id, filament_volume] : ps.filament_stats) {
                     int items_printed = 0;
                     double total_length = 0;
-                    // print each color change for this extruder
-                    for (auto entry : ps.color_extruderid_to_used_filament) {
-                        if (filament.first == entry.first) {
-                            items_printed++;
-                            new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), items_printed , (filament.first + 1));
-                            total_length += entry.second;
-                            info_text += wxString::Format("\n%.2f (%.2f)", entry.second / 1000, total_length / 1000);
+                    const Preset* filament_preset = filaments.find_preset(filament_presets[filament_id], false);
+                    if (filament_preset) {
+                        double crosssection = 0.5 * filament_preset->config.opt_float("filament_diameter", filament_id);
+                        crosssection *= crosssection * PI;
+                        double mm3_to_m = 0.001 / crosssection;
+                        // print each color change for this extruder
+                        for (auto entry : ps.color_extruderid_to_used_filament) {
+                            if (filament_id == entry.first) {
+                                items_printed++;
+                                new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), items_printed , (filament_id + 1));
+                                total_length += entry.second;
+                                info_text += wxString::Format("\n%.2f (%.2f)", entry.second / 1000, total_length / 1000);
+                            }
                         }
-                    }
-                    //print total for this extruder
-                    if (items_printed == 0) {
-                        new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament.first + 1);
-                        //new_label += from_u8((boost::format("\n    - %1% %2%") % _utf8(L("Color")) % ps.color_extruderid_to_used_filament.size()).str());
-                        info_text += wxString::Format("\n%.2f", filament.second / 1000);
-                    } 
-                    else {
-                        new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), (items_printed+1), (filament.first + 1));
-                        info_text += wxString::Format("\n%.2f (%.2f)", (filament.second - total_length) / 1000, filament.second / 1000);
+                        //print total for this extruder
+                        if (items_printed == 0) {
+                            new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament_id + 1);
+                            //new_label += from_u8((boost::format("\n    - %1% %2%") % _utf8(L("Color")) % ps.color_extruderid_to_used_filament.size()).str());
+                            info_text += wxString::Format("\n%.2f", filament_volume * mm3_to_m);
+                        } 
+                        else {
+                            new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), (items_printed+1), (filament_id + 1));
+                            info_text += wxString::Format("\n%.2f (%.2f)", (filament_volume - total_length) * mm3_to_m, filament_volume * mm3_to_m);
+                        }
                     }
                 }
             }
@@ -1386,15 +1394,15 @@ void Sidebar::update_sliced_info_sizer()
                     bool has_spool = false;
                     new_label += ":";
                     //for each extruder
-                    for (auto filament : ps.filament_stats) {
-                        const Preset* filament_preset = filaments.find_preset(filament_presets[filament.first], false);
+                    for (auto [filament_id, filament_volume] : ps.filament_stats) {
+                        const Preset* filament_preset = filaments.find_preset(filament_presets[filament_id], false);
                         if (filament_preset) {
                             double spool_weight = filament_preset->config.opt_float("filament_spool_weight", 0);
-                            double filament_density = filament_preset->config.opt_float("filament_density", filament.first);
-                            double crosssection = filament_preset->config.opt_float("filament_diameter", filament.first);
-                            crosssection *= crosssection;
-                            crosssection *= 0.25 * PI;
+                            double filament_density = filament_preset->config.opt_float("filament_density", filament_id);
+                            double crosssection = 0.5 * filament_preset->config.opt_float("filament_diameter", filament_id);
+                            crosssection *= crosssection * PI;
                             double m_to_g = filament_density / (crosssection * 1000);
+                            double mm3_to_g = filament_density *0.001;
                             int items_printed = 0;
                             double total_length = 0;
                             //for (int i = 0; i < ps.color_extruderid_to_used_filament.size(); i++) {
@@ -1406,9 +1414,9 @@ void Sidebar::update_sliced_info_sizer()
                             if (spool_weight != 0.0)
                                 has_spool = true;
                             for (auto entry : ps.color_extruderid_to_used_filament) {
-                                if (filament.first == entry.first) {
+                                if (filament_id == entry.first) {
                                     items_printed++;
-                                    new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), items_printed, (filament.first + 1));
+                                    new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), items_printed, (filament_id + 1));
                                     total_length += entry.second;
                                     info_text += wxString::Format("\n%.2f", entry.second * m_to_g);
                                     if (spool_weight != 0.0)
@@ -1417,16 +1425,16 @@ void Sidebar::update_sliced_info_sizer()
                             }
                             //print total for this extruder
                             if (items_printed == 0) {
-                                new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament.first + 1);
+                                new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament_id + 1);
                                 //new_label += from_u8((boost::format("\n    - %1% %2%") % _utf8(L("Color")) % ps.color_extruderid_to_used_filament.size()).str());
-                                info_text += wxString::Format("\n%.2f", filament.second * m_to_g);
+                                info_text += wxString::Format("\n%.2f", filament_volume * mm3_to_g);
                                 if (spool_weight != 0.0)
-                                    info_text += wxString::Format(" (%.2f)", filament.second * m_to_g + spool_weight);
+                                    info_text += wxString::Format(" (%.2f)", filament_volume * mm3_to_g + spool_weight);
                             } else {
-                                new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), (items_printed + 1), (filament.first + 1));
-                                info_text += wxString::Format("\n%.2f", (filament.second - total_length) * m_to_g);
+                                new_label += "\n    - " + format_wxstr(_L("Color %1% at extruder %2%"), (items_printed + 1), (filament_id + 1));
+                                info_text += wxString::Format("\n%.2f", (filament_volume - total_length) * mm3_to_g);
                                 if (spool_weight != 0.0)
-                                    info_text += wxString::Format(" (%.2f)", (filament.second - total_length) * m_to_g + spool_weight);
+                                    info_text += wxString::Format(" (%.2f)", (filament_volume - total_length) * mm3_to_g + spool_weight);
                             }
                         }
                     }

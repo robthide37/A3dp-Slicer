@@ -764,9 +764,9 @@ namespace DoExport {
             if (extruder == extruders.end())
                 continue;
 
-            double s = PI * sqr(0.5* extruder->filament_diameter());
+            double section = PI * sqr(0.5 * extruder->filament_diameter());
             double weight = volume.second * extruder->filament_density() * 0.001;
-            total_used_filament += volume.second/s;
+            total_used_filament += volume.second / section;
             total_weight        += weight;
             total_cost          += weight * extruder->filament_cost() * 0.001;
         }
