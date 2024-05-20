@@ -4961,7 +4961,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm²");
     def->min = 0;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(70));
+    def->set_default_value(new ConfigOptionFloat(4));
 
     def = this->add("solid_infill_overlap", coPercent);
     def->label = L("Solid fill overlap");

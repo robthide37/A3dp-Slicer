@@ -241,12 +241,9 @@ void Control::SetLowerValue(const int lower_tick)
     m_selection = ssLower;
     m_lower_tick = lower_tick;
     correct_lower_value();
-    Refresh();
-    Update();
-
-    wxCommandEvent e(wxEVT_SCROLL_CHANGED);
-    e.SetEventObject(this);
-    ProcessWindowEvent(e);
+    
+    m_need_refresh_and_update = true;
+    m_need_fire_scroll_change = true;
 }
 
 void Control::SetHigherValue(const int higher_tick)
@@ -254,12 +251,9 @@ void Control::SetHigherValue(const int higher_tick)
     m_selection = ssHigher;
     m_higher_tick = higher_tick;
     correct_higher_value();
-    Refresh();
-    Update();
-
-    wxCommandEvent e(wxEVT_SCROLL_CHANGED);
-    e.SetEventObject(this);
-    ProcessWindowEvent(e);
+    
+    m_need_refresh_and_update = true;
+    m_need_fire_scroll_change = true;
 }
 
 void Control::SetSelectionSpan(const int lower_tick, const int higher_tick)
@@ -268,20 +262,14 @@ void Control::SetSelectionSpan(const int lower_tick, const int higher_tick)
     m_higher_tick = std::max(std::min(higher_tick, m_max_tick), m_lower_tick);
     if (m_lower_tick < m_higher_tick)
         m_is_one_layer = false;
-
-    Refresh();
-    Update();
-
-    wxCommandEvent e(wxEVT_SCROLL_CHANGED);
-    e.SetEventObject(this);
-    ProcessWindowEvent(e);
+    
+    m_need_refresh_and_update = true;
+    m_need_fire_scroll_change = true;
 }
 
 void Control::SetMaxValue(const int max_tick)
 {
     m_max_tick = max_tick;
-    Refresh();
-    Update();
 }
 
 void Control::SetSliderValues(const std::vector<double>& values)
@@ -359,9 +347,9 @@ double Control::get_double_value(const SelectedSlider& selection)
     return m_values[selection == ssLower ? m_lower_tick : m_higher_tick];
 }
 
-int Control::get_tick_from_value(double value, bool force_lower_bound/* = false*/)
+int Control::get_tick_from_value(double value, bool force_lower_bound/* = false*/) const
 {
-    std::vector<double>::iterator it;
+    std::vector<double>::const_iterator it;
     if (m_is_wipe_tower && !force_lower_bound)
         it = std::find_if(m_values.begin(), m_values.end(),
                           [value](const double & val) { return fabs(value - val) <= epsilon(); });
@@ -419,13 +407,12 @@ void Control::SetTicksValues(const Info& custom_gcode_per_print_z)
 
     if (custom_gcode_per_print_z.mode && !custom_gcode_per_print_z.gcodes.empty())
         m_ticks.mode = custom_gcode_per_print_z.mode;
-
-    Refresh();
-    Update();
+    
+    m_need_refresh_and_update = true;
 }
 
 void Control::SetLayersTimes(const std::vector<float>& layers_times, float total_time)
-{ 
+{
     m_layers_times.clear();
     if (layers_times.empty())
         return;
@@ -447,8 +434,7 @@ void Control::SetLayersTimes(const std::vector<float>& layers_times, float total
         if (m_layers_values.size() != m_layers_times.size())
             for (size_t i = m_layers_times.size(); i < m_layers_values.size(); i++)
                 m_layers_times.push_back(total_time);
-        Refresh();
-        Update();
+        m_need_refresh_and_update = true;
 }
 }
 
@@ -529,6 +515,7 @@ void Control::draw_focus_rect()
 
 void Control::render()
 {
+    std::lock_guard lock(m_lock_data);
 #ifdef _WIN32 
     GUI::wxGetApp().UpdateDarkUI(this);
 #else
@@ -766,6 +753,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
     auto get_layer_number = [this](int value, LabelType label_type) {
         if (label_type == ltEstimatedTime && m_layers_times.empty())
             return size_t(-1);
+        assert((is_wipe_tower_layer(value) ? std::max<int>(value - 1, 0) : value) < m_values.size());
         double layer_print_z = m_values[is_wipe_tower_layer(value) ? std::max<int>(value - 1, 0) : value];
         auto it = std::lower_bound(m_layers_values.begin(), m_layers_values.end(), layer_print_z - epsilon());
         if (it == m_layers_values.end()) {
@@ -784,7 +772,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
             if (m_is_wipe_tower) {
                 size_t layer_number = get_layer_number(value, label_type);
                 return (layer_number == size_t(-1) || layer_number == m_layers_times.size()) ? "" : short_and_splitted_time(get_time_dhms(m_layers_times[layer_number]));
-        }
+            }
             return value < m_layers_times.size() ? short_and_splitted_time(get_time_dhms(m_layers_times[value])) : "";
         }
         wxString str = m_values.empty() ?
@@ -793,7 +781,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
         if (label_type == ltHeight)
             return str;
         if (label_type == ltHeightWithLayer) {
-            size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) /**/ + 1 : (m_values.empty() ? value : value /* + 1 */ );
+            size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) /**/ + 1 : value;
             bool show_lheight = GUI::wxGetApp().app_config->get("show_layer_height_doubleslider") == "1";
             bool show_ltime = GUI::wxGetApp().app_config->get("show_layer_time_doubleslider") == "1";
             int nb_lines = 2; // to move things down if the slider is on top
@@ -802,11 +790,13 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
                 nb_lines++;
                 double layer_height = 0;
                 if (layer_number >= m_values.size()) {
+                    const auto st1 = layer_number;
+                    const auto st2 = m_values.size();
+                    layer_height = m_values.empty() ? m_label_koef : m_values.back() - (m_values.size() > 1 ? m_values[m_values.size() - 2] : 0);
                     assert(layer_number == m_values.size());
-                    layer_height = m_values.empty() ? m_label_koef : m_values[m_values.size() - 1] - (m_values.size() > 1 ? m_values[m_values.size() - 2] : 0);
                 } else if (layer_number == 0) {
                     layer_height = m_values.empty() ? m_label_koef : m_values[layer_number];
-                }else {
+                } else {
                     layer_height = m_values.empty() ? m_label_koef : m_values[layer_number] - (layer_number > 1 ? m_values[layer_number - 1] : 0);
                 }
                 str = str + comma + wxString::Format("%.*f", 2, layer_height);
@@ -1399,44 +1389,43 @@ void Control::ChangeOneLayerLock()
     m_selection == ssLower ? correct_lower_value() : correct_higher_value();
     if (!m_selection) m_selection = ssHigher;
 
-    Refresh();
-    Update();
-
-    wxCommandEvent e(wxEVT_SCROLL_CHANGED);
-    e.SetEventObject(this);
-    ProcessWindowEvent(e);
+    m_need_refresh_and_update = true;
+    m_need_fire_scroll_change = true;
 }
 
 void Control::OnLeftDown(wxMouseEvent& event)
 {
-    if (HasCapture())
-        return;
-    this->CaptureMouse();
+    {
+        std::lock_guard lock(m_lock_data);
+        if (HasCapture())
+            return;
+        this->CaptureMouse();
 
-    m_mouse = maNone;
+        m_mouse = maNone;
 
-    wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
+        wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
 
-    if (is_point_in_rect(pos, m_rect_one_layer_icon)) 
-        m_mouse = maOneLayerIconClick;
-    else if (is_point_in_rect(pos, m_rect_cog_icon))
-        m_mouse = maCogIconClick;
-    else if (m_draw_mode == dmRegular) {
-        if (is_point_in_rect(pos, m_rect_tick_action)) {
-            auto it = m_ticks.ticks.find(TickCode{ m_selection == ssLower ? m_lower_tick : m_higher_tick });
-            m_mouse = it == m_ticks.ticks.end() ? maAddTick : maDeleteTick;
+        if (is_point_in_rect(pos, m_rect_one_layer_icon))
+            m_mouse = maOneLayerIconClick;
+        else if (is_point_in_rect(pos, m_rect_cog_icon))
+            m_mouse = maCogIconClick;
+        else if (m_draw_mode == dmRegular) {
+            if (is_point_in_rect(pos, m_rect_tick_action)) {
+                auto it = m_ticks.ticks.find(TickCode{m_selection == ssLower ? m_lower_tick : m_higher_tick});
+                m_mouse = it == m_ticks.ticks.end() ? maAddTick : maDeleteTick;
+            } else if (is_point_in_rect(pos, m_rect_revert_icon))
+                m_mouse = maRevertIconClick;
         }
-        else if (is_point_in_rect(pos, m_rect_revert_icon))
-            m_mouse = maRevertIconClick;
-    }
 
-    // move only if not in not in motion and not in dead zone (in vertical slicer)
-    if(is_horizontal() || (m_mouse == maNone && pos.y < m_rect_one_layer_icon.y - m_rect_one_layer_icon.height/2))
-        m_is_left_down = true;
+        // move only if not in not in motion and not in dead zone (in vertical slicer)
+        if (is_horizontal() ||
+            (m_mouse == maNone && pos.y < m_rect_one_layer_icon.y - m_rect_one_layer_icon.height / 2))
+            m_is_left_down = true;
 
-    if (m_mouse == maNone)
+        if (m_mouse == maNone)
             detect_selected_slider(pos);
-
+    }
+    this->fire_update_if_needed();
     event.Skip();
 }
 
@@ -1564,9 +1553,10 @@ wxString Control::get_tooltip(int tick/*=-1*/)
 		                format_wxstr(_L("Extruder (tool) is changed to Extruder \"%1%\""), tick_code_it->extruder) :                
 		                from_u8(format_gcode(tick_code_it->extra));// tick_code_it->type == Custom
 
+        assert(tick < m_values.size() && !m_values.empty());
         // If tick is marked as a conflict (exclamation icon),
         // we should to explain why
-        ConflictType conflict = m_ticks.is_conflict_tick(*tick_code_it, m_mode, m_only_extruder, m_values[tick]);
+        ConflictType conflict = m_ticks.is_conflict_tick(*tick_code_it, m_mode, m_only_extruder, tick < m_values.size() ? m_values[tick] : m_values.back());
         if (conflict != ctNone)
             tooltip += "\n\n" + _L("Note") + "! ";
         if (conflict == ctModeConflict)
@@ -1610,70 +1600,82 @@ int Control::get_edited_tick_for_position(const wxPoint pos, Type type /*= Color
     return -1;
 }
 
-void Control::OnMotion(wxMouseEvent& event)
+void Control::OnMotion(wxMouseEvent &event)
 {
-    bool action = false;
+    bool            action = false;
+    {
+        std::lock_guard lock(m_lock_data);
 
-    const wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
-    int tick = -1;
+        const wxPoint pos  = event.GetLogicalPosition(wxClientDC(this));
+        int           tick = -1;
 
-    if (!m_is_left_down && !m_is_right_down) {
-        if (is_point_in_rect(pos, m_rect_one_layer_icon))
-            m_focus = fiOneLayerIcon;
-        else if (is_point_in_rect(pos, m_rect_tick_action)) {
-            m_focus = fiActionIcon;
-            tick = m_selection == ssLower ? m_lower_tick : m_higher_tick;
+        if (!m_is_left_down && !m_is_right_down) {
+            if (is_point_in_rect(pos, m_rect_one_layer_icon))
+                m_focus = fiOneLayerIcon;
+            else if (is_point_in_rect(pos, m_rect_tick_action)) {
+                m_focus = fiActionIcon;
+                tick    = m_selection == ssLower ? m_lower_tick : m_higher_tick;
+            } else if (!m_ticks.empty() && is_point_in_rect(pos, m_rect_revert_icon))
+                m_focus = fiRevertIcon;
+            else if (is_point_in_rect(pos, m_rect_cog_icon))
+                m_focus = fiCogIcon;
+            else if (m_mode == SingleExtruder && is_point_in_rect(pos, get_colored_band_rect()) &&
+                     get_edited_tick_for_position(pos) >= 0)
+                m_focus = fiColorBand;
+            else if (is_point_in_rect(pos, m_rect_lower_thumb))
+                m_focus = fiLowerThumb;
+            else if (is_point_in_rect(pos, m_rect_higher_thumb))
+                m_focus = fiHigherThumb;
+            else {
+                tick = get_tick_near_point(pos);
+                if (tick < 0 && m_is_wipe_tower) {
+                    tick    = get_tick_from_position(pos);
+                    m_focus = tick > 0 && is_wipe_tower_layer(tick) &&
+                                      (tick == m_lower_tick || tick == m_higher_tick) ?
+                                  fiSmartWipeTower :
+                                  fiTick;
+                } else
+                    m_focus = fiTick;
+            }
+            m_moving_pos = pos;
+        } else if (m_is_left_down || m_is_right_down) {
+            if (m_selection == ssLower) {
+                int current_value = m_lower_tick;
+                m_lower_tick      = get_tick_from_position(pos.x, pos.y);
+                correct_lower_value();
+                action = (current_value != m_lower_tick);
+            } else if (m_selection == ssHigher) {
+                int current_value = m_higher_tick;
+                m_higher_tick     = get_tick_from_position(pos.x, pos.y);
+                correct_higher_value();
+                action = (current_value != m_higher_tick);
+            }
+            m_moving_pos = wxDefaultPosition;
         }
-        else if (!m_ticks.empty() && is_point_in_rect(pos, m_rect_revert_icon))
-            m_focus = fiRevertIcon;
-        else if (is_point_in_rect(pos, m_rect_cog_icon))
-            m_focus = fiCogIcon;
-        else if (m_mode == SingleExtruder && is_point_in_rect(pos, get_colored_band_rect()) &&
-                 get_edited_tick_for_position(pos) >= 0 )
-            m_focus = fiColorBand;
-        else if (is_point_in_rect(pos, m_rect_lower_thumb))
-            m_focus = fiLowerThumb;
-        else if (is_point_in_rect(pos, m_rect_higher_thumb))
-            m_focus = fiHigherThumb;
-        else {
-            tick = get_tick_near_point(pos);
-            if (tick < 0 && m_is_wipe_tower) {
-                tick = get_tick_from_position(pos);
-                m_focus = tick > 0 && is_wipe_tower_layer(tick) && (tick == m_lower_tick || tick == m_higher_tick) ? 
-                          fiSmartWipeTower : fiTick;
+
+        // Set tooltips with information for each icon
+        if (GUI::wxGetApp().is_editor()) {
+            this->SetToolTip(get_tooltip(tick));
         }
-            else 
-                m_focus = fiTick;
-        }
-        m_moving_pos = pos;
     }
-    else if (m_is_left_down || m_is_right_down) {
-        if (m_selection == ssLower) {
-            int current_value = m_lower_tick;
-            m_lower_tick = get_tick_from_position(pos.x, pos.y);
-            correct_lower_value();
-            action = (current_value != m_lower_tick);
-        }
-        else if (m_selection == ssHigher) {
-            int current_value = m_higher_tick;
-            m_higher_tick = get_tick_from_position(pos.x, pos.y);
-            correct_higher_value();
-            action = (current_value != m_higher_tick);
-        }
-        m_moving_pos = wxDefaultPosition;
-    }
+    m_need_refresh_and_update = false;
     Refresh();
     Update();
     event.Skip();
-
-    // Set tooltips with information for each icon
-    if (GUI::wxGetApp().is_editor())
-    this->SetToolTip(get_tooltip(tick));
-
-    if (action) {
+    if (action || m_need_fire_scroll_change) {
+        m_need_fire_scroll_change = false;
         wxCommandEvent e(wxEVT_SCROLL_CHANGED);
         e.SetEventObject(this);
-        e.SetString("moving");
+        if (action)
+            e.SetString("moving");
+        ProcessWindowEvent(e);
+    }
+    //need double event or the sphere won't be shown in color (while moving the thing by mouse in the lower direction).
+    //FIXME better than that.
+    if (action || m_need_fire_scroll_change) {
+        m_need_fire_scroll_change = false;
+        wxCommandEvent e(wxEVT_SCROLL_CHANGED);
+        e.SetEventObject(this);
         ProcessWindowEvent(e);
     }
 }
@@ -1714,7 +1716,8 @@ void Control::append_add_color_change_menu_item(wxMenu* menu, bool switch_curren
     const int extruders_cnt = GUI::wxGetApp().extruders_edited_cnt();
     if (extruders_cnt > 1) {
         int tick = m_selection == ssLower ? m_lower_tick : m_higher_tick; 
-        std::set<int> used_extruders_for_tick = m_ticks.get_used_extruders_for_tick(tick, m_only_extruder, m_values[tick]);
+        assert(tick < m_values.size() && !m_values.empty());
+        std::set<int> used_extruders_for_tick = m_ticks.get_used_extruders_for_tick(tick, m_only_extruder, tick < m_values.size() ? m_values[tick] : m_values.back());
 
         wxMenu* add_color_change_menu = new wxMenu();
 
@@ -1739,40 +1742,33 @@ void Control::append_add_color_change_menu_item(wxMenu* menu, bool switch_curren
 
 void Control::OnLeftUp(wxMouseEvent& event)
 {
-    if (!HasCapture())
-        return;
-    this->ReleaseMouse();
+    {
+        std::lock_guard lock(m_lock_data);
+        if (!HasCapture())
+            return;
+        this->ReleaseMouse();
 
-    switch (m_mouse) {
-    case maNone :
-        if(m_is_left_down)
-            move_current_thumb_to_pos(event.GetLogicalPosition(wxClientDC(this)));
-        break;
-    case maDeleteTick : 
-        delete_current_tick();
-        break;
-    case maAddTick :
-        add_current_tick();
-        break;
-    case maCogIconClick :
-        show_cog_icon_context_menu();
-        break;
-    case maOneLayerIconClick:
-        switch_one_layer_mode();
-        break;
-    case maRevertIconClick:
-        discard_all_thicks();
-        break;
-    default :
-        break;
+        switch (m_mouse) {
+        case maNone:
+            if (m_is_left_down)
+                move_current_thumb_to_pos(event.GetLogicalPosition(wxClientDC(this)));
+            break;
+        case maDeleteTick: delete_current_tick(); break;
+        case maAddTick: add_current_tick(); break;
+        case maCogIconClick: show_cog_icon_context_menu(); break;
+        case maOneLayerIconClick: switch_one_layer_mode(); break;
+        case maRevertIconClick: discard_all_thicks(); break;
+        default: break;
+        }
+
+        m_is_left_down = false;
     }
-
-    m_is_left_down = false;
-
+    m_need_refresh_and_update = false;
     Refresh();
     Update();
     event.Skip();
-
+    
+    m_need_fire_scroll_change = false;
     wxCommandEvent e(wxEVT_SCROLL_CHANGED);
     e.SetEventObject(this);
     ProcessWindowEvent(e);
@@ -1781,8 +1777,8 @@ void Control::OnLeftUp(wxMouseEvent& event)
 void Control::enter_window(wxMouseEvent& event, const bool enter)
 {
     m_is_focused = enter;
-    Refresh();
-    Update();
+    m_need_refresh_and_update = true;
+    this->fire_update_if_needed();
     event.Skip();
 }
 
@@ -1816,154 +1812,163 @@ void Control::move_current_thumb(const bool condition)
         m_higher_tick -= delta;
         correct_higher_value();
     }
-    Refresh();
-    Update();
-
-    wxCommandEvent e(wxEVT_SCROLL_CHANGED);
-    e.SetEventObject(this);
-    ProcessWindowEvent(e);
+    
+    m_need_refresh_and_update = true;
+    m_need_fire_scroll_change = true;
 }
 
 void Control::OnWheel(wxMouseEvent& event)
 {
-    // Set nearest to the mouse thumb as a selected, if there is not selected thumb
-    if (m_selection == ssUndef) {
-        const wxPoint& pt = event.GetLogicalPosition(wxClientDC(this));
-        
-        if (is_horizontal())
-            m_selection = abs(pt.x - m_rect_lower_thumb.GetRight()) <= 
-                          abs(pt.x - m_rect_higher_thumb.GetLeft()) ? 
-                          ssLower : ssHigher;
-        else
-            m_selection = abs(pt.y - m_rect_lower_thumb.GetTop()) <= 
-                          abs(pt.y - m_rect_higher_thumb.GetBottom()) ? 
-                          ssLower : ssHigher;
+    {
+        std::lock_guard lock(m_lock_data);
+        // Set nearest to the mouse thumb as a selected, if there is not selected thumb
+        if (m_selection == ssUndef) {
+            const wxPoint &pt = event.GetLogicalPosition(wxClientDC(this));
+
+            if (is_horizontal())
+                m_selection = abs(pt.x - m_rect_lower_thumb.GetRight()) <= abs(pt.x - m_rect_higher_thumb.GetLeft()) ?
+                                  ssLower :
+                                  ssHigher;
+            else
+                m_selection = abs(pt.y - m_rect_lower_thumb.GetTop()) <= abs(pt.y - m_rect_higher_thumb.GetBottom()) ?
+                                  ssLower :
+                                  ssHigher;
+        }
+
+        if (m_selection == ssLower && !is_lower_thumb_editable())
+            m_selection = ssUndef;
+
+        move_current_thumb((m_draw_mode == dmSequentialGCodeView) ? event.GetWheelRotation() < 0 :
+                                                                    event.GetWheelRotation() > 0);
     }
-
-    if (m_selection == ssLower && !is_lower_thumb_editable())
-        m_selection = ssUndef;
-
-    move_current_thumb((m_draw_mode == dmSequentialGCodeView) ? event.GetWheelRotation() < 0 : event.GetWheelRotation() > 0);
+    this->fire_update_if_needed();
 }
 
 void Control::OnKeyDown(wxKeyEvent &event)
 {
-    const int key = event.GetKeyCode();
-    if (m_draw_mode != dmSequentialGCodeView && key == WXK_NUMPAD_ADD) {
-        // OnChar() is called immediately after OnKeyDown(), which can cause call of add_tick() twice.
-        // To avoid this case we should suppress second add_tick() call.
-        m_ticks.suppress_plus(true);
-        add_current_tick(true);
-    }
-    else if (m_draw_mode != dmSequentialGCodeView && (key == WXK_NUMPAD_SUBTRACT || key == WXK_DELETE || key == WXK_BACK)) {
-        // OnChar() is called immediately after OnKeyDown(), which can cause call of delete_tick() twice.
-        // To avoid this case we should suppress second delete_tick() call.
-        m_ticks.suppress_minus(true);
-        delete_current_tick();
-    }
-    else if (m_draw_mode != dmSequentialGCodeView && event.GetKeyCode() == WXK_SHIFT)
-        UseDefaultColors(false);
-    else if (is_horizontal()) {
-        if (m_is_focused) {
-            if (key == WXK_LEFT || key == WXK_RIGHT)
-                move_current_thumb(key == WXK_LEFT);
-            else if (key == WXK_UP || key == WXK_DOWN) {
-                if (key == WXK_DOWN)
-                    m_selection = ssHigher;
-                else if (key == WXK_UP && is_lower_thumb_editable())
-                    m_selection = ssLower;
-                Refresh();
+    {
+        std::lock_guard lock(m_lock_data);
+        const int       key = event.GetKeyCode();
+        if (m_draw_mode != dmSequentialGCodeView && key == WXK_NUMPAD_ADD) {
+            // OnChar() is called immediately after OnKeyDown(), which can cause call of add_tick() twice.
+            // To avoid this case we should suppress second add_tick() call.
+            m_ticks.suppress_plus(true);
+            add_current_tick(true);
+        } else if (m_draw_mode != dmSequentialGCodeView &&
+                   (key == WXK_NUMPAD_SUBTRACT || key == WXK_DELETE || key == WXK_BACK)) {
+            // OnChar() is called immediately after OnKeyDown(), which can cause call of delete_tick() twice.
+            // To avoid this case we should suppress second delete_tick() call.
+            m_ticks.suppress_minus(true);
+            delete_current_tick();
+        } else if (m_draw_mode != dmSequentialGCodeView && event.GetKeyCode() == WXK_SHIFT)
+            UseDefaultColors(false);
+        else if (is_horizontal()) {
+            if (m_is_focused) {
+                if (key == WXK_LEFT || key == WXK_RIGHT)
+                    move_current_thumb(key == WXK_LEFT);
+                else if (key == WXK_UP || key == WXK_DOWN) {
+                    if (key == WXK_DOWN)
+                        m_selection = ssHigher;
+                    else if (key == WXK_UP && is_lower_thumb_editable())
+                        m_selection = ssLower;
+                    m_need_refresh_and_update = true;
+                }
+            } else {
+                if (key == WXK_LEFT || key == WXK_RIGHT)
+                    move_current_thumb(key == WXK_LEFT);
+            }
+        } else {
+            if (m_is_focused) {
+                if (key == WXK_LEFT || key == WXK_RIGHT) {
+                    if (key == WXK_LEFT)
+                        m_selection = ssHigher;
+                    else if (key == WXK_RIGHT && is_lower_thumb_editable())
+                        m_selection = ssLower;
+                    m_need_refresh_and_update = true;
+                } else if (key == WXK_UP || key == WXK_DOWN)
+                    move_current_thumb(key == WXK_UP);
+            } else {
+                if (key == WXK_UP || key == WXK_DOWN)
+                    move_current_thumb(key == WXK_UP);
             }
         }
-        else {
-            if (key == WXK_LEFT || key == WXK_RIGHT)
-                move_current_thumb(key == WXK_LEFT);
-        }
-    }
-    else {
-        if (m_is_focused) {
-            if (key == WXK_LEFT || key == WXK_RIGHT) {
-                if (key == WXK_LEFT)
-                    m_selection = ssHigher;
-                else if (key == WXK_RIGHT && is_lower_thumb_editable())
-                    m_selection = ssLower;
-                Refresh();
-            }
-            else if (key == WXK_UP || key == WXK_DOWN)
-                move_current_thumb(key == WXK_UP);
-        }
-        else {
-            if (key == WXK_UP || key == WXK_DOWN)
-                move_current_thumb(key == WXK_UP);
-    }
-    }
 
-    event.Skip(); // !Needed to have EVT_CHAR generated as well
+        event.Skip(); // !Needed to have EVT_CHAR generated as well
+    }
+    this->fire_update_if_needed();
 }
 
 void Control::OnKeyUp(wxKeyEvent &event)
 {
-    if (event.GetKeyCode() == WXK_CONTROL)
-        m_is_one_layer = false;
-    else if (event.GetKeyCode() == WXK_SHIFT)
-        UseDefaultColors(true);
+    {
+        std::lock_guard lock(m_lock_data);
+        if (event.GetKeyCode() == WXK_CONTROL)
+            m_is_one_layer = false;
+        else if (event.GetKeyCode() == WXK_SHIFT)
+            UseDefaultColors(true);
 
-    Refresh();
-    Update();
+        m_need_refresh_and_update = true;
+    }
     event.Skip();
+    this->fire_update_if_needed();
 }
 
 void Control::OnChar(wxKeyEvent& event)
 {
-    const int key = event.GetKeyCode();
-    if (m_draw_mode != dmSequentialGCodeView) {
-        if (key == '+' && !m_ticks.suppressed_plus()) {
-            add_current_tick(true);
-            m_ticks.suppress_plus(false);
+    {
+        std::lock_guard lock(m_lock_data);
+        const int       key = event.GetKeyCode();
+        if (m_draw_mode != dmSequentialGCodeView) {
+            if (key == '+' && !m_ticks.suppressed_plus()) {
+                add_current_tick(true);
+                m_ticks.suppress_plus(false);
+            } else if (key == '-' && !m_ticks.suppressed_minus()) {
+                delete_current_tick();
+                m_ticks.suppress_minus(false);
+            }
         }
-        else if (key == '-' && !m_ticks.suppressed_minus()) {
-            delete_current_tick();
-            m_ticks.suppress_minus(false);
-        }
+        if (key == 'G')
+            jump_to_value();
     }
-    if (key == 'G')
-        jump_to_value();
+    this->fire_update_if_needed();
 }
 
 void Control::OnRightDown(wxMouseEvent& event)
 {
-    if (HasCapture() || m_is_left_down)
-        return;
-    this->CaptureMouse();
+    {
+        std::lock_guard lock(m_lock_data);
+        if (HasCapture() || m_is_left_down)
+            return;
+        this->CaptureMouse();
 
-    const wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
+        const wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
 
-    m_mouse = maNone;
-    if (m_draw_mode == dmRegular) {
-        if (is_point_in_rect(pos, m_rect_tick_action)) {
-            const int tick = m_selection == ssLower ? m_lower_tick : m_higher_tick;
-            m_mouse = m_ticks.ticks.find(TickCode{ tick }) == m_ticks.ticks.end() ?
-                             maAddMenu : maEditMenu;
+        m_mouse = maNone;
+        if (m_draw_mode == dmRegular) {
+            if (is_point_in_rect(pos, m_rect_tick_action)) {
+                const int tick = m_selection == ssLower ? m_lower_tick : m_higher_tick;
+                m_mouse        = m_ticks.ticks.find(TickCode{tick}) == m_ticks.ticks.end() ? maAddMenu : maEditMenu;
+            } else if (m_mode == SingleExtruder && !detect_selected_slider(pos) &&
+                       is_point_in_rect(pos, get_colored_band_rect()))
+                m_mouse = maForceColorEdit;
+            else if (m_mode == MultiAsSingle && is_point_in_rect(pos, m_rect_cog_icon))
+                m_mouse = maCogIconMenu;
         }
-        else if (m_mode == SingleExtruder   && !detect_selected_slider(pos) && is_point_in_rect(pos, get_colored_band_rect()))
-            m_mouse = maForceColorEdit;
-        else if (m_mode == MultiAsSingle    && is_point_in_rect(pos, m_rect_cog_icon))
-            m_mouse = maCogIconMenu;
+        if (m_mouse != maNone || !detect_selected_slider(pos))
+            return;
+
+        if (m_selection == ssLower)
+            m_higher_tick = m_lower_tick;
+        else
+            m_lower_tick = m_higher_tick;
+
+        // set slider to "one layer" mode
+        m_is_right_down = m_is_one_layer = true;
+
+        m_need_refresh_and_update = true;
+        event.Skip();
+        this->fire_update_if_needed();
     }
-    if (m_mouse != maNone || !detect_selected_slider(pos))
-        return;
-
-    if (m_selection == ssLower)
-        m_higher_tick = m_lower_tick;
-    else
-        m_lower_tick = m_higher_tick;
-
-    // set slider to "one layer" mode
-    m_is_right_down = m_is_one_layer = true; 
-
-    Refresh();
-    Update();
-    event.Skip();
 }
 
 // Get active extruders for tick. 
@@ -2224,29 +2229,45 @@ void Control::auto_color_change()
     post_ticks_changed_event();
 }
 
+void Control::fire_update_if_needed() {
+    if (m_need_refresh_and_update) {
+        m_need_refresh_and_update = false;
+        Refresh();
+        Update();
+    }
+    if (m_need_fire_scroll_change) {
+        m_need_fire_scroll_change = false;
+        wxCommandEvent e(wxEVT_SCROLL_CHANGED);
+        e.SetEventObject(this);
+        ProcessWindowEvent(e);
+    }
+}
+
 void Control::OnRightUp(wxMouseEvent& event)
 {
-    if (!HasCapture() || m_is_left_down)
-        return;
-    this->ReleaseMouse();
-    m_is_right_down = m_is_one_layer = false;
+    {
+        std::lock_guard lock(m_lock_data);
+        if (!HasCapture() || m_is_left_down)
+            return;
+        this->ReleaseMouse();
+        m_is_right_down = m_is_one_layer = false;
 
-    if (m_mouse == maForceColorEdit) {
-        wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
-        int edited_tick = get_edited_tick_for_position(pos);
-        if (edited_tick >= 0)
-            edit_tick(edited_tick);
+        if (m_mouse == maForceColorEdit) {
+            wxPoint pos         = event.GetLogicalPosition(wxClientDC(this));
+            int     edited_tick = get_edited_tick_for_position(pos);
+            if (edited_tick >= 0)
+                edit_tick(edited_tick);
+        } else if (m_mouse == maAddMenu)
+            show_add_context_menu();
+        else if (m_mouse == maEditMenu)
+            show_edit_context_menu();
+        else if (m_mouse == maCogIconMenu)
+            show_cog_icon_context_menu();
+
+        m_need_refresh_and_update = true;
     }
-    else if (m_mouse == maAddMenu)
-        show_add_context_menu();
-    else if (m_mouse == maEditMenu)
-        show_edit_context_menu();
-    else if (m_mouse == maCogIconMenu)
-        show_cog_icon_context_menu();
-
-    Refresh();
-    Update();
     event.Skip();
+    this->fire_update_if_needed();
 }
 
 static std::string get_new_color(const std::string& color)
@@ -2376,7 +2397,8 @@ void Control::add_code_as_tick(Type type, int selected_extruder/* = -1*/)
     
     if ( it == m_ticks.ticks.end() ) {
         // try to add tick
-        if (!m_ticks.add_tick(tick, type, extruder, m_values[tick]))
+        assert(tick < m_values.size() && !m_values.empty());
+        if (!m_ticks.add_tick(tick, type, extruder, tick < m_values.size() ? m_values[tick] : m_values.back()))
             return;
     }
     else if (type == ToolChange || type == ColorChange) {
