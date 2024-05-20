@@ -609,6 +609,7 @@ wxBoxSizer* Preview::create_layers_slider_sizer()
 {
     wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
     m_layers_slider = new DoubleSlider::Control(this, wxID_ANY, 0, 0, 0, 100);
+    std::lock_guard lock(m_layers_slider->lock_render());
 
     m_layers_slider->SetDrawMode(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA,
         wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("complete_objects"));
@@ -685,6 +686,10 @@ void Preview::check_layers_slider_values(std::vector<CustomGCode::Item>& ticks_f
 
 void Preview::update_layers_slider(const std::vector<double>& layers_z, bool keep_z_range)
 {
+  //lock rendering while updating
+  {
+    std::lock_guard lock(m_layers_slider->lock_render());
+
     // Save the initial slider span.
     double z_low = m_layers_slider->GetLowerValueD();
     double z_high = m_layers_slider->GetHigherValueD();
@@ -748,7 +753,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     {
         // create area array
         //area not computed for sla_print_technology //TODO
-        if (!sla_print_technology){
+        if (!sla_print_technology) {
             const std::vector<std::pair<coordf_t, float>> &layerz_to_area = plater->fff_print().print_statistics().layer_area_stats;
             std::vector<float> areas;
             for(auto [z, area] : layerz_to_area)
@@ -825,9 +830,10 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
                 break;
         }
     }
-
-    m_layers_slider_sizer->Show((size_t)0);
-    Layout();
+  }
+  m_layers_slider_sizer->Show((size_t)0);
+  m_layers_slider->fire_update_if_needed();
+  Layout();
 }
 
 void Preview::update_layers_slider_mode()
@@ -881,12 +887,14 @@ void Preview::update_layers_slider_mode()
     }
 
     m_layers_slider->SetModeAndOnlyExtruder(one_extruder_printed_model, only_extruder);
+    m_layers_slider->fire_update_if_needed();
 }
 
 void Preview::reset_layers_slider()
 {
     m_layers_slider->SetHigherValue(0);
     m_layers_slider->SetLowerValue(0);
+    m_layers_slider->fire_update_if_needed();
 }
 
 void Preview::update_layers_slider_from_canvas(wxKeyEvent& event)
@@ -901,19 +909,20 @@ void Preview::update_layers_slider_from_canvas(wxKeyEvent& event)
     if (key == 'S' || key == 'W') {
         const int new_pos = key == 'W' ? m_layers_slider->GetHigherValue() + 1 : m_layers_slider->GetHigherValue() - 1;
         m_layers_slider->SetHigherValue(new_pos);
-        if (event.ShiftDown() || m_layers_slider->is_one_layer()) m_layers_slider->SetLowerValue(m_layers_slider->GetHigherValue());
-    }
-    else if (key == 'A' || key == 'D') {
+        if (event.ShiftDown() || m_layers_slider->is_one_layer())
+            m_layers_slider->SetLowerValue(m_layers_slider->GetHigherValue());
+    } else if (key == 'A' || key == 'D') {
         const int new_pos = key == 'D' ? m_moves_slider->GetHigherValue() + 1 : m_moves_slider->GetHigherValue() - 1;
         m_moves_slider->SetHigherValue(new_pos);
-        if (event.ShiftDown() || m_moves_slider->is_one_layer()) m_moves_slider->SetLowerValue(m_moves_slider->GetHigherValue());
-    }
-    else if (key == 'X')
+        if (event.ShiftDown() || m_moves_slider->is_one_layer())
+            m_moves_slider->SetLowerValue(m_moves_slider->GetHigherValue());
+    } else if (key == 'X') {
         m_layers_slider->ChangeOneLayerLock();
-    else if (key == WXK_SHIFT)
+    } else if (key == WXK_SHIFT)
         m_layers_slider->UseDefaultColors(false);
     else
         event.Skip();
+    m_layers_slider->fire_update_if_needed();
 }
 
 void Preview::update_moves_slider()
@@ -937,6 +946,8 @@ void Preview::update_moves_slider()
     m_moves_slider->SetSliderAlternateValues(alternate_values);
     m_moves_slider->SetMaxValue(view.endpoints.last - view.endpoints.first);
     m_moves_slider->SetSelectionSpan(view.current.first - view.endpoints.first, view.current.last - view.endpoints.first);
+    m_moves_slider->Refresh();
+    m_moves_slider->Update();
 }
 
 void Preview::enable_moves_slider(bool enable)
