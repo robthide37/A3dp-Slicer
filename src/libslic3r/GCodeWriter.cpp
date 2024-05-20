@@ -876,9 +876,9 @@ std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_id
     double fan_baseline = (config.fan_percentage ? 100.0 : 255.0);
 
     //add fan_offset
-    int8_t fan_speed = int8_t(std::min(uint8_t(100), speed));
+    int16_t fan_speed = int8_t(std::min(uint8_t(100), speed));
     fan_speed += (uint8_t)config.extruder_fan_offset.get_abs_value(extruder_idx, 1.0);
-    fan_speed = std::max(int8_t(0), std::min(int8_t(100), fan_speed));
+    fan_speed = std::max(int16_t(0), std::min(int16_t(100), fan_speed));
 
     //check if we should use a special fan
     if ((gcfKlipper == gcode_flavor) && !config.fan_name.get_at(extruder_idx).empty()) {

@@ -857,7 +857,8 @@ struct SeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.0f || b.overhang > 0.0f) {
+        if ((a.overhang > a.perimeter.flow_width / 4 && b.overhang == 0.0f) ||
+            (b.overhang > b.perimeter.flow_width / 4 && a.overhang == 0.0f)) {
             return a.overhang < b.overhang;
         }
 
@@ -881,11 +882,11 @@ struct SeamComparator {
         }
 
         // the penalites are kept close to range [0-1.x] however, it should not be relied upon
-        float penalty_a = a.overhang
+        float penalty_a = 2 * a.overhang / a.perimeter.flow_width
                 + visibility_importance * a.visibility
                 + angle_importance * compute_angle_penalty(a.local_ccw_angle)
                 + travel_importance * distance_penalty_a;
-        float penalty_b = b.overhang 
+        float penalty_b = 2 * b.overhang / b.perimeter.flow_width
                 + visibility_importance * b.visibility
                 + angle_importance * compute_angle_penalty(b.local_ccw_angle)
                 + travel_importance * distance_penalty_b;
@@ -1220,10 +1221,12 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
                         Vec2f point = Vec2f { perimeter_point.position.head<2>() };
                         if (prev_layer_distancer.get() != nullptr) {
-                            perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point)
-                                    + 0.6f * perimeter_point.perimeter.flow_width
-                                    - tan(SeamPlacer::overhang_angle_threshold)
-                                            * po->layers()[layer_idx]->height;
+                            perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point);
+
+                            //perimeter_point.overhang = perimeter_point.overhang + 0.6f * perimeter_point.perimeter.flow_width
+                            //        - tan(SeamPlacer::overhang_angle_threshold)
+                            //                * po->layers()[layer_idx]->height;
+
                             perimeter_point.overhang =
                                     perimeter_point.overhang < 0.0f ? 0.0f : perimeter_point.overhang;
                         }

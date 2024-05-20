@@ -764,9 +764,9 @@ namespace DoExport {
             if (extruder == extruders.end())
                 continue;
 
-            double s = PI * sqr(0.5* extruder->filament_diameter());
+            double section = PI * sqr(0.5 * extruder->filament_diameter());
             double weight = volume.second * extruder->filament_density() * 0.001;
-            total_used_filament += volume.second/s;
+            total_used_filament += volume.second / section;
             total_weight        += weight;
             total_cost          += weight * extruder->filament_cost() * 0.001;
         }
@@ -5019,8 +5019,8 @@ void GCode::add_wipe_points(const std::vector<THING>& paths) {
                 break; // Do not perform a wipe on bridges.
 
             assert(it->polyline.size() >= 2);
-            assert(m_wipe.path.points.back() == it->last_point());
-            if (m_wipe.path.points.back() != it->last_point())
+            assert(m_wipe.path.points.back().coincides_with_epsilon(it->last_point()));
+            if (!m_wipe.path.points.back().coincides_with_epsilon(it->last_point()))
                 break; // ExtrusionMultiPath is interrupted in some place.
 
             m_wipe.path.points.insert(m_wipe.path.points.end(), it->polyline.get_points().rbegin() + 1, it->polyline.get_points().rend());

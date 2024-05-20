@@ -522,7 +522,7 @@ void PreferencesDialog::build(size_t selected_tab)
 
 		def.label = L("Suppress to open hyperlink in browser");
 		def.type = coBool;
-		def.tooltip = L("If enabled, PrusaSlicer will not open hyperlinks in your browser.");
+		def.tooltip = (boost::format(_u8L("If enabled, %1% will not open hyperlinks in your browser.")) % SLIC3R_APP_NAME).str();
 		//def.tooltip = ("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
 		//	"If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks.");
 		def.set_default_value(new ConfigOptionBool{ app_config->get("suppress_hyperlinks") == "1" });
@@ -759,7 +759,7 @@ void PreferencesDialog::build(size_t selected_tab)
 
     def.label = L("Restore window position on start");
     def.type = coBool;
-    def.tooltip = L("If enabled, PrusaSlicer will be open at the position it was closed");
+    def.tooltip = (boost::format(_u8L("If enabled, %1% will be open at the position it was closed")) % SLIC3R_APP_NAME).str();
     def.set_default_value(new ConfigOptionBool{ app_config->get("restore_win_position") == "1" });
     option = Option(def, "restore_win_position");
     m_optgroups_gui.back()->append_single_option_line(option);

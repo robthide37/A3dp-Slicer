@@ -485,7 +485,7 @@ struct PrintStatistics
     std::string                     estimated_normal_print_time;
     std::string                     estimated_silent_print_time;
     double                          total_used_filament;
-    std::vector<std::pair<size_t, double>> color_extruderid_to_used_filament;
+    std::vector<std::pair<size_t, double>> color_extruderid_to_used_filament; // id -> mm (length)
     double                          total_extruded_volume;
     double                          total_cost;
     int                             total_toolchanges;
@@ -497,7 +497,7 @@ struct PrintStatistics
     unsigned int                    initial_extruder_id;
     std::string                     initial_filament_type;
     std::string                     printing_filament_types;
-    std::map<size_t, double>        filament_stats;
+    std::map<size_t, double>        filament_stats; // extruder id -> volume in mm3
 
     // Config with the filled in print statistics.
     DynamicConfig           config() const;

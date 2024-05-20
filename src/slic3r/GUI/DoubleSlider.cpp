@@ -579,7 +579,7 @@ bool Control::is_wipe_tower_layer(int tick) const
         return false;
     if (tick == 0 || (tick == (int)m_values.size() - 1 && m_values[tick] > m_values[tick - 1]))
         return false;
-    if ((m_values[tick - 1] == m_values[tick + 1] && m_values[tick] < m_values[tick + 1]) ||
+    if (m_values.size() > tick + 1 && (m_values[tick - 1] == m_values[tick + 1] && m_values[tick] < m_values[tick + 1]) ||
         (tick > 0 && m_values[tick] < m_values[tick - 1]) ) // if there is just one wiping on the layer 
         return true;
 

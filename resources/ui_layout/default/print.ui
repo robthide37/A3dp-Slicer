@@ -337,13 +337,14 @@ group:label_width$8:sidetext_width$7:Speed for print moves
 		setting:width$4:bridge_speed_internal
 		setting:width$4:overhangs_speed
 	line:Gap fill speed
-		setting:width$4:label$maximum speed:gap_fill_speed
+		setting:width$4:label$Maximum speed:gap_fill_speed
 		setting:width$4:label$Cap with:sidetext$% of perimeter flow:sidetext_width$20:gap_fill_flow_match_perimeter
 	line:Other speed
 		setting:width$4:thin_walls_speed
 		setting:width$4:ironing_speed
-		setting:wipe_tower_speed
-		setting:wipe_tower_wipe_starting_speed
+	line:Wipe tower
+		setting:width$4:label$Main speed:wipe_tower_speed
+		setting:width$4:label$Wipe starting speed:wipe_tower_wipe_starting_speed
 group:Speed for non-print moves
 	line:Travel speed
 		setting:label$xy:travel_speed

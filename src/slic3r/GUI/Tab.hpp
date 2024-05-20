@@ -518,7 +518,8 @@ public:
 	void		init() override;
 	void		build() override;
 	void		toggle_options() override;
-	void		update() override {}
+    void        update() {};
+	void		update_changed_setting(const std::string& opt_key);
 	PrinterTechnology get_printer_technology() const override { return (m_type & Preset::Type::TYPE_TECHNOLOGY) == Preset::Type::TYPE_FFF ? PrinterTechnology::ptFFF : 
 																	   (m_type & Preset::Type::TYPE_TECHNOLOGY) == Preset::Type::TYPE_SLA ? PrinterTechnology::ptSLA :
 																	   PrinterTechnology::ptAny; }

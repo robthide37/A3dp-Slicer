@@ -2595,7 +2595,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 manager->set_cb_edited([this]() {
                     update_dirty();
                     toggle_options();
-                    wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
+                    wxGetApp().mainframe->on_config_changed(*m_config); // invalidate print
                 });
                 current_line            = current_group->create_single_option_line(opt_key);
                 current_line.label_path = "";
@@ -2784,6 +2784,15 @@ void TabFrequent::toggle_options()
     }
 }
 
+void TabFrequent::update_changed_setting(const std::string& opt_key)
+{
+    //find the option, and ask for refresh
+    const ConfigOption *opt = m_config_base->option(opt_key);
+    DynamicConfig fake_conf;
+    fake_conf.set_key_value(opt_key, opt->clone());
+    wxGetApp().mainframe->on_config_changed(fake_conf);
+}
+
 void TabPrint::init()
 {
     m_presets = &m_preset_bundle->fff_prints;
@@ -2873,7 +2882,8 @@ void TabPrint::update()
 {
     if (m_preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA)
         return; // ys_FIXME
-
+    
+    assert(m_config);
     ++m_update_cnt;
 
     // see https://github.com/prusa3d/PrusaSlicer/issues/6814
@@ -2905,7 +2915,7 @@ void TabPrint::update()
         if (!wxGetApp().plater()->inside_snapshot_capture())
             wxGetApp().obj_list()->update_and_show_object_settings_item();
 
-        wxGetApp().mainframe->on_config_changed(m_config);
+        wxGetApp().mainframe->on_config_changed(*m_config);
     }
 }
 
@@ -3157,8 +3167,10 @@ void TabFilament::update()
 
     m_update_cnt--;
 
-    if (m_update_cnt == 0)
-        wxGetApp().mainframe->on_config_changed(m_config);
+    if (m_update_cnt == 0) {
+        assert(m_config);
+        wxGetApp().mainframe->on_config_changed(*m_config);
+    }
 }
 
 void TabFilament::clear_pages()
@@ -3874,8 +3886,10 @@ void TabPrinter::update()
     update_description_lines();
     Layout();
 
-    if (m_update_cnt == 0)
-        wxGetApp().mainframe->on_config_changed(m_config);
+    if (m_update_cnt == 0) {
+        assert(m_config);
+        wxGetApp().mainframe->on_config_changed(*m_config);
+    }
 }
 
 void TabPrinter::update_fff()
@@ -4506,7 +4520,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     // Print bed has to be updated, when printer preset is detached from the system preset
     if (detach && type() == Preset::TYPE_PRINTER) {
         assert(m_config);
-        wxGetApp().mainframe->on_config_changed(m_config);
+        wxGetApp().mainframe->on_config_changed(*m_config);
     }
 
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
@@ -5053,11 +5067,12 @@ wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
     wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(2, 5, wxGetApp().em_unit()); // delete_button,  edit column contains "Find", "Replace", "Notes"
     grid_sizer->SetFlexibleDirection(wxBOTH);
     grid_sizer->AddGrowableCol(1);
-
+    
+    assert(m_config);
     m_subst_manager.init(m_config, parent, grid_sizer);
     m_subst_manager.set_cb_edited_substitution([this]() {
         update_dirty();
-        wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
+        wxGetApp().mainframe->on_config_changed(*m_config); // invalidate print
         });
     m_subst_manager.set_cb_hide_delete_all_btn([this]() {
         m_del_all_substitutions_btn->Hide();
@@ -5740,7 +5755,8 @@ void TabSLAMaterial::update()
 //     m_update_cnt--;
 //
 //     if (m_update_cnt == 0)
-        wxGetApp().mainframe->on_config_changed(m_config);
+        assert(m_config);
+        wxGetApp().mainframe->on_config_changed(*m_config);
 }
 
 void TabSLAPrint::init()
@@ -5790,6 +5806,8 @@ void TabSLAPrint::update()
 {
     if (m_preset_bundle->printers.get_selected_preset().printer_technology() == ptFFF)
         return;
+    
+    assert(m_config);
 
     m_update_cnt++;
 
@@ -5808,7 +5826,7 @@ void TabSLAPrint::update()
         if (!wxGetApp().plater()->inside_snapshot_capture())
             wxGetApp().obj_list()->update_and_show_object_settings_item();
 
-        wxGetApp().mainframe->on_config_changed(m_config);
+        wxGetApp().mainframe->on_config_changed(*m_config);
     }
 }
 
