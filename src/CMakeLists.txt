@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.13)
 project(Slic3r-native)
 
 add_subdirectory(build-utils)
-add_subdirectory(test-utils)
+if (NOT APPLE)
+    add_subdirectory(test-utils)
+endif ()
 add_subdirectory(admesh)
 add_subdirectory(avrdude)
 # boost/nowide
