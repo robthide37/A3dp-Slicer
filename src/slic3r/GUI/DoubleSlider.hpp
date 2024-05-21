@@ -303,9 +303,10 @@ public:
     void auto_color_change();
 
     // mutex to lock the rendering & callbacks while updating the data.
-    std::mutex &lock_render() { return m_lock_data; }
+    std::recursive_mutex &lock_render() { return m_lock_data; }
     // emit refresh, update, and event. Do it only outside of lock_render()
     void fire_update_if_needed();
+    bool ensure_correctly_filled() const;
 
     ExtrudersSequence m_extruders_sequence;
 
@@ -433,7 +434,7 @@ private:
     bool m_need_fire_scroll_change = false;
 
     // lock for avoiding render & callbacks while data is updating
-    std::mutex m_lock_data;
+    std::recursive_mutex m_lock_data;
     
     std::vector<double> m_values;
     TickCodeInfo        m_ticks;

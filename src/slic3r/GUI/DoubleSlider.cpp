@@ -452,14 +452,27 @@ void Control::SetLayersAreas(const std::vector<float>& layers_areas)
     m_layers_areas.reserve(layers_areas.size());
     for(float area : layers_areas)
         m_layers_areas.push_back(area);
-    if (m_layers_values.size() == m_layers_areas.size() + 1)
-        m_layers_areas.insert(m_layers_areas.begin(), 0.);
-    if (m_is_wipe_tower && m_values.size() != m_layers_areas.size()) {
-        // When whipe tower is used to the end of print, there is one layer which is not marked in layers_times
-        // So, add this value from the total print time value
-        for (size_t i = m_layers_areas.size(); i < m_layers_values.size(); i++)
-            m_layers_areas.push_back(0.);
+}
+bool Control::ensure_correctly_filled() const
+{
+    bool ok = true;
+    if (!m_layers_times.empty() && m_layers_times.size() != m_values.size() && m_layers_times.size() != m_values.size() - 1) {
+        ok = false;
+        assert(false);
+        //m_layers_times.clear();
     }
+    if (!m_layers_areas.empty() && m_layers_areas.size() != m_values.size() && m_layers_areas.size() != m_values.size() - 1) {
+        ok = false;
+        assert(false);
+        //m_layers_areas.clear();
+    }
+    if (!m_layers_values.empty()) {
+        ok = m_is_wipe_tower;
+        assert(m_is_wipe_tower);
+        //m_is_wipe_tower = false;
+    }
+
+    return ok;
 }
 
 void Control::SetDrawMode(bool is_sla_print, bool is_sequential_print)
@@ -752,12 +765,33 @@ static wxString short_and_splitted_time(const std::string& time)
 
 wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer*/) const
 {
+    if (!ensure_correctly_filled())
+        return "";
     const size_t value = tick;
 
     if (m_label_koef == 1.0 && m_values.empty())
         return wxString::Format("%lu", static_cast<unsigned long>(value));
     if (value >= m_values.size())
         return "ErrVal";
+    if (m_draw_mode == dmSequentialGCodeView)
+        return wxString::Format("%lu", static_cast<unsigned long>(m_alternate_values[value]));
+
+    wxString str = m_values.empty() ?
+        wxString::Format("%.*f", 2, m_label_koef * value) :
+        wxString::Format("%.*f", 2, m_values[value]);
+    if (label_type == ltHeight)
+        return str;
+
+    // get the layer num (gcode can have 0, but not preview)
+    bool is_preview_not_gcode = m_layers_times.size()  == m_values.size();
+    if (m_is_wipe_tower) {
+        is_preview_not_gcode = (m_layers_values.size() != m_values.size());
+    } else {
+        //assert(m_layers_times.size() == m_values.size() - 1 || m_layers_times.size()  == m_values.size() || m_layers_times.empty());
+        //assert(m_layers_values.empty());
+    }
+    const size_t layer_number = is_preview_not_gcode ? value + 1 : value;
+    const size_t time_idx = is_preview_not_gcode ? value : value - 1;
 
     // When "Print Settings -> Multiple Extruders -> No sparse layer" is enabled, then "Smart" Wipe Tower is used for wiping.
     // As a result, each layer with tool changes is splited for min 3 parts: first tool, wiping, second tool ...
@@ -766,38 +800,27 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
     // m_values contains data for all layer's parts,
     // but m_layers_values contains just unique Z values.
     // Use this function for correct conversion slider position to number of printed layer
-    auto get_layer_number = [this](int value, LabelType label_type) {
-        if (label_type == ltEstimatedTime && m_layers_times.empty())
-            return size_t(-1);
-        assert((is_wipe_tower_layer(value) ? std::max<int>(value - 1, 0) : value) < m_values.size());
-        double layer_print_z = m_values[is_wipe_tower_layer(value) ? std::max<int>(value - 1, 0) : value];
-        auto it = std::lower_bound(m_layers_values.begin(), m_layers_values.end(), layer_print_z - epsilon());
-        if (it == m_layers_values.end()) {
-            it = std::lower_bound(m_values.begin(), m_values.end(), layer_print_z - epsilon());
-            if (it == m_values.end())
-                return size_t(-1);
-            return size_t(value);
-        }
-        return size_t(it - m_layers_values.begin());
-    };
+    //auto get_layer_number = [this](int value, LabelType label_type) -> size_t {
+    //    if (label_type == ltEstimatedTime && m_layers_times.empty())
+    //        return size_t(-1);
+    //    assert((is_wipe_tower_layer(value) ? std::max<int>(value - 1, 0) : value) < m_values.size());
+    //    double layer_print_z = m_values[is_wipe_tower_layer(value) ? std::max<int>(value - 1, 0) : value];
+    //    auto it = std::lower_bound(m_layers_values.begin(), m_layers_values.end(), layer_print_z - epsilon());
+    //    if (it == m_layers_values.end()) {
+    //        it = std::lower_bound(m_values.begin(), m_values.end(), layer_print_z - epsilon());
+    //        if (it == m_values.end())
+    //            return size_t(-1);
+    //        return size_t(value);
+    //    }
+    //    size_t res = size_t(it - m_layers_values.begin());
+    //    return res;
+    //};
 
-    if (m_draw_mode == dmSequentialGCodeView)
-        return wxString::Format("%lu", static_cast<unsigned long>(m_alternate_values[value]));
-    else {
+    {
         if (label_type == ltEstimatedTime) {
-            if (m_is_wipe_tower) {
-                size_t layer_number = get_layer_number(value, label_type);
-                return (layer_number == size_t(-1) || layer_number == m_layers_times.size()) ? "" : short_and_splitted_time(get_time_dhms(m_layers_times[layer_number]));
-            }
-            return value < m_layers_times.size() ? short_and_splitted_time(get_time_dhms(m_layers_times[value])) : "";
+            return time_idx < m_layers_times.size() ? short_and_splitted_time(get_time_dhms(m_layers_times[time_idx])) : "";
         }
-        wxString str = m_values.empty() ?
-            wxString::Format("%.*f", 2, m_label_koef * value) :
-            wxString::Format("%.*f", 2, m_values[value]);
-        if (label_type == ltHeight)
-            return str;
         if (label_type == ltHeightWithLayer) {
-            size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) /**/ + 1 : value;
             bool show_lheight = GUI::wxGetApp().app_config->get("show_layer_height_doubleslider") == "1";
             bool show_ltime = GUI::wxGetApp().app_config->get("show_layer_time_doubleslider") == "1";
             bool show_larea = GUI::wxGetApp().app_config->get("show_layer_area_doubleslider") == "1";
@@ -806,48 +829,42 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
             if (show_lheight) {
                 nb_lines++;
                 double layer_height = 0;
-                if (layer_number >= m_values.size()) {
-                    const auto st1 = layer_number;
+                if (value >= m_values.size()) {
+                    const auto st1 = value;
                     const auto st2 = m_values.size();
                     layer_height = m_values.empty() ? m_label_koef : m_values.back() - (m_values.size() > 1 ? m_values[m_values.size() - 2] : 0);
-                    assert(layer_number == m_values.size());
-                } else if (layer_number == 0) {
-                    layer_height = m_values.empty() ? m_label_koef : m_values[layer_number];
+                    assert(value == m_values.size());
+                } else if (value == 0) {
+                    layer_height = m_values.empty() ? m_label_koef : m_values[value];
                 } else {
-                    layer_height = m_values.empty() ? m_label_koef : m_values[layer_number] - (layer_number > 1 ? m_values[layer_number - 1] : 0);
+                    layer_height = m_values.empty() ? m_label_koef : m_values[value] - (value > 1 ? m_values[value - 1] : 0);
                 }
                 str = str + comma + wxString::Format("%.*f", 2, layer_height);
                 comma = "\n";
             }
             if (show_ltime && !m_layers_times.empty()) {
-                if (m_layers_times.size() +1 >= m_values.size()) {
-                    size_t layer_idx_time = layer_number;
-                    if (m_values.size() > m_layers_times.size()) {
-                        layer_idx_time--;
-                    }
-                    if (layer_idx_time < m_layers_times.size()) {
+                if (m_layers_times.size() + 1 >= m_values.size()) {
+                    if (time_idx < m_layers_times.size()) {
                         nb_lines++;
-                        double previous_time = (layer_idx_time > 0 ? m_layers_times[layer_idx_time - 1] : 0);
-                        wxString layer_time_wstr = short_and_splitted_time(get_time_dhms(m_layers_times[layer_idx_time] - previous_time));
+                        double previous_time = (time_idx > 0 ? m_layers_times[time_idx - 1] : 0);
+                        wxString layer_time_wstr = short_and_splitted_time(get_time_dhms(m_layers_times[time_idx] - previous_time));
                         str = str + comma + layer_time_wstr;
                         comma = "\n";
                     }
                 }
             }
             if (show_larea && !m_layers_areas.empty()) {
-                if (m_layers_areas.size() +1 >= m_values.size()) {
-                    size_t layer_idx_time = layer_number;
-                    if (m_values.size() > m_layers_areas.size()) {
-                        layer_idx_time--;
-                    }
-                    if (layer_idx_time < m_layers_areas.size()) {
+                if (m_layers_areas.size() + 1 >= m_values.size()) {
+                    //assert(time_idx < m_layers_areas.size());
+                    assert(m_layers_areas.size() == m_layers_times.size() || m_layers_areas.size() == m_layers_times.size() - 1);
+                    if (time_idx < m_layers_areas.size()) {
                         nb_lines++;
-                        str = str + comma + wxString::Format("%.*f", m_layers_areas[layer_idx_time] < 1 ? 3 : m_layers_areas[layer_idx_time] < 10 ? 2 : m_layers_areas[layer_idx_time] < 100 ? 1 : 0, m_layers_areas[layer_idx_time]);
+                        str = str + comma + wxString::Format("%.*f", m_layers_areas[time_idx] < 1 ? 3 : m_layers_areas[time_idx] < 10 ? 2 : m_layers_areas[time_idx] < 100 ? 1 : 0, m_layers_areas[time_idx]);
                         comma = "\n";
                     }
                 }
             }
-            int nb_step_down = layer_number - m_values.size() + nb_lines - 1;
+            int nb_step_down = value - m_values.size() + nb_lines - 1;
             while (nb_step_down > 0) {
                 str = "\n" + str;
                 nb_step_down--;
@@ -1776,23 +1793,25 @@ void Control::OnLeftUp(wxMouseEvent& event)
         std::lock_guard lock(m_lock_data);
         if (!HasCapture())
             return;
-        this->ReleaseMouse();
-
-        switch (m_mouse) {
-        case maNone:
-            if (m_is_left_down)
-                move_current_thumb_to_pos(event.GetLogicalPosition(wxClientDC(this)));
-            break;
-        case maDeleteTick: delete_current_tick(); break;
-        case maAddTick: add_current_tick(); break;
-        case maCogIconClick: show_cog_icon_context_menu(); break;
-        case maOneLayerIconClick: switch_one_layer_mode(); break;
-        case maRevertIconClick: discard_all_thicks(); break;
-        default: break;
-        }
-
-        m_is_left_down = false;
+        
     }
+    this->ReleaseMouse();
+
+    //there are some event fired inside, so can't be in the lock section
+    switch (m_mouse) {
+    case maNone:
+        if (m_is_left_down)
+            move_current_thumb_to_pos(event.GetLogicalPosition(wxClientDC(this)));
+        break;
+    case maDeleteTick: delete_current_tick(); break;
+    case maAddTick: add_current_tick(); break;
+    case maCogIconClick: show_cog_icon_context_menu(); break;
+    case maOneLayerIconClick: switch_one_layer_mode(); break;
+    case maRevertIconClick: discard_all_thicks(); break;
+    default: break;
+    }
+
+    m_is_left_down = false;
     m_need_refresh_and_update = false;
     Refresh();
     Update();
@@ -2479,7 +2498,7 @@ void Control::add_current_tick(bool call_from_keyboard /*= false*/)
                   wxPoint(get_position_from_tick(tick), height + coord) :
                   wxPoint(width + coord, get_position_from_tick(tick));
         }
-
+        //fire many event, including an OnLeaveWindows that will refresh us
         GUI::wxGetApp().plater()->PopupMenu(&menu, pos);
     }
 }

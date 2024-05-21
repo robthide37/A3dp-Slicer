@@ -747,18 +747,27 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     if (sla_print_technology)
         m_layers_slider->SetLayersTimes(plater->sla_print().print_statistics().layers_times);
     else {
-        auto print_mode_stat = m_gcode_result->print_statistics.modes.front();
-        m_layers_slider->SetLayersTimes(print_mode_stat.layers_times, print_mode_stat.time);
+        if (plater->fff_print().print_statistics().is_computing_gcode || !plater->fff_print().finished()) {
+            //do not fetch uncomplete data
+            m_layers_slider->SetLayersTimes({}, 0);
+        } else {
+            auto print_mode_stat = m_gcode_result->print_statistics.modes.front();
+            m_layers_slider->SetLayersTimes(print_mode_stat.layers_times, print_mode_stat.time);
+        }
     }
-    {
         // create area array
         //area not computed for sla_print_technology //TODO
-        if (!sla_print_technology) {
+    if (!sla_print_technology){
+        if (plater->fff_print().print_statistics().is_computing_gcode || !plater->fff_print().finished()) {
+            //do not fetch uncomplete data
+            m_layers_slider->SetLayersAreas({});
+        } else {
             const std::vector<std::pair<coordf_t, float>> &layerz_to_area = plater->fff_print().print_statistics().layer_area_stats;
             std::vector<float> areas;
             for(auto [z, area] : layerz_to_area)
                 areas.push_back(area);
             m_layers_slider->SetLayersAreas(areas);
+            assert(areas.size() == m_gcode_result->print_statistics.modes.front().layers_times.size());
             //auto objects = plater->fff_print().objects();
             //for (auto object : objects) {
             //    for (auto layer : object->layers()) {
@@ -830,6 +839,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
                 break;
         }
     }
+    m_layers_slider->ensure_correctly_filled();
   }
   m_layers_slider_sizer->Show((size_t)0);
   m_layers_slider->fire_update_if_needed();
@@ -1091,7 +1101,6 @@ void Preview::load_print_as_fff(bool keep_z_range)
                     m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
                     if (wxGetApp().is_gcode_viewer())
                         m_keep_current_preview_type = true;
-                    refresh_print();
                 }
             }
         }
