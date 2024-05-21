@@ -6012,7 +6012,7 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
         && !(m_config.avoid_crossing_not_first_layer && this->on_first_layer());
 
     // check / compute avoid_crossing_perimeters
-    bool will_cross_perimeter = this->can_cross_perimeter(travel, can_avoid_cross_peri);
+    bool will_cross_perimeter = this->can_cross_perimeter(travel, true);
 
     // if a retraction would be needed (with a low min_dist threshold), try to use avoid_crossing_perimeters to plan a
     // multi-hop travel path inside the configuration space
@@ -6026,8 +6026,9 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
 
     // check whether a straight travel move would need retraction
     bool needs_retraction = this->needs_retraction(travel, role);
-    if (m_config.only_retract_when_crossing_perimeters && !(m_config.enforce_retract_first_layer && m_layer_index == 0))
-        needs_retraction = needs_retraction && will_cross_perimeter;
+    if (m_config.only_retract_when_crossing_perimeters &&
+        !(m_config.enforce_retract_first_layer && m_layer_index == 0))
+        needs_retraction = needs_retraction && this->can_cross_perimeter(travel, false);
 
     // Re-allow avoid_crossing_perimeters for the next travel moves
     m_avoid_crossing_perimeters.reset_once_modifiers();
@@ -6225,7 +6226,7 @@ bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
             //construct m_layer_slices_offseted if needed
             if (m_layer_slices_offseted.layer != m_layer) {
                 m_layer_slices_offseted.layer = m_layer;
-                m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4));
+                m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) / 2;
                 m_layer_slices_offseted.slices = m_layer->lslices;
                 m_layer_slices_offseted.slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
                 //remove top surfaces
@@ -6236,6 +6237,28 @@ bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
                 }
                 
             }
+        //{
+        //    static int aodfjiaqsdz = 0;
+        //    std::stringstream stri;
+        //    stri << this->m_layer->id() << "_avoid_" <<"_"<<(aodfjiaqsdz++) << ".svg";
+        //    SVG svg(stri.str());
+        //    svg.draw(m_layer->lslices, "grey");
+        //    for (auto &entry : offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices) {
+        //        bool checked  = (travel.size() > 1 && 
+        //            (entry.second.contains(travel.front()) ||
+        //            entry.second.contains(travel.back()) ||
+        //            entry.second.contains(travel.points[travel.size() / 2]) ||
+        //            entry.second.cross(travel) )
+        //            );
+        //        svg.draw((entry.second.polygon().split_at_first_point()), checked?"green":"orange", scale_t(0.03));
+        //        int diff_count =0;
+        //        if(checked)
+        //            diff_count = diff_pl(travel, entry.first.contour).size();
+        //        svg.draw(to_polylines(entry.first), diff_count==0?"blue":diff_count==1?"teal":"yellow", scale_t(0.05));
+        //    }
+        //    svg.draw(travel, "red", scale_t(0.05));
+        //    svg.Close();
+        //}
             // test if a expoly contains the entire travel
             for (const ExPolygon &poly :
                  offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices) {
