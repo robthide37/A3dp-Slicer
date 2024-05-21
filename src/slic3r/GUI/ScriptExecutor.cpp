@@ -183,14 +183,14 @@ float as_get_float_idx(std::string& key, int idx)
     float val = 1;
     // if precent, divide by 100
     if (opt->type() == ConfigOptionType::coPercent || opt->type() == ConfigOptionType::coPercents) {
-        val *= 0.01;
+        val *= 0.01f;
     }
     if (opt->type() == ConfigOptionType::coFloatOrPercent && static_cast<const ConfigOptionFloatOrPercent*>(opt)->percent)
-        val *= 0.01;
+        val *= 0.01f;
     if (opt->is_vector()) {
         const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
         if (opt->type() == ConfigOptionType::coFloatsOrPercents && static_cast<const ConfigOptionFloatsOrPercents*>(vector)->get_at(idx).percent)
-            val *= 0.01;
+            val *= 0.01f;
         val *= (float)vector->get_float(idx);
     } else {
         val *= (float)(opt->get_float());

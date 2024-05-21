@@ -38,9 +38,9 @@ public:
         recalculate_line();
     }
     void  set_manual_points_manipulation(bool manip) { m_manual_points_manipulation = manip; }
-    void  set_x_label(wxString &label, float incr = 0.1f) { m_x_legend = label; m_x_legend_incr = incr; }
-    void  set_y_label(wxString &label, float incr = 0.1f) { m_y_legend = label; m_y_legend_incr = incr; }
-    void  set_no_point_label(wxString &label) { m_no_point_legend = label; }
+    void  set_x_label(const wxString &label, float incr = 0.1f) { m_x_legend = label; m_x_legend_incr = incr; }
+    void  set_y_label(const wxString &label, float incr = 0.1f) { m_y_legend = label; m_y_legend_incr = incr; }
+    void  set_no_point_label(const wxString &label) { m_no_point_legend = label; }
     float get_volume() const { return m_total_volume; }
     float get_max_x()   const { return visible_area.m_width; }
     

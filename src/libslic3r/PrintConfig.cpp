@@ -5033,7 +5033,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm²");
     def->min = 0;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloat(70));
+    def->set_default_value(new ConfigOptionFloat(4));
 
     def = this->add("solid_infill_below_layer_area", coFloat);
     def->label = L("Solid infill layer threshold area");
@@ -8420,6 +8420,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "start_gcode_manual",
 "solid_infill_below_layer_area",
 "solid_infill_below_thickness",
+"solid_infill_below_width",
 "support_material_angle_height",
 "support_material_acceleration",
 "support_material_contact_distance_type",
