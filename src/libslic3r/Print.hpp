@@ -20,6 +20,7 @@
 
 #include <Eigen/Geometry>
 
+#include <atomic>
 #include <ctime>
 #include <functional>
 #include <set>
@@ -499,6 +500,8 @@ struct PrintStatistics
     std::string                     printing_filament_types;
     std::map<size_t, double>        filament_stats; // extruder id -> volume in mm3
 
+    std::atomic_bool is_computing_gcode;
+
     // Config with the filled in print statistics.
     DynamicConfig           config() const;
     // Config with the statistics keys populated with placeholder strings.
@@ -519,6 +522,7 @@ struct PrintStatistics
         printing_filament_types.clear();
         filament_stats.clear();
         printing_extruders.clear();
+        is_computing_gcode = false;
     }
 };
 

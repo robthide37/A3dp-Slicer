@@ -4688,6 +4688,7 @@ void Plater::priv::enable_preview_moves_slider(bool enable)
 
 void Plater::priv::reset_gcode_toolpaths()
 {
+    gcode_result.reset();
     preview->reset_gcode_toolpaths();
 }
 

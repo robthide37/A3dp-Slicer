@@ -1308,12 +1308,20 @@ void GCode::_init_multiextruders(const Print& print, std::string& out, GCodeWrit
     }
 }
 
+struct LockMonitor
+{
+    PrintStatistics &m_status_monitor;
+    LockMonitor(PrintStatistics &status_monitor) : m_status_monitor(status_monitor) { m_status_monitor.is_computing_gcode = true; }
+    ~LockMonitor(){ m_status_monitor.is_computing_gcode = false; }
+};
+
 void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     PROFILE_FUNC();
 
     const Print &print = print_mod;
     Print::StatusMonitor status_monitor{print_mod};
+    LockMonitor monitor_soft_lock(status_monitor.stats());
     this->m_throw_if_canceled =
         [&print]() { print.throw_if_canceled(); };
 

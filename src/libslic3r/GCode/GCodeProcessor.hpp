@@ -68,7 +68,7 @@ namespace Slic3r {
         PrintEstimatedStatistics() { reset(); }
 
         void reset() {
-            for (auto m : modes) {
+            for (Mode &m : modes) {
                 m.reset();
             }
             volumes_per_color_change.clear();
