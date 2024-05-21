@@ -69,11 +69,11 @@ then
 	apt install g++ m4
     if [[ -z "$FOUND_GTK3" ]]
     then
-        echo -e "\nInstalling: libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext
+        echo -e "\nInstalling: libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse\n"
+        apt install libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse
     else
-        echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext
+        echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse\n"
+        apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse
     fi
     # for ubuntu 22.04:
     ubu_version="$(cat /etc/issue)" 
