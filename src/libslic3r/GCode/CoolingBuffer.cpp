@@ -68,7 +68,7 @@ struct CoolingLine
         TYPE_G2                 = 1 << 20,
         TYPE_G3                 = 1 << 21,
         // Would be TYPE_ADJUSTABLE, but the block of G-code lines has zero extrusion length, thus the block
-        // cannot have its speed adjusted. This should not happen (sic!).
+        // cannot have its speed adjusted. This should not happen (sic!). (delete the block if no g1)
         TYPE_ADJUSTABLE_EMPTY   = 1 << 22,
     };
     static inline ExtrusionRole to_extrusion_role(uint32_t type) {
@@ -412,6 +412,12 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             // There should be at least some extrusion move inside the adjustment block.
             // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
             //FIXME: Pressure equalizer add EXTRUDE_SET_SPEED_TAG withotu removing the previous one at the line before.
+            if (!ignore_empty && sm.length <= 0) {
+                // the mouvment has been deleted because it'ts too short for the precision.
+                // so soft-delete the CoolingLine (will be deleted in the apply layer cooldown func)
+                sm.type = CoolingLine::TYPE_ADJUSTABLE_EMPTY;
+                return;
+            }
             assert(ignore_empty || sm.length > 0);
             assert(ignore_empty || sm.time > 0);
             if (sm.time <= 0) {
@@ -1131,6 +1137,11 @@ std::string CoolingBuffer::apply_layer_cooldown(
                     new_gcode.append(end, line_end - end);
                 }
             }
+        } else if(line->type == CoolingLine::TYPE_ADJUSTABLE_EMPTY) {
+            // nothing useful, don't write it (an extrusion that don't move because it wasn't printed as it's too small).
+            std::string deleted(line_start, line_end - line_start);
+            boost::replace_all(deleted, "\n", "");
+            new_gcode.append(std::string("; deleted stuff: ") + deleted);
         } else {
             new_gcode.append(line_start, line_end - line_start);
         }

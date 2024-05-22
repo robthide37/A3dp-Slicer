@@ -54,7 +54,14 @@ class Wipe {
 public:
     bool enable;
     Polyline path;
-    
+
+    void append(const Point &p);
+    void append(const Polyline &p);
+    void set(const Polyline &p);
+    void reverse() { path.reverse(); }
+    void clip_start(coord_t dist) { path.clip_start(dist); }
+    void translate(const Point &trsl) { path.translate(trsl); }
+
     Wipe() : enable(false) {}
     bool has_path() const { return !this->path.points.empty(); }
     void reset_path() { this->path = Polyline(); }
