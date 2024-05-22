@@ -193,7 +193,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
 
         int cnt = 0;
 
-        if ( (type == Preset::TYPE_SLA_MATERIAL || type == Preset::TYPE_PRINTER) && opt_key != "bed_shape")
+        if ( (type == Preset::TYPE_SLA_MATERIAL || type == Preset::TYPE_FFF_FILAMENT || type == Preset::TYPE_PRINTER) && opt_key != "bed_shape")
             switch (config->option(opt_key)->type())
             {
             case coInts:	change_opt_key<ConfigOptionInts		>(opt_key, config, cnt);	break;
@@ -997,8 +997,8 @@ void SearchListModel::Prepend(const std::string& label)
     wxString   str    = from_u8(label).Remove(0, 1);
 
     int        icon_idx = 0; 
-    if(icon_c < icon_idxs.size())
-        icon_idx = icon_idxs.at(icon_c);
+    if(auto it = icon_idxs.find(icon_c); it != icon_idxs.end())
+        icon_idx = it->second;
     m_values.emplace_back(str, icon_idx);
 
     RowPrepended();
