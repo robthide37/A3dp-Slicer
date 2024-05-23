@@ -1213,6 +1213,8 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     case coString:
     case coStrings:func_name = "void"; break;
     case coEnum: func_name = "int"; break;
+    default:
+        assert(false);
     }
     func_name += (" " + def.opt_key + "_get(");
     switch (def.type) {
@@ -1221,6 +1223,7 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     case coString:
     case coStrings:
     case coEnum: func_name += "string &out"; break;
+    default:;
     }
     func_name += ")";
     AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl(func_name.c_str());

@@ -282,8 +282,9 @@ void show_substitutions_info(const PresetsConfigSubstitutions &presets_config_su
     wxString changes;
 
     // check count
-    if (check_count(presets_config_substitutions) == 0)
+    if (check_count(presets_config_substitutions) == 0) {
         return;
+    }
 
 	auto preset_type_name = [](Preset::Type type) {
 		switch (type) {
@@ -312,8 +313,9 @@ void show_substitutions_info(const PresetsConfigSubstitutions &presets_config_su
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename)
 {
     // check count
-    if (check_count(config_substitutions) == 0)
+    if (check_count(config_substitutions) == 0) {
         return;
+    }
 
 	wxString changes = "\n";
 	add_config_substitutions(config_substitutions, changes);

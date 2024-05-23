@@ -6654,6 +6654,7 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             "Resolve the current problem to continue slicing.");
         error = ErrorType::PLATER_ERROR;
         break;
+    case EWarning::PrintWarning: text = ""; error = ErrorType::PLATER_WARNING; break;
     }
     auto& notification_manager = *wxGetApp().plater()->get_notification_manager();
     switch (error)
