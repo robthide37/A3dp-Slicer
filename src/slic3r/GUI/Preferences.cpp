@@ -1002,7 +1002,7 @@ void PreferencesDialog::accept(wxEvent&)
 		m_seq_top_layer_only_changed = app_config->get("seq_top_layer_only") != it->second;
 
 	m_settings_layout_changed = false;
-	for (const std::string& key : { "old_settings_layout_mode",
+	for (const std::string key : { "old_settings_layout_mode",
 								    "new_settings_layout_mode",
 								    "dlg_settings_layout_mode" })
 	{
@@ -1013,7 +1013,7 @@ void PreferencesDialog::accept(wxEvent&)
 		}
 	}
 
-	for (const std::string& key : {	"default_action_on_close_application", 
+	for (const std::string key : {	"default_action_on_close_application", 
 									"default_action_on_select_preset", 
 									"default_action_on_new_project" }) {
 	    auto it = m_values.find(key);

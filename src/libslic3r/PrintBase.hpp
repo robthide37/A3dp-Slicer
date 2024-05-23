@@ -466,7 +466,7 @@ public:
         } else {
             printf("%d => ", percent);
             if(args.empty())
-                printf(message.c_str());
+                printf("%s", message.c_str());
             else if (args.size()==1)
                 printf(message.c_str(), args.front().c_str());
             else if (args.size()==2)

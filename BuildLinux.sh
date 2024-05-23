@@ -54,12 +54,15 @@ then
     exit 0
 fi
 
-# mkdir build
-if [ ! -d "build" ]
+if [[ -n "$FOUND_GTK3" ]]
 then
-    mkdir build
+    echo "Found GTK3"
+else
+    if [[ -n "$FOUND_GTK2" ]]
+    then
+        echo "Found GTK2"
+    fi
 fi
-
 
 if [[ -n "$UPDATE_LIB" ]]
 then
@@ -117,6 +120,12 @@ echo "[2/9] Changing date in version..."
     sed -i "s/+UNKNOWN/_$(date '+%F')/" version.inc
 }
 echo "done"
+
+# mkdir build
+if [ ! -d "build" ]
+then
+    mkdir build
+fi
 
 # mkdir in deps
 if [ ! -d "deps/build" ]
