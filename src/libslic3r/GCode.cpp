@@ -1327,6 +1327,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
 
     //apply print config to m_config and m_writer, so we don't have to use print.config() instead
     // (and mostly to make m_writer.preamble() works)
+    // this also reset the gcode writer
     this->apply_print_configs(print);
 
     // modifies m_silent_time_estimator_enabled
