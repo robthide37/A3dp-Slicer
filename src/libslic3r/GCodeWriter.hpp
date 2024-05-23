@@ -13,7 +13,7 @@ namespace Slic3r {
 class GCodeWriter {
 public:
     GCodeConfig config;
-    bool multiple_extruders;
+    bool multiple_extruders = false;
     // override from region
     const PrintRegionConfig* config_region = nullptr;
     
@@ -108,6 +108,13 @@ private:
     // current lift, to remove from m_pos to have the current height.
     double          m_lifted = 0;
     Vec3d           m_pos = Vec3d::Zero();
+    // cached string representation of x & y m_pos
+    std::string     m_pos_str_x;
+    std::string     m_pos_str_y;
+    // stored de that wasn't written, because of the rounding
+    double          m_de_left = 0;
+    std::pair<std::string, bool> _compute_de(double dE);
+
     
     std::string _travel_to_z(double z, const std::string &comment);
     std::string _retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange, const std::string &comment);
@@ -176,6 +183,17 @@ public:
         if (! axis.empty()) {
             // not gcfNoExtrusion
             this->emit_axis(axis[0], v, m_gcode_precision_e);
+        }
+    }
+
+    void emit(const std::string &axis, std::string str) {
+        if (! axis.empty()) {
+            * ptr_err_ptr++ = ' ';
+            assert(axis.size() == 1);
+            *ptr_err_ptr++ = axis.front();
+            for (char c : str) {
+                * ptr_err_ptr++ = c;
+            }
         }
     }
 

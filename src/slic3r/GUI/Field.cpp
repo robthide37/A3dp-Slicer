@@ -1448,16 +1448,16 @@ void SpinCtrl::BUILD() {
         propagate_value();
 	}));
 
-    temp->Bind(wxEVT_SPINCTRL, ([this](wxCommandEvent e) {  propagate_value();  }), temp->GetId());
+    temp->Bind(wxEVT_SPINCTRL, ([this](wxCommandEvent& e) {  propagate_value();  }), temp->GetId());
 
-    temp->Bind(wxEVT_TEXT_ENTER, ([this](wxCommandEvent e)
+    temp->Bind(wxEVT_TEXT_ENTER, ([this](wxCommandEvent& e)
     {
         e.Skip();
         propagate_value();
         bEnterPressed = true;
     }), temp->GetId());
 
-	temp->Bind(wxEVT_TEXT, ([this, temp](wxCommandEvent e)
+	temp->Bind(wxEVT_TEXT, ([this, temp](wxCommandEvent& e)
 	{
 // 		# On OSX / Cocoa, wxSpinCtrl::GetValue() doesn't return the new value
 // 		# when it was changed from the text control, so the on_change callback
@@ -1592,7 +1592,7 @@ void Choice::BUILD() {
 		}
 		set_selection();
 	}
-
+    this->suppress_scroll();
     temp->Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& e) {
         if (m_suppress_scroll && !m_is_dropped)
             e.StopPropagation();

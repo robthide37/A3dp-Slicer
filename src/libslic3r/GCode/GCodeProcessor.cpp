@@ -1344,6 +1344,7 @@ void GCodeProcessor::reset()
     // 1st move must be a dummy move
     assert(m_result.moves.empty());
     m_result.moves.emplace_back();
+    m_has_reset = true;
 
     m_use_volumetric_e = false;
     m_last_default_color_id = 0;
