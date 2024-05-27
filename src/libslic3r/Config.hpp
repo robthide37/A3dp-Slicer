@@ -819,9 +819,9 @@ public:
                     return false;
             return true;
         } else {
-            return idx < values.size() ? (std::isnan(this->values[idx]) || NIL_VALUE() == this->values[idx]) :
-                   values.empty()      ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
-                                         (std::isnan(this->values.front()) || NIL_VALUE() == this->values.front());
+            return idx < int32_t(values.size()) ? (std::isnan(this->values[idx]) || NIL_VALUE() == this->values[idx]) :
+                   values.empty()               ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
+                                                  (std::isnan(this->values.front()) || NIL_VALUE() == this->values.front());
         }
     }
     double                  get_float(size_t idx = 0) const override { return get_at(idx); }
@@ -1003,9 +1003,9 @@ public:
                     return false;
             return true;
         } else {
-            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
-                   values.empty()      ? NIL_VALUE() == this->default_value :
-                                         NIL_VALUE() == this->values.front();
+            return idx < int32_t(values.size()) ? NIL_VALUE() == this->values[idx] :
+                   values.empty()               ? NIL_VALUE() == this->default_value :
+                                                  NIL_VALUE() == this->values.front();
         }
     }
     int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
@@ -1345,9 +1345,9 @@ public:
                     return false;
             return true;
         } else {
-            return idx < values.size() ? (std::isnan(this->values[idx].value) || NIL_VALUE() == this->values[idx]) :
-                   values.empty()      ? (std::isnan(this->default_value.value) || NIL_VALUE() == this->default_value) :
-                                         (std::isnan(this->values.front().value) || NIL_VALUE() == this->values.front());
+            return idx < int32_t(values.size()) ? (std::isnan(this->values[idx].value) || NIL_VALUE() == this->values[idx]) :
+                   values.empty()               ? (std::isnan(this->default_value.value) || NIL_VALUE() == this->default_value) :
+                                                  (std::isnan(this->values.front().value) || NIL_VALUE() == this->values.front());
         }
     }
     double                  get_abs_value(size_t i, double ratio_over) const {
@@ -1708,9 +1708,9 @@ public:
                     return false;
             return true;
         } else {
-            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
-                   values.empty()      ? NIL_VALUE() == this->default_value :
-                                         NIL_VALUE() == this->values.front();
+            return idx < int32_t(values.size()) ? NIL_VALUE() == this->values[idx] :
+                   values.empty()               ? NIL_VALUE() == this->default_value :
+                                                  NIL_VALUE() == this->values.front();
         }
     }
     bool                    get_bool(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }

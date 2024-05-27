@@ -719,7 +719,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                     assert(compute_volume.volume <= area * surface_fill.params.layer_height * 1.001 || f->debug_verify_flow_mult <= 0.8);
                     if(compute_volume.volume > 0) //can fail for thin regions
                         assert(compute_volume.volume >= area * surface_fill.params.layer_height * 0.999 || f->debug_verify_flow_mult >= 1.3 || f->debug_verify_flow_mult == 0 // sawtooth output more filament,as it's 3D (debug_verify_flow_mult==0)
-                            || area < std::max(1.,surface_fill.params.config->solid_infill_below_area.value) || area < std::max(1.,surface_fill.params.config->solid_infill_below_layer_area.value));
+                            || area < std::max(1.,surface_fill.params.config->solid_infill_below_area.value));
                 }
 #endif
             }

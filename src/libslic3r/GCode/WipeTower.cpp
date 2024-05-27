@@ -12,8 +12,8 @@
 #include "LocalesUtils.hpp"
 #include "Flow.hpp"
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-
 
 namespace Slic3r
 {
