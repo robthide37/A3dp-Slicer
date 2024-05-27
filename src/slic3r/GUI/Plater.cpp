@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <algorithm>
+#include <chrono>
 #include <numeric>
 #include <vector>
 #include <string>
@@ -1466,21 +1467,35 @@ void Sidebar::update_sliced_info_sizer()
                         wxString::Format("%.2f", ps.total_cost);
             p->sliced_info->SetTextAndShow(siCost, info_text,      new_label);
 
-            if (ps.estimated_normal_print_time == "N/A" && ps.estimated_silent_print_time == "N/A")
+            const std::chrono::system_clock::time_point time_now = std::chrono::system_clock::now();
+            if (ps.estimated_print_time.empty())
                 p->sliced_info->SetTextAndShow(siEstimatedTime, "N/A");
             else {
                 info_text = "";
                 new_label = _L("Estimated printing time") + ":";
-                if (ps.estimated_normal_print_time != "N/A") {
-                    new_label += format_wxstr("\n   - %1%", _L("normal mode"));
-                    info_text += format_wxstr("\n%1%", short_time(ps.estimated_normal_print_time));
+                if (auto it = ps.estimated_print_time_str.find(static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Normal)); it != ps.estimated_print_time_str.end()) {
+                    if (ps.estimated_print_time_str.size() > 1) {
+                        new_label += format_wxstr("\n   - %1%", _L("normal mode"));
+                        info_text += format_wxstr("\n%1%", short_time(it->second));
+                    } else {
+                        info_text += format_wxstr("%1%", short_time(it->second));
+                    }
 
-                    p->plater->get_notification_manager()->set_slicing_complete_print_time(_utf8("Estimated printing time: ") + ps.estimated_normal_print_time, p->plater->is_sidebar_collapsed());
+                    assert(ps.estimated_print_time.find(static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Normal)) != ps.estimated_print_time.end());
+                    std::chrono::system_clock::time_point time_finished = time_now + std::chrono::seconds(int32_t(ps.estimated_print_time.at(static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Normal))));
+                    std::time_t timestamp_finished = std::chrono::system_clock::to_time_t(time_finished);
+                    info_text += format_wxstr(_L(" (finished at %1%)"), std::put_time(std::localtime(&timestamp_finished), "%T"));
 
+                    p->plater->get_notification_manager()->set_slicing_complete_print_time(_utf8("Estimated printing time: ") + it->second, p->plater->is_sidebar_collapsed());
                 }
-                if (ps.estimated_silent_print_time != "N/A") {
+                if (auto it = ps.estimated_print_time_str.find(static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Stealth)); it != ps.estimated_print_time_str.end()) {
                     new_label += format_wxstr("\n   - %1%", _L("stealth mode"));
-                    info_text += format_wxstr("\n%1%", short_time(ps.estimated_silent_print_time));
+                    info_text += format_wxstr("\n%1%", short_time(it->second));
+
+                    assert(ps.estimated_print_time.find(static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Stealth)) != ps.estimated_print_time.end());
+                    std::chrono::system_clock::time_point time_finished = time_now + std::chrono::seconds(int32_t(ps.estimated_print_time.at(static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Stealth))));
+                    std::time_t timestamp_finished = std::chrono::system_clock::to_time_t(time_finished);
+                    info_text += format_wxstr(_L(" (finished at %1%)"), std::put_time(std::localtime(&timestamp_finished), "%T"));
                 }
                 p->sliced_info->SetTextAndShow(siEstimatedTime, info_text, new_label);
             }

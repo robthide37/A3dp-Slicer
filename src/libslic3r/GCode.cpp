@@ -803,9 +803,18 @@ namespace DoExport {
     static void update_print_estimated_stats(const GCodeProcessor& processor, const std::vector<Extruder>& extruders, const PrintConfig& config, PrintStatistics& print_statistics)
     {
         const GCodeProcessorResult& result = processor.get_result();
-        print_statistics.estimated_normal_print_time = get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time);
-        print_statistics.estimated_silent_print_time = processor.is_stealth_time_estimator_enabled() ?
-            get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].time) : "N/A";
+        print_statistics.estimated_print_time.clear();
+        print_statistics.estimated_print_time_str.clear();
+        print_statistics.estimated_print_time[static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Normal)] =
+            result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time;
+        print_statistics.estimated_print_time_str[static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Normal)] =
+            get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time);
+        if(processor.is_stealth_time_estimator_enabled()){
+            print_statistics.estimated_print_time[static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Stealth)] =
+                result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].time;
+            print_statistics.estimated_print_time_str[static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Stealth)] =
+                get_time_dhms(result.print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].time);
+        }
 
         // update filament statictics
         double total_extruded_volume = 0.0;
