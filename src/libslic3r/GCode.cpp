@@ -249,7 +249,7 @@ std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
         }
         coordf_t min_sqr_dist = precision * precision;
         // Be sure the dist isn't too short
-        if (wipe_dist < min_sqr_dist * 2) {
+        if (wipe_dist * wipe_dist < min_sqr_dist * 2) {
             this->reset_path();
             return "";
         }
@@ -1330,7 +1330,6 @@ static inline std::vector<const PrintInstance*> sort_object_instances_by_max_y(c
             BoundingBox bb(poly.points);
             Vec2crd offset = object->instances()[i].shift - object->center_offset();
             bb.translate(offset.x(), offset.y());
-            std::cout<<"bbobj (mod*inst) "<<i<<" : x:"<<unscaled(bb.min.x())<<"->"<<unscaled(bb.max.x())<<" ; y:"<<unscaled(bb.min.y())<<"->"<<unscaled(bb.max.y())<<"\n";
             map_min_y[instances.back()] = bb.min.y();
         }
     }
@@ -4775,7 +4774,8 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
             throw Slic3r::SlicingError(_(L("Error while writing gcode: two points are at the same position. Please send the .3mf project to the dev team for debugging. Extrude loop: wipe.")));
         }
 
-        gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
+        // start the wipe. Note: you have to end it! (no return before emmitting it)
+        std::string start_wipe = ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
         //extra wipe before the little move.
         if (dist_wipe_extra_perimeter > 0) {
             coordf_t wipe_dist = scale_(dist_wipe_extra_perimeter);
@@ -4817,6 +4817,10 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                 for (const Point& pt : path.polyline.get_points()) {
                     prev_point = current_point;
                     current_point = pt;
+                    if (!start_wipe.empty()) {
+                        gcode += start_wipe;
+                        start_wipe = "";
+                    }
                     gcode += m_writer.travel_to_xy(this->point_to_gcode(pt), 0.0, config().gcode_comments ? "; extra wipe" : "");
                     this->set_last_pos(pt);
                 }
@@ -4847,109 +4851,182 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         Vec2d  next_pos = next_point.cast<double>();
         Vec2d  vec_dist = next_pos - current_pos;
         double vec_norm = vec_dist.norm();
+        double sin_a    = std::abs(std::sin(angle));
+        sin_a = std::max(0.1, sin_a);
         const double setting_max_depth = (m_config.wipe_inside_depth.get_abs_value(m_writer.tool()->id(), nozzle_diam));
-        coordf_t dist = scale_d(nozzle_diam) / 2;
+        coordf_t dist   = setting_max_depth <= 0 ? scale_d(nozzle_diam) / 2 : scale_d(setting_max_depth);
         if (nozzle_diam != 0 && setting_max_depth > nozzle_diam * 0.55)
-            dist = coordf_t(check_wipe::max_depth(wipe_paths, scale_t(setting_max_depth), scale_t(nozzle_diam), [current_pos, current_point, vec_dist, vec_norm, angle](coord_t dist)->Point {
-            Point pt = (current_pos + vec_dist * (2 * dist / vec_norm)).cast<coord_t>();
-            pt.rotate(angle, current_point);
-            return pt;
+            dist = coordf_t(check_wipe::max_depth(wipe_paths, scale_t(setting_max_depth), scale_t(nozzle_diam), 
+                [current_pos, current_point, vec_dist, vec_norm, angle, sin_a](coord_t dist)->Point {
+                    Point pt = (current_pos + vec_dist * (dist / (vec_norm * sin_a))).cast<coord_t>();
+                    pt.rotate(angle, current_point);
+                    return pt;
                 }));
         // Shift by no more than a nozzle diameter.
-        //FIXME Hiding the seams will not work nicely for very densely discretized contours!
-        Point pt_inside = (/*(nd >= vec_norm) ? next_pos : */ (current_pos + vec_dist * (2 * dist / vec_norm))).cast<coord_t>();
+        // FIXME Hiding the seams will not work nicely for very densely discretized contours!
+        Point pt_inside = (/*(nd >= vec_norm) ? next_pos : */ (current_pos + vec_dist * ( dist / (vec_norm * sin_a))))
+                              .cast<coord_t>();
         pt_inside.rotate(angle, current_point);
-        // generate the travel move
+
         if (EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true)) {
-            gcode += m_writer.travel_to_xy(this->point_to_gcode(pt_inside), 0.0, "move inwards before travel");
-            this->set_last_pos(pt_inside);
-        }
+            if (!m_wipe.enable) {
+                if (!start_wipe.empty()) {
+                    gcode += start_wipe;
+                    start_wipe = "";
+                }
+                // generate the travel move
+                gcode += m_writer.travel_to_xy(this->point_to_gcode(pt_inside), 0.0, "move inwards before travel");
+                this->set_last_pos(pt_inside);
+            } else {
+                // also shift the wipe on retract if wipe_inside_end
+                // go to the inside (use clipper for easy shift)
+                Polygon original_polygon = original_loop.polygon();
+                for (int i = 1; i < original_polygon.points.size(); ++i)
+                    assert(!original_polygon.points[i - 1].coincides_with_epsilon(original_polygon.points[i]));
+                Polygons polys = offset(original_polygon, -dist);
+                if (!polys.empty()) {
+                    // if multiple polygon, keep only our nearest.
+                    if (polys.size() > 1) {
+                        size_t   nearest_poly_idx = size_t(-1);
+                        coordf_t best_dist_sqr    = dist * dist * 100;
+                        for (int idx_poly = 0; idx_poly < polys.size(); ++idx_poly) {
+                            Polygon &poly = polys[idx_poly];
+                            for (int idxpt = 0; idxpt < poly.points.size(); ++idxpt) {
+                                if (coordf_t test_dist = pt_inside.distance_to_square(poly.points[idxpt]);
+                                    test_dist < best_dist_sqr) {
+                                    nearest_poly_idx = idx_poly;
+                                    best_dist_sqr    = test_dist;
+                                }
+                            }
+                        }
+                        if (nearest_poly_idx + 1 < polys.size())
+                            polys.erase(polys.begin() + nearest_poly_idx + 1, polys.end());
+                        if (nearest_poly_idx > 0)
+                            polys.erase(polys.begin(), polys.begin() + nearest_poly_idx);
+                        assert(polys.size() == 1);
+                        assert(polys.front().closest_point(pt_inside) != nullptr &&
+                               std::abs(polys.front().closest_point(pt_inside)->distance_to_square(pt_inside) -
+                                        best_dist_sqr) < EPSILON);
+                    }
 
-        gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
-
-        // also shift the wipe on retract if wipe_inside_end
-        if (m_wipe.enable && EXTRUDER_CONFIG_WITH_DEFAULT(wipe_inside_end, true)) {
-            current_pos = pt_inside.cast<double>();
-            //go to the inside (use clipper for easy shift)
-            Polygon original_polygon = original_loop.polygon();
-            for(int i=1;i<original_polygon.points.size();++i)
-                assert(!original_polygon.points[i-1].coincides_with_epsilon(original_polygon.points[i]));
-            Polygons polys = offset(original_polygon, -dist);
-            // This offset may put point so close that they coincides.
-            // So we need to remove points that are now too close.
-            assert(!paths.empty());
-            coordf_t min_dist_sqr = scale_d(paths.front().width) / 10;
-            min_dist_sqr *= min_dist_sqr;
-            for (int idx_poly = 0; idx_poly < polys.size(); ++idx_poly) {
-                Polygon &poly = polys[idx_poly];
-                for (int idxpt = 1; idxpt < poly.points.size(); ++idxpt) {
-                    if (poly.points[idxpt - 1].distance_to_square(poly.points[idxpt]) < min_dist_sqr) {
-                        poly.points.erase(poly.points.begin() + idxpt);
-                        idxpt--;
+                    // This offset may put point so close that they coincides.
+                    // So we need to remove points that are now too close.
+                    assert(!paths.empty());
+                    coordf_t min_dist_sqr = scale_d(paths.front().width) / 10;
+                    min_dist_sqr *= min_dist_sqr;
+                    int      pop_back = 0;
+                    Point    last_pop_back;
+                    int      pop_in = 0;
+                    Point    last_pop_in;
+                    Polygon &poly = polys.front();
+                    for (int idxpt = 1; idxpt < poly.points.size(); ++idxpt) {
+                        if (poly.points[idxpt - 1].distance_to_square(poly.points[idxpt]) < min_dist_sqr) {
+                            last_pop_in = poly.points[idxpt];
+                            poly.points.erase(poly.points.begin() + idxpt);
+                            idxpt--;
+                            pop_in++;
+                        }
+                    }
+                    if (poly.size() > 1 && poly.front().distance_to_square(poly.back()) < min_dist_sqr) {
+                        last_pop_back = poly.points.back();
+                        poly.points.pop_back();
+                        pop_back++;
+                    }
+                    if (poly.size() < 3) {
+                        polys.clear();
                     }
                 }
-                if (poly.size() > 1 && poly.front().distance_to_square(poly.back()) < min_dist_sqr) {
-                    poly.points.pop_back();
-                }
-                if (poly.size() < 2) {
-                    polys.erase(polys.begin() + idx_poly);
-                    idx_poly--;
-                }
-            }
-            assert(!polys.empty());
-            for(Polygon &poly : polys)
-                for(int i=1;i<poly.points.size();++i)
-                    assert(!poly.points[i-1].coincides_with_epsilon(poly.points[i]));
-            //find nearest point
-            size_t best_poly_idx = 0;
-            size_t best_pt_idx = 0;
-            const coordf_t max_sqr_dist = dist * dist * 8; // 2*nozzle²
-            coordf_t best_sqr_dist = max_sqr_dist;
-            for (size_t poly_idx = 0; poly_idx < polys.size(); poly_idx++) {
-                Polygon& poly = polys[poly_idx];
-                if (poly.is_clockwise() ^ original_polygon.is_clockwise())
-                    poly.reverse();
-                for (size_t pt_idx = 0; pt_idx < poly.size(); pt_idx++) {
-                    if (poly.points[pt_idx].distance_to_square(pt_inside) < best_sqr_dist) {
-                        best_sqr_dist = poly.points[pt_idx].distance_to_square(pt_inside);
-                        best_poly_idx = poly_idx;
-                        best_pt_idx = pt_idx;
-                    }
-                }
-            }
-            if (best_sqr_dist == max_sqr_dist) {
-                //try to find an edge
-                for (size_t poly_idx = 0; poly_idx < polys.size(); poly_idx++) {
-                    Polygon& poly = polys[poly_idx];
+                // find nearest point
+                size_t         best_poly_idx = 0;
+                size_t         best_pt_idx   = 0;
+                const coordf_t max_sqr_dist  = dist * dist * 8; // 2*nozzle²
+                coordf_t       best_sqr_dist = max_sqr_dist;
+                Point          start_point   = pt_inside;
+                if (!polys.empty()) {
+                    Polygon &poly = polys.front();
+                    for (int i = 1; i < poly.points.size(); ++i)
+                        assert(!poly.points[i - 1].coincides_with_epsilon(poly.points[i]));
                     if (poly.is_clockwise() ^ original_polygon.is_clockwise())
                         poly.reverse();
-                    poly.points.push_back(poly.points.front());
-                    for (size_t pt_idx = 0; pt_idx < poly.points.size()-1; pt_idx++) {
-                        if (Line{ poly.points[pt_idx], poly.points[pt_idx + 1] }.distance_to_squared(pt_inside) < best_sqr_dist) {
-                            poly.points.insert(poly.points.begin() + pt_idx + 1, pt_inside);
-                            best_sqr_dist = 0;
-                            best_poly_idx = poly_idx;
-                            best_pt_idx = pt_idx + 1;
-                            poly.points.erase(poly.points.end() - 1);
-                            break;
+                    for (size_t pt_idx = 0; pt_idx < poly.size(); pt_idx++) {
+                        if (poly.points[pt_idx].distance_to_square(pt_inside) < best_sqr_dist) {
+                            best_sqr_dist = poly.points[pt_idx].distance_to_square(pt_inside);
+                            best_pt_idx   = pt_idx;
+                        }
+                    }
+                    if (best_sqr_dist == max_sqr_dist) {
+                        // fail to find nearest point, try to find an edge
+                        if (poly.is_clockwise() ^ original_polygon.is_clockwise())
+                            poly.reverse();
+                        poly.points.push_back(poly.points.front());
+                        for (size_t pt_idx = 0; pt_idx < poly.points.size() - 1; pt_idx++) {
+                            if (Line{poly.points[pt_idx], poly.points[pt_idx + 1]}.distance_to_squared(pt_inside) <
+                                best_sqr_dist) {
+                                poly.points.insert(poly.points.begin() + pt_idx + 1, pt_inside);
+                                best_sqr_dist = 0;
+                                best_pt_idx   = pt_idx + 1;
+                                start_point   = pt_inside.projection_onto(
+                                    Line{poly.points[pt_idx], poly.points[pt_idx + 1]});
+                                poly.points.erase(poly.points.end() - 1);
+                                break;
+                            }
+                        }
+                    } else {
+                        // check if the point is "before" or "after"
+                        // get the intersection with line that start with the best point (works if the point is before
+                        // us, ie in the wrong dir)
+                        Point pt_if_before;
+                        if (best_pt_idx + 1 < poly.size()) {
+                            pt_if_before = pt_inside.projection_onto(Line{poly.points[best_pt_idx], poly.points[best_pt_idx + 1]});
+                        } else {
+                            pt_if_before = pt_inside.projection_onto(Line{poly.points[best_pt_idx], poly.points.front()});
+                        }
+                        // get the intersection with line that end with the best point (works if the point is after
+                        // us, ie in the good dir)
+                        Point pt_if_after;
+                        if (best_pt_idx > 0) {
+                            pt_if_after = pt_inside.projection_onto(Line{poly.points[best_pt_idx - 1], poly.points[best_pt_idx]});
+                        } else {
+                            pt_if_after = pt_inside.projection_onto(Line{poly.points.back(), poly.points[best_pt_idx]});
+                        }
+                        // choose
+                        if (pt_if_before.distance_to_square(pt_inside) > pt_if_after.distance_to_square(pt_inside)) {
+                            start_point = pt_if_after;
+                        } else {
+                            start_point = pt_if_before;
+                            best_pt_idx = (best_pt_idx + 1) % poly.size();
                         }
                     }
                 }
-            }
-            if (best_sqr_dist == max_sqr_dist) {
-                //can't find a path, use the old one
-                //BOOST_LOG_TRIVIAL(warning) << "Warn: can't find a proper path for wipe on retract. Layer " << m_layer_index << ", pos " << this->point_to_gcode(pt).x() << " : " << this->point_to_gcode(pt).y() << " !";
-            } else {
-                m_wipe.reset_path();
-                //get the points from here
-                Polygon& poly = polys[best_poly_idx];
-                for (size_t pt_idx = best_pt_idx; pt_idx < poly.points.size(); pt_idx++) {
-                    m_wipe.append(poly.points[pt_idx]);
+                if (best_sqr_dist == max_sqr_dist || polys.empty()) {
+                    // can't find a path, use the old one
+                    //BOOST_LOG_TRIVIAL(warning) << "Warn: can't find a proper path for wipe on retract. Layer " << m_layer_index << ", pos " << this->point_to_gcode(pt).x() << " : " << this->point_to_gcode(pt).y() << " !";
+                } else {
+                    Polygon &poly = polys.front();
+                    m_wipe.reset_path();
+                    // add first point if not redondant
+                    if (poly.points[best_pt_idx].distance_to_square(start_point) > SCALED_EPSILON * SCALED_EPSILON * 100)
+                        m_wipe.append(start_point);
+                    // get the points from here
+                    for (size_t pt_idx = best_pt_idx; pt_idx < poly.points.size(); pt_idx++) {
+                        m_wipe.append(poly.points[pt_idx]);
+                    }
+                    for (size_t pt_idx = 0; pt_idx < best_pt_idx; pt_idx++) { m_wipe.append(poly.points[pt_idx]); }
                 }
-                for (size_t pt_idx = 0; pt_idx < best_pt_idx; pt_idx++) {
-                    m_wipe.append(poly.points[pt_idx]);
+                
+                if (!start_wipe.empty()) {
+                    gcode += start_wipe;
+                    start_wipe = "";
                 }
+                // generate the travel move
+                gcode += m_writer.travel_to_xy(this->point_to_gcode(start_point), 0.0, "move inwards before wipe");
+                this->set_last_pos(start_point);
             }
+
+        }
+        // if we started wiping, then end the wipe section.
+        if (start_wipe.empty()) {
+            gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
         }
     }
 
