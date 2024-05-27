@@ -1,33 +1,33 @@
+#include "clipper/clipper_z.hpp"
+
 #include "PerimeterGenerator.hpp"
 
+#include "BoundingBox.hpp"
 #include "BridgeDetector.hpp"
 #include "ClipperUtils.hpp"
+#include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "Geometry.hpp"
+#include "Geometry/MedialAxis.hpp"
+#include "Geometry.hpp"
+#include "Line.hpp"
+#include "Milling/MillingPostProcess.hpp"
+#include "Polygon.hpp"
 #include "ShortestPath.hpp"
+#include "SVG.hpp"
 
 #include "Arachne/WallToolPaths.hpp"
 #include "Arachne/utils/ExtrusionLine.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cassert>
+#include <list>
 #include <stack>
 #include <unordered_map>
 #include <vector>
 
-#include "BoundingBox.hpp"
-#include "ExPolygon.hpp"
-#include "Geometry.hpp"
-#include "Geometry/MedialAxis.hpp"
-#include "Milling/MillingPostProcess.hpp"
-#include "Polygon.hpp"
-#include "Line.hpp"
-#include "ClipperUtils.hpp"
-#include "SVG.hpp"
-#include <algorithm>
-#include <cassert>
-#include <list>
 #include <boost/log/trivial.hpp>
 
 //#define ARACHNE_DEBUG

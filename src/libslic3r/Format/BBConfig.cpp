@@ -9,6 +9,11 @@
 #include <map>
 #include <string>
 
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+
 namespace Slic3r {
     
 namespace BBConfiguration {

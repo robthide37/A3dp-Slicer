@@ -6,6 +6,7 @@
 #include <string>
 
 #include <boost/algorithm/string/trim_all.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "libslic3r/Config.hpp"
 #include "libslic3r/Semver.hpp"

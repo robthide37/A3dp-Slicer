@@ -1,9 +1,11 @@
 #include "ScriptExecutor.hpp"
+
+#include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Print.hpp"
+
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "Tab.hpp"
-#include "libslic3r/PresetBundle.hpp"
-#include "libslic3r/Print.hpp"
 
 #include <string>
 
@@ -13,6 +15,11 @@
 #include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
 #include <angelscript/add_on/scriptstdstring/scriptstdstring.h>
 #include <angelscript/add_on/scriptmath/scriptmath.h>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/log/trivial.hpp>
 
 using namespace gw;
 
