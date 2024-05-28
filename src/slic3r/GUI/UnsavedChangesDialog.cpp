@@ -1074,6 +1074,18 @@ static wxString get_full_label(std::string opt_key, const DynamicPrintConfig& co
     return opt->full_label.empty() ? opt->label : opt->full_label;
 }
 
+wxString graph_to_string(const GraphData &graph)
+{
+    wxString str = "";
+    switch (graph.type) {
+    case GraphData::GraphType::SQUARE: str = _L("Square") + ":"; break;
+    case GraphData::GraphType::LINEAR: str = _L("Linear") + ":"; break;
+    case GraphData::GraphType::SPLINE: str = _L("Spline") + ":"; break;
+    }
+    for (const Vec2d &pt : graph.data()) { str += format_wxstr(" %1%,%2%", pt.x(), pt.y()); }
+    return str;
+}
+
 static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& config)
 {
     size_t opt_idx = get_id_from_opt_key(opt_key);
@@ -1234,6 +1246,17 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
                 return from_u8((boost::format("[%1%]") % ConfigOptionPoint(opt_pts->get_at(opt_idx)).serialize()).str());
             else
                 return from_u8(opt_pts->serialize());
+    }
+    case coGraph: {
+        return graph_to_string(config.option<ConfigOptionGraph>(opt_key)->value);
+    }
+    case coGraphs: {
+        const ConfigOptionGraphs* opt_graphs = config.opt<ConfigOptionGraphs>(opt_key);
+        if (!opt_graphs->empty())
+            if (opt_idx < opt_graphs->size())
+                return graph_to_string(opt_graphs->get_at(opt_idx));
+            else
+                return from_u8(opt_graphs->serialize());
     }
     default:
         break;

@@ -276,6 +276,269 @@ std::string escape_ampersand(const std::string& str)
     return std::string(out.data(), outptr - out.data());
 }
 
+bool GraphData::operator<(const GraphData &rhs) const
+{
+    if (this->data_size() == rhs.data_size()) {
+        const Pointfs my_data = this->data();
+        const Pointfs other_data = rhs.data();
+        assert(my_data.size() == other_data.size());
+        auto it_this = my_data.begin();
+        auto it_other = other_data.begin();
+        while (it_this != my_data.end()) {
+            if(it_this->x() != it_other->x())
+                return it_this->x() < it_other->x();
+            if(it_this->y() != it_other->y())
+                return it_this->y() < it_other->y();
+            ++it_this;
+            ++it_other;
+        }
+        return this->type < rhs.type;
+    }
+    return this->data_size() < rhs.data_size();
+}
+
+bool GraphData::operator>(const GraphData &rhs) const
+{
+    if (this->data_size() == rhs.data_size()) {
+        const Pointfs my_data = this->data();
+        const Pointfs other_data = rhs.data();
+        assert(my_data.size() == other_data.size());
+        auto it_this = my_data.begin();
+        auto it_other = other_data.begin();
+        while (it_this != my_data.end()) {
+            if(it_this->x() != it_other->x())
+                return it_this->x() > it_other->x();
+            if(it_this->y() != it_other->y())
+                return it_this->y() > it_other->y();
+            ++it_this;
+            ++it_other;
+        }
+        return this->type > rhs.type;
+    }
+    return this->data_size() > rhs.data_size();
+}
+
+Pointfs GraphData::data() const
+{
+    assert(validate());
+    return Pointfs(this->graph_points.begin() + this->begin_idx, this->graph_points.begin() + this->end_idx);
+}
+
+size_t GraphData::data_size() const
+{
+    assert(validate());
+    return this->end_idx - this->begin_idx;
+}
+
+double GraphData::interpolate(double x_value) const{
+    double y_value = 0.;
+    if (this->data_size() < 1) {
+        // nothing
+    } else if (this->graph_points.size() == 1 || this->graph_points.front().x() >= x_value) {
+        y_value = this->graph_points.front().y();
+    } else if (this->graph_points.back().x() <= x_value) {
+        y_value = this->graph_points.back().y();
+    } else {
+        // find first and second datapoint
+        for (size_t idx = this->begin_idx; idx < this->end_idx; ++idx) {
+            const auto &data_point = this->graph_points[idx];
+            if (data_point.x() == x_value) {
+                // lucky point
+                y_value = data_point.y();
+                break;
+            } else if (data_point.x() < x_value) {
+                // not yet, iterate
+            } else if (idx == 0) {
+                y_value = data_point.y();
+                break;
+            } else {
+                // interpolate
+                const auto &data_point_before = this->graph_points[idx - 1];
+                assert(data_point.x() > data_point_before.x());
+                assert(data_point_before.x() < x_value);
+                assert(data_point.x() > x_value);
+                if (this->type == GraphData::GraphType::SQUARE) {
+                    y_value = data_point_before.y();
+                } else if (this->type == GraphData::GraphType::LINEAR) {
+                    const double interval     = data_point.x() - data_point_before.x();
+                    const double ratio_before = (x_value - data_point_before.x()) / interval;
+                    double mult = data_point_before.y() * (1 - ratio_before) + data_point.y() * ratio_before;
+                    y_value = mult;
+                } else if (this->type == GraphData::GraphType::SPLINE) {
+                    // Cubic spline interpolation: see https://en.wikiversity.org/wiki/Cubic_Spline_Interpolation#Methods
+                    const bool boundary_first_derivative = true; // true - first derivative is 0 at the leftmost and
+                                                                 // rightmost point false - second ---- || -------
+                    // TODO: cache (if the caller use my cache).
+                    const int N = end_idx - begin_idx - 1; // last point can be accessed as N, we have N+1 total points
+                    std::vector<float> diag(N + 1);
+                    std::vector<float> mu(N + 1);
+                    std::vector<float> lambda(N + 1);
+                    std::vector<float> h(N + 1);
+                    std::vector<float> rhs(N + 1);
+
+                    // let's fill in inner equations
+                    for (int i = 1 + begin_idx; i <= N + begin_idx; ++i) h[i] = this->graph_points[i].x() - this->graph_points[i - 1].x();
+                    std::fill(diag.begin(), diag.end(), 2.f);
+                    for (int i = 1 + begin_idx; i <= N + begin_idx - 1; ++i) {
+                        mu[i]     = h[i] / (h[i] + h[i + 1]);
+                        lambda[i] = 1.f - mu[i];
+                        rhs[i]    = 6 * (float(this->graph_points[i + 1].y() - this->graph_points[i].y()) /
+                                          (h[i + 1] * (this->graph_points[i + 1].x() - this->graph_points[i - 1].x())) -
+                                      float(this->graph_points[i].y() - this->graph_points[i - 1].y()) /
+                                          (h[i] * (this->graph_points[i + 1].x() - this->graph_points[i - 1].x())));
+                    }
+
+                    // now fill in the first and last equations, according to boundary conditions:
+                    if (boundary_first_derivative) {
+                        const float endpoints_derivative = 0;
+                        lambda[0]                        = 1;
+                        mu[N]                            = 1;
+                        rhs[0] = (6.f / h[1]) * (float(this->graph_points[begin_idx].y() - this->graph_points[1 + begin_idx].y()) /
+                                                     (this->graph_points[begin_idx].x() - this->graph_points[1 + begin_idx].x()) - endpoints_derivative);
+                        rhs[N] = (6.f / h[N]) * (endpoints_derivative - float(this->graph_points[N + begin_idx - 1].y() - this->graph_points[N + begin_idx].y()) /
+                                                                            (this->graph_points[N + begin_idx - 1].x() - this->graph_points[N + begin_idx].x()));
+                    } else {
+                        lambda[0] = 0;
+                        mu[N]     = 0;
+                        rhs[0]    = 0;
+                        rhs[N]    = 0;
+                    }
+
+                    // the trilinear system is ready to be solved:
+                    for (int i = 1; i <= N; ++i) {
+                        float multiple = mu[i] / diag[i - 1]; // let's subtract proper multiple of above equation
+                        diag[i] -= multiple * lambda[i - 1];
+                        rhs[i] -= multiple * rhs[i - 1];
+                    }
+                    // now the back substitution (vector mu contains invalid values from now on):
+                    rhs[N] = rhs[N] / diag[N];
+                    for (int i = N - 1; i >= 0; --i) rhs[i] = (rhs[i] - lambda[i] * rhs[i + 1]) / diag[i];
+
+                    //now interpolate at our point
+                    size_t curr_idx = idx - begin_idx;
+                    y_value = (rhs[curr_idx - 1] * pow(this->graph_points[idx].x() - x_value, 3) +
+                            rhs[curr_idx] * pow(x_value - this->graph_points[idx - 1].x(), 3)) /
+                            (6 * h[curr_idx]) +
+                        (this->graph_points[idx - 1].y() - rhs[curr_idx - 1] * h[curr_idx] * h[curr_idx] / 6.f) *
+                            (this->graph_points[idx].x() - x_value) / h[curr_idx] +
+                        (this->graph_points[idx].y() - rhs[curr_idx] * h[curr_idx] * h[curr_idx] / 6.f) *
+                            (x_value - this->graph_points[idx - 1].x()) / h[curr_idx];
+                } else {
+                    assert(false);
+                }
+                break;
+            }
+        }
+    }
+    return y_value;
+}
+
+bool GraphData::validate() const
+{
+    if (this->begin_idx < 0 || this->end_idx < 0 || this->end_idx < this->begin_idx)
+        return false;
+    if (this->end_idx > this->graph_points.size() && !this->graph_points.empty())
+        return false;
+    if(this->graph_points.empty())
+        return this->end_idx == 0 && this->begin_idx == 0;
+    for (size_t i = 1; i < this->graph_points.size(); ++i)
+        if (this->graph_points[i - 1].x() > this->graph_points[i].x())
+            return false;
+    return true;
+}
+
+std::string GraphData::serialize() const
+{
+    std::ostringstream ss;
+    ss << this->begin_idx;
+    ss << ":";
+    ss << this->end_idx;
+    ss << ":";
+    ss << uint16_t(this->type);
+    for (const Vec2d &graph_point : this->graph_points) {
+        ss << ":";
+        ss << graph_point.x();
+        ss << "x";
+        ss << graph_point.y();
+    }
+    return ss.str();
+}
+    
+bool GraphData::deserialize(const std::string &str)
+{
+    if (size_t pos = str.find('|'); pos != std::string::npos) {
+        // old format
+        assert(str.size() > pos + 2);
+        assert(str[pos+1] == ' ');
+        assert(str[pos+2] != ' ');
+        if (str.size() > pos + 1) {
+            std::string buttons = str.substr(pos + 2);
+            size_t start = 0;
+            size_t end_x = buttons.find(' ', start);
+            size_t end_y= buttons.find(' ', end_x + 1);
+            while (end_x != std::string::npos && end_y != std::string::npos) {
+                this->graph_points.emplace_back();
+                Vec2d &data_point = this->graph_points.back();
+                data_point.x() = std::stod(buttons.substr(start, end_x));
+                data_point.y() = std::stod(buttons.substr(end_x + 1, end_y));
+                start = end_y + 1;
+                end_x = buttons.find(' ', start);
+                end_y= buttons.find(' ', end_x + 1);
+            }
+            if (end_x != std::string::npos && end_x + 1 < buttons.size()) {
+                this->graph_points.emplace_back();
+                Vec2d &data_point = this->graph_points.back();
+                data_point.x() = std::stod(buttons.substr(start, end_x));
+                data_point.y() = std::stod(buttons.substr(end_x + 1, buttons.size()));
+            }
+        }
+        this->begin_idx = 0;
+        this->end_idx = this->graph_points.size();
+        this->type = GraphType::SPLINE;
+    } else {
+        std::istringstream iss(str);
+        std::string              item;
+        char                     sep_point = 'x';
+        char                     sep       = ':';
+        std::vector<std::string> values_str;
+        // get begin_idx
+        if (std::getline(iss, item, sep)) {
+            std::istringstream(item) >> this->begin_idx;
+        } else
+            return false;
+        // get end_idx
+        if (std::getline(iss, item, sep)) {
+            std::istringstream(item) >> this->end_idx;
+        } else
+            return false;
+        // get type
+        if (std::getline(iss, item, sep)) {
+            uint16_t int_type;
+            std::istringstream(item) >> int_type;
+            this->type = GraphType(int_type);
+        } else
+            return false;
+        // get points
+        while (std::getline(iss, item, sep)) {
+            this->graph_points.emplace_back();
+            Vec2d &data_point = this->graph_points.back();
+            std::string                s_point;
+            std::istringstream         isspoint(item);
+            if (std::getline(isspoint, s_point, sep_point)) {
+                std::istringstream(s_point) >> data_point.x();
+            } else
+                return false;
+            if (std::getline(isspoint, s_point, sep_point)) {
+                std::istringstream(s_point) >> data_point.y();
+            } else
+                return false;
+        }
+    }
+    //check if data is okay
+    if (!this->validate()) return false;
+    return true;
+}
+
 void ConfigOptionDeleter::operator()(ConfigOption* p) {
     delete p;
 }
@@ -327,6 +590,8 @@ ConfigOption* ConfigOptionDef::create_empty_option() const
 	    case coPoints:          return new ConfigOptionPoints();
 	    case coPoint3:          return new ConfigOptionPoint3();
 	//    case coPoint3s:         return new ConfigOptionPoint3s();
+	    case coGraph:           return new ConfigOptionGraph();
+	    case coGraphs:          return new ConfigOptionGraphs();
 	    case coBool:            return new ConfigOptionBool();
 	    case coBools:           return new ConfigOptionBools();
 	    case coEnum:            return new ConfigOptionEnumGeneric(this->enum_keys_map);
@@ -1620,6 +1885,8 @@ CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloatsOrPercentsNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionPoint)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionPoints)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionPoint3)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionGraph)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionGraphs)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionBool)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionBools)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionBoolsNullable)
@@ -1632,12 +1899,14 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionS
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<std::string>) 
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<Slic3r::Vec2d>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<Slic3r::Vec3d>)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<Slic3r::GraphData>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<bool>) 
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionVectorBase) 
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<double>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<int32_t>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<std::string>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<Slic3r::Vec2d>)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<Slic3r::GraphData>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<unsigned char>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<double>, Slic3r::ConfigOptionFloat)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<double>, Slic3r::ConfigOptionFloats)
@@ -1656,6 +1925,8 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<Slic3r::FloatOrP
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<Slic3r::Vec2d>, Slic3r::ConfigOptionPoint)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<Slic3r::Vec2d>, Slic3r::ConfigOptionPoints)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<Slic3r::Vec3d>, Slic3r::ConfigOptionPoint3)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<Slic3r::GraphData>, Slic3r::ConfigOptionGraph)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<Slic3r::GraphData>, Slic3r::ConfigOptionGraphs)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<bool>, Slic3r::ConfigOptionBool)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<unsigned char>, Slic3r::ConfigOptionBools)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<unsigned char>, Slic3r::ConfigOptionBoolsNullable)

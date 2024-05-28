@@ -42,6 +42,63 @@ namespace Slic3r {
     inline bool operator==(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value == r.value && l.percent == r.percent; }
     inline bool operator!=(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return !(l == r); }
     inline bool operator< (const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value < r.value || (l.value == r.value && int(l.percent) < int(r.percent)); }
+    inline bool operator> (const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value > r.value || (l.value == r.value && int(l.percent) > int(r.percent)); }
+
+    struct GraphData
+    {
+    public:
+        enum GraphType : uint8_t {
+            SQUARE,
+            LINEAR,
+            SPLINE,
+            COUNT
+        };
+    
+        GraphData() {}
+        GraphData(Pointfs graph_data) : graph_points(graph_data) {
+            begin_idx = 0;
+            end_idx = graph_data.size();
+        }
+        GraphData(size_t start_idx, size_t stop_idx, Pointfs graph_data)
+            : graph_points(graph_data), begin_idx(start_idx), end_idx(stop_idx) {}
+        GraphData(size_t start_idx, size_t stop_idx, GraphType graph_type, Pointfs graph_data)
+            : graph_points(graph_data), begin_idx(start_idx), end_idx(stop_idx), type(graph_type) {}
+    
+        bool operator==(const GraphData &rhs) const { return this->data_size() == rhs.data_size() && this->data() == rhs.data() && this->type == rhs.type; }
+        bool operator!=(const GraphData &rhs) const { return this->data_size() != rhs.data_size() || this->data() != rhs.data() || this->type != rhs.type; }
+        bool operator<(const GraphData &rhs) const;
+        bool operator>(const GraphData &rhs) const;
+    
+        // data is the useable part of the graph
+        Pointfs data() const;
+        size_t data_size() const;
+
+        double interpolate(double x_value) const;
+
+        //return false if data are not good
+        bool validate() const;
+
+    //protected:
+        Pointfs graph_points;
+        size_t begin_idx = 0; //included
+        size_t end_idx = 0; //excluded
+        GraphType type = GraphType::LINEAR;
+    
+        std::string serialize() const;
+        bool deserialize(const std::string &str);
+
+    private:
+        friend class cereal::access;
+        template<class Archive> void serialize(Archive &ar)
+        {
+            ar(this->begin_idx);
+            ar(this->end_idx);
+            ar(this->type);
+            // does this works?
+            ar(this->graph_points);
+        }
+    };
+
 }
 
 namespace std {
@@ -49,6 +106,20 @@ namespace std {
         std::size_t operator()(const Slic3r::FloatOrPercent& v) const noexcept {
             std::size_t seed = std::hash<double>{}(v.value);
             return v.percent ? seed ^ 0x9e3779b9 : seed;
+        }
+    };
+    
+    template<> struct hash<Slic3r::GraphData> {
+        std::size_t operator()(const Slic3r::GraphData& v) const noexcept {
+            std::size_t seed = 0;
+            boost::hash_combine(seed, std::hash<double>{}(v.begin_idx));
+            boost::hash_combine(seed, std::hash<double>{}(v.end_idx));
+            boost::hash_combine(seed, std::hash<double>{}(v.type));
+            for (const auto &pt : v.graph_points) {
+                boost::hash_combine(seed, std::hash<double>{}(pt.x()));
+                boost::hash_combine(seed, std::hash<double>{}(pt.y()));
+            }
+            return seed;
         }
     };
 
@@ -216,7 +287,7 @@ public:
 
 // Type of a configuration value.
 enum ConfigOptionType : uint16_t{
-    coVectorType    = 0x4000,
+    coVectorType    = 0x4000, // 16384
     coNone          = 0,
     // single float
     coFloat         = 1,
@@ -250,6 +321,10 @@ enum ConfigOptionType : uint16_t{
     coBools         = coBool + coVectorType,
     // a generic enum
     coEnum          = 9,
+    // a graph of double->double
+    coGraph         = 10,
+    // a vector of graph of double->double
+    coGraphs        = coGraph + coVectorType,
 };
 
 enum ConfigOptionMode : uint64_t {
@@ -445,12 +520,12 @@ public:
     ConfigOption*               set_phony(bool phony) { if (phony) this->flags |= FCO_PHONY; else this->flags &= uint8_t(0xFF ^ FCO_PHONY); return this; }
     // Is this option overridden by another option?
     // An option overrides another option if it is not nil and not equal.
-    virtual bool 				overriden_by(const ConfigOption *rhs) const {
+    virtual bool                overriden_by(const ConfigOption *rhs) const {
     	assert(! this->nullable() && ! rhs->nullable());
         return *this != *rhs && this->is_enabled() == rhs->is_enabled();
     }
     // Apply an override option, possibly a nullable one.
-    virtual bool 				apply_override(const ConfigOption *rhs) { 
+    virtual bool                apply_override(const ConfigOption *rhs) {
     	if (*this == *rhs) 
     		return false; 
     	*this = *rhs; 
@@ -1944,6 +2019,150 @@ private:
 	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<Vec3d>>(this)); }
 };
 
+class ConfigOptionGraph : public ConfigOptionSingle<GraphData>
+{
+public:
+    ConfigOptionGraph() : ConfigOptionSingle<GraphData>(GraphData()) {}
+    explicit ConfigOptionGraph(const GraphData &value) : ConfigOptionSingle<GraphData>(value) {}
+    
+    static ConfigOptionType static_type() { return coGraph; }
+    ConfigOptionType        type()  const override { return static_type(); }
+    ConfigOption*           clone() const override { return new ConfigOptionGraph(*this); }
+    ConfigOptionGraph&      operator=(const ConfigOption *opt) { this->set(opt); return *this; }
+    bool                    operator==(const ConfigOptionGraph &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionGraph &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value <  rhs.value); }
+    
+    std::string serialize() const override
+    {
+        std::ostringstream ss;
+        if(!this->is_enabled())
+            ss << "!";
+        ss << this->value.serialize();
+        return ss.str();
+    }
+
+    bool deserialize(const std::string &str, bool append = false) override
+    {
+        UNUSED(append);
+        GraphData data;
+        bool enabled = true;
+        if (!str.empty() && str.front() == '!') {
+            enabled = false;
+        }
+        bool ok = data.deserialize(enabled ? str : str.substr(1));
+        if (!ok)
+            return false;
+        this->set_enabled(enabled);
+        this->value = data;
+        return true;
+    }
+    
+
+private:
+    friend class cereal::access;
+    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<GraphData>>(this)); }
+};
+
+
+class ConfigOptionGraphs : public ConfigOptionVector<GraphData>
+{
+public:
+    ConfigOptionGraphs() : ConfigOptionVector<GraphData>() {}
+    explicit ConfigOptionGraphs(const GraphData &value) : ConfigOptionVector<GraphData>(value) {}
+    explicit ConfigOptionGraphs(size_t n, const GraphData& value) : ConfigOptionVector<GraphData>(n, value) {}
+    explicit ConfigOptionGraphs(std::initializer_list<GraphData> il) : ConfigOptionVector<GraphData>(std::move(il)) {}
+    explicit ConfigOptionGraphs(const std::vector<GraphData> &values) : ConfigOptionVector<GraphData>(values) {}
+    
+    static ConfigOptionType static_type() { return coGraphs; }
+    ConfigOptionType        type()  const override { return static_type(); }
+    ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionGraphs(*this); }
+    ConfigOptionGraphs&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
+    bool                    operator==(const ConfigOptionGraphs &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
+    bool operator<(const ConfigOptionGraphs &rhs) const throw()
+    {
+        return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && 
+            std::lexicographical_compare(this->m_values.begin(), this->m_values.end(), rhs.m_values.begin(),
+                                            rhs.m_values.end(), [](const auto &l, const auto &r) { return l < r; }));
+    }
+    bool                    is_nil(int32_t idx = 0) const override { return false; }
+
+    std::string serialize() const override
+    {
+        std::ostringstream ss;
+        for (size_t idx = 0; idx < size(); ++idx) {
+            const GraphData &graph = this->m_values[idx];
+            if (idx != 0) ss << ",";
+            if (!this->is_enabled(idx)) ss << "!";
+            ss << graph.serialize();
+        }
+        return ss.str();
+    }
+
+    std::vector<std::string> vserialize() const override
+    {
+        std::vector<std::string> vv;
+        for (size_t idx = 0; idx < size(); ++idx) {
+            const GraphData &graph = this->m_values[idx];
+            std::ostringstream ss;
+            if (!this->is_enabled(idx)) ss << "!";
+            ss << graph.serialize();
+            vv.push_back(ss.str());
+        }
+        return vv;
+    }
+    
+    bool deserialize(const std::string &str, bool append = false) override
+    {
+        if (!append) {
+            this->m_values.clear();
+            this->m_enabled.clear();
+        }
+        std::istringstream is(str);
+        std::string graph_str;
+        char sep = ',';
+        if (str.find(';') != std::string::npos)
+            sep = ';';
+        while (std::getline(is, graph_str, sep)) {
+            boost::trim(graph_str);
+            bool enabled = true;
+            if (!graph_str.empty() && graph_str.front() == '!') {
+                enabled = false;
+                graph_str = graph_str.substr(1);
+                boost::trim(graph_str);
+            }
+            GraphData graph;
+            bool ok = graph.deserialize(graph_str);
+            if (ok) {
+                this->m_values.push_back(std::move(graph));
+                this->m_enabled.push_back(enabled);
+            }
+        }
+        set_default_enabled();
+        return true;
+    }
+
+private:
+    // use the string representation for cereal archive, as it's convenient.
+    // TODO: try to save/load the vector of pair of double and the two bits.
+    friend class cereal::access;
+    template<class Archive> void save(Archive& archive) const {
+        archive(flags);
+        std::string serialized = this->serialize();
+        size_t cnt = serialized.size();
+        archive(cnt);
+        archive.saveBinary((const char*)serialized.data(), sizeof(char) * cnt);
+    }
+    template<class Archive> void load(Archive& archive) {
+        archive(flags);
+        size_t cnt;
+        archive(cnt);
+        std::string serialized;
+        serialized.assign(cnt, char());
+        archive.loadBinary((char*)serialized.data(), sizeof(char) * cnt);
+        deserialize(serialized, false);
+    }
+};
+
 class ConfigOptionBool : public ConfigOptionSingle<bool>
 {
 public:
@@ -2344,6 +2563,8 @@ public:
             case coPoint:           { auto opt = new ConfigOptionPoint();           archive(*opt); return opt; }
             case coPoints:          { auto opt = new ConfigOptionPoints();          archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coPoint3:          { auto opt = new ConfigOptionPoint3();          archive(*opt); return opt; }
+            case coGraph:           { auto opt = new ConfigOptionGraph();           archive(*opt); return opt; }
+            case coGraphs:          { auto opt = new ConfigOptionGraphs();          archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coBool:            { auto opt = new ConfigOptionBool();            archive(*opt); return opt; }
             case coBools:           { auto opt = new ConfigOptionBools();           archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coEnum:            { auto opt = new ConfigOptionEnumGeneric(this->enum_keys_map); archive(*opt); return opt; }
@@ -2377,6 +2598,8 @@ public:
 		    case coPoint:           archive(*static_cast<const ConfigOptionPoint*>(opt)); 			break;
 		    case coPoints:          archive(*static_cast<const ConfigOptionPoints*>(opt)); 			break;
 		    case coPoint3:          archive(*static_cast<const ConfigOptionPoint3*>(opt)); 			break;
+		    case coGraph:           archive(*static_cast<const ConfigOptionGraph*>(opt)); 			break;
+		    case coGraphs:          archive(*static_cast<const ConfigOptionGraphs*>(opt)); 			break;
 		    case coBool:            archive(*static_cast<const ConfigOptionBool*>(opt)); 			break;
 		    case coBools:           archive(*static_cast<const ConfigOptionBools*>(opt)); 			break;
 		    case coEnum:            archive(*static_cast<const ConfigOptionEnumGeneric*>(opt)); 	break;

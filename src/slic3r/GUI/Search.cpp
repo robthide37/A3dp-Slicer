@@ -207,6 +207,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
             //case coFloatsOrPercents:change_opt_key<ConfigOptionFloatsOrPercents	>(opt_key, config, cnt);	break;
             case coFloatsOrPercents:change_opt_keyFoP(opt_key, config, cnt);	break;
             case coPoints:	change_opt_key<ConfigOptionPoints	>(opt_key, config, cnt);	break;
+            case coGraphs:	change_opt_key<ConfigOptionGraphs	>(opt_key, config, cnt);	break;
             default:		break;
             }
 

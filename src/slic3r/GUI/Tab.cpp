@@ -870,6 +870,7 @@ void TabPrinter::init_options_list()
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coGraphs:	add_correct_opts_to_options_list<ConfigOptionGraphs		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         default: m_options_list.emplace(opt_key, std::pair<int,int>{-1, m_opt_status_value}); break;
         }
     }
@@ -916,6 +917,7 @@ void TabSLAMaterial::init_options_list()
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coGraphs:	add_correct_opts_to_options_list<ConfigOptionGraphs		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         default:		m_options_list.emplace(opt_key, std::pair<int,int>{0, m_opt_status_value});		break;
         }
     }
