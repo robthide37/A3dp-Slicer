@@ -844,14 +844,18 @@ void Layer::make_ironing()
             }
             if (ironing_params.extruder != -1) {
                 //TODO just_infill is currently not used.
-                ironing_params.type              = config.ironing_type;
-                ironing_params.just_infill     = false;
+                ironing_params.type         = config.ironing_type;
+                ironing_params.just_infill  = false;
                 ironing_params.line_spacing = config.ironing_spacing;
-                ironing_params.height         = default_layer_height * 0.01 * config.ironing_flowrate;
-                ironing_params.speed         = config.ironing_speed;
-                ironing_params.angle         = config.ironing_angle <0 ?
-                    compute_fill_angle(config, layerm->layer()->id()) :
-                    float(Geometry::deg2rad(config.ironing_angle.value));
+                ironing_params.height       = default_layer_height * 0.01 * config.ironing_flowrate;
+                ironing_params.speed        = config.ironing_speed;
+                if (config.ironing_angle.value >= 0) {
+                    ironing_params.angle = float(Geometry::deg2rad(config.ironing_angle.value));
+                } else {
+                    ironing_params.angle = compute_fill_angle(config, layerm->layer()->id());
+                    if (config.ironing_angle.value < -1)
+                        ironing_params.angle += float(Geometry::deg2rad(-config.ironing_angle.value));
+                }
                 ironing_params.layerm         = layerm;
                 by_extruder.emplace_back(ironing_params);
             }
@@ -933,7 +937,8 @@ void Layer::make_ironing()
 
         // Create the filler object.
         fill.init_spacing(ironing_params.line_spacing, fill_params);
-        fill.angle = float(ironing_params.angle + 0.25 * M_PI);
+        fill.can_angle_cross = region_config.fill_angle_cross.value;
+        fill.angle = float(ironing_params.angle);
         fill.link_max_length = (coord_t)scale_(3. * fill.get_spacing());
         double extrusion_height = ironing_params.height * fill.get_spacing() / nozzle_dmr;
         //FIXME FLOW decide if it's good

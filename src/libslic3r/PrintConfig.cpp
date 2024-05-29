@@ -3339,11 +3339,14 @@ void PrintConfigDef::init_fff_params()
     def = this->add("ironing_angle", coFloat);
     def->label = L("Ironing angle");
     def->category = OptionCategory::ironing;
-    def->tooltip = L("Ironing angle. if negative, it will use the fill angle.");
+    def->tooltip = L("Ironing post-process angle."
+        "\nIf positive, the ironing will use this angle."
+        "\nIf -1, it will use the fill angle."
+        "\nIf lower than -1, it will use the fill angle minus this angle.");
     def->sidetext = L("°");
-    def->min = -1;
+    def->min = -360;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(-1));
+    def->set_default_value(new ConfigOptionFloat(-45));
 
     def = this->add("ironing_type", coEnum);
     def->label = L("Ironing Type");
