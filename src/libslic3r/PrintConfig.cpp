@@ -2477,7 +2477,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("XY First layer compensation");
     def->category = OptionCategory::slicing;
     def->tooltip = L("The first layer will be grown / shrunk in the XY plane by the configured value "
-        "to compensate for the 1st layer squish aka an Elephant Foot effect. (should be negative = inwards)");
+        "to compensate for the 1st layer squish aka an Elephant Foot effect. (should be negative = inwards = remove area)");
     def->sidetext = L("mm");
     def->mode = comAdvancedE | comSuSi | comPrusa; // just a rename & inverted of prusa 's elefant_foot
     def->set_default_value(new ConfigOptionFloat(0));
@@ -3688,7 +3688,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{ 75, true} });
 
     def = this->add("max_print_speed", coFloatOrPercent);
-    def->label = L("Max print speed");
+    def->label = L("Max auto-speed");
     def->full_label = L("Max print speed for Autospeed");
     def->category = OptionCategory::speed;
     def->tooltip = L("When setting other speed settings to 0, Slic3r will autocalculate the optimal speed "
@@ -3716,8 +3716,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPercents{ 90 });
 
     def = this->add("max_volumetric_speed", coFloat);
-    def->label = L("Volumetric speed");
-    def->full_label = L("Maximum Print Volumetric speed");
+    def->label = L("Volumetric auto-speed");
+    def->full_label = L("Maximum Volumetric print speed for Autospeed");
     def->category = OptionCategory::extruders;
     def->tooltip = L("This setting allows you to set the maximum flowrate for your print, and so cap the desired flow rate for the autospeed algorithm."
         " The autospeed tries to keep a constant feedrate for the entire object, and so can lower the volumetric speed for some features."
@@ -6411,7 +6411,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Outer XY size compensation");
     def->category = OptionCategory::slicing;
     def->tooltip = L("The object will be grown/shrunk in the XY plane by the configured value "
-        "(negative = inwards, positive = outwards). This might be useful for fine-tuning sizes."
+        "(negative = inwards = remove area, positive = outwards = add area). This might be useful for fine-tuning sizes."
         "\nThis one only applies to the 'exterior' shell of the object."
         "\n !!! it's recommended you put the same value into the 'Inner XY size compensation', unless you are sure you don't have horizontal holes. !!! ");
     def->sidetext = L("mm");
@@ -6423,7 +6423,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Inner XY size compensation");
     def->category = OptionCategory::slicing;
     def->tooltip = L("The object will be grown/shrunk in the XY plane by the configured value "
-        "(negative = inwards, positive = outwards). This might be useful for fine-tuning sizes."
+        "(negative = inwards = remove area, positive = outwards = add area). This might be useful for fine-tuning sizes."
         "\nThis one only applies to the 'inner' shell of the object (!!! horizontal holes break the shell !!!)");
     def->sidetext = L("mm");
     def->mode = comExpert | comSuSi;
@@ -6434,7 +6434,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("XY holes compensation");
     def->category = OptionCategory::slicing;
     def->tooltip = L("The convex holes will be grown / shrunk in the XY plane by the configured value"
-        " (negative = inwards, positive = outwards, should be negative as the holes are always a bit smaller irl)."
+        " (negative = inwards = remove area, positive = outwards = add area, should be negative as the holes are always a bit smaller irl)."
         " This might be useful for fine-tuning hole sizes."
         "\nThis setting behaves the same as 'Inner XY size compensation' but only for convex shapes. It's added to 'Inner XY size compensation', it does not replace it. ");
     def->sidetext = L("mm");

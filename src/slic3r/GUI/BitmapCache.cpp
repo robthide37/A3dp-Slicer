@@ -6,6 +6,7 @@
 #include "GUI_Utils.hpp"
 
 #include <boost/filesystem.hpp>
+#include <boost/log/trivial.hpp>
 
 #ifdef __WXGTK2__
     // Broken alpha workaround

@@ -2,6 +2,7 @@
 #include "ExtrusionEntityCollection.hpp"
 #include "ExPolygonCollection.hpp"
 #include "ClipperUtils.hpp"
+#include "Config.hpp"
 #include "Extruder.hpp"
 #include "Flow.hpp"
 #include <cmath>
@@ -590,6 +591,13 @@ bool HasRoleVisitor::search(const ExtrusionEntitiesPtr &entities, HasRoleVisitor
         if (visitor.found) return true;
     }
     return visitor.found;
+}
+
+void SimplifyVisitor::use(ExtrusionPath& path) {
+    path.simplify(m_scaled_resolution, m_use_arc_fitting, scale_d(m_arc_fitting_tolearance->get_abs_value(path.width)));
+}
+void SimplifyVisitor::use(ExtrusionPath3D& path3D) {
+    path3D.simplify(m_scaled_resolution, m_use_arc_fitting, scale_d(m_arc_fitting_tolearance->get_abs_value(path3D.width)));
 }
 
 //class ExtrusionTreeVisitor : ExtrusionVisitor {

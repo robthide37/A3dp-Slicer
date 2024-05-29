@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
 
 // Mark string for localization and translate.
 #define L(s) Slic3r::I18N::translate(s)

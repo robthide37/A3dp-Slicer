@@ -218,7 +218,7 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
             
         out += " ";
         out += format_wxstr(_L("print speed will be reduced so that no less than %1%s are spent on that layer"), slowdown_below_layer_time);
-        if(min_print_speed > 0)
+        if (min_print_speed > 0) {
             if (max_speed_reduc > 0) {
                 out += " ";
                 out += format_wxstr(_L("(however, speed will never be reduced below %1%mm/s or up to %2%%% reduction)"), min_print_speed, max_speed_reduc);
@@ -226,6 +226,7 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
                 out += " ";
                 out += format_wxstr(_L("(however, speed will never be reduced below %1%mm/s)"), min_print_speed);
             }
+        }
     }
 
     if (fan_below_layer_time > 0 || slowdown_below_layer_time > 0) {
@@ -285,7 +286,7 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
     double support_material_interface_speed = full_print_config.get_computed_value("support_material_interface_speed");
     double bridge_speed                     = full_print_config.get_computed_value("bridge_speed");
     double bridge_flow_ratio                = full_print_config.get_computed_value("bridge_flow_ratio");
-    double over_bridge_flow_ratio           = full_print_config.get_computed_value("over_bridge_flow_ratio");
+    //double over_bridge_flow_ratio           = full_print_config.get_computed_value("over_bridge_flow_ratio");
     double perimeter_speed                  = full_print_config.get_computed_value("perimeter_speed");
     double external_perimeter_speed         = full_print_config.get_computed_value("external_perimeter_speed");
     // double gap_fill_speed                = full_print_config.get_computed_value("gap_fill_speed");

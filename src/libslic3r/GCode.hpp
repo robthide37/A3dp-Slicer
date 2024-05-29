@@ -519,7 +519,7 @@ private:
     void _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment);
     void _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment, Point& last_pos, const double path_width);
     std::string _before_extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
-    double_t    _compute_speed_mm_per_sec(const ExtrusionPath& path, double speed = -1);
+    double_t    _compute_speed_mm_per_sec(const ExtrusionPath &path, double speed, std::string *comment);
     std::string _after_extrude(const ExtrusionPath &path);
     void print_machine_envelope(GCodeOutputStream &file, const Print &print);
     void _print_first_layer_bed_temperature(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);

@@ -25,9 +25,10 @@
 #include <wx/treectrl.h>
 #include <wx/imaglist.h>
 
+#include <atomic>
 #include <map>
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "BedShapeDialog.hpp"
 #include "ButtonsDescription.hpp"

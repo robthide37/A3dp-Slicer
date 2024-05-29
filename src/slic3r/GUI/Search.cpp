@@ -149,7 +149,7 @@ const GroupAndCategory& OptionsSearcher::get_group_and_category(const std::strin
 
 void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type)
 {
-    const ConfigDef* defs = config->def();
+    //const ConfigDef* defs = config->def();
     auto emplace_option = [this, type](const std::string grp_key, const int16_t idx)
     {
         assert(groups_and_categories.find(grp_key) == groups_and_categories.end()
@@ -190,7 +190,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
 
     for (std::string opt_key : config->keys())
     {
-        const ConfigOptionDef& opt = config->def()->options.at(opt_key);
+        //const ConfigOptionDef& opt = config->def()->options.at(opt_key);
         //if (opt.mode != comNone && (opt.mode & current_tags) == 0)
         //    continue;
 
@@ -310,39 +310,43 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
     auto get_label = [this, &sep](const Option& opt, bool marked = true)
     {
         std::wstring out;
-        if (marked)
+        if (marked) {
             out += marker_by_type(opt.type, printer_technology);
+        }
         const std::wstring* prev = nullptr;
         for (const std::wstring* const s : {
             view_params.category ?  &opt.category_local : nullptr,
             view_params.category ?  &opt.group_local : nullptr,
-                                    & opt.label_local })
+                                    & opt.label_local }) {
             if (s != nullptr && (prev == nullptr || *prev != *s)) {
                 if (out.size() > 2)
                     out += sep;
                 out += *s;
                 prev = s;
             }
-            return out;
+        }
+        return out;
     };
 
     auto get_label_english = [this, &sep](const Option& opt, bool marked = true)
     {
         std::wstring out;
-        if (marked)
+        if (marked) {
             out += marker_by_type(opt.type, printer_technology);
-        const std::wstring* prev = nullptr;
+        }
+        const std::wstring *prev = nullptr;
         for (const std::wstring* const s : {
             view_params.category ? &opt.category : nullptr,
                 view_params.category ? &opt.group : nullptr,
-                & opt.label })
+                & opt.label }) {
             if (s != nullptr && (prev == nullptr || *prev != *s)) {
                 if (out.size() > 2)
                     out += sep;
                 out += *s;
                 prev = s;
             }
-            return out;
+        }
+        return out;
     };
 
     auto get_tooltip = [this, &sep](const Option& opt)
@@ -351,13 +355,15 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
         std::wstring tooltip;
         int length = 0;
         for (int i = 0; i < opt.tooltip_local.size(); i++) {
-            if (length >= 80 && opt.tooltip_local[i] == u' ')
+            if (length >= 80 && opt.tooltip_local[i] == u' ') {
                 tooltip.push_back(u'\n');
-            else
+            } else {
                 tooltip.push_back(opt.tooltip_local[i]);
+            }
             length++;
-            if (tooltip.back() == u'\n')
+            if (tooltip.back() == u'\n') {
                 length = 0;
+            }
         }
 
 
@@ -1008,7 +1014,7 @@ void SearchDialog::on_sys_color_changed()
 SearchListModel::SearchListModel(wxWindow* parent) : wxDataViewVirtualListModel(0)
 {
     int icon_id = 0;
-    for (const std::string& icon : { "cog", "printer", "sla_printer", "spool", "resin" })
+    for (const std::string icon : { "cog", "printer", "sla_printer", "spool", "resin" })
         m_icon[icon_id++] = ScalableBitmap(parent, icon);    
 }
 

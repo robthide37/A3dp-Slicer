@@ -1029,6 +1029,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
     int                 current_feedrate  = 0;
     int                 stored_fan_speed  = m_fan_speed < 0 ? 0 : m_fan_speed;
     int                 current_fan_speed = -1;
+    const std::string   comment_speed = m_config.gcode_comments ? " ; speed changed by the cooling algorithm" : "";
     change_extruder_set_fan();
     for (const CoolingLine *line : lines) {
         const char *line_start  = gcode.c_str() + line->line_start;
@@ -1100,7 +1101,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                     char buf[64];
                     sprintf(buf, "%d", int(current_feedrate));
                     new_gcode += buf;
-                } else {
+                } else /*if (remove)*/ {
                     // Remove the feedrate word.
                     const char *f = fpos;
                     // Roll the pointer before the 'F' word.
@@ -1134,17 +1135,31 @@ std::string CoolingBuffer::apply_layer_cooldown(
                     }
                     if (line->type & CoolingLine::TYPE_WIPE)
                         boost::replace_all(comment, ";_WIPE", "");
+                    assert((comment.empty() && new_gcode.back() == '\n') ||
+                           (!comment.empty() && comment.back() == '\n' && new_gcode.back() != '\n'));
                     new_gcode += comment;
                 } else {
+                    assert((new_gcode.back() == '\n' && line_end == end) ||
+                           (new_gcode.back() != '\n' && (*(line_end-1)) == '\n'));
                     // Just attach the rest of the source line.
                     new_gcode.append(end, line_end - end);
                 }
             }
+            if (modify) {
+                if (!comment_speed.empty()) {
+                    assert(new_gcode.back() == '\n');
+                    new_gcode.resize(new_gcode.size() - 1);
+                    new_gcode.append(comment_speed);
+                    new_gcode.append("\n");
+                }
+            }
         } else if(line->type == CoolingLine::TYPE_ADJUSTABLE_EMPTY) {
             // nothing useful, don't write it (an extrusion that don't move because it wasn't printed as it's too small).
-            std::string deleted(line_start, line_end - line_start);
-            boost::replace_all(deleted, "\n", "");
-            new_gcode.append(std::string("; deleted stuff: ") + deleted);
+            if (m_config.gcode_comments) {
+                std::string deleted(line_start, line_end - line_start);
+                boost::replace_all(deleted, "\n", "");
+                new_gcode.append(std::string("; deleted empty line: ") + deleted);
+            }
         } else {
             new_gcode.append(line_start, line_end - line_start);
         }

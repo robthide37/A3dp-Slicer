@@ -1,35 +1,37 @@
-// #include "libslic3r/GCodeSender.hpp"
-#include "slic3r/Utils/Serial.hpp"
 #include "Tab.hpp"
-#include "PresetHints.hpp"
+
 #include "libslic3r/Log.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#include <libslic3r/Slicing.hpp>
 
-#include "slic3r/Utils/Http.hpp"
-#include "slic3r/Utils/PrintHost.hpp"
 #include "BonjourDialog.hpp"
-#include "WipeTowerDialog.hpp"
-#include "GraphDialog.hpp"
 #include "ButtonsDescription.hpp"
-#include "Search.hpp"
+#include "GUI_App.hpp"
+#include "GUI_ObjectList.hpp"
+#include "MainFrame.hpp"
+#include "GLCanvas3D.hpp"
+#include "GraphDialog.hpp"
+#include "slic3r/Utils/Http.hpp"
+#include "format.hpp"
+#include "MsgDialog.hpp"
+#include "Notebook.hpp"
 #include "OG_CustomCtrl.hpp"
+#include "PhysicalPrinterDialog.hpp"
+#include "Plater.hpp"
+#include "PresetComboBoxes.hpp"
+#include "PresetHints.hpp"
+#include "slic3r/Utils/PrintHost.hpp"
+#include "slic3r/Utils/Serial.hpp"
+#include "SavePresetDialog.hpp"
+#include "Search.hpp"
+#include "UnsavedChangesDialog.hpp"
+#include "WipeTowerDialog.hpp"
 
-#include <wx/app.h>
-#include <wx/button.h>
-#include <wx/scrolwin.h>
-#include <wx/sizer.h>
 
-#include <wx/bmpcbox.h>
-#include <wx/bmpbuttn.h>
-#include <wx/collpane.h>
-#include <wx/treectrl.h>
-#include <wx/imaglist.h>
-#include <wx/settings.h>
-#include <wx/filedlg.h>
-
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -37,25 +39,22 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/log/trivial.hpp>
+
+#include <wx/app.h>
+#include <wx/bmpcbox.h>
+#include <wx/bmpbuttn.h>
+#include <wx/button.h>
+#include <wx/collpane.h>
+#include <wx/filedlg.h>
+#include <wx/imaglist.h>
+#include <wx/settings.h>
+#include <wx/scrolwin.h>
+#include <wx/sizer.h>
+#include <wx/treectrl.h>
 
 #include "wxExtensions.hpp"
-#include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
-
-#include <libslic3r/Slicing.hpp>
-
-#include "GUI_App.hpp"
-#include "GUI_ObjectList.hpp"
-#include "Plater.hpp"
-#include "MainFrame.hpp"
-#include "GLCanvas3D.hpp"
-#include "format.hpp"
-#include "PhysicalPrinterDialog.hpp"
-#include "UnsavedChangesDialog.hpp"
-#include "SavePresetDialog.hpp"
-#include "Search.hpp"
-#include "MsgDialog.hpp"
-#include "Notebook.hpp"
 
 #ifdef WIN32
     #include <commctrl.h>

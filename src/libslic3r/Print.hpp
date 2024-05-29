@@ -485,8 +485,9 @@ private:
 struct PrintStatistics
 {
     PrintStatistics() { clear(); }
-    std::string                     estimated_normal_print_time;
-    std::string                     estimated_silent_print_time;
+    // PrintEstimatedStatistics::ETimeMode::Normal -> time
+    std::map<uint8_t, double>       estimated_print_time;
+    std::map<uint8_t, std::string>  estimated_print_time_str;
     double                          total_used_filament;
     std::vector<std::pair<size_t, double>> color_extruderid_to_used_filament; // id -> mm (length)
     double                          total_extruded_volume;
