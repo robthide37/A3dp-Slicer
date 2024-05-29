@@ -2264,10 +2264,12 @@ bool GLCanvas3D::is_gcode_preview_dirty(const GCodeProcessorResult& gcode_result
     return last_showned_gcode != gcode_result.computed_timestamp;
 }
 
-void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
+void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult     &gcode_result,
+                                    const std::vector<std::string> &str_tool_colors,
+                                    bool                            force_gcode_color_recompute)
 {
-    if (last_showned_gcode != gcode_result.computed_timestamp
-        || !m_gcode_viewer.is_loaded(gcode_result)) {
+    if (last_showned_gcode != gcode_result.computed_timestamp || force_gcode_color_recompute ||
+        !m_gcode_viewer.is_loaded(gcode_result)) {
         last_showned_gcode = gcode_result.computed_timestamp;
         m_gcode_viewer.load(gcode_result, *this->fff_print(), m_initialized);
 
