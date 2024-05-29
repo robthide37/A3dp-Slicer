@@ -565,10 +565,12 @@ void Preview::on_combochecklist_options(wxCommandEvent& evt)
     m_canvas->set_gcode_options_visibility_from_flags(new_flags);
     if (m_canvas->get_gcode_view_type() == GCodeViewer::EViewType::Feedrate) {
         const unsigned int diff_flags = curr_flags ^ new_flags;
-        if ((diff_flags & (1 << static_cast<unsigned int>(Preview::OptionType::Travel))) != 0)
+        if ((diff_flags & (1 << static_cast<unsigned int>(Preview::OptionType::Travel))) != 0) {
+            m_force_gcode_color_recompute = true;
             refresh_print();
-        else
+        } else {
             m_canvas->refresh_gcode_preview_render_paths();
+        }
     }
     else
         m_canvas->refresh_gcode_preview_render_paths();
@@ -951,13 +953,16 @@ void Preview::update_moves_slider()
             alternate_values[count] = static_cast<double>(view.gcode_ids[i]);
         ++count;
     }
-
+    // should the end of the horizontal slider stay at the end?
+    bool max_is_max = m_moves_slider->GetMaxValue() == m_moves_slider->GetHigherValue();
+    // update values
     m_moves_slider->SetSliderValues(values);
     m_moves_slider->SetSliderAlternateValues(alternate_values);
     m_moves_slider->SetMaxValue(view.endpoints.last - view.endpoints.first);
-    m_moves_slider->SetSelectionSpan(view.current.first - view.endpoints.first, view.current.last - view.endpoints.first);
-    m_moves_slider->Refresh();
-    m_moves_slider->Update();
+    m_moves_slider->SetSelectionSpan(view.current.first - view.endpoints.first,
+                                     max_is_max ? m_moves_slider->GetMaxValue() :
+                                                  (view.current.last - view.endpoints.first));
+    m_moves_slider->fire_update_if_needed();
 }
 
 void Preview::enable_moves_slider(bool enable)
@@ -1065,7 +1070,8 @@ void Preview::load_print_as_fff(bool keep_z_range)
             // Load the real G-code preview.
             if (current_force_state == ForceState::NoForce)
                 m_canvas->set_items_show(false, true);
-            m_canvas->load_gcode_preview(*m_gcode_result, colors);
+            m_canvas->load_gcode_preview(*m_gcode_result, colors, m_force_gcode_color_recompute);
+            m_force_gcode_color_recompute = false;
             m_left_sizer->Show(m_bottom_toolbar_panel);
             m_left_sizer->Layout();
             Refresh();

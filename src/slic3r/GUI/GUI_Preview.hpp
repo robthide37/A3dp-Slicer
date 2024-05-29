@@ -126,6 +126,7 @@ class Preview : public wxTitledPanel
     //fields to see what color to display
     bool m_has_switched_to_color = false;
     bool m_has_switched_to_extruders = false;
+    bool m_force_gcode_color_recompute = false;
 
     bool m_loaded { false };
 
