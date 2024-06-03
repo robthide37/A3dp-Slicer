@@ -40,6 +40,7 @@ public:
     std::string postamble() const;
     std::string set_temperature(int16_t temperature, bool wait = false, int tool = -1);
     std::string set_bed_temperature(uint32_t temperature, bool wait = false);
+    std::string set_chamber_temperature(uint32_t temperature, bool wait = false);
     void        set_acceleration(uint32_t acceleration);
     void        set_travel_acceleration(uint32_t acceleration);
     uint32_t    get_acceleration() const;
@@ -103,6 +104,7 @@ private:
     int16_t         m_last_temperature_with_offset = 0;
     int16_t         m_last_bed_temperature = 0;
     bool            m_last_bed_temperature_reached = true;
+    int16_t         m_last_chamber_temperature = 0;
     // if positive, it's set, and the next lift wil have this extra lift
     double          m_extra_lift = 0;
     // current lift, to remove from m_pos to have the current height.
