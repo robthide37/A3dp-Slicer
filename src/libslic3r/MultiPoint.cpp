@@ -152,6 +152,25 @@ bool MultiPoint::first_intersection(const Line& line, Point* intersection) const
             }
         }
     }
+    /*last-to-first line */{
+        assert(!points.back().coincides_with_epsilon(points.front()));
+        l.a = points.back();
+        l.b = points.front();
+        Point ip;
+        if (l.intersection(line, &ip)) {
+            if (!found) {
+                found         = true;
+                dmin          = (line.a - ip).cast<double>().norm();
+                *intersection = ip;
+            } else {
+                double d = (line.a - ip).cast<double>().norm();
+                if (d < dmin) {
+                    dmin          = d;
+                    *intersection = ip;
+                }
+            }
+        }
+    }
     return found;
 }
 

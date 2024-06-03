@@ -88,6 +88,7 @@ public:
     }
 
     bool intersection(const Line& line, Point* intersection) const;
+    // if the line cross multiple times, it will return the poitn nearest from line.a
     bool first_intersection(const Line& line, Point* intersection) const;
     bool intersections(const Line &line, Points *intersections) const;
     // Projection of a point onto the lines defined by the points.
