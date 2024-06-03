@@ -35,12 +35,25 @@ void CalibrationFlowDialog::create_buttons(wxStdDialogButtonSizer* buttons){
     buttons->Add(bt);
 }
 
+void CalibrationFlowDialog::create_geometry_10(wxCommandEvent &event_args)
+{
+    Plater *plat = this->main_frame->plater();
+    if (!plat->new_project(L("Flow 10 percent calibration")))
+        return;
+    create_geometry(80.f, 10.f);
+}
+
+void CalibrationFlowDialog::create_geometry_2_5(wxCommandEvent &event_args)
+{
+    Plater *plat = this->main_frame->plater();
+    if (!plat->new_project(L("Flow 2 percent calibration")))
+        return;
+    create_geometry(92.f, 2.F);
+}
 
 void CalibrationFlowDialog::create_geometry(float start, float delta) {
     Plater* plat = this->main_frame->plater();
     Model& model = plat->model();
-    if (!plat->new_project(L("Flow calibration")))
-        return;
 
     //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";

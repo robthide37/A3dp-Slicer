@@ -3339,11 +3339,14 @@ void PrintConfigDef::init_fff_params()
     def = this->add("ironing_angle", coFloat);
     def->label = L("Ironing angle");
     def->category = OptionCategory::ironing;
-    def->tooltip = L("Ironing angle. if negative, it will use the fill angle.");
+    def->tooltip = L("Ironing post-process angle."
+        "\nIf positive, the ironing will use this angle."
+        "\nIf -1, it will use the fill angle."
+        "\nIf lower than -1, it will use the fill angle minus this angle.");
     def->sidetext = L("°");
-    def->min = -1;
+    def->min = -360;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(-1));
+    def->set_default_value(new ConfigOptionFloat(-45));
 
     def = this->add("ironing_type", coEnum);
     def->label = L("Ironing Type");
@@ -5224,7 +5227,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Only custom Start G-code");
     def->category = OptionCategory::customgcode;
     def->tooltip = L("Ensure that the slicer won't add heating, fan, extruder... commands before or just after your start-gcode."
-                    "If set to true, you have to write a good and complete start_gcode, as no checks are made anymore.");
+                    "\nIf set to true, you have to write a good and complete start_gcode, as no checks are made anymore."
+                    "\nExemple:\nG21 ; set units to millimeters\nG90 ; use absolute coordinates\n{if use_relative_e_distances}M83{else}M82{endif}\nG92 E0 ; reset extrusion distance");
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -6219,7 +6223,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("wipe_only_crossing", coBools);
     def->label = L("Wipe only when crossing perimeters");
     def->category = OptionCategory::extruders;
-    def->tooltip = L("Don't wipe when you don't cross a perimeter. Need 'only_retract_when_crossing_perimeters'and 'wipe' enabled.");
+    def->tooltip = L("Don't wipe when you don't cross a perimeter. Need 'avoid_crossing_perimeters' and 'wipe' enabled.");
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });

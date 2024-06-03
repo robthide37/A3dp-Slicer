@@ -269,7 +269,34 @@ std::string GCodeWriter::set_bed_temperature(uint32_t temperature, bool wait)
     return gcode.str();
 }
 
+std::string GCodeWriter::set_chamber_temperature(uint32_t temperature, bool wait)
+{
+    if (temperature == m_last_chamber_temperature && !wait)
+        return std::string();
 
+    if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfRepRap) || FLAVOR_IS(gcfMachinekit)) {
+        // ok
+    } else {
+        return std::string();
+    }
+
+    m_last_chamber_temperature = temperature;
+
+    std::string code, comment;
+    if (wait) {
+        code = "M191";
+        comment = "set chamber temperature and wait for it to be reached";
+    } else {
+        code = "M141";
+        comment = "set chamber temperature";
+    }
+    
+    std::ostringstream gcode;
+    gcode << code << " " << "S";
+    gcode << temperature << " ; " << comment << "\n";
+    
+    return gcode.str();
+}
 
 void GCodeWriter::set_acceleration(uint32_t acceleration)
 {
@@ -926,7 +953,7 @@ std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comm
 
     // write it
     if (fan_speed == 0) {
-        if ((gcfTeacup == gcode_flavor)) {
+        if ((gcfTeacup == gcode_flavor || gcfRepRap == gcode_flavor)) {
             gcode << "M106 S0";
         } else if ((gcfMakerWare == gcode_flavor) || (gcfSailfish == gcode_flavor)) {
             gcode << "M127";
