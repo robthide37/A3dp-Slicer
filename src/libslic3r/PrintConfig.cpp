@@ -5131,7 +5131,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Only custom Start G-code");
     def->category = OptionCategory::customgcode;
     def->tooltip = L("Ensure that the slicer won't add heating, fan, extruder... commands before or just after your start-gcode."
-                    "If set to true, you have to write a good and complete start_gcode, as no checks are made anymore.");
+                    "\nIf set to true, you have to write a good and complete start_gcode, as no checks are made anymore."
+                    "\nExemple:\nG21 ; set units to millimeters\nG90 ; use absolute coordinates\n{if use_relative_e_distances}M83{else}M82{endif}\nG92 E0 ; reset extrusion distance");
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
