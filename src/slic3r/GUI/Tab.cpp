@@ -2338,10 +2338,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             // hack (see FreqChangedParams::init() in plater.cpp)
             current_line.label_tooltip = full_line;
         } else if (full_line == "update_nozzle_diameter") {
-            current_group
-                ->m_on_change = set_or_add(current_group->m_on_change, [this,
-                                                                        idx_page](const t_config_option_key &opt_key,
-                                                                                  boost::any                 value) {
+            current_group->m_on_change = set_or_add(current_group->m_on_change, [this, idx_page]
+                    (const t_config_option_key &opt_key, boost::any value) {
                 TabPrinter *tab = nullptr;
                 if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
                     return;
@@ -2573,19 +2571,38 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             } else if (boost::starts_with(full_line, "extruder_extrusion_multiplier_speed")) {
                 // don't forget the idx_page as it's on the extruder page.
                 Line thisline = current_group->create_single_option_line("extruder_extrusion_multiplier_speed", "", idx_page);
-                thisline.widget = [this](wxWindow *parent) {
+                thisline.widget = [this, idx_page](wxWindow *parent) {
                     auto dialog_btn = new wxButton(parent, wxID_ANY, _L("Extrusion multiplier per speed") + dots,
                                                            wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
                     dialog_btn->SetFont(Slic3r::GUI::wxGetApp().normal_font());
                     wxGetApp().UpdateDarkUI(dialog_btn);
                     auto sizer = new wxBoxSizer(wxHORIZONTAL);
                     sizer->Add(dialog_btn);
-
-                    dialog_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent &e) {
-                        GraphDialog dlg(this, (m_config_base->option<ConfigOptionStrings>("extruder_extrusion_multiplier_speed"))->get_at(0));
-                        if (dlg.ShowModal() == wxID_OK)
+                    dialog_btn->Bind(wxEVT_BUTTON, ([this, idx_page](wxCommandEvent &e) {
+                        GraphSettings settings;
+                        settings.title = L("Extrusion multiplier per extrusion speed");
+                        settings.description = L("Choose the extrusion multipler value for multiple speeds.\nYou can add/remove points with a right clic.");
+                        settings.x_label = L("Print speed (mm/s)");
+                        settings.y_label = L("Extrusion multiplier");
+                        settings.null_label = L("No compensation");
+                        settings.label_min_x = L("Graph min speed");
+                        settings.label_max_x = L("Graph max speed");
+                        settings.label_min_y = L("Minimum flow");
+                        settings.label_max_y = L("Maximum flow");
+                        settings.min_x = 10;
+                        settings.max_x = 2000;
+                        settings.step_x = 1.;
+                        settings.min_y = 0.1;
+                        settings.max_y = 2;
+                        settings.step_y = 0.1;
+                        settings.allowed_types = {GraphData::GraphType::LINEAR, GraphData::GraphType::SQUARE};
+                        settings.reset_vals = static_cast<const ConfigOptionGraphs*>(m_config_base->def()->get("extruder_extrusion_multiplier_speed")->default_value.get())->get_at(idx_page);
+                        GraphDialog dlg(this, (m_config_base->option<ConfigOptionGraphs>("extruder_extrusion_multiplier_speed"))->get_at(idx_page), settings);
+                        if (dlg.ShowModal() == wxID_OK) {
                             //(m_config_base->option<ConfigOptionStrings>("extruder_extrusion_multiplier_speed"))->get_at(0) = dlg.get_parameters();
-                            load_key_value("extruder_extrusion_multiplier_speed", dlg.get_parameters(), false, 0);
+                            m_config_base->option("extruder_extrusion_multiplier_speed")->set_enabled(!dlg.is_disabled(), idx_page);
+                            load_key_value("extruder_extrusion_multiplier_speed", dlg.get_data(), false, idx_page);
+                        }
                     }));
                     return sizer;
                 };

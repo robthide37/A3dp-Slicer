@@ -1719,13 +1719,14 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionStrings{ "" });
 
-    def = this->add("extruder_extrusion_multiplier_speed", coStrings);
+    def = this->add("extruder_extrusion_multiplier_speed", coGraphs);
     def->label = L("Extrusion multipler");
     def->tooltip = L("This string is edited by a Dialog and contains extusion multiplier for different speeds.");
     def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionStrings { "0 1 1 1 1 1 1 1 1 1 1 1|"
-       " 10 1. 20 1. 30 1. 40 1. 60 1. 80 1. 120 1. 160 1. 240 1. 320 1. 480 1. 640 1. 960 1. 1280 1." });
+    def->set_default_value((new ConfigOptionGraphs( GraphData(0,10, 
+        {{10,1.},{20,1.},{30,1.},{40,1.},{60,1.},{80,1.},{120,1.},{160,1.},{240,1.},{320,1.},{480,1.},{640,1.},{960,1.},{1280,1.}}
+    )))->set_enabled(false));
 
     def = this->add("extruder_offset", coPoints);
     def->label = L("Extruder offset");

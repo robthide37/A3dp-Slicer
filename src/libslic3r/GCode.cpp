@@ -5700,27 +5700,16 @@ double GCode::compute_e_per_mm(double path_mm3_per_mm) {
         * m_writer.tool()->e_per_mm3() // inside is the filament_extrusion_multiplier
         * this->config().print_extrusion_multiplier.get_abs_value(1);
     // extrusion mult per speed
-    std::string str = this->config().extruder_extrusion_multiplier_speed.get_at(this->m_writer.tool()->id());
-    if (str.size() > 2 && !(str.at(0) == '0' && str.at(1) == ' ')) {
-        assert(e_per_mm > 0);
-        double current_speed = this->writer().get_speed();
-        std::vector<double> extrusion_mult;
-        std::stringstream stream{str};
-        double parsed            = 0.f;
-        while (stream >> parsed)
-            extrusion_mult.push_back(parsed);
-        int idx_before = int(current_speed/10);
-        if (idx_before >= extrusion_mult.size() - 1) {
-            // last or after the last
-            e_per_mm *= extrusion_mult.back();
-        } else {
-            assert(idx_before + 1 < extrusion_mult.size());
-            float percent_before = 1 - (current_speed/10 - idx_before);
-            double mult = extrusion_mult[idx_before] * percent_before;
-            mult += extrusion_mult[idx_before+1] * (1-percent_before);
-            e_per_mm *= (mult / 2);
+    if (this->config().extruder_extrusion_multiplier_speed.is_enabled()) {
+        GraphData eems_graph = this->config().extruder_extrusion_multiplier_speed.get_at(this->m_writer.tool()->id());
+        if (eems_graph.data_size() > 0 && this->config().extruder_extrusion_multiplier_speed.is_enabled(this->m_writer.tool()->id())) {
+            assert(e_per_mm > 0);
+            double                   current_speed = this->writer().get_speed();
+            if (eems_graph.data_size() > 0) {
+                e_per_mm *= eems_graph.interpolate(current_speed);
+            }
+            assert(e_per_mm > 0);
         }
-        assert(e_per_mm > 0);
     }
     // first layer mult
     if (this->m_layer->bottom_z() < EPSILON)
