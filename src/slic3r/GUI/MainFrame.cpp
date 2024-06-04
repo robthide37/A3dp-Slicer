@@ -981,7 +981,7 @@ void MainFrame::update_title()
     	}
     }
 
-    title += wxString(SLIC3R_APP_NAME) + "_" + wxString(SLIC3R_VERSION) ;
+    title += wxString(SLIC3R_APP_NAME) + "_" + wxString(SLIC3R_VERSION_FULL) ;
     if (wxGetApp().is_editor() && !has_name)
         title += (" " + _L(SLIC3R_BASED_ON));
 
