@@ -1507,6 +1507,11 @@ void Tab::activate_option(const std::string& opt_key, const wxString& category)
     m_highlighter.init(get_custom_ctrl_with_blinking_ptr(opt_key));
 }
 
+void TabFrequent::activate_option(const std::string &opt_key, const wxString &category){
+    wxGetApp().plater()->collapse_sidebar(false);
+    wxGetApp().mainframe->select_tab(MainFrame::ETabType::Plater3D);
+}
+
 void Tab::cache_config_diff(const std::vector<std::string>& selected_options)
 {
     m_cache_config.apply_only(m_presets->get_edited_preset().config, selected_options);

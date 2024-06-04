@@ -475,7 +475,7 @@ public:
 	void			on_value_change(const std::string& opt_key, const boost::any& value);
 
     void            update_wiping_button_visibility();
-	void			activate_option(const std::string& opt_key, const wxString& category);
+	virtual void	activate_option(const std::string& opt_key, const wxString& category);
 	void			cache_config_diff(const std::vector<std::string>& selected_options);
 	void			apply_config_from_cache();
 
@@ -524,6 +524,7 @@ public:
 	PrinterTechnology get_printer_technology() const override { return (m_type & Preset::Type::TYPE_TECHNOLOGY) == Preset::Type::TYPE_FFF ? PrinterTechnology::ptFFF : 
 																	   (m_type & Preset::Type::TYPE_TECHNOLOGY) == Preset::Type::TYPE_SLA ? PrinterTechnology::ptSLA :
 																	   PrinterTechnology::ptAny; }
+    virtual void    activate_option(const std::string& opt_key, const wxString& category) override;
 };
 
 class TabPrint : public Tab
