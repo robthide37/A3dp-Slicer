@@ -122,7 +122,7 @@ public:
 	//DynamicPrintConfig* m_config;
 
 	wxBoxSizer*	vsizer() const { return m_vsizer; }
-	wxWindow*	parent() const { return m_parent; }
+	wxWindow*	parent() const { assert(m_parent); return m_parent; }
 	const wxString&	title()	 const { return m_title; }
 	size_t		iconID() const { return m_iconID; }
 	//void		set_config(DynamicPrintConfig* config_in) { m_config = config_in; }
@@ -384,6 +384,7 @@ public:
     // 3. propagate changed configuration to the Plater when (m_update_cnt == 0) only
     std::atomic_int16_t m_update_cnt = 0;
 
+	static inline bool fake_build = false;
 public:
     Tab(wxBookCtrlBase* parent, const wxString& title, Preset::Type type);
     ~Tab() {}
@@ -433,9 +434,11 @@ public:
 	void		update_undo_buttons();
 
 	void		on_roll_back_value(const bool to_sys = false);
-
-	PageShp         create_options_page(const wxString& title, const std::string& icon);
+	
+	int             get_icon_id(const wxString& title, const std::string &icon);
+	virtual PageShp create_options_page(const wxString &title, const std::string &icon);
 	static wxString translate_category(const wxString& title, Preset::Type preset_type);
+
 
 	virtual void	OnActivate();
 	virtual void	on_preset_loaded() {}
@@ -510,6 +513,7 @@ protected:
 class TabFrequent : public Tab
 {
 	MultiPtrPrintConfig m_multi_conf;
+	wxWindow * m_freq_parent = nullptr;
 public:
 	TabFrequent(wxBookCtrlBase* parent, const wxString &title, Preset::Type tab_type) :
         Tab(parent, title, tab_type) {}
@@ -525,6 +529,8 @@ public:
 																	   (m_type & Preset::Type::TYPE_TECHNOLOGY) == Preset::Type::TYPE_SLA ? PrinterTechnology::ptSLA :
 																	   PrinterTechnology::ptAny; }
     virtual void    activate_option(const std::string& opt_key, const wxString& category) override;
+    void set_freq_parent(wxWindow * freq_parent) { m_freq_parent = freq_parent;}
+	virtual PageShp create_options_page(const wxString &title, const std::string &icon) override;
 };
 
 class TabPrint : public Tab
