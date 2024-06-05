@@ -5069,9 +5069,15 @@ std::string GCode::extrude_multi_path(const ExtrusionMultiPath &multipath, const
         //reverse to get a shorter point (hopefully there is still no feature that choose a point that need no perimeter crossing before).
         // extrude along the  reversedpath
         for (size_t idx_path = multipath.paths.size() - 1; idx_path < multipath.paths.size(); --idx_path) {
-            assert(multipath.paths[idx_path].can_reverse());
-            //extrude_path will reverse the path by itself, no need to copy it do to it here.
-            gcode += extrude_path(multipath.paths[idx_path], description, speed);
+            //it's possible to have un-reverseable paths into a reversable multipath: this means that only the whole thing can be reversed, and not individual apths.
+            if (multipath.paths[idx_path].can_reverse()) {
+                // extrude_path will reverse the path by itself, no need to copy it do to it here.
+                gcode += extrude_path(multipath.paths[idx_path], description, speed);
+            } else {
+                ExtrusionPath path = multipath.paths[idx_path];
+                path.reverse();
+                gcode += extrude_path(path, description, speed);
+            }
         }
     } else {
         // extrude along the path
