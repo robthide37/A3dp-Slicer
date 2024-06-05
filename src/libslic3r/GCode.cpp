@@ -3441,7 +3441,7 @@ LayerResult GCode::process_layer(
         //extrude object-only skirt (for sequential)
         //TODO: use it also for wiping like the other one (as they are exlusiev)
         if (single_object_instance_idx != size_t(-1) && !layers.front().object()->skirt().empty()
-            && extruder_id == layer_tools.extruders.front()) {
+            && extruder_id == layer_tools.extruders.front() && object_layer) {
 
             const PrintObject *print_object = layers.front().object();
             //object skirt & brim use the object settings.
@@ -3459,7 +3459,7 @@ LayerResult GCode::process_layer(
         }
         //extrude object-only brim (for sequential)
         if (single_object_instance_idx != size_t(-1) && !layers.front().object()->brim().empty()
-            && extruder_id == layer_tools.extruders.front()) {
+            && extruder_id == layer_tools.extruders.front() && object_layer) {
 
             const PrintObject* print_object = layers.front().object();
             //object skirt & brim use the object settings.
