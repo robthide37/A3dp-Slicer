@@ -1754,7 +1754,7 @@ std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer,
 
                 double test_lambda_z = std::abs(layer.print_z - test_lambda_pos.z());
                 Point xy_lambda(scale_(test_lambda_pos.x()), scale_(test_lambda_pos.y()));
-                Point nearest = polygon.point_projection(xy_lambda);
+                Point nearest = polygon.point_projection(xy_lambda).first;
                 Vec3d polygon_3dpoint{ unscaled(nearest.x()), unscaled(nearest.y()), (double)layer.print_z };
                 double test_lambda_dist = (polygon_3dpoint - test_lambda_pos).norm();
                 double sphere_radius = po->model_object()->instance_bounding_box(0, true).size().x() / 2;
