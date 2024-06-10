@@ -264,7 +264,7 @@ bool Bed3D::contains(const Point& point) const
 
 Point Bed3D::point_projection(const Point& point) const
 {
-    return m_polygon.point_projection(point);
+    return m_polygon.point_projection(point).first;
 }
 
 void Bed3D::render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture)

@@ -4188,7 +4188,7 @@ namespace check_wipe {
             const Point* closest = poly_to_test.closest_point(external_polygon.front());
             // because sqrt(2) = 1.42 and it's the worst case
             if (closest->distance_to(external_polygon.front()) < coordf_t(wipe_inside_depth * 1.43)) {
-                Point pt_proj = poly_to_test.point_projection(reference);
+                Point pt_proj = poly_to_test.point_projection(reference).first;
                 Point pt_temp;
                 if (pt_proj.distance_to(reference) < threshold || poly_to_test.intersection(Line{ reference , external_polygon.front() }, &pt_temp)) {
                     //ok
@@ -4932,26 +4932,59 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                 if (!polys.empty()) {
                     // if multiple polygon, keep only our nearest.
                     if (polys.size() > 1) {
+                        Point nearest_pt;
+                        size_t nearest_pt_idx;
                         size_t   nearest_poly_idx = size_t(-1);
                         coordf_t best_dist_sqr    = dist * dist * 100;
                         for (int idx_poly = 0; idx_poly < polys.size(); ++idx_poly) {
                             Polygon &poly = polys[idx_poly];
-                            for (int idxpt = 0; idxpt < poly.points.size(); ++idxpt) {
-                                if (coordf_t test_dist = pt_inside.distance_to_square(poly.points[idxpt]);
-                                    test_dist < best_dist_sqr) {
-                                    nearest_poly_idx = idx_poly;
-                                    best_dist_sqr    = test_dist;
-                                }
+                            // use projection  
+                            auto [near_pt, near_idx] = poly.point_projection(pt_inside);
+                            if (coordf_t test_dist = pt_inside.distance_to_square(near_pt);
+                                test_dist < best_dist_sqr) {
+                                nearest_poly_idx = idx_poly;
+                                best_dist_sqr    = test_dist;
+                                nearest_pt       = near_pt;
+                                nearest_pt_idx   = near_idx;
                             }
                         }
-                        if (nearest_poly_idx + 1 < polys.size())
-                            polys.erase(polys.begin() + nearest_poly_idx + 1, polys.end());
-                        if (nearest_poly_idx > 0)
-                            polys.erase(polys.begin(), polys.begin() + nearest_poly_idx);
-                        assert(polys.size() == 1);
-                        assert(polys.front().closest_point(pt_inside) != nullptr &&
-                               std::abs(polys.front().closest_point(pt_inside)->distance_to_square(pt_inside) -
-                                        best_dist_sqr) < EPSILON);
+                        if (nearest_poly_idx == size_t(-1)) {
+                            // too far away, try with lower offset
+                            polys = offset(original_polygon, -dist / 2);
+                            assert(!polys.empty());
+                            if (!polys.empty()) {
+                                for (int idx_poly = 0; idx_poly < polys.size(); ++idx_poly) {
+                                    Polygon &poly = polys[idx_poly];
+                                    auto [near_pt, near_idx] = poly.point_projection(pt_inside);
+                                    if (coordf_t test_dist = pt_inside.distance_to_square(near_pt);
+                                        test_dist < best_dist_sqr) {
+                                        nearest_poly_idx = idx_poly;
+                                        best_dist_sqr    = test_dist;
+                                        nearest_pt       = near_pt;
+                                        nearest_pt_idx   = near_idx;
+                                    }
+                                }
+                            }
+                            // if fail again (weird) reuse our initial poly
+                        }
+                        assert(nearest_poly_idx < polys.size());
+                        if (nearest_poly_idx < polys.size()) {
+                            if (nearest_poly_idx < polys.size() - 1)
+                                polys.erase(polys.begin() + nearest_poly_idx + 1, polys.end());
+                            if (nearest_poly_idx > 0 )
+                                polys.erase(polys.begin(), polys.begin() + nearest_poly_idx);
+                            assert(polys.size() == 1);
+                            assert(nearest_pt_idx < polys.front().points.size());
+                            if (nearest_pt_idx < polys.front().points.size() &&
+                                !polys.front().points[nearest_pt_idx].coincides_with_epsilon(nearest_pt)) {
+                                polys.front().points.insert(polys.front().points.begin() + nearest_pt_idx, nearest_pt);
+                            }
+                            assert(polys.front().closest_point(pt_inside) != nullptr &&
+                                   std::abs(polys.front().closest_point(pt_inside)->distance_to_square(pt_inside) -
+                                            best_dist_sqr) < SCALED_EPSILON);
+                        } else {
+                            polys = { original_polygon };
+                        }
                     }
 
                     // This offset may put point so close that they coincides.
