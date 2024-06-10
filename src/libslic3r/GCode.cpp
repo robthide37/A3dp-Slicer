@@ -4316,10 +4316,10 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
         if (next_point == start_point || prev_point == end_point) {
             throw Slic3r::SlicingError(_(L("Error while writing gcode: two points are at the same position. Please send the .3mf project to the dev team for debugging. Extrude loop: seam notch.")));
         }
+        if(building_paths.size() == 1)
+            assert(is_full_loop_ccw == Polygon(building_paths.front().polyline.get_points()).is_counter_clockwise());
         double angle = PI / 2;
-        if (is_hole_loop ? is_full_loop_ccw : (!is_full_loop_ccw)) {
-            // swap points
-            next_point = *(building_paths.back().polyline.get_points().end() - 2);
+        if (is_hole_loop ? (is_full_loop_ccw) : (!is_full_loop_ccw)) {
             angle *= -1;
         }
         Vec2d  vec_start = next_point.cast<double>() - start_point.cast<double>();
@@ -4335,9 +4335,9 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
         //use a vec that is the mean between the two.
         vec_start = (vec_start + vec_end) / 2;
 
-        Point moved_start = (start_point.cast<double>() + vec_start * notch_value).cast<coord_t>();;
+        Point moved_start = (start_point.cast<double>() + vec_start * notch_value).cast<coord_t>();
         moved_start.rotate(angle, start_point);
-        Point moved_end = (end_point.cast<double>() + vec_start * notch_value).cast<coord_t>();;
+        Point moved_end = (end_point.cast<double>() + vec_start * notch_value).cast<coord_t>();
         moved_end.rotate(angle, end_point);
 
         //check if the current angle isn't too sharp
@@ -4552,7 +4552,7 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
             };
             create_new_extrusion(notch_extrusion_end, building_paths.back(), check_length_clipped(p2)?0.75f:0.f, building_paths.back().last_point(), p2);
             create_new_extrusion(notch_extrusion_end, building_paths.back(), check_length_clipped(p1) ? 0.5f : 0.f, p2, p1);
-            create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.f, p1, moved_end);
+            create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.f, p1, moved_end); // 0 instead of 25%, to remove a bit of material at the nd, for oozing and pressure reduction.
         } else {
             create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.5f, building_paths.back().last_point(), moved_end);
         }
