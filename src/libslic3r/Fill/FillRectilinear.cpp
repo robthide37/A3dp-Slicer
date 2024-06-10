@@ -3162,7 +3162,7 @@ bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillPar
             fill_lines = chain_polylines(std::move(fill_lines));
         append(polylines_out, std::move(fill_lines));
     } else
-        connect_infill(std::move(fill_lines), surface->expolygon, poly_with_offset_base.polygons_outer, polylines_out, this->get_spacing(), params);
+        connect_infill(std::move(fill_lines), surface->expolygon, poly_with_offset_base.polygons_outer, polylines_out, scale_t(this->get_spacing()), params);
 
     return true;
 }
@@ -3242,8 +3242,9 @@ Polylines FillSupportBase::fill_surface(const Surface *surface, const FillParams
         coord_t line_spacing = _line_spacing_for_density(params);
         // Create infill lines, keep them vertical.
         make_fill_lines(poly_with_offset, rotate_vector.second.rotated(- rotate_vector.first), 0, 0, line_spacing, 0, fill_lines, params);
+
         // Both the poly_with_offset and polylines_out are rotated, so the infill lines are strictly vertical.
-        connect_base_support(std::move(fill_lines), poly_with_offset.polygons_outer, poly_with_offset.bounding_box_outer(), polylines_out, this->get_spacing(), params);
+        connect_base_support(std::move(fill_lines), poly_with_offset.polygons_outer, poly_with_offset.bounding_box_outer(), polylines_out,  _line_spacing_for_density(params), params);
         // Rotate back by rotate_vector.first
         const double cos_a = cos(rotate_vector.first);
         const double sin_a = sin(rotate_vector.first);

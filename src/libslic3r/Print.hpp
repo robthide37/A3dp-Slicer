@@ -439,8 +439,7 @@ private:
     bool                                    m_typed_slices = false;
 
     //this setting allow fill_aligned_z to get the max sparse spacing spacing.
-    coord_t                                 m_max_sparse_spacing;
-
+    coord_t                                 m_max_sparse_spacing = 0;
 
 };
 
