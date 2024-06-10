@@ -934,7 +934,7 @@ void Layer::make_ironing()
         // Create the filler object.
         fill.init_spacing(ironing_params.line_spacing, fill_params);
         fill.angle = float(ironing_params.angle + 0.25 * M_PI);
-        fill.link_max_length = (coord_t)scale_(3. * fill.get_spacing());
+        fill.link_max_length = scale_t(3. * fill.get_spacing());
         double extrusion_height = ironing_params.height * fill.get_spacing() / nozzle_dmr;
         //FIXME FLOW decide if it's good
         double max_overlap = region_config.get_computed_value("filament_max_overlap", ironing_params.extruder - 1);

@@ -3417,7 +3417,7 @@ static inline void fill_expolygon_generate_paths(
     float                    density,
     ExtrusionRole            role,
     const Flow              &flow,
-    coordf_t                 spacing)
+    double                   spacing)
 {
     assert(!fill_params.use_arachne);
     FillParams new_params = fill_params;
@@ -3440,7 +3440,7 @@ static inline void fill_expolygons_generate_paths(
     float                    density,
     ExtrusionRole            role,
     const Flow              &flow,
-    coordf_t                 spacing)
+    double                   spacing)
 {
     for (ExPolygon& expoly : expolygons)
         fill_expolygon_generate_paths(dst, std::move(expoly), filler, fill_params, density, role, flow, spacing);
@@ -3453,7 +3453,7 @@ static inline void fill_expolygons_generate_paths(
     float                    density,
     ExtrusionRole            role,
     const Flow              &flow,
-    coordf_t                 spacing,
+    double                   spacing,
     const PrintRegionConfig& region_config)
 {
     FillParams fill_params;
@@ -4401,7 +4401,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 //filler->layer_id = support_layer_id; // don't do that, or the filler will rotate thigns from that layerid
                 filler->z = support_layer.print_z;
                 float supp_density = m_support_params.interface_density;
-                coordf_t filler_spacing;
+                double filler_spacing;
                 //if first layer and solid first layer : draw concentric with 100% density
                 if (support_layer.id() == 0 && layer_ex.layer->bottom_z <= 0) {
                     filler = filler_first_layer_ptr.get();
@@ -4441,7 +4441,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             // Base interface layers under soluble interfaces
             if ( ! base_interface_layer.empty() && ! base_interface_layer.polygons_to_extrude().empty()) {
                 Fill *filler = filler_base_interface.get();
-                coordf_t filler_spacing = filler->get_spacing();
+                double filler_spacing = filler->get_spacing();
                 //FIXME Bottom interfaces are extruded with the briding flow. Some bridging layers have its height slightly reduced, therefore
                 // the bridging flow does not quite apply. Reduce the flow to area of an ellipse? (A = pi * a * b)
                 assert(! base_interface_layer.layer->bridging);
@@ -4465,7 +4465,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             // Base support or flange.
             if (! base_layer.empty() && ! base_layer.polygons_to_extrude().empty()) {
                 Fill *filler = filler_support.get();
-                coordf_t filler_spacing = m_support_params.support_material_flow.spacing();
+                double filler_spacing = m_support_params.support_material_flow.spacing();
                 // We don't use $base_flow->spacing because we need a constant spacing
                 // value that guarantees that all layers are correctly aligned.
                 assert(! base_layer.layer->bridging);
