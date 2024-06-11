@@ -3058,8 +3058,10 @@ LayerResult GCode::process_layer(
     const Layer         *object_layer  = nullptr;
     const SupportLayer  *support_layer = nullptr;
     const SupportLayer  *raft_layer    = nullptr;
-    const size_t layer_id = layers.front().layer()->id();
+    /*const*/ size_t layer_id = size_t(-1);
     for (const LayerToPrint &l : layers) {
+        if(l.layer())
+            layer_id = l.layer()->id();
         if (l.object_layer && ! object_layer)
             object_layer = l.object_layer;
         if (l.support_layer) {
@@ -3070,6 +3072,7 @@ LayerResult GCode::process_layer(
         }
         assert(l.layer() == nullptr || layer_id == l.layer()->id());
     }
+    assert(layer_id < layer_count());
     const Layer         &layer         = (object_layer != nullptr) ? *object_layer : *support_layer;
     LayerResult   result { {}, layer.id(), false, last_layer, false};
     if (layer_tools.extruders.empty())
@@ -3082,7 +3085,7 @@ LayerResult GCode::process_layer(
             m_object_sequentially_printed.insert(object_layer->object());
             print.set_status(int((layer.id() * 100) / nb_layers),
                              std::string(L("Generating G-code layer %s / %s for object %s / %s")),
-                             std::vector<std::string>{std::to_string(layer.id()), std::to_string(nb_layers), m_object_sequentially_printed.size(), print.num_object_instances()},
+                             std::vector<std::string>{std::to_string(layer.id()), std::to_string(nb_layers), std::to_string(m_object_sequentially_printed.size()), std::to_string(print.num_object_instances())},
                              PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
         } else {
             print.set_status(int((layer.id() * 100) / layer_count()),
