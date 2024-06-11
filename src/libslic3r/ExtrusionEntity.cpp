@@ -159,7 +159,7 @@ bool ExtrusionLoop::split_at_vertex(const Point &point, const double scaled_epsi
                     p2.append(std::move(p1));
                     path->polyline.swap(p2); // swap points & fitting result
                 }
-            } else {
+            } else if (idx > 0 && idx < path->size() - 1) {
                 // new paths list starts with the second half of current path
                 ExtrusionPaths new_paths;
                 PolylineOrArc p1, p2;
@@ -236,8 +236,8 @@ void ExtrusionLoop::split_at(const Point &point, bool prefer_non_overhang, const
         const Point *p1 = this->paths[path_idx].polyline.get_points().data() + segment_idx;
         const Point *p2 = p1;
         ++ p2;
-        double d2_1 = (point - *p1).cast<double>().squaredNorm();
-        double d2_2 = (point - *p2).cast<double>().squaredNorm();
+        double d2_1 = (p - *p1).cast<double>().squaredNorm();
+        double d2_2 = (p - *p2).cast<double>().squaredNorm();
         const double thr2 = scaled_epsilon * scaled_epsilon;
         if (d2_1 < d2_2) {
             if (d2_1 < thr2)
