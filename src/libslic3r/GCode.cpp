@@ -3019,8 +3019,10 @@ LayerResult GCode::process_layer(
     const Layer         *object_layer  = nullptr;
     const SupportLayer  *support_layer = nullptr;
     const SupportLayer  *raft_layer    = nullptr;
-    const size_t layer_id = layers.front().layer()->id();
+    /*const*/ size_t layer_id = size_t(-1);
     for (const LayerToPrint &l : layers) {
+        if(l.layer())
+            layer_id = l.layer()->id();
         if (l.object_layer && ! object_layer)
             object_layer = l.object_layer;
         if (l.support_layer) {
@@ -3031,6 +3033,7 @@ LayerResult GCode::process_layer(
         }
         assert(l.layer() == nullptr || layer_id == l.layer()->id());
     }
+    assert(layer_id < layer_count());
     const Layer         &layer         = (object_layer != nullptr) ? *object_layer : *support_layer;
     LayerResult   result { {}, layer.id(), false, last_layer, false};
     if (layer_tools.extruders.empty())
