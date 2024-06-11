@@ -436,6 +436,8 @@ private:
     std::string                         m_delayed_layer_change;
     // Keeps track of the last extrusion role passed to the processor
     ExtrusionRole                       m_last_processor_extrusion_role;
+    // For Progress bar indicator, in sequential mode (complete objects)
+    std::set<const PrintObject*>              m_object_sequentially_printed;
     // How many times will change_layer() be called?
     // change_layer() will update the progress bar.
     uint32_t                            m_layer_count;

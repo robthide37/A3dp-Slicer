@@ -1905,6 +1905,9 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
      this->m_throw_if_canceled();
 
     // Collect custom seam data from all objects.
+     print.set_status(0, L("Computing seam visibility areas: object %s / %s"),
+                      {"1", std::to_string(print.objects().size())},
+                      PrintBase::SlicingStatus::FORCE_SHOW | PrintBase::SlicingStatus::SECONDARY_STATE);
     m_seam_placer.init(print, this->m_throw_if_canceled);
 
     //activate first extruder is multi-extruder and not in start-gcode
@@ -3073,6 +3076,22 @@ LayerResult GCode::process_layer(
         // Nothing to extrude.
         return result;
 
+    if (object_layer) {
+        if (single_object_instance_idx != size_t(-1)) {
+            size_t nb_layers = object_layer->object()->layer_count();
+            m_object_sequentially_printed.insert(object_layer->object());
+            print.set_status(int((layer.id() * 100) / nb_layers),
+                             std::string(L("Generating G-code layer %s / %s for object %s / %s")),
+                             std::vector<std::string>{std::to_string(layer.id()), std::to_string(nb_layers), m_object_sequentially_printed.size(), print.num_object_instances()},
+                             PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
+        } else {
+            print.set_status(int((layer.id() * 100) / layer_count()),
+                             std::string(L("Generating G-code layer %s / %s")),
+                             std::vector<std::string>{std::to_string(layer.id()), std::to_string(layer_count())},
+                             PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
+        }
+    }
+
     // Extract 1st object_layer and support_layer of this set of layers with an equal print_z.
     coordf_t print_z           = layer.print_z;
     bool     first_layer       = layer_id == 0;
@@ -3763,9 +3782,6 @@ LayerResult GCode::process_layer(
 
     BOOST_LOG_TRIVIAL(trace) << "Exported layer " << layer.id() << " print_z " << print_z <<
     log_memory_info();
-
-    if(object_layer)
-        print.set_status(int((layer.id() * 100) / layer_count()), std::string(L("Generating G-code layer %s / %s")), std::vector<std::string>{ std::to_string(layer.id()), std::to_string(layer_count()) }, PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
 
     result.gcode = std::move(gcode);
     result.cooling_buffer_flush = object_layer || raft_layer || last_layer;

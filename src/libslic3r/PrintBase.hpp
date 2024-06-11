@@ -420,7 +420,8 @@ public:
             SLICING_ENDED                       = 1 << 6,
             GCODE_ENDED                         = 1 << 7,
             MAIN_STATE                          = 1 << 8,
-            SECONDARY_STATE                     = 1 << 9
+            SECONDARY_STATE                     = 1 << 9,
+            FORCE_SHOW                          = 1 << 10
         };
         // Bitmap of FlagBits
         unsigned int    flags;
@@ -443,7 +444,7 @@ public:
     }
     void                    set_status(int percent, const std::string& message, const std::vector<std::string>& args, unsigned int flags = SlicingStatus::DEFAULT) const {
         //check if it need an update. Avoid doing a gui update each ms.
-        if ((flags & SlicingStatus::SECONDARY_STATE) != 0 && message != m_last_status_message) {
+        if ((flags & SlicingStatus::FORCE_SHOW) == 0 && (flags & SlicingStatus::SECONDARY_STATE) != 0 && message != m_last_status_message) {
             std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
             if ((static_cast<std::chrono::duration<double>>(current_time - PrintBase::m_last_status_update)).count() > 0.002 && PrintBase::m_last_status_percent != percent) {
                 PrintBase::m_last_status_update = current_time;
