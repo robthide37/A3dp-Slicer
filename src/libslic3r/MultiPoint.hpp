@@ -50,7 +50,7 @@ public:
     int  find_point(const Point &point) const;
     // Return index of the closest point to point closer than scaled_epsilon.
     // Return -1 if no such point exists.
-    int  find_point(const Point &point, const double scaled_epsilon) const;
+    int  find_point(const Point &point, const coordf_t scaled_epsilon) const;
     bool has_boundary_point(const Point &point) const;
     int  closest_point_index(const Point &point) const {
         int idx = -1;

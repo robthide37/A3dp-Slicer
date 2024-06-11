@@ -150,16 +150,20 @@ namespace Slic3r {
         // but we don't generate any extra perimeter if fill density is zero, as they would be floating
         // inside the object - infill_only_where_needed should be the method of choice for printing
         // hollow objects
-    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
-        const PrintRegion &region = this->printing_region(region_id);
+        for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+            const PrintRegion &region = this->printing_region(region_id);
             if (!region.config().extra_perimeters || region.config().perimeters == 0 || region.config().fill_density == 0 || this->layer_count() < 2)
                 continue;
-
+            // use an antomic idx instead of the range, to avoid a thread being very late because it's on the difficult layers.
+            //TODO: sort the layers by difficulty (difficult first) (number of points, region, surfaces, .. ?)
+            std::atomic_size_t next_layer_idx(0);
             BOOST_LOG_TRIVIAL(debug) << "Generating extra perimeters for region " << region_id << " in parallel - start";
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, m_layers.size() - 1),
-                [this, &region, region_id](const tbb::blocked_range<size_t>& range) {
-                for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                [this, &region, region_id, &next_layer_idx](const tbb::blocked_range<size_t>& range) {
+                //TODO: find a better wya to just fire the threads.
+                //for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                for (size_t layer_idx = next_layer_idx++; layer_idx < m_layers.size() - 1; layer_idx = next_layer_idx++) {
                     m_print->throw_if_canceled();
                     LayerRegion &layerm                     = *m_layers[layer_idx]->get_region(region_id);
                     const LayerRegion &upper_layerm         = *m_layers[layer_idx+1]->get_region(region_id);
@@ -214,10 +218,12 @@ namespace Slic3r {
         }
 
         BOOST_LOG_TRIVIAL(debug) << "Generating perimeters in parallel - start";
+        std::atomic_size_t next_layer_idx(0);
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
-            [this, &atomic_count, nb_layers_update](const tbb::blocked_range<size_t>& range) {
-            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+            [this, &atomic_count, nb_layers_update, &next_layer_idx](const tbb::blocked_range<size_t>& range) {
+            //for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+            for (size_t layer_idx = next_layer_idx++; layer_idx < m_layers.size(); layer_idx = next_layer_idx++) {
                 std::chrono::time_point<std::chrono::system_clock> start_make_perimeter = std::chrono::system_clock::now();
                 m_print->throw_if_canceled();
                 m_layers[layer_idx]->make_perimeters();
@@ -456,10 +462,13 @@ namespace Slic3r {
             const int nb_layers_update = std::max(1, (int)m_layers.size() / 20);
 
             BOOST_LOG_TRIVIAL(debug) << "Filling layers in parallel - start";
+            std::atomic_size_t next_layer_idx(0);
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, m_layers.size()),
-                [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree, &lightning_generator, &atomic_count, nb_layers_update](const tbb::blocked_range<size_t>& range) {
-                for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree, &lightning_generator, &atomic_count, nb_layers_update, &next_layer_idx]
+                (const tbb::blocked_range<size_t>& range) {
+                //for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                for (size_t layer_idx = next_layer_idx++; layer_idx < m_layers.size(); layer_idx = next_layer_idx++) {
                     std::chrono::time_point<std::chrono::system_clock> start_make_fill = std::chrono::system_clock::now();
                     m_print->throw_if_canceled();
                     m_layers[layer_idx]->make_fills(adaptive_fill_octree.get(), support_fill_octree.get(), lightning_generator.get());

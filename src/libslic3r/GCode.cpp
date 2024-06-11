@@ -4142,6 +4142,18 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, bool was_clockwise)
     if (loop.paths.empty())
         return;
 
+#if _DEBUG
+    ExtrusionLoop old_loop = loop;
+    for (const ExtrusionPath &path : loop.paths)
+        for (int i = 1; i < path.polyline.get_points().size(); ++i)
+            assert(!path.polyline.get_points()[i - 1].coincides_with_epsilon(path.polyline.get_points()[i]));
+    for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
+        assert(it->polyline.size() >= 2);
+        assert(std::prev(it)->polyline.back() == it->polyline.front());
+    }
+    assert(loop.first_point() == loop.last_point());
+#endif
+
 //    SeamPosition seam_position = m_config.seam_position;
 //    if (loop.loop_role() == elrSkirt)
 //        seam_position = spNearest;

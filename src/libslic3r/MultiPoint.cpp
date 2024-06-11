@@ -63,16 +63,16 @@ int MultiPoint::find_point(const Point &point) const
     return -1;  // not found
 }
 
-int MultiPoint::find_point(const Point &point, double scaled_epsilon) const
+int MultiPoint::find_point(const Point &point, coordf_t scaled_epsilon) const
 {
     if (scaled_epsilon == 0)
         return this->find_point(point);
 
-    auto dist2_min = std::numeric_limits<double>::max();
-    auto eps2      = scaled_epsilon * scaled_epsilon;
-    int  idx_min  = -1;
+    coordf_t dist2_min = std::numeric_limits<coordf_t>::max();
+    coordf_t eps2      = scaled_epsilon * scaled_epsilon;
+    int      idx_min   = -1;
     for (const Point &pt : this->points) {
-        double d2 = (pt - point).cast<double>().squaredNorm();
+        coordf_t d2 = pt.distance_to_square(point); //(pt - point).cast<coordf_t>().squaredNorm();
         if (d2 < dist2_min) {
             idx_min = int(&pt - &this->points.front());
             dist2_min = d2;
