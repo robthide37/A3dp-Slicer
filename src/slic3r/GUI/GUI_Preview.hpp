@@ -214,7 +214,7 @@ private:
     void check_layers_slider_values(std::vector<CustomGCode::Item>& ticks_from_model,
         const std::vector<double>& layers_z);
     void reset_layers_slider();
-    void update_layers_slider(const std::vector<double>& layers_z, bool keep_z_range = false);
+    void update_layers_slider(const std::vector<double>& layers_z, bool show_gcode_data = false, bool keep_z_range = false);
     void update_layers_slider_mode();
     // update vertical DoubleSlider after keyDown in canvas
     void update_layers_slider_from_canvas(wxKeyEvent& event);

@@ -126,11 +126,14 @@ OptionsGroup::OptionsGroup(	wxWindow* _parent, const wxString& title,
                 m_use_custom_ctrl(is_tab_opt),
                 staticbox(title!=""), extra_column(extra_clmn)
 {
+    assert(Tab::fake_build || m_parent);
 }
 
 wxWindow* OptionsGroup::ctrl_parent() const
 {
-	return this->custom_ctrl && m_use_custom_ctrl_as_parent ? static_cast<wxWindow*>(this->custom_ctrl) : (this->stb ? static_cast<wxWindow*>(this->stb) : this->parent());
+	wxWindow* ret_val = this->custom_ctrl && m_use_custom_ctrl_as_parent ? static_cast<wxWindow*>(this->custom_ctrl) : (this->stb ? static_cast<wxWindow*>(this->stb) : this->parent());
+    assert(ret_val);
+    return ret_val;
 }
 
 bool OptionsGroup::is_legend_line()
@@ -190,7 +193,7 @@ void OptionsGroup::show_field(const t_config_option_key& opt_key, bool show/* = 
 
 void OptionsGroup::append_line(const Line& line)
 {
-	m_lines.emplace_back(line);
+	m_lines.push_back(line);
 
 	if (line.full_width && (
 		line.widget != nullptr ||

@@ -3441,7 +3441,7 @@ LayerResult GCode::process_layer(
         //extrude object-only skirt (for sequential)
         //TODO: use it also for wiping like the other one (as they are exlusiev)
         if (single_object_instance_idx != size_t(-1) && !layers.front().object()->skirt().empty()
-            && extruder_id == layer_tools.extruders.front()) {
+            && extruder_id == layer_tools.extruders.front() && object_layer) {
 
             const PrintObject *print_object = layers.front().object();
             //object skirt & brim use the object settings.
@@ -3459,7 +3459,7 @@ LayerResult GCode::process_layer(
         }
         //extrude object-only brim (for sequential)
         if (single_object_instance_idx != size_t(-1) && !layers.front().object()->brim().empty()
-            && extruder_id == layer_tools.extruders.front()) {
+            && extruder_id == layer_tools.extruders.front() && object_layer) {
 
             const PrintObject* print_object = layers.front().object();
             //object skirt & brim use the object settings.
@@ -4188,7 +4188,7 @@ namespace check_wipe {
             const Point* closest = poly_to_test.closest_point(external_polygon.front());
             // because sqrt(2) = 1.42 and it's the worst case
             if (closest->distance_to(external_polygon.front()) < coordf_t(wipe_inside_depth * 1.43)) {
-                Point pt_proj = poly_to_test.point_projection(reference);
+                Point pt_proj = poly_to_test.point_projection(reference).first;
                 Point pt_temp;
                 if (pt_proj.distance_to(reference) < threshold || poly_to_test.intersection(Line{ reference , external_polygon.front() }, &pt_temp)) {
                     //ok
@@ -4316,10 +4316,10 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
         if (next_point == start_point || prev_point == end_point) {
             throw Slic3r::SlicingError(_(L("Error while writing gcode: two points are at the same position. Please send the .3mf project to the dev team for debugging. Extrude loop: seam notch.")));
         }
+        if(building_paths.size() == 1)
+            assert(is_full_loop_ccw == Polygon(building_paths.front().polyline.get_points()).is_counter_clockwise());
         double angle = PI / 2;
-        if (is_hole_loop ? is_full_loop_ccw : (!is_full_loop_ccw)) {
-            // swap points
-            next_point = *(building_paths.back().polyline.get_points().end() - 2);
+        if (is_hole_loop ? (is_full_loop_ccw) : (!is_full_loop_ccw)) {
             angle *= -1;
         }
         Vec2d  vec_start = next_point.cast<double>() - start_point.cast<double>();
@@ -4335,9 +4335,9 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
         //use a vec that is the mean between the two.
         vec_start = (vec_start + vec_end) / 2;
 
-        Point moved_start = (start_point.cast<double>() + vec_start * notch_value).cast<coord_t>();;
+        Point moved_start = (start_point.cast<double>() + vec_start * notch_value).cast<coord_t>();
         moved_start.rotate(angle, start_point);
-        Point moved_end = (end_point.cast<double>() + vec_start * notch_value).cast<coord_t>();;
+        Point moved_end = (end_point.cast<double>() + vec_start * notch_value).cast<coord_t>();
         moved_end.rotate(angle, end_point);
 
         //check if the current angle isn't too sharp
@@ -4552,7 +4552,7 @@ void GCode::seam_notch(const ExtrusionLoop& original_loop,
             };
             create_new_extrusion(notch_extrusion_end, building_paths.back(), check_length_clipped(p2)?0.75f:0.f, building_paths.back().last_point(), p2);
             create_new_extrusion(notch_extrusion_end, building_paths.back(), check_length_clipped(p1) ? 0.5f : 0.f, p2, p1);
-            create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.f, p1, moved_end);
+            create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.f, p1, moved_end); // 0 instead of 25%, to remove a bit of material at the nd, for oozing and pressure reduction.
         } else {
             create_new_extrusion(notch_extrusion_end, building_paths.back(), 0.5f, building_paths.back().last_point(), moved_end);
         }
@@ -4932,26 +4932,59 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
                 if (!polys.empty()) {
                     // if multiple polygon, keep only our nearest.
                     if (polys.size() > 1) {
+                        Point nearest_pt;
+                        size_t nearest_pt_idx;
                         size_t   nearest_poly_idx = size_t(-1);
                         coordf_t best_dist_sqr    = dist * dist * 100;
                         for (int idx_poly = 0; idx_poly < polys.size(); ++idx_poly) {
                             Polygon &poly = polys[idx_poly];
-                            for (int idxpt = 0; idxpt < poly.points.size(); ++idxpt) {
-                                if (coordf_t test_dist = pt_inside.distance_to_square(poly.points[idxpt]);
-                                    test_dist < best_dist_sqr) {
-                                    nearest_poly_idx = idx_poly;
-                                    best_dist_sqr    = test_dist;
-                                }
+                            // use projection  
+                            auto [near_pt, near_idx] = poly.point_projection(pt_inside);
+                            if (coordf_t test_dist = pt_inside.distance_to_square(near_pt);
+                                test_dist < best_dist_sqr) {
+                                nearest_poly_idx = idx_poly;
+                                best_dist_sqr    = test_dist;
+                                nearest_pt       = near_pt;
+                                nearest_pt_idx   = near_idx;
                             }
                         }
-                        if (nearest_poly_idx + 1 < polys.size())
-                            polys.erase(polys.begin() + nearest_poly_idx + 1, polys.end());
-                        if (nearest_poly_idx > 0)
-                            polys.erase(polys.begin(), polys.begin() + nearest_poly_idx);
-                        assert(polys.size() == 1);
-                        assert(polys.front().closest_point(pt_inside) != nullptr &&
-                               std::abs(polys.front().closest_point(pt_inside)->distance_to_square(pt_inside) -
-                                        best_dist_sqr) < EPSILON);
+                        if (nearest_poly_idx == size_t(-1)) {
+                            // too far away, try with lower offset
+                            polys = offset(original_polygon, -dist / 2);
+                            assert(!polys.empty());
+                            if (!polys.empty()) {
+                                for (int idx_poly = 0; idx_poly < polys.size(); ++idx_poly) {
+                                    Polygon &poly = polys[idx_poly];
+                                    auto [near_pt, near_idx] = poly.point_projection(pt_inside);
+                                    if (coordf_t test_dist = pt_inside.distance_to_square(near_pt);
+                                        test_dist < best_dist_sqr) {
+                                        nearest_poly_idx = idx_poly;
+                                        best_dist_sqr    = test_dist;
+                                        nearest_pt       = near_pt;
+                                        nearest_pt_idx   = near_idx;
+                                    }
+                                }
+                            }
+                            // if fail again (weird) reuse our initial poly
+                        }
+                        assert(nearest_poly_idx < polys.size());
+                        if (nearest_poly_idx < polys.size()) {
+                            if (nearest_poly_idx < polys.size() - 1)
+                                polys.erase(polys.begin() + nearest_poly_idx + 1, polys.end());
+                            if (nearest_poly_idx > 0 )
+                                polys.erase(polys.begin(), polys.begin() + nearest_poly_idx);
+                            assert(polys.size() == 1);
+                            assert(nearest_pt_idx < polys.front().points.size());
+                            if (nearest_pt_idx < polys.front().points.size() &&
+                                !polys.front().points[nearest_pt_idx].coincides_with_epsilon(nearest_pt)) {
+                                polys.front().points.insert(polys.front().points.begin() + nearest_pt_idx, nearest_pt);
+                            }
+                            assert(polys.front().closest_point(pt_inside) != nullptr &&
+                                   std::abs(polys.front().closest_point(pt_inside)->distance_to_square(pt_inside) -
+                                            best_dist_sqr) < SCALED_EPSILON);
+                        } else {
+                            polys = { original_polygon };
+                        }
                     }
 
                     // This offset may put point so close that they coincides.
@@ -5114,9 +5147,15 @@ std::string GCode::extrude_multi_path(const ExtrusionMultiPath &multipath, const
         //reverse to get a shorter point (hopefully there is still no feature that choose a point that need no perimeter crossing before).
         // extrude along the  reversedpath
         for (size_t idx_path = multipath.paths.size() - 1; idx_path < multipath.paths.size(); --idx_path) {
-            assert(multipath.paths[idx_path].can_reverse());
-            //extrude_path will reverse the path by itself, no need to copy it do to it here.
-            gcode += extrude_path(multipath.paths[idx_path], description, speed);
+            //it's possible to have un-reverseable paths into a reversable multipath: this means that only the whole thing can be reversed, and not individual apths.
+            if (multipath.paths[idx_path].can_reverse()) {
+                // extrude_path will reverse the path by itself, no need to copy it do to it here.
+                gcode += extrude_path(multipath.paths[idx_path], description, speed);
+            } else {
+                ExtrusionPath path = multipath.paths[idx_path];
+                path.reverse();
+                gcode += extrude_path(path, description, speed);
+            }
         }
     } else {
         // extrude along the path
@@ -6373,7 +6412,7 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
     bool needs_retraction = this->needs_retraction(travel, role);
     if (m_config.only_retract_when_crossing_perimeters &&
         !(m_config.enforce_retract_first_layer && m_layer_index == 0))
-        needs_retraction = needs_retraction && this->can_cross_perimeter(travel, false);
+        needs_retraction = needs_retraction && this->can_cross_perimeter(travel, true);
 
     // Re-allow avoid_crossing_perimeters for the next travel moves
     m_avoid_crossing_perimeters.reset_once_modifiers();

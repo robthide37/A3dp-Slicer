@@ -939,7 +939,7 @@ void Layer::make_ironing()
         fill.init_spacing(ironing_params.line_spacing, fill_params);
         fill.can_angle_cross = region_config.fill_angle_cross.value;
         fill.angle = float(ironing_params.angle);
-        fill.link_max_length = (coord_t)scale_(3. * fill.get_spacing());
+        fill.link_max_length = scale_t(3. * fill.get_spacing());
         double extrusion_height = ironing_params.height * fill.get_spacing() / nozzle_dmr;
         //FIXME FLOW decide if it's good
         // note: don't use filament_max_overlap, as it's a top surface

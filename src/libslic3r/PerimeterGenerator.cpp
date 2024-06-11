@@ -3889,7 +3889,7 @@ PerimeterGenerator::_get_nearest_point(const PerimeterGeneratorLoops &children, 
             //don't check the last point, as it's used to go outter, can't use it to go inner.
             for (size_t idx_point = 1; idx_point < myPolylines.paths[idx_poly].polyline.size()-1; idx_point++) {
                 const Point &p = myPolylines.paths[idx_poly].polyline.get_points()[idx_point];
-                Point nearest_p = child.polygon.point_projection(p);
+                Point nearest_p = child.polygon.point_projection(p).first;
                 coord_t dist = (coord_t)nearest_p.distance_to(p);
                 //if no projection, go to next
                 if (dist == 0) continue;
@@ -3917,7 +3917,7 @@ PerimeterGenerator::_get_nearest_point(const PerimeterGeneratorLoops &children, 
             //lastly, try to check from one of his points
             for (size_t idx_point = 0; idx_point < child.polygon.size(); idx_point++) {
                 const Point &p = child.polygon.points[idx_point];
-                Point nearest_p = myPolylines.paths[idx_poly].polyline.point_projection(p);
+                Point nearest_p = myPolylines.paths[idx_poly].polyline.point_projection(p).first;
                 coord_t dist = (coord_t)nearest_p.distance_to(p);
                 //if no projection, go to next
                 if (dist == 0) continue;

@@ -873,7 +873,7 @@ bool GUI_App::init_opengl()
             if (boost::contains(gpu_vendor, "Apple") || boost::contains(gpu_vendor, "APPLE")) {
                 assert(false); // apple gpu are only in _M_ARM64
             }
-        } catch (std::exception &ex) {}
+        } catch (std::exception &) {}
 #endif
         app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
     }
@@ -2652,7 +2652,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                         associate_gcode_files();
                 }
 #endif // _WIN32
-              } catch (std::exception &e) {}
+              } catch (std::exception &) {}
             }
             if (app_layout_changed) {
                 // hide full main_sizer for mainFrame

@@ -82,7 +82,7 @@ void FillHoneycomb::_fill_surface_single(
     if (params.connection == icNotConnected || all_polylines.size() <= 1)
         append(polylines_out, chain_polylines(std::move(all_polylines)));
     else
-        connect_infill(std::move(all_polylines), expolygon, polylines_out, this->get_spacing(), params);
+        connect_infill(std::move(all_polylines), expolygon, polylines_out, scale_t(this->get_spacing()), params);
 }
 
 } // namespace Slic3r
