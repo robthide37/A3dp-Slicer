@@ -2791,7 +2791,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("gap_fill_flow_match_perimeter", coPercent);
     def->label = L("Cap with perimeter flow");
     def->full_label = L("Gapfill: cap speed with perimeter flow");
-    def->category = OptionCategory::output;
+    def->category = OptionCategory::speed;
     def->tooltip = L("A percentage of the perimeter flow (mm3/s) is used as a limit for the gap fill flow, and so the gapfill may reduce its speed when the gap fill extrusions became too thick."
                 " This allow you to use a high gapfill speed, to print the thin gapfill quickly and reduce the difference in flow rate for the gapfill."
                 "\nSet zero to deactivate.");
@@ -3929,6 +3929,18 @@ void PrintConfigDef::init_fff_params()
     def->height = 13;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionString{ "" });
+
+    def = this->add("object_gcode", coString);
+    def->label = L("Per object G-code");
+    def->category = OptionCategory::advanced;
+    def->tooltip = L("This code is inserted each layer, when the object began to print (just after the label if any)."
+                     " It's main advantage is when you use it as a object modifer (right click on a model)."
+                     "\nSpecial variables: 'layer_num','layer_z'");
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 10;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("only_one_perimeter_first_layer", coBool);
     def->label = L("Only one perimeter on First layer");
@@ -8366,6 +8378,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "min_width_top_surface",
 "model_precision",
 "no_perimeter_unsupported_algo",
+"object_gcode",
 "only_one_perimeter_top_other_algo",
 "only_one_perimeter_top",
 "only_one_perimeter_first_layer",

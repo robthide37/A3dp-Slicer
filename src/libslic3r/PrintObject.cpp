@@ -983,6 +983,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "external_perimeters_vase"
                 || opt_key == "gap_fill_speed"
                 || opt_key == "infill_speed"
+                || opt_key == "object_gcode"
                 || opt_key == "overhangs_speed"
                 || opt_key == "perimeter_speed"
                 || opt_key == "seam_position"
