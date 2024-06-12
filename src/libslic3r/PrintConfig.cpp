@@ -4539,6 +4539,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def = this->add("region_gcode", coString);
+    def->label = L("Per region G-code");
+    def->category = OptionCategory::output;
+    def->tooltip = L("This code is inserted when a region is starting to print something (infill, perimeter, ironing)."
+                     " It's main advantage is when you use it as a object modifer(right click on a model to add it there)"
+                     "\nSpecial variables: 'layer_num','layer_z'");
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 10;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionString(""));
+
     def = this->add("resolution", coFloat);
     def->label = L("Slice resolution");
     def->category = OptionCategory::slicing;
@@ -8414,6 +8426,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "printhost_client_cert_password",
 "raft_layer_height",
 "raft_interface_layer_height",
+"region_gcode",
 "remaining_times_type",
 "resolution_internal",
 "retract_lift_first_layer",

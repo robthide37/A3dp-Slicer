@@ -986,6 +986,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "object_gcode"
                 || opt_key == "overhangs_speed"
                 || opt_key == "perimeter_speed"
+                || opt_key == "region_gcode"
                 || opt_key == "seam_position"
                 || opt_key == "seam_preferred_direction"
                 || opt_key == "seam_preferred_direction_jitter"

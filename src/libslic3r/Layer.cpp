@@ -218,6 +218,7 @@ void Layer::make_perimeters()
                 && config.thin_walls_speed          == other_config.thin_walls_speed
                 && config.infill_overlap            == other_config.infill_overlap
                 && config.perimeter_loop            == other_config.perimeter_loop
+                && config.region_gcode              == other_config.region_gcode
 
                 && config.fuzzy_skin                == other_config.fuzzy_skin
                 && config.fuzzy_skin_thickness      == other_config.fuzzy_skin_thickness

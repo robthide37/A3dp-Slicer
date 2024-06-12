@@ -80,6 +80,7 @@ struct SurfaceFillParams : FillParams
             RETURN_COMPARE_NON_EQUAL(config->bridge_speed_internal);
             RETURN_COMPARE_NON_EQUAL(config->gap_fill_speed);
             RETURN_COMPARE_NON_EQUAL(config->print_extrusion_multiplier);
+            RETURN_COMPARE_NON_EQUAL(config->region_gcode.value);
         }
         if (config == nullptr || rhs.config == nullptr || max_sparse_infill_spacing == 0)
             RETURN_COMPARE_NON_EQUAL(flow.width());

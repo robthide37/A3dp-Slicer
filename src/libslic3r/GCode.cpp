@@ -5375,6 +5375,41 @@ std::string GCode::extrude_path_3D(const ExtrusionPath3D &path, const std::strin
     return gcode;
 }
 
+// Apply region-specific settings
+void GCode::apply_region_config(std::string &gcode) {
+    // modify our fullprintconfig with it. (works as all items avaialable in the regionconfig are present in this config, ie: it write everything region-defined)
+    m_config.apply(m_region->config());
+    // pass our region config to the gcode writer
+    m_writer.apply_print_region_config(m_region->config());
+    // perimeter-only (but won't break anything if done also in infill & ironing): pass needed settings to seam placer.
+    m_seam_placer.external_perimeters_first = m_region->config().external_perimeters_first.value;
+    // temperature override from region
+    if (m_config.print_temperature > 0) {
+        if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0) {
+            gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
+        } else {
+            gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
+        }
+    } else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0) {
+        gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false,
+                                          m_writer.tool()->id());
+    } else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) { // don't set it if disabled
+        gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false,
+                                          m_writer.tool()->id());
+    }
+    // apply region_gcode
+    if (!m_region->config().region_gcode.value.empty()) {
+        DynamicConfig config;
+        config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+        config.set_key_value("layer_z", new ConfigOptionFloat(m_layer == nullptr ? m_last_height : m_layer->print_z));
+        m_gcode_label_objects_start += this->placeholder_parser_process("region_gcode",
+                                                                        m_region->config().region_gcode.value,
+                                                                        m_writer.tool()->id(), &config) +
+                                       "\n";
+    }
+    
+}
+
 // Extrude perimeters: Decide where to put seams (hide or align seams).
 std::string GCode::extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region)
 {
@@ -5384,20 +5419,7 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
         if (! region.perimeters.empty()) {
             m_region = &print.get_print_region(&region - &by_region.front());
             // Apply region-specific settings
-            m_config.apply(m_region->config());
-            m_writer.apply_print_region_config(m_region->config());
-            m_seam_placer.external_perimeters_first = m_region->config().external_perimeters_first.value;
-            if (m_config.print_temperature > 0)
-                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
-                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
-                else
-                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
-            else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
-                gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
-            else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) { // don't set it if disabled
-                gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false,
-                                                  m_writer.tool()->id());
-            }
+            apply_region_config(gcode);
             ExtrusionEntitiesPtr extrusions{region.perimeters};
             chain_and_reorder_extrusion_entities(extrusions, &m_last_pos);
             for (const ExtrusionEntity *ee : extrusions) {
@@ -5416,17 +5438,7 @@ std::string GCode::extrude_infill(const Print& print, const std::vector<ObjectBy
         m_region = &print.get_print_region(&region - &by_region.front());
         if (!region.infills.empty() &&
             (m_region->config().infill_first == is_infill_first)) {
-            m_config.apply(m_region->config());
-            m_writer.apply_print_region_config(m_region->config());
-            if (m_config.print_temperature > 0)
-                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
-                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
-                else
-                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
-            else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
-                    gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
-            else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
-                gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
+            apply_region_config(gcode);
             ExtrusionEntitiesPtr extrusions{ region.infills };
             chain_and_reorder_extrusion_entities(extrusions, &m_last_pos);
             for (const ExtrusionEntity* fill : extrusions) {
@@ -5445,17 +5457,7 @@ std::string GCode::extrude_ironing(const Print& print, const std::vector<ObjectB
     for (const ObjectByExtruder::Island::Region& region : by_region) {
         if (!region.ironings.empty()) {
             m_region = &print.get_print_region(&region - &by_region.front());
-            m_config.apply(m_region->config());
-            m_writer.apply_print_region_config(m_region->config());
-            if (m_config.print_temperature > 0)
-                if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.print_first_layer_temperature.value > 0)
-                    gcode += m_writer.set_temperature(m_config.print_first_layer_temperature.value, false, m_writer.tool()->id());
-                else
-                    gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
-            else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
-                    gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
-            else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0)
-                gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
+            apply_region_config(gcode);
             ExtrusionEntitiesPtr extrusions{ region.ironings };
             chain_and_reorder_extrusion_entities(extrusions, &m_last_pos);
             for (const ExtrusionEntity* fill : extrusions) {
