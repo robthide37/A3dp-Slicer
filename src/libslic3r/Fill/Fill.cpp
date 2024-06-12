@@ -542,6 +542,12 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->can_angle_cross   = surface_fill.params.can_angle_cross;
         f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
 
+        // add object angle if needed
+        double z_object_angle = this->m_object->trafo().rotation().eulerAngles(0,1,2).z();
+        if (this->object()->config().fill_angle_follow_model.value) {
+            f->angle += z_object_angle;
+        }
+
         if (surface_fill.params.pattern == ipLightning)
             dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
 

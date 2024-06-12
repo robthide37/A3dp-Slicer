@@ -463,7 +463,6 @@ namespace Slic3r {
     {
         // prerequisites
         this->prepare_infill();
-
         m_print->set_status(35, L("Infilling layers"));
         m_print->set_status(0, L("Infilling layer %s / %s"), { std::to_string(0), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
         if (this->set_started(posInfill)) {
@@ -882,6 +881,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "fill_aligned_z"
                 || opt_key == "fill_angle"
                 || opt_key == "fill_angle_cross"
+                || opt_key == "fill_angle_follow_model"
                 || opt_key == "fill_angle_increment"
                 || opt_key == "fill_angle_template"
                 || opt_key == "fill_top_flow_ratio"

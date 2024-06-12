@@ -2336,6 +2336,13 @@ void PrintConfigDef::init_fff_params()
     def->mode       = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(true));
 
+    def             = this->add("fill_angle_follow_model", coBool);
+    def->label      = L("Rotate with object");
+    def->category   = OptionCategory::infill;
+    def->tooltip    = L("If your object has a z-rotation, then the infill will also be rotated by this value.");
+    def->mode       = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("fill_angle_increment", coFloat);
     def->label = L("Fill");
     def->full_label = L("Fill angle increment");
@@ -8295,6 +8302,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "fill_aligned_z",
 "fill_angle_increment",
 "fill_angle_cross",
+"fill_angle_follow_model",
 "fill_angle_template",
 "fill_smooth_distribution",
 "fill_smooth_width",

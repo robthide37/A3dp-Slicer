@@ -517,6 +517,7 @@ static std::vector<std::string> s_Preset_print_options {
         "fill_aligned_z",
         "fill_angle",
         "fill_angle_cross",
+        "fill_angle_follow_model",
         "fill_angle_increment",
         "fill_angle_template",
         "bridge_angle",

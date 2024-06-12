@@ -214,6 +214,7 @@ group:sidetext_width$5:Infill angle
 	line:Modifiers
 		setting:label_width$6:width$5:label$increment:fill_angle_increment
 		setting:width$5:fill_angle_cross
+		setting:width$5:fill_angle_follow_model
 	vector_line:fill_angle_template
 #	setting:fill_angle_template
 group:sidetext_width$5:Advanced
