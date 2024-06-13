@@ -219,7 +219,7 @@ group:sidetext_width$5:Infill angle
 #	setting:fill_angle_template
 group:sidetext_width$5:Advanced
 	setting:solid_infill_every_layers
-	line:Solid infill is area below
+	line:Solid infill if area below
         setting:label$From region:solid_infill_below_area
         setting:label$From the whole layer:solid_infill_below_layer_area
 	end_line

@@ -3073,7 +3073,9 @@ LayerResult GCode::process_layer(
         assert(l.layer() == nullptr || layer_id == l.layer()->id());
     }
     assert(layer_id < layer_count());
+    assert(object_layer != nullptr || support_layer != nullptr);
     const Layer         &layer         = (object_layer != nullptr) ? *object_layer : *support_layer;
+    assert(layer_id == layer.id());
     LayerResult   result { {}, layer.id(), false, last_layer, false};
     if (layer_tools.extruders.empty())
         // Nothing to extrude.
