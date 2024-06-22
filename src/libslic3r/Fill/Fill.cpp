@@ -86,7 +86,9 @@ struct SurfaceFillParams : FillParams
             RETURN_COMPARE_NON_EQUAL(config->gap_fill_acceleration);
             RETURN_COMPARE_NON_EQUAL(config->gap_fill_speed);
             RETURN_COMPARE_NON_EQUAL(config->print_extrusion_multiplier);
-            RETURN_COMPARE_NON_EQUAL(config->region_gcode.value);
+            RETURN_COMPARE_NON_EQUAL(config->region_gcode.value)
+            RETURN_COMPARE_NON_EQUAL(config->small_area_infill_flow_compensation.value)
+            RETURN_COMPARE_NON_EQUAL(config->small_area_infill_flow_compensation_model.value);
         }
         if (config == nullptr || rhs.config == nullptr || max_sparse_infill_spacing == 0)
             RETURN_COMPARE_NON_EQUAL(flow.width());
@@ -115,6 +117,8 @@ struct SurfaceFillParams : FillParams
             || config->gap_fill_speed != rhs.config->gap_fill_speed
             || config->print_extrusion_multiplier != rhs.config->print_extrusion_multiplier
             || config->region_gcode != rhs.config->region_gcode
+            || config->small_area_infill_flow_compensation != rhs.config->small_area_infill_flow_compensation
+            || config->small_area_infill_flow_compensation_model != rhs.config->small_area_infill_flow_compensation_model
             ))
             return false;
         // then check params

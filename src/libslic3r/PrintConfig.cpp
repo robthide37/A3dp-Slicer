@@ -2510,6 +2510,42 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->set_default_value(new ConfigOptionPercent(10));
 
+    def = this->add("small_area_infill_flow_compensation", coBool);
+    def->label = L("Enable small area flow compensation");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Enable flow compensation for small infill areas."
+                    "\nFirst layer is always disabled, to not compromise adhesion.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("small_area_infill_flow_compensation_model", coGraph);
+    def->label = L("Flow Compensation Model");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Flow Compensation Model, used to adjust the flow for small solid infill "
+                     "lines. The model is a graph of flow correction factors (between 0 and 1) per extrusion length (in mm)."
+                     "\nThe first point length has to be 0mm. the last point need to have a flow correction of 1.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionGraph(GraphData(0,10, GraphData::GraphType::SPLINE,
+        {{0,0},{0.2,0.44},{0.4,0.61},{0.6,0.7},{0.8,0.76},{1.5,0.86},{2,0.89},{3,0.92},{5,0.95},{10,1}}
+    )));
+    def->graph_settings = std::make_shared<GraphSettings>();
+    def->graph_settings->title       = L("Flow Compensation Model");
+    def->graph_settings->description = def->tooltip;
+    def->graph_settings->x_label     = L("Length of an extrusion (mm)");
+    def->graph_settings->y_label     = L("Flow correction (ratio between 0 and 1)");
+    def->graph_settings->null_label  = L("No values");
+    def->graph_settings->label_min_x = "";
+    def->graph_settings->label_max_x = L("Maximum length");
+    def->graph_settings->label_min_y = L("Minimum ratio");
+    def->graph_settings->label_max_y = L("Maximum ratio");
+    def->graph_settings->min_x       = 0;
+    def->graph_settings->max_x       = 100;
+    def->graph_settings->step_x      = 0.1;
+    def->graph_settings->min_y       = 0;
+    def->graph_settings->max_y       = 1;
+    def->graph_settings->step_y      = 0.01;
+    def->graph_settings->allowed_types = {GraphData::GraphType::LINEAR, GraphData::GraphType::SPLINE, GraphData::GraphType::SQUARE};
+
     def = this->add("first_layer_acceleration", coFloatOrPercent);
     def->label = L("Max");
     def->full_label = L("First layer acceleration");
@@ -8467,6 +8503,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "skirt_brim",
 "skirt_distance_from_brim",
 "skirt_extrusion_width",
+"small_area_infill_flow_compensation",
+"small_area_infill_flow_compensation_model",
 "small_perimeter_max_length",
 "small_perimeter_min_length",
 "solid_fill_pattern",

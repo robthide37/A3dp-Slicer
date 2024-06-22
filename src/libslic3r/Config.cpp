@@ -495,6 +495,25 @@ bool GraphData::deserialize(const std::string &str)
         this->begin_idx = 0;
         this->end_idx = this->graph_points.size();
         this->type = GraphType::SPLINE;
+    } else if (size_t pos = str.find(','); pos != std::string::npos) {
+        //maybe a coStrings with 0,0 values inside, like a coPoints but worse (used by orca's small_area_infill_flow_compensation_model)
+        std::vector<std::string> args;
+        boost::split(args, str, boost::is_any_of(","));
+        if (args.size() % 2 == 0) {
+            for (size_t i = 0; i < args.size(); i += 2) {
+                this->graph_points.emplace_back();
+                Vec2d &data_point = this->graph_points.back();
+                args[i].erase(std::remove(args[i].begin(), args[i].end(), '\n'), args[i].end());
+                args[i].erase(std::remove(args[i].begin(), args[i].end(), '"'), args[i].end());
+                data_point.x() = std::stod(args[i]);
+                args[i+1].erase(std::remove(args[i+1].begin(), args[i+1].end(), '\n'), args[i+1].end());
+                args[i+1].erase(std::remove(args[i+1].begin(), args[i+1].end(), '"'), args[i+1].end());
+                data_point.y() = std::stod(args[i+1]);
+            }
+        }
+        this->begin_idx = 0;
+        this->end_idx = this->graph_points.size();
+        this->type = GraphType::SPLINE;
     } else {
         std::istringstream iss(str);
         std::string              item;

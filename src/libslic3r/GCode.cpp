@@ -5595,16 +5595,41 @@ std::vector<double> cut_corner_cache = {
     0.252510726678311,0.262777267777188,0.27352986689699,0.284799648665007,0.296620441746888,0.309029079319231,0.322065740515038,0.335774339512048,0.350202970204428,0.365404415947691,
     0.381436735764648,0.398363940736199,0.416256777189962,0.435193636891737,0.455261618934834 };
 
-
-void GCode::_extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment) {
+void GCode::_extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment,
+                          ExtrusionRole role) {
     if (line.a.coincides_with_epsilon(line.b)) {
         assert(false); // todo: investigate if it happens (it happens in perimeters)
         return;
     }
+    std::string comment_copy = comment;
+    double unscaled_line_length = unscaled(line.length());
+    double extrusion_value = e_per_mm * unscaled_line_length;
+    // small_area_infill_flow_compensation
+    // this is only done in _extrude_line and not in _extrude_line_cut_corner because _extrude_line_cut_corner doesn't apply to solid infill, but only for external perimeters.
+    if (!this->on_first_layer() && (role == ExtrusionRole::erSolidInfill || role == ExtrusionRole::erTopSolidInfill) &&
+        m_config.small_area_infill_flow_compensation.value &&
+        m_config.small_area_infill_flow_compensation_model.value.data_size() > 1) {
+        GraphData graph = m_config.small_area_infill_flow_compensation_model.value;
+        assert(graph.begin_idx >= 0 && graph.begin_idx + 1 < graph.end_idx && graph.end_idx <= graph.graph_points.size());
+        // ensure it start at length = 0, and ensure it ends with a compensation of 1.
+        graph.graph_points[graph.begin_idx].x() = 0;
+        graph.graph_points[graph.end_idx - 1].y() = 1;
+        //interpolate and verify
+        double new_extrusion_value = extrusion_value * graph.interpolate(unscaled_line_length);
+        assert(new_extrusion_value > 0.0);
+        if (new_extrusion_value != extrusion_value) {
+            extrusion_value = (new_extrusion_value > 0.0) ? new_extrusion_value : 0.0;
+            if (m_config.gcode_comments) {
+                comment_copy += Slic3r::format(_(L(" | Old Flow Value: %0.5f Length: %0.5f")), extrusion_value,
+                                               unscaled_line_length);
+            }
+        }
+    }
+    // end small_area_infill_flow_compensation
     gcode_str += m_writer.extrude_to_xy(
         this->point_to_gcode(line.b),
-        e_per_mm * unscaled(line.length()),
-        comment);
+        extrusion_value,
+        comment_copy);
 }
 
 void GCode::_extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment, Point& last_pos, const double path_width) {
@@ -5745,7 +5770,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string &descri
             for (const Line& line : path.polyline.lines()) {
                 if (path.role() != erExternalPerimeter || config().external_perimeter_cut_corners.value == 0) {
                     // normal & legacy pathcode
-                    _extrude_line(gcode, line, e_per_mm, comment);
+                    _extrude_line(gcode, line, e_per_mm, comment, path.role());
                 } else {
                     _extrude_line_cut_corner(gcode, line, e_per_mm, comment, last_pos, path.width);
                 }
@@ -5763,7 +5788,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string &descri
                         const Line line = Line(path.polyline.get_points()[point_index - 1], path.polyline.get_points()[point_index]);
                         if (path.role() != erExternalPerimeter || config().external_perimeter_cut_corners.value == 0) {
                             // normal & legacy pathcode
-                            _extrude_line(gcode, line, e_per_mm, comment);
+                            _extrude_line(gcode, line, e_per_mm, comment, path.role());
                         } else {
                             _extrude_line_cut_corner(gcode, line, e_per_mm, comment, last_pos, path.width);
                         }

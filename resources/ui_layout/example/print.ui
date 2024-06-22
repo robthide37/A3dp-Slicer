@@ -214,6 +214,10 @@ group:Advanced Infill options
 		setting:label_width$8:width$5:fill_smooth_distribution
 		setting:label_width$26:label$Spacing between ironing lines:width$5:sidetext_width$7:fill_smooth_width
 	end_line
+	line:Small Area Infill Flow Compensation (beta)
+		setting:label$_:sidetext_width$0:small_area_infill_flow_compensation
+		setting:label_:small_area_infill_flow_compensation_model
+	end_line
 group:title_width$19:Ironing post-process (This will go on top of infills and perimeters)
 	line:Enable ironing post-process
 		setting:label$_:sidetext_width$0:ironing

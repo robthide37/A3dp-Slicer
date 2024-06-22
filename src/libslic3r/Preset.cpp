@@ -679,6 +679,7 @@ static std::vector<std::string> s_Preset_print_options {
         "bridge_overlap_min",
         "first_layer_flow_ratio",
         "clip_multipart_objects", "enforce_full_fill_volume", "external_infill_margin", "bridged_infill_margin",
+        "small_area_infill_flow_compensation", "small_area_infill_flow_compensation_model",
         // compensation
         "first_layer_size_compensation",
         "first_layer_size_compensation_layers",
@@ -737,7 +738,7 @@ static std::vector<std::string> s_Preset_print_options {
         "milling_speed",
         //Arachne
         "perimeter_generator", "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
-        "wall_distribution_count", "min_feature_size", "min_bead_width"
+        "wall_distribution_count", "min_feature_size", "min_bead_width",
 };
 
 static std::vector<std::string> s_Preset_filament_options {
