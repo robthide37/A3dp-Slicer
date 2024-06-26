@@ -5,6 +5,7 @@
 
 #include "BitmapComboBox.hpp"
 #include "format.hpp"
+#include "GraphDialog.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "I18N.hpp"
@@ -2095,6 +2096,119 @@ void ColourPicker::sys_color_changed()
 	if (wxWindow* win = this->getWindow())
 		if (wxColourPickerCtrl* picker = dynamic_cast<wxColourPickerCtrl*>(win))
 			wxGetApp().UpdateDarkUI(picker->GetPickerCtrl(), true);
+#endif
+}
+
+
+void GraphButton::BUILD()
+{
+    auto size = wxSize(def_width() * m_em_unit, wxDefaultCoord);
+    if (m_opt.height >= 0) size.SetHeight(m_opt.height*m_em_unit);
+    if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
+
+    assert(m_opt.type == coGraph || m_opt.type == coGraphs);
+    if (m_opt.type == coGraphs)
+        current_value = m_opt.get_default_value<ConfigOptionGraphs>()->get_at(m_opt_idx);
+    if (m_opt.type == coGraph)
+        current_value = m_opt.get_default_value<ConfigOptionGraph>()->value;
+
+    wxButton* bt_widget = new wxButton(m_parent, wxID_ANY, _L("Edit graph"), wxDefaultPosition, size);
+    if (parent_is_custom_ctrl && m_opt.height < 0)
+        opt_height = (double)bt_widget->GetSize().GetHeight() / m_em_unit;
+    bt_widget->SetFont(Slic3r::GUI::wxGetApp().normal_font());
+    if (!wxOSX) bt_widget->SetBackgroundStyle(wxBG_STYLE_PAINT);
+
+    wxGetApp().UpdateDarkUI(bt_widget);
+
+    // recast as a wxWindow to fit the calling convention
+    window = dynamic_cast<wxWindow*>(bt_widget);
+
+    //window->Bind(wxEVT_COLOURPICKER_CHANGED, ([this](wxCommandEvent e) { on_change_field(); }), window->GetId());
+    
+    bt_widget->Bind(wxEVT_BUTTON, ([this](wxCommandEvent &e) {
+        GraphSettings settings;
+        assert(m_opt.graph_settings);
+        if (m_opt.graph_settings) {
+            settings = *m_opt.graph_settings;
+        } else {
+            settings.title       = m_opt.full_label.empty() ? m_opt.label : m_opt.full_label;
+            settings.description = m_opt.tooltip;
+            settings.x_label     = "";
+            settings.y_label     = "";
+            settings.null_label  = L("No values");
+            settings.label_min_x = L("Minimum x");
+            settings.label_max_x = L("Maximum x");
+            settings.label_min_y = L("Minimum y");
+            settings.label_max_y = L("Maximum y");
+            settings.min_x       = 0;
+            settings.max_x       = 1000;
+            settings.step_x      = 0.1;
+            settings.min_y       = 0;
+            settings.max_y       = 1000;
+            settings.step_y      = 0.1;
+            settings.allowed_types = {GraphData::GraphType::LINEAR, GraphData::GraphType::SPLINE, GraphData::GraphType::SQUARE};
+        }
+        if (this->m_opt.type == coGraphs)
+            settings.reset_vals = m_opt.get_default_value<ConfigOptionGraphs>()->get_at(m_opt_idx);
+        if (this->m_opt.type == coGraph)
+            settings.reset_vals = m_opt.get_default_value<ConfigOptionGraph>()->value;
+        GraphDialog dlg(this->window, current_value, settings);
+        if (dlg.ShowModal() == wxID_OK) {
+            m_value = current_value = dlg.get_data();
+            this->on_change_field();
+        }
+    }));
+    this->set_tooltip(current_value.serialize());
+}
+
+void GraphButton::set_any_value(const boost::any &value, bool change_event)
+{
+    // can be ConfigOptionDef::GUIType::color
+    m_disable_change_event = !change_event;
+    if (this->m_opt.type == coGraphs && m_opt_idx >= 0) {
+        assert(false); // shouldn't happen. or need to be tested
+        std::vector<GraphData> graphs = boost::any_cast<std::vector<GraphData>>(value);
+        assert(!graphs.empty());
+        if (!graphs.empty()) {
+            assert(m_opt_idx <graphs.size());
+            m_value = current_value = graphs[m_opt_idx <graphs.size() ? m_opt_idx : 0];
+        }
+    } else if (this->m_opt.type == coGraph || this->m_opt.type == coGraphs) {
+        m_value = current_value = boost::any_cast<GraphData>(value);
+    }
+    m_disable_change_event = false;
+}
+
+boost::any& GraphButton::get_value()
+{
+    m_value = current_value;
+    return m_value;
+}
+
+void GraphButton::msw_rescale()
+{
+    Field::msw_rescale();
+
+    wxButton* field = dynamic_cast<wxButton*>(window);
+    auto size = wxSize(def_width() * m_em_unit, wxDefaultCoord);
+    if (m_opt.height >= 0)
+        size.SetHeight(m_opt.height * m_em_unit);
+    else if (parent_is_custom_ctrl && opt_height > 0)
+        size.SetHeight(lround(opt_height * m_em_unit));
+    if (m_opt.width >= 0) size.SetWidth(m_opt.width * m_em_unit);
+    if (parent_is_custom_ctrl)
+        field->SetSize(size);
+    else
+        field->SetMinSize(size);
+
+}
+
+void GraphButton::sys_color_changed()
+{
+#ifdef _WIN32
+    if (wxWindow* win = this->getWindow())
+        if (wxButton* bt = dynamic_cast<wxButton*>(win))
+            wxGetApp().UpdateDarkUI(bt);
 #endif
 }
 

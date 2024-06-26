@@ -210,6 +210,17 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 			if (! new_val.empty())
 				new_val.erase(new_val.begin() + new_val.size() - 2, new_val.end());
 			break;
+        case coGraph:
+            if (auto opt = dynamic_cast<const ConfigOptionGraph *>(conf_substitution.new_value.get())) {
+                new_val = opt->value.serialize();
+            } else assert(false);
+            break;
+        case coGraphs:
+            if (auto opts = dynamic_cast<const ConfigOptionGraphs *>(conf_substitution.new_value.get())) {
+                for (const GraphData &graph : opts->get_values())
+                    new_val += graph.serialize() + ", ";
+            } else assert(false);
+            break;
 		default:
 			assert(false);
 		}

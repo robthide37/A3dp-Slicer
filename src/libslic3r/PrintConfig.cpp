@@ -1724,9 +1724,26 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("This string is edited by a Dialog and contains extusion multiplier for different speeds.");
     def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
-    def->set_default_value((new ConfigOptionGraphs( GraphData(0,10, 
+    def->set_default_value(new ConfigOptionGraphs( GraphData(0,10, GraphData::GraphType::LINEAR,
         {{10,1.},{20,1.},{30,1.},{40,1.},{60,1.},{80,1.},{120,1.},{160,1.},{240,1.},{320,1.},{480,1.},{640,1.},{960,1.},{1280,1.}}
-    )))->set_enabled(false));
+    )));
+    def->graph_settings = std::make_shared<GraphSettings>();
+    def->graph_settings->title       = L("Extrusion multiplier per extrusion speed");
+    def->graph_settings->description = L("Choose the extrusion multipler value for multiple speeds.\nYou can add/remove points with a right clic.");
+    def->graph_settings->x_label     = L("Print speed (mm/s)");
+    def->graph_settings->y_label     = L("Extrusion multiplier");
+    def->graph_settings->null_label  = L("No compensation");
+    def->graph_settings->label_min_x = L("Graph min speed");
+    def->graph_settings->label_max_x = L("Graph max speed");
+    def->graph_settings->label_min_y = L("Minimum flow");
+    def->graph_settings->label_max_y = L("Maximum flow");
+    def->graph_settings->min_x       = 10;
+    def->graph_settings->max_x       = 2000;
+    def->graph_settings->step_x      = 1.;
+    def->graph_settings->min_y       = 0.1;
+    def->graph_settings->max_y       = 2;
+    def->graph_settings->step_y      = 0.1;
+    def->graph_settings->allowed_types = {GraphData::GraphType::LINEAR, GraphData::GraphType::SQUARE};
 
     def = this->add("extruder_offset", coPoints);
     def->label = L("Extruder offset");

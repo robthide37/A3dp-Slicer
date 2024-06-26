@@ -7,26 +7,10 @@
 #include <wx/checkbox.h>
 #include <wx/msgdlg.h>
 
+#include "libslic3r/Config.hpp" // for GraphSettings
 #include "RammingChart.hpp"
 
 namespace Slic3r { namespace GUI {
-
-struct GraphSettings
-{
-    std::string title;
-    std::string description;
-    std::string y_label;
-    std::string x_label;
-    std::string null_label;
-    double min_x, max_x, step_x;
-    double min_y, max_y, step_y;
-    std::string label_min_x;
-    std::string label_max_x;
-    std::string label_min_y;
-    std::string label_max_y;
-    std::vector<GraphData::GraphType> allowed_types;
-    GraphData reset_vals;
-};
 
 class GraphPanel : public wxPanel
 {

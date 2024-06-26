@@ -99,6 +99,22 @@ namespace Slic3r {
         }
     };
 
+    struct GraphSettings
+    {
+        std::string title;
+        std::string description;
+        std::string y_label;
+        std::string x_label;
+        std::string null_label;
+        double min_x, max_x, step_x;
+        double min_y, max_y, step_y;
+        std::string label_min_x;
+        std::string label_max_x;
+        std::string label_min_y;
+        std::string label_max_y;
+        std::vector<GraphData::GraphType> allowed_types;
+        GraphData reset_vals;
+    };
 }
 
 namespace std {
@@ -2691,6 +2707,9 @@ public:
     // For enums (when type == coEnum). Maps enum_values to enums.
     // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
     const t_config_enum_values         *enum_keys_map   = nullptr;
+    
+    // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
+    std::shared_ptr<GraphSettings>      graph_settings;
 
     // for scripted gui widgets
     // true if it's not a real option but a simplified/composite one that use angelscript for interaction.
