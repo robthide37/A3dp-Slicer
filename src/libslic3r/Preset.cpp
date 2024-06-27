@@ -695,6 +695,7 @@ static std::vector<std::string> s_Preset_print_options {
         "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_bridging",
         "wipe_tower_speed", "wipe_tower_wipe_starting_speed",
         "wipe_tower_brim_width",
+        "priming_position",
         "mmu_segmented_region_max_width",
         "single_extruder_multi_material_priming", 
         "wipe_tower_no_sparse_layers",

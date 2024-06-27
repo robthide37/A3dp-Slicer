@@ -287,6 +287,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
             || opt_key == "first_layer_temperature"
             || opt_key == "gcode_flavor"
             || opt_key == "high_current_on_filament_swap"
+            || opt_key == "priming_position"
             || opt_key == "single_extruder_multi_material"
             || opt_key == "temperature"
             || opt_key == "wipe_tower"

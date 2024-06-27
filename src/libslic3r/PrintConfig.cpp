@@ -4447,6 +4447,17 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionStrings());
 
+    def = this->add("priming_position", coPoint);
+    def->label = L("Priming position");
+    def->full_label = L("Priming position");
+    def->tooltip = L("Coordinates of the left front corner of the priming patch."
+                     "\nIf set to 0,0 then the position is computed automatically.");
+    //TODO: enable/disable
+    def->category = OptionCategory::customgcode;
+    def->sidetext = L("mm");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionPoint(Vec2d(0,0)));
+
     def = this->add("printer_custom_variables", coString);
     def->label = L("Custom variables");
     def->full_label = L("Custom Printer variables");
@@ -5382,15 +5393,6 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("If enabled, all printing extruders will be primed at the front edge of the print bed at the start of the print.");
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionBool(true));
-
-    def = this->add("wipe_tower_no_sparse_layers", coBool);
-    def->label = L("No sparse layers (EXPERIMENTAL)");
-    def->category = OptionCategory::mmsetup;
-    def->tooltip = L("If enabled, the wipe tower will not be printed on layers with no toolchanges. "
-                     "On layers with a toolchange, extruder will travel downward to print the wipe tower. "
-                     "User is responsible for ensuring there is no collision with the print.");
-    def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(new ConfigOptionBool(false));
     
     def = this->add("solid_infill_acceleration", coFloatOrPercent);
     def->label = L("Solid ");
@@ -6431,6 +6433,14 @@ void PrintConfigDef::init_fff_params()
     def->aliases = { "wipe_tower_brim" }; // SuperSlicer 2.3 and before
     def->set_default_value(new ConfigOptionFloatOrPercent(2,false));
 
+    def = this->add("wipe_tower_no_sparse_layers", coBool);
+    def->label = L("No sparse layers (EXPERIMENTAL)");
+    def->category = OptionCategory::mmsetup;
+    def->tooltip = L("If enabled, the wipe tower will not be printed on layers with no toolchanges. "
+                     "On layers with a toolchange, extruder will travel downward to print the wipe tower. "
+                     "User is responsible for ensuring there is no collision with the print.");
+    def->mode = comAdvancedE | comPrusa;
+    def->set_default_value(new ConfigOptionBool(false));
     def = this->add("wipe_tower_x", coFloat);
     def->label = L("X");
     def->full_label = L("Wipe tower X");
@@ -6438,6 +6448,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(180.));
+
 
     def = this->add("wipe_tower_y", coFloat);
     def->label = L("Y");
@@ -8471,6 +8482,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "perimeter_reverse",
 "perimeter_round_corners",
 "perimeters_hole",
+"priming_position",
 "print_extrusion_multiplier",
 "print_first_layer_temperature",
 "print_custom_variables",

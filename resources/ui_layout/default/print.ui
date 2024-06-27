@@ -503,7 +503,10 @@ group:Wipe tower
 	setting:wipe_tower_rotation_angle
 	setting:wipe_tower_bridging
 	setting:wipe_tower_no_sparse_layers
-	setting:single_extruder_multi_material_priming
+	line:Priming
+        setting:single_extruder_multi_material_priming
+        setting:priming_position
+	end_line
 group:Advanced
 	setting:interface_shells
 	setting:mmu_segmented_region_max_width

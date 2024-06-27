@@ -1247,6 +1247,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInts,                 overhangs_fan_speed))
     ((ConfigOptionInts,                 perimeter_fan_speed))
     ((ConfigOptionStrings,              post_process))
+    ((ConfigOptionPoint,                priming_position))
     ((ConfigOptionString,               print_custom_variables))
     ((ConfigOptionString,               printer_custom_variables))
     ((ConfigOptionString,               printer_model))

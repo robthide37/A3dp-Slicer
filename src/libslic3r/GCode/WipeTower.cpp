@@ -776,16 +776,23 @@ std::vector<WipeTower::ToolChangeResult> WipeTower::prime(
     // therefore the homing position is shifted inside the bed by 0.2 in the firmware to [0.2, -2.0].
 //	box_coordinates cleaning_box(xy(0.5f, - 1.5f), m_wipe_tower_width, wipe_area);
 
-    float prime_section_width = std::min(0.9f * m_bed_width / tools.size(), 60.f);
+    float prime_section_width = std::min((m_bed_shape == CircularBed ? 0.45f : 0.9f) * m_bed_width / tools.size(), 60.f);
     box_coordinates cleaning_box(Vec2f(0.02f * m_bed_width, 0.01f + m_perimeter_width/2.f), prime_section_width, 100.f);
     if (m_bed_shape == CircularBed) {
         cleaning_box = box_coordinates(Vec2f(0.f, 0.f), prime_section_width, 100.f);
         float total_width_half = tools.size() * prime_section_width / 2.f;
-        cleaning_box.translate(-total_width_half, -std::sqrt(std::max(0.f, std::pow(m_bed_width/2, 2.f) - std::pow(1.05f * total_width_half, 2.f))));
+        if (m_config->priming_position.value == Vec2d(0,0)) {
+            cleaning_box.translate(-total_width_half, -std::sqrt(std::max(0.f, std::pow(m_bed_width/2, 2.f) - std::pow(1.05f * total_width_half, 2.f))));
+        } else {
+            cleaning_box.translate(m_config->priming_position.value.x(), m_config->priming_position.value.y());
+        }
+    } else {
+        if (m_config->priming_position.value == Vec2d(0,0)) {
+            cleaning_box.translate(m_bed_bottom_left);
+        } else {
+            cleaning_box.translate(m_config->priming_position.value.x(), m_config->priming_position.value.y());
+        }
     }
-    else
-        cleaning_box.translate(m_bed_bottom_left);
-
     std::vector<ToolChangeResult> results;
 
     // Iterate over all priming toolchanges and push respective ToolChangeResults into results vector.
