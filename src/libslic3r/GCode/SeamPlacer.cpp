@@ -784,8 +784,9 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
     throw_if_canceled();
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB tree: end";
+    bool has_seam_visibility = po->config().seam_visibility.value && po->config().seam_position.value == SeamPosition::spCost;
     result.mesh_samples_visibility = raycast_visibility(raycasting_tree, triangle_set, result.mesh_samples,
-            negative_volumes_start_index, !po->config().seam_visibility.value);
+            negative_volumes_start_index, !has_seam_visibility);
     throw_if_canceled();
 #ifdef DEBUG_FILES
     result.debug_export(triangle_set);
@@ -840,7 +841,10 @@ struct SeamComparator {
             travel_importance = (float)po.config().seam_travel_cost.get_abs_value(1.f);
             angle_importance = (float)po.config().seam_angle_cost.get_abs_value(1.f);
         }
-        visibility_importance = po.config().seam_visibility.value ? 1.f : 0.f;
+        visibility_importance = (po.config().seam_visibility.value &&
+                                 po.config().seam_position.value == SeamPosition::spCost) ?
+                                    1.f :
+                                    0.f;
     }
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
@@ -1754,7 +1758,7 @@ std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer,
 
                 double test_lambda_z = std::abs(layer.print_z - test_lambda_pos.z());
                 Point xy_lambda(scale_(test_lambda_pos.x()), scale_(test_lambda_pos.y()));
-                Point nearest = polygon.point_projection(xy_lambda);
+                Point nearest = polygon.point_projection(xy_lambda).first;
                 Vec3d polygon_3dpoint{ unscaled(nearest.x()), unscaled(nearest.y()), (double)layer.print_z };
                 double test_lambda_dist = (polygon_3dpoint - test_lambda_pos).norm();
                 double sphere_radius = po->model_object()->instance_bounding_box(0, true).size().x() / 2;

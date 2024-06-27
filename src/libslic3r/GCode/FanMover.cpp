@@ -4,6 +4,9 @@
 #include "LocalesUtils.hpp"
 
 #include <iomanip>
+
+#include <boost/log/trivial.hpp>
+
 /*
 #include <memory.h>
 #include <string.h>
@@ -13,8 +16,6 @@
 #include "../PrintConfig.hpp"
 #include "../Utils.hpp"
 #include "Print.hpp"
-
-#include <boost/log/trivial.hpp>
 */
 
 

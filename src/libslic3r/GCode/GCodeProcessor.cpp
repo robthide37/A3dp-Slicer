@@ -779,6 +779,7 @@ void GCodeProcessorResult::reset() {
 #endif // ENABLE_SPIRAL_VASE_LAYERS
     time = 0;
     computed_timestamp = std::time(0);
+    print_statistics.reset();
 }
 #else
 void GCodeProcessorResult::reset() {
@@ -797,6 +798,7 @@ void GCodeProcessorResult::reset() {
     spiral_vase_layers = std::vector<std::pair<float, std::pair<size_t, size_t>>>();
 #endif // ENABLE_SPIRAL_VASE_LAYERS
     computed_timestamp = std::time(0);
+    print_statistics.reset();
 }
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
@@ -1346,6 +1348,7 @@ void GCodeProcessor::reset()
     // 1st move must be a dummy move
     assert(m_result.moves.empty());
     m_result.moves.emplace_back();
+    m_has_reset = true;
 
     m_use_volumetric_e = false;
     m_last_default_color_id = 0;

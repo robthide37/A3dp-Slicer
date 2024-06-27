@@ -70,7 +70,7 @@ public:
     Points concave_points(double angle = PI) const;
     Points convex_points(double angle = PI) const;
     // Projection of a point onto the polygon.
-    Point point_projection(const Point &point) const;
+    std::pair<Point, size_t> point_projection(const Point &point) const override;
     std::vector<float> parameter_by_length() const;
     /// remove points that are (almost) on an existing line from previous & next point.
     /// return number of point removed

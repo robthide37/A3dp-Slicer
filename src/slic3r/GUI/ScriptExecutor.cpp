@@ -1,9 +1,11 @@
 #include "ScriptExecutor.hpp"
+
+#include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Print.hpp"
+
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "Tab.hpp"
-#include "libslic3r/PresetBundle.hpp"
-#include "libslic3r/Print.hpp"
 
 #include <string>
 
@@ -13,6 +15,11 @@
 #include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
 #include <angelscript/add_on/scriptstdstring/scriptstdstring.h>
 #include <angelscript/add_on/scriptmath/scriptmath.h>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/log/trivial.hpp>
 
 using namespace gw;
 
@@ -183,14 +190,14 @@ float as_get_float_idx(std::string& key, int idx)
     float val = 1;
     // if precent, divide by 100
     if (opt->type() == ConfigOptionType::coPercent || opt->type() == ConfigOptionType::coPercents) {
-        val *= 0.01;
+        val *= 0.01f;
     }
     if (opt->type() == ConfigOptionType::coFloatOrPercent && static_cast<const ConfigOptionFloatOrPercent*>(opt)->percent)
-        val *= 0.01;
+        val *= 0.01f;
     if (opt->is_vector()) {
         const ConfigOptionVectorBase* vector = static_cast<const ConfigOptionVectorBase*>(opt);
         if (opt->type() == ConfigOptionType::coFloatsOrPercents && static_cast<const ConfigOptionFloatsOrPercents*>(vector)->get_at(idx).percent)
-            val *= 0.01;
+            val *= 0.01f;
         val *= (float)vector->get_float(idx);
     } else {
         val *= (float)(opt->get_float());
@@ -1206,6 +1213,8 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     case coString:
     case coStrings:func_name = "void"; break;
     case coEnum: func_name = "int"; break;
+    default:
+        assert(false);
     }
     func_name += (" " + def.opt_key + "_get(");
     switch (def.type) {
@@ -1214,6 +1223,7 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     case coString:
     case coStrings:
     case coEnum: func_name += "string &out"; break;
+    default:;
     }
     func_name += ")";
     AngelScript::asIScriptFunction* func = m_script_module->GetFunctionByDecl(func_name.c_str());

@@ -33,12 +33,17 @@
 #include <wx/file.h>
 #include <wx/mimetype.h>
 #include <wx/odcombo.h>
+#include <wx/rawbmp.h>
 #include <wx/textctrl.h>
 #include <wx/wrapsizer.h>
 #include "wxExtensions.hpp"
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/log/trivial.hpp>
 #include <boost/nowide/fstream.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 
 #if ENABLE_SCROLLABLE
 static wxSize get_screen_size(wxWindow* window)

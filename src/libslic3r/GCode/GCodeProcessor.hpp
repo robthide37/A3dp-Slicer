@@ -69,7 +69,7 @@ namespace Slic3r {
         PrintEstimatedStatistics() { reset(); }
 
         void reset() {
-            for (auto m : modes) {
+            for (Mode &m : modes) {
                 m.reset();
             }
             volumes_per_color_change.clear();
@@ -606,6 +606,7 @@ namespace Slic3r {
         UsedFilaments m_used_filaments;
 
         GCodeProcessorResult m_result;
+        bool m_has_reset = false;
         static unsigned int s_result_id;
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -626,7 +627,10 @@ namespace Slic3r {
         void reset();
 
         const GCodeProcessorResult& get_result() const { return m_result; }
-        GCodeProcessorResult&& extract_result() { return std::move(m_result); }
+        GCodeProcessorResult&& extract_result() {
+            m_has_reset = false;
+            return std::move(m_result);
+        }
 
         // Load a G-code into a stand-alone G-code viewer.
         // throws CanceledException through print->throw_if_canceled() (sent by the caller as callback).

@@ -219,8 +219,9 @@ Points Polygon::convex_points(double angle) const
 }
 
 // Projection of a point onto the polygon.
-Point Polygon::point_projection(const Point &point) const
+std::pair<Point, size_t> Polygon::point_projection(const Point &point) const
 {
+    size_t pt_idx = size_t(-1);
     Point proj = point;
     double dmin = std::numeric_limits<double>::max();
     if (! this->points.empty()) {
@@ -231,11 +232,13 @@ Point Polygon::point_projection(const Point &point) const
             if (d < dmin) {
                 dmin = d;
                 proj = pt0;
+                pt_idx = i;
             }
             d = (point - pt1).cast<double>().norm();
             if (d < dmin) {
                 dmin = d;
                 proj = pt1;
+                pt_idx = (i + 1 == this->points.size()) ? 0 : i + 1;
             }
             Vec2d v1(coordf_t(pt1(0) - pt0(0)), coordf_t(pt1(1) - pt0(1)));
             coordf_t div = v1.squaredNorm();
@@ -248,12 +251,13 @@ Point Polygon::point_projection(const Point &point) const
                     if (d < dmin) {
                         dmin = d;
                         proj = foot;
+                        pt_idx = i;
                     }
                 }
             }
         }
     }
-    return proj;
+    return {proj, pt_idx};
 }
 
 std::vector<float> Polygon::parameter_by_length() const

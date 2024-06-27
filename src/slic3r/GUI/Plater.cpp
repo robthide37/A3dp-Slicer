@@ -342,7 +342,7 @@ public:
 
 void FreqChangedParams::msw_rescale()
 {
-    m_og->msw_rescale();
+    if(m_og) m_og->msw_rescale();
     for(auto& entry : m_og_other)
         entry.second->msw_rescale();
 
@@ -352,7 +352,7 @@ void FreqChangedParams::msw_rescale()
 
 void FreqChangedParams::sys_color_changed()
 {
-    m_og->sys_color_changed();
+    if(m_og) m_og->sys_color_changed();
     for (auto& entry : m_og_other)
         entry.second->sys_color_changed();
 
@@ -388,16 +388,17 @@ void FreqChangedParams::init()
 
     assert(tab_freq_fff == nullptr || dynamic_cast<TabFrequent *>(tab_freq_fff));
     if (tab_freq_fff && dynamic_cast<TabFrequent *>(tab_freq_fff)) {
-        // std::vector<PageShp> pages;
+        static_cast<TabFrequent *>(tab_freq_fff)->set_freq_parent(m_og->parent());
         tab_freq_fff->build();
-        // if(tab_freq_fff  != nullptr) pages =
-        // tab_freq_fff->create_pages(Preset::type_name(tab_freq_fff->type())+".ui", -1, tab_freq_fff->type());
         if (tab_freq_fff->get_page_count() > 0) {
+            assert(tab_freq_fff->get_page_count() == 1);
+            assert(tab_freq_fff->get_page(0));
+            assert(tab_freq_fff->get_page(0)->m_optgroups.size() == 1);
+            m_og = (tab_freq_fff->get_page(0)->m_optgroups[0]);
             m_og->set_config(config);
             m_og->hide_labels();
             m_og->m_on_change =
                 Tab::set_or_add(m_og->m_on_change, [tab_freq_fff, this](t_config_option_key opt_key, boost::any value)
-                                // m_og->m_on_change = [tab_print, this](t_config_option_key opt_key, boost::any value)
                                 {
                                     const Option *opt_def = this->m_og->get_option_def(opt_key);
                                     if (opt_def && !opt_def->opt.is_script) {
@@ -469,10 +470,9 @@ void FreqChangedParams::init()
                 line_for_purge->append_widget(wiping_dialog_btn);
             }
 
-            for (const Line &l : page->m_optgroups[0]->get_lines()) { m_og->append_line(l); }
-
             // current_group->m_on_change = on_change;
             m_og->activate();
+            assert(m_og->sizer);
             m_sizer->Add(m_og->sizer, 0, wxEXPAND);
         }
     }
@@ -482,12 +482,14 @@ void FreqChangedParams::init()
     Tab* tab_freq_sla = wxGetApp().get_tab(Preset::TYPE_FREQUENT_SLA, false);
     assert(tab_freq_sla == nullptr || dynamic_cast<TabFrequent *>(tab_freq_sla));
     if (tab_freq_sla && dynamic_cast<TabFrequent *>(tab_freq_sla)) {
+        static_cast<TabFrequent *>(tab_freq_sla)->set_freq_parent(m_parent);
         tab_freq_sla->build();
-        // if (tab_freq_sla != nullptr) pages =
-        // tab_freq_sla->create_pages(Preset::type_name(tab_freq_sla->type())+".ui", -1, tab_freq_sla->type());
         if (tab_freq_sla->get_page_count() > 0) {
+            assert(tab_freq_fff->get_page_count() == 1);
+            assert(tab_freq_fff->get_page(0));
+            assert(tab_freq_fff->get_page(0)->m_optgroups.size() == 1);
             std::shared_ptr<ConfigOptionsGroup> m_og_sla = m_og_other[ptSLA] =
-                std::make_shared<ConfigOptionsGroup>(m_parent, "");
+                (tab_freq_sla->get_page(0)->m_optgroups[0]);
             m_og_sla->set_config(config);
             m_og_sla->hide_labels();
             m_og_sla->m_on_change = Tab::set_or_add(m_og_sla->m_on_change, [tab_freq_sla,
@@ -511,8 +513,8 @@ void FreqChangedParams::init()
                     l.append_widget(empty_widget);
                 }
             }
-            for (const Line &l : page->m_optgroups[0]->get_lines()) { m_og_sla->append_line(l); }
             m_og_sla->activate();
+            assert(m_og_sla->sizer);
             m_sizer->Add(m_og_sla->sizer, 0, wxEXPAND);
         }
     }
@@ -532,7 +534,7 @@ void FreqChangedParams::Show(bool visible) {
 
 void FreqChangedParams::Show(PrinterTechnology tech)
 {
-    m_og->Show( (tech & PrinterTechnology::ptFFF) != 0);
+    if(m_og) m_og->Show( (tech & PrinterTechnology::ptFFF) != 0);
     for (auto& entry : m_og_other)
         entry.second->Show( (entry.first & tech) != 0);
 
@@ -1154,7 +1156,7 @@ void Sidebar::jump_to_option(size_t selected)
         }
     }
 
-    wxGetApp().get_tab(opt.type)->activate_option(opt.opt_key_with_idx(), boost::nowide::narrow(opt.category));
+    wxGetApp().get_tab(opt.type, false)->activate_option(opt.opt_key_with_idx(), boost::nowide::narrow(opt.category));
 
     // Switch to the Settings NotePad
 //    wxGetApp().mainframe->select_tab(MainFrame::ETabType::LastSettings);
@@ -4688,6 +4690,7 @@ void Plater::priv::enable_preview_moves_slider(bool enable)
 
 void Plater::priv::reset_gcode_toolpaths()
 {
+    gcode_result.reset();
     preview->reset_gcode_toolpaths();
 }
 

@@ -91,7 +91,7 @@ public:
     bool first_intersection(const Line& line, Point* intersection) const;
     bool intersections(const Line &line, Points *intersections) const;
     // Projection of a point onto the lines defined by the points.
-    virtual Point point_projection(const Point &point) const;
+    virtual std::pair<Point, size_t> point_projection(const Point &point) const;
 
     static Points _douglas_peucker(const Points& points, const double tolerance);
     static Points _douglas_peucker_plus(const Points& points, const double tolerance, const double min_length);

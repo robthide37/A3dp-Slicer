@@ -149,7 +149,7 @@ const GroupAndCategory& OptionsSearcher::get_group_and_category(const std::strin
 
 void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type type)
 {
-    const ConfigDef* defs = config->def();
+    //const ConfigDef* defs = config->def();
     auto emplace_option = [this, type](const std::string grp_key, const int16_t idx)
     {
         for (const GroupAndCategory& gc : groups_and_categories[grp_key]) {
@@ -187,13 +187,13 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
 
     for (std::string opt_key : config->keys())
     {
-        const ConfigOptionDef& opt = config->def()->options.at(opt_key);
+        //const ConfigOptionDef& opt = config->def()->options.at(opt_key);
         //if (opt.mode != comNone && (opt.mode & current_tags) == 0)
         //    continue;
 
         int cnt = 0;
 
-        if ( (type == Preset::TYPE_SLA_MATERIAL || type == Preset::TYPE_PRINTER) && opt_key != "bed_shape")
+        if ( (type == Preset::TYPE_SLA_MATERIAL || type == Preset::TYPE_FFF_FILAMENT || type == Preset::TYPE_PRINTER) && opt_key != "bed_shape")
             switch (config->option(opt_key)->type())
             {
             case coInts:	change_opt_key<ConfigOptionInts		>(opt_key, config, cnt);	break;
@@ -307,39 +307,43 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
     auto get_label = [this, &sep](const Option& opt, bool marked = true)
     {
         std::wstring out;
-        if (marked)
+        if (marked) {
             out += marker_by_type(opt.type, printer_technology);
+        }
         const std::wstring* prev = nullptr;
         for (const std::wstring* const s : {
             view_params.category ?  &opt.category_local : nullptr,
             view_params.category ?  &opt.group_local : nullptr,
-                                    & opt.label_local })
+                                    & opt.label_local }) {
             if (s != nullptr && (prev == nullptr || *prev != *s)) {
                 if (out.size() > 2)
                     out += sep;
                 out += *s;
                 prev = s;
             }
-            return out;
+        }
+        return out;
     };
 
     auto get_label_english = [this, &sep](const Option& opt, bool marked = true)
     {
         std::wstring out;
-        if (marked)
+        if (marked) {
             out += marker_by_type(opt.type, printer_technology);
-        const std::wstring* prev = nullptr;
+        }
+        const std::wstring *prev = nullptr;
         for (const std::wstring* const s : {
             view_params.category ? &opt.category : nullptr,
                 view_params.category ? &opt.group : nullptr,
-                & opt.label })
+                & opt.label }) {
             if (s != nullptr && (prev == nullptr || *prev != *s)) {
                 if (out.size() > 2)
                     out += sep;
                 out += *s;
                 prev = s;
             }
-            return out;
+        }
+        return out;
     };
 
     auto get_tooltip = [this, &sep](const Option& opt)
@@ -348,13 +352,15 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
         std::wstring tooltip;
         int length = 0;
         for (int i = 0; i < opt.tooltip_local.size(); i++) {
-            if (length >= 80 && opt.tooltip_local[i] == u' ')
+            if (length >= 80 && opt.tooltip_local[i] == u' ') {
                 tooltip.push_back(u'\n');
-            else
+            } else {
                 tooltip.push_back(opt.tooltip_local[i]);
+            }
             length++;
-            if (tooltip.back() == u'\n')
+            if (tooltip.back() == u'\n') {
                 length = 0;
+            }
         }
 
 
@@ -981,7 +987,7 @@ void SearchDialog::on_sys_color_changed()
 SearchListModel::SearchListModel(wxWindow* parent) : wxDataViewVirtualListModel(0)
 {
     int icon_id = 0;
-    for (const std::string& icon : { "cog", "printer", "sla_printer", "spool", "resin" })
+    for (const std::string icon : { "cog", "printer", "sla_printer", "spool", "resin" })
         m_icon[icon_id++] = ScalableBitmap(parent, icon);    
 }
 
@@ -997,8 +1003,8 @@ void SearchListModel::Prepend(const std::string& label)
     wxString   str    = from_u8(label).Remove(0, 1);
 
     int        icon_idx = 0; 
-    if(icon_c < icon_idxs.size())
-        icon_idx = icon_idxs.at(icon_c);
+    if(auto it = icon_idxs.find(icon_c); it != icon_idxs.end())
+        icon_idx = it->second;
     m_values.emplace_back(str, icon_idx);
 
     RowPrepended();

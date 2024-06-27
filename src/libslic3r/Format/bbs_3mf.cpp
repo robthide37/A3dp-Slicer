@@ -23,12 +23,12 @@
 
 
 #include <limits>
+#include <mutex>
 #include <stdexcept>
 #include <iomanip>
 
 #include <boost/assign.hpp>
 #include <boost/bimap.hpp>
-
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -47,6 +47,7 @@
 
 namespace pt = boost::property_tree;
 
+#include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
 #include <expat.h>
@@ -721,11 +722,11 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
     // Base class with error messages management
     class _BBS_3MF_Base
     {
-        mutable boost::mutex mutex;
+        mutable std::mutex mutex_error;
         mutable std::vector<std::string> m_errors;
 
     protected:
-        void add_error(const std::string& error) const { boost::unique_lock l(mutex); m_errors.push_back(error); }
+        void add_error(const std::string& error) const { std::lock_guard l(mutex_error); m_errors.push_back(error); }
         void clear_errors() { m_errors.clear(); }
 
     public:
@@ -1770,15 +1771,15 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             }
 
             bool object_load_result = true;
-            boost::mutex mutex;
+            std::mutex mutex_load;
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, m_object_importers.size()),
-                [this, &mutex, &object_load_result](const tbb::blocked_range<size_t>& importer_range) {
+                [this, &mutex_load, &object_load_result](const tbb::blocked_range<size_t>& importer_range) {
                     CNumericLocalesSetter locales_setter;
                     for (size_t object_index = importer_range.begin(); object_index < importer_range.end(); ++ object_index) {
                         bool result = m_object_importers[object_index]->extract_object_model();
                         {
-                            boost::unique_lock l(mutex);
+                            std::lock_guard l(mutex_load);
                             object_load_result &= result;
                         }
                     }

@@ -551,7 +551,7 @@ namespace Slic3r {
     void PrintObject::_compute_max_sparse_spacing()
     {
         m_max_sparse_spacing = 0;
-        std::atomic_int64_t max_sparse_spacing;
+        std::atomic_int64_t max_sparse_spacing(0);
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
             [this, &max_sparse_spacing](const tbb::blocked_range<size_t>& range) {

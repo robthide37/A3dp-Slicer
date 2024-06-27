@@ -10,8 +10,9 @@
 #include <wx/dc.h>
 #include <wx/slider.h>
 
-#include <vector>
+#include <mutex>
 #include <set>
+#include <vector>
 
 class wxMenu;
 
@@ -300,6 +301,12 @@ public:
     void show_cog_icon_context_menu();
     void auto_color_change();
 
+    // mutex to lock the rendering & callbacks while updating the data.
+    std::recursive_mutex &lock_render() { return m_lock_data; }
+    // emit refresh, update, and event. Do it only outside of lock_render()
+    void fire_update_if_needed();
+    bool ensure_correctly_filled() const;
+
     ExtrudersSequence m_extruders_sequence;
 
 protected:
@@ -346,7 +353,7 @@ private:
     wxSize      get_size() const;
     void        get_size(int* w, int* h) const;
     double      get_double_value(const SelectedSlider& selection);
-    int         get_tick_from_value(double value, bool force_lower_bound = false);
+    int         get_tick_from_value(double value, bool force_lower_bound = false) const;
     wxString    get_tooltip(int tick = -1);
     int         get_edited_tick_for_position(wxPoint pos, Type type = ColorChange);
 
@@ -421,6 +428,13 @@ private:
     long        m_extra_style;
     float       m_label_koef{ 1.0 };
 
+    //for updating
+    bool m_need_refresh_and_update = false;
+    bool m_need_fire_scroll_change = false;
+
+    // lock for avoiding render & callbacks while data is updating
+    std::recursive_mutex m_lock_data;
+    
     std::vector<double> m_values;
     TickCodeInfo        m_ticks;
     std::vector<double> m_layers_times;

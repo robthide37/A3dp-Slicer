@@ -163,7 +163,8 @@ bool MultiPoint::intersections(const Line &line, Points *intersections) const
 }
 
 // Projection of a point onto the polygon.
-Point MultiPoint::point_projection(const Point &point) const {
+std::pair<Point, size_t> MultiPoint::point_projection(const Point &point) const {
+    size_t pt_idx = size_t(-1);
     Point proj = point;
     double dmin = std::numeric_limits<double>::max();
     if (!this->points.empty()) {
@@ -174,11 +175,13 @@ Point MultiPoint::point_projection(const Point &point) const {
             if (d < dmin) {
                 dmin = d;
                 proj = pt0;
+                pt_idx = i;
             }
             d = pt1.distance_to(point);
             if (d < dmin) {
                 dmin = d;
                 proj = pt1;
+                pt_idx = i + 1;
             }
             Vec2d v1(coordf_t(pt1(0) - pt0(0)), coordf_t(pt1(1) - pt0(1)));
             coordf_t div = dot(v1);
@@ -191,12 +194,13 @@ Point MultiPoint::point_projection(const Point &point) const {
                     if (d < dmin) {
                         dmin = d;
                         proj = foot;
+                        pt_idx = i;
                     }
                 }
             }
         }
     }
-    return proj;
+    return {proj, pt_idx};
 }
 
 std::vector<Point> MultiPoint::_douglas_peucker(const std::vector<Point>& pts, const double tolerance)
