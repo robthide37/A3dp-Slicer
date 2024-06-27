@@ -726,7 +726,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                 f->fill_surface_extrusion(&surface_fill.surface, surface_fill.params, fills_by_priority[(size_t)surface_fill.params.priority]->set_entities());
 #if _DEBUG
                 //check no over or underextrusion if fill_exactly
-                if(surface_fill.params.fill_exactly && surface_fill.params.density == 1) {
+                if(surface_fill.params.fill_exactly && surface_fill.params.density == 1 && !surface_fill.params.flow.bridge()) {
                     ExtrusionVolume compute_volume;
                     ExtrusionVolume compute_volume_no_gap_fill(false);
                     const size_t idx_end = fills_by_priority[(size_t)surface_fill.params.priority]->entities().size();
