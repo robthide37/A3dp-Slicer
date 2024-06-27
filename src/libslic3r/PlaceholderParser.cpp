@@ -1810,7 +1810,7 @@ void PlaceholderParser::parse_custom_variables(const ConfigOptionStrings& filame
     std::map<std::string, std::vector<std::string>> name2var_array;
     const std::vector<std::string> empty_array(filament_custom_variables.size());
 
-    for (int extruder_id = 0; extruder_id < filament_custom_variables.size(); ++extruder_id)
+    for (size_t extruder_id = 0; extruder_id < filament_custom_variables.size(); ++extruder_id)
     {
         std::string raw_text = filament_custom_variables.get_at(extruder_id);
         boost::erase_all(raw_text, "\r");

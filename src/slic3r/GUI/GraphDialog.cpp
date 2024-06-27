@@ -161,7 +161,7 @@ GraphPanel::GraphPanel(wxWindow *parent, GraphData data, const GraphSettings &se
     //stream.get();
     
     // min & max
-    Pointfs &data_points = data.data();
+    Pointfs data_points = data.data();
     if (!data_points.empty()) {
         for (Vec2d &point : data_points) {
             m_last_min_y = std::min(m_last_min_y, (point.y()));

@@ -1788,7 +1788,7 @@ DynamicConfig PrintStatistics::config() const
 DynamicConfig PrintStatistics::placeholders()
 {
     DynamicConfig config;
-    for (const std::string &key : { 
+    for (const char *key : { 
         "print_time", "normal_print_time", "silent_print_time", 
         "used_filament", "extruded_volume", "total_cost", "total_weight", 
         "total_toolchanges", "total_wipe_tower_cost", "total_wipe_tower_filament",
