@@ -584,18 +584,6 @@ const Option& OptionsSearcher::get_option(const std::string& opt_key, Preset::Ty
     size_t pos_hash = opt_key.find('#');
     if (pos_hash == std::string::npos) {
         auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(opt_key), type, idx }));
-#ifdef _DEBUG
-        if (options[it - options.begin()].opt_key_with_idx() != opt_key) {
-            std::wstring wopt_key = boost::nowide::widen(opt_key);
-            for (const Option &opt : options) {
-                if (opt.key == wopt_key) {
-                    if (opt.type == type) {
-                        std::cout << "found\n";
-                    }
-                }
-            }
-        }
-#endif
         assert(it != options.end());
         return options[it - options.begin()];
     } else {
@@ -603,17 +591,6 @@ const Option& OptionsSearcher::get_option(const std::string& opt_key, Preset::Ty
         std::string opt_idx = opt_key.substr(pos_hash + 1);
         idx = atoi(opt_idx.c_str());
         auto it = std::lower_bound(options.begin(), options.end(), Option({ boost::nowide::widen(raw_opt_key), type, idx }));
-#ifdef _DEBUG
-        if (options[it - options.begin()].opt_key_with_idx() != opt_key) {
-            for (const Option &opt : options) {
-                if (opt.opt_key_with_idx() == opt_key) {
-                    if (opt.type == type) {
-                        std::cout << "found\n";
-                    }
-                }
-            }
-        }
-#endif
         assert(it != options.end());
         return options[it - options.begin()];
     }
