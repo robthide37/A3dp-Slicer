@@ -44,6 +44,30 @@ inline double angle(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBas
 struct GlobalModelInfo;
 struct SeamComparator;
 
+class PolylineWithEnd : public Polyline {
+public:
+    enum PolyDir {
+        CCW,
+        CW,
+        BOTH
+    };
+    /// if true => it's an endpoint, if false it join somthign that can't be used for a seam, so don't use this endpoint.
+    std::pair<bool, bool> endpoints;
+    PolyDir direction;
+
+    PolylineWithEnd() : endpoints(false, false), direction(PolyDir::BOTH) {}
+    PolylineWithEnd(bool stopstart, bool stopend, PolyDir is_ccw) : endpoints(stopstart, stopend), direction(is_ccw) {}
+    PolylineWithEnd(const Points &pts, bool stopstart, bool stopend, PolyDir is_ccw) : Polyline(pts), endpoints(stopstart, stopend), direction(is_ccw) {}
+    PolylineWithEnd(Points &&pts,  bool stopstart, bool stopend, PolyDir is_ccw) : Polyline(pts), endpoints(stopstart, stopend), direction(is_ccw) {}
+    void reverse() {
+        Polyline::reverse();
+        std::swap(this->endpoints.first, this->endpoints.second);
+        if (direction != PolyDir::BOTH)
+            direction = (direction == PolyDir::CCW) ? PolyDir::CW : PolyDir::CCW;
+    }
+};
+typedef std::vector<PolylineWithEnd> PolylineWithEnds;
+
 enum class EnforcedBlockedSeamPoint {
     Blocked = 0,
     Neutral = 1,
