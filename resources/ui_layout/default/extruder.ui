@@ -11,7 +11,7 @@ group:Offsets (for multi-extruder printers)
 	setting:idx:extruder_offset
 	setting:idx:extruder_temperature_offset
 	setting:idx:extruder_fan_offset
-    extruder_extrusion_multiplier_speed
+	setting:idx:extruder_extrusion_multiplier_speed
 group:Retraction
 	setting:idx:retract_length
 	setting:idx:retract_lift

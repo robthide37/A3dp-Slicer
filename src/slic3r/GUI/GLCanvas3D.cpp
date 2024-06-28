@@ -276,9 +276,9 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
         const ConfigOptionFloats* nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
         min_height = std::numeric_limits<float>::max();
         max_height = 0.f;
-        assert(extruders_min_height->values.size() == extruders_max_height->values.size());
-        assert(extruders_min_height->values.size() == nozzle_diameter->values.size());
-        for (size_t idx_extruder = 0; idx_extruder < extruders_min_height->values.size(); ++idx_extruder) {
+        assert(extruders_min_height->size() == extruders_max_height->size());
+        assert(extruders_min_height->size() == nozzle_diameter->size());
+        for (size_t idx_extruder = 0; idx_extruder < extruders_min_height->size(); ++idx_extruder) {
             min_height = std::min(min_height, float(extruders_min_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
             max_height = std::max(max_height, float(extruders_max_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
         }
@@ -2163,7 +2163,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
     if (printer_technology == ptFFF && m_config->has("nozzle_diameter")) {
         // Should the wipe tower be visualized ?
-        unsigned int extruders_count = (unsigned int)m_config->option<ConfigOptionFloats>("nozzle_diameter")->values.size();
+        unsigned int extruders_count = (unsigned int)m_config->option<ConfigOptionFloats>("nozzle_diameter")->size();
 
         bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
         bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
@@ -2180,8 +2180,8 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             const Print *print = m_process->fff_print();
 
             //FIXME use real nozzle diameter
-            float depth = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->values.front()).depth;
-            float brim_width = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->values.front()).brim_width;
+            float depth = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0)).depth;
+            float brim_width = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0)).brim_width;
 
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),

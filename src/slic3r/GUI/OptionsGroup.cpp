@@ -25,7 +25,7 @@ const t_field& OptionsGroup::build_field(const Option& opt) {
     return build_field(opt.opt_id, opt.opt);
 }
 const t_field& OptionsGroup::build_field(const t_config_option_key& id) {
-	const ConfigOptionDef& opt = m_options.at(id).opt;
+    const ConfigOptionDef& opt = m_options.at(id).opt;
     return build_field(id, opt);
 }
 
@@ -54,11 +54,11 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
             case coFloatOrPercent:
             case coFloat:
             case coFloats:
-			case coPercent:
+            case coPercent:
             case coPercents:
             case coFloatsOrPercents:
-			case coString:
-			case coStrings:
+            case coString:
+            case coStrings:
                 m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id));
                 break;
             case coBools:
@@ -67,28 +67,32 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
                     m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id));
                     break;
                 }
-			case coBool:
+            case coBool:
                 m_fields.emplace(id, CheckBox::Create<CheckBox>(this->ctrl_parent(), opt, id));
-				break;
+                break;
             case coInts:
                 if (id.find('#') == std::string::npos) {
                     // string field with vector serialization
                     m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id));
                     break;
                 }
-			case coInt:
+            case coInt:
                 m_fields.emplace(id, SpinCtrl::Create<SpinCtrl>(this->ctrl_parent(), opt, id));
-				break;
+                break;
             case coEnum:
                 m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
-				break;
+                break;
             case coPoint:
             case coPoints:
                 m_fields.emplace(id, PointCtrl::Create<PointCtrl>(this->ctrl_parent(), opt, id));
-				break;
+                break;
+            case coGraph:
+            case coGraphs:
+                m_fields.emplace(id, GraphButton::Create<GraphButton>(this->ctrl_parent(), opt, id));
+                break;
             case coNone:  assert(false); break;
             default:
-				throw Slic3r::LogicError("This control doesn't exist till now"); break;
+                throw Slic3r::LogicError("This control doesn't exist till now"); break;
         }
     }
     // Grab a reference to fields for convenience
@@ -697,10 +701,10 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
     auto it_opt_map = m_opt_map.find(opt_key);
 	if (opt_key == "extruders_count") {
 		auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("nozzle_diameter"));
-		value = int(nozzle_diameter->values.size());
+		value = int(nozzle_diameter->size());
 	} else if (opt_key == "milling_count") {
 		auto   *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
-		value = int(milling_diameter->values.size());
+		value = int(milling_diameter->size());
 	} else if (it_opt != m_options.end() && it_opt->second.opt.is_script) {
         // when a scripted key is reset, reset its deps
         // call the reset function if it exits

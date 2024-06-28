@@ -96,7 +96,7 @@ void init()
     //key_translation_map["bridge_angle"]                             = "bridge_angle";
     key_translation_map["bridge_density"]                           = "bridge_overlap_min";
     key_translation_map["bridge_no_support"]                        = "dont_support_bridges";
-    key_translation_map["internal_bridge_speed"]                    = "bridge_speed_internal";
+    //key_translation_map["internal_bridge_speed"]                    = "internal_bridge_speed";
     //key_translation_map["brim_ears"]                                = "brim_ears";
     //key_translation_map["brim_ears_detection_length"]               = "brim_ears_detection_length";
     //key_translation_map["brim_ears_max_angle"]                      = "brim_ears_max_angle";
@@ -585,8 +585,9 @@ void custom_gcode_transform(DynamicPrintConfig &print_config)
     }
     for (std::string opt_key : {"end_filament_gcode", "start_filament_gcode"}) {
         auto opt = print_config.opt<ConfigOptionStrings>(opt_key);
-        if (opt != nullptr)
-            for (std::string &custom_gcode : opt->values) {
+        if (opt != nullptr) {
+            std::vector<std::string> custom_gcode_values = opt->get_values();
+            for (std::string &custom_gcode : custom_gcode_values) {
                 // check & replace setting name
                 for (auto &entry : key_translation_map) {
                     boost::replace_all(custom_gcode, entry.first, entry.second);
@@ -596,6 +597,8 @@ void custom_gcode_transform(DynamicPrintConfig &print_config)
                     boost::replace_all(custom_gcode, entry.first, entry.second);
                 }
             }
+            opt->set(custom_gcode_values);
+        }
     }
 }
 

@@ -95,6 +95,7 @@ RammingPanel::RammingPanel(wxWindow* parent, const std::string& parameters)
 		buttons.push_back(std::make_pair(x, y));
 
 	m_chart = new Chart(this, wxRect(scale(1),scale(1),scale(48),scale(36)), buttons, scale(1));
+    m_chart->set_type(Slic3r::GraphData::GraphType::SPLINE);
     m_chart->set_xy_range(0, 0, 0.25f * ramming_speed_size, 20.);
     m_chart->set_x_label(_L("Time") + " ("+_L("s")+")", 0.1f);
     m_chart->set_y_label(_L("Volumetric speed") + " (" + _L("mm³/s") + ")", 1);
@@ -152,7 +153,7 @@ RammingPanel::RammingPanel(wxWindow* parent, const std::string& parameters)
     m_widget_time->Bind(wxEVT_TEXT,[this](wxCommandEvent&) {m_chart->set_xy_range(0, 0, m_widget_time->GetValue(), -1);});
     m_widget_time->Bind(wxEVT_CHAR,[](wxKeyEvent&){});      // do nothing - prevents the user to change the value
     m_widget_volume->Bind(wxEVT_CHAR,[](wxKeyEvent&){});    // do nothing - prevents the user to change the value   
-    Bind(EVT_WIPE_TOWER_CHART_CHANGED,[this](wxCommandEvent&) {m_widget_volume->SetValue(m_chart->get_volume()); m_widget_time->SetValue(m_chart->get_max_x());} );
+    Bind(EVT_SLIC3R_CHART_CHANGED,[this](wxCommandEvent&) {m_widget_volume->SetValue(m_chart->get_volume()); m_widget_time->SetValue(m_chart->get_max_x());} );
     Refresh(true); // erase background
 }
 
@@ -163,7 +164,7 @@ void RammingPanel::line_parameters_changed() {
 
 std::string RammingPanel::get_parameters()
 {
-    std::vector<float> speeds = m_chart->get_speed(0.25f);
+    std::vector<float> speeds = m_chart->get_value_samples(0.25f);
     std::vector<std::pair<float,float>> buttons = m_chart->get_buttons();
     std::stringstream stream;
     stream << m_ramming_line_width_multiplicator << " " << m_ramming_step_multiplicator;

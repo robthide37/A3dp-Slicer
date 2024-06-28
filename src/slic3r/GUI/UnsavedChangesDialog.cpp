@@ -1074,6 +1074,18 @@ static wxString get_full_label(std::string opt_key, const DynamicPrintConfig& co
     return opt->full_label.empty() ? opt->label : opt->full_label;
 }
 
+wxString graph_to_string(const GraphData &graph)
+{
+    wxString str = "";
+    switch (graph.type) {
+    case GraphData::GraphType::SQUARE: str = _L("Square") + ":"; break;
+    case GraphData::GraphType::LINEAR: str = _L("Linear") + ":"; break;
+    case GraphData::GraphType::SPLINE: str = _L("Spline") + ":"; break;
+    }
+    for (const Vec2d &pt : graph.data()) { str += format_wxstr(" %1%,%2%", pt.x(), pt.y()); }
+    return str;
+}
+
 static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& config)
 {
     size_t opt_idx = get_id_from_opt_key(opt_key);
@@ -1193,7 +1205,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
                 return out;
             }
             if (!strings->empty())
-                if (opt_idx < strings->values.size())
+                if (opt_idx < strings->size())
                     return from_u8(strings->get_at(opt_idx));
                 else
                     return from_u8(strings->serialize());
@@ -1209,7 +1221,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     case coFloatsOrPercents: {
         const ConfigOptionFloatsOrPercents* floats_percents = config.opt<ConfigOptionFloatsOrPercents>(opt_key);
         if (floats_percents)
-            if(opt_idx < floats_percents->values.size())
+            if(opt_idx < floats_percents->size())
                 return double_to_string(floats_percents->get_at(opt_idx).value, opt->precision) + (floats_percents->get_at(opt_idx).percent ? "%" : "");
             else
                 return from_u8(floats_percents->serialize());
@@ -1229,11 +1241,22 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         }
         
         const ConfigOptionPoints* opt_pts = config.opt<ConfigOptionPoints>(opt_key);
-        if (!opt_pts->values.empty())
-            if (opt_idx < opt_pts->values.size())
+        if (!opt_pts->empty())
+            if (opt_idx < opt_pts->size())
                 return from_u8((boost::format("[%1%]") % ConfigOptionPoint(opt_pts->get_at(opt_idx)).serialize()).str());
             else
                 return from_u8(opt_pts->serialize());
+    }
+    case coGraph: {
+        return graph_to_string(config.option<ConfigOptionGraph>(opt_key)->value);
+    }
+    case coGraphs: {
+        const ConfigOptionGraphs* opt_graphs = config.opt<ConfigOptionGraphs>(opt_key);
+        if (!opt_graphs->empty())
+            if (opt_idx < opt_graphs->size())
+                return graph_to_string(opt_graphs->get_at(opt_idx));
+            else
+                return from_u8(opt_graphs->serialize());
     }
     default:
         break;
@@ -1320,10 +1343,10 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
 
         // process changes of extruders count
         if (type == Preset::TYPE_PRINTER && old_pt == ptFFF &&
-            old_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() != new_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()) {
+            old_config.opt<ConfigOptionStrings>("extruder_colour")->size() != new_config.opt<ConfigOptionStrings>("extruder_colour")->size()) {
             wxString local_label = _L("Extruders count");
-            wxString old_val = from_u8((boost::format("%1%") % old_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
-            wxString new_val = from_u8((boost::format("%1%") % new_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
+            wxString old_val = from_u8((boost::format("%1%") % old_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
+            wxString new_val = from_u8((boost::format("%1%") % new_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
 
             assert(category_icon_map.find(wxGetApp().get_tab(type)->get_page(0)->title()) != category_icon_map.end());
             if(wxGetApp().get_tab(type)->get_page_count() > 0)
@@ -1699,7 +1722,7 @@ void DiffPresetDialog::update_tree()
         // Collect dirty options.
         const bool deep_compare = (type == Preset::TYPE_PRINTER || type == Preset::TYPE_SLA_MATERIAL);
         auto dirty_options = type == Preset::TYPE_PRINTER && left_pt == ptFFF &&
-                             left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() < right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size() ?
+                             left_config.opt<ConfigOptionStrings>("extruder_colour")->size() < right_congig.opt<ConfigOptionStrings>("extruder_colour")->size() ?
                              presets->dirty_options(right_preset, left_preset, deep_compare) :
                              presets->dirty_options(left_preset, right_preset, deep_compare);
 
@@ -1721,10 +1744,10 @@ void DiffPresetDialog::update_tree()
 
         // process changes of extruders count
         if (type == Preset::TYPE_PRINTER && left_pt == ptFFF &&
-            left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() != right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size()) {
+            left_config.opt<ConfigOptionStrings>("extruder_colour")->size() != right_congig.opt<ConfigOptionStrings>("extruder_colour")->size()) {
             wxString local_label = _L("Extruders count");
-            wxString left_val = from_u8((boost::format("%1%") % left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
-            wxString right_val = from_u8((boost::format("%1%") % right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
+            wxString left_val = from_u8((boost::format("%1%") % left_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
+            wxString right_val = from_u8((boost::format("%1%") % right_congig.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
 
             m_tree->Append("extruders_count", type, _L("General"), _L("Capabilities"), local_label, left_val, right_val, category_icon_map.at("General"));
         }

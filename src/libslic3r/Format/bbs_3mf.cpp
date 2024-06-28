@@ -2676,7 +2676,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                     //skip this file
                     return;
                 }
-                preset_name = filament_names->values[0];
+                preset_name = filament_names->get_at(0);
             }
             else if (type == Preset::TYPE_PRINTER) {
                 print_name = dynamic_cast < ConfigOptionString* > (config.option("printer_settings_id"));
@@ -7570,7 +7570,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
 //                ConfigOptionInts *first_layer_print_sequence_opt = plate_data->config.option<ConfigOptionInts>("first_layer_print_sequence");
 //                if (first_layer_print_sequence_opt != nullptr) {
 //                    stream << "    <" << METADATA_TAG << " " << KEY_ATTR << "=\"" << FIRST_LAYER_PRINT_SEQUENCE_ATTR << "\" " << VALUE_ATTR << "=\"";
-//                    const std::vector<int>& values = first_layer_print_sequence_opt->values;
+//                    const std::vector<int>& values = first_layer_print_sequence_opt->get_values();
 //                    for (int i = 0; i < values.size(); ++i) {
 //                        stream << values[i];
 //                        if (i != (values.size() - 1))

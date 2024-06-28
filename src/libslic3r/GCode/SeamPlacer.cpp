@@ -241,51 +241,85 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
     return result;
 }
 
-std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, const std::vector<float> &lengths,
+std::vector<float> calculate_polyline_angles_at_vertices(const PolylineWithEnd &polyline, const std::vector<float> &lengths,
         float min_arm_length) {
-    std::vector<float> result(polygon.size());
+    std::vector<float> result(polyline.size());
+    assert(polyline.size() - 1 == lengths.size());
 
-    if (polygon.size() == 1) {
+    if (polyline.size() == 1) {
         result[0] = 0.0f;
     }
 
     size_t idx_prev = 0;
     size_t idx_curr = 0;
     size_t idx_next = 0;
+    size_t idx_start = 0;
+    size_t idx_end = 0;
 
     float distance_to_prev = 0;
     float distance_to_next = 0;
 
-    //push idx_prev far enough back as initialization
-    while (distance_to_prev < min_arm_length) {
-        idx_prev = Slic3r::prev_idx_modulo(idx_prev, polygon.size());
-        distance_to_prev += lengths[idx_prev];
+    bool is_polygon = polyline.front() == polyline.back();
+
+    //if polygon : start at 0
+    if (is_polygon) {
+        idx_start = 0;
+        idx_end = polyline.size() -1; // last point is same as first, don't bother.
+        // push idx_prev far enough back as initialization
+        while (distance_to_prev < min_arm_length) {
+            idx_prev = Slic3r::prev_idx_modulo(idx_prev, lengths.size());
+            distance_to_prev += lengths[idx_prev];
+        }
+    } else {
+        //line, start & end are hardcoded
+        idx_start = 1;
+        idx_end = polyline.size() -1;
+        result.front() = polyline.endpoints.first ? -PI / 2 : 0;
+        result.back()  = polyline.endpoints.second ? -PI / 2 : 0;
     }
 
-    for (size_t _i = 0; _i < polygon.size(); ++_i) {
+    for (size_t _i = idx_start; _i < idx_end; ++_i) {
         // pull idx_prev to current as much as possible, while respecting the min_arm_length
-        while (distance_to_prev - lengths[idx_prev] > min_arm_length) {
+        while (distance_to_prev - lengths[idx_prev] > min_arm_length && idx_prev < lengths.size()) {
             distance_to_prev -= lengths[idx_prev];
-            idx_prev = Slic3r::next_idx_modulo(idx_prev, polygon.size());
+            // if polygon, circle, if line, then stop at the end.
+            if (is_polygon) {
+                idx_prev = Slic3r::next_idx_modulo(idx_prev, lengths.size());
+            } else {
+                idx_prev++;
+            }
         }
 
         //push idx_next forward as far as needed
-        while (distance_to_next < min_arm_length) {
+        while (distance_to_next < min_arm_length && idx_next < lengths.size()) {
             distance_to_next += lengths[idx_next];
-            idx_next = Slic3r::next_idx_modulo(idx_next, polygon.size());
+            // if polygon, circle, if line, then stop at the end.
+            if (is_polygon) {
+                idx_next = Slic3r::next_idx_modulo(idx_next, lengths.size());
+            } else {
+                idx_next++;
+            }
         }
 
         // Calculate angle between idx_prev, idx_curr, idx_next.
-        const Point &p0 = polygon.points[idx_prev];
-        const Point &p1 = polygon.points[idx_curr];
-        const Point &p2 = polygon.points[idx_next];
+        const Point &p0 = polyline.points[idx_prev];
+        const Point &p1 = polyline.points[idx_curr];
+        const Point &p2 = polyline.points[idx_next];
         result[idx_curr] = float(angle(p1 - p0, p2 - p1));
+        if (!is_polygon && polyline.direction == PolylineWithEnd::PolyDir::BOTH) {
+            result[idx_curr] = std::abs(result[idx_curr]);
+        }
 
         // increase idx_curr by one
         float curr_distance = lengths[idx_curr];
         idx_curr++;
         distance_to_prev += curr_distance;
         distance_to_next -= curr_distance;
+    }
+    
+    // polygon: repeat angle
+    if (is_polygon) {
+        result.back() = result.front();
     }
 
     return result;
@@ -419,14 +453,14 @@ struct GlobalModelInfo {
 }
 ;
 
-//Extract perimeter polygons of the given layer
-Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition configured_seam_preference,
+//Extract perimeter polylines of the given layer
+PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosition configured_seam_preference,
         std::vector<const LayerRegion*> &corresponding_regions_out, PerimeterGeneratorType perimeter_type) {
     
 
-    Polygons polygons;
+    PolylineWithEnds polylines;
     class PerimeterCopy : public ExtrusionVisitorConst {
-        Polygons* polygons;
+        PolylineWithEnds* polylines;
         std::vector<const LayerRegion*>* corresponding_regions_out;
         const LayerRegion* current_layer_region;
         SeamPosition configured_seam_preference;
@@ -434,59 +468,83 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
     public:
         bool also_overhangs = false;
         bool also_thin_walls = false;
-        PerimeterCopy(std::vector<const LayerRegion*>* regions_out, Polygons* polys, SeamPosition configured_seam, PerimeterGeneratorType perimeter_type)
-            : corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polygons(polys), perimeter_type(perimeter_type) {
+        PerimeterCopy(std::vector<const LayerRegion*>* regions_out, PolylineWithEnds* polys, SeamPosition configured_seam, PerimeterGeneratorType perimeter_type)
+            : corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polylines(polys), perimeter_type(perimeter_type) {
         }
         virtual void default_use(const ExtrusionEntity& entity) {};
         virtual void use(const ExtrusionPath &path) override {
             if (perimeter_type == PerimeterGeneratorType::Arachne && path.role() != erThinWall) {
-                path.polygons_covered_by_width(*polygons, SCALED_EPSILON);
-                while (corresponding_regions_out->size() < polygons->size()) {
+                //path.polygons_covered_by_width(*polygons, SCALED_EPSILON);
+                assert(corresponding_regions_out->size() == polylines->size());
+                polylines->emplace_back(path.polyline.get_points(), true, true, PolylineWithEnd::PolyDir::BOTH); // TODO: more point for arcs
+                //while (corresponding_regions_out->size() < polylines->size()) {
                     corresponding_regions_out->push_back(current_layer_region);
-                }
+                //}
             }
         }
         virtual void use(const ExtrusionLoop& loop) override {
-            if ((configured_seam_preference == spAllRandom && !loop.paths.empty() &&
-                    is_perimeter(loop.paths.front().role()))
-                || (also_thin_walls && loop.role() == erThinWall)) {
-                Points p;
-                loop.collect_points(p);
-                polygons->emplace_back(std::move(p));
+            bool is_ccw = loop.polygon().is_counter_clockwise();
+            if ((configured_seam_preference == spAllRandom && !loop.paths.empty() && is_perimeter(loop.paths.front().role()))
+                    || (also_thin_walls && loop.role() == erThinWall)) {
+                Points pts;
+                loop.collect_points(pts);
+                pts.push_back(pts.front()); //polygon
+                assert(corresponding_regions_out->size() == polylines->size());
+                polylines->emplace_back(std::move(pts), true, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
                 corresponding_regions_out->push_back(current_layer_region);
                 return;
             }else {
-                Points        p;
+                PolylineWithEnds polys;
+                size_t count_paths_collected = 0;
+                bool previous_collected = false;
+                bool current_collected = false;
                 for (const ExtrusionPath &path : loop.paths) {
+                    current_collected = false;
                     if (path.role() == ExtrusionRole::erExternalPerimeter) {
-                        path.collect_points(p);
+                        if(!previous_collected)
+                            polys.emplace_back(false, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
+                        path.collect_points(polys.back().points);
+                        count_paths_collected++;
+                        current_collected = true;
                     }
                     if (path.role() == ExtrusionRole::erOverhangPerimeter &&
                         also_overhangs) { // TODO find a way to search for external overhangs only
-                        path.collect_points(p);
+                        if(!previous_collected)
+                            polys.emplace_back(false, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
+                        path.collect_points(polys.back().points);
+                        count_paths_collected++;
+                        current_collected = true;
                     }
                     //if (path.role() == ExtrusionRole::erThinWall && also_thin_walls) {
                     //    path.collect_points(p); // TODO: 2.7: reactivate when it's possible to distinguish between thinwalltravel & thinextrusions
                     // // currently, only looking for thinwall-only loop
                     //}
+                    previous_collected = current_collected;
                 }
 
-                if (!p.empty()) { // for random seam alignment, extract all perimeters
-                    polygons->emplace_back(std::move(p));
-                    corresponding_regions_out->push_back(current_layer_region);
+                if (!polys.empty()) { // for random seam alignment, extract all perimeters
+                    if (count_paths_collected == loop.paths.size()) {
+                        assert(polys.size() == 1);
+                        assert(polys.front().first_point() ==  polys.front().last_point());
+                    }
+                    assert(corresponding_regions_out->size() == polylines->size());
+                    append(*polylines, std::move(polys));
+                    while (corresponding_regions_out->size() < polylines->size()) {
+                        corresponding_regions_out->push_back(current_layer_region);
+                    }
                 }
             }
         }
         virtual void use(const ExtrusionMultiPath& collection) override {
             
             if (perimeter_type == PerimeterGeneratorType::Arachne) {
-                Polygons polys;
-                for (const ExtrusionPath& path : collection.paths) {
-                    path.polygons_covered_by_width(polys, SCALED_EPSILON);
-                }
-                polys = union_(polys);
-                append(*polygons, polys);
-                while (corresponding_regions_out->size() < polygons->size()) {
+                for (size_t idx = 0; idx < collection.size(); idx++) {
+                    const ExtrusionPath &path = collection.paths[idx];
+                    assert(corresponding_regions_out->size() == polylines->size());
+                    polylines->emplace_back(path.polyline.get_points(),
+                                            idx == 0 ? true : false,
+                                            idx + 1 < collection.size() ? false : true,
+                                            PolylineWithEnd::PolyDir::BOTH); // TODO: more points for arcs
                     corresponding_regions_out->push_back(current_layer_region);
                 }
             }
@@ -497,29 +555,28 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
             }
         }
         void set_current_layer_region(const LayerRegion *set) { current_layer_region = set; }
-    } visitor(&corresponding_regions_out, &polygons, configured_seam_preference, perimeter_type);
+    } visitor(&corresponding_regions_out, &polylines, configured_seam_preference, perimeter_type);
 
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities()) {
             visitor.set_current_layer_region(layer_region);
             ex_entity->visit(visitor);
-            if (polygons.empty()) {
+            if (polylines.empty()) {
                 // maybe only thin walls?
                 visitor.also_thin_walls = true;
                 ex_entity->visit(visitor);
-                if (polygons.empty()) {
+                if (polylines.empty()) {
                     // can happen if the external is fully an overhang
                     visitor.also_overhangs = true;
                     ex_entity->visit(visitor);
                     visitor.also_overhangs = false;
-                    if (polygons.empty()) {
+                    if (polylines.empty()) {
                         // shouldn't happen
-                        ex_entity->visit(visitor);
                         assert(ex_entity->role() == erThinWall); // no loops
                         // what to do in this case?
-                        Points p;
-                        ex_entity->collect_points(p);
-                        polygons.emplace_back(std::move(p));
+                        Points pts;
+                        ex_entity->collect_points(pts);
+                        polylines.emplace_back(std::move(pts), true, pts.front() != pts.back(), PolylineWithEnd::PolyDir::BOTH);
                         corresponding_regions_out.push_back(layer_region);
                     }
                 }
@@ -527,51 +584,53 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
             }
         }
     }
-    if (polygons.empty()) { // If there are no perimeter polygons for whatever reason (disabled perimeters .. ) insert dummy point
+    if (polylines.empty()) { // If there are no perimeter polylines/polygons for whatever reason (disabled perimeters .. ) insert dummy point
         // it is easier than checking everywhere if the layer is not emtpy, no seam will be placed to this layer anyway
-        polygons.emplace_back(std::vector { Point { 0, 0 } });
+        polylines.emplace_back(std::vector{ Point { 0, 0 } }, true, true, PolylineWithEnd::PolyDir::BOTH);
         corresponding_regions_out.push_back(nullptr);
     }
-    assert(corresponding_regions_out.size() == polygons.size());
-    return polygons;
+    assert(corresponding_regions_out.size() == polylines.size());
+    return polylines;
 }
 
-// Insert SeamCandidates created from perimeter polygons in to the result vector.
+// Insert SeamCandidates created from perimeter polygons/polylines in to the result vector.
 // Compute its type (Enfrocer,Blocker), angle, and position
-//each SeamCandidate also contains pointer to shared Perimeter structure representing the polygon
-// if Custom Seam modifiers are present, oversamples the polygon if necessary to better fit user intentions
-void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const LayerRegion *region,
+//each SeamCandidate also contains pointer to shared Perimeter structure representing the polyline
+// if Custom Seam modifiers are present, oversamples the polyline if necessary to better fit user intentions
+void process_perimeter_polylines(const PolylineWithEnd &orig_polyline, float z_coord, const LayerRegion *region,
         const GlobalModelInfo &global_model_info, PrintObjectSeamData::LayerSeams &result) {
-    if (orig_polygon.size() == 0) {
+    if (orig_polyline.size() == 0) {
         return;
     }
-    Polygon polygon = orig_polygon;
-    bool was_clockwise = polygon.make_counter_clockwise();
+    PolylineWithEnd polyline = orig_polyline;
+    bool is_polygon = polyline.first_point() == polyline.last_point();
+    assert(!is_polygon || polyline.direction != PolylineWithEnd::PolyDir::BOTH);
+    if (is_polygon && polyline.direction == PolylineWithEnd::PolyDir::CW) {
+        polyline.reverse();
+        assert(polyline.direction == PolylineWithEnd::PolyDir::CCW);
+    }
     float angle_arm_len = region != nullptr ? region->flow(FlowRole::frExternalPerimeter).nozzle_diameter() : 0.5f;
 
     std::vector<float> lengths { };
-    for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
-        lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
+    for (size_t point_idx = 0; point_idx < polyline.size() - 1; ++point_idx) {
+        lengths.push_back((unscale(polyline.points[point_idx]) - unscale(polyline.points[point_idx + 1])).norm());
     }
-    lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
-    std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
-            angle_arm_len);
+    std::vector<float> polyline_angles = calculate_polyline_angles_at_vertices(polyline, lengths, angle_arm_len);
 
     result.perimeters.push_back( { });
     Perimeter &perimeter = result.perimeters.back();
 
-    std::queue<Vec3f> orig_polygon_points { };
-    for (size_t index = 0; index < polygon.size(); ++index) {
-        Vec2f unscaled_p = unscale(polygon[index]).cast<float>();
-        orig_polygon_points.emplace(unscaled_p.x(), unscaled_p.y(), z_coord);
+    std::queue<Vec3f> orig_polyline_points { };
+    for (size_t index = 0; index < polyline.size(); ++index) {
+        Vec2f unscaled_p = unscale(polyline.points[index]).cast<float>();
+        orig_polyline_points.emplace(unscaled_p.x(), unscaled_p.y(), z_coord);
     }
-    Vec3f first = orig_polygon_points.front();
     std::queue<Vec3f> oversampled_points { };
     size_t orig_angle_index = 0;
     perimeter.start_index = result.points.size();
     perimeter.flow_width = region != nullptr ? region->flow(FlowRole::frExternalPerimeter).width() : 0.0f;
     bool some_point_enforced = false;
-    while (!orig_polygon_points.empty() || !oversampled_points.empty()) {
+    while (!orig_polyline_points.empty() || !oversampled_points.empty()) {
         EnforcedBlockedSeamPoint type = EnforcedBlockedSeamPoint::Neutral;
         Vec3f position;
         float local_ccw_angle = 0;
@@ -580,9 +639,16 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             position = oversampled_points.front();
             oversampled_points.pop();
         } else {
-            position = orig_polygon_points.front();
-            orig_polygon_points.pop();
-            local_ccw_angle = was_clockwise ? -polygon_angles[orig_angle_index] : polygon_angles[orig_angle_index];
+            position = orig_polyline_points.front();
+            orig_polyline_points.pop();
+            if (orig_polyline.direction == PolylineWithEnd::PolyDir::BOTH) {
+                local_ccw_angle = polyline_angles[orig_angle_index];
+            } else if (orig_polyline.direction == PolylineWithEnd::PolyDir::CW) {
+                local_ccw_angle = -polyline_angles[orig_angle_index];
+            } else {
+                assert(orig_polyline.direction == PolylineWithEnd::PolyDir::CCW);
+                local_ccw_angle = polyline_angles[orig_angle_index];
+            }
             orig_angle_index++;
             orig_point = true;
         }
@@ -596,10 +662,11 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
         }
         some_point_enforced = some_point_enforced || type == EnforcedBlockedSeamPoint::Enforced;
 
-        if (orig_point) {
-            Vec3f pos_of_next = orig_polygon_points.empty() ? first : orig_polygon_points.front();
+        if (orig_point && !orig_polyline_points.empty()) {
+            Vec3f pos_of_next = orig_polyline_points.front();
+            Line  line(scaled(Vec2f(position.head<2>())), scaled(Vec2f(pos_of_next.head<2>())));
             float distance_to_next = (position - pos_of_next).norm();
-            if (global_model_info.is_enforced(position, distance_to_next)) {
+            if (global_model_info.is_enforced( (position + pos_of_next) / 2, distance_to_next / 2)) {
                 Vec3f vec_to_next = (pos_of_next - position).normalized();
                 float step_size = SeamPlacer::enforcer_oversampling_distance;
                 float step = step_size;
@@ -614,6 +681,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     }
 
     perimeter.end_index = result.points.size();
+    assert(!is_polygon || result.points[perimeter.end_index-1].position == result.points[perimeter.start_index].position);
 
     if (some_point_enforced) {
         // We will patches of enforced points (patch: continuous section of enforced points), choose
@@ -624,18 +692,26 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             return perimeter.start_index + Slic3r::next_idx_modulo(idx - perimeter.start_index, perimeter_size);
         };
 
+        assert(perimeter.start_index + 2 <= perimeter.end_index); // at least 2 elt
         std::vector<size_t> patches_starts_ends;
-        for (size_t i = perimeter.start_index; i < perimeter.end_index; ++i) {
+        for (size_t i = perimeter.start_index; i < perimeter.end_index - 1; ++i) {
             if (result.points[i].type != EnforcedBlockedSeamPoint::Enforced &&
-                    result.points[next_index(i)].type == EnforcedBlockedSeamPoint::Enforced) {
-                patches_starts_ends.push_back(next_index(i));
+                    result.points[i+1].type == EnforcedBlockedSeamPoint::Enforced) {
+                patches_starts_ends.push_back(i+1);
             }
             if (result.points[i].type == EnforcedBlockedSeamPoint::Enforced &&
-                    result.points[next_index(i)].type != EnforcedBlockedSeamPoint::Enforced) {
-                patches_starts_ends.push_back(next_index(i));
+                    result.points[i+1].type != EnforcedBlockedSeamPoint::Enforced) {
+                patches_starts_ends.push_back(i+1);
             }
         }
-        //if patches_starts_ends are empty, it means that the whole perimeter is enforced.. don't do anything in that case
+        // also add start & end that can't be found for polyline
+        if (!is_polygon && result.points[perimeter.start_index].type == EnforcedBlockedSeamPoint::Enforced) {
+            patches_starts_ends.insert(patches_starts_ends.begin(), perimeter.start_index);
+        }
+        if (!is_polygon && result.points[perimeter.end_index - 1].type == EnforcedBlockedSeamPoint::Enforced) {
+            patches_starts_ends.push_back(perimeter.end_index);
+        }
+        // If patches_starts_ends are empty, it means that the whole perimeter is enforced.. don't do anything in that case, as there is no center of a circumference
         if (!patches_starts_ends.empty()) {
             //if the first point in the patches is not enforced, it marks a patch end. in that case, put it to the end and start on next
             // to simplify the processing
@@ -969,7 +1045,7 @@ void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams> &lay
         float max_weight = min_weight;
 
         for (const SeamCandidate &point : layers[layer_idx].points) {
-            Vec3i color = value_to_rgbi(-PI, PI, point.local_ccw_angle);
+            Vec3i32 color = value_to_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
                     + std::to_string(color.z()) + ")";
             angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
@@ -1171,9 +1247,9 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po,
                     auto unscaled_z = layer->slice_z;
                     std::vector<const LayerRegion*> regions;
                     //NOTE corresponding region ptr may be null, if the layer has zero perimeters
-                    Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference, regions, po->config().perimeter_generator.value);
-                    for (size_t poly_index = 0; poly_index < polygons.size(); ++poly_index) {
-                        process_perimeter_polygon(polygons[poly_index], unscaled_z,
+                    PolylineWithEnds polygons_and_lines = extract_perimeter_polylines(layer, configured_seam_preference, regions, po->config().perimeter_generator.value);
+                    for (size_t poly_index = 0; poly_index < polygons_and_lines.size(); ++poly_index) {
+                        process_perimeter_polylines(polygons_and_lines[poly_index], unscaled_z,
                                 regions[poly_index], global_model_info, layer_seams);
                     }
                     auto functor = SeamCandidateCoordinateFunctor { layer_seams.points };
@@ -1653,7 +1729,12 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
     m_seam_per_object.clear();
     this->external_perimeters_first = print.default_region_config().external_perimeters_first;
 
-    for (const PrintObject *po : print.objects()) {
+    for (size_t obj_idx = 0; obj_idx < print.objects().size(); ++ obj_idx) {
+        const PrintObject *po = print.objects()[obj_idx];
+        print.set_status(int((obj_idx * 100) / print.objects().size()),
+                         ("Computing seam visibility areas: object %s / %s"),
+                         {std::to_string(obj_idx + 1), std::to_string(print.objects().size())},
+                         PrintBase::SlicingStatus::SECONDARY_STATE);
         throw_if_canceled_func();
         SeamPosition configured_seam_preference = po->config().seam_position.value;
         SeamComparator comparator { configured_seam_preference, *po };

@@ -846,7 +846,7 @@ template<class T>
 void add_correct_opts_to_options_list(const std::string &opt_key, std::map<std::string, std::pair<int,int>>& map, Tab *tab, const int& value)
 {
     T *opt_cur = static_cast<T*>(tab->get_config()->option(opt_key));
-    for (size_t i = 0; i < opt_cur->values.size(); i++)
+    for (size_t i = 0; i < opt_cur->size(); i++)
         map.emplace(opt_key /* + "#" + std::to_string(i)*/, std::pair<int, int>{i, value});
 }
 
@@ -870,6 +870,7 @@ void TabPrinter::init_options_list()
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coGraphs:	add_correct_opts_to_options_list<ConfigOptionGraphs		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         default: m_options_list.emplace(opt_key, std::pair<int,int>{-1, m_opt_status_value}); break;
         }
     }
@@ -916,6 +917,7 @@ void TabSLAMaterial::init_options_list()
         case coPercents:add_correct_opts_to_options_list<ConfigOptionPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coFloatsOrPercents:add_correct_opts_to_options_list<ConfigOptionFloatsOrPercents	>(opt_key, m_options_list, this, m_opt_status_value);	break;
         case coPoints:	add_correct_opts_to_options_list<ConfigOptionPoints		>(opt_key, m_options_list, this, m_opt_status_value);	break;
+        case coGraphs:	add_correct_opts_to_options_list<ConfigOptionGraphs		>(opt_key, m_options_list, this, m_opt_status_value);	break;
         default:		m_options_list.emplace(opt_key, std::pair<int,int>{0, m_opt_status_value});		break;
         }
     }
@@ -1054,7 +1056,7 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
                 to_sys ? group->back_to_sys_value("compatible_printers") : group->back_to_initial_value("compatible_printers");
                 load_key_value("compatible_printers", true/*some value*/, true);
 
-                bool is_empty = m_config_base->option<ConfigOptionStrings>("compatible_printers")->values.empty();
+                bool is_empty = m_config_base->option<ConfigOptionStrings>("compatible_printers")->empty();
                 m_compatible_printers.checkbox->SetValue(is_empty);
                 is_empty ? m_compatible_printers.btn->Disable() : m_compatible_printers.btn->Enable();
             }
@@ -1064,7 +1066,7 @@ void Tab::on_roll_back_value(const bool to_sys /*= true*/)
                 to_sys ? group->back_to_sys_value("compatible_prints") : group->back_to_initial_value("compatible_prints");
                 load_key_value("compatible_prints", true/*some value*/, true);
 
-                bool is_empty = m_config_base->option<ConfigOptionStrings>("compatible_prints")->values.empty();
+                bool is_empty = m_config_base->option<ConfigOptionStrings>("compatible_prints")->empty();
                 m_compatible_prints.checkbox->SetValue(is_empty);
                 is_empty ? m_compatible_prints.btn->Disable() : m_compatible_prints.btn->Enable();
             }
@@ -1457,7 +1459,7 @@ void Tab::update_wiping_button_visibility() {
     if (m_preset_bundle->printers.get_selected_preset().printer_technology() != ptFFF)
         return; // ys_FIXME
     bool wipe_tower_enabled = dynamic_cast<ConfigOptionBool*>(  (m_preset_bundle->fff_prints.get_edited_preset().config  ).option("wipe_tower"))->value;
-    bool multiple_extruders = dynamic_cast<ConfigOptionFloats*>((m_preset_bundle->printers.get_edited_preset().config).option("nozzle_diameter"))->values.size() > 1;
+    bool multiple_extruders = dynamic_cast<ConfigOptionFloats*>((m_preset_bundle->printers.get_edited_preset().config).option("nozzle_diameter"))->size() > 1;
 
     auto wiping_dialog_button = wxGetApp().sidebar().get_wiping_dialog_button();
     if (wiping_dialog_button) {
@@ -1667,7 +1669,7 @@ void Tab::update_preset_description_line()
             {
                 //FIXME add prefered_sla_material_profile for SLA
                 const std::string              &default_print_profile = preset.config.opt_string("default_print_profile");
-                const std::vector<std::string> &default_filament_profiles = preset.config.option<ConfigOptionStrings>("default_filament_profile")->values;
+                const std::vector<std::string> &default_filament_profiles = preset.config.option<ConfigOptionStrings>("default_filament_profile")->get_values();
                 if (!default_print_profile.empty())
                     description_line += "\n\n\t" + _(L("default print profile")) + ": \n\t\t" + default_print_profile;
                 if (!default_filament_profiles.empty())
@@ -1898,7 +1900,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                                 assert(m_config);
                                 if (boost::any_cast<bool>(value) && tab->m_extruders_count > 1) {
                                     SuppressBackgroundProcessingUpdate sbpu;
-                                    std::vector<double> nozzle_diameters = static_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"))->values;
+                                    std::vector<double> nozzle_diameters = static_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"))->get_values();
                                     const double frst_diam = nozzle_diameters[0];
 
                                     for (auto cur_diam : nozzle_diameters) {
@@ -2336,10 +2338,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             // hack (see FreqChangedParams::init() in plater.cpp)
             current_line.label_tooltip = full_line;
         } else if (full_line == "update_nozzle_diameter") {
-            current_group
-                ->m_on_change = set_or_add(current_group->m_on_change, [this,
-                                                                        idx_page](const t_config_option_key &opt_key,
-                                                                                  boost::any                 value) {
+            current_group->m_on_change = set_or_add(current_group->m_on_change, [this, idx_page]
+                    (const t_config_option_key &opt_key, boost::any value) {
                 TabPrinter *tab = nullptr;
                 if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
                     return;
@@ -2348,7 +2348,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     SuppressBackgroundProcessingUpdate sbpu;
                     const double                       new_nd = boost::any_cast<double>(value);
                     std::vector<double>                nozzle_diameters =
-                        static_cast<const ConfigOptionFloats *>(m_config_base->option("nozzle_diameter"))->values;
+                        static_cast<const ConfigOptionFloats *>(m_config_base->option("nozzle_diameter"))->get_values();
 
                     // if value was changed
                     if (fabs(nozzle_diameters[idx_page == 0 ? 1 : 0] - new_nd) > EPSILON) {
@@ -2568,26 +2568,6 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     return sizer;
                 };
                 current_group->append_line(thisline);
-            } else if (boost::starts_with(full_line, "extruder_extrusion_multiplier_speed")) {
-                // don't forget the idx_page as it's on the extruder page.
-                Line thisline = current_group->create_single_option_line("extruder_extrusion_multiplier_speed", "", idx_page);
-                thisline.widget = [this](wxWindow *parent) {
-                    auto dialog_btn = new wxButton(parent, wxID_ANY, _L("Extrusion multiplier per speed") + dots,
-                                                           wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-                    dialog_btn->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-                    wxGetApp().UpdateDarkUI(dialog_btn);
-                    auto sizer = new wxBoxSizer(wxHORIZONTAL);
-                    sizer->Add(dialog_btn);
-
-                    dialog_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent &e) {
-                        GraphDialog dlg(this, (m_config_base->option<ConfigOptionStrings>("extruder_extrusion_multiplier_speed"))->get_at(0));
-                        if (dlg.ShowModal() == wxID_OK)
-                            //(m_config_base->option<ConfigOptionStrings>("extruder_extrusion_multiplier_speed"))->get_at(0) = dlg.get_parameters();
-                            load_key_value("extruder_extrusion_multiplier_speed", dlg.get_parameters(), false, 0);
-                    }));
-                    return sizer;
-                };
-                current_group->append_line(thisline);
             } else if (full_line == "bed_shape") {
                 TabPrinter *tab = nullptr;
                 if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
@@ -2691,12 +2671,11 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     assert(m_config);
                     btn->Bind(wxEVT_BUTTON, [this, idx_page](wxCommandEvent &e) {
                         std::vector<std::string> colors =
-                            static_cast<const ConfigOptionStrings *>(m_config->option("extruder_colour"))->values;
+                            static_cast<const ConfigOptionStrings *>(m_config->option("extruder_colour"))->get_values();
                         colors[idx_page] = "";
 
                         DynamicPrintConfig new_conf = *m_config;
-                        new_conf.set_key_value("extruder_colour",
-                                               (new ConfigOptionStrings(colors))->set_is_extruder_size(true));
+                        new_conf.set_key_value("extruder_colour", (new ConfigOptionStrings(colors))->set_is_extruder_size(true));
                         load_config(new_conf);
 
                         update_dirty();
@@ -3229,18 +3208,18 @@ void TabPrinter::build_fff()
     m_pages.reserve(30);
 
     auto* nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
-    m_initial_extruders_count = m_extruders_count = nozzle_diameter->values.size();
+    m_initial_extruders_count = m_extruders_count = nozzle_diameter->size();
     wxGetApp().sidebar().update_objects_list_extruder_column(m_initial_extruders_count);
 
     auto* milling_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("milling_diameter"));
-    m_initial_milling_count = m_milling_count = milling_diameter->values.size();
+    m_initial_milling_count = m_milling_count = milling_diameter->size();
 
     const Preset* parent_preset = m_printer_technology == ptSLA ? nullptr // just for first build, if SLA printer preset is selected 
                                   : m_presets->get_selected_preset_parent();
     m_sys_extruders_count = parent_preset == nullptr ? 0 :
-        static_cast<const ConfigOptionFloats*>(parent_preset->config.option("nozzle_diameter"))->values.size();
+        static_cast<const ConfigOptionFloats*>(parent_preset->config.option("nozzle_diameter"))->size();
     m_sys_milling_count = parent_preset == nullptr ? 0 :
-        static_cast<const ConfigOptionFloats*>(parent_preset->config.option("milling_diameter"))->values.size();
+        static_cast<const ConfigOptionFloats*>(parent_preset->config.option("milling_diameter"))->size();
 
     append(this->m_pages, create_pages("printer_fff.ui"));
 
@@ -3272,7 +3251,7 @@ void TabPrinter::extruders_count_changed(size_t extruders_count)
         m_preset_bundle->update_multi_material_filament_presets();
         is_count_changed = true;
     } else if (m_extruders_count == 1 &&
-        m_preset_bundle->project_config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values.size() > 1)
+        m_preset_bundle->project_config.option<ConfigOptionFloats>("wiping_volumes_matrix")->size() > 1)
         m_preset_bundle->update_multi_material_filament_presets();
 
 
@@ -3288,9 +3267,9 @@ void TabPrinter::extruders_count_changed(size_t extruders_count)
         on_value_change("extruders_count", (int)extruders_count);
         //update default tool_name => not used, no need to do that
         //ConfigOptionStrings* names = this->m_config->option<ConfigOptionStrings>("tool_name");
-        //for (size_t ss = 0; ss < names->values.size(); ss++)
-        //    if (names->values[ss] == "")
-        //        names->values[ss] = std::to_string(ss);
+        //for (size_t ss = 0; ss < names->size(); ss++)
+        //    if (names->get_at(ss) == "")
+        //        names->get_at(ss) = std::to_string(ss);
         //update gui
         wxGetApp().sidebar().update_objects_list_extruder_column(extruders_count);
     }
@@ -3543,13 +3522,13 @@ void TabPrinter::on_preset_loaded()
 {
     // update the extruders count field
     auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
-    size_t extruders_count = nozzle_diameter->values.size();
+    size_t extruders_count = nozzle_diameter->size();
     // update the GUI field according to the number of nozzle diameters supplied
     extruders_count_changed(extruders_count);
 
     //same for milling
     auto* milling_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("milling_diameter"));
-    size_t milling_count = milling_diameter->values.size();
+    size_t milling_count = milling_diameter->size();
     milling_count_changed(milling_count);
 }
 
@@ -3750,8 +3729,8 @@ void TabPrinter::toggle_options()
             DynamicPrintConfig new_conf = *m_config;
             if (dialog.ShowModal() == wxID_YES) {
                 auto wipe = static_cast<ConfigOptionBools*>(m_config->option("wipe")->clone());
-                for (size_t w = 0; w < wipe->values.size(); w++)
-                    wipe->values[w] = false;
+                for (size_t w = 0; w < wipe->size(); w++)
+                    wipe->get_at(w) = false;
                 new_conf.set_key_value("wipe", wipe);
             } else {
                 new_conf.set_key_value("use_firmware_retraction", new ConfigOptionBool(false));
@@ -3799,24 +3778,24 @@ void TabPrinter::toggle_options()
         int64_t z_step_Mlong = (int64_t)(z_step * 1000000.);
         DynamicPrintConfig new_conf;
         bool has_changed = false;
-        const std::vector<double>& nozzle_diameters = m_config->option<ConfigOptionFloats>("nozzle_diameter")->values;
-        const std::vector<FloatOrPercent>& min_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("min_layer_height")->values;
+        const std::vector<double>& nozzle_diameters = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_values();
+        const std::vector<FloatOrPercent>& min_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("min_layer_height")->get_values();
         for (int i = 0; i < min_layer_height.size(); i++) {
             if(!min_layer_height[i].percent)
                 if (min_layer_height[i].value != 0 && (int64_t)(min_layer_height[i].value * 1000000.) % z_step_Mlong != 0) {
                     if (!has_changed)
                         new_conf = *m_config;
-                    new_conf.option<ConfigOptionFloatsOrPercents>("min_layer_height")->values[i].value = std::max(z_step, Slic3r::check_z_step(min_layer_height[i].value, z_step));
+                    new_conf.option<ConfigOptionFloatsOrPercents>("min_layer_height")->set_at(FloatOrPercent{std::max(z_step, Slic3r::check_z_step(min_layer_height[i].value, z_step)), false}, i);
                     has_changed = true;
                 }
         }
-        std::vector<FloatOrPercent> max_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("max_layer_height")->values;
+        std::vector<FloatOrPercent> max_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("max_layer_height")->get_values();
         for (int i = 0; i < max_layer_height.size(); i++) {
             if (!max_layer_height[i].percent)
                 if ((int64_t)(max_layer_height[i].value * 1000000.) % z_step_Mlong != 0) {
                     if (!has_changed)
                         new_conf = *m_config;
-                    new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->values[i].value = std::max(z_step, Slic3r::check_z_step(max_layer_height[i].value, z_step));
+                    new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->get_at(i).value = std::max(z_step, Slic3r::check_z_step(max_layer_height[i].value, z_step));
                     has_changed = true;
                 }
         }
@@ -3980,13 +3959,13 @@ void Tab::load_current_preset()
             }
             on_presets_changed();
             if (printer_technology == ptFFF) {
-                static_cast<TabPrinter*>(this)->m_initial_extruders_count = static_cast<const ConfigOptionFloats*>(m_presets->get_selected_preset().config.option("nozzle_diameter"))->values.size(); //static_cast<TabPrinter*>(this)->m_extruders_count;
+                static_cast<TabPrinter*>(this)->m_initial_extruders_count = static_cast<const ConfigOptionFloats*>(m_presets->get_selected_preset().config.option("nozzle_diameter"))->size(); //static_cast<TabPrinter*>(this)->m_extruders_count;
                 const Preset* parent_preset = m_presets->get_selected_preset_parent();
                 static_cast<TabPrinter*>(this)->m_sys_extruders_count = parent_preset == nullptr ? 0 :
-                    static_cast<const ConfigOptionFloats*>(parent_preset->config.option("nozzle_diameter"))->values.size();
+                    static_cast<const ConfigOptionFloats*>(parent_preset->config.option("nozzle_diameter"))->size();
                 static_cast<TabPrinter*>(this)->m_initial_milling_count = static_cast<TabPrinter*>(this)->m_milling_count;
                 static_cast<TabPrinter*>(this)->m_sys_milling_count = parent_preset == nullptr ? 0 :
-                    static_cast<const ConfigOptionFloats*>(parent_preset->config.option("milling_diameter"))->values.size();
+                    static_cast<const ConfigOptionFloats*>(parent_preset->config.option("milling_diameter"))->size();
             }
         }
         else {
@@ -4708,8 +4687,8 @@ wxSizer* Tab::compatible_widget_create(wxWindow* parent, PresetDependencies &dep
         // Collect and set indices of depending_presets marked as compatible.
         wxArrayInt selections;
         auto *compatible_printers = dynamic_cast<const ConfigOptionStrings*>(m_config_base->option(deps.key_list));
-        if (compatible_printers != nullptr || !compatible_printers->values.empty())
-            for (auto preset_name : compatible_printers->values)
+        if (compatible_printers != nullptr || !compatible_printers->empty())
+            for (auto preset_name : compatible_printers->get_values())
                 for (size_t idx = 0; idx < presets.GetCount(); ++idx)
                     if (presets[idx] == preset_name) {
                         selections.Add(idx);
@@ -4748,17 +4727,17 @@ void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxF
 
 void SubstitutionManager::validate_lenth()
 {
-    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
-    if ((substitutions.size() % 4) != 0) {
+    size_t substitutions_size = m_config->option<ConfigOptionStrings>("gcode_substitutions")->size();
+    if ((substitutions_size % 4) != 0) {
         WarningDialog(m_parent, "Value of gcode_substitutions parameter will be cut to valid length",
             "Invalid length of gcode_substitutions parameter").ShowModal();
-        substitutions.resize(substitutions.size() - (substitutions.size() % 4));
+        m_config->option<ConfigOptionStrings>("gcode_substitutions")->resize(substitutions_size - (substitutions_size % 4));
     }
 }
 
 bool SubstitutionManager::is_compatibile_with_ui()
 {
-    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->get_values();
     if (int(substitutions.size() / 4) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
         ErrorDialog(m_parent, "Invalid compatibility between UI and BE", false).ShowModal();
         return false;
@@ -4768,7 +4747,7 @@ bool SubstitutionManager::is_compatibile_with_ui()
 
 bool SubstitutionManager::is_valid_id(int substitution_id, const wxString& message)
 {
-    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    const std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->get_values();
     if (int(substitutions.size() / 4) < substitution_id) {
         ErrorDialog(m_parent, message, false).ShowModal();
         return false;
@@ -4800,8 +4779,9 @@ void SubstitutionManager::delete_substitution(int substitution_id)
         return;
 
     // delete substitution
-    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    std::vector<std::string> substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->get_values();
     substitutions.erase(std::next(substitutions.begin(), substitution_id * 4), std::next(substitutions.begin(), substitution_id * 4 + 4));
+    m_config->option<ConfigOptionStrings>("gcode_substitutions")->set(substitutions);
     call_ui_update();
 
     // update grid_sizer
@@ -4826,9 +4806,10 @@ void SubstitutionManager::add_substitution(int substitution_id,
 
         // create new substitution
         // it have to be added to config too
-        std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+        std::vector<std::string> substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->get_values();
         for (size_t i = 0; i < 4; i++)
             substitutions.push_back(std::string());
+        m_config->option<ConfigOptionStrings>("gcode_substitutions")->set(substitutions);
 
         call_after_layout = true;
     }
@@ -4928,7 +4909,7 @@ void SubstitutionManager::update_from_config()
     if (!m_grid_sizer->IsEmpty())
         m_grid_sizer->Clear(true);
 
-    std::vector<std::string>& subst = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    const std::vector<std::string>& subst = m_config->option<ConfigOptionStrings>("gcode_substitutions")->get_values();
     if (subst.empty())
         hide_delete_all_btn();
     else
@@ -4945,7 +4926,7 @@ void SubstitutionManager::update_from_config()
 
 void SubstitutionManager::delete_all()
 {
-    m_config->option<ConfigOptionStrings>("gcode_substitutions")->values.clear();
+    m_config->option<ConfigOptionStrings>("gcode_substitutions")->clear();
     call_ui_update();
 
     if (!m_grid_sizer->IsEmpty())
@@ -4956,20 +4937,21 @@ void SubstitutionManager::delete_all()
 
 void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, const std::string& value)
 {
-    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    std::vector<std::string> substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->get_values();
 
     validate_lenth();
     if (!is_compatibile_with_ui() || !is_valid_id(substitution_id, "Invalid substitution_id to edit"))
         return;
 
     substitutions[substitution_id * 4 + opt_pos] = value;
+    m_config->option<ConfigOptionStrings>("gcode_substitutions")->set(substitutions);
 
     call_ui_update();
 }
 
 bool SubstitutionManager::is_empty_substitutions()
 {
-    return m_config->option<ConfigOptionStrings>("gcode_substitutions")->values.empty();
+    return m_config->option<ConfigOptionStrings>("gcode_substitutions")->empty();
 }
 
 // Return a callback to create a TabPrint widget to edit G-code substitutions
@@ -5048,10 +5030,10 @@ wxSizer *VectorManager::init(DynamicPrintConfig *config, wxWindow *parent, PageS
 
 bool VectorManager::is_compatibile_with_ui()
 {
-    const std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
-    if (int(values.size()) != m_grid_sizer->GetItemCount()) {
+    size_t values_size = m_config->option<ConfigOptionFloats>(m_opt_key)->size();
+    if (int(values_size) != m_grid_sizer->GetItemCount()) {
         ErrorDialog(m_parent,
-                    std::string("Invalid compatibility between UI and BE: ") + std::to_string(values.size()) +
+                    std::string("Invalid compatibility between UI and BE: ") + std::to_string(values_size) +
                         std::string("=!=") + std::to_string(m_grid_sizer->GetItemCount()),
                     false)
             .ShowModal();
@@ -5068,8 +5050,9 @@ void VectorManager::pop_back()
     }
 
     // delete substitution
-    std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
-    values.pop_back();
+    ConfigOptionFloats* opt = m_config->option<ConfigOptionFloats>(m_opt_key);
+    // pop_back();
+    opt->resize(opt->size() - 1);
 
     call_ui_update();
 
@@ -5084,12 +5067,11 @@ void VectorManager::push_back(const std::string &str_value)
 {
     bool call_after_layout = false;
 
-    std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
-
     if (str_value == "") {
         // create new substitution
         // it have to be added to config too
-        values.push_back(0);
+        ConfigOptionFloats* opt = m_config->option<ConfigOptionFloats>(m_opt_key);
+        opt->set_at(0, opt->size()); // push_back()
 
         call_after_layout = true;
     }
@@ -5133,7 +5115,7 @@ void VectorManager::update_from_config()
 
     switch (m_opt_type) {
     case coBools: {
-        std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        const std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->get_values();
         if (values.empty())
             clear();
         else
@@ -5141,7 +5123,7 @@ void VectorManager::update_from_config()
         break;
     }
     case coInts: {
-        std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->values;
+        const std::vector<int32_t> &values = m_config->option<ConfigOptionInts>(m_opt_key)->get_values();
         if (values.empty())
             clear();
         else
@@ -5149,7 +5131,7 @@ void VectorManager::update_from_config()
         break;
     }
     case coFloats: {
-        std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
+        const std::vector<double> &values = m_config->option<ConfigOptionFloats>(m_opt_key)->get_values();
         if (values.empty())
             clear();
         else
@@ -5157,7 +5139,7 @@ void VectorManager::update_from_config()
         break;
     }
     case coPercents: {
-        std::vector<double> &values = m_config->option<ConfigOptionPercents>(m_opt_key)->values;
+        const std::vector<double> &values = m_config->option<ConfigOptionPercents>(m_opt_key)->get_values();
         if (values.empty())
             clear();
         else
@@ -5165,7 +5147,7 @@ void VectorManager::update_from_config()
         break;
     }
     case coFloatsOrPercents: {
-        std::vector<FloatOrPercent> &values = m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->values;
+        const std::vector<FloatOrPercent> &values = m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->get_values();
         if (values.empty())
             clear();
         else
@@ -5199,38 +5181,33 @@ void VectorManager::edit_value(int idx_value, const std::string &str_value)
         return;
     switch (m_opt_type) {
     case coBools: {
-        std::vector<uint8_t> &values = m_config->option<ConfigOptionBools>(m_opt_key)->values;
         std::string        lower  = str_value;
         boost::to_lower(lower);
         bool is_val       = str_value == "1" || lower == "true";
-        values[idx_value] = is_val;
+        m_config->option<ConfigOptionBools>(m_opt_key)->set_at(is_val, idx_value);
         break;
     }
     case coInts: {
-        std::vector<int32_t> &values  = m_config->option<ConfigOptionInts>(m_opt_key)->values;
         int32_t               int_val = (int32_t) string_to_double_decimal_point(str_value);
-        values[idx_value]             = int_val;
+        m_config->option<ConfigOptionInts>(m_opt_key)->set_at(int_val, idx_value);
         break;
     }
     case coFloats: {
-        std::vector<double> &values    = m_config->option<ConfigOptionFloats>(m_opt_key)->values;
         double               float_val = string_to_double_decimal_point(str_value);
-        values[idx_value]              = float_val;
+        m_config->option<ConfigOptionFloats>(m_opt_key)->set_at(float_val, idx_value);
         break;
     }
     case coPercents: {
-        std::vector<double> &values    = m_config->option<ConfigOptionPercents>(m_opt_key)->values;
         double               float_val = string_to_double_decimal_point(str_value);
-        values[idx_value]              = float_val;
+        m_config->option<ConfigOptionPercents>(m_opt_key)->set_at(float_val, idx_value);
         break;
     }
     case coFloatsOrPercents: {
-        std::vector<FloatOrPercent> &values = m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->values;
         std::string                  trimed = str_value;
         boost::trim(trimed);
         bool   has_percent = !trimed.empty() && trimed.back() == '%';
         double float_val = string_to_double_decimal_point(has_percent ? trimed.substr(0, trimed.size() - 1) : trimed);
-        values[idx_value] = FloatOrPercent{float_val, has_percent};
+        m_config->option<ConfigOptionFloatsOrPercents>(m_opt_key)->set_at(FloatOrPercent{float_val, has_percent}, idx_value);
         break;
     }
     case coPoints: {
@@ -5431,7 +5408,7 @@ void Tab::compatible_widget_reload(PresetDependencies &deps)
     if (!field)
         return;
 
-    bool has_any = ! m_config_base->option<ConfigOptionStrings>(deps.key_list)->values.empty();
+    bool has_any = ! m_config_base->option<ConfigOptionStrings>(deps.key_list)->empty();
     has_any ? deps.btn->Enable() : deps.btn->Disable();
     deps.checkbox->SetValue(! has_any);
 

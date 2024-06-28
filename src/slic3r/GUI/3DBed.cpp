@@ -387,7 +387,7 @@ std::tuple<Bed3D::Type, std::string, std::string, bool> Bed3D::detect_type(const
         const Preset* curr = &bundle->printers.get_selected_preset();
         while (curr != nullptr) {
             if (curr->config.has("bed_shape")) {
-                if (shape == dynamic_cast<const ConfigOptionPoints*>(curr->config.option("bed_shape"))->values) {
+                if (shape == dynamic_cast<const ConfigOptionPoints*>(curr->config.option("bed_shape"))->get_values()) {
                     std::string model_filename = PresetUtils::system_printer_bed_model(*curr);
                     std::string texture_filename = PresetUtils::system_printer_bed_texture(*curr);
                     if (!model_filename.empty() && !texture_filename.empty())

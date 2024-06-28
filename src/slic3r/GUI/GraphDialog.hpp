@@ -7,6 +7,7 @@
 #include <wx/checkbox.h>
 #include <wx/msgdlg.h>
 
+#include "libslic3r/Config.hpp" // for GraphSettings
 #include "RammingChart.hpp"
 
 namespace Slic3r { namespace GUI {
@@ -14,26 +15,33 @@ namespace Slic3r { namespace GUI {
 class GraphPanel : public wxPanel
 {
 public:
-    GraphPanel(wxWindow *parent, const std::string &data);
-    std::string get_parameters();
+    GraphPanel(wxWindow *parent, GraphData data,const GraphSettings &settings);
+    GraphData get_data();
+    bool      is_disabled();
 
 private:
-    Chart *           m_chart           = nullptr;
-    wxSpinCtrl *      m_widget_speed    = nullptr;
-    wxSpinCtrlDouble *m_widget_min_flow = nullptr;
-    wxSpinCtrlDouble *m_widget_max_flow = nullptr;
-    int               m_last_speed      = 120;
+    Chart *           m_chart        = nullptr;
+    wxSpinCtrlDouble *m_widget_min_x = nullptr;
+    wxSpinCtrlDouble *m_widget_max_x = nullptr;
+    wxSpinCtrlDouble *m_widget_min_y = nullptr;
+    wxSpinCtrlDouble *m_widget_max_y = nullptr;
+    double            m_last_min_x   = 0.f;
+    double            m_last_max_x   = 1.f;
+    double            m_last_min_y   = 0.f;
+    double            m_last_max_y   = 1.f;
 };
 
 class GraphDialog : public wxDialog
 {
 public:
-    GraphDialog(wxWindow *parent, const std::string &parameters);
-    std::string get_parameters() { return m_output_data; }
+    GraphDialog(wxWindow *parent, const GraphData &parameters, const GraphSettings &settings);
+    GraphData get_data() { return m_output_data; }
+    bool      is_disabled() { return m_disabled; }
 
 private:
     GraphPanel *m_panel_graph = nullptr;
-    std::string m_output_data;
+    GraphData m_output_data;
+    bool m_disabled = false;
 };
 
 }}     // namespace Slic3r::GUI

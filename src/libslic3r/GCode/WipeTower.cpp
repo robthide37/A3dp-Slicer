@@ -654,7 +654,7 @@ WipeTower::WipeTower(const PrintConfig& config, const PrintObjectConfig& default
     }
     // Read absolute value of first layer speed, if given as percentage,
     // it is taken over wipe_tower_speed.
-    m_first_layer_speed = config.get_abs_value("first_layer_speed", m_speed);
+    m_first_layer_speed = default_object_config.first_layer_speed.get_abs_value(m_speed);
     if (m_first_layer_speed == 0.f) { // just to make sure autospeed doesn't break it.
         m_first_layer_speed = m_speed;
     }
@@ -669,7 +669,7 @@ WipeTower::WipeTower(const PrintConfig& config, const PrintObjectConfig& default
         m_set_extruder_trimpot = config.high_current_on_filament_swap;
     }
     // Calculate where the priming lines should be - very naive test not detecting parallelograms etc.
-    const std::vector<Vec2d>& bed_points = config.bed_shape.values;
+    const std::vector<Vec2d>& bed_points = config.bed_shape.get_values();
     BoundingBoxf bb(bed_points);
     m_bed_width = float(bb.size().x());
     m_bed_shape = (bed_points.size() == 4 ? RectangularBed : CircularBed);
@@ -776,23 +776,30 @@ std::vector<WipeTower::ToolChangeResult> WipeTower::prime(
     // therefore the homing position is shifted inside the bed by 0.2 in the firmware to [0.2, -2.0].
 //	box_coordinates cleaning_box(xy(0.5f, - 1.5f), m_wipe_tower_width, wipe_area);
 
-    float prime_section_width = std::min(0.9f * m_bed_width / tools.size(), 60.f);
+    float prime_section_width = std::min((m_bed_shape == CircularBed ? 0.45f : 0.9f) * m_bed_width / tools.size(), 60.f);
     box_coordinates cleaning_box(Vec2f(0.02f * m_bed_width, 0.01f + m_perimeter_width/2.f), prime_section_width, 100.f);
     if (m_bed_shape == CircularBed) {
         cleaning_box = box_coordinates(Vec2f(0.f, 0.f), prime_section_width, 100.f);
         float total_width_half = tools.size() * prime_section_width / 2.f;
-        cleaning_box.translate(-total_width_half, -std::sqrt(std::max(0.f, std::pow(m_bed_width/2, 2.f) - std::pow(1.05f * total_width_half, 2.f))));
+        if (m_config->priming_position.value == Vec2d(0,0)) {
+            cleaning_box.translate(-total_width_half, -std::sqrt(std::max(0.f, std::pow(m_bed_width/2, 2.f) - std::pow(1.05f * total_width_half, 2.f))));
+        } else {
+            cleaning_box.translate(m_config->priming_position.value.x(), m_config->priming_position.value.y());
+        }
+    } else {
+        if (m_config->priming_position.value == Vec2d(0,0)) {
+            cleaning_box.translate(m_bed_bottom_left);
+        } else {
+            cleaning_box.translate(m_config->priming_position.value.x(), m_config->priming_position.value.y());
+        }
     }
-    else
-        cleaning_box.translate(m_bed_bottom_left);
-
     std::vector<ToolChangeResult> results;
 
     // Iterate over all priming toolchanges and push respective ToolChangeResults into results vector.
     for (size_t idx_tool = 0; idx_tool < tools.size(); ++ idx_tool) {
         size_t old_tool = m_current_tool;
 
-        WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.values, m_filpar);
+        WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.get_values(), m_filpar);
         writer.set_extrusion_flow(m_extrusion_flow)
               .set_z(m_z_pos)
               .set_initial_tool(m_current_tool);
@@ -888,7 +895,7 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
         (tool != (unsigned int)(-1) ? wipe_area+m_depth_traversed-0.5f*m_perimeter_width
                                     : m_wipe_tower_depth-m_perimeter_width));
 
-	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.values, m_filpar);
+	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.get_values(), m_filpar);
 	writer.set_extrusion_flow(m_extrusion_flow)
 		.set_z(m_z_pos)
 		.set_initial_tool(m_current_tool)
@@ -1330,7 +1337,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
 
     size_t old_tool = m_current_tool;
 
-	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.values, m_filpar);
+	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_config->tool_name.get_values(), m_filpar);
 	writer.set_extrusion_flow(m_extrusion_flow)
 		.set_z(m_z_pos)
 		.set_initial_tool(m_current_tool)
@@ -1435,7 +1442,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
             *Flow::extrusion_spacing_option("brim", brim_region_config),
             (float)m_nozzle_diameter,
             (float)m_layer_height,
-            (m_current_tool < m_config->nozzle_diameter.values.size()) ? m_object_config->get_computed_value("filament_max_overlap", m_current_tool) : 1
+            (m_current_tool < m_config->nozzle_diameter.size()) ? m_object_config->get_computed_value("filament_max_overlap", m_current_tool) : 1
         );
         const double spacing = brim_flow.spacing();
         // How many perimeters shall the brim have?

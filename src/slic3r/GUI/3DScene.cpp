@@ -1040,7 +1040,7 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
         if (filamemts_opt == nullptr)
             return;
 
-        unsigned int colors_count = std::max((unsigned int)extruders_opt->values.size(), (unsigned int)filamemts_opt->values.size());
+        unsigned int colors_count = std::max((unsigned int)extruders_opt->size(), (unsigned int)filamemts_opt->size());
         if (colors_count == 0)
             return;
         colors.resize(colors_count);
