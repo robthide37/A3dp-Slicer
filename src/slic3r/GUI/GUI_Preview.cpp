@@ -632,9 +632,15 @@ wxBoxSizer* Preview::create_layers_slider_sizer()
     Bind(DoubleSlider::wxCUSTOMEVT_TICKSCHANGED, [this](wxEvent&) {
         Model& model = wxGetApp().plater()->model();
         Info custom_gcode_per_print_z = m_layers_slider->GetTicksValues();
+        auto num_of_old_gcodes = model.custom_gcode_per_print_z.gcodes.size();
         model.custom_gcode_per_print_z = custom_gcode_per_print_z;
-        m_schedule_background_process();
+        std::string operation_message = (num_of_old_gcodes == model.custom_gcode_per_print_z.gcodes.size()) ? "Edit" :
+                                        (num_of_old_gcodes < model.custom_gcode_per_print_z.gcodes.size())  ? "Add" :
+                                                                                                              "Remove";
 
+        m_schedule_background_process();
+        wxGetApp().plater()->take_snapshot(from_u8(
+            (boost::format(_utf8(L("Change layer gcode: %s element"))) % operation_message).str()));
         m_keep_current_preview_type = false;
         reload_print(false);
         });
