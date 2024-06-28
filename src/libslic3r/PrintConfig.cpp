@@ -8625,6 +8625,10 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
     } else if ("seam_position" == opt_key) {
         if ("cost" == value) {
             value = "nearest";
+        }else if ("allrandom" == value) {
+            value = "random";
+        }else if ("contiguous" == value) {
+            value = "aligned";
         }
     } else if ("first_layer_size_compensation" == opt_key) {
         opt_key = "elefant_foot_compensation";
@@ -8637,13 +8641,14 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         }
     } else if ("elephant_foot_min_width" == opt_key) {
         opt_key = "elefant_foot_min_width";
-    } else if("first_layer_acceleration" == opt_key) {
+    } else if("first_layer_acceleration" == opt_key || "first_layer_acceleration_over_raft" == opt_key) {
         if (value.find("%") != std::string::npos) {
             // can't support %, so we uese the default accel a baseline for half-assed conversion
             value = std::to_string(all_conf.get_abs_value(opt_key, all_conf.get_computed_value("default_acceleration")));
         }
     } else if ("infill_acceleration" == opt_key || "bridge_acceleration" == opt_key || "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key
-        || "overhangs_speed" == opt_key || "ironing_speed" == opt_key || "perimeter_speed" == opt_key || "infill_speed" == opt_key || "bridge_speed" == opt_key || "support_material_speed" == opt_key
+        || "overhangs_speed" == opt_key || "ironing_speed" == opt_key || "perimeter_speed" == opt_key 
+        || "infill_speed" == opt_key || "bridge_speed" == opt_key || "support_material_speed" == opt_key
         || "max_print_speed" == opt_key
         ) {
         // remove '%'
@@ -8762,6 +8767,20 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
             opt_key = "min_fan_speed";
             new_entries["fan_always_on"] = "1";
         }
+    }
+
+    // compute max & min height from % to flat value
+    if ("min_layer_height" == opt_key || "max_layer_height" == opt_key) {
+        ConfigOptionFloats computed_opt;
+        const ConfigOptionFloatsOrPercents *current_opt = all_conf.option<ConfigOptionFloatsOrPercents>(opt_key);
+        const ConfigOptionFloats *nozzle_diameters = all_conf.option<ConfigOptionFloats>("nozzle_diameter");
+        assert(current_opt && nozzle_diameters);
+        assert(current_opt->size() == nozzle_diameters->size());
+        for (int i = 0; i < current_opt->size(); i++) {
+            computed_opt.set_at(current_opt->get_abs_value(i, nozzle_diameters->get_at(i)), i);
+        }
+        assert(computed_opt.size() == nozzle_diameters->size());
+        value = computed_opt.serialize();
     }
     
     if ("thumbnails" == opt_key) {
