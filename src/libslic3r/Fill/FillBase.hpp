@@ -241,6 +241,8 @@ namespace NaiveConnect {
 class FillWithPerimeter : public Fill
 {
 public:
+    // bewteen 0 (0%) and 1 (100%) overlap
+    float overlap_ratio = 0;
     std::unique_ptr<Fill> infill{ nullptr };
     float ratio_fill_inside = 0.f;
     FillWithPerimeter() : Fill() {}
