@@ -19,7 +19,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/spin_mutex.h>
 #include <tbb/task_group.h>
-
+#pragma optimize("", off)
 #define SUPPORT_USE_AGG_RASTERIZER
 
 #ifdef SUPPORT_USE_AGG_RASTERIZER
@@ -3912,10 +3912,10 @@ void modulate_extrusion_by_overlapping_layers(
         const PrintObjectSupportMaterial::MyLayer &overlapping_layer = *overlapping_layers[i_overlapping_layer];
         bbox.merge(get_extents(overlapping_layer.polygons));
     }
-    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.begin(); it != extrusions_in_out.end(); ++ it) {
+    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.set_entities().begin(); it != extrusions_in_out.set_entities().end(); ++ it) {
         ExtrusionPath *path = dynamic_cast<ExtrusionPath*>(*it);
         assert(path != nullptr);
-        bbox.merge(get_extents(path->polyline));
+        bbox.merge(get_extents(path->polyline.as_polyline()));
     }
     SVG svg(debug_out_path("support-fragments-%d-%lf.svg", iRun, this_layer.print_z).c_str(), bbox);
     const float transparency = 0.5f;
@@ -3932,10 +3932,10 @@ void modulate_extrusion_by_overlapping_layers(
         svg.draw(to_polylines(overlapping_layer.polygons), dbg_index_to_color(int(i_overlapping_layer)), scale_(0.1));
     }
     // Fill extrusion, the source.
-    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.begin(); it != extrusions_in_out.end(); ++ it) {
+    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.set_entities().begin(); it != extrusions_in_out.set_entities().end(); ++ it) {
         ExtrusionPath *path = dynamic_cast<ExtrusionPath*>(*it);
         std::string color_name;
-        switch ((it - extrusions_in_out.begin()) % 9) {
+        switch ((it - extrusions_in_out.set_entities().begin()) % 9) {
             case 0: color_name = "magenta"; break;
             case 1: color_name = "deepskyblue"; break;
             case 2: color_name = "coral"; break;
@@ -3946,7 +3946,7 @@ void modulate_extrusion_by_overlapping_layers(
             case 7: color_name = "brown"; break;
             default: color_name = "orchid"; break;
         }
-        svg.draw(path->polyline, color_name, scale_(0.2));
+        svg.draw(path->polyline.as_polyline(), color_name, scale_(0.2));
     }
 #endif /* SLIC3R_DEBUG */
 
@@ -4171,8 +4171,10 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             std::unique_ptr<Fill> filler_interface = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_fill_pattern)); //m_support_params.interface_fill_pattern)); FIXME choose
             std::unique_ptr<Fill> filler_support   = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.base_fill_pattern));
             std::unique_ptr<FillWithPerimeter> filler_support_with_sheath = std::make_unique<FillWithPerimeter>((Fill::new_from_type(m_support_params.base_fill_pattern)));
+            filler_support_with_sheath->overlap = m_support_params.gap_xy == 0 ? 0 : 1; // allow periemter overlap is not touching perimeters
             filler_support_with_sheath->ratio_fill_inside = 0.2f;
             std::unique_ptr<FillWithPerimeter> filler_dense = std::make_unique<FillWithPerimeter>((Fill::new_from_type(ipRectilinear)));
+            filler_dense->overlap = m_support_params.gap_xy == 0 ? 0 : 1;
             filler_dense->ratio_fill_inside = 0.2f;
             filler_interface->set_bounding_box(bbox_object);
             filler_support->set_bounding_box(bbox_object);
@@ -4489,7 +4491,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     // Destination
                     base_layer.extrusions.set_entities(),
                     // Regions to fill
-                    closing_ex(base_layer.polygons_to_extrude(), float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width())),
+                    closing_ex(base_layer.polygons_to_extrude(), float(SCALED_EPSILON), float(SCALED_EPSILON)),
                     // Filler and its parameters
                     filler, density,
                     // Extrusion parameters
