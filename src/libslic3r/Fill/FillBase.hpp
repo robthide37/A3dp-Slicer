@@ -267,9 +267,9 @@ public:
     ExtrusionSetRole(ExtrusionRole role) : new_role(role) {}
     void use(ExtrusionPath &path) override { path.set_role(new_role); }
     void use(ExtrusionPath3D &path3D) override { path3D.set_role(new_role); }
-    void use(ExtrusionMultiPath &multipath) override { for (ExtrusionPath path : multipath.paths) path.set_role(new_role); }
-    void use(ExtrusionMultiPath3D &multipath) override { for (ExtrusionPath path : multipath.paths) path.set_role(new_role); }
-    void use(ExtrusionLoop &loop) override { for (ExtrusionPath path : loop.paths) path.set_role(new_role); }
+    void use(ExtrusionMultiPath &multipath) override { for (ExtrusionPath &path : multipath.paths) path.set_role(new_role); }
+    void use(ExtrusionMultiPath3D &multipath) override { for (ExtrusionPath &path : multipath.paths) path.set_role(new_role); }
+    void use(ExtrusionLoop &loop) override { for (ExtrusionPath &path : loop.paths) path.set_role(new_role); }
     void use(ExtrusionEntityCollection &collection) override { for (ExtrusionEntity *entity : collection.entities()) entity->visit(*this); }
 };
 
