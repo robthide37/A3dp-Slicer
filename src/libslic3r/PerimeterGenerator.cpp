@@ -1579,7 +1579,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& contour_count, int
                                     bound.remove_point_too_near(ext_perimeter_width / 10);
                                     // the maximum thickness of our thin wall area is equal to the minimum thickness of a single loop (*1.2 because of circles approx. and enlrgment from 'div')
                                     Slic3r::Geometry::MedialAxis ma{ thin[0], (coord_t)((ext_perimeter_width + ext_perimeter_spacing) * 1.2),
-                                        min_width, coord_t(this->layer->height) };
+                                        min_width, scale_t(this->layer->height) };
                                     ma.use_bounds(bound)
                                         .use_min_real_width(scale_t(this->ext_perimeter_flow.nozzle_diameter()))
                                         .use_tapers(thin_walls_overlap)
@@ -3759,7 +3759,7 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
             
             //create thin wall path exttrusion
             ExtrusionEntityCollection tws;
-            tws.append(Geometry::thin_variable_width({ tw }, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)), false));
+            tws.append(Geometry::thin_variable_width({ tw }, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 10, scale_t(this->print_config->resolution)), false));
             assert(!tws.entities().empty());
 #if _DEBUG
                 tws.visit(LoopAssertVisitor{});
