@@ -363,11 +363,14 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //    }
                 //    //goto_next_polyline:
                 //}
-                if (!polylines.empty() && !is_bridge(good_role)) {
+                bool fill_bridge = is_bridge(good_role) || params.flow.bridge();
+                // allow bridged gapfill, mostly for support bottom interface.
+                assert(!is_bridge(good_role));
+                if (!polylines.empty()) {
                     ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
                     if (!gap_fill_entities.empty()) {
-                        //set role if needed
-                        if (good_role != erSolidInfill) {
+                        // set role if needed
+                        if (fill_bridge || (good_role != erSolidInfill && good_role != erTopSolidInfill)) {
                             ExtrusionSetRole set_good_role(good_role);
                             for (ExtrusionEntity* ptr : gap_fill_entities)
                                 ptr->visit(set_good_role);
@@ -395,7 +398,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
     // external gapfill
     ExPolygons gapfill_areas = diff_ex(ExPolygons{ surface->expolygon }, offset_ex(expp, double(scale_(0.5 * this->get_spacing()))));
     gapfill_areas = union_safety_offset_ex(gapfill_areas);
-    if (gapfill_areas.size() > 0) {
+    if (gapfill_areas.size() > 0 && no_overlap_expolygons.size() > 0) {
         double minarea = double(params.flow.scaled_width()) * double(params.flow.scaled_width());
         if (params.config != nullptr) minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
         for (int i = 0; i < gapfill_areas.size(); i++) {
