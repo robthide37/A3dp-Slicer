@@ -3260,9 +3260,12 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
         if (searcher.search_result.path != nullptr) {
 #if _DEBUG
             searcher.search_result.loop->visit(LoopAssertVisitor{});
+            ExtrusionLoop orig_loop = *searcher.search_result.loop;
 #endif
             if (!searcher.search_result.from_start)
                 tw.reverse();
+            //save old path, as it may be destroyed before being re-created and we want to keep its parameters.
+            ExtrusionPath path_to_split = *searcher.search_result.path; // TODO: 2.7: just save hte pathsettigns
             //get the point
             Point point = tw.front().projection_onto(searcher.search_result.line);
             //we have to create 3 paths: 1: thinwall extusion, 2: thinwall return, 3: end of the path
@@ -3322,7 +3325,7 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
             } else {
                 assert(poly_after.length() > SCALED_EPSILON);
                 searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add, 
-                    ExtrusionPath(poly_after, *searcher.search_result.path));
+                    ExtrusionPath(poly_after, path_to_split));
             }
             assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].polyline.size() > 1);
             assert(poly_after.size() > 0);
