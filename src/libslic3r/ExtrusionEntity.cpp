@@ -159,32 +159,54 @@ bool ExtrusionLoop::split_at_vertex(const Point &point, const double scaled_epsi
                     p2.append(std::move(p1));
                     path->polyline.swap(p2); // swap points & fitting result
                 }
-            } else if (idx > 0 && idx < path->size() - 1) {
-                // new paths list starts with the second half of current path
-                ExtrusionPaths new_paths;
-                PolylineOrArc p1, p2;
-                path->polyline.split_at_index(idx, &p1, &p2);
-                new_paths.reserve(this->paths.size() + 1);
-                {
-                    ExtrusionPath p = *path;
-                    p.polyline.swap(p2);
-                    if (p.polyline.is_valid()) new_paths.push_back(p);
+            } else if (idx > 0) {
+                if (idx < path->size() - 1) {
+                    // new paths list starts with the second half of current path
+                    ExtrusionPaths new_paths;
+                    PolylineOrArc  p1, p2;
+                    path->polyline.split_at_index(idx, &p1, &p2);
+                    new_paths.reserve(this->paths.size() + 1);
+                    {
+                        ExtrusionPath p = *path;
+                        p.polyline.swap(p2);
+                        if (p.polyline.is_valid())
+                            new_paths.push_back(p);
+                    }
+
+                    // then we add all paths until the end of current path list
+                    new_paths.insert(new_paths.end(), path + 1, this->paths.end()); // not including this path
+
+                    // then we add all paths since the beginning of current list up to the previous one
+                    new_paths.insert(new_paths.end(), this->paths.begin(), path); // not including this path
+
+                    // finally we add the first half of current path
+                    {
+                        ExtrusionPath p = *path;
+                        p.polyline.swap(p1);
+                        if (p.polyline.is_valid())
+                            new_paths.push_back(p);
+                    }
+                    // we can now override the old path list with the new one and stop looping
+                    this->paths = std::move(new_paths);
+                } else {
+                    // last point
+                    assert( (path)->last_point().coincides_with_epsilon(point));
+                    assert( (path + 1)->first_point().coincides_with_epsilon(point));
+                    ExtrusionPaths new_paths;
+                    new_paths.reserve(this->paths.size());
+                    // then we add all paths until the end of current path list
+                    new_paths.insert(new_paths.end(), path + 1, this->paths.end()); // not including this path
+                    // then we add all paths since the beginning of current list up to the previous one
+                    new_paths.insert(new_paths.end(), this->paths.begin(), path + 1); // including this path
+                    // we can now override the old path list with the new one and stop looping
+                    this->paths = std::move(new_paths);
                 }
-
-                // then we add all paths until the end of current path list
-                new_paths.insert(new_paths.end(), path + 1, this->paths.end());  // not including this path
-
-                // then we add all paths since the beginning of current list up to the previous one
-                new_paths.insert(new_paths.end(), this->paths.begin(), path);  // not including this path
-
-                // finally we add the first half of current path
-                {
-                    ExtrusionPath p = *path;
-                    p.polyline.swap(p1);
-                    if (p.polyline.is_valid()) new_paths.push_back(p);
-                }
-                // we can now override the old path list with the new one and stop looping
-                this->paths = std::move(new_paths);
+            } else {
+                // else first point ->
+                // if first path - nothign to change.
+                // else, then impossible as it's also the last point of the previous path.
+                assert(path == this->paths.begin());
+                assert(path->first_point().coincides_with_epsilon(point));
             }
             return true;
         }
@@ -250,8 +272,8 @@ void ExtrusionLoop::split_at(const Point &point, bool prefer_non_overhang, const
     
     // now split path_idx in two parts
     const ExtrusionPath &path = this->paths[path_idx];
-    ExtrusionPath p1(path.role(), path.mm3_per_mm, path.width, path.height, can_reverse());
-    ExtrusionPath p2(path.role(), path.mm3_per_mm, path.width, path.height, can_reverse());
+    ExtrusionPath p1(path.role(), path.mm3_per_mm, path.width, path.height, path.can_reverse());
+    ExtrusionPath p2(path.role(), path.mm3_per_mm, path.width, path.height, path.can_reverse());
     path.polyline.split_at(p, &p1.polyline, &p2.polyline);
     
     if (this->paths.size() == 1) {
