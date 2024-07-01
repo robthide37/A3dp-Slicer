@@ -5766,11 +5766,36 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<SupportMaterialPattern>(smpRectilinear));
 
-    def = this->add("support_material_interface_pattern", coEnum);
-    def->label = L("Pattern");
-    def->full_label = L("Support interface pattern");
+    def = this->add("support_material_bottom_interface_pattern", coEnum);
+    def->label = L("Bottom Pattern");
+    def->full_label = L("Support bottom interface pattern");
     def->category = OptionCategory::support;
-    def->tooltip = L("Pattern for interface layers."
+    def->tooltip = L("Pattern for the bottom interface layers (the ones that start on the object)."
+        "\nDefault pattern is the same as the top interface, unless it's Hilbert Curve or Ironing."
+        "\nNote that 'Hilbert', 'Ironing' , '(filled)' patterns are really discouraged, and meant to be used with soluble supports and 100% fill interface layer.");
+    def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
+    def->enum_values.push_back("auto");
+    def->enum_values.push_back("rectilinear");
+    def->enum_values.push_back("monotonic");
+    def->enum_values.push_back("concentric");
+    def->enum_values.push_back("hilbertcurve");
+    def->enum_values.push_back("concentricgapfill");
+    def->enum_values.push_back("smooth");
+    def->enum_labels.push_back(L("Default"));
+    def->enum_labels.push_back(L("Rectilinear"));
+    def->enum_labels.push_back(L("Monotonic"));
+    def->enum_labels.push_back(L("Concentric"));
+    def->enum_labels.push_back(L("Hilbert Curve"));
+    def->enum_labels.push_back(L("Concentric (filled)"));
+    def->enum_labels.push_back(L("Ironing"));
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipAuto));
+
+    def = this->add("support_material_top_interface_pattern", coEnum);
+    def->label = L("Top Pattern");
+    def->full_label = L("Support top interface pattern");
+    def->category = OptionCategory::support;
+    def->tooltip = L("Pattern for the top interface layers."
         "\nNote that 'Hilbert', 'Ironing' and '(filled)' patterns are meant to be used with soluble supports and 100% fill interface layer.");
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values.push_back("auto");
@@ -5791,6 +5816,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Ironing"));
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+    def->aliases = {"support_material_interface_pattern"};
 
     def = this->add("support_material_layer_height", coFloatOrPercent);
     def->label = L("Support layer height");
@@ -7923,7 +7949,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     // some changes has occurs between rectilineargapfill and monotonicgapfill. Set them at the right value for each type
     if (value == "rectilineargapfill" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern") )
         value = "monotonicgapfill";
-    if (opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern") {
+    if (opt_key == "fill_pattern" || opt_key == "support_material_interface_pattern" || opt_key == "support_material_top_interface_pattern" || opt_key == "support_material_bottom_interface_pattern") {
         if (value == "rectilineargapfill") {
             value = "rectilinear";
         } else if (value == "monotonicgapfill") {
@@ -8540,7 +8566,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "support_material_interface_angle_increment",
 "support_material_interface_fan_speed",
 "support_material_interface_layer_height",
-"support_material_interface_pattern",
+"support_material_bottom_interface_pattern",
 "support_material_layer_height",
 "thin_perimeters_all",
 "thin_perimeters",
@@ -8621,6 +8647,9 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         if (all_conf.has("fill_angle_increment") && ((int(all_conf.option("fill_angle_increment")->get_float())-90)%180) == 0 && "rectilinear" == value
             && ("fill_pattern" == opt_key || "top_fill_pattern" == opt_key)) {
             value = "alignedrectilinear";
+        }
+        if ("support_material_top_interface_pattern" == opt_key) {
+            opt_key = "support_material_interface_pattern";
         }
     } else if ("seam_position" == opt_key) {
         if ("cost" == value) {
