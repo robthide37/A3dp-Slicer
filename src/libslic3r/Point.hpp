@@ -179,13 +179,13 @@ public:
     Point  projection_onto(const Line &line) const;
     Point  interpolate(const double percent, const Point &p) const;
 
-    double distance_to(const Point &point) const { return (point - *this).cast<double>().norm(); }
-    double distance_to_square(const Point &point) const {
-        double dx = double(point.x() - this->x());
-        double dy = double(point.y() - this->y());
+    coordf_t distance_to(const Point &point) const { return (point - *this).cast<coordf_t>().norm(); }
+    coordf_t distance_to_square(const Point &point) const {
+        coordf_t dx = double(point.x() - this->x());
+        coordf_t dy = double(point.y() - this->y());
         return dx*dx + dy*dy;
     }
-    double distance_to(const Line &line) const;
+    coordf_t distance_to(const Line &line) const;
     bool coincides_with(const Point &point) const { return this->x() == point.x() && this->y() == point.y(); }
     bool coincides_with_epsilon(const Point &point) const {
         return std::abs(this->x() - point.x()) < SCALED_EPSILON/2 && std::abs(this->y() - point.y()) < SCALED_EPSILON/2;

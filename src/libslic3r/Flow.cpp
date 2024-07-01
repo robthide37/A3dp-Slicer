@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
 
 // Mark string for localization and translate.
 #define L(s) Slic3r::I18N::translate(s)
@@ -306,7 +307,7 @@ Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, flo
     } else if (role == frTopSolidInfill) {
         config_width = print_config.opt<ConfigOptionFloatOrPercent>("top_infill_extrusion_width");
         config_spacing = print_config.opt<ConfigOptionFloatOrPercent>("top_infill_extrusion_spacing");
-        overlap = (float)print_config.get_abs_value("solid_infill_overlap", 1.);
+        overlap = (float)print_config.get_abs_value("top_solid_infill_overlap", 1.);
     } else {
         throw Slic3r::InvalidArgument("Unknown role");
     }
@@ -322,7 +323,8 @@ Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, flo
 
     // Get the configured nozzle_diameter for the extruder associated to the flow role requested.
     // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
-    return Flow::new_from_config_width(role, config_width, config_spacing, nozzle_diameter, layer_height, std::min(overlap, filament_max_overlap));
+    return Flow::new_from_config_width(role, config_width, config_spacing, nozzle_diameter, layer_height, 
+        std::min(role == frTopSolidInfill ? 1.f : overlap, filament_max_overlap));
     //bridge ? (float)m_config.bridge_flow_ratio.get_abs_value(1) : 0.0f);
 }
 

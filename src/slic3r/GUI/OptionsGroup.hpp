@@ -135,7 +135,7 @@ public:
     /// Returns a copy of the pointer of the parent wxWindow.
     /// Accessor function is because users are not allowed to change the parent
     /// but defining it as const means a lot of const_casts to deal with wx functions.
-	inline wxWindow* parent() const { return m_parent; }
+	inline wxWindow* parent() const { assert(m_parent); return m_parent; }
 
     wxWindow*   ctrl_parent() const;
 

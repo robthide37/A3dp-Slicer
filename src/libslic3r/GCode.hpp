@@ -54,7 +54,14 @@ class Wipe {
 public:
     bool enable;
     Polyline path;
-    
+
+    void append(const Point &p);
+    void append(const Polyline &p);
+    void set(const Polyline &p);
+    void reverse() { path.reverse(); }
+    void clip_start(coord_t dist) { path.clip_start(dist); }
+    void translate(const Point &trsl) { path.translate(trsl); }
+
     Wipe() : enable(false) {}
     bool has_path() const { return !this->path.points.empty(); }
     void reset_path() { this->path = Polyline(); }
@@ -72,7 +79,7 @@ public:
         m_right(float(/*print_config.wipe_tower_x.value +*/ print_config.wipe_tower_width.value)),
         m_wipe_tower_pos(float(print_config.wipe_tower_x.value), float(print_config.wipe_tower_y.value)),
         m_wipe_tower_rotation(float(print_config.wipe_tower_rotation_angle)),
-        m_extruder_offsets(print_config.extruder_offset.values),
+        m_extruder_offsets(print_config.extruder_offset.get_values()),
         m_priming(priming),
         m_tool_changes(tool_changes),
         m_final_purge(final_purge),
@@ -383,6 +390,7 @@ private:
 		// For sequential print, the instance of the object to be printing has to be defined.
 		const size_t                     				 single_object_instance_idx);
 
+    void            apply_region_config(std::string &gcode);
     std::string     extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region);
     std::string     extrude_infill(const Print& print, const std::vector<ObjectByExtruder::Island::Region>& by_region, bool is_infill_first);
     std::string     extrude_ironing(const Print& print, const std::vector<ObjectByExtruder::Island::Region>& by_region);
@@ -429,6 +437,8 @@ private:
     std::string                         m_delayed_layer_change;
     // Keeps track of the last extrusion role passed to the processor
     ExtrusionRole                       m_last_processor_extrusion_role;
+    // For Progress bar indicator, in sequential mode (complete objects)
+    std::set<const PrintObject*>              m_object_sequentially_printed;
     // How many times will change_layer() be called?
     // change_layer() will update the progress bar.
     uint32_t                            m_layer_count;
@@ -444,8 +454,8 @@ private:
     // For crossing perimeter retraction detection  (contain the layer & nozzle widdth used to construct it)
     // !!!! not thread-safe !!!! if threaded per layer, please store it in the thread.
     struct SliceOffsetted {
-        ExPolygons slices;
-        ExPolygons slices_offsetted;
+        std::vector<std::pair<ExPolygon, BoundingBox>> slices;
+        std::vector<std::pair<ExPolygon, BoundingBox>> slices_offsetted;
         const Layer* layer;
         coord_t diameter;
     }                                   m_layer_slices_offseted{ {},{},nullptr, 0};
@@ -507,14 +517,16 @@ private:
 
     std::function<void()> m_throw_if_canceled = [](){};
 
+    double compute_e_per_mm(double path_mm3_per_mm);
     std::string _extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
-    void _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment);
+    void _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment, ExtrusionRole role);
     void _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment, Point& last_pos, const double path_width);
     std::string _before_extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
-    double_t    _compute_speed_mm_per_sec(const ExtrusionPath& path, double speed = -1);
+    double_t    _compute_speed_mm_per_sec(const ExtrusionPath &path, double speed, std::string *comment);
     std::string _after_extrude(const ExtrusionPath &path);
     void print_machine_envelope(GCodeOutputStream &file, const Print &print);
     void _print_first_layer_bed_temperature(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
+    void _print_first_layer_chamber_temperature(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
     void _print_first_layer_extruder_temperatures(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait);
     // On the first printing layer. This flag triggers first layer speeds.
     bool                                on_first_layer() const { return m_layer != nullptr && m_layer->id() == 0; }

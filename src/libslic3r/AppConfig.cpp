@@ -1,10 +1,12 @@
-#include "libslic3r/libslic3r.h"
-#include "libslic3r/Utils.hpp"
 #include "AppConfig.hpp"
+
+#include "libslic3r.h"
+#include "format.hpp"
 #include "Exception.hpp"
+#include "I18N.hpp"
 #include "LocalesUtils.hpp"
 #include "Thread.hpp"
-#include "format.hpp"
+#include "Utils.hpp"
 
 #include <utility>
 #include <vector>
@@ -13,7 +15,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 #include <boost/format/format_fwd.hpp>
 #include <boost/locale.hpp>
 #include <boost/log/trivial.hpp>
@@ -475,6 +476,9 @@ void AppConfig::set_defaults()
 
         if (get("show_layer_time_doubleslider").empty())
             set("show_layer_time_doubleslider", "0");
+
+        if (get("show_layer_area_doubleslider").empty())
+            set("show_layer_area_doubleslider", "0");
 
 	} else {
 #ifdef _WIN32

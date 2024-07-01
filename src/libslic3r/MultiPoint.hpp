@@ -50,7 +50,7 @@ public:
     int  find_point(const Point &point) const;
     // Return index of the closest point to point closer than scaled_epsilon.
     // Return -1 if no such point exists.
-    int  find_point(const Point &point, const double scaled_epsilon) const;
+    int  find_point(const Point &point, const coordf_t scaled_epsilon) const;
     bool has_boundary_point(const Point &point) const;
     int  closest_point_index(const Point &point) const {
         int idx = -1;
@@ -88,10 +88,11 @@ public:
     }
 
     bool intersection(const Line& line, Point* intersection) const;
+    // if the line cross multiple times, it will return the poitn nearest from line.a
     bool first_intersection(const Line& line, Point* intersection) const;
     bool intersections(const Line &line, Points *intersections) const;
     // Projection of a point onto the lines defined by the points.
-    virtual Point point_projection(const Point &point) const;
+    virtual std::pair<Point, size_t> point_projection(const Point &point) const;
 
     static Points _douglas_peucker(const Points& points, const double tolerance);
     static Points _douglas_peucker_plus(const Points& points, const double tolerance, const double min_length);

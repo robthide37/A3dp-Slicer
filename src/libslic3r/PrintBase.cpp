@@ -123,7 +123,7 @@ std::string PrintBase::output_filename(const std::string &format, const std::str
             filepath = filename + extension;
         }
         if (filepath.extension().empty())
-            filepath = boost::filesystem::change_extension(filepath, default_ext);
+            filepath.replace_extension(default_ext);
         return filepath.string();
     } catch (std::runtime_error &err) {
         throw Slic3r::PlaceholderParserError(L("Failed processing of the output_filename_format template.") + "\n" + err.what());

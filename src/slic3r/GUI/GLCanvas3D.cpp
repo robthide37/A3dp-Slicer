@@ -276,9 +276,9 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
         const ConfigOptionFloats* nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
         min_height = std::numeric_limits<float>::max();
         max_height = 0.f;
-        assert(extruders_min_height->values.size() == extruders_max_height->values.size());
-        assert(extruders_min_height->values.size() == nozzle_diameter->values.size());
-        for (size_t idx_extruder = 0; idx_extruder < extruders_min_height->values.size(); ++idx_extruder) {
+        assert(extruders_min_height->size() == extruders_max_height->size());
+        assert(extruders_min_height->size() == nozzle_diameter->size());
+        for (size_t idx_extruder = 0; idx_extruder < extruders_min_height->size(); ++idx_extruder) {
             min_height = std::min(min_height, float(extruders_min_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
             max_height = std::max(max_height, float(extruders_max_height->get_abs_value(idx_extruder, nozzle_diameter->get_float(idx_extruder))));
         }
@@ -2163,7 +2163,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
     if (printer_technology == ptFFF && m_config->has("nozzle_diameter")) {
         // Should the wipe tower be visualized ?
-        unsigned int extruders_count = (unsigned int)m_config->option<ConfigOptionFloats>("nozzle_diameter")->values.size();
+        unsigned int extruders_count = (unsigned int)m_config->option<ConfigOptionFloats>("nozzle_diameter")->size();
 
         bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
         bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
@@ -2180,8 +2180,8 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             const Print *print = m_process->fff_print();
 
             //FIXME use real nozzle diameter
-            float depth = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->values.front()).depth;
-            float brim_width = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->values.front()).brim_width;
+            float depth = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0)).depth;
+            float brim_width = print->wipe_tower_data(extruders_count, m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0)).brim_width;
 
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 1000, x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
@@ -2264,10 +2264,12 @@ bool GLCanvas3D::is_gcode_preview_dirty(const GCodeProcessorResult& gcode_result
     return last_showned_gcode != gcode_result.computed_timestamp;
 }
 
-void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
+void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult     &gcode_result,
+                                    const std::vector<std::string> &str_tool_colors,
+                                    bool                            force_gcode_color_recompute)
 {
-    if (last_showned_gcode != gcode_result.computed_timestamp
-        || !m_gcode_viewer.is_loaded(gcode_result)) {
+    if (last_showned_gcode != gcode_result.computed_timestamp || force_gcode_color_recompute ||
+        !m_gcode_viewer.is_loaded(gcode_result)) {
         last_showned_gcode = gcode_result.computed_timestamp;
         m_gcode_viewer.load(gcode_result, *this->fff_print(), m_initialized);
 
@@ -5922,11 +5924,20 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
     Vec4i32 viewport(camera.get_viewport().data());
 
     GLint y = viewport[3] - (GLint)mouse_pos(1);
-    GLfloat mouse_z;
-    if (z == nullptr)
-        glsafe(::glReadPixels((GLint)mouse_pos(0), y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, (void*)&mouse_z));
-    else
+    double mouse_z;
+    if (z == nullptr) {
+        GLuint render_z;
+        if(sizeof(render_z)==2)
+            glsafe(::glReadPixels((GLint) mouse_pos(0), y, 1, 1, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, (void *) &render_z));
+        else if(sizeof(render_z)==4)
+            glsafe(::glReadPixels((GLint) mouse_pos(0), y, 1, 1, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, (void *) &render_z));
+        else {
+            BOOST_LOG_TRIVIAL(error) << "error, opengl depth buffer of odd size.";
+        }
+        mouse_z = (double(render_z)/std::numeric_limits<GLuint>::max());
+    } else {
         mouse_z = *z;
+    }
 
     Vec3d out;
     igl::unproject(Vec3d(mouse_pos(0), y, mouse_z), modelview, projection, viewport, out);
@@ -6645,6 +6656,7 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             "Resolve the current problem to continue slicing.");
         error = ErrorType::PLATER_ERROR;
         break;
+    case EWarning::PrintWarning: text = ""; error = ErrorType::PLATER_WARNING; break;
     }
     auto& notification_manager = *wxGetApp().plater()->get_notification_manager();
     switch (error)

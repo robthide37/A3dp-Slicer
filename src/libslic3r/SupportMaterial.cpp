@@ -19,7 +19,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/spin_mutex.h>
 #include <tbb/task_group.h>
-
+#pragma optimize("", off)
 #define SUPPORT_USE_AGG_RASTERIZER
 
 #ifdef SUPPORT_USE_AGG_RASTERIZER
@@ -360,7 +360,7 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
     m_support_params.support_layer_height_min = 1000000.;
     const ConfigOptionFloatsOrPercents& min_layer_height = m_print_config->min_layer_height;
     const ConfigOptionFloats& nozzle_diameter = m_print_config->nozzle_diameter;
-    for (int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id) {
+    for (int extr_id = 0; extr_id < min_layer_height.size(); ++extr_id) {
         double min_from_extr = min_layer_height.get_abs_value(extr_id, nozzle_diameter.get_at(extr_id));
         if(min_from_extr > 0)
             m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, min_from_extr);
@@ -370,7 +370,7 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
             m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, layer->height);
     }
     if (m_support_params.support_layer_height_min >= 1000000.) {
-        for (int extr_id = 0; extr_id < min_layer_height.values.size(); ++extr_id) {
+        for (int extr_id = 0; extr_id < min_layer_height.size(); ++extr_id) {
             m_support_params.support_layer_height_min = std::min(m_support_params.support_layer_height_min, nozzle_diameter.get_at(extr_id) / 10);
         }
     }
@@ -427,14 +427,26 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
         support_pattern == smpHoneycomb ? ipHoneycomb :
         m_support_params.support_density > 0.95 || m_support_params.with_sheath ? ipRectilinear : ipSupportBase;
     m_support_params.interface_fill_pattern = (m_support_params.interface_density > 0.95 ? ipRectilinear : ipSupportBase);
-    m_support_params.contact_fill_pattern   = m_object_config->support_material_interface_pattern;
-    if (m_support_params.contact_fill_pattern == ipAuto)
+    m_support_params.contact_top_fill_pattern   = m_object_config->support_material_top_interface_pattern;
+    m_support_params.contact_bottom_fill_pattern   = m_object_config->support_material_bottom_interface_pattern;
+    if (m_support_params.contact_top_fill_pattern == ipAuto)
         if (m_slicing_params->soluble_interface)
-            m_support_params.contact_fill_pattern = ipConcentric;
+            m_support_params.contact_top_fill_pattern = ipConcentric;
         else if (m_support_params.interface_density > 0.95)
-            m_support_params.contact_fill_pattern = ipRectilinear;
+            m_support_params.contact_top_fill_pattern = ipRectilinear;
         else
-            m_support_params.contact_fill_pattern = ipSupportBase;
+            m_support_params.contact_top_fill_pattern = ipSupportBase;
+    if (m_support_params.contact_bottom_fill_pattern == ipAuto)
+        if(m_support_params.contact_top_fill_pattern != ipHilbertCurve
+            && m_support_params.contact_top_fill_pattern != ipSmooth
+            && m_support_params.contact_top_fill_pattern != ipSawtooth)
+            m_support_params.contact_bottom_fill_pattern = m_support_params.contact_top_fill_pattern;
+        else if (m_slicing_params->soluble_interface)
+            m_support_params.contact_bottom_fill_pattern = ipConcentric;
+        else if (m_support_params.interface_density > 0.95)
+            m_support_params.contact_bottom_fill_pattern = ipRectilinear;
+        else
+            m_support_params.contact_bottom_fill_pattern = ipSupportBase;
 }
 
 // Using the std::deque as an allocator.
@@ -3417,7 +3429,7 @@ static inline void fill_expolygon_generate_paths(
     float                    density,
     ExtrusionRole            role,
     const Flow              &flow,
-    coordf_t                 spacing)
+    double                   spacing)
 {
     assert(!fill_params.use_arachne);
     FillParams new_params = fill_params;
@@ -3440,7 +3452,7 @@ static inline void fill_expolygons_generate_paths(
     float                    density,
     ExtrusionRole            role,
     const Flow              &flow,
-    coordf_t                 spacing)
+    double                   spacing)
 {
     for (ExPolygon& expoly : expolygons)
         fill_expolygon_generate_paths(dst, std::move(expoly), filler, fill_params, density, role, flow, spacing);
@@ -3453,7 +3465,7 @@ static inline void fill_expolygons_generate_paths(
     float                    density,
     ExtrusionRole            role,
     const Flow              &flow,
-    coordf_t                 spacing,
+    double                   spacing,
     const PrintRegionConfig& region_config)
 {
     FillParams fill_params;
@@ -3912,10 +3924,10 @@ void modulate_extrusion_by_overlapping_layers(
         const PrintObjectSupportMaterial::MyLayer &overlapping_layer = *overlapping_layers[i_overlapping_layer];
         bbox.merge(get_extents(overlapping_layer.polygons));
     }
-    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.begin(); it != extrusions_in_out.end(); ++ it) {
+    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.set_entities().begin(); it != extrusions_in_out.set_entities().end(); ++ it) {
         ExtrusionPath *path = dynamic_cast<ExtrusionPath*>(*it);
         assert(path != nullptr);
-        bbox.merge(get_extents(path->polyline));
+        bbox.merge(get_extents(path->polyline.as_polyline()));
     }
     SVG svg(debug_out_path("support-fragments-%d-%lf.svg", iRun, this_layer.print_z).c_str(), bbox);
     const float transparency = 0.5f;
@@ -3932,10 +3944,10 @@ void modulate_extrusion_by_overlapping_layers(
         svg.draw(to_polylines(overlapping_layer.polygons), dbg_index_to_color(int(i_overlapping_layer)), scale_(0.1));
     }
     // Fill extrusion, the source.
-    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.begin(); it != extrusions_in_out.end(); ++ it) {
+    for (ExtrusionEntitiesPtr::const_iterator it = extrusions_in_out.set_entities().begin(); it != extrusions_in_out.set_entities().end(); ++ it) {
         ExtrusionPath *path = dynamic_cast<ExtrusionPath*>(*it);
         std::string color_name;
-        switch ((it - extrusions_in_out.begin()) % 9) {
+        switch ((it - extrusions_in_out.set_entities().begin()) % 9) {
             case 0: color_name = "magenta"; break;
             case 1: color_name = "deepskyblue"; break;
             case 2: color_name = "coral"; break;
@@ -3946,7 +3958,7 @@ void modulate_extrusion_by_overlapping_layers(
             case 7: color_name = "brown"; break;
             default: color_name = "orchid"; break;
         }
-        svg.draw(path->polyline, color_name, scale_(0.2));
+        svg.draw(path->polyline.as_polyline(), color_name, scale_(0.2));
     }
 #endif /* SLIC3R_DEBUG */
 
@@ -4167,14 +4179,16 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             SupportLayer &support_layer = *support_layers[support_layer_id];
             assert(support_layer.support_fills.entities().empty());
             MyLayer      &raft_layer    = *raft_layers[support_layer_id];
-
-            std::unique_ptr<Fill> filler_interface = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_fill_pattern)); //m_support_params.interface_fill_pattern)); FIXME choose
-            std::unique_ptr<Fill> filler_support   = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.base_fill_pattern));
+            
+            std::unique_ptr<Fill> filler_top_interface    = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_top_fill_pattern));
+            std::unique_ptr<Fill> filler_support          = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.base_fill_pattern));
             std::unique_ptr<FillWithPerimeter> filler_support_with_sheath = std::make_unique<FillWithPerimeter>((Fill::new_from_type(m_support_params.base_fill_pattern)));
+            filler_support_with_sheath->overlap = m_support_params.gap_xy == 0 ? 0 : 1; // allow periemter overlap is not touching perimeters
             filler_support_with_sheath->ratio_fill_inside = 0.2f;
             std::unique_ptr<FillWithPerimeter> filler_dense = std::make_unique<FillWithPerimeter>((Fill::new_from_type(ipRectilinear)));
+            filler_dense->overlap = m_support_params.gap_xy == 0 ? 0 : 1;
             filler_dense->ratio_fill_inside = 0.2f;
-            filler_interface->set_bounding_box(bbox_object);
+            filler_top_interface->set_bounding_box(bbox_object);
             filler_support->set_bounding_box(bbox_object);
 
             // Print the support base below the support columns, or the support base for the support columns plus the contacts.
@@ -4205,7 +4219,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 }
             }
 
-            Fill *filler = filler_interface.get();
+            Fill *filler = filler_top_interface.get();
             Flow  flow = m_support_params.first_layer_flow;
             float density = 0.f;
             double spacing = 0.f;
@@ -4281,7 +4295,8 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         size_t idx_layer_intermediate     = size_t(-1);
         size_t idx_layer_interface        = size_t(-1);
         size_t idx_layer_base_interface   = size_t(-1);
-        std::unique_ptr<Fill> filler_interface       = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_fill_pattern));
+        std::unique_ptr<Fill> filler_top_interface          = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_top_fill_pattern));
+        std::unique_ptr<Fill> filler_bottom_interface       = std::unique_ptr<Fill>(Fill::new_from_type(m_support_params.contact_bottom_fill_pattern));
         std::unique_ptr<Fill> filler_intermediate_interface = std::unique_ptr<Fill>(Fill::new_from_type(ipRectilinear));
         // Filler for the base interface (to be used for soluble interface / non soluble base, to produce non soluble interface layer below soluble interface layer).
         std::unique_ptr<Fill> filler_base_interface  = std::unique_ptr<Fill>(base_interface_layers.empty() ? nullptr : 
@@ -4294,7 +4309,8 @@ void PrintObjectSupportMaterial::generate_toolpaths(
         } else {
             filler_support.reset(Fill::new_from_type(m_support_params.base_fill_pattern));
         }
-        filler_interface->set_bounding_box(bbox_object);
+        filler_top_interface->set_bounding_box(bbox_object);
+        filler_bottom_interface->set_bounding_box(bbox_object);
         filler_intermediate_interface->set_bounding_box(bbox_object);
         if (range.begin() == 0)
             filler_first_layer_ptr->set_bounding_box(bbox_object);
@@ -4397,11 +4413,11 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                 Flow interface_flow = layer_ex.layer->bridging ?
                     Flow::bridging_flow(layer_ex.layer->height, m_support_params.support_material_bottom_interface_flow.nozzle_diameter()) :
                     (interface_as_base ? &m_support_params.support_material_flow : &m_support_params.support_material_interface_flow)->with_height(float(layer_ex.layer->height));
-                Fill *filler = i == 2 ? filler_intermediate_interface.get() : filler_interface.get();
+                Fill *filler = (i == 0) ? filler_top_interface.get() : (i == 1 ? filler_bottom_interface.get() : filler_intermediate_interface.get());
                 //filler->layer_id = support_layer_id; // don't do that, or the filler will rotate thigns from that layerid
                 filler->z = support_layer.print_z;
                 float supp_density = m_support_params.interface_density;
-                coordf_t filler_spacing;
+                double filler_spacing;
                 //if first layer and solid first layer : draw concentric with 100% density
                 if (support_layer.id() == 0 && layer_ex.layer->bottom_z <= 0) {
                     filler = filler_first_layer_ptr.get();
@@ -4441,7 +4457,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             // Base interface layers under soluble interfaces
             if ( ! base_interface_layer.empty() && ! base_interface_layer.polygons_to_extrude().empty()) {
                 Fill *filler = filler_base_interface.get();
-                coordf_t filler_spacing = filler->get_spacing();
+                double filler_spacing = filler->get_spacing();
                 //FIXME Bottom interfaces are extruded with the briding flow. Some bridging layers have its height slightly reduced, therefore
                 // the bridging flow does not quite apply. Reduce the flow to area of an ellipse? (A = pi * a * b)
                 assert(! base_interface_layer.layer->bridging);
@@ -4465,7 +4481,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
             // Base support or flange.
             if (! base_layer.empty() && ! base_layer.polygons_to_extrude().empty()) {
                 Fill *filler = filler_support.get();
-                coordf_t filler_spacing = m_support_params.support_material_flow.spacing();
+                double filler_spacing = m_support_params.support_material_flow.spacing();
                 // We don't use $base_flow->spacing because we need a constant spacing
                 // value that guarantees that all layers are correctly aligned.
                 assert(! base_layer.layer->bridging);
@@ -4489,7 +4505,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     // Destination
                     base_layer.extrusions.set_entities(),
                     // Regions to fill
-                    closing_ex(base_layer.polygons_to_extrude(), float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width())),
+                    closing_ex(base_layer.polygons_to_extrude(), float(SCALED_EPSILON), float(SCALED_EPSILON)),
                     // Filler and its parameters
                     filler, density,
                     // Extrusion parameters

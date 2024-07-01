@@ -66,6 +66,7 @@
 #include "CalibrationOverBridgeDialog.hpp"
 #include "CalibrationTempDialog.hpp"
 #include "CalibrationRetractionDialog.hpp"
+#include "CalibrationPressureAdvDialog.hpp"
 #include "ConfigSnapshotDialog.hpp"
 #include "CreateMMUTiledCanvas.hpp"
 #include "FreeCADDialog.hpp"
@@ -725,7 +726,7 @@ static void generic_exception_handle()
         BOOST_LOG_TRIVIAL(error) << boost::format("Uncaught exception: %1%") % ex.what();
         std::terminate();
         throw;
-    } catch (const std::exception& ex) {
+    } catch (const std::exception &ex) {
         wxLogError(format_wxstr(_L("Internal error: %1%"), ex.what()));
         BOOST_LOG_TRIVIAL(error) << boost::format("Uncaught exception: %1%") % ex.what();
         throw;
@@ -860,7 +861,7 @@ bool GUI_App::init_opengl()
                 hard_gpu = AppConfig::HardwareType::hGpuIntel;
             if (boost::contains(gpu_vendor, "ATI") || boost::contains(gpu_vendor, "AMD"))
                 hard_gpu = AppConfig::HardwareType::hGpuAmd;
-        } catch (std::exception ex) {}
+        } catch (std::exception &ex) {}
 #else
         try {
             std::string gpu_vendor = OpenGLManager::get_gl_info().get_vendor();
@@ -873,7 +874,7 @@ bool GUI_App::init_opengl()
             if (boost::contains(gpu_vendor, "Apple") || boost::contains(gpu_vendor, "APPLE")) {
                 assert(false); // apple gpu are only in _M_ARM64
             }
-        } catch (std::exception ex) {}
+        } catch (std::exception &) {}
 #endif
         app_config->set_hardware_type(AppConfig::HardwareType(hard_cpu + hard_gpu));
     }
@@ -947,9 +948,9 @@ void GUI_App::init_app_config()
 
 	if (!app_config) {
         app_config.reset(new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer));
+#ifdef _M_ARM64
         AppConfig::HardwareType hard_cpu = AppConfig::HardwareType::hCpuOther; // TODO for x86 if needed
         AppConfig::HardwareType hard_gpu = AppConfig::HardwareType::hGpuOther;
-#ifdef _M_ARM64
 #ifdef __APPLE__
         // Arm apple
         hard_cpu = AppConfig::HardwareType::hCpuApple;
@@ -1981,6 +1982,10 @@ void GUI_App::calibration_retraction_dialog()
 {
     change_calibration_dialog(nullptr, new CalibrationRetractionDialog(this, mainframe));
 }
+void GUI_App::calibration_pressureadv_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationPressureAdvDialog(this, mainframe));
+}
 void GUI_App::freecad_script_dialog()
 {
     change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
@@ -2410,21 +2415,24 @@ bool GUI_App::load_language(wxString language, bool initial)
     }
 #endif
 
-    if (! wxLocale::IsAvailable(language_info->Language)) {
-    	// Loading the language dictionary failed.
-    	wxString message = "Switching " SLIC3R_APP_NAME " to language " + language_info->CanonicalName + " failed.";
+    if (!wxLocale::IsAvailable(language_info->Language)) {
+        // Loading the language dictionary failed.
+        wxString message = "Switching " SLIC3R_APP_NAME " to language " + language_info->CanonicalName + " failed.";
 #if !defined(_WIN32) && !defined(__APPLE__)
         // likely some linux system
-        message += "\nYou may need to reconfigure the missing locales, likely by running the \"locale-gen\" and \"dpkg-reconfigure locales\" commands.\n";
+        message += "\nYou may need to reconfigure the missing locales, likely by running the \"locale-gen\" and "
+                   "\"dpkg-reconfigure locales\" commands.\n";
 #endif
-        if (initial)
-        	message + "\n\nApplication will close.";
-		wxMessageBox(message, SLIC3R_APP_NAME " - Switching language failed", wxOK | wxICON_ERROR);
-        if (initial)
-			std::exit(EXIT_FAILURE);
-		else
-			return false;
-            }
+        if (initial) {
+            message + "\n\nApplication will close.";
+        }
+        wxMessageBox(message, SLIC3R_APP_NAME " - Switching language failed", wxOK | wxICON_ERROR);
+        if (initial) {
+            std::exit(EXIT_FAILURE);
+        } else {
+            return false;
+        }
+    }
 
     // Release the old locales, create new locales.
     //FIXME wxWidgets cause havoc if the current locale is deleted. We just forget it causing memory leaks for now.
@@ -2649,7 +2657,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                         associate_gcode_files();
                 }
 #endif // _WIN32
-              } catch (std::exception e) {}
+              } catch (std::exception &) {}
             }
             if (app_layout_changed) {
                 // hide full main_sizer for mainFrame
@@ -3127,7 +3135,7 @@ int GUI_App::extruders_cnt() const
 {
     const Preset& preset = preset_bundle->printers.get_selected_preset();
     return preset.printer_technology() == ptSLA ? 1 :
-           preset.config.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
+           preset.config.option<ConfigOptionFloats>("nozzle_diameter")->size();
 }
 
 // extruders count from edited printer preset
@@ -3135,7 +3143,7 @@ int GUI_App::extruders_edited_cnt() const
 {
     const Preset& preset = preset_bundle->printers.get_edited_preset();
     return preset.printer_technology() == ptSLA ? 1 :
-           preset.config.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
+           preset.config.option<ConfigOptionFloats>("nozzle_diameter")->size();
 }
 
 wxString GUI_App::current_language_code_safe() const
@@ -3393,8 +3401,7 @@ bool GUI_App::check_updates(const bool verbose)
 			MsgNoUpdates dlg;
 			dlg.ShowModal();
 		}
-	}
-	catch (const std::exception & ex) {
+	} catch (const std::exception &ex) {
 		show_error(nullptr, ex.what());
 	}
     // Applicaiton will continue.

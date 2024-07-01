@@ -2636,17 +2636,15 @@ MedialAxis::taper_ends(ThickPolylines& pp)
         if (polyline.length() < length * 2.2) continue;
         if (polyline.endpoints.first) {
             polyline.points_width[0] = min_size;
-            coord_t current_dist = min_size;
-            coord_t last_dist = min_size;
+            coord_t current_dist = 0;
+            coord_t last_dist = 0;
             for (size_t i = 1; i < polyline.points_width.size(); ++i) {
                 current_dist += (coord_t)polyline.points[i - 1].distance_to(polyline.points[i]);
                 if (current_dist > length) {
                     //create a new point if not near enough
-                    if (current_dist > length + coordf_t(this->m_resolution)) {
-                        coordf_t percent_dist = (length - last_dist) / (current_dist - last_dist);
-                        polyline.points.insert(polyline.points.begin() + i, polyline.points[i - 1].interpolate(percent_dist, polyline.points[i]));
-                        polyline.points_width.insert(polyline.points_width.begin() + i, polyline.points_width[i]);
-                    }
+                    coordf_t percent_dist = (length - last_dist) / (current_dist - last_dist);
+                    polyline.points.insert(polyline.points.begin() + i, polyline.points[i - 1].interpolate(percent_dist, polyline.points[i]));
+                    polyline.points_width.insert(polyline.points_width.begin() + i, polyline.points_width[i]);
                     break;
                 }
                 polyline.points_width[i] = std::max((coordf_t)min_size, min_size + (polyline.points_width[i] - min_size) * current_dist / length);
@@ -2655,17 +2653,15 @@ MedialAxis::taper_ends(ThickPolylines& pp)
         }
         if (polyline.endpoints.second) {
             polyline.points_width[polyline.points_width.size() - 1] = min_size;
-            coord_t current_dist = min_size;
-            coord_t last_dist = min_size;
+            coord_t current_dist = 0;
+            coord_t last_dist = 0;
             for (size_t i = polyline.points_width.size() - 1; i > 0; --i) {
                 current_dist += (coord_t)polyline.points[i].distance_to(polyline.points[i - 1]);
                 if (current_dist > length) {
                     //create new point if not near enough
-                    if (current_dist > length + coordf_t(this->m_resolution)) {
-                        coordf_t percent_dist = (length - last_dist) / (current_dist - last_dist);
-                        polyline.points.insert(polyline.points.begin() + i, polyline.points[i].interpolate(percent_dist, polyline.points[i - 1]));
-                        polyline.points_width.insert(polyline.points_width.begin() + i, polyline.points_width[i - 1]);
-                    }
+                    coordf_t percent_dist = (length - last_dist) / (current_dist - last_dist);
+                    polyline.points.insert(polyline.points.begin() + i, polyline.points[i].interpolate(percent_dist, polyline.points[i - 1]));
+                    polyline.points_width.insert(polyline.points_width.begin() + i, polyline.points_width[i - 1]);
                     break;
                 }
                 polyline.points_width[i - 1] = std::max((coordf_t)min_size, min_size + (polyline.points_width[i - 1] - min_size) * current_dist / length);
@@ -3114,25 +3110,23 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                 continue;
             }
         } else if (i > 0 && resolution_internal > line_len + prev_line_len) {
+            assert(prev_line_len > 0 && line_len > 0);
             //merge lines?
             //if it's a loop, merge only if the distance is high enough
             if (polyline.first_point() == polyline.last_point() && polyline.length() < (line_len + prev_line_len) * 6)
                 continue;
             ThickLine& prev_line = lines[i - 1];
+            const coordf_t sum_length = prev_line_len + line_len;
+            const coordf_t new_length = prev_line.a.distance_to(line.b);
+            assert(sum_length - new_length > -0.0000000001);
+            // only merge if the distance is almost the sum (90° = 0.707)
+            if(new_length < std::max(sum_length * 0.9,  std::max(prev_line_len + line_len/2 , prev_line_len /2 + line_len)))
+                continue;
+            assert(new_length > prev_line_len && new_length > line_len);
             coordf_t width = prev_line_len * (prev_line.a_width + prev_line.b_width) / 2;
             width += line_len * (line.a_width + line.b_width) / 2;
+            width /= (prev_line_len + line_len);
             prev_line.b = line.b;
-            const coordf_t new_length = prev_line.length();
-            if (new_length < SCALED_EPSILON) {
-                // too short, remove it and restart
-                if (i > 1) {
-                    line.a = lines[i - 2].b;
-                }
-                lines.erase(lines.begin() + i - 1);
-                i -= 2;
-                continue;
-            }
-            width /= new_length;
             prev_line.a_width = width;
             prev_line.b_width = width;
             saved_line_len = new_length;
@@ -3154,6 +3148,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
         //  but we can't extrude with a negative spacing, so we have to gradually fall back to spacing if the width is too small.
 
         // default: extrude a thin wall that doesn't go outside of the specified width.
+        assert(line.a_width == line.b_width);
         double wanted_width = unscaled(line.a_width);
         //if gapfill or arachne, the width is in fact the spacing.
         if (role != erThinWall) {
@@ -3163,21 +3158,25 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             } else {
                 // Convert from spacing to extrusion width based on the extrusion model
                 // of a square extrusion ended with semi circles.
-                wanted_width = Flow::rounded_rectangle_extrusion_width_from_spacing(unscaled(line.a_width), flow.height(), flow.spacing_ratio());
+                wanted_width = Flow::rounded_rectangle_extrusion_width_from_spacing(wanted_width, flow.height(), flow.spacing_ratio());
             }
         }
         // check if the width isn't too small (negative spacing)
         // 1.f spacing ratio, because it's to get the really minimum. 0 spacing ratio will makes that irrelevant.
-        if (unscale<coordf_t>(line.a_width) < 2 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f)) {
+        if (wanted_width < 2 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f)) {
             //width (too) small, be sure to not extrude with negative spacing.
             //we began to fall back to spacing gradually even before the spacing go into the negative
-            //  to make extrusion1 < extrusion2 if width1 < width2 even if width2 is too small. 
-            wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f);
+            //  to make extrusion1 < extrusion2 if width1 < width2 even if width2 is too small.
+            wanted_width = wanted_width * 0.35 + 1.3 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f);
         }
 
         if (path.polyline.empty()) {
             if (wanted_width != current_flow.width()) {
-                current_flow = current_flow.with_width((float)wanted_width);
+                if (current_flow.bridge()) {
+                    current_flow = Flow::bridging_flow(current_flow.height(), (float) wanted_width);
+                } else {
+                    current_flow = current_flow.with_width((float) wanted_width);
+                }
             }
             path.polyline.append(line.a);
             path.polyline.append(line.b);
@@ -3198,7 +3197,11 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                 paths.push_back(path);
                 path = ExtrusionPath(role, false);
                 if (wanted_width != current_flow.width()) {
-                    current_flow = current_flow.with_width(wanted_width);
+                    if (current_flow.bridge()) {
+                        current_flow = Flow::bridging_flow(current_flow.height(), (float) wanted_width);
+                    } else {
+                        current_flow = current_flow.with_width((float) wanted_width);
+                    }
                 }
                 path.polyline.append(line.a);
                 path.polyline.append(line.b);
@@ -3226,7 +3229,7 @@ ExtrusionEntitiesPtr
     // this value determines granularity of adaptive width, as G-code does not allow
     // variable extrusion within a single move; this value shall only affect the amount
     // of segments, and any pruning shall be performed before we apply this tolerance
-    const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
+    const coord_t tolerance = flow.scaled_width() / 20;//scale_(0.05);
     ExtrusionEntitiesPtr coll;
     for (const ThickPolyline& p : polylines) {
         ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance, can_reverse);

@@ -503,7 +503,7 @@ void ObjectManipulation::update_ui_from_settings()
             if (m_use_colors) {
                 editor->SetBackgroundColour(wxColour(axes_color_back[axis_id]));
                 if (wxGetApp().dark_mode())
-                    editor->SetForegroundColour(*wxBLACK);
+                    editor->SetForegroundColour(wxGetApp().get_label_clr_default());
             }
             else {
 #ifdef _WIN32
@@ -1086,7 +1086,7 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
 #endif // __WXOSX__
     if (parent->use_colors()) {
         this->SetBackgroundColour(wxColour(axes_color_back[axis]));
-        this->SetForegroundColour(*wxBLACK);
+        this->SetForegroundColour(wxGetApp().get_label_clr_default());
     } else {
         wxGetApp().UpdateDarkUI(this);
     }
@@ -1140,7 +1140,7 @@ void ManipulationEditor::msw_rescale()
 void ManipulationEditor::sys_color_changed(ObjectManipulation* parent)
 {
     if (parent->use_colors())
-        SetForegroundColour(*wxBLACK);
+        SetForegroundColour(wxGetApp().get_label_clr_default());
     else
 #ifdef _WIN32
         wxGetApp().UpdateDarkUI(this);

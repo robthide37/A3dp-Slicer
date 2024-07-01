@@ -215,32 +215,34 @@ protected:
     }
 
 public:
-    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
+    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
     //for rectilinear
-    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, const Polygons& polygons_src, Polylines& polylines_out, const double spacing, const FillParams& params);
+    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, const Polygons& polygons_src, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
 
-    static void connect_base_support(Polylines &&infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params);
-    static void connect_base_support(Polylines &&infill_ordered, const Polygons &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params);
+    static void connect_base_support(Polylines &&infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const coord_t line_spacing, const FillParams &params);
+    static void connect_base_support(Polylines &&infill_ordered, const Polygons &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const coord_t line_spacing, const FillParams &params);
 
     static coord_t  _adjust_solid_spacing(const coord_t width, const coord_t distance, const double factor_max = 1.2);
 };
 
 namespace FakePerimeterConnect {
-    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
-    void connect_infill(Polylines&& infill_ordered, const Polygons& boundary, const BoundingBox& bbox, Polylines& polylines_out, const double spacing, const FillParams& params);
-    void connect_infill(Polylines&& infill_ordered, const std::vector<const Polygon*>& boundary, const BoundingBox& bbox, Polylines& polylines_out, double spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const Polygons& boundary, const BoundingBox& bbox, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const std::vector<const Polygon*>& boundary, const BoundingBox& bbox, Polylines& polylines_out, coord_t spacing, const FillParams& params);
 }
 namespace PrusaSimpleConnect {
-    void connect_infill(Polylines& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
+    void connect_infill(Polylines& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
 }
 namespace NaiveConnect {
-    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
 }
 
 // composite filler
 class FillWithPerimeter : public Fill
 {
 public:
+    // bewteen 0 (0%) and 1 (100%) overlap
+    float overlap_ratio = 0;
     std::unique_ptr<Fill> infill{ nullptr };
     float ratio_fill_inside = 0.f;
     FillWithPerimeter() : Fill() {}
@@ -265,9 +267,9 @@ public:
     ExtrusionSetRole(ExtrusionRole role) : new_role(role) {}
     void use(ExtrusionPath &path) override { path.set_role(new_role); }
     void use(ExtrusionPath3D &path3D) override { path3D.set_role(new_role); }
-    void use(ExtrusionMultiPath &multipath) override { for (ExtrusionPath path : multipath.paths) path.set_role(new_role); }
-    void use(ExtrusionMultiPath3D &multipath) override { for (ExtrusionPath path : multipath.paths) path.set_role(new_role); }
-    void use(ExtrusionLoop &loop) override { for (ExtrusionPath path : loop.paths) path.set_role(new_role); }
+    void use(ExtrusionMultiPath &multipath) override { for (ExtrusionPath &path : multipath.paths) path.set_role(new_role); }
+    void use(ExtrusionMultiPath3D &multipath) override { for (ExtrusionPath &path : multipath.paths) path.set_role(new_role); }
+    void use(ExtrusionLoop &loop) override { for (ExtrusionPath &path : loop.paths) path.set_role(new_role); }
     void use(ExtrusionEntityCollection &collection) override { for (ExtrusionEntity *entity : collection.entities()) entity->visit(*this); }
 };
 

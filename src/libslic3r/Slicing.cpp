@@ -94,7 +94,7 @@ std::shared_ptr<SlicingParameters> SlicingParameters::create_from_config(
         for (uint16_t extruder_id : object_extruders) {
             if (print_config.nozzle_diameter.size() <= extruder_id)
                 break;
-            double nozzle_diameter = print_config.nozzle_diameter.values[extruder_id];
+            double nozzle_diameter = print_config.nozzle_diameter.get_at(extruder_id);
             first_layer_height = std::min(first_layer_height, object_config.first_layer_height.get_abs_value(nozzle_diameter));
         }
         if (first_layer_height == 1000000000.)

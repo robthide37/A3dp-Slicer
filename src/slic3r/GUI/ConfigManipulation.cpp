@@ -344,8 +344,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_perimeters);
 
     bool has_spiral_vase = have_perimeters && config->opt_bool("spiral_vase");
-
-    bool have_arachne = have_perimeters && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
+    
+    bool have_arachne = have_perimeters && (config->opt_int("perimeters") == config->opt_int("perimeters_hole") || config->opt_int("perimeters_hole") < 0);
+    toggle_field("perimeter_generator", have_arachne);
+    have_arachne = have_arachne && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
     for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "min_feature_size", "min_bead_width", "aaa" })
        toggle_field(el, have_arachne);
 
@@ -355,10 +357,11 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     toggle_field("perimeter_bonding", config->opt_bool("external_perimeters_first") && !have_arachne && config->option("perimeter_overlap")->get_float() == 100.f && config->option("external_perimeter_overlap")->get_float() == 100.f);
 
-    for (auto el : {"perimeter_loop", "extra_perimeters_overhangs", "no_perimeter_unsupported_algo",
+    for (auto el : {"perimeter_loop", "extra_perimeters_overhangs",
         "thin_perimeters", "perimeter_round_corners"})
         toggle_field(el, have_perimeters && !have_arachne);
-
+    
+    toggle_field("no_perimeter_unsupported_algo", have_perimeters);
     toggle_field("only_one_perimeter_top", have_perimeters);
     toggle_field("only_one_perimeter_first_layer", config->opt_int("perimeters") > 1);
     toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0);
@@ -396,7 +399,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;
     // infill_extruder uses the same logic as in Print::extruders()
     for (auto el : { "fill_aligned_z", "fill_pattern", "infill_connection", "infill_every_layers", "infill_only_where_needed",
-                    "solid_infill_every_layers", "solid_infill_below_area", "infill_extruder", "infill_anchor_max" })
+                    "solid_infill_every_layers", "solid_infill_below_area", "solid_infill_below_layer_area", "solid_infill_below_width",
+                    "infill_extruder", "infill_anchor_max" })
         toggle_field(el, have_infill);
     // Only allow configuration of open anchors if the anchoring is enabled.
     bool has_infill_anchors = have_infill && config->option<ConfigOptionEnum<InfillConnection>>("infill_connection")->value != InfillConnection::icNotConnected;
@@ -425,11 +429,16 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     toggle_field("infill_first", (has_solid_infill || have_infill));
 
-    for (auto el : {"fill_angle_cross","fill_angle_increment", "fill_angle_template", "fill_angle_cross", "bridge_angle", "infill_extrusion_width",
+    for (auto el : {"fill_angle_cross","fill_angle_follow_model","fill_angle_increment", "fill_angle_template", "bridge_angle", "infill_extrusion_width",
                     "infill_extrusion_spacing", "infill_extrusion_change_odd_layers", "infill_speed" })
         toggle_field(el, have_infill || has_solid_infill);
         
     toggle_field("fill_angle", (have_infill || has_solid_infill) && ((ConfigOptionVectorBase*)config->option("fill_angle_template"))->size() == 0);
+
+
+    toggle_field("small_area_infill_flow_compensation", has_solid_infill);
+    bool have_small_area_infill_flow_compensation = has_solid_infill && config->opt_bool("small_area_infill_flow_compensation");
+    toggle_field("small_area_infill_flow_compensation_model", have_small_area_infill_flow_compensation);
 
     toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill);
     toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill);
@@ -493,7 +502,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "support_material_contact_distance", "support_material_bottom_contact_distance" })
         toggle_field(el, have_support_material && !have_support_soluble);
 
-    for (auto el : { "support_material_interface_pattern", "support_material_interface_spacing", "support_material_interface_extruder",
+    for (auto el : { "support_material_bottom_interface_pattern", "support_material_top_interface_pattern", "support_material_interface_spacing", "support_material_interface_extruder",
                     "support_material_interface_speed", "support_material_interface_contact_loops", "support_material_interface_layer_height"
                     "support_material_interface_angle", "support_material_interface_angle_increment"})
         toggle_field(el, have_support_material && have_support_interface);
@@ -560,7 +569,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, (has_top_solid_infill && config->option<ConfigOptionEnum<InfillPattern>>("top_fill_pattern")->value == InfillPattern::ipSmooth)
             || (has_bottom_solid_infill && config->option<ConfigOptionEnum<InfillPattern>>("bottom_fill_pattern")->value == InfillPattern::ipSmooth)
             || (has_solid_infill && config->option<ConfigOptionEnum<InfillPattern>>("solid_fill_pattern")->value == InfillPattern::ipSmooth)
-            || (have_support_material && config->option<ConfigOptionEnum<InfillPattern>>("support_material_interface_pattern")->value == InfillPattern::ipSmooth));
+            || (have_support_material && config->option<ConfigOptionEnum<InfillPattern>>("support_material_top_interface_pattern")->value == InfillPattern::ipSmooth)
+            || (have_support_material && config->option<ConfigOptionEnum<InfillPattern>>("support_material_bottom_interface_pattern")->value == InfillPattern::ipSmooth));
 
     //TODO: can the milling_diameter or the milling_cutter be check to enable/disable this?
     for (auto el : { "milling_after_z", "milling_extra_size", "milling_speed" })
@@ -580,7 +590,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("support_material_acceleration", have_default_acceleration && (have_support_material || have_brim || have_skirt));
     toggle_field("support_material_interface_acceleration", have_default_acceleration && have_support_material && have_support_interface);
     toggle_field("brim_acceleration", have_default_acceleration && (have_brim || have_skirt));
-    for (auto el : { "bridge_acceleration", "bridge_internal_acceleration", "overhangs_acceleration", "gap_fill_acceleration", "travel_acceleration", "travel_deceleration_use_target", "first_layer_acceleration" })
+    for (auto el : { "bridge_acceleration", "internal_bridge_acceleration", "overhangs_acceleration", "gap_fill_acceleration", "travel_acceleration", "travel_deceleration_use_target", "first_layer_acceleration" })
         toggle_field(el, have_default_acceleration);
 
     // for default speed, it needs at least a dependent field with a %
