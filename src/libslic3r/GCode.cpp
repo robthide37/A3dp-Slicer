@@ -5718,7 +5718,7 @@ void GCode::_extrude_line_cut_corner(std::string& gcode_str, const Line& line, c
 
 double GCode::compute_e_per_mm(double path_mm3_per_mm) {
     // no e if no extrusion axis
-    if (m_writer.extrusion_axis().empty())
+    if (m_writer.extrusion_axis().empty() || path_mm3_per_mm <= 0)
         return 0;
     // compute
     double e_per_mm = path_mm3_per_mm
