@@ -1427,8 +1427,8 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
 
     //klipper can hide gcode into a macro, so add guessed init gcode to the processor.
     if (this->config().start_gcode_manual) {
-        std::string gcode = m_writer.preamble();
-        m_processor.process_string(gcode,  this->m_throw_if_canceled);
+        // from m_writer.preamble();
+        m_processor.process_preamble(true/*unit_mm*/, true/*absolute_coords*/, m_writer.config.use_relative_e_distances.value, 0/*G92*/);
     }
 
     if (! print.config().gcode_substitutions.empty()) {
