@@ -397,7 +397,7 @@ private:
     // Cache for custom seam enforcers/blockers for each layer.
     SeamPlacer                          m_seam_placer;
     bool                                m_seam_perimeters = false;
-
+    public:
     /* Origin of print coordinates expressed in unscaled G-code coordinates.
        This affects the input arguments supplied to the extrude*() and travel_to()
        methods. */
@@ -419,12 +419,16 @@ private:
     // Collection of templates, on which the placeholder substitution failed.
         std::map<std::string, std::string>  failed_templates;
         // Input/output from/to custom G-code block, for returning position, retraction etc.
+        // output_config contains unique_ptr of ConfigOptions
         DynamicConfig                       output_config;
-        ConfigOptionFloats                 *opt_position { nullptr };
-        ConfigOptionFloats                 *opt_e_position { nullptr };
-        ConfigOptionFloat                  *opt_zhop { nullptr };
+        // these are pointer to unique_ptr from output_config
         ConfigOptionFloats                 *opt_e_retracted { nullptr };
         ConfigOptionFloats                 *opt_e_restart_extra { nullptr };
+        ConfigOptionFloats                 *opt_e_position { nullptr };
+        ConfigOptionFloats                 *opt_position { nullptr };
+        // these are pointer to unique_ptr from parser.m_config
+        ConfigOptionFloats                 *opt_position_parser { nullptr };
+        ConfigOptionFloat                  *opt_zhop { nullptr };
         ConfigOptionFloats                 *opt_extruded_volume { nullptr };
         ConfigOptionFloats                 *opt_extruded_weight { nullptr };
         ConfigOptionFloat                  *opt_extruded_volume_total { nullptr };
@@ -485,10 +489,10 @@ private:
     // Not know the gapfill role for retract_lift_top
     GCodeExtrusionRole                  m_last_notgapfill_extrusion_role;
     // Support for G-Code Processor
-    float                               m_last_height{ 0.0f };
-    float                               m_last_layer_z{ 0.0f };
-    float                               m_max_layer_z{ 0.0f };
-    float                               m_last_width{ 0.0f };
+    double                              m_last_height{ 0.0 };
+    double                              m_last_layer_z{ 0.0 };
+    double                              m_max_layer_z{ 0.0 };
+    double                              m_last_width{ 0.0 };
     // to pass between before_xtrude and after_extrude.
     double                              m_last_fan_override{ -1.0 };
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING

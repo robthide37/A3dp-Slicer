@@ -30,7 +30,7 @@ public:
         // between PlaceholderParser evaluations.
         std::unique_ptr<DynamicConfig>  global_config;
     };
-
+    
     PlaceholderParser(const DynamicConfig *external_config = nullptr);
     
     void clear_config() { m_config.clear(); }

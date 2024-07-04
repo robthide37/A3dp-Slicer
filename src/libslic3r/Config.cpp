@@ -1700,25 +1700,32 @@ size_t DynamicConfig::remove_nil_options()
 
 ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key, bool create)
 {
-    auto it = options.find(opt_key);
-    if (it != options.end())
-        // Option was found.
-        return it->second.get();
-    if (! create)
+    if (create) {
+        // Use lower_bound instead of find for emplace_hint
+        auto it = options.lower_bound(opt_key);
+        if (it != options.end() && it->first == opt_key)
+            // Option was found.
+            return it->second.get();
+        // Try to create a new ConfigOption.
+        const ConfigDef *def = this->def();
+        if (def == nullptr)
+            throw NoDefinitionException(opt_key);
+        const ConfigOptionDef *optdef = def->get(opt_key);
+        if (optdef == nullptr)
+            //        throw ConfigurationError(std::string("Invalid option name: ") + opt_key);
+            // Let the parent decide what to do if the opt_key is not defined by this->def().
+            return nullptr;
+        ConfigOption *opt = optdef->create_default_option();
+        this->options.emplace_hint(it, opt_key, std::unique_ptr<ConfigOption>(opt));
+        return opt;
+    } else {
+        auto it = options.find(opt_key);
+        if (it != options.end())
+            // Option was found.
+            return it->second.get();
         // Option was not found and a new option shall not be created.
         return nullptr;
-    // Try to create a new ConfigOption.
-    const ConfigDef       *def    = this->def();
-    if (def == nullptr)
-        throw NoDefinitionException(opt_key);
-    const ConfigOptionDef *optdef = def->get(opt_key);
-    if (optdef == nullptr)
-//        throw ConfigurationError(std::string("Invalid option name: ") + opt_key);
-        // Let the parent decide what to do if the opt_key is not defined by this->def().
-        return nullptr;
-    ConfigOption *opt = optdef->create_default_option();
-    this->options.emplace_hint(it, opt_key, std::unique_ptr<ConfigOption>(opt));
-    return opt;
+    }
 }
 
 const ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key) const

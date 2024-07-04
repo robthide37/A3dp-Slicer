@@ -255,6 +255,7 @@ void GCodeGenerator::PlaceholderParserIntegration::reset()
     this->failed_templates.clear();
     this->output_config.clear();
     this->opt_position = nullptr;
+    this->opt_position_parser = nullptr;
     this->opt_zhop = nullptr;
     this->opt_e_position = nullptr;
     this->opt_e_retracted = nullptr;
@@ -329,7 +330,8 @@ void GCodeGenerator::PlaceholderParserIntegration::init(const PrintConfig &print
     this->position.assign(3, 0);
     this->opt_position = new ConfigOptionFloats(this->position);
     this->output_config.set_key_value("position", this->opt_position);
-    this->parser.set("current_position", this->opt_position);
+    this->opt_position_parser = new ConfigOptionFloats(this->position);
+    this->parser.set("current_position", this->opt_position_parser);
 
     // Store zhop variable into the parser itself, it is a read-only variable to the script.
     this->opt_zhop = new ConfigOptionFloat(0);
@@ -340,6 +342,7 @@ void GCodeGenerator::PlaceholderParserIntegration::update_from_gcodewriter(const
 {
     memcpy(this->position.data(), writer.get_position().data(), sizeof(double) * 3);
     this->opt_position->values = this->position;
+    this->opt_position_parser->values = this->position;
     this->opt_zhop->value = writer.get_lift();
 
     if (this->num_extruders > 0) {
@@ -1952,7 +1955,8 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             //for all extruder used in this print
             for (uint16_t extruder_id : print.tool_ordering().all_extruders()) {
                 //only for extruders
-                if (std::find(m_writer.extruder_ids().begin(),m_writer.extruder_ids().end(), extruder_id) != m_writer.extruder_ids().end() ) {
+                auto extr_ids = m_writer.extruder_ids();
+                if (std::find(extr_ids.begin(), extr_ids.end(), extruder_id) != extr_ids.end() ) {
                     //write end flament gcode.
                     const std::string& end_gcode = print.config().end_filament_gcode.values[extruder_id];
                     config.set_key_value("filament_extruder_id", new ConfigOptionInt(extruder_id));
@@ -3072,13 +3076,13 @@ LayerResult GCodeGenerator::process_layer(
     gcode += std::string(";Z:") + float_to_string_decimal_point(print_z) + "\n";
 
     // export layer height
-    float height = first_layer ? static_cast<float>(print_z) : static_cast<float>(print_z) - m_last_layer_z;
+    double height = first_layer ? print_z : print_z - m_last_layer_z;
     gcode += std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height)
         + float_to_string_decimal_point(height) + "\n";
 
     // update caches
-    const coordf_t previous_layer_z{m_last_layer_z};
-    m_last_layer_z = static_cast<float>(print_z);
+    const double previous_layer_z{m_last_layer_z};
+    m_last_layer_z = print_z;
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
     m_last_height = height;
     m_last_too_small.polyline.clear();
@@ -3086,7 +3090,7 @@ LayerResult GCodeGenerator::process_layer(
     //m_already_unretracted = false;
 
     // Set new layer - this will change Z and force a retraction if retract_layer_change is enabled.
-    assert(previous_layer_z == (m_layer != nullptr ? m_layer->print_z : 0));
+    assert(std::abs(previous_layer_z - (m_layer != nullptr ? m_layer->print_z : 0)) < 0.00000001);
     if (! print.config().before_layer_gcode.value.empty()) {
         DynamicConfig config;
         config.set_key_value("previous_layer_z", new ConfigOptionFloat(previous_layer_z));
@@ -4110,7 +4114,7 @@ void GCodeGenerator::split_at_seam_pos(ExtrusionLoop& loop, bool was_clockwise)
 
     // find the point of the loop that is closest to the current extruder position
     // or randomize if requested
-    Point seam_point = this->last_pos();
+    Point seam_point = this->last_pos_defined() ? this->last_pos() : Point(0,0);
     //for first spiral, choose the seam, as the position will be very relevant.
     if (m_spiral_vase_layer > 1 /* spiral vase is printing and it's after the transition layer (that one can find a good spot)*/
         || !m_seam_perimeters) {
@@ -5178,7 +5182,10 @@ void GCodeGenerator::extrude_perimeters(const ExtrudeArgs &print_args, const Lay
     ExtrusionEntityReferences chained = chain_extrusion_references(to_extrude, &last_pos());
     for (const ExtrusionEntityReference &next_entity : chained) {
         gcode += this->extrude_entity(next_entity, comment_perimeter, -1.);
-        m_travel_obstacle_tracker.mark_extruded(&next_entity.extrusion_entity(), print_args.print_instance.object_layer_to_print_id, print_args.print_instance.instance_id);
+        if (m_travel_obstacle_tracker.is_init())
+            m_travel_obstacle_tracker.mark_extruded(&next_entity.extrusion_entity(),
+                                                    print_args.print_instance.object_layer_to_print_id,
+                                                    print_args.print_instance.instance_id);
     }
     m_region = nullptr;
     m_seam_perimeters = false;
@@ -5259,7 +5266,6 @@ void GCodeGenerator::extrude_ironing(const ExtrudeArgs &print_args, const LayerI
 void GCodeGenerator::extrude_skirt(
     ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override, std::string &gcode, const std::string_view description)
 {
-
     assert(loop_src.is_counter_clockwise());
 
     if (loop_src.paths.empty())
@@ -5271,7 +5277,9 @@ void GCodeGenerator::extrude_skirt(
         assert(!std::isnan(extrusion_flow_override.height));
         path.attributes_mutable().mm3_per_mm = extrusion_flow_override.mm3_per_mm;
         path.attributes_mutable().height     = extrusion_flow_override.height;
-        gcode += this->extrude_loop(loop_src, description, -1);
+        //gcode += this->extrude_loop(loop_src, description, -1);
+        // use extrude_entity to init "visitor fields".
+        gcode += this->extrude_entity({loop_src, false}, description, -1);
     }
 
     if (m_wipe.is_enabled())

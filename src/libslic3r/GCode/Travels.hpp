@@ -76,6 +76,7 @@ class TravelObstacleTracker
 {
 public:
     void init_layer(const Layer &layer, const ObjectsLayerToPrint &objects_to_print);
+    bool is_init() const { return !m_current_layer_distancer.get_lines().empty(); }
 
     void mark_extruded(const ExtrusionEntity *extrusion_entity, size_t object_layer_idx, size_t instance_idx);
 

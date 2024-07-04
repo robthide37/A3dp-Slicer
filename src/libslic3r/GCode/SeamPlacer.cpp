@@ -31,6 +31,9 @@
 
 #include "libslic3r/Utils.hpp"
 
+
+#include <atomic>
+
 //#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
@@ -429,7 +432,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
         }
         virtual void default_use(const ExtrusionEntity& entity) {};
         virtual void use(const ExtrusionPath &path) override {
-            if (perimeter_type == PerimeterGeneratorType::Arachne && path.role() != ExtrusionRole::ThinWall) {
+            if (/*perimeter_type == PerimeterGeneratorType::Arachne &&*/ path.role() != ExtrusionRole::ThinWall) {
                 path.polygons_covered_by_width(*polygons, SCALED_EPSILON);
                 while (m_corresponding_regions_out.size() < polygons->size()) {
                     m_corresponding_regions_out.push_back(current_layer_region);
@@ -480,6 +483,11 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
                 }
             }
         }
+        virtual void use(const ExtrusionEntityCollection& collection) override {
+            for (const ExtrusionEntity* entity : collection.entities()) {
+                entity->visit(*this);
+            }
+        }
         void set_current_layer_region(const LayerRegion *set) { current_layer_region = set; }
     } visitor(corresponding_regions_out, &polygons, configured_seam_preference, perimeter_type);
 
@@ -500,7 +508,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
                     if (polygons.empty()) {
                         // shouldn't happen
                         ex_entity->visit(visitor);
-                        assert(ex_entity->role() == ExtrusionRole::ThinWall); // no loops
+                        //assert(ex_entity->role() == ExtrusionRole::ThinWall); // no loops
                         // what to do in this case?
                         Points p;
                         ex_entity->collect_points(p);
@@ -1098,11 +1106,14 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerI
     using namespace SeamPlacerImpl;
     PrintObjectSeamData &seam_data = m_seam_per_object.emplace(po, PrintObjectSeamData { }).first->second;
     seam_data.layers.resize(po->layer_count());
-
+    
+    // use an antomic idx instead of the range, to avoid a thread being very late because it's on the difficult layers.
+    std::atomic_size_t next_layer_idx(0);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [po, &global_model_info, &seam_data, configured_seam_preference]
+            [po, &global_model_info, &seam_data, configured_seam_preference, &next_layer_idx]
             (tbb::blocked_range<size_t> r) {
-                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                //for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                for (size_t layer_idx = next_layer_idx++; layer_idx < po->layers().size(); layer_idx = next_layer_idx++) {
                     PrintObjectSeamData::LayerSeams &layer_seams = seam_data.layers[layer_idx];
                     const Layer *layer = po->get_layer(layer_idx);
                     auto unscaled_z = layer->slice_z;

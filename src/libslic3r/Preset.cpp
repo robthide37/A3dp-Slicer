@@ -1116,7 +1116,7 @@ void PresetCollection::reset(bool delete_files)
 void PresetCollection::add_default_preset(const std::vector<std::string> &keys, const Slic3r::StaticPrintConfig &defaults, const std::string &preset_name)
 {
     // Insert just the default preset.
-    m_presets.emplace_back(Preset(this->type(), preset_name, true));
+    m_presets.emplace_back(Preset::PresetFactory{this->type(), preset_name, true});
     m_presets.back().config.apply_only(defaults, keys.empty() ? defaults.keys() : keys);
     m_presets.back().loaded = true;
     ++ m_num_default_presets;
@@ -1342,7 +1342,7 @@ Preset& PresetCollection::load_preset(const std::string &path, const std::string
     auto it = this->find_preset_internal(name);
     if (it == m_presets.end() || it->name != name) {
         // The preset was not found. Create a new preset.
-        it = m_presets.emplace(it, Preset(m_type, name, false));
+        it = m_presets.emplace(it, Preset::PresetFactory{m_type, name, false});
     }
     Preset &preset = *it;
     preset.file = path;
