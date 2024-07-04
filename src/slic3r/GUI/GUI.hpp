@@ -47,7 +47,6 @@ extern void add_menus(wxMenuBar *menu, int event_preferences_changed, int event_
 void show_error(wxWindow* parent, const wxString& message, bool monospaced_font = false);
 void show_error(wxWindow* parent, const char* message, bool monospaced_font = false);
 inline void show_error(wxWindow* parent, const std::string& message, bool monospaced_font = false) { show_error(parent, message.c_str(), monospaced_font); }
-void show_error_id(int id, const std::string& message);   // For Perl
 void show_info(wxWindow* parent, const wxString& message, const wxString& title = wxString());
 void show_info(wxWindow* parent, const char* message, const char* title = nullptr);
 inline void show_info(wxWindow* parent, const std::string& message,const std::string& title = std::string()) { show_info(parent, message.c_str(), title.c_str()); }

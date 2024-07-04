@@ -818,7 +818,7 @@ void PageMaterials::check_and_update_presets(bool force_reload_presets /*= false
     if (presets_loaded)
         return;
     wizard_p()->update_materials(materials->technology);
-    if (force_reload_presets)
+//    if (force_reload_presets)
         reload_presets();
 }
 
@@ -2847,11 +2847,16 @@ bool ConfigWizard::priv::on_bnt_finish()
      * than last changes wouldn't be updated for filaments/materials.
      * SO, do that before check_and_install_missing_materials()
      */
-    page_filaments->check_and_update_presets();
-    page_sla_materials->check_and_update_presets();
+    if (page_filaments)
+        page_filaments->check_and_update_presets();
+    if (page_sla_materials)
+        page_sla_materials->check_and_update_presets();
     
-	// there's no need to check that filament is selected if we have only custom printer
-    if (custom_printer_selected && !any_fff_selected && !any_sla_selected) return true;
+    // Even if we have only custom printer installed, check filament selection. 
+    // Template filaments could be selected in this case. 
+    if (custom_printer_selected && !any_fff_selected && !any_sla_selected) 
+        return check_and_install_missing_materials(T_FFF);
+
     // check, that there is selected at least one filament/material
     return check_and_install_missing_materials(T_ANY);
 }
@@ -2959,7 +2964,7 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 
     bool no_templates = wxGetApp().app_config->get("no_templates") == "1";
 
-    if (any_fff_selected && (technology & T_FFF)) {
+    if ((any_fff_selected || custom_printer_selected) && (technology & T_FFF)) {
     	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptFFF, AppConfig::SECTION_FILAMENTS, no_templates);
     	if (! printer_models_without_material.empty()) {
 			if (only_for_model_id.empty())
@@ -3063,7 +3068,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
                 }
             }
         }
-        return pt;
+        return ptAny;
     };
     // Prusa printers are considered first, then 3rd party.
     if (preferred_pt = get_preferred_printer_technology(ALLOW_PRUSA_FIRST, bundles.prusa_bundle());

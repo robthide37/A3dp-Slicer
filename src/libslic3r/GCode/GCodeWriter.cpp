@@ -568,10 +568,8 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const double speed, c
     /*  In all the other cases, we perform an actual XYZ move and cancel
         the lift. */
     m_lifted = 0;
-    m_pos    = point;
     
     GCodeG1Formatter w(this->get_default_gcode_formatter());
-    w.emit_xyz(point);
     w.emit_f(travel_speed * 60);
     w.emit_comment(this->config.gcode_comments, comment);
     return write_acceleration() + w.string();
@@ -600,7 +598,6 @@ std::string GCodeWriter::travel_to_z(double z, const std::string_view comment)
 std::string GCodeWriter::get_travel_to_z_gcode(double z, const std::string_view comment)
 {
     m_pos.z() = z;
-
     double speed = this->config.travel_speed_z.value;
     if (speed == 0.)
         speed = this->config.travel_speed.value;

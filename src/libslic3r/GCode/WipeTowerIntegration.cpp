@@ -70,10 +70,23 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
                                          || is_ramming
                                          || will_go_down);       // don't dig into the print
     if (should_travel_to_tower) {
+        const Point xy_point = wipe_tower_point_to_object_point(gcodegen, start_pos);
         gcode += gcodegen.retract_and_wipe();
         gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
-        Polyline travel_path = gcodegen.travel_to(gcode, wipe_tower_point_to_object_point(gcodegen, start_pos), ExtrusionRole::Mixed);
-        gcodegen.write_travel_to(gcode, travel_path, "Travel to a Wipe Tower");
+        const std::string comment{"Travel to a Wipe Tower"};
+        if (gcodegen.m_current_layer_first_position) {
+            if (gcodegen.last_pos_defined()) {
+                Polyline travel_path = gcodegen.travel_to(gcode, xy_point, ExtrusionRole::Mixed);
+                gcodegen.write_travel_to(gcode, travel_path, comment);
+            } else {
+                // TODO: check if the z is already set
+                gcode += gcodegen.writer().travel_to_xy(gcodegen.point_to_gcode(xy_point), 0.0, comment);
+                gcode += gcodegen.writer().get_travel_to_z_gcode(z, comment);
+            }
+        } else {
+            const Vec3crd point = to_3d(xy_point, scaled(z));
+            gcode += gcodegen.travel_to_first_position(point);
+        }
         need_unretract = true;
     } else {
         // When this is multiextruder printer without any ramming, we can just change
@@ -96,10 +109,11 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
         if (is_ramming)
             gcodegen.m_wipe.reset_path(); // We don't want wiping on the ramming lines.
         toolchange_gcode_str = gcodegen.set_extruder(new_extruder_id, tcr.print_z); // TODO: toolchange_z vs print_z
-        if (gcodegen.config().wipe_tower)
-            deretraction_str += gcodegen.writer().get_travel_to_z_gcode(z, "restore layer Z");
+        if (gcodegen.config().wipe_tower) {
+            const double retract_to_z = tcr.priming ? tcr.print_z + gcodegen.config().z_offset.value : z;
+            deretraction_str += gcodegen.writer().get_travel_to_z_gcode(retract_to_z, "restore layer Z");
             deretraction_str += gcodegen.unretract();
-
+        }
     }
     assert(toolchange_gcode_str.empty() || toolchange_gcode_str.back() == '\n');
     assert(deretraction_str.empty() || deretraction_str.back() == '\n');

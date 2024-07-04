@@ -1553,7 +1553,8 @@ ExPolygons dense_fill_fit_to_size(const ExPolygon& bad_polygon_to_cover,
 void PrintObject::tag_under_bridge() {
     const float COEFF_SPLIT = 1.5;
 
-    for (const PrintRegion* region : this->m_print->print_regions_mutable()) {
+    for (size_t region_idx = 0; region_idx < this->print()->num_print_regions(); ++ region_idx) {
+        const PrintRegion* region = &this->print()->get_print_region(region_idx);
         //count how many surface there are on each one
         if (region->config().infill_dense.get_bool() && region->config().fill_density < 40) {
             std::vector<LayerRegion*> layeridx2lregion;

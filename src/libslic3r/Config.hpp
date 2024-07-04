@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <map>
 #include <climits>
+#include <limits>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
@@ -61,9 +62,9 @@ namespace Slic3r {
         template<class Archive> void serialize(Archive& ar) { ar(this->value); ar(this->percent); }
     };
 
-    inline bool operator==(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value == r.value && l.percent == r.percent; }
-    inline bool operator!=(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return !(l == r); }
-    inline bool operator< (const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value < r.value || (l.value == r.value && int(l.percent) < int(r.percent)); }
+    inline bool operator==(const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return l.value == r.value && l.percent == r.percent; }
+    inline bool operator!=(const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return !(l == r); }
+    inline bool operator< (const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return l.value < r.value || (l.value == r.value && int(l.percent) < int(r.percent)); }
 }
 
 namespace std {
@@ -471,8 +472,56 @@ private:
 typedef ConfigOption*       ConfigOptionPtr;
 typedef const ConfigOption* ConfigOptionConstPtr;
 
+// Nill value will be defined in specializations
+template<class T, class En = void> struct NilValueTempl
+{
+    using NilType = T;
+    static_assert(always_false<T>::value, "Type has no well defined nil value");
+};
+
+template<class T> struct NilValueTempl<T, std::enable_if_t<std::is_integral_v<T>, void>> {
+    using NilType = T;
+    static constexpr auto value = std::numeric_limits<T>::max();
+};
+
+template<> struct NilValueTempl<bool> : public NilValueTempl<int>{};
+
+// For enums the nil is the max value of the underlying type.
+template<class T>
+struct NilValueTempl<T, std::enable_if_t<std::is_enum_v<T>, void>>
+{
+    using NilType = T;
+    static constexpr auto value = static_cast<T>(std::numeric_limits<std::underlying_type_t<T>>::max());
+};
+
+template<class T> struct NilValueTempl<T, std::enable_if_t<std::is_floating_point_v<T>, void>> {
+    using NilType = T;
+    static constexpr auto value = std::numeric_limits<T>::quiet_NaN();
+};
+
+template<>
+struct NilValueTempl<FloatOrPercent> : public NilValueTempl<double> {};
+
+template<> struct NilValueTempl<std::string> {
+    using NilType = const char *;
+
+    static constexpr const char* value = "";
+};
+
+template<int N, class T> struct NilValueTempl<Vec<N, T>> {
+    using NilType = Vec<N, T>;
+    // No constexpr for Vec<N, T>
+    static inline const Vec<N, T> value = Vec<N, T>::Ones() * NilValueTempl<remove_cvref_t<T>>::value;
+};
+
+template<class T> using NilType = typename NilValueTempl<remove_cvref_t<T>>::NilType;
+
+// Define shortcut as a function instead of a static const var so that it can be constexpr
+// even if the NilValueTempl::value is not constexpr.
+template<class T> static constexpr NilType<T> NilValue() noexcept { return NilValueTempl<remove_cvref_t<T>>::value; }
+
 // Value of a single valued option (bool, int, float, string, point, enum)
-template <class T>
+template <class T, bool NULLABLE = false>
 class ConfigOptionSingle : public ConfigOption {
 public:
     T value;
@@ -486,8 +535,8 @@ public:
     {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Assigning an incompatible type");
-        assert(dynamic_cast<const ConfigOptionSingle<T>*>(rhs));
-        this->value = static_cast<const ConfigOptionSingle<T>*>(rhs)->value;
+        assert(dynamic_cast<const ConfigOptionSingle*>(rhs));
+        this->value = static_cast<const ConfigOptionSingle*>(rhs)->value;
         this->flags = rhs->flags;
     }
 
@@ -495,8 +544,10 @@ public:
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Comparing incompatible types");
-        assert(dynamic_cast<const ConfigOptionSingle<T>*>(&rhs));
-        return this->value == static_cast<const ConfigOptionSingle<T>*>(&rhs)->value;
+        assert(dynamic_cast<const ConfigOptionSingle*>(&rhs));
+        if (this->is_nil() && rhs.is_nil())
+            return true;
+        return this->value == static_cast<const ConfigOptionSingle*>(&rhs)->value;
     }
 
     bool operator==(const T &rhs) const throw() { return this->value == rhs; }
@@ -505,10 +556,66 @@ public:
 
     size_t hash() const throw() override { return std::hash<T>{}(this->value); }
 
+    // Is this option overridden by another option?
+    // An option overrides another option if it is not nil and not equal.
+    bool overriden_by(const ConfigOption *rhs) const override {
+        if (this->nullable())
+            throw ConfigurationError("Cannot override a nullable ConfigOption.");
+        if (rhs->type() != this->type())
+            throw ConfigurationError("ConfigOptionVector.overriden_by() applied to different types.");
+        auto rhs_co = static_cast<const ConfigOptionSingle*>(rhs);
+        if (! rhs->nullable())
+            // Overridding a non-nullable object with another non-nullable object.
+            return this->value != rhs_co->value;
+
+        return !rhs_co->is_nil() && rhs_co->value != this->value;
+    }
+    // Apply an override option, possibly a nullable one.
+    bool apply_override(const ConfigOption *rhs) override {
+        if (this->nullable())
+            throw ConfigurationError("Cannot override a nullable ConfigOption.");
+        if (rhs->type() != this->type())
+            throw ConfigurationError("ConfigOptionVector.apply_override() applied to different types.");
+        auto rhs_co = static_cast<const ConfigOptionSingle*>(rhs);
+        if (! rhs->nullable()) {
+            // Overridding a non-nullable object with another non-nullable object.
+            if (this->value != rhs_co->value) {
+                this->value = rhs_co->value;
+                return true;
+            }
+            return false;
+        }
+
+        if (!rhs_co->is_nil() && rhs_co->value != this->value) {
+            this->value = rhs_co->value;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool nullable() const override { return NULLABLE; }
+
+    static constexpr NilType<T> nil_value() { return NilValue<T>(); }
+
+    // A scalar is nil, or all values of a vector are nil.
+    bool is_nil(int32_t idx = -1) const override
+    {
+        bool ret = false;
+
+        if constexpr (NULLABLE)
+            ret = this->value == nil_value();
+
+        return ret;
+    }
+
 private:
 	friend class cereal::access;
 	template<class Archive> void serialize(Archive & ar) { ar(this->flags); ar(this->value); }
 };
+
+template<class T>
+using ConfigOptionSingleNullable = ConfigOptionSingle<T, true>;
 
 // Value of a vector valued option (bools, ints, floats, strings, points)
 class ConfigOptionVectorBase : public ConfigOption {
@@ -536,6 +643,8 @@ public:
     virtual size_t size()  const = 0;
     // Is this vector empty?
     virtual bool   empty() const = 0;
+    // Is the value nil? That should only be possible if this->nullable().
+    bool   is_nil(int32_t idx) const override = 0;
     // Get if the size of this vector is/should be the same as nozzle_diameter
     bool is_extruder_size() const { return (flags & FCO_EXTRUDER_ARRAY) != 0; }
     ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size) {
@@ -546,6 +655,7 @@ public:
     // We just overloaded and hid two base class virtual methods.
     // Let's show it was intentional (warnings).
     using ConfigOption::set;
+    using ConfigOption::is_nil;
 
 
 protected:
@@ -768,24 +878,36 @@ private:
 	template<class Archive> void serialize(Archive & ar) { ar(this->flags); ar(this->values); }
 };
 
-class ConfigOptionFloat : public ConfigOptionSingle<double>
+template<bool NULLABLE = false>
+class ConfigOptionFloatTempl : public ConfigOptionSingle<double, NULLABLE>
 {
 public:
-    ConfigOptionFloat() : ConfigOptionSingle<double>(0) {}
-    explicit ConfigOptionFloat(double _value) : ConfigOptionSingle<double>(_value) {}
-    explicit ConfigOptionFloat(double _value, bool _phony) : ConfigOptionSingle<double>(_value, _phony) {}
+    ConfigOptionFloatTempl() : ConfigOptionSingle<double, NULLABLE>(0) {}
+    explicit ConfigOptionFloatTempl(double _value) : ConfigOptionSingle<double, NULLABLE>(_value) {}
+    explicit ConfigOptionFloatTempl(double _value, bool _phony) : ConfigOptionSingle<double>(_value, _phony) {}
 
     static ConfigOptionType static_type() { return coFloat; }
     ConfigOptionType        type()      const override { return static_type(); }
     double                  get_float(size_t idx = 0) const override { return this->value; }
-    ConfigOption*           clone()     const override { return new ConfigOptionFloat(*this); }
-    bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionFloat &rhs) const throw() { return this->value <  rhs.value; }
+    ConfigOption*           clone()     const override { return new ConfigOptionFloatTempl(*this); }
+    bool                    operator==(const ConfigOptionFloatTempl &rhs) const throw() { return this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionFloatTempl &rhs) const throw() { return this->value <  rhs.value; }
     
     std::string serialize() const override
     {
         std::ostringstream ss;
-        ss << this->value;
+        double v = this->value;
+
+        if (std::isfinite(v))
+            ss << v;
+        else if (std::isnan(v)) {
+            if (NULLABLE)
+                ss << "nil";
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            throw ConfigurationError("Serializing invalid number");
+
         return ss.str();
     }
     
@@ -793,20 +915,44 @@ public:
     {
         UNUSED(append);
         std::istringstream iss(str);
-        iss >> this->value;
+
+        if (str == "nil") {
+            if (NULLABLE)
+                this->value = this->nil_value();
+            else
+                throw ConfigurationError("Deserializing nil into a non-nullable object");
+        } else {
+            iss >> this->value;
+        }
+
         return !iss.fail();
     }
 
-    ConfigOptionFloat& operator=(const ConfigOption *opt)
+    ConfigOptionFloatTempl& operator=(const ConfigOption *opt)
     {   
         this->set(opt);
         return *this;
     }
 
+    bool is_nil(int32_t idx = -1) const override
+    {
+        return std::isnan(this->value);
+    }
+
+    static inline bool is_any_nil(const boost::any &to_check) {
+        return std::isnan(boost::any_cast<double>(to_check)) || boost::any_cast<double>(to_check) == ConfigOptionSingle<double, NULLABLE>::nil_value();
+    }
+
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_any_nil() { return boost::any(ConfigOptionSingle<double, NULLABLE>::nil_value()); }
+
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double>>(this)); }
+    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double, NULLABLE>>(this)); }
 };
+
+using ConfigOptionFloat = ConfigOptionFloatTempl<false>;
+using ConfigOptionFloatNullable  = ConfigOptionFloatTempl<true>;
 
 template<bool NULLABLE>
 class ConfigOptionFloatsTempl : public ConfigOptionVector<double>
@@ -837,22 +983,16 @@ public:
     {
         if (idx < 0) {
             for (double v : this->values)
-                if (!std::isnan(v) && v != NIL_VALUE())
+                if (!std::isnan(v) && v != ConfigOptionFloatNullable::nil_value())
                     return false;
             return true;
         } else {
-            return idx < values.size() ? (std::isnan(this->values[idx]) || NIL_VALUE() == this->values[idx]) :
-                   values.empty()      ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
-                                         (std::isnan(this->values.front()) || NIL_VALUE() == this->values.front());
+            return idx < values.size() ? (std::isnan(this->values[idx]) || ConfigOptionFloatNullable::nil_value() == this->values[idx]) :
+                   values.empty()      ? (std::isnan(this->default_value) || ConfigOptionFloatNullable::nil_value() == this->default_value) :
+                                         (std::isnan(this->values.front()) || ConfigOptionFloatNullable::nil_value() == this->values.front());
         }
     }
     double                  get_float(size_t idx = 0) const override { return get_at(idx); }
-
-    static inline bool is_nil(const boost::any &to_check) {
-        return std::isnan(boost::any_cast<double>(to_check)) || boost::any_cast<double>(to_check) == NIL_VALUE();
-    }
-    // don't use it to compare, use is_nil() to check.
-    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -887,7 +1027,7 @@ public:
         	boost::trim(item_str);
         	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-        			this->values.push_back(NIL_VALUE());
+        			this->values.push_back(ConfigOptionFloatNullable::nil_value());
         		else
         			throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
@@ -909,11 +1049,11 @@ public:
 protected:
     // Special "nil" value to be stored into the vector if this->supports_nil().
     //please use is_nil & create_nil, to better support nan
-    static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
+    //static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
 	void serialize_single_value(std::ostringstream &ss, const double v) const {
         	if (std::isfinite(v))
 	            ss << v;
-	        else if (std::isnan(v) || v == NIL_VALUE()) {
+	        else if (std::isnan(v) || v == ConfigOptionFloatNullable::nil_value()) {
         		if (NULLABLE)
         			ss << NIL_STR_VALUE;
         		else
@@ -926,7 +1066,7 @@ protected:
     		if (v1.size() != v2.size())
     			return false;
     		for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-                if (!(((std::isnan(*it1) || *it1 == NIL_VALUE()) && (std::isnan(*it2) || *it2 == NIL_VALUE())) ||
+                if (!(((std::isnan(*it1) || *it1 == ConfigOptionFloatNullable::nil_value()) && (std::isnan(*it2) || *it2 == ConfigOptionFloatNullable::nil_value())) ||
                       *it1 == *it2))
 	    			return false;
     		return true;
@@ -937,8 +1077,8 @@ protected:
     static bool vectors_lower(const std::vector<double> &v1, const std::vector<double> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(*it1) || *it1 == NIL_VALUE());
-                auto null2 = int(std::isnan(*it2) || *it2 == NIL_VALUE());
+                auto null1 = int(std::isnan(*it1) || *it1 == ConfigOptionFloatNullable::nil_value());
+                auto null2 = int(std::isnan(*it2) || *it2 == ConfigOptionFloatNullable::nil_value());
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -955,24 +1095,32 @@ private:
 using ConfigOptionFloats 		 = ConfigOptionFloatsTempl<false>;
 using ConfigOptionFloatsNullable = ConfigOptionFloatsTempl<true>;
 
-class ConfigOptionInt : public ConfigOptionSingle<int32_t>
+template<bool NULLABLE = false>
+class ConfigOptionIntTempl : public ConfigOptionSingle<int32_t, NULLABLE>
 {
 public:
-    ConfigOptionInt() : ConfigOptionSingle<int32_t>(0) {}
-    explicit ConfigOptionInt(int32_t value) : ConfigOptionSingle<int32_t>(value) {}
-    explicit ConfigOptionInt(double _value) : ConfigOptionSingle<int32_t>(int32_t(floor(_value + 0.5))) {}
+    ConfigOptionIntTempl() : ConfigOptionSingle<int32_t, NULLABLE>(0) {}
+    explicit ConfigOptionIntTempl(int32_t value) : ConfigOptionSingle<int32_t, NULLABLE>(value) {}
+    explicit ConfigOptionIntTempl(double _value) : ConfigOptionSingle<int32_t, NULLABLE>(int32_t(floor(_value + 0.5))) {}
     
     static ConfigOptionType static_type() { return coInt; }
     ConfigOptionType        type()   const override { return static_type(); }
     int32_t                 get_int(size_t idx = 0) const override { return this->value; }
     double                  get_float(size_t idx = 0) const override { return this->value; }
-    ConfigOption*           clone()  const override { return new ConfigOptionInt(*this); }
-    bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->value == rhs.value; }
+    ConfigOption*           clone()  const override { return new ConfigOptionIntTempl(*this); }
+    bool                    operator==(const ConfigOptionIntTempl &rhs) const throw() { return this->value == rhs.value; }
     
     std::string serialize() const override 
     {
         std::ostringstream ss;
-        ss << this->value;
+        if (this->value == this->nil_value()) {
+            if (NULLABLE)
+                ss << "nil";
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            ss << this->value;
+
         return ss.str();
     }
     
@@ -980,20 +1128,40 @@ public:
     {
         UNUSED(append);
         std::istringstream iss(str);
-        iss >> this->value;
+
+        if (str == "nil") {
+            if (NULLABLE)
+                this->value = this->nil_value();
+            else
+                throw ConfigurationError("Deserializing nil into a non-nullable object");
+        } else {
+            iss >> this->value;
+        }
+
         return !iss.fail();
     }
 
-    ConfigOptionInt& operator=(const ConfigOption *opt) 
+    ConfigOptionIntTempl& operator=(const ConfigOption *opt)
     {   
         this->set(opt);
         return *this;
     }
+    
+
+    static inline bool is_any_nil(const boost::any &to_check) {
+        return boost::any_cast<int32_t>(to_check) == ConfigOptionSingle<int32_t, NULLABLE>::nil_value();
+    }
+
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_any_nil() { return boost::any(ConfigOptionSingle<int32_t, NULLABLE>::nil_value()); }
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int32_t>>(this)); }
+    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int32_t, NULLABLE>>(this)); }
 };
+
+using ConfigOptionInt = ConfigOptionIntTempl<false>;
+using ConfigOptionIntNullable = ConfigOptionIntTempl<true>;
 
 template<bool NULLABLE>
 class ConfigOptionIntsTempl : public ConfigOptionVector<int32_t>
@@ -1015,19 +1183,19 @@ public:
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
     bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
-    static int32_t          NIL_VALUE() { return std::numeric_limits<int32_t>::max(); }
+    //static int32_t          NIL_VALUE() { return std::numeric_limits<int32_t>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (int32_t v : this->values)
-                if (v != NIL_VALUE())
+                if (v != ConfigOptionIntNullable::nil_value())
                     return false;
             return true;
         } else {
-            return idx < values.size() ? NIL_VALUE() == this->values[idx] :
-                   values.empty()      ? NIL_VALUE() == this->default_value :
-                                         NIL_VALUE() == this->values.front();
+            return idx < values.size() ? ConfigOptionIntNullable::nil_value() == this->values[idx] :
+                   values.empty()      ? ConfigOptionIntNullable::nil_value() == this->default_value :
+                                         ConfigOptionIntNullable::nil_value() == this->values.front();
         }
     }
     int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
@@ -1066,7 +1234,7 @@ public:
         	boost::trim(item_str);
         	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-                    this->values.push_back(NIL_VALUE());
+                    this->values.push_back(ConfigOptionIntNullable::nil_value());
         		else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
@@ -1081,7 +1249,7 @@ public:
 
 private:
 	void serialize_single_value(std::ostringstream &ss, const int32_t v) const {
-			if (v == NIL_VALUE()) {
+			if (v == ConfigOptionIntNullable::nil_value()) {
         		if (NULLABLE)
         			ss << NIL_STR_VALUE;
         		else
@@ -1233,7 +1401,7 @@ public:
             if (&v != &this->values.front())
             	ss << ",";
 			this->serialize_single_value(ss, v);
-			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+			if (! (std::isnan(v) || v == ConfigOptionFloatNullable::nil_value()))
 				ss << "%";
         }
         std::string str = ss.str();
@@ -1247,7 +1415,7 @@ public:
         for (const double v : this->values) {
             std::ostringstream ss;
 			this->serialize_single_value(ss, v);
-			if (! (std::isnan(v) || v == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+			if (! (std::isnan(v) || v == ConfigOptionFloatNullable::nil_value()))
 				ss << "%";
             vv.push_back(ss.str());
         }
@@ -1380,13 +1548,13 @@ public:
     }
     double                  get_float(size_t idx = 0) const override { return get_abs_value(idx, 1.); }
 
-    static inline bool is_nil(const boost::any &to_check) {
+    static inline bool is_any_nil(const boost::any &to_check) {
         bool ok = std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value
             || boost::any_cast<FloatOrPercent>(to_check).value > std::numeric_limits<float>::max();
         return ok;
     }
     // don't use it to compare, use is_nil() to check.
-    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
+    static inline boost::any create_any_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -1986,9 +2154,10 @@ public:
     std::optional<std::reference_wrapper<const std::string>> enum_to_value(int enum_val) const;
 
     std::optional<std::reference_wrapper<const std::string>> enum_to_label(int enum_val) const;
-
-#ifndef NDEBUG
+    
+    //should be only used for debugging, but the script executor uses it to know how to read/write into the enum_def
     bool is_valid_closed_enum() const;
+#ifndef NDEBUG
     bool is_valid_open_enum() const;
 #endif // NDEBUG
 
@@ -2100,6 +2269,8 @@ public:
     template<class Archive> ConfigOption* load_option_from_archive(Archive &archive) const {
         if (this->nullable) {
             switch (this->type) {
+            case coFloat:           { auto opt = new ConfigOptionFloatNullable();   archive(*opt); return opt; }
+            case coInt:             { auto opt = new ConfigOptionIntNullable();	    archive(*opt); return opt; }
             case coFloats:          { auto opt = new ConfigOptionFloatsNullable();  archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coInts:            { auto opt = new ConfigOptionIntsNullable();    archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coPercents:        { auto opt = new ConfigOptionPercentsNullable();archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
@@ -2133,6 +2304,8 @@ public:
     template<class Archive> ConfigOption* save_option_to_archive(Archive &archive, const ConfigOption *opt) const {
     	if (this->nullable) {
 		    switch (this->type) {
+            case coFloat:           archive(*static_cast<const ConfigOptionFloatNullable*>(opt));  break;
+            case coInt:             archive(*static_cast<const ConfigOptionIntNullable*>(opt));  break;
 		    case coFloats:          archive(*static_cast<const ConfigOptionFloatsNullable*>(opt));  break;
 		    case coInts:            archive(*static_cast<const ConfigOptionIntsNullable*>(opt));    break;
 		    case coPercents:        archive(*static_cast<const ConfigOptionPercentsNullable*>(opt));break;

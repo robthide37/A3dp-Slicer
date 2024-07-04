@@ -195,6 +195,9 @@ namespace Slic3r {
             Height,
             Width,
             Layer_Change,
+            Layer_Change_Travel,
+            Layer_Change_Retraction_Start,
+            Layer_Change_Retraction_End,
             Color_Change,
             Pause_Print,
             Custom_Code,
@@ -883,5 +886,3 @@ namespace Slic3r {
 } /* namespace Slic3r */
 
 #endif /* slic3r_GCodeProcessor_hpp_ */
-
-

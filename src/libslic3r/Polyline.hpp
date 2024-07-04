@@ -329,7 +329,7 @@ public:
     // need some work to work better on arc
     void                  set_front(const Point &p);
     void                  set_back(const Point &p);
-    int  find_point(const Point &point, coordf_t epsilon) const;
+    int                   find_point(const Point &point, coordf_t epsilon) const;
 
 
     // Works on points & arc

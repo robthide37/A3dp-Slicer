@@ -130,12 +130,6 @@ int CLI::run(int argc, char **argv)
             // On Unix systems, the superslicer binary may be symlinked to give the application a different meaning.
             boost::algorithm::iends_with(boost::filesystem::path(argv[0]).filename().string(), GCODEVIEWER_APP_CMD);
 #endif // _WIN32
-#if ENABLE_GL_CORE_PROFILE
-    std::pair<int, int>              opengl_version = { 0, 0 };
-#if ENABLE_OPENGL_DEBUG_OPTION
-    bool                             opengl_debug = false;
-#endif // ENABLE_OPENGL_DEBUG_OPTION
-#endif // ENABLE_GL_CORE_PROFILE
 
     const std::vector<std::string>              &load_configs		      = m_config.option<ConfigOptionStrings>("load", true)->values;
     const ForwardCompatibilitySubstitutionRule   config_substitution_rule = m_config.option<ConfigOptionEnum<ForwardCompatibilitySubstitutionRule>>("config_compatibility", true)->value;
@@ -177,7 +171,12 @@ int CLI::run(int argc, char **argv)
         m_print_config.apply(config);
     }
         
+#ifdef SLIC3R_GUI
 #if ENABLE_GL_CORE_PROFILE
+    std::pair<int, int> opengl_version = { 0, 0 };
+    bool                opengl_debug = false;
+    bool                opengl_compatibility_profile = false;
+
     // search for special keys into command line parameters
     auto it = std::find(m_actions.begin(), m_actions.end(), "gcodeviewer");
     if (it != m_actions.end()) {
@@ -188,30 +187,37 @@ int CLI::run(int argc, char **argv)
 
     it = std::find(m_actions.begin(), m_actions.end(), "opengl-version");
     if (it != m_actions.end()) {
-        std::string opengl_version_str = m_config.opt_string("opengl-version");
-        if (std::find(Slic3r::GUI::OpenGLVersions::core_str.begin(), Slic3r::GUI::OpenGLVersions::core_str.end(), opengl_version_str) == Slic3r::GUI::OpenGLVersions::core_str.end()) {
-            if (std::find(Slic3r::GUI::OpenGLVersions::precore_str.begin(), Slic3r::GUI::OpenGLVersions::precore_str.end(), opengl_version_str) == Slic3r::GUI::OpenGLVersions::precore_str.end()) {
-                boost::nowide::cerr << "Found invalid OpenGL version: " << opengl_version_str << std::endl;
-                opengl_version_str.clear();
+        const Semver opengl_minimum = Semver(3,2,0,0);
+        const std::string opengl_version_str = m_config.opt_string("opengl-version");
+        boost::optional<Semver> semver = Semver::parse(opengl_version_str);
+        if (semver.has_value() && (*semver) >= opengl_minimum ) {
+            opengl_version.first = semver->maj();
+            opengl_version.second = semver->min();
+            if (std::find(Slic3r::GUI::OpenGLVersions::core.begin(), Slic3r::GUI::OpenGLVersions::core.end(), std::make_pair(opengl_version.first, opengl_version.second)) == Slic3r::GUI::OpenGLVersions::core.end()) {
+                opengl_version = { 0, 0 };
+                boost::nowide::cerr << "Required OpenGL version " << opengl_version_str << " not recognized.\n Option 'opengl-version' ignored." << std::endl;
             }
-        }
-
-        if (!opengl_version_str.empty()) {
-            std::vector<std::string> tokens;
-            boost::split(tokens, opengl_version_str, boost::is_any_of("."), boost::token_compress_on);
-            opengl_version.first = std::stoi(tokens[0].c_str());
-            opengl_version.second = std::stoi(tokens[1].c_str());
-        }
+        } else
+            boost::nowide::cerr << "Required OpenGL version " << opengl_version_str << " is invalid. Must be greater than or equal to " <<
+                opengl_minimum.to_string() << "\n Option 'opengl-version' ignored." << std::endl;
         start_gui = true;
+        m_actions.erase(it);
+    }
+
+    it = std::find(m_actions.begin(), m_actions.end(), "opengl-compatibility");
+    if (it != m_actions.end()) {
+        start_gui = true;
+        opengl_compatibility_profile = true;
+        // reset version as compatibility profile always take the highest version
+        // supported by the graphic card
+        opengl_version = std::make_pair(0, 0);
         m_actions.erase(it);
     }
 
     it = std::find(m_actions.begin(), m_actions.end(), "opengl-debug");
     if (it != m_actions.end()) {
         start_gui = true;
-#if ENABLE_OPENGL_DEBUG_OPTION
         opengl_debug = true;
-#endif // ENABLE_OPENGL_DEBUG_OPTION
         m_actions.erase(it);
     }
 #else
@@ -225,6 +231,17 @@ int CLI::run(int argc, char **argv)
         }
     }
 #endif // ENABLE_GL_CORE_PROFILE
+#else // SLIC3R_GUI
+    // If there is no GUI, we shall ignore the parameters. Remove them from the list.
+    for (const std::string& s : { "opengl-version", "opengl-compatibility", "opengl-debug", "gcodeviewer" }) {
+        auto it = std::find(m_actions.cbegin(), m_actions.cend(), s);
+        if (it != m_actions.end()) {
+            boost::nowide::cerr << "Parameter '" << s << "' is ignored, this PrusaSlicer build is CLI only." << std::endl;
+            m_actions.erase(it);
+        }
+    }
+#endif
+
 
     // Read input file(s) if any.
     for (const std::string& file : m_input_files)
@@ -714,10 +731,9 @@ int CLI::run(int argc, char **argv)
         params.download_url = download_url;
         params.delete_after_load = delete_after_load;
 #if ENABLE_GL_CORE_PROFILE
-#if ENABLE_OPENGL_DEBUG_OPTION
         params.opengl_version = opengl_version;
         params.opengl_debug = opengl_debug;
-#endif // ENABLE_OPENGL_DEBUG_OPTION
+        params.opengl_compatibiity_profile = opengl_compatibility_profile;
 #endif // ENABLE_GL_CORE_PROFILE
         return Slic3r::GUI::GUI_Run(params);
 #else // SLIC3R_GUI
@@ -817,7 +833,13 @@ bool CLI::setup(int argc, char **argv)
         if (opt_loglevel != 0)
             set_logging_level(opt_loglevel->value);
     }
-    
+
+    {
+        const ConfigOptionInt *opt_threads = m_config.opt<ConfigOptionInt>("threads");
+        if (opt_threads != nullptr)
+            thread_count = opt_threads->value;
+    }
+
     //FIXME Validating at this stage most likely does not make sense, as the config is not fully initialized yet.
     std::string validity = m_config.validate();
 

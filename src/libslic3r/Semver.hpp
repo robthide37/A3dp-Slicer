@@ -116,8 +116,8 @@ public:
 	~Semver() { ::semver_free(&ver); }
 
 	// const accessors
-	//int 		maj()        const { return ver.counter_size > 0 ? ver.counters[0] : 0; }
-	//int 		min()        const { return ver.counter_size > 1 ? ver.counters[1] : 0; }
+	int 		maj()        const { return ver.counter_size > 0 ? ver.counters[0] : 0; }
+	int 		min()        const { return ver.counter_size > 1 ? ver.counters[1] : 0; }
 	//int 		counter()    const { return ver.counter_size > 2 ? ver.counters[2] : 0; }
 	//int 		patch() 	 const { return ver.counter_size > 3 ? ver.counters[3] : 0; }
 	const char*	prerelease() const { return ver.prerelease; }

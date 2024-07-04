@@ -569,6 +569,11 @@ void PreferencesDialog::build()
             L("When loading a configuration, if it's coming from an earlier, a future or from another software, show the ignored settings that doesn't suit this version. Uncheck to remove this anoying pop-up."),
 			app_config->get_bool("show_unknown_setting"));
 
+        append_bool_option(m_optgroups_general.back(), "use_binary_gcode_when_supported", L("Use binary G-code when the printer supports it"),
+                    L("If the 'Supports binary G-code' option is enabled in Printer Settings, "
+                      "checking this option will result in the export of G-code in binary format."),
+                    app_config->get_bool("use_binary_gcode_when_supported"));
+
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Dialogs"), tabs, 0));
 		

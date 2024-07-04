@@ -48,7 +48,6 @@ option(SLIC3R_FHS               "Assume Slic3r is to be installed in a FHS direc
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
 option(SLIC3R_MSVC_PDB          "Generate PDB files on MSVC in Release mode" 1)
-option(SLIC3R_PERL_XS           "Compile XS Perl module and enable Perl unit and integration tests" 0)
 option(SLIC3R_ASAN              "Enable ASan on Clang and GCC" 0)
 option(SLIC3R_UBSAN             "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" ON)
@@ -92,7 +91,6 @@ option(SLIC3R_BUILD_TESTS       "Build unit tests" OFF)
 
 if (IS_CROSS_COMPILE)
     message("Detected cross compilation setup. Tests and encoding checks will be forcedly disabled!")
-    set(SLIC3R_PERL_XS OFF CACHE BOOL "" FORCE)
     set(SLIC3R_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 endif ()
 
@@ -179,10 +177,6 @@ enable_testing ()
 # Enable C++17 language standard.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# To be able to link libslic3r with the Perl XS module.
-# Once we get rid of Perl and libslic3r is linked statically, we can get rid of -fPIC
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # WIN10SDK_PATH is used to point CMake to the WIN10 SDK installation directory.
 # We pick it from environment if it is not defined in another way
@@ -655,13 +649,6 @@ add_subdirectory(src)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Slic3r_app_console)
 
 add_dependencies(gettext_make_pot hintsToPot)
-
-# Perl bindings, currently only used for the unit / integration tests of libslic3r.
-# Also runs the unit / integration tests.
-#FIXME Port the tests into C++ to finally get rid of the Perl!
-if (SLIC3R_PERL_XS)
-    add_subdirectory(xs)
-endif ()
 
 if(SLIC3R_BUILD_SANDBOXES)
     add_subdirectory(sandboxes)

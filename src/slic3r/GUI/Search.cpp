@@ -210,7 +210,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
 
         int cnt = 0;
 
-        if ( type != Preset::TYPE_FFF_FILAMENT && opt.is_vector_extruder )
+        if ( type != Preset::TYPE_FFF_FILAMENT && type != Preset::TYPE_SLA_MATERIAL && opt.is_vector_extruder )
             switch (config->option(opt_key)->type())
             {
             case coInts:	change_opt_key<ConfigOptionInts		>(opt_key, config, cnt);	break;

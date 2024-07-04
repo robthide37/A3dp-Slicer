@@ -399,8 +399,6 @@ public:
     ExPolygons              merged(float offset) const;
     void                    make_perimeters();
     void                    make_milling_post_process();
-    // Phony version of make_fills() without parameters for Perl integration only.
-    void                    make_fills() { this->make_fills(nullptr, nullptr, nullptr); }
     void                    make_fills(FillAdaptive::Octree     *adaptive_fill_octree,
                                        FillAdaptive::Octree     *support_fill_octree,
                                        FillLightning::Generator *lightning_generator);

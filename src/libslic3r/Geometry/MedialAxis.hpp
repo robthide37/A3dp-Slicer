@@ -122,13 +122,14 @@ private:
     coord_t m_extension_length = 0;
 
     //voronoi stuff
-    class VD : public voronoi_diagram<double> {
-    public:
-        typedef double                                          coord_type;
-        typedef boost::polygon::point_data<coordinate_type>     point_type;
-        typedef boost::polygon::segment_data<coordinate_type>   segment_type;
-        typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
-    };
+    using VD = VoronoiDiagram;
+    //class VD : public voronoi_diagram<double> {
+    //public:
+    //    typedef double                                          coord_type;
+    //    typedef boost::polygon::point_data<coordinate_type>     point_type;
+    //    typedef boost::polygon::segment_data<coordinate_type>   segment_type;
+    //    typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
+    //};
     void process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline, std::set<const VD::edge_type*>& edges, std::set<const VD::edge_type*>& valid_edges, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness);
     bool validate_edge(const VD::edge_type* edge, Lines& lines, const ExPolygon& expolygon_touse, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness);
     const Line& retrieve_segment(const VD::cell_type* cell, Lines& lines) const;

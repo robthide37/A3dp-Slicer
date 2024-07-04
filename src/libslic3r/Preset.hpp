@@ -776,7 +776,7 @@ protected:
 class PhysicalPrinterCollection
 {
 public:
-    PhysicalPrinterCollection(const std::vector<std::string>& keys);
+    PhysicalPrinterCollection(const std::vector<std::string>& keys, PresetBundle* preset_bundle);
 
     typedef std::deque<PhysicalPrinter>::iterator Iterator;
     typedef std::deque<PhysicalPrinter>::const_iterator ConstIterator;
@@ -897,6 +897,8 @@ private:
 
     // Path to the directory to store the config files into.
     std::string                 m_dir_path;
+
+    const PresetBundle*         m_preset_bundle_owner{ nullptr };
 };
 
 

@@ -425,7 +425,7 @@ public:
 	void		rename_preset();
 	void		delete_preset();
 	void		toggle_show_hide_incompatible();
-	void		update_show_hide_incompatible_button();
+	void		update_compatibility_ui();
 	void		update_ui_from_settings();
 	void		update_label_colours();
 	void		decorate();
@@ -551,7 +551,6 @@ public:
 	ogStaticText*	m_volumetric_speed_description_line {nullptr};
 	ogStaticText*	m_cooling_description_line {nullptr};
 	ogStaticText*	m_machine_limits_descr {nullptr};
-	PageShp         create_filament_overrides_page();
 protected:
     BitmapComboBox* m_extruders_cb {nullptr};
     int             m_active_extruder {0};
@@ -574,6 +573,7 @@ public:
 	void		update_description_lines() override;
 	void		toggle_options() override;
 	void		update() override;
+	PageShp     create_filament_overrides_page();
 	void		clear_pages() override;
 	void		init_options_list() override;
 	PrinterTechnology get_printer_technology() const override { return ptFFF; }
@@ -586,6 +586,7 @@ public:
     bool        set_active_extruder(int new_selected_extruder);
     void        invalidate_active_extruder() { m_active_extruder = -1; }
     void        update_extruder_combobox();
+    void        update_extruder_combobox_visibility();
     int         get_active_extruder() const { return m_active_extruder; }
 
 	const std::string&	get_custom_gcode(const t_config_option_key& opt_key) override;
@@ -673,6 +674,11 @@ public:
 
 class TabSLAMaterial : public Tab
 {
+	void		create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key);
+	void		update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, bool is_checked = true);
+	void		update_material_overrides_page();
+
+	std::map<std::string, wxWindow*> m_overrides_options;
 public:
     TabSLAMaterial(wxBookCtrlBase* parent) :
 		Tab(parent, _(L("Material Settings")), Slic3r::Preset::TYPE_SLA_MATERIAL) {}
@@ -683,6 +689,7 @@ public:
 	void		build() override;
 	void		toggle_options() override;
 	void		update() override;
+    PageShp     create_material_overrides_page();
 	void		init_options_list() override;
 	PrinterTechnology get_printer_technology() const override { return ptSLA; }
 };

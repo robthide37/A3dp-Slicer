@@ -21,9 +21,9 @@ void Wipe::init(const PrintConfig &config, const GCodeWriter &writer, const std:
         if (config.wipe.get_at(id)) {
             // Wipe length to extrusion ratio.
             const double xy_to_e = this->calc_xy_to_e_ratio(writer, id);
-            wipe_xy              = std::max(wipe_xy, xy_to_e * writer.gcode_config().retract_length.get_at(id));
+            wipe_xy              = std::max(wipe_xy, writer.gcode_config().retract_length.get_at(id) / xy_to_e);
             if (multimaterial)
-                wipe_xy = std::max(wipe_xy, xy_to_e * writer.gcode_config().retract_length_toolchange.get_at(id));
+                wipe_xy = std::max(wipe_xy, writer.gcode_config().retract_length_toolchange.get_at(id) / xy_to_e);
         }
 
     if (wipe_xy == 0)
@@ -37,11 +37,12 @@ void Wipe::set_path(const ExtrusionPaths &paths, bool reversed)
     this->reset_path();
 
     if (this->is_enabled() && ! paths.empty()) {
+        coord_t wipe_len_max_scaled = scaled(m_wipe_len_max);
         if (reversed) {
             m_path = paths.back().as_polyline().get_arc();
             Geometry::ArcWelder::reverse(m_path);
             int64_t len = Geometry::ArcWelder::estimate_path_length(m_path);
-            for (auto it = std::next(paths.rbegin()); len < m_wipe_len_max && it != paths.rend(); ++ it) {
+            for (auto it = std::next(paths.rbegin()); len < wipe_len_max_scaled && it != paths.rend(); ++ it) {
                 if (it->role().is_bridge())
                     break; // Do not perform a wipe on bridges.
                 assert(it->size() >= 2);
@@ -55,7 +56,7 @@ void Wipe::set_path(const ExtrusionPaths &paths, bool reversed)
         } else {
             m_path = std::move(paths.front().as_polyline().get_arc());
             int64_t len = Geometry::ArcWelder::estimate_path_length(m_path);
-            for (auto it = std::next(paths.begin()); len < m_wipe_len_max && it != paths.end(); ++ it) {
+            for (auto it = std::next(paths.begin()); len < wipe_len_max_scaled && it != paths.end(); ++ it) {
                 if (it->role().is_bridge())
                     break; // Do not perform a wipe on bridges.
                 assert(it->size() >= 2);

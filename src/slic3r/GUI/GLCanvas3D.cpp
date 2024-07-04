@@ -92,7 +92,7 @@ static const Slic3r::ColorRGBA ERROR_BG_DARK_COLOR    = { 0.478f, 0.192f, 0.039f
 static const Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f, 1.0f };
 
 // Number of floats
-static constexpr const size_t MAX_VERTEX_BUFFER_SIZE     = 131072 * 6; // 3.15MB
+static constexpr const size_t MAX_VERTEX_BUFFER_SIZE = 131072 * 6; // 3.15MB
 
 #define SHOW_IMGUI_DEMO_WINDOW
 #ifdef SHOW_IMGUI_DEMO_WINDOW
@@ -2111,7 +2111,7 @@ void GLCanvas3D::render()
     }
 
 #if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
-    if (wxGetApp().plater()->is_view3D_shown() && current_printer_technology() != ptSLA && fff_print()->config().gcode_binary)
+    if (wxGetApp().plater()->is_view3D_shown() && current_printer_technology() != ptSLA && fff_print()->config().binary_gcode)
         show_binary_gcode_debug_window();
 #endif // ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
 
@@ -3318,7 +3318,10 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                     // m_canvas->HandleAsNavigationKey(evt);   // XXX: Doesn't work in some cases / on Linux
                     post_event(SimpleEvent(EVT_GLCANVAS_TAB));
                 }
-                else if (keyCode == WXK_TAB && evt.ShiftDown() && !evt.ControlDown() && ! wxGetApp().is_gcode_viewer()) {
+                else if (! wxGetApp().is_gcode_viewer() && keyCode == WXK_TAB &&
+                    // Use strong condition for modifiers state to avoid cases when Shift can be combined with other modifiers
+                    // (see https://github.com/prusa3d/PrusaSlicer/issues/7799)
+                    evt.GetModifiers() == wxMOD_SHIFT) {
                     // Collapse side-panel with Shift+Tab
                     // already done with the menu entry, don't re-do the call here.
                     //post_event(SimpleEvent(EVT_GLCANVAS_COLLAPSE_SIDEBAR));
@@ -5052,8 +5055,9 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
     camera.apply_projection(volumes_box, near_z, far_z);
 
-    const ModelObjectPtrs &model_objects     = GUI::wxGetApp().model().objects;
-    std::vector<ColorRGBA> extruders_colors  = get_extruders_colors();
+    const ModelObjectPtrs &model_objects                = GUI::wxGetApp().model().objects;
+    std::vector<ColorRGBA> extruders_colors             = get_extruders_colors();
+    const bool             is_enabled_painted_thumbnail = !model_objects.empty() && !extruders_colors.empty();
 
     if (thumbnail_params.transparent_background)
         glsafe(::glClearColor(0.0f, 0.0f, 0.0f, 0.0f));
@@ -5083,8 +5087,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     for (GLVolume *vol : visible_volumes) {
         const int obj_idx = vol->object_idx();
         const int vol_idx = vol->volume_idx();
-        const bool render_as_painted = (obj_idx >= 0 && vol_idx >= 0) ?
-            !model_objects[obj_idx]->volumes[vol_idx]->mmu_segmentation_facets.empty() : false;
+        const bool render_as_painted = is_enabled_painted_thumbnail && obj_idx >= 0 && vol_idx >= 0 && !model_objects[obj_idx]->volumes[vol_idx]->mm_segmentation_facets.empty();
         GLShaderProgram* shader = wxGetApp().get_shader(render_as_painted ? "mm_gouraud" : "gouraud_light");
         if (shader == nullptr)
             continue;
@@ -5119,10 +5122,10 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
             glsafe(::glFrontFace(GL_CW));
 
         if (render_as_painted) {
-          const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
+            const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
             const size_t extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
             TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
-            ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
+            ts.deserialize(model_volume.mm_segmentation_facets.get_data(), true);
             ts.request_update_render_data();
 
             ts.render(nullptr, model_matrix);
@@ -7055,8 +7058,14 @@ void GLCanvas3D::_load_skirt_brim_preview_toolpaths(const BuildVolume &build_vol
                 }
         }
     }
-    volume->model.init_from(std::move(init_data));
-    volume->is_outside = !contains(build_volume, volume->model);
+    if (init_data.is_empty()) {
+        assert(m_volumes.volumes.back().get() == volume);
+        m_volumes.volumes.pop_back();
+    }
+    else {
+        volume->model.init_from(std::move(init_data));
+        volume->is_outside = !contains(build_volume, volume->model);
+    }
 }
 
 void GLCanvas3D::_load_print_object_toolpaths(const PrintObject &                   print_object,

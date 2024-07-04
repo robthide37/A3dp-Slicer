@@ -988,6 +988,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                autoemit_temperature_commands))
     ((ConfigOptionString,              before_layer_gcode))
     ((ConfigOptionString,              between_objects_gcode))
+    ((ConfigOptionBool,                binary_gcode))
     ((ConfigOptionFloats,              deretract_speed))
     ((ConfigOptionString,              end_gcode))
     ((ConfigOptionStrings,             end_filament_gcode))
@@ -1051,7 +1052,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     //      i - case insensitive
     //      w - whole word
     ((ConfigOptionStrings,             gcode_substitutions))
-    ((ConfigOptionBool,                gcode_binary))
     ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionString,              feature_gcode))
     ((ConfigOptionFloat,               max_gcode_per_second))
@@ -1509,19 +1509,33 @@ enum SLAMaterialSpeed { slamsSlow, slamsFast, slamsHighViscosity };
 PRINT_CONFIG_CLASS_DEFINE(
     SLAMaterialConfig,
 
-    ((ConfigOptionFloat,                        initial_layer_height))
-    ((ConfigOptionFloat,                        bottle_cost))
-    ((ConfigOptionFloat,                        bottle_volume))
-    ((ConfigOptionFloat,                        bottle_weight))
-    ((ConfigOptionStrings,                      filament_custom_variables))
-    ((ConfigOptionFloat,                        material_density))
-    ((ConfigOptionFloat,                        exposure_time))
-    ((ConfigOptionFloat,                        initial_exposure_time))
-    ((ConfigOptionFloats,                       material_correction))
-    ((ConfigOptionFloat,                        material_correction_x))
-    ((ConfigOptionFloat,                        material_correction_y))
-    ((ConfigOptionFloat,                        material_correction_z))
-    ((ConfigOptionEnum<SLAMaterialSpeed>,       material_print_speed))
+    ((ConfigOptionFloat,                       initial_layer_height))
+    ((ConfigOptionFloat,                       bottle_cost))
+    ((ConfigOptionFloat,                       bottle_volume))
+    ((ConfigOptionFloat,                       bottle_weight))
+    ((ConfigOptionStrings,                     filament_custom_variables))
+    ((ConfigOptionFloat,                       material_density))
+    ((ConfigOptionFloat,                       exposure_time))
+    ((ConfigOptionFloat,                       initial_exposure_time))
+    ((ConfigOptionFloats,                      material_correction))
+    ((ConfigOptionFloat,                       material_correction_x))
+    ((ConfigOptionFloat,                       material_correction_y))
+    ((ConfigOptionFloat,                       material_correction_z))
+    ((ConfigOptionEnum<SLAMaterialSpeed>,      material_print_speed))
+    ((ConfigOptionFloatNullable,               material_ow_support_pillar_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_pillar_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_front_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_front_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_penetration))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_penetration))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_width))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_width))
+    ((ConfigOptionIntNullable,                 material_ow_support_points_density_relative))
+
+    ((ConfigOptionFloatNullable,               material_ow_first_layer_size_compensation)) /* material_ow_elefant_foot_compensation */
+    ((ConfigOptionFloatNullable,               material_ow_relative_correction_x))
+    ((ConfigOptionFloatNullable,               material_ow_relative_correction_y))
+    ((ConfigOptionFloatNullable,               material_ow_relative_correction_z))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(

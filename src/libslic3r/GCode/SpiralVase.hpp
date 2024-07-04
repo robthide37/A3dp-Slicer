@@ -28,10 +28,6 @@ public:
     	m_enabled 		   = en;
     }
 
-    bool is_enabled() const {
-        return m_enabled;
-    }
-
     std::string process_layer(const std::string& gcode);
 
     bool is_transition_layer() { return m_transition_layer; }

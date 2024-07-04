@@ -836,7 +836,7 @@ void PrintConfigDef::init_fff_params()
         " To use if you have some difficulties with the big flow changes from perimeter and infill flow to bridge flow and vice-versa, the bridge flow ratio let you compensate for the change in speed."
         " \nThe preview will display the expected shape of the bridge extrusion (cylinder), don't expect a magical thick and solid air to flatten the extrusion magically.");
     def->sidetext = L("%");
-    def->set_enum<AuthorizationType>({
+    def->set_enum<BridgeType>({
         { "nozzle", L("Nozzle diameter") },
         { "height", L("Layer height") },
         { "flow", L("Keep current flow") },
@@ -953,7 +953,8 @@ void PrintConfigDef::init_fff_params()
     auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
                         "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
                         "Speeds for overhang sizes in between are calculated via linear interpolation. "
-                        "If set as percentage, the speed is calculated over the external perimeter speed.");
+                        "If set as percentage, the speed is calculated over the external perimeter speed. "
+                        "Note that the speeds generated to gcode will never exceed the max volumetric speed value.");
 
     def             = this->add("overhang_speed_0", coFloatOrPercent);
     def->label      = L("speed for 0% overlap (bridge)");
@@ -1107,7 +1108,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::infill;
     def->tooltip = L("Pattern for the ear. The concentric is the default one."
                     " The rectilinear has a perimeter around it, you can try it if the concentric has too many problems to stick to the build plate.");
-    def->set_enum<AuthorizationType>({
+    def->set_enum<InfillPattern>({
         { "concentric", L("Concentric") },
         { "rectilinear", L("Rectilinear") },
     });
@@ -3006,12 +3007,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionStrings());
 
-    def = this->add("gcode_binary", coBool);
-    def->label = L("Export as binary G-code");
-    def->tooltip = L("Export G-code in binary format.");
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionBool(0));
-
     def = this->add("high_current_on_filament_swap", coBool);
     def->label = L("High extruder current on filament swap");
     def->category = OptionCategory::general;
@@ -3532,6 +3527,13 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Will only take into account the delay for the cooling of overhangs.");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("binary_gcode", coBool);
+    def->label = L("Supports binary G-code");
+    def->tooltip = L("Enable, if the firmware supports binary G-code format (bgcode). "
+                     "To generate .bgcode files, make sure you have binary G-code enabled in Configuration->Preferences->Other.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("fan_kickstart", coFloat);
     def->label = L("Fan KickStart time");
@@ -6740,20 +6742,20 @@ void PrintConfigDef::init_fff_params()
         }
         case coFloats: {
             ConfigOptionFloatsNullable *opt = new ConfigOptionFloatsNullable(it_opt->second.default_value.get()->get_float());
-            opt->set_any(ConfigOptionFloatsNullable::create_nil(), 0);
+            opt->set_any(ConfigOptionFloatNullable::create_any_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coPercents: {
             ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
-            opt->set_any(ConfigOptionPercentsNullable::create_nil(), 0);
+            opt->set_any(ConfigOptionFloatNullable::create_any_nil(), 0);
             def->set_default_value(opt);
             break;
         }
         case coFloatsOrPercents: {
             ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
                 static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
-            opt->set_any(ConfigOptionFloatsOrPercentsNullable::create_nil(), 0);
+            opt->set_any(ConfigOptionFloatsOrPercents::create_any_nil(), 0);
             def->set_default_value(opt);
             break;
         }
@@ -7357,7 +7359,7 @@ void PrintConfigDef::init_sla_params()
     def->sidetext = L("°C");
     def->min = 0;
     def->max = max_temp;
-    def->set_default_value(new ConfigOptionIntsNullable { ConfigOptionIntsNullable::NIL_VALUE() });
+    def->set_default_value(new ConfigOptionIntsNullable { ConfigOptionIntNullable::nil_value() });
 
     def = this->add("bottle_volume", coFloat);
     def->label = L("Bottle volume");
@@ -7767,6 +7769,35 @@ void PrintConfigDef::init_sla_params()
     def->min = float(SCALING_FACTOR);
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0.001));
+
+    // Declare retract values for material profile, overriding the print and printer profiles.
+    for (const char* opt_key : {
+        // float
+        "support_head_front_diameter", "branchingsupport_head_front_diameter", 
+        "support_head_penetration", "branchingsupport_head_penetration", 
+        "support_head_width", "branchingsupport_head_width",
+        "support_pillar_diameter", "branchingsupport_pillar_diameter",
+        "relative_correction_x", "relative_correction_y", "relative_correction_z", 
+        "first_layer_size_compensation",
+        // int
+        "support_points_density_relative"
+        }) {
+        auto it_opt = options.find(opt_key);
+        assert(it_opt != options.end());
+        def = this->add_nullable(std::string("material_ow_") + opt_key, it_opt->second.type);
+        def->label = it_opt->second.label;
+        def->full_label = it_opt->second.full_label;
+        def->tooltip = it_opt->second.tooltip;
+        def->sidetext = it_opt->second.sidetext;
+        def->min  = it_opt->second.min;
+        def->max  = it_opt->second.max;
+        def->mode = it_opt->second.mode;
+        switch (def->type) {
+        case coFloat: def->set_default_value(new ConfigOptionFloatNullable{ it_opt->second.default_value->get_float() }); break;
+        case coInt:   def->set_default_value(new ConfigOptionIntNullable{ it_opt->second.default_value->get_int() }); break;
+        default: assert(false);
+        }
+    }
 }
 
 // Ignore the following obsolete configuration keys:
@@ -7789,6 +7820,7 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "ensure_vertical_shell_thickness",
     // Disabled in 2.6.0-alpha6, this option is problematic
 //    "infill_only_where_needed",
+    "gcode_binary" // Introduced in 2.7.0-alpha1, removed in 2.7.1 (replaced by binary_gcode).
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value, bool remove_unkown_keys)
@@ -9840,9 +9872,15 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->cli = "opengl-version";
     def->set_default_value(new ConfigOptionString());
 
+    def = this->add("opengl-compatibility", coBool);
+    def->label = L("OpenGL compatibility profile");
+    def->tooltip = L("Enable OpenGL compatibility profile");
+    def->cli = "opengl-compatibility";
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("opengl-debug", coBool);
     def->label = L("OpenGL debug output");
-    def->tooltip = L("Activate OpenGL debug output on graphic cards which support it");
+    def->tooltip = L("Activate OpenGL debug output on graphic cards which support it (OpenGL 4.3 or higher)");
     def->cli = "opengl-debug";
     def->set_default_value(new ConfigOptionBool(false));
 #endif // ENABLE_GL_CORE_PROFILE
@@ -10016,6 +10054,11 @@ CLIMiscConfigDef::CLIMiscConfigDef()
     def = this->add("datadir", coString);
     def->label = L("Data directory");
     def->tooltip = L("Load and store settings at the given directory. This is useful for maintaining different profiles or including configurations from a network storage.");
+
+    def = this->add("threads", coInt);
+    def->label = L("Maximum number of threads");
+    def->tooltip = L("Sets the maximum number of threads the slicing process will use. If not defined, it will be decided automatically.");
+    def->min = 1;
 
     def = this->add("loglevel", coInt);
     def->label = L("Logging level");
@@ -10311,7 +10354,9 @@ static std::map<t_custom_gcode_key, t_config_option_keys> s_CustomGcodeSpecificP
     {"layer_gcode",             {"layer_num", "layer_z", "previous_layer_z", "max_layer_z"}},
     {"feature_gcode",           {"layer_num", "layer_z", "max_layer_z", "previous_extrusion_role", "next_extrusion_role", /*deprecated*/"extrusion_role", "last_extrusion_role" /*deprecated*/}},
     {"toolchange_gcode",        {"layer_num", "layer_z", "max_layer_z", "previous_extruder", "next_extruder", "toolchange_z"}},
-    // {"between_objects_gcode, {}}
+    {"color_change_gcode",      {"color_change_extruder"}},
+    {"pause_print_gcode",       {"color_change_extruder"}},
+    {"between_objects_gcode",   {"layer_num", "layer_z"}},
 };
 
 const std::map<t_custom_gcode_key, t_config_option_keys>& custom_gcode_specific_placeholders()
@@ -10357,6 +10402,11 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     def = this->add("toolchange_z", coFloat);
     def->label = L("Toolchange Z");
     def->tooltip = L("Height above the print bed when the toolchange takes place. Usually the same as layer_z, but can be different.");
+
+    def = this->add("color_change_extruder", coInt);
+    // TRN: This is a label in custom g-code editor dialog, belonging to color_change_extruder. Denoted index of the extruder for which color change is performed.
+    def->label = L("Color change extruder");
+    def->tooltip = L("Index of the extruder for which color change will be performed. The index is zero based (first extruder has index 0).");
 }
 
 const CustomGcodeSpecificConfigDef custom_gcode_specific_config_def;

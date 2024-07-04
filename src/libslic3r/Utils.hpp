@@ -23,6 +23,7 @@ namespace boost { namespace filesystem { class directory_entry; }}
 
 namespace Slic3r {
 
+inline std::optional<std::size_t> thread_count;
 extern void set_logging_level(unsigned int level);
 extern unsigned get_logging_level();
 // Format memory allocated, separate thousands by comma.
@@ -31,7 +32,7 @@ extern std::string format_memsize_MB(size_t n);
 // The string is non-empty if the loglevel >= info (3) or ignore_loglevel==true.
 // Latter is used to get the memory info from SysInfoDialog.
 extern std::string log_memory_info(bool ignore_loglevel = false);
-extern void disable_multi_threading();
+extern void enforce_thread_count(std::size_t count);
 // Returns the size of physical memory (RAM) in bytes.
 extern size_t total_physical_memory();
 

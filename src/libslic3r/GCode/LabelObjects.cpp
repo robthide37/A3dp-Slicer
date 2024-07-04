@@ -84,7 +84,7 @@ void LabelObjects::init(const Print& print)
                 name += " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id); 
             }
             if (m_flavor == gcfKlipper) {
-                const std::string banned = " ";
+                const std::string banned = "\b\t\n\v\f\r \"#%&\'*-./:;<>\\";
                 std::replace_if(name.begin(), name.end(), [&banned](char c) { return banned.find(c) != std::string::npos; }, '_');
             }
 
@@ -131,7 +131,7 @@ std::string LabelObjects::all_objects_header(BoundingBoxf3 &global_bounding_box,
         if ((m_label_objects_style == LabelObjectsStyle::Firmware || m_label_objects_style == LabelObjectsStyle::Both)
                 && m_flavor == gcfKlipper)  {
             //start EXCLUDE_OBJECT_DEFINE line with name
-            out.append("EXCLUDE_OBJECT_DEFINE NAME=").append(label.unique_name);
+            out.append("EXCLUDE_OBJECT_DEFINE NAME='").append(label.unique_name).append("'");
             // add centroid of object.
             std::snprintf(buffer, sizeof(buffer) - 1, " CENTER=%.3f,%.3f", unscale<float>(center[0]), unscale<float>(center[1]));
             out.append(buffer).append(" POLYGON=[");
@@ -216,7 +216,7 @@ std::string LabelObjects::start_object(const PrintInstance& print_instance, Incl
             }
             out += "\n";
         } else if (m_flavor == gcfKlipper)
-            out += "EXCLUDE_OBJECT_START NAME=" + label.unique_name + "\n";
+            out += "EXCLUDE_OBJECT_START NAME='" + label.unique_name + "'\n";
         else {
             // Not supported by / implemented for the other firmware flavors.
         }
@@ -240,7 +240,7 @@ std::string LabelObjects::stop_object(const PrintInstance& print_instance) const
         if (m_flavor == GCodeFlavor::gcfMarlinFirmware || m_flavor == GCodeFlavor::gcfMarlinLegacy || m_flavor == GCodeFlavor::gcfRepRap)
             out += std::string("M486 S-1\n");
         else if (m_flavor ==gcfKlipper)
-            out += "EXCLUDE_OBJECT_END NAME=" + label.unique_name + "\n";
+            out += "EXCLUDE_OBJECT_END NAME='" + label.unique_name + "'\n";
         else {
             // Not supported by / implemented for the other firmware flavors.
         }

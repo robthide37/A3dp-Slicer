@@ -504,7 +504,7 @@ void GalleryDialog::change_thumbnail()
 
         fs::path current = fs::path(into_u8(input_files.Item(0)));
 		std::string error_msg;
-        if (copy_file_inner(current, png_path, error_msg))
+        if (copy_file_inner(current, png_path, error_msg)) // TODO: fs::copy_options::overwrite_existing instead of fs::copy_option::overwrite_if_exists
             throw FileIOError(error_msg);
     }
     catch (fs::filesystem_error const& e) {

@@ -88,7 +88,7 @@ enum FileType
 
 extern wxString file_wildcards(FileType file_type, const std::string &custom_extension = {});
 
-wxString sla_wildcards(OutputFormat formatid);
+wxString sla_wildcards(OutputFormat formatid, const std::string& custom_extension);
 
 enum ConfigMenuIDs {
     ConfigMenuWizard,
@@ -437,7 +437,6 @@ private:
 
     bool                    m_datadir_redefined { false }; 
     bool                    m_wifi_config_dialog_shown { false };
-    bool                    m_wifi_config_dialog_was_declined { false };
 };
 
 DECLARE_APP(GUI_App)

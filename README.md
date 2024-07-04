@@ -65,10 +65,8 @@ document first!
 * `src/`: the C++ source of the `slic3r` executable and the CMake definition file for compiling it
 * `src/slic3r/GUI`: The C++ GUI.
 * `tests`: Test suite for Slic3r. Implemented with [Catch2](https://github.com/catchorg/Catch2)
-* `t/`: the really old test suite (deprecated)
 * `utils/`: various useful scripts
 * `src/libslic3r/`: C++ sources for libslic3r
-* `xs/xsp/`: bindings for calling libslic3r from Perl (XS) (deprecated)
 
 ## Licensing and attribution
 

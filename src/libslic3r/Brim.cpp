@@ -7,7 +7,6 @@
 
 #include "ClipperUtils.hpp"
 #include "EdgeGrid.hpp"
-#include "Fill/Fill.hpp"
 #include "Print.hpp"
 #include "Layer.hpp"
 #include "PrintConfig.hpp"

@@ -10,7 +10,7 @@ set(SLIC3R_APP_CMD "Slic3r.1")
 # id for windows registry
 set(SLIC3R_APP_PROG_ID "Slic3r")
 # versions
-set(SLIC3R_VERSION "2.7-rc2")
+set(SLIC3R_VERSION "2.7-rc")
 set(SLIC3R_VERSION_FULL "2.7.60.0")
 set(SLIC3R_BUILD_ID "${SLIC3R_APP_KEY}_${SLIC3R_VERSION_FULL}+UNKNOWN")
 set(SLIC3R_RC_VERSION "2,7,60,0")

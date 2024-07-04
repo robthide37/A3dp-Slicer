@@ -73,7 +73,7 @@ public:
      * \param point The actual location.
      * \return The grid coordinates that correspond to \p point.
      */
-    GridPoint toGridPoint(const Vec2i3264 &point) const;
+    GridPoint toGridPoint(const Vec2i64 &point) const;
 
     /*! \brief Compute the grid coordinate of a real space coordinate.
      * \param coord The actual location.

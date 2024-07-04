@@ -248,9 +248,10 @@ wxString Field::get_tooltip_text(const wxString& default_string)
         opt_id += "]";
     }
 
+    bool newline_after_name = boost::iends_with(opt_id, "_gcode") && opt_id != "binary_gcode";
     if (tooltip.length() > 0)
         tooltip_text = tooltip + "\n" + _L("default value") + "\t: " +
-        (boost::iends_with(opt_id, "_gcode") ? "\n" : "") + default_string + "\n" +
+        (newline_after_name ? "\n" : "") + default_string + "\n" +
         _L("parameter name") + "\t: " + opt_id;
 
     return tooltip_text;
@@ -425,14 +426,24 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
                 deserialize(ConfigOptionPercents{});
             break;
         }
-        if (opt.nullable && ConfigOptionFloatsNullable::is_nil(value)) {
+        if (opt.nullable && ConfigOptionFloatNullable::is_any_nil(value)) {
             text_value = na_value();
             has_nil    = true;
             break;
         }
     }
     case coFloat:
+        if(opt.nullable  && ConfigOptionFloatNullable::is_any_nil(value)) {
+            text_value = na_value();
+            has_nil    = true;
+            break;
+        }
     case coPercent: {
+        if(opt.nullable  && ConfigOptionFloatNullable::is_any_nil(value)) {
+            text_value = na_value();
+            has_nil    = true;
+            break;
+        }
         text_value = double_to_string(boost::any_cast<double>(value), opt.precision);
         break;
     }
@@ -475,7 +486,7 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
                 deserialize(ConfigOptionFloatsOrPercents{});
             break;
         }
-        if (opt.nullable && ConfigOptionFloatsOrPercentsNullable::is_nil(value)) {
+        if (opt.nullable && ConfigOptionFloatsOrPercentsNullable::is_any_nil(value)) {
             text_value = na_value();
             has_nil    = true;
             break;
@@ -518,13 +529,18 @@ std::pair<wxString, bool> any_to_wxstring(const boost::any &value, const ConfigO
                 deserialize(ConfigOptionInts{});
             break;
         }
-        if (opt.nullable && boost::any_cast<int32_t>(value) == ConfigOptionIntsNullable::NIL_VALUE()) {
+        if (opt.nullable && ConfigOptionIntNullable::is_any_nil(value)) {
             text_value = na_value();
             has_nil    = true;
             break;
         }
     }
     case coInt: {
+        if(opt.nullable  && ConfigOptionIntNullable::is_any_nil(value)) {
+            text_value = na_value();
+            has_nil    = true;
+            break;
+        }
         text_value = wxString::Format(_T("%i"), int(boost::any_cast<int>(value)));
         break;
     }
@@ -593,8 +609,11 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
             break;
         } // else: one int on m_opt_idx, done below
     case coInt: {
-        m_value = wxAtoi(str);
-        val     = wxAtoi(str);
+        if (m_opt.nullable && str == NIL_STR_VALUE)
+            val = ConfigOptionIntNullable::nil_value();
+        else
+            val = wxAtoi(str);
+        m_value = int32_t(val);
         break;
     }
     case coBools: // not used
@@ -654,7 +673,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
         else {
             if (is_na_value) {
                 val     = NAN;
-                m_value = ConfigOptionFloatsNullable::create_nil();
+                m_value = ConfigOptionFloatNullable::nil_value();
                 break;
             } else if (!str.ToDouble(&val)) {
                 if (!check_value) {
@@ -799,7 +818,7 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
                 str.Replace("m", "", true);
 
                 if (m_opt.nullable && str == NIL_STR_VALUE) {
-                    m_value = ConfigOptionFloatsOrPercentsNullable::create_nil();
+                    m_value = ConfigOptionFloatsOrPercentsNullable::create_any_nil();
                     break;
                 } else if (!str.ToDouble(&val)) {
                     if (!check_value) {
@@ -1075,10 +1094,16 @@ bool TextCtrl::value_was_changed()
         if (m_opt.nullable) {
             uint8_t new_val = boost::any_cast<uint8_t>(m_value);
             uint8_t old_val = boost::any_cast<uint8_t>(val);
-            if (new_val == ConfigOptionInts::NIL_VALUE() && old_val == ConfigOptionInts::NIL_VALUE())
+            if (new_val == ConfigOptionIntNullable::nil_value() && old_val == ConfigOptionIntNullable::nil_value())
                 return false;
         }
     case coInt:
+        if (m_opt.nullable) {
+            uint8_t new_val = boost::any_cast<uint8_t>(m_value);
+            uint8_t old_val = boost::any_cast<uint8_t>(val);
+            if (new_val == ConfigOptionIntNullable::nil_value() && old_val == ConfigOptionIntNullable::nil_value())
+                return false;
+        }
         return boost::any_cast<int>(m_value) != boost::any_cast<int>(val);
     case coPercents:
     case coFloats:
@@ -1088,12 +1113,19 @@ bool TextCtrl::value_was_changed()
         if (m_opt.nullable) {
             double new_val = boost::any_cast<double>(m_value);
             double old_val = boost::any_cast<double>(val);
-            if ((std::isnan(new_val) || ConfigOptionFloats::is_nil(m_value)) &&
-                (std::isnan(old_val) || ConfigOptionFloats::is_nil(val)))
+            if ((std::isnan(new_val) || ConfigOptionFloatNullable::is_any_nil(m_value)) &&
+                (std::isnan(old_val) || ConfigOptionFloatNullable::is_any_nil(val)))
             return false;
         }
     case coPercent:
     case coFloat: {
+        if (m_opt.nullable) {
+            double new_val = boost::any_cast<double>(m_value);
+            double old_val = boost::any_cast<double>(val);
+            if ((std::isnan(new_val) || ConfigOptionFloatNullable::is_any_nil(m_value)) &&
+                (std::isnan(old_val) || ConfigOptionFloatNullable::is_any_nil(val)))
+            return false;
+        }
         return boost::any_cast<double>(m_value) != boost::any_cast<double>(val);
     }
     case coStrings:
@@ -1109,10 +1141,14 @@ bool TextCtrl::value_was_changed()
                    boost::any_cast<std::vector<FloatOrPercent>>(val);
         }
         if (m_opt.nullable) {
-            if (ConfigOptionFloatsOrPercents::is_nil(m_value) &&ConfigOptionFloatsOrPercents::is_nil(val))
+            if (ConfigOptionFloatsOrPercents::is_any_nil(m_value) &&ConfigOptionFloatsOrPercents::is_any_nil(val))
                 return false;
         }
     case coFloatOrPercent:
+        if (m_opt.nullable) {
+            if (ConfigOptionFloatOrPercent::is_any_nil(m_value) &&ConfigOptionFloatOrPercent::is_any_nil(val))
+                return false;
+        }
         return boost::any_cast<FloatOrPercent>(m_value) != boost::any_cast<FloatOrPercent>(val);
     case coPoints:
         if (m_opt_idx < 0) {
@@ -1456,6 +1492,15 @@ void CheckBox::disable()
     window->Disable();
 }
 
+int get_default_int(double min, double max){
+    if ( min == -1 || min == 0 )
+        return int(min);
+    if (max < 1000)
+        return int(max);
+    if(min > -1000)
+        return int(min);
+    return int(std::min(max,std::max(min, 0.)));
+}
 
 void SpinCtrl::BUILD() {
 	auto size = wxSize(def_width() * m_em_unit, wxDefaultCoord);
@@ -1468,13 +1513,19 @@ void SpinCtrl::BUILD() {
 	switch (m_opt.type) {
 	case coInt:
 		default_value = m_opt.default_value->get_int();
+        if (m_opt.nullable) {
+            if (default_value == ConfigOptionIntNullable::nil_value())
+                m_last_meaningful_value = get_default_int(m_opt.min, m_opt.max);
+            else
+                m_last_meaningful_value = default_value;
+		}
 		break;
 	case coInts:
 	{
         default_value = m_opt.get_default_value<ConfigOptionInts>()->get_at(m_opt_idx);
         if (m_opt.nullable) {
-            if (default_value == ConfigOptionIntsNullable::NIL_VALUE())
-                m_last_meaningful_value = m_opt.opt_key == "idle_temperature" ? 30 : static_cast<int>(m_opt.max);
+            if (default_value == ConfigOptionIntNullable::nil_value())
+                m_last_meaningful_value = m_opt.opt_key == "idle_temperature" ? 30 : get_default_int(m_opt.min, m_opt.max);
             else
                 m_last_meaningful_value = default_value;
 		}
@@ -1560,7 +1611,7 @@ void SpinCtrl::set_any_value(const boost::any& value, bool change_event/* = fals
     tmp_value = boost::any_cast<int32_t>(value);
     m_value = value;
     if (m_opt.nullable) {
-        const bool m_is_na_val = tmp_value == ConfigOptionIntsNullable::NIL_VALUE();
+        const bool m_is_na_val = tmp_value == ConfigOptionIntNullable::nil_value();
         if (m_is_na_val)
             dynamic_cast<::SpinInput*>(window)->SetValue(na_value(true));
         else {
@@ -1583,7 +1634,7 @@ void SpinCtrl::set_last_meaningful_value()
 void SpinCtrl::set_na_value()
 {
     dynamic_cast<::SpinInput*>(window)->SetValue(na_value(true));
-    m_value = ConfigOptionIntsNullable::NIL_VALUE();
+    m_value = ConfigOptionIntNullable::nil_value();
     propagate_value();
 }
 
@@ -1591,7 +1642,7 @@ boost::any& SpinCtrl::get_value()
 {
     ::SpinInput* spin = static_cast<::SpinInput*>(window);
     if (spin->GetTextValue() == na_value(true)) {
-        assert(boost::any_cast<int32_t>(m_value) == ConfigOptionIntsNullable::NIL_VALUE());
+        assert(boost::any_cast<int32_t>(m_value) == ConfigOptionIntNullable::nil_value());
         return m_value;
     }
 
@@ -1605,7 +1656,7 @@ void SpinCtrl::propagate_value()
     if (!m_value.empty() && boost::any_cast<int>(m_value) == tmp_value)
         return;
 
-    if (m_opt.nullable && tmp_value != ConfigOptionIntsNullable::NIL_VALUE())
+    if (m_opt.nullable && tmp_value != ConfigOptionIntNullable::nil_value())
         m_last_meaningful_value = tmp_value;
 
     if (tmp_value == UNDEF_VALUE) {

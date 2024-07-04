@@ -20,7 +20,7 @@ group:Print Host upload
 group:silent_mode_event:filename_format_event:Firmware
 	setting:gcode_flavor
 	setting:silent_mode
-	setting:gcode_binary
+	setting:binary_gcode
 	line:Print remaining times
 		setting:label$:remaining_times
 		setting:remaining_times_type
