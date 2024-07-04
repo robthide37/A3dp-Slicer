@@ -3759,7 +3759,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm or %");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
-    def->max_literal = { 10, false };
+    def->max_literal = { 1, true };
     def->mode = comSimpleAE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{ 75, true} });
@@ -6095,7 +6095,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("print_first_layer_temperature", coInt);
-    def->label = L("Temperature");
+    def->label = L("First Layer Temperature");
     def->category = OptionCategory::filament;
     def->tooltip = L("Override the temperature of the extruder (for the first layer). Avoid making too many changes, it won't stop for cooling/heating. 0 to disable (using print_temperature if defined). May only work on Height range modifiers.");
     def->mode = comExpert | comSuSi;
