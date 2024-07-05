@@ -153,29 +153,31 @@ void LayerRegion::make_perimeters(
     const ExPolygons *lower_slices = this->layer()->lower_layer ? &this->layer()->lower_layer->lslices : nullptr;
     const ExPolygons *upper_slices = this->layer()->upper_layer ? &this->layer()->upper_layer->lslices : nullptr;
     
-    size_t perimeters_begin = m_perimeters.size();
-    size_t gap_fills_begin = m_thin_fills.size();
-    size_t fill_expolygons_begin = fill_expolygons.size();
+    for (const Surface &surface : slices) {
+        size_t perimeters_begin = m_perimeters.size();
+        size_t gap_fills_begin = m_thin_fills.size();
+        size_t fill_expolygons_begin = fill_expolygons.size();
 
-    PerimeterGenerator::PerimeterGenerator g{params};
-    g.process(
-        // input:
-        lower_slices, &slices, upper_slices,
-        // output:
-            // Loops with the external thin walls
-        &m_perimeters,
-            // Gaps without the thin walls
-        &m_thin_fills,
-            // Infills without the gap fills
-        fill_expolygons,
-            // mask for "no overlap" area
-        m_fill_no_overlap_expolygons
-    );
+        PerimeterGenerator::PerimeterGenerator g{params};
+        g.process(
+            // input:
+            surface, lower_slices, slices, upper_slices,
+            // output:
+                // Loops with the external thin walls
+            &m_perimeters,
+                // Gaps without the thin walls
+            &m_thin_fills,
+                // Infills without the gap fills
+            fill_expolygons,
+                // mask for "no overlap" area
+            m_fill_no_overlap_expolygons
+        );
     
-    perimeter_and_gapfill_ranges.emplace_back(
-        ExtrusionRange{ uint32_t(perimeters_begin), uint32_t(m_perimeters.size()) }, 
-        ExtrusionRange{ uint32_t(gap_fills_begin),  uint32_t(m_thin_fills.size()) });
-    fill_expolygons_ranges.emplace_back(ExtrusionRange{ uint32_t(fill_expolygons_begin), uint32_t(fill_expolygons.size()) });
+        perimeter_and_gapfill_ranges.emplace_back(
+            ExtrusionRange{ uint32_t(perimeters_begin), uint32_t(m_perimeters.size()) }, 
+            ExtrusionRange{ uint32_t(gap_fills_begin),  uint32_t(m_thin_fills.size()) });
+        fill_expolygons_ranges.emplace_back(ExtrusionRange{ uint32_t(fill_expolygons_begin), uint32_t(fill_expolygons.size()) });
+    }
 }
 
 void LayerRegion::make_milling_post_process(const SurfaceCollection& slices) {

@@ -883,8 +883,10 @@ namespace DoExport {
                 excluded.insert(ExtrusionRole::Perimeter);
             if (config->option("external_perimeter_speed") != nullptr && config->get_computed_value("external_perimeter_speed") != 0)
                 excluded.insert(ExtrusionRole::ExternalPerimeter);
-            if (config->option("overhangs_speed") != nullptr && config->get_computed_value("overhangs_speed") != 0)
+            if (config->option("overhangs_speed") != nullptr && config->get_computed_value("overhangs_speed") != 0) {
                 excluded.insert(ExtrusionRole::OverhangPerimeter);
+                excluded.insert(ExtrusionRole::OverhangExternalPerimeter);
+            }
             if (config->option("gap_fill_speed") != nullptr && config->get_computed_value("gap_fill_speed") != 0)
                 excluded.insert(ExtrusionRole::GapFill);
             if (config->option("thin_walls_speed") != nullptr && config->get_computed_value("thin_walls_speed") != 0)
@@ -962,7 +964,7 @@ namespace DoExport {
 	            const PrintRegion &region = object->printing_region(region_id);
 	            for (auto layer : object->layers()) {
 	                const LayerRegion* layerm = layer->regions()[region_id];
-                    if (compute_min_mm3_per_mm.is_compatible({ ExtrusionRole::Perimeter, ExtrusionRole::ExternalPerimeter, ExtrusionRole::OverhangPerimeter }))
+                    if (compute_min_mm3_per_mm.is_compatible({ ExtrusionRole::Perimeter, ExtrusionRole::ExternalPerimeter, ExtrusionRole::OverhangPerimeter, ExtrusionRole::OverhangExternalPerimeter }))
                         mm3_per_mm.push_back(compute_min_mm3_per_mm.reset_use_get(layerm->perimeters()));
                     if (compute_min_mm3_per_mm.is_compatible({ ExtrusionRole::InternalInfill, ExtrusionRole::SolidInfill, ExtrusionRole::TopSolidInfill,ExtrusionRole::BridgeInfill,ExtrusionRole::InternalBridgeInfill }))
                         mm3_per_mm.push_back(compute_min_mm3_per_mm.reset_use_get(layerm->fills()));
@@ -4766,7 +4768,12 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
             // swap points
             Point c = a; a = b; b = c;
         }
+#ifdef _DEBUG
+        double a1 = angle_ccw( a-current_point,b-current_point);
+        double abs1 = abs_angle(angle_ccw( a-current_point,b-current_point));
+        double a2 = ccw_angle_old_test(current_point, a, b);
         assert(is_approx(abs_angle(angle_ccw( a-current_point,b-current_point)), ccw_angle_old_test(current_point, a, b), 0.000000001));
+#endif
         double angle = abs_angle(angle_ccw( a-current_point,b-current_point)) / 3;
         
         // turn left if contour, turn right if hole
@@ -5693,7 +5700,7 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path_att
             speed = m_config.get_computed_value("bridge_speed");
         } else if (path_attrs.role() == ExtrusionRole::InternalBridgeInfill) {
             speed = m_config.get_computed_value("bridge_speed_internal");
-        } else if (path_attrs.role() == ExtrusionRole::OverhangPerimeter) {
+        } else if (path_attrs.role().has(ExtrusionRole::OverhangPerimeter)) { // OverhangPerimeter or OverhangExternalPerimeter
             speed = m_config.get_computed_value("overhangs_speed");
         } else if (path_attrs.role() == ExtrusionRole::InternalInfill) {
             speed = m_config.get_computed_value("infill_speed");
@@ -5717,7 +5724,7 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path_att
             }
         } else if (path_attrs.role() == ExtrusionRole::Ironing) {
             speed = m_config.get_computed_value("ironing_speed");
-        } else if (path_attrs.role() == ExtrusionRole::None || path_attrs.role().has(ExtrusionRoleModifier::Travel)) {
+        } else if (path_attrs.role() == ExtrusionRole::None || path_attrs.role().has(ExtrusionRole::Travel)) {
             assert(path_attrs.role() != ExtrusionRole::None);
             speed = m_config.get_computed_value("travel_speed");
         } else if (path_attrs.role() == ExtrusionRole::Milling) {
@@ -5747,7 +5754,7 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path_att
             speed = m_config.bridge_speed.get_abs_value(vol_speed);
         } else if (path_attrs.role() == ExtrusionRole::InternalBridgeInfill) {
             speed = m_config.bridge_speed_internal.get_abs_value(vol_speed);
-        } else if (path_attrs.role() == ExtrusionRole::OverhangPerimeter) {
+        } else if (path_attrs.role().has(ExtrusionRole::OverhangPerimeter)) { // also overhang external perimeter
             speed = m_config.overhangs_speed.get_abs_value(vol_speed);
         } else if (path_attrs.role() == ExtrusionRole::InternalInfill) {
             speed = m_config.infill_speed.get_abs_value(vol_speed);

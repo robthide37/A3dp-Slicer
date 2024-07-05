@@ -412,7 +412,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
             bool has_overhang = false;
             if (params.config.overhangs_speed_enforce.value > 0) {
                 for (const ExtrusionPath& path : eloop->paths) {
-                    if (path.role() == ExtrusionRole::OverhangPerimeter) {
+                    if (path.role().has(ExtrusionRole::OverhangPerimeter)) {
                         has_overhang = true;
                         break;
                     }
@@ -420,8 +420,10 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
                 if (has_overhang || params.config.overhangs_speed_enforce.value > count_since_overhang) {
                     //enforce
                     for (ExtrusionPath& path : eloop->paths) {
-                        if (path.role() == ExtrusionRole::Perimeter || path.role() == ExtrusionRole::ExternalPerimeter) {
+                        if (path.role() == ExtrusionRole::Perimeter) {
                             path.set_role(ExtrusionRole::OverhangPerimeter);
+                        } else if (path.role() == ExtrusionRole::ExternalPerimeter) {
+                            path.set_role(ExtrusionRole::OverhangExternalPerimeter);
                         }
                     }
                 }
@@ -648,7 +650,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
             paths,
             small_speed,
             ExtrusionAttributes{
-                role | ExtrusionRoleModifier::Bridge,
+                role | ExtrusionRole::Bridge,
                 ExtrusionFlow(is_external ? params.ext_mm3_per_mm() : params.mm3_per_mm(),
                     is_external ? params.ext_perimeter_flow.width() : params.perimeter_flow.width(),
                     no_small_flow ? 2 : 1 // layer height is used as id, temporarly
@@ -660,7 +662,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
             paths,
             big_speed,
             ExtrusionAttributes{
-                role | ExtrusionRoleModifier::Bridge,
+                role | ExtrusionRole::Bridge,
                 ExtrusionFlow(is_external ? params.ext_mm3_per_mm() : params.mm3_per_mm(),
                     is_external ? params.ext_perimeter_flow.width() : params.perimeter_flow.width(),
                     no_small_flow ? 3 : 2 // layer height is used as id, temporarly
@@ -672,7 +674,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
             paths,
             small_flow,
             ExtrusionAttributes{
-                role | ExtrusionRoleModifier::Bridge,
+                role | ExtrusionRole::Bridge,
                 ExtrusionFlow(params.m_mm3_per_mm_overhang,
                     params.overhang_flow.width(),
                     3 // layer height is used as id, temporarly
@@ -684,7 +686,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
             paths,
             big_flow,
             ExtrusionAttributes{
-                role | ExtrusionRoleModifier::Bridge,
+                role | ExtrusionRole::Bridge,
                 ExtrusionFlow(params.m_mm3_per_mm_overhang,
                     params.overhang_flow.width(),
                     4 // layer height is used as id, temporarly
@@ -1265,7 +1267,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     if (!small_speed.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : small_speed) {
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                    role | ExtrusionRoleModifier::Bridge,
+                    role | ExtrusionRole::Bridge,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
                     std::max(params.ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)),
                     (is_external ? params.ext_perimeter_flow : params.perimeter_flow).scaled_width() / 10);
@@ -1289,7 +1291,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     if (!big_speed.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : big_speed) {
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                    role | ExtrusionRoleModifier::Bridge,
+                    role | ExtrusionRole::Bridge,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
                     std::max(params.ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)),
                     (is_external ? params.ext_perimeter_flow : params.perimeter_flow).scaled_width() / 10);
@@ -1313,7 +1315,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     if (!small_flow.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : small_flow) {
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                    role | ExtrusionRoleModifier::Bridge,
+                    role | ExtrusionRole::Bridge,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
                     std::max(params.ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)),
                     (is_external ? params.ext_perimeter_flow : params.perimeter_flow).scaled_width() / 10);
@@ -1343,7 +1345,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     if (!big_flow.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : big_flow) {
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                    ExtrusionRole::OverhangPerimeter,
+                    is_external ? ExtrusionRole::OverhangExternalPerimeter : ExtrusionRole::OverhangPerimeter,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
                     std::max(params.ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)),
                     (is_external ? params.ext_perimeter_flow : params.perimeter_flow).scaled_width() / 10);
@@ -2438,8 +2440,9 @@ void PerimeterGenerator::split_top_surfaces(const ExPolygons *lower_slices,
 }
 
 void PerimeterGenerator::process(// Input:
+            const Surface           &srf_to_use,
             const ExPolygons *       lower_slices,
-            const SurfaceCollection *slices,
+            const SurfaceCollection &slices,
             const ExPolygons *       upper_slices,
             // Output:
             // Loops with the external thin walls
@@ -2453,7 +2456,7 @@ void PerimeterGenerator::process(// Input:
 {
     //TODO: remove these from member
     this->lower_slices = lower_slices;
-    this->slices = slices;
+    this->slices = &slices;
     this->upper_slices = upper_slices;
 
     // Calculate the minimum required spacing between two adjacent traces.
@@ -2526,7 +2529,7 @@ void PerimeterGenerator::process(// Input:
     }
 
     // have to grown the perimeters if mill post-process
-    MillingPostProcess miller(slices, lower_slices, params.config, params.object_config, params.print_config);
+    MillingPostProcess miller(&slices, lower_slices, params.config, params.object_config, params.print_config);
     bool have_to_grow_for_miller = miller.can_be_milled(params.layer) && params.config.milling_extra_size.get_abs_value(1) > 0;
     this->mill_extra_size = 0;
     if (have_to_grow_for_miller) {
@@ -2538,7 +2541,7 @@ void PerimeterGenerator::process(// Input:
 
     // we need to process each island separately because we might have different
     // extra perimeters for each one
-    Surfaces all_surfaces = this->slices->surfaces;
+    Surfaces all_surfaces = { srf_to_use } ;//this->slices->surfaces;
 
     processs_no_bridge(params, all_surfaces, fill_surfaces);
 

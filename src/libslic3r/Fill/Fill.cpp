@@ -94,7 +94,7 @@ struct SurfaceFillParams : FillParams
             RETURN_COMPARE_NON_EQUAL(config->print_extrusion_multiplier);
         }
         assert(*this == rhs);
-        return this->role.lower(rhs.role);
+        return this->role < rhs.role;
         // return this->extrusion_role.lower(rhs.extrusion_role);
     }
 

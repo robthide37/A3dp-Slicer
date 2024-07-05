@@ -890,6 +890,7 @@ void Layer::sort_perimeters_into_islands(
     const std::vector<uint32_t>                                     &layer_region_ids)
 {
     assert(perimeter_and_gapfill_ranges.size() == fill_expolygons_ranges.size());
+    assert(perimeter_and_gapfill_ranges.size() == slices.size()); // not sureab
     assert(! layer_region_ids.empty());
 
     LayerRegion &this_layer_region = *m_regions[region_id];

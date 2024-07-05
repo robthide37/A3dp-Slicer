@@ -195,8 +195,9 @@ public:
     PerimeterGenerator(const Parameters &params) : params(params) {}
 
     void process( // Input:
+            const Surface           &srf_to_use,
             const ExPolygons *       lower_slices,
-            const SurfaceCollection *slices,
+            const SurfaceCollection &slices,
             const ExPolygons *       upper_slices,
             // Output:
             // Loops with the external thin walls

@@ -453,7 +453,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
                     if (path.role() == ExtrusionRole::ExternalPerimeter) {
                         path.collect_points(p);
                     }
-                    if (path.role() == ExtrusionRole::OverhangPerimeter &&
+                    if ( path.role().is_overhang() &&
                         also_overhangs) { // TODO find a way to search for external overhangs only
                         path.collect_points(p);
                     }
