@@ -4463,8 +4463,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
         //but not for the first layer
         && this->m_layer->id() > 0
         //exclude if min_layer_height * 2 > layer_height (increase from 2 to 3 because it's working but uses in-between)
-        && this->m_layer->height >= m_config.min_layer_height.get_abs_value(m_writer.tool()->id(), nozzle_diam) * 2 - EPSILON
-        ) {
+        && this->m_layer->height >= m_config.min_layer_height.get_abs_value(m_writer.tool()->id(), nozzle_diam) * 2 - EPSILON) {
         return extrude_loop_vase(original_loop, description, speed);
     }
 
@@ -4472,8 +4471,8 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
     // next copies (if any) would not detect the correct orientation
     ExtrusionLoop loop_to_seam = original_loop;
     bool save_flipped = this->visitor_flipped;
-    if (this->visitor_flipped) {
-        assert(loop_to_seam.can_reverse());
+    //ignore flip if can't reverse. we're a loop anyway.
+    if (this->visitor_flipped && loop_to_seam.can_reverse()) {
         loop_to_seam.reverse();
     }
     this->visitor_flipped = false;
@@ -4767,7 +4766,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
             // swap points
             Point c = a; a = b; b = c;
         }
-        assert(abs_angle(angle_ccw( a-current_point,b-current_point)) == ccw_angle_old_test(current_point, a, b));
+        assert(is_approx(abs_angle(angle_ccw( a-current_point,b-current_point)), ccw_angle_old_test(current_point, a, b), 0.000000001));
         double angle = abs_angle(angle_ccw( a-current_point,b-current_point)) / 3;
         
         // turn left if contour, turn right if hole

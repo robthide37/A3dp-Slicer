@@ -1133,6 +1133,18 @@ void Print::auto_assign_extruders(ModelObject* model_object) const
     }
 }
 
+#ifdef _DEBUG
+class CheckOrientation : public ExtrusionVisitorRecursiveConst
+{
+public:
+    bool ccw;
+    CheckOrientation(bool is_ccw) : ExtrusionVisitorRecursiveConst() {ccw = (is_ccw);}
+    void use(const ExtrusionLoop &loop) override {
+        assert(loop.is_counter_clockwise() == ccw);
+    }
+};
+#endif
+
 // Slicing process, running at a background thread.
 void Print::process()
 {
@@ -1204,9 +1216,15 @@ void Print::process()
                     obj->m_instances.emplace_back();
                     this->_make_skirt({ obj }, obj->m_skirt, obj->m_skirt_first_layer);
                     obj->m_instances = copies;
+#ifdef _DEBUG
+                    obj->m_skirt.start_visit(CheckOrientation(true));
+#endif
                 }
             } else {
                 this->_make_skirt(m_objects, m_skirt, m_skirt_first_layer);
+#ifdef _DEBUG
+                m_skirt.start_visit(CheckOrientation(true));
+#endif
             }
         }
 
@@ -1432,6 +1450,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
 
 void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollection &out, std::optional<ExtrusionEntityCollection>& out_first_layer)
 {
+    assert(out.empty());
     // First off we need to decide how tall the skirt must be.
     // The skirt_height option from config is expressed in layers, but our
     // object might have different layer heights, so we need to find the print_z
@@ -1581,9 +1600,9 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             false
         );
         eloop.paths.back().polyline = loop.split_at_first_point();
-        //we make it clowkwise, but as it will be reversed, it will be ccw
+        //we make it counter-clowkwise, as loop aren't reversed
         //eloop.make_clockwise();
-        if(!eloop.is_clockwise())
+        if(eloop.is_clockwise())
             eloop.reverse();
         if(!first_layer_only)
             out.append(eloop);
@@ -1614,10 +1633,16 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             // The skirt lenght is not limited, extrude the skirt with the 1st extruder only.
         }
     }
+#ifdef _DEBUG
+    out.start_visit(CheckOrientation{true});
+#endif
     // Brims were generated inside out, reverse to print the outmost contour first.
     out.reverse();
     if (out_first_layer)
         out_first_layer->reverse();
+#ifdef _DEBUG
+    out.start_visit(CheckOrientation(true));
+#endif
 
     // Remember the outer edge of the last skirt line extruded as m_skirt_convex_hull.
     for (Polygon &poly : offset(convex_hull, distance + 0.5f * float(this->skirt_flow(extruders[extruders.size() - 1]).scaled_spacing()), ClipperLib::jtRound, float(scale_(0.1))))

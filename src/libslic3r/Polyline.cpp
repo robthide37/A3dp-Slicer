@@ -838,10 +838,12 @@ void ArcPolyline::split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const
     Geometry::ArcWelder::PathSegmentProjection result = Geometry::ArcWelder::point_to_path_projection(m_path, point);
     assert(result.center != Point(0, 0) || this->m_path[result.segment_id].radius == 0); // if no radius, then no center
     assert(result.center == Point(0, 0) || this->m_path[result.segment_id].radius != 0); // if center defined, then the radius isn't null
+    // the point to add is between m_path[result.segment_id] and m_path[result.segment_id + 1]
+    assert(result.segment_id + 1 < this->m_path.size());
     //split and update point
     p1.clear();
-    p1.m_path.reserve(result.segment_id + 1);
-    p1.m_path.insert(p1.m_path.begin(), this->m_path.begin(), this->m_path.begin() + result.segment_id + 1);
+    p1.m_path.reserve(result.segment_id + 2);
+    p1.m_path.insert(p1.m_path.begin(), this->m_path.begin(), this->m_path.begin() + result.segment_id + 2);
     p1.m_path.back().point = result.point;
     p1.m_only_strait       = not_arc(p1);
     p2.clear();

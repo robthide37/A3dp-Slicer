@@ -177,6 +177,8 @@ public:
     }
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override{ visitor.use(*this); };
+    void start_visit(ExtrusionVisitor &&visitor) { visitor.use(*this); };
+    void start_visit(ExtrusionVisitorConst &&visitor) const{ visitor.use(*this); };
 };
 
 //// visitors /////
