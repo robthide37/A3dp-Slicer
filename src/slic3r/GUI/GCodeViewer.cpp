@@ -4301,7 +4301,7 @@ void GCodeViewer::render_legend(float& legend_height)
                          _u8L("Tool"),
                          _u8L("Filament"),
                          _u8L("Color Print") };
-        view_options_id = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+        view_options_id = { 0, 1, 2, 3, 4, 5, 8, 9, 6, 7, 10, 11, 12 };
         assert(view_options_id.size() == size_t(EViewType::Count));
         assert(view_options_id.back() < size_t(EViewType::Count));
     }
@@ -4317,7 +4317,7 @@ void GCodeViewer::render_legend(float& legend_height)
                          _u8L("Tool"),
                          _u8L("Filament"),
                          _u8L("Color Print") };
-        view_options_id = { 0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12 };
+        view_options_id = { 0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12 };
         assert(view_options_id.size() == size_t(EViewType::Count) - 2);
         assert(view_options_id.back() < size_t(EViewType::Count));
         if (view_type == int(EViewType::LayerTime) || view_type == int(EViewType::Chronology) )
@@ -4334,6 +4334,7 @@ void GCodeViewer::render_legend(float& legend_height)
         wxGetApp().plater()->set_keep_current_preview_type(true);
         wxGetApp().plater()->refresh_print();
         view_type_changed = true;
+        ImGui::ResetMaxCursorScreenPos();
     }
 
     // extrusion paths section -> title
@@ -5000,6 +5001,13 @@ void GCodeViewer::render_legend(float& legend_height)
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::Spacing();
+
+    // reset max width here, because buttons will take all the width -> they block the resize.
+    // icons are the true max width anyway, so it's reset just before them.
+    if (old_view_type != view_type) {
+        ImGui::ResetMaxCursorScreenPos();
+    }
+
     toggle_button(Preview::OptionType::Travel, _u8L("Travel"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
         imgui.draw_icon(window, pos, size, ImGui::LegendTravel);
         });
@@ -5019,7 +5027,15 @@ void GCodeViewer::render_legend(float& legend_height)
     toggle_button(Preview::OptionType::Seams, _u8L("Seams"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
         imgui.draw_icon(window, pos, size, ImGui::LegendSeams);
         });
-    ImGui::SameLine();
+    if (!wxGetApp().is_gcode_viewer()) {
+        ImGui::SameLine();
+        toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
+            imgui.draw_icon(window, pos, size, ImGui::LegendShells);
+            });
+    }
+    // put icons on two line if not FeatureType, as only FeatureType is very wide.
+    if(m_view_type == EViewType::FeatureType)
+        ImGui::SameLine();
     toggle_button(Preview::OptionType::ToolChanges, _u8L("Tool changes"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
         imgui.draw_icon(window, pos, size, ImGui::LegendToolChanges);
         });
@@ -5040,12 +5056,6 @@ void GCodeViewer::render_legend(float& legend_height)
         imgui.draw_icon(window, pos, size, ImGui::LegendCOG);
         });
     ImGui::SameLine();
-    if (!wxGetApp().is_gcode_viewer()) {
-        toggle_button(Preview::OptionType::Shells, _u8L("Shells"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
-            imgui.draw_icon(window, pos, size, ImGui::LegendShells);
-            });
-        ImGui::SameLine();
-    }
     toggle_button(Preview::OptionType::ToolMarker, _u8L("Tool marker"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
         imgui.draw_icon(window, pos, size, ImGui::LegendToolMarker);
         });
