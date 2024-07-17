@@ -7,6 +7,13 @@
 #include "Plater.hpp"
 #include "Tab.hpp"
 
+#include <boost/log/trivial.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string/trim_all.hpp>
+#include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/filesystem.hpp>
+
 #include <string>
 
 #include <angelscript/source/as_config.h>
@@ -434,12 +441,14 @@ void _set_string(DynamicPrintConfig& conf, const PresetCollection* pcoll, const 
         conf.set_key_value(key, new_val);
     } else if (opt->type() == ConfigOptionType::coEnum) {
         const ConfigOptionDef* def = pcoll->get_edited_preset().config.get_option_def(key);
-        auto it_idx = def->enum_keys_map->find(val);
-        if(it_idx == def->enum_keys_map->end())
-            throw NoDefinitionExceptionEmitLog("set_string(): error, can't find enum option '" +val+ "' in "+ key);
-        int idx = it_idx->second;
+        std::optional<int> it_idx = def->enum_def->value_to_index(val);
+        if (!it_idx) {
+            it_idx = def->enum_def->label_to_index(val);
+            if (!it_idx)
+                throw NoDefinitionExceptionEmitLog("set_string(): error, can't find enum option '" + val + "' in " + key);
+        }
         ConfigOption* copy = opt->clone();
-        copy->set_enum_int(idx);
+        copy->set_enum_int(*it_idx);
         conf.set_key_value(key, copy);
     } else {
         throw NoDefinitionExceptionEmitLog("set_string(): error, can't find string option (wrong type?) " + key);
@@ -569,8 +578,8 @@ std::string get_custom_var_option(int preset_type) {
         : current_script->tab()->m_preset_bundle->sla_prints.get_edited_preset().config.opt_string("print_custom_variables");
     else if (preset_type == 1) {
         return (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
-            ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0))
-            : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
+            ? current_script->tab()->m_preset_bundle->filaments.get_edited_preset().config.opt_string("filament_custom_variables", size_t(0))
+            : current_script->tab()->m_preset_bundle->sla_materials.get_edited_preset().config.opt_string("filament_custom_variables", size_t(0));
     } else return current_script->tab()->m_preset_bundle->printers.get_edited_preset().config.opt_string("printer_custom_variables");
 }
 std::string get_custom_value(std::string custom_var_field, const std::string& opt_key) {
@@ -816,8 +825,8 @@ void as_back_custom_initial_value(int preset_type, std::string& key) {
         : current_script->tab()->m_preset_bundle->sla_prints.get_selected_preset().config.opt_string("print_custom_variables");
     else if (preset_type == 1) {
         initial_serialized_vars = (current_script->tab()->get_printer_technology() & PrinterTechnology::ptFFF) != 0
-            ? current_script->tab()->m_preset_bundle->filaments.get_selected_preset().config.opt_string("filament_custom_variables", (unsigned int)(0))
-            : current_script->tab()->m_preset_bundle->sla_materials.get_selected_preset().config.opt_string("filament_custom_variables", (unsigned int)(0));
+            ? current_script->tab()->m_preset_bundle->filaments.get_selected_preset().config.opt_string("filament_custom_variables", size_t(0))
+            : current_script->tab()->m_preset_bundle->sla_materials.get_selected_preset().config.opt_string("filament_custom_variables", size_t(0));
     } else initial_serialized_vars = current_script->tab()->m_preset_bundle->printers.get_selected_preset().config.opt_string("printer_custom_variables");
     std::string serialized_value = get_custom_value(initial_serialized_vars, key);
     std::string serialized_vars = get_custom_var_option(preset_type);
@@ -959,8 +968,10 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
         // Let the builder load the script, and do the necessary pre-processing (include files, etc)
         //res = builder.AddSectionFromFile(ui_script_file.string().c_str()); //seems to be problematic on cyrillic locale
         {
-            std::string all_file;
-            boost::filesystem::load_string_file(ui_script_file, all_file);
+            //std::string all_file;
+            //boost::filesystem::load_string_file(ui_script_file, all_file);
+	        boost::nowide::ifstream file(ui_script_file.string());
+	        std::string all_file { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
             res = builder.AddSectionFromMemory(ui_script_file.string().c_str(), all_file.c_str(), (unsigned int)(all_file.length()), 0);
         }
         if (res < 0) throw CompileErrorException("Error, can't build the script for tab " + tab_key);
@@ -1061,8 +1072,10 @@ void ScriptContainer::call_script_function_set(const ConfigOptionDef& def, const
     }
     case coEnum: {
         int32_t enum_idx = boost::any_cast<std::int32_t>(value);
-        if (enum_idx >= 0 && enum_idx < def.enum_values.size()) {
-            str_arg = def.enum_values[enum_idx];
+        assert(def.enum_def);
+        assert(enum_idx < def.enum_def->values().size());
+        if (enum_idx >= 0 && def.enum_def && enum_idx < def.enum_def->values().size()) {
+            str_arg = def.enum_def->label(enum_idx);
             ctx->SetArgAddress(0, &str_arg);
             ctx->SetArgDWord(1, enum_idx);
         }
@@ -1304,14 +1317,20 @@ boost::any ScriptContainer::call_script_function_get_value(const ConfigOptionDef
     }
     case coEnum: { 
         ret_int = ctx->GetReturnDWord();
-        if (ret_int >= 0 && ret_int < def.enum_values.size()) {
+        assert(def.enum_def && ret_int < def.enum_def->values().size());
+        if (ret_int >= 0 && def.enum_def && ret_int < def.enum_def->values().size()) {
             opt_val = int32_t(ret_int);
         } else {
             opt_val = int32_t(0);
-            for (size_t i = 0; i < def.enum_values.size(); i++) {
-                if (ret_str == def.enum_values[i])
-                    opt_val = int32_t(i);
+            std::optional<int> idx;
+            if (def.enum_def->is_valid_closed_enum()) {
+                idx = def.enum_def->value_to_index(ret_str);
+            } else {
+                idx = def.enum_def->label_to_index(ret_str);
             }
+            assert(idx);
+            if(idx)
+                opt_val = int32_t(*idx);
         }
         break; //Choice
     }

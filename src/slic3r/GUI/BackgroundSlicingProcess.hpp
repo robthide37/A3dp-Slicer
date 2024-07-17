@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2019 John Drake @foxox
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_BackgroundSlicingProcess_hpp_
 #define slic3r_GUI_BackgroundSlicingProcess_hpp_
 
@@ -11,7 +16,6 @@
 
 #include "libslic3r/PrintBase.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
-#include "libslic3r/Format/SL1.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 
@@ -133,7 +137,7 @@ public:
 	bool 		empty() const;
 	// Validate the print. Returns a {PrintValidationError::None,empty string} if valid, returns an error message if invalid.
 	// Call validate before calling start().
-	std::pair<PrintBase::PrintValidationError, std::string> validate(std::string* warning = nullptr);
+	std::pair<PrintBase::PrintValidationError, std::string> validate(std::vector<std::string>* warnings = nullptr);
 
 	// Set the export path of the G-code.
 	// Once the path is set, the G-code 
@@ -218,9 +222,9 @@ private:
 	// Data structure, to which the G-code export writes its annotations.
 	GCodeProcessorResult     *m_gcode_result 		 = nullptr;
 	// Callback function, used to write thumbnails into gcode.
-	ThumbnailsGeneratorCallback m_thumbnail_cb = nullptr;
-	std::shared_ptr<SLAAbstractArchive> m_sla_archive  = nullptr;
-	// Temporary G-code, there is one defined for the BackgroundSlicingProcess, differentiated from the other processes by a process ID.
+    ThumbnailsGeneratorCallback m_thumbnail_cb 	     = nullptr;
+    // Temporary G-code, there is one defined for the BackgroundSlicingProcess,
+    // differentiated from the other processes by a process ID.
 	std::string 				m_temp_output_path;
 	// Output path provided by the user. The output path may be set even if the slicing is running,
 	// but once set, it cannot be re-set.

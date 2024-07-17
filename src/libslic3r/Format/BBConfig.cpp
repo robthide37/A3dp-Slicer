@@ -88,7 +88,6 @@ void init()
     // print
     key_translation_map["alternate_extra_wall"]             = "extra_perimeters_odd_layers";
     key_translation_map["is_infill_first"]                          = "infill_first";
-    key_translation_map["enable_arc_fitting"]                       = "arc_fitting";
     key_translation_map["bottom_shell_layers"]                      = "bottom_solid_layers";
     key_translation_map["bottom_shell_thickness"]                   = "bottom_solid_min_thickness";
     key_translation_map["bottom_solid_infill_flow_ratio"]   = "first_layer_flow_ratio ";
@@ -508,6 +507,15 @@ void complicated_convert(t_config_option_key &opt_key, std::string &value, const
             value = "0";
         } else {
             value = "1";
+        }
+    }
+    if ("enable_arc_fitting" == opt_key) {
+        opt_key = "arc_fitting";
+        if ("1" == value) {
+            value = "bambu";
+        } else {
+            assert(value == "0");
+            value = "disabled";
         }
     }
     //if ("enable_overhang_speed") {

@@ -1,741 +1,43 @@
+///|/ Copyright (c) superslicer 2021 - 2023 Durand Rémi @supermerill
+///// Copyright (c) Prusa Research 2021 - 2022 Vojtěch Bubník @bubnikv
+///|/
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include <boost/log/trivial.hpp>
 
 #include "MedialAxis.hpp"
 
 #include "clipper.hpp"
 #include "../ClipperUtils.hpp"
+#include "ClipperUtils.hpp"
 
-//#ifdef SLIC3R_DEBUG
-//namespace boost { namespace polygon {
-//
-//// The following code for the visualization of the boost Voronoi diagram is based on:
-////
-//// Boost.Polygon library voronoi_graphic_utils.hpp header file
-////          Copyright Andrii Sydorchuk 2010-2012.
-//// Distributed under the Boost Software License, Version 1.0.
-////    (See accompanying file LICENSE_1_0.txt or copy at
-////          http://www.boost.org/LICENSE_1_0.txt)
-//template <typename CT>
-//class voronoi_visual_utils {
-// public:
-//  // Discretize parabolic Voronoi edge.
-//  // Parabolic Voronoi edges are always formed by one point and one segment
-//  // from the initial input set.
-//  //
-//  // Args:
-//  //   point: input point.
-//  //   segment: input segment.
-//  //   max_dist: maximum discretization distance.
-//  //   discretization: point discretization of the given Voronoi edge.
-//  //
-//  // Template arguments:
-//  //   InCT: coordinate type of the input geometries (usually integer).
-//  //   Point: point type, should model point concept.
-//  //   Segment: segment type, should model segment concept.
-//  //
-//  // Important:
-//  //   discretization should contain both edge endpoints initially.
-//  template <class InCT1, class InCT2,
-//            template<class> class Point,
-//            template<class> class Segment>
-//  static
-//  typename enable_if<
-//    typename gtl_and<
-//      typename gtl_if<
-//        typename is_point_concept<
-//          typename geometry_concept< Point<InCT1> >::type
-//        >::type
-//      >::type,
-//      typename gtl_if<
-//        typename is_segment_concept<
-//          typename geometry_concept< Segment<InCT2> >::type
-//        >::type
-//      >::type
-//    >::type,
-//    void
-//  >::type discretize(
-//      const Point<InCT1>& point,
-//      const Segment<InCT2>& segment,
-//      const CT max_dist,
-//      std::vector< Point<CT> >* discretization) {
-//    // Apply the linear transformation to move start point of the segment to
-//    // the point with coordinates (0, 0) and the direction of the segment to
-//    // coincide the positive direction of the x-axis.
-//    CT segm_vec_x = cast(x(high(segment))) - cast(x(low(segment)));
-//    CT segm_vec_y = cast(y(high(segment))) - cast(y(low(segment)));
-//    CT sqr_segment_length = segm_vec_x * segm_vec_x + segm_vec_y * segm_vec_y;
-//
-//    // Compute x-coordinates of the endpoints of the edge
-//    // in the transformed space.
-//    CT projection_start = sqr_segment_length *
-//        get_point_projection((*discretization)[0], segment);
-//    CT projection_end = sqr_segment_length *
-//        get_point_projection((*discretization)[1], segment);
-//
-//    // Compute parabola parameters in the transformed space.
-//    // Parabola has next representation:
-//    // f(x) = ((x-rot_x)^2 + rot_y^2) / (2.0*rot_y).
-//    CT point_vec_x = cast(x(point)) - cast(x(low(segment)));
-//    CT point_vec_y = cast(y(point)) - cast(y(low(segment)));
-//    CT rot_x = segm_vec_x * point_vec_x + segm_vec_y * point_vec_y;
-//    CT rot_y = segm_vec_x * point_vec_y - segm_vec_y * point_vec_x;
-//
-//    // Save the last point.
-//    Point<CT> last_point = (*discretization)[1];
-//    discretization->pop_back();
-//
-//    // Use stack to avoid recursion.
-//    std::stack<CT> point_stack;
-//    point_stack.push(projection_end);
-//    CT cur_x = projection_start;
-//    CT cur_y = parabola_y(cur_x, rot_x, rot_y);
-//
-//    // Adjust max_dist parameter in the transformed space.
-//    const CT max_dist_transformed = max_dist * max_dist * sqr_segment_length;
-//    while (!point_stack.empty()) {
-//      CT new_x = point_stack.top();
-//      CT new_y = parabola_y(new_x, rot_x, rot_y);
-//
-//      // Compute coordinates of the point of the parabola that is
-//      // furthest from the current line segment.
-//      CT mid_x = (new_y - cur_y) / (new_x - cur_x) * rot_y + rot_x;
-//      CT mid_y = parabola_y(mid_x, rot_x, rot_y);
-//
-//      // Compute maximum distance between the given parabolic arc
-//      // and line segment that discretize it.
-//      CT dist = (new_y - cur_y) * (mid_x - cur_x) -
-//          (new_x - cur_x) * (mid_y - cur_y);
-//      dist = dist * dist / ((new_y - cur_y) * (new_y - cur_y) +
-//          (new_x - cur_x) * (new_x - cur_x));
-//      if (dist <= max_dist_transformed) {
-//        // Distance between parabola and line segment is less than max_dist.
-//        point_stack.pop();
-//        CT inter_x = (segm_vec_x * new_x - segm_vec_y * new_y) /
-//            sqr_segment_length + cast(x(low(segment)));
-//        CT inter_y = (segm_vec_x * new_y + segm_vec_y * new_x) /
-//            sqr_segment_length + cast(y(low(segment)));
-//        discretization->push_back(Point<CT>(inter_x, inter_y));
-//        cur_x = new_x;
-//        cur_y = new_y;
-//      } else {
-//        point_stack.push(mid_x);
-//      }
-//    }
-//
-//    // Update last point.
-//    discretization->back() = last_point;
-//  }
-//
-// private:
-//  // Compute y(x) = ((x - a) * (x - a) + b * b) / (2 * b).
-//  static CT parabola_y(CT x, CT a, CT b) {
-//    return ((x - a) * (x - a) + b * b) / (b + b);
-//  }
-//
-//  // Get normalized length of the distance between:
-//  //   1) point projection onto the segment
-//  //   2) start point of the segment
-//  // Return this length divided by the segment length. This is made to avoid
-//  // sqrt computation during transformation from the initial space to the
-//  // transformed one and vice versa. The assumption is made that projection of
-//  // the point lies between the start-point and endpoint of the segment.
-//  template <class InCT,
-//            template<class> class Point,
-//            template<class> class Segment>
-//  static
-//  typename enable_if<
-//    typename gtl_and<
-//      typename gtl_if<
-//        typename is_point_concept<
-//          typename geometry_concept< Point<int> >::type
-//        >::type
-//      >::type,
-//      typename gtl_if<
-//        typename is_segment_concept<
-//          typename geometry_concept< Segment<long> >::type
-//        >::type
-//      >::type
-//    >::type,
-//    CT
-//  >::type get_point_projection(
-//      const Point<CT>& point, const Segment<InCT>& segment) {
-//    CT segment_vec_x = cast(x(high(segment))) - cast(x(low(segment)));
-//    CT segment_vec_y = cast(y(high(segment))) - cast(y(low(segment)));
-//    CT point_vec_x = x(point) - cast(x(low(segment)));
-//    CT point_vec_y = y(point) - cast(y(low(segment)));
-//    CT sqr_segment_length =
-//        segment_vec_x * segment_vec_x + segment_vec_y * segment_vec_y;
-//    CT vec_dot = segment_vec_x * point_vec_x + segment_vec_y * point_vec_y;
-//    return vec_dot / sqr_segment_length;
-//  }
-//
-//  template <typename InCT>
-//  static CT cast(const InCT& value) {
-//    return static_cast<CT>(value);
-//  }
-//};
-//
-//} } // namespace boost::polygon
-//#endif // SLIC3R_DEBUG
+#include <boost/log/trivial.hpp>
 
 namespace Slic3r { namespace Geometry {
-
-
-//#ifdef SLIC3R_DEBUG
-//// The following code for the visualization of the boost Voronoi diagram is based on:
-////
-//// Boost.Polygon library voronoi_visualizer.cpp file
-////          Copyright Andrii Sydorchuk 2010-2012.
-//// Distributed under the Boost Software License, Version 1.0.
-////    (See accompanying file LICENSE_1_0.txt or copy at
-////          http://www.boost.org/LICENSE_1_0.txt)
-//namespace Voronoi { namespace Internal {
-//
-//    typedef double coordinate_type;
-//    typedef boost::polygon::point_data<coordinate_type> point_type;
-//    typedef boost::polygon::segment_data<coordinate_type> segment_type;
-//    typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
-//    typedef boost::polygon::voronoi_diagram<coordinate_type> VD;
-//    typedef VD::cell_type cell_type;
-//    typedef VD::cell_type::source_index_type source_index_type;
-//    typedef VD::cell_type::source_category_type source_category_type;
-//    typedef VD::edge_type edge_type;
-//    typedef VD::cell_container_type cell_container_type;
-//    typedef VD::cell_container_type vertex_container_type;
-//    typedef VD::edge_container_type edge_container_type;
-//    typedef VD::const_cell_iterator const_cell_iterator;
-//    typedef VD::const_vertex_iterator const_vertex_iterator;
-//    typedef VD::const_edge_iterator const_edge_iterator;
-//
-//    static const std::size_t EXTERNAL_COLOR = 1;
-//
-//    inline void color_exterior(const VD::edge_type* edge) 
-//    {
-//        if (edge->color() == EXTERNAL_COLOR)
-//            return;
-//        edge->color(EXTERNAL_COLOR);
-//        edge->twin()->color(EXTERNAL_COLOR);
-//        const VD::vertex_type* v = edge->vertex1();
-//        if (v == NULL || !edge->is_primary())
-//            return;
-//        v->color(EXTERNAL_COLOR);
-//        const VD::edge_type* e = v->incident_edge();
-//        do {
-//            color_exterior(e);
-//            e = e->rot_next();
-//        } while (e != v->incident_edge());
-//    }
-//
-//    inline point_type retrieve_point(const std::vector<segment_type> &segments, const cell_type& cell) 
-//    {
-//        assert(cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT || cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT);
-//        return (cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT) ? low(segments[cell.source_index()]) : high(segments[cell.source_index()]);
-//    }
-//
-//    inline void clip_infinite_edge(const std::vector<segment_type> &segments, const edge_type& edge, coordinate_type bbox_max_size, std::vector<point_type>* clipped_edge) 
-//    {
-//        const cell_type& cell1 = *edge.cell();
-//        const cell_type& cell2 = *edge.twin()->cell();
-//        point_type origin, direction;
-//        // Infinite edges could not be created by two segment sites.
-//        if (cell1.contains_point() && cell2.contains_point()) {
-//            point_type p1 = retrieve_point(segments, cell1);
-//            point_type p2 = retrieve_point(segments, cell2);
-//            origin.x((p1.x() + p2.x()) * 0.5);
-//            origin.y((p1.y() + p2.y()) * 0.5);
-//            direction.x(p1.y() - p2.y());
-//            direction.y(p2.x() - p1.x());
-//        } else {
-//            origin = cell1.contains_segment() ? retrieve_point(segments, cell2) : retrieve_point(segments, cell1);
-//            segment_type segment = cell1.contains_segment() ? segments[cell1.source_index()] : segments[cell2.source_index()];
-//            coordinate_type dx = high(segment).x() - low(segment).x();
-//            coordinate_type dy = high(segment).y() - low(segment).y();
-//            if ((low(segment) == origin) ^ cell1.contains_point()) {
-//                direction.x(dy);
-//                direction.y(-dx);
-//            } else {
-//                direction.x(-dy);
-//                direction.y(dx);
-//            }
-//        }
-//        coordinate_type koef = bbox_max_size / (std::max)(fabs(direction.x()), fabs(direction.y()));
-//        if (edge.vertex0() == NULL) {
-//            clipped_edge->push_back(point_type(
-//                origin.x() - direction.x() * koef,
-//                origin.y() - direction.y() * koef));
-//        } else {
-//            clipped_edge->push_back(
-//                point_type(edge.vertex0()->x(), edge.vertex0()->y()));
-//        }
-//        if (edge.vertex1() == NULL) {
-//            clipped_edge->push_back(point_type(
-//                origin.x() + direction.x() * koef,
-//                origin.y() + direction.y() * koef));
-//        } else {
-//            clipped_edge->push_back(
-//                point_type(edge.vertex1()->x(), edge.vertex1()->y()));
-//        }
-//    }
-//
-//    inline void sample_curved_edge(const std::vector<segment_type> &segments, const edge_type& edge, std::vector<point_type> &sampled_edge, coordinate_type max_dist) 
-//    {
-//        point_type point = edge.cell()->contains_point() ?
-//            retrieve_point(segments, *edge.cell()) :
-//            retrieve_point(segments, *edge.twin()->cell());
-//        segment_type segment = edge.cell()->contains_point() ?
-//            segments[edge.twin()->cell()->source_index()] :
-//            segments[edge.cell()->source_index()];
-//        ::boost::polygon::voronoi_visual_utils<coordinate_type>::discretize(point, segment, max_dist, &sampled_edge);
-//    }
-//
-//} /* namespace Internal */ } // namespace Voronoi
-//
-//void dump_voronoi_to_svg(const Lines &lines, /* const */ boost::polygon::voronoi_diagram<double> &vd, const ThickPolylines *polylines, const char *path)
-//{
-//    const double        scale                       = 0.2;
-//    const std::string   inputSegmentPointColor      = "lightseagreen";
-//    const coord_t       inputSegmentPointRadius     = coord_t(0.09 * scale / SCALING_FACTOR); 
-//    const std::string   inputSegmentColor           = "lightseagreen";
-//    const coord_t       inputSegmentLineWidth       = coord_t(0.03 * scale / SCALING_FACTOR);
-//
-//    const std::string   voronoiPointColor           = "black";
-//    const coord_t       voronoiPointRadius          = coord_t(0.06 * scale / SCALING_FACTOR);
-//    const std::string   voronoiLineColorPrimary     = "black";
-//    const std::string   voronoiLineColorSecondary   = "green";
-//    const std::string   voronoiArcColor             = "red";
-//    const coord_t       voronoiLineWidth            = coord_t(0.02 * scale / SCALING_FACTOR);
-//
-//    const bool          internalEdgesOnly           = false;
-//    const bool          primaryEdgesOnly            = false;
-//
-//    BoundingBox bbox = BoundingBox(lines);
-//    bbox.min(0) -= coord_t(1. / SCALING_FACTOR);
-//    bbox.min(1) -= coord_t(1. / SCALING_FACTOR);
-//    bbox.max(0) += coord_t(1. / SCALING_FACTOR);
-//    bbox.max(1) += coord_t(1. / SCALING_FACTOR);
-//
-//    ::Slic3r::SVG svg(path, bbox);
-//
-//    if (polylines != NULL)
-//        svg.draw(*polylines, "lime", "lime", voronoiLineWidth);
-//
-////    bbox.scale(1.2);
-//    // For clipping of half-lines to some reasonable value.
-//    // The line will then be clipped by the SVG viewer anyway.
-//    const double bbox_dim_max = double(bbox.max(0) - bbox.min(0)) + double(bbox.max(1) - bbox.min(1));
-//    // For the discretization of the Voronoi parabolic segments.
-//    const double discretization_step = 0.0005 * bbox_dim_max;
-//
-//    // Make a copy of the input segments with the double type.
-//    std::vector<Voronoi::Internal::segment_type> segments;
-//    for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++ it)
-//        segments.push_back(Voronoi::Internal::segment_type(
-//            Voronoi::Internal::point_type(double(it->a(0)), double(it->a(1))), 
-//            Voronoi::Internal::point_type(double(it->b(0)), double(it->b(1)))));
-//    
-//    // Color exterior edges.
-//    for (boost::polygon::voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it)
-//        if (!it->is_finite())
-//            Voronoi::Internal::color_exterior(&(*it));
-//
-//    // Draw the end points of the input polygon.
-//    for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++it) {
-//        svg.draw(it->a, inputSegmentPointColor, inputSegmentPointRadius);
-//        svg.draw(it->b, inputSegmentPointColor, inputSegmentPointRadius);
-//    }
-//    // Draw the input polygon.
-//    for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++it)
-//        svg.draw(Line(Point(coord_t(it->a(0)), coord_t(it->a(1))), Point(coord_t(it->b(0)), coord_t(it->b(1)))), inputSegmentColor, inputSegmentLineWidth);
-//
-//#if 1
-//    // Draw voronoi vertices.
-//    for (boost::polygon::voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it)
-//        if (! internalEdgesOnly || it->color() != Voronoi::Internal::EXTERNAL_COLOR)
-//            svg.draw(Point(coord_t(it->x()), coord_t(it->y())), voronoiPointColor, voronoiPointRadius);
-//
-//    for (boost::polygon::voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
-//        if (primaryEdgesOnly && !it->is_primary())
-//            continue;
-//        if (internalEdgesOnly && (it->color() == Voronoi::Internal::EXTERNAL_COLOR))
-//            continue;
-//        std::vector<Voronoi::Internal::point_type> samples;
-//        std::string color = voronoiLineColorPrimary;
-//        if (!it->is_finite()) {
-//            Voronoi::Internal::clip_infinite_edge(segments, *it, bbox_dim_max, &samples);
-//            if (! it->is_primary())
-//                color = voronoiLineColorSecondary;
-//        } else {
-//            // Store both points of the segment into samples. sample_curved_edge will split the initial line
-//            // until the discretization_step is reached.
-//            samples.push_back(Voronoi::Internal::point_type(it->vertex0()->x(), it->vertex0()->y()));
-//            samples.push_back(Voronoi::Internal::point_type(it->vertex1()->x(), it->vertex1()->y()));
-//            if (it->is_curved()) {
-//                Voronoi::Internal::sample_curved_edge(segments, *it, samples, discretization_step);
-//                color = voronoiArcColor;
-//            } else if (! it->is_primary())
-//                color = voronoiLineColorSecondary;
-//        }
-//        for (std::size_t i = 0; i + 1 < samples.size(); ++i)
-//            svg.draw(Line(Point(coord_t(samples[i].x()), coord_t(samples[i].y())), Point(coord_t(samples[i+1].x()), coord_t(samples[i+1].y()))), color, voronoiLineWidth);
-//    }
-//#endif
-//
-//    if (polylines != NULL)
-//        svg.draw(*polylines, "blue", voronoiLineWidth);
-//
-//    svg.Close();
-//}
-//#endif // SLIC3R_DEBUG
-//
-//template<typename VD, typename SEGMENTS>
-//inline const typename VD::point_type retrieve_cell_point(const typename VD::cell_type& cell, const SEGMENTS &segments)
-//{
-//    assert(cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT || cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT);
-//    return (cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT) ? low(segments[cell.source_index()]) : high(segments[cell.source_index()]);
-//}
-//
-//template<typename VD, typename SEGMENTS>
-//inline std::pair<typename VD::coord_type, typename VD::coord_type>
-//measure_edge_thickness(const VD &vd, const typename VD::edge_type& edge, const SEGMENTS &segments)
-//{
-//    typedef typename VD::coord_type T;
-//    const typename VD::point_type  pa(edge.vertex0()->x(), edge.vertex0()->y());
-//    const typename VD::point_type  pb(edge.vertex1()->x(), edge.vertex1()->y());
-//    const typename VD::cell_type  &cell1 = *edge.cell();
-//    const typename VD::cell_type  &cell2 = *edge.twin()->cell();
-//    if (cell1.contains_segment()) {
-//        if (cell2.contains_segment()) {
-//            // Both cells contain a linear segment, the left / right cells are symmetric.
-//            // Project pa, pb to the left segment.
-//            const typename VD::segment_type segment1 = segments[cell1.source_index()];
-//            const typename VD::point_type p1a = project_point_to_segment(segment1, pa);
-//            const typename VD::point_type p1b = project_point_to_segment(segment1, pb);
-//            return std::pair<T, T>(T(2.)*dist(pa, p1a), T(2.)*dist(pb, p1b));
-//        } else {
-//            // 1st cell contains a linear segment, 2nd cell contains a point.
-//            // The medial axis between the cells is a parabolic arc.
-//            // Project pa, pb to the left segment.
-//            const typename  VD::point_type p2 = retrieve_cell_point<VD>(cell2, segments);
-//            return std::pair<T, T>(T(2.)*dist(pa, p2), T(2.)*dist(pb, p2));
-//        }
-//    } else if (cell2.contains_segment()) {
-//        // 1st cell contains a point, 2nd cell contains a linear segment.
-//        // The medial axis between the cells is a parabolic arc.
-//        const typename VD::point_type p1 = retrieve_cell_point<VD>(cell1, segments);
-//        return std::pair<T, T>(T(2.)*dist(pa, p1), T(2.)*dist(pb, p1));
-//    } else {
-//        // Both cells contain a point. The left / right regions are triangular and symmetric.
-//        const typename VD::point_type p1 = retrieve_cell_point<VD>(cell1, segments);
-//        return std::pair<T, T>(T(2.)*dist(pa, p1), T(2.)*dist(pb, p1));
-//    }
-//}
-//
-//// Converts the Line instances of Lines vector to VD::segment_type.
-//template<typename VD>
-//class Lines2VDSegments
-//{
-//public:
-//    Lines2VDSegments(const Lines &alines) : lines(alines) {}
-//    typename VD::segment_type operator[](size_t idx) const {
-//        return typename VD::segment_type(
-//            typename VD::point_type(typename VD::coord_type(lines[idx].a(0)), typename VD::coord_type(lines[idx].a(1))),
-//            typename VD::point_type(typename VD::coord_type(lines[idx].b(0)), typename VD::coord_type(lines[idx].b(1))));
-//    }
-//private:
-//    const Lines &lines;
-//};
-//
-//void
-//MedialAxis::build(ThickPolylines* polylines)
-//{
-//    construct_voronoi(this->lines.begin(), this->lines.end(), &this->vd);
-//    
-//    /*
-//    // DEBUG: dump all Voronoi edges
-//    {
-//        for (VD::const_edge_iterator edge = this->vd.edges().begin(); edge != this->vd.edges().end(); ++edge) {
-//            if (edge->is_infinite()) continue;
-//            
-//            ThickPolyline polyline;
-//            polyline.points.push_back(Point( edge->vertex0()->x(), edge->vertex0()->y() ));
-//            polyline.points.push_back(Point( edge->vertex1()->x(), edge->vertex1()->y() ));
-//            polylines->push_back(polyline);
-//        }
-//        return;
-//    }
-//    */
-//    
-//    //typedef const VD::vertex_type vert_t;
-//    typedef const VD::edge_type   edge_t;
-//    
-//    // collect valid edges (i.e. prune those not belonging to MAT)
-//    // note: this keeps twins, so it inserts twice the number of the valid edges
-//    this->valid_edges.clear();
-//    {
-//        std::set<const VD::edge_type*> seen_edges;
-//        for (VD::const_edge_iterator edge = this->vd.edges().begin(); edge != this->vd.edges().end(); ++edge) {
-//            // if we only process segments representing closed loops, none if the
-//            // infinite edges (if any) would be part of our MAT anyway
-//            if (edge->is_secondary() || edge->is_infinite()) continue;
-//        
-//            // don't re-validate twins
-//            if (seen_edges.find(&*edge) != seen_edges.end()) continue;  // TODO: is this needed?
-//            seen_edges.insert(&*edge);
-//            seen_edges.insert(edge->twin());
-//            
-//            if (!this->validate_edge(&*edge)) continue;
-//            this->valid_edges.insert(&*edge);
-//            this->valid_edges.insert(edge->twin());
-//        }
-//    }
-//    this->edges = this->valid_edges;
-//    
-//    // iterate through the valid edges to build polylines
-//    while (!this->edges.empty()) {
-//        const edge_t* edge = *this->edges.begin();
-//        
-//        // start a polyline
-//        ThickPolyline polyline;
-//        polyline.points.push_back(Point( edge->vertex0()->x(), edge->vertex0()->y() ));
-//        polyline.points.push_back(Point( edge->vertex1()->x(), edge->vertex1()->y() ));
-//        polyline.width.push_back(this->thickness[edge].first);
-//        polyline.width.push_back(this->thickness[edge].second);
-//        
-//        // remove this edge and its twin from the available edges
-//        (void)this->edges.erase(edge);
-//        (void)this->edges.erase(edge->twin());
-//        
-//        // get next points
-//        this->process_edge_neighbors(edge, &polyline);
-//        
-//        // get previous points
-//        {
-//            ThickPolyline rpolyline;
-//            this->process_edge_neighbors(edge->twin(), &rpolyline);
-//            polyline.points.insert(polyline.points.begin(), rpolyline.points.rbegin(), rpolyline.points.rend());
-//            polyline.width.insert(polyline.width.begin(), rpolyline.width.rbegin(), rpolyline.width.rend());
-//            polyline.endpoints.first = rpolyline.endpoints.second;
-//        }
-//        
-//        assert(polyline.width.size() == polyline.points.size()*2 - 2);
-//        
-//        // prevent loop endpoints from being extended
-//        if (polyline.first_point() == polyline.last_point()) {
-//            polyline.endpoints.first = false;
-//            polyline.endpoints.second = false;
-//        }
-//        
-//        // append polyline to result
-//        polylines->push_back(polyline);
-//    }
-//
-//    #ifdef SLIC3R_DEBUG
-//    {
-//        static int iRun = 0;
-//        dump_voronoi_to_svg(this->lines, this->vd, polylines, debug_out_path("MedialAxis-%d.svg", iRun ++).c_str());
-//        printf("Thick lines: ");
-//        for (ThickPolylines::const_iterator it = polylines->begin(); it != polylines->end(); ++ it) {
-//            ThickLines lines = it->thicklines();
-//            for (ThickLines::const_iterator it2 = lines.begin(); it2 != lines.end(); ++ it2) {
-//                printf("%f,%f ", it2->a_width, it2->b_width);
-//            }
-//        }
-//        printf("\n");
-//    }
-//    #endif /* SLIC3R_DEBUG */
-//}
-//
-//void
-//MedialAxis::build(Polylines* polylines)
-//{
-//    ThickPolylines tp;
-//    this->build(&tp);
-//    polylines->insert(polylines->end(), tp.begin(), tp.end());
-//}
-//
-//void
-//MedialAxis::process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline)
-//{
-//    while (true) {
-//        // Since rot_next() works on the edge starting point but we want
-//        // to find neighbors on the ending point, we just swap edge with
-//        // its twin.
-//        const VD::edge_type* twin = edge->twin();
-//    
-//        // count neighbors for this edge
-//        std::vector<const VD::edge_type*> neighbors;
-//        for (const VD::edge_type* neighbor = twin->rot_next(); neighbor != twin;
-//            neighbor = neighbor->rot_next()) {
-//            if (this->valid_edges.count(neighbor) > 0) neighbors.push_back(neighbor);
-//        }
-//    
-//        // if we have a single neighbor then we can continue recursively
-//        if (neighbors.size() == 1) {
-//            const VD::edge_type* neighbor = neighbors.front();
-//            
-//            // break if this is a closed loop
-//            if (this->edges.count(neighbor) == 0) return;
-//            
-//            Point new_point(neighbor->vertex1()->x(), neighbor->vertex1()->y());
-//            polyline->points.push_back(new_point);
-//            polyline->width.push_back(this->thickness[neighbor].first);
-//            polyline->width.push_back(this->thickness[neighbor].second);
-//            (void)this->edges.erase(neighbor);
-//            (void)this->edges.erase(neighbor->twin());
-//            edge = neighbor;
-//        } else if (neighbors.size() == 0) {
-//            polyline->endpoints.second = true;
-//            return;
-//        } else {
-//            // T-shaped or star-shaped joint
-//            return;
-//        }
-//    }
-//}
-//
-//bool MedialAxis::validate_edge(const VD::edge_type* edge)
-//{
-//    // prevent overflows and detect almost-infinite edges
-//#ifndef CLIPPERLIB_INT32
-//    if (std::abs(edge->vertex0()->x()) > double(CLIPPER_MAX_COORD_UNSCALED) || 
-//        std::abs(edge->vertex0()->y()) > double(CLIPPER_MAX_COORD_UNSCALED) || 
-//        std::abs(edge->vertex1()->x()) > double(CLIPPER_MAX_COORD_UNSCALED) ||
-//        std::abs(edge->vertex1()->y()) > double(CLIPPER_MAX_COORD_UNSCALED))
-//        return false;
-//#endif // CLIPPERLIB_INT32
-//
-//    // construct the line representing this edge of the Voronoi diagram
-//    const Line line(
-//        Point( edge->vertex0()->x(), edge->vertex0()->y() ),
-//        Point( edge->vertex1()->x(), edge->vertex1()->y() )
-//    );
-//    
-//    // discard edge if it lies outside the supplied shape
-//    // this could maybe be optimized (checking inclusion of the endpoints
-//    // might give false positives as they might belong to the contour itself)
-//    if (this->m_expolygon != NULL) {
-//        if (line.a == line.b) {
-//            // in this case, contains(line) returns a false positive
-//            if (!this->m_expolygon->contains(line.a)) return false;
-//        } else {
-//            if (!this->m_expolygon->contains(line)) return false;
-//        }
-//    }
-//    
-//    // retrieve the original line segments which generated the edge we're checking
-//    const VD::cell_type* cell_l = edge->cell();
-//    const VD::cell_type* cell_r = edge->twin()->cell();
-//    const Line &segment_l = this->retrieve_segment(cell_l);
-//    const Line &segment_r = this->retrieve_segment(cell_r);
-//    
-//    /*
-//    SVG svg("edge.svg");
-//    svg.draw(*this->m_expolygon);
-//    svg.draw(line);
-//    svg.draw(segment_l, "red");
-//    svg.draw(segment_r, "blue");
-//    svg.Close();
-//    */
-//    
-//    /*  Calculate thickness of the cross-section at both the endpoints of this edge.
-//        Our Voronoi edge is part of a CCW sequence going around its Voronoi cell 
-//        located on the left side. (segment_l).
-//        This edge's twin goes around segment_r. Thus, segment_r is 
-//        oriented in the same direction as our main edge, and segment_l is oriented
-//        in the same direction as our twin edge.
-//        We used to only consider the (half-)distances to segment_r, and that works
-//        whenever segment_l and segment_r are almost specular and facing. However, 
-//        at curves they are staggered and they only face for a very little length
-//        (our very short edge represents such visibility).
-//        Both w0 and w1 can be calculated either towards cell_l or cell_r with equal
-//        results by Voronoi definition.
-//        When cell_l or cell_r don't refer to the segment but only to an endpoint, we
-//        calculate the distance to that endpoint instead.  */
-//    
-//    coordf_t w0 = cell_r->contains_segment()
-//        ? segment_r.distance_to(line.a)*2
-//        : (this->retrieve_endpoint(cell_r) - line.a).cast<double>().norm()*2;
-//    
-//    coordf_t w1 = cell_l->contains_segment()
-//        ? segment_l.distance_to(line.b)*2
-//        : (this->retrieve_endpoint(cell_l) - line.b).cast<double>().norm()*2;
-//    
-//    if (cell_l->contains_segment() && cell_r->contains_segment()) {
-//        // calculate the relative angle between the two boundary segments
-//        double angle = fabs(segment_r.orientation() - segment_l.orientation());
-//        if (angle > PI) angle = 2*PI - angle;
-//        assert(angle >= 0 && angle <= PI);
-//        
-//        // fabs(angle) ranges from 0 (collinear, same direction) to PI (collinear, opposite direction)
-//        // we're interested only in segments close to the second case (facing segments)
-//        // so we allow some tolerance.
-//        // this filter ensures that we're dealing with a narrow/oriented area (longer than thick)
-//        // we don't run it on edges not generated by two segments (thus generated by one segment
-//        // and the endpoint of another segment), since their orientation would not be meaningful
-//        if (PI - angle > PI/8) {
-//            // angle is not narrow enough
-//            
-//            // only apply this filter to segments that are not too short otherwise their 
-//            // angle could possibly be not meaningful
-//            if (w0 < SCALED_EPSILON || w1 < SCALED_EPSILON || line.length() >= this->m_min_width)
-//                return false;
-//        }
-//    } else {
-//        if (w0 < SCALED_EPSILON || w1 < SCALED_EPSILON)
-//            return false;
-//    }
-//    
-//    if (w0 < this->m_min_width && w1 < this->m_min_width)
-//        return false;
-//    
-//    if (w0 > this->m_max_width && w1 > this->m_max_width)
-//        return false;
-//    
-//    this->thickness[edge]         = std::make_pair(w0, w1);
-//    this->thickness[edge->twin()] = std::make_pair(w1, w0);
-//    
-//    return true;
-//}
-//
-//const Line& MedialAxis::retrieve_segment(const VD::cell_type* cell) const
-//{
-//    return this->lines[cell->source_index()];
-//}
-//
-//const Point& MedialAxis::retrieve_endpoint(const VD::cell_type* cell) const
-//{
-//    const Line& line = this->retrieve_segment(cell);
-//    if (cell->source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT) {
-//        return line.a;
-//    } else {
-//        return line.b;
-//    }
-//}
-
 
 //SUPERSLICER version
 
 
-void
-MedialAxis::build(Polylines& polylines)
-{
-    //TODO: special case for triangles
-    //  take the longest edge
-    //  take the opposite vertex and get the otho dist
-    //  move the longest edge by X% that dist (depends on angle? from 1/2 to 1/4? or always 1/3?) use move dist as width
-    //  clip it and then enlarge it into anchor
-    //  note: ensure that if anchor is over only one edge, it's not the one choosen.
-
-    //TODO: special case for quasi-rectangle
-    //  take longest (not-anchor if any) edge
-    //  get mid-dist for each adjascent edge
-    //  use these point to get the line, with the mid-dist as widths.
-    //  enlarge it into anchor
-
-    ThickPolylines tp;
-    this->build(tp);
-    polylines.insert(polylines.end(), tp.begin(), tp.end());
-}
+//void MedialAxis::build(Polylines& polylines)
+//{
+//    //TODO: special case for triangles
+//    //  take the longest edge
+//    //  take the opposite vertex and get the otho dist
+//    //  move the longest edge by X% that dist (depends on angle? from 1/2 to 1/4? or always 1/3?) use move dist as width
+//    //  clip it and then enlarge it into anchor
+//    //  note: ensure that if anchor is over only one edge, it's not the one choosen.
+//
+//    //TODO: special case for quasi-rectangle
+//    //  take longest (not-anchor if any) edge
+//    //  get mid-dist for each adjascent edge
+//    //  use these point to get the line, with the mid-dist as widths.
+//    //  enlarge it into anchor
+//
+//    ThickPolylines tps;
+//    this->build(tps);
+//    for(ThickPolyline &tp : tps)
+//        polylines.push_back(Polyline(tps.points));
+//}
 
 void
 MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylines* polylines)
@@ -745,23 +47,38 @@ MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylin
     VD vd;
     ExPolygons poly_temp;
     const ExPolygon* poly_to_use = &voronoi_polygon;
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    vd.construct_voronoi(lines.begin(), lines.end());
+    bool need_closing = false;
+
+    // For several ExPolygons in SPE-1729, an invalid Voronoi diagram was produced that wasn't fixable by rotating input data.
+    // Those ExPolygons contain very thin lines and holes formed by very close (1-5nm) vertices that are on the edge of our resolution.
+    // Those thin lines and holes are both unprintable and cause the Voronoi diagram to be invalid.
+    // So we filter out such thin lines and holes and try to compute the Voronoi diagram again.
+    if (!vd.is_valid()) {
+        lines = to_lines(closing_ex({*poly_to_use}, float(2. * SCALED_EPSILON)));
+        vd.construct_voronoi(lines.begin(), lines.end());
+        need_closing = true;
+
+        if (!vd.is_valid())
+            BOOST_LOG_TRIVIAL(error) << "MedialAxis - Invalid Voronoi diagram even after morphological closing.";
+    }
+
     //use a degraded mode, so it won't slow down too much #2664
      // first simplify from resolution, to see where we are
     if (vd.edges().size() > 20000) {
         poly_temp = poly_to_use->simplify(this->m_resolution / 2);
         if (poly_temp.size() == 1) poly_to_use = &poly_temp.front();
-        lines = poly_to_use->lines();
+        lines = need_closing ? to_lines(closing_ex({*poly_to_use}, float(2. * SCALED_EPSILON))) : poly_to_use->lines();;
         vd.clear();
-        construct_voronoi(lines.begin(), lines.end(), &vd);
+        vd.construct_voronoi(lines.begin(), lines.end());
     }
     // maybe a second one, and this time, use an adapted resolution
     if (vd.edges().size() > 20000) {
         poly_temp = poly_to_use->simplify(this->m_resolution * (vd.edges().size() / 40000.));
         if (poly_temp.size() == 1) poly_to_use = &poly_temp.front();
-        lines = poly_to_use->lines();
+        lines = need_closing ? to_lines(closing_ex({*poly_to_use}, float(2. * SCALED_EPSILON))) : poly_to_use->lines();;
         vd.clear();
-        construct_voronoi(lines.begin(), lines.end(), &vd);
+        vd.construct_voronoi(lines.begin(), lines.end());
     }
 
     typedef const VD::edge_type   edge_t;
@@ -853,7 +170,7 @@ MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylin
 
         // if loop, set endpoints to false
         // prevent loop endpoints from being extended
-        if (polyline.first_point().coincides_with(polyline.last_point())) {
+        if (polyline.front().coincides_with(polyline.back())) {
             polyline.endpoints.first = false;
             polyline.endpoints.second = false;
         }
@@ -881,11 +198,11 @@ MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylin
 void
 MedialAxis::process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline, std::set<const VD::edge_type*>& edges, std::set<const VD::edge_type*>& valid_edges, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness)
 {
-    while (true) {
+    for (;;) {
         // Since rot_next() works on the edge starting point but we want
         // to find neighbors on the ending point, we just swap edge with
         // its twin.
-        const VD::edge_type* twin = edge->twin();
+        const VD::edge_type *twin = edge->twin();
 
         // count neighbors for this edge
         std::vector<const VD::edge_type*> neighbors;
@@ -910,11 +227,11 @@ MedialAxis::process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* pol
             edge = neighbor;
         } else if (neighbors.size() == 0) {
             polyline->endpoints.second = true;
-            return;
         } else {
-            // T-shaped or star-shaped joint
-            return;
+            // T-shaped or star-shaped joint    
         }
+        // Stop chaining.
+        break;
     }
 }
 
@@ -995,14 +312,14 @@ MedialAxis::validate_edge(const VD::edge_type* edge, Lines& lines, const ExPolyg
         results by Voronoi definition.
         When cell_l or cell_r don't refer to the segment but only to an endpoint, we
         calculate the distance to that endpoint instead.  */
-
+    
     coordf_t w0 = cell_r->contains_segment()
-        ? line.a.distance_to(segment_r) * 2
-        : line.a.distance_to(this->retrieve_endpoint(cell_r, lines)) * 2;
+        ? segment_r.distance_to(line.a) * 2
+        : this->retrieve_endpoint(cell_r, lines).distance_to(line.a) * 2;
 
     coordf_t w1 = cell_l->contains_segment()
-        ? line.b.distance_to(segment_l) * 2
-        : line.b.distance_to(this->retrieve_endpoint(cell_l, lines)) * 2;
+        ? segment_l.distance_to(line.b) * 2
+        : this->retrieve_endpoint(cell_l, lines).distance_to(line.b) * 2;
 
     //don't remove the line that goes to the intersection of the contour
     // we use them to create nicer thin wall lines
@@ -1179,15 +496,17 @@ get_coeff_from_angle_countour(Point& point, const ExPolygon& contour, coord_t mi
         }
     }
     //compute angle
-    angle = point_nearest.ccw_angle(point_before, point_after);
-    if (angle >= PI) angle = 2 * PI - angle;  // smaller angle
+    assert(is_approx(abs_angle(angle_ccw(point_before - point_nearest, point_after - point_nearest)), ccw_angle_old_test(point_nearest, point_before, point_after), 0.000000001));
+    angle = angle_ccw(point_before - point_nearest, point_after - point_nearest);//point_nearest.ccw_angle(point_before, point_after);if (angle >= PI) angle = 2 * PI - angle;
+    assert(angle < PI);
     //compute the diff from 90°
     angle = abs(angle - PI / 2);
     if (point_near.coincides_with_epsilon(point_nearest) && std::max(nearest_dist, near_dist) + SCALED_EPSILON < point_nearest.distance_to(point_near)) {
         //not only nearest
         Point point_before = id_near == 0 ? contour.contour.points.back() : contour.contour.points[id_near - 1];
         Point point_after = id_near == contour.contour.points.size() - 1 ? contour.contour.points.front() : contour.contour.points[id_near + 1];
-        double angle2 = std::min(point_nearest.ccw_angle(point_before, point_after), point_nearest.ccw_angle(point_after, point_before));
+        double angle2 = std::min(abs_angle(angle_ccw(point_before - point_nearest, point_after - point_nearest)), abs_angle(angle_ccw( point_after - point_nearest, point_before - point_nearest)));
+        assert(angle2 >= 0);
         angle2 = abs(angle2 - PI / 2);
         angle = (angle + angle2) / 2;
     }
@@ -1236,8 +555,12 @@ MedialAxis::fusion_curve(ThickPolylines& pp)
             (Line(this->m_expolygon.contour.points[closest_point_idx], this->m_expolygon.contour.points[next_idx])))));
 
         //compute angle
-        double coeff_contour_angle = this->m_expolygon.contour.points[closest_point_idx].ccw_angle(this->m_expolygon.contour.points[prev_idx], this->m_expolygon.contour.points[next_idx]);
-        if (coeff_contour_angle >= PI) coeff_contour_angle = 2 * PI - coeff_contour_angle;  // smaller angle
+        double coeff_contour_angle;
+        {
+            Point &current      = this->m_expolygon.contour.points[closest_point_idx];
+            coeff_contour_angle = angle_ccw(this->m_expolygon.contour.points[prev_idx] - current,
+                                            this->m_expolygon.contour.points[next_idx] - current);
+        }
         //compute the diff from 90°
         coeff_contour_angle = abs(coeff_contour_angle - PI / 2);
 
@@ -1250,13 +573,13 @@ MedialAxis::fusion_curve(ThickPolylines& pp)
         for (size_t j = 0; j < pp.size(); ++j) {
             if (j == i) continue;
             ThickPolyline& other = pp[j];
-            if (polyline.first_point().coincides_with_epsilon(other.last_point())) {
+            if (polyline.front().coincides_with_epsilon(other.back())) {
                 other.reverse();
                 crosspoint.push_back(j);
                 double dot_temp = dot(Line(polyline.points[0], polyline.points[1]), (Line(other.points[0], other.points[1])));
                 min_dot = std::min(min_dot, abs(dot_temp));
                 sum_dot += dot_temp;
-            } else if (polyline.first_point().coincides_with_epsilon(other.first_point())) {
+            } else if (polyline.front().coincides_with_epsilon(other.front())) {
                 crosspoint.push_back(j);
                 double dot_temp = dot(Line(polyline.points[0], polyline.points[1]), (Line(other.points[0], other.points[1])));
                 min_dot = std::min(min_dot, abs(dot_temp));
@@ -1334,10 +657,10 @@ MedialAxis::remove_bits(ThickPolylines& pp)
         for (size_t j = 0; j < pp.size(); ++j) {
             if (j == i) continue;
             ThickPolyline& other = pp[j];
-            if (polyline.first_point().coincides_with_epsilon(other.last_point())) {
+            if (polyline.front().coincides_with_epsilon(other.back())) {
                 other.reverse();
                 crosspoint.push_back(j);
-            } else if (polyline.first_point().coincides_with_epsilon(other.first_point())) {
+            } else if (polyline.front().coincides_with_epsilon(other.front())) {
                 crosspoint.push_back(j);
             }
         }
@@ -1396,10 +719,10 @@ MedialAxis::fusion_corners(ThickPolylines& pp)
         for (size_t j = 0; j < pp.size(); ++j) {
             if (j == i) continue;
             ThickPolyline& other = pp[j];
-            if (polyline.first_point().coincides_with_epsilon(other.last_point())) {
+            if (polyline.front().coincides_with_epsilon(other.back())) {
                 other.reverse();
                 crosspoint.push_back(j);
-            } else if (polyline.first_point().coincides_with_epsilon(other.first_point())) {
+            } else if (polyline.front().coincides_with_epsilon(other.front())) {
                 crosspoint.push_back(j);
             }
         }
@@ -1407,10 +730,11 @@ MedialAxis::fusion_corners(ThickPolylines& pp)
         if (crosspoint.size() != 2) continue;
 
         // check if i am at the external side of a curve
-        double angle1 = polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[0]].points[1]);
-        if (angle1 >= PI) angle1 = 2 * PI - angle1;  // smaller angle
-        double angle2 = polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[1]].points[1]);
-        if (angle2 >= PI) angle2 = 2 * PI - angle2;  // smaller angle
+        assert(is_approx(abs_angle(angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[0]].points[1] - polyline.points[0])), ccw_angle_old_test(polyline.points[0], polyline.points[1], pp[crosspoint[0]].points[1]), 0.000000001));
+        double angle1 = angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[0]].points[1] - polyline.points[0]);//polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[0]].points[1]); if (angle1 >= PI) angle1 = 2 * PI - angle1;
+        assert(angle1 < PI);
+        double angle2 = angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[1]].points[1] - polyline.points[0]); // polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[1]].points[1]); if (angle2 >= PI) angle2 = 2 * PI - angle2;
+        assert(angle2 < PI);
         if (angle1 + angle2 < PI) continue;
 
         //check if is smaller or the other ones are not endpoits
@@ -1457,7 +781,7 @@ MedialAxis::fusion_corners(ThickPolylines& pp)
 void
 MedialAxis::extends_line_both_side(ThickPolylines& pp) {
     // opening : offset2-+
-    const ExPolygons anchors = opening_ex(diff_ex(*this->m_bounds, this->m_expolygon), double(this->m_resolution));
+    const ExPolygons anchors = opening_ex(diff_ex({*this->m_bounds}, {this->m_expolygon}), double(this->m_resolution));
     for (size_t i = 0; i < pp.size(); ++i) {
         ThickPolyline& polyline = pp[i];
         this->extends_line(polyline, anchors, this->m_min_width);
@@ -1472,6 +796,21 @@ MedialAxis::extends_line_both_side(ThickPolylines& pp) {
     }
 }
 
+bool has_boundary_point(const MultiPoint& contour, const Point &point)
+{
+    
+    double dist = (contour.point_projection(point).first - point).cast<double>().norm();
+    return dist < SCALED_EPSILON;
+}
+bool has_boundary_point(const ExPolygon& expoly, const Point &point)
+{
+    if (has_boundary_point(expoly.contour, point)) return true;
+    for (Polygons::const_iterator h = expoly.holes.begin(); h != expoly.holes.end(); ++h) {
+        if (has_boundary_point(*h,point)) return true;
+    }
+    return false;
+}
+
 void
 MedialAxis::extends_line(ThickPolyline& polyline, const ExPolygons& anchors, const coord_t join_width)
 {
@@ -1479,7 +818,7 @@ MedialAxis::extends_line(ThickPolyline& polyline, const ExPolygons& anchors, con
     // We assign new endpoints to temporary variables because in case of a single-line
     // polyline, after we extend the start point it will be caught by the intersection()
     // call, so we keep the inner point until we perform the second intersection() as well
-    if (polyline.endpoints.second && !this->m_bounds->has_boundary_point(polyline.points.back())) {
+    if (polyline.endpoints.second && !has_boundary_point(*this->m_bounds, polyline.points.back())) {
         size_t first_idx = polyline.points.size() - 2;
         Line line(*(polyline.points.begin() + first_idx), polyline.points.back());
         while (line.length() < double(this->m_resolution) && first_idx > 0) {
@@ -1491,7 +830,7 @@ MedialAxis::extends_line(ThickPolyline& polyline, const ExPolygons& anchors, con
 
         line.extend_end((double)this->m_max_width);
         Point new_back;
-        if (this->m_expolygon.contour.has_boundary_point(polyline.points.back())) {
+        if (has_boundary_point(this->m_expolygon.contour, polyline.points.back())) {
             new_back = polyline.points.back();
         } else {
             bool finded = this->m_expolygon.contour.first_intersection(line, &new_back);
@@ -1572,8 +911,8 @@ MedialAxis::extends_line(ThickPolyline& polyline, const ExPolygons& anchors, con
             Point p_maybe_inside = a.contour.centroid();
             coordf_t test_dist = new_bound.distance_to(p_maybe_inside) + new_back.distance_to(p_maybe_inside);
             //if (test_dist < m_max_width / 2 && (test_dist < shortest_dist || shortest_dist < 0)) {
-            double angle_test = new_back.ccw_angle(p_maybe_inside, line.a);
-            if (angle_test > PI) angle_test = 2 * PI - angle_test;
+            double angle_test = angle_ccw(p_maybe_inside - new_back, line.a - new_back); //new_back.ccw_angle(p_maybe_inside, line.a); if (angle_test > PI) angle_test = 2 * PI - angle_test;
+            assert(angle_test < PI);
             if (test_dist < (coordf_t)this->m_max_width && test_dist<shortest_dist && abs(angle_test) > PI / 2) {
                 shortest_dist = test_dist;
                 best_anchor = p_maybe_inside;
@@ -1651,13 +990,13 @@ MedialAxis::main_fusion(ThickPolylines& pp)
             // find another polyline starting here
             for (size_t j = i + 1; j < pp.size(); ++j) {
                 ThickPolyline& other = pp[j];
-                if (polyline.last_point().coincides_with_epsilon(other.last_point())) {
+                if (polyline.back().coincides_with_epsilon(other.back())) {
                     polyline.reverse();
                     other.reverse();
-                } else if (polyline.first_point().coincides_with_epsilon(other.last_point())) {
+                } else if (polyline.front().coincides_with_epsilon(other.back())) {
                     other.reverse();
-                } else if (polyline.first_point().coincides_with_epsilon(other.first_point())) {
-                } else if (polyline.last_point().coincides_with_epsilon(other.first_point())) {
+                } else if (polyline.front().coincides_with_epsilon(other.front())) {
+                } else if (polyline.back().coincides_with_epsilon(other.front())) {
                     polyline.reverse();
                 } else {
                     continue;
@@ -1702,7 +1041,8 @@ MedialAxis::main_fusion(ThickPolylines& pp)
 
                 //compute angle to see if it's better than previous ones (straighter = better).
                 //we need to add how strait we are from our main.
-                float test_dot = (float)(dot(polyline.lines().front(), other.lines().front()));
+                assert(polyline.size() > 1 && other.size() > 1);
+                float test_dot = (float)(dot(Line(polyline.front(),polyline.points[1]), Line(other.front(), other.points[1])));
 
                 // Get the branch/line in wich we may merge, if possible
                 // with that, we can decide what is important, and how we can merge that.
@@ -1717,7 +1057,7 @@ MedialAxis::main_fusion(ThickPolylines& pp)
                     //std::cout << "try to find main : " << k << " ? " << i << " " << j << " ";
                     if (k == i || k == j) continue;
                     ThickPolyline& main = pp[k];
-                    if (polyline.first_point().coincides_with_epsilon(main.last_point())) {
+                    if (polyline.front().coincides_with_epsilon(main.back())) {
                         main.reverse();
                         if (!main.endpoints.second)
                             find_main_branch = true;
@@ -1725,7 +1065,7 @@ MedialAxis::main_fusion(ThickPolylines& pp)
                             biggest_main_branch_id = k;
                             biggest_main_branch_length = (coord_t)main.length();
                         }
-                    } else if (polyline.first_point().coincides_with_epsilon(main.first_point())) {
+                    } else if (polyline.front().coincides_with_epsilon(main.front())) {
                         if (!main.endpoints.second)
                             find_main_branch = true;
                         else if (biggest_main_branch_length < main.length()) {
@@ -1906,7 +1246,7 @@ MedialAxis::main_fusion(ThickPolylines& pp)
                 }
                 //remove points that are outside of the geometry
                 for (size_t idx_point = 0; idx_point < polyline.points.size(); ++idx_point) {
-                    if (!this->m_bounds->contains_b(polyline.points[idx_point])) {
+                    if (!this->m_bounds->contains(polyline.points[idx_point])) {
                         polyline.points.erase(polyline.points.begin() + idx_point);
                         polyline.points_width.erase(polyline.points_width.begin() + idx_point);
                         --idx_point;
@@ -2071,6 +1411,15 @@ MedialAxis::remove_too_thick_extrusion(ThickPolylines& pp)
     if (changes) concatThickPolylines(pp);
 }
 
+Vector get_front_vector(const ThickPolyline &poly) {
+    assert(poly.size()>1);
+    return Line(poly.front(), poly.points[1]).vector();
+}
+Vector get_back_vector(const ThickPolyline &poly) {
+    assert(poly.size()>1);
+    return Line(poly.points[poly.size()-2], poly.back()).vector();
+}
+
 void
 MedialAxis::concatenate_small_polylines(ThickPolylines& pp)
 {
@@ -2108,23 +1457,22 @@ MedialAxis::concatenate_small_polylines(ThickPolylines& pp)
             if (other_length + polyline.length() <= shortest_size) continue; // need to be long enough to save it
             bool me_reverse = false;
             bool other_reverse = false;
-            if (polyline.last_point().coincides_with_epsilon(other.last_point())) {
+            if (polyline.back().coincides_with_epsilon(other.back())) {
                 other_reverse = true;
-            } else if (polyline.first_point().coincides_with_epsilon(other.last_point())) {
+            } else if (polyline.front().coincides_with_epsilon(other.back())) {
                 me_reverse = true;
                 other_reverse = true;
-            } else if (polyline.first_point().coincides_with_epsilon(other.first_point())) {
+            } else if (polyline.front().coincides_with_epsilon(other.front())) {
                 me_reverse = true;
-            } else if (!polyline.last_point().coincides_with_epsilon(other.first_point())) {
+            } else if (!polyline.back().coincides_with_epsilon(other.front())) {
                 continue;
             }
-
             //find the straitest
-            Vec2d v_poly(me_reverse ? polyline.lines().front().vector().x() : polyline.lines().back().vector().x(),
-                me_reverse ? polyline.lines().front().vector().y() : polyline.lines().back().vector().y());
+            Vec2d v_poly(me_reverse ? get_front_vector(polyline).x() : get_back_vector(polyline).x(),
+                me_reverse ? get_front_vector(polyline).y() : get_back_vector(polyline).y());
             v_poly *= (1 / std::sqrt(v_poly.x() * v_poly.x() + v_poly.y() * v_poly.y()));
-            Vec2d v_other(other_reverse ? other.lines().back().vector().x() : other.lines().front().vector().x(),
-                other_reverse ? other.lines().back().vector().y() : other.lines().front().vector().y());
+            Vec2d v_other(other_reverse ? get_back_vector(other).x() : get_front_vector(other).x(),
+                other_reverse ? get_back_vector(other).y() : get_front_vector(other).y());
             v_other *= (1 / std::sqrt(v_other.x() * v_other.x() + v_other.y() * v_other.y()));
             float other_dot = std::abs(float(v_poly.x() * v_other.x() + v_poly.y() * v_other.y()));
             // use the straitest one
@@ -2144,12 +1492,12 @@ MedialAxis::concatenate_small_polylines(ThickPolylines& pp)
             }
         }
         if (best_candidate != nullptr && best_candidate->points.size() > 1) {
-            if (polyline.last_point().coincides_with_epsilon(best_candidate->last_point())) {
+            if (polyline.back().coincides_with_epsilon(best_candidate->back())) {
                 best_candidate->reverse();
-            } else if (polyline.first_point().coincides_with_epsilon(best_candidate->last_point())) {
+            } else if (polyline.front().coincides_with_epsilon(best_candidate->back())) {
                 polyline.reverse();
                 best_candidate->reverse();
-            } else if (polyline.first_point().coincides_with_epsilon(best_candidate->first_point())) {
+            } else if (polyline.front().coincides_with_epsilon(best_candidate->front())) {
                 polyline.reverse();
             }
             //intersections may create over-extrusion because the included circle can be a bit larger. We have to make it short again if needed.
@@ -2160,7 +1508,7 @@ MedialAxis::concatenate_small_polylines(ThickPolylines& pp)
             }
             //be far enough
             int far_idx = 1;
-            while (far_idx < best_candidate->points.size() && polyline.last_point().coincides_with_epsilon(best_candidate->points[far_idx]))
+            while (far_idx < best_candidate->points.size() && polyline.back().coincides_with_epsilon(best_candidate->points[far_idx]))
                 far_idx++;
             polyline.points.insert(polyline.points.end(), best_candidate->points.begin() + far_idx, best_candidate->points.end());
             polyline.points_width.insert(polyline.points_width.end(), best_candidate->points_width.begin() + far_idx, best_candidate->points_width.end());
@@ -2203,22 +1551,22 @@ MedialAxis::concatenate_polylines_with_crossing(ThickPolylines& pp)
             if (other.endpoints.first && other.endpoints.second) continue;
             bool me_reverse = false;
             bool other_reverse = false;
-            if (polyline.last_point().coincides_with_epsilon(other.last_point())) {
+            if (polyline.back().coincides_with_epsilon(other.back())) {
                 other_reverse = true;
-            } else if (polyline.first_point().coincides_with_epsilon(other.last_point())) {
+            } else if (polyline.front().coincides_with_epsilon(other.back())) {
                 me_reverse = true;
                 other_reverse = true;
-            } else if (polyline.first_point().coincides_with_epsilon(other.first_point())) {
+            } else if (polyline.front().coincides_with_epsilon(other.front())) {
                 me_reverse = true;
-            } else if (!polyline.last_point().coincides_with_epsilon(other.first_point())) {
+            } else if (!polyline.back().coincides_with_epsilon(other.front())) {
                 continue;
             }
 
-            Vec2d v_poly(me_reverse ? polyline.lines().front().vector().x() : polyline.lines().back().vector().x(),
-                me_reverse ? polyline.lines().front().vector().y() : polyline.lines().back().vector().y());
+            Vec2d v_poly(me_reverse ? get_front_vector(polyline).x() : get_back_vector(polyline).x(),
+                me_reverse ? get_front_vector(polyline).y() : get_back_vector(polyline).y());
             v_poly *= (1 / std::sqrt(v_poly.x() * v_poly.x() + v_poly.y() * v_poly.y()));
-            Vec2d v_other(other_reverse ? other.lines().back().vector().x() : other.lines().front().vector().x(),
-                other_reverse ? other.lines().back().vector().y() : other.lines().front().vector().y());
+            Vec2d v_other(other_reverse ? get_back_vector(other).x() : get_front_vector(other).x(),
+                other_reverse ? get_back_vector(other).y() : get_front_vector(other).y());
             v_other *= (1 / std::sqrt(v_other.x() * v_other.x() + v_other.y() * v_other.y()));
             float other_dot = std::abs(float(v_poly.x() * v_other.x() + v_poly.y() * v_other.y()));
             if (other_dot > best_dot) {
@@ -2228,12 +1576,12 @@ MedialAxis::concatenate_polylines_with_crossing(ThickPolylines& pp)
             }
         }
         if (best_candidate != nullptr && best_candidate->points.size() > 1) {
-            if (polyline.last_point().coincides_with_epsilon(best_candidate->last_point())) {
+            if (polyline.back().coincides_with_epsilon(best_candidate->back())) {
                 best_candidate->reverse();
-            } else if (polyline.first_point().coincides_with_epsilon(best_candidate->last_point())) {
+            } else if (polyline.front().coincides_with_epsilon(best_candidate->back())) {
                 polyline.reverse();
                 best_candidate->reverse();
-            } else if (polyline.first_point().coincides_with_epsilon(best_candidate->first_point())) {
+            } else if (polyline.front().coincides_with_epsilon(best_candidate->front())) {
                 polyline.reverse();
             }
             //intersections may create over-extrusion because the included circle can be a bit larger. We have to make it short again if needed.
@@ -2244,7 +1592,7 @@ MedialAxis::concatenate_polylines_with_crossing(ThickPolylines& pp)
             }
             //be far enough
             int far_idx = 1;
-            while (far_idx < best_candidate->points.size() && polyline.last_point().coincides_with_epsilon(best_candidate->points[far_idx]))
+            while (far_idx < best_candidate->points.size() && polyline.back().coincides_with_epsilon(best_candidate->points[far_idx]))
                 far_idx++;
             polyline.points.insert(polyline.points.end(), best_candidate->points.begin() + far_idx, best_candidate->points.end());
             polyline.points_width.insert(polyline.points_width.end(), best_candidate->points_width.begin() + far_idx, best_candidate->points_width.end());
@@ -2386,19 +1734,19 @@ MedialAxis::remove_too_short_polylines(ThickPolylines& pp)
     //    }
     //    if (endpoint_not_used[idx_endpoint]) {
     //        int nb_endpoints;
-    //        Point pt = idx_endpoint % 2 == 0 ? polyline.first_point() : polyline.last_point();
-    //        if (idx_endpoint % 2 == 0 && pt.coincides_with_epsilon(polyline.last_point())) {
+    //        Point pt = idx_endpoint % 2 == 0 ? polyline.front() : polyline.back();
+    //        if (idx_endpoint % 2 == 0 && pt.coincides_with_epsilon(polyline.back())) {
     //            nb_endpoints++;
     //            endpoint_not_used[(idx_endpoint / 2) + 1] = false;
     //        }
     //        //good, now find other points
     //        for (size_t idx_other_pp = (idx_endpoint / 2) + 1; idx_other_pp < pp.size(); idx_other_pp++) {
     //            ThickPolyline& other = pp[idx_other_pp];
-    //            if (pt.coincides_with_epsilon(other.first_point())) {
+    //            if (pt.coincides_with_epsilon(other.front())) {
     //                nb_endpoints++;
     //                endpoint_not_used[idx_other_pp * 2] = false;
     //            }
-    //            if (pt.coincides_with_epsilon(other.last_point())) {
+    //            if (pt.coincides_with_epsilon(other.back())) {
     //                nb_endpoints++;
     //                endpoint_not_used[idx_other_pp * 2 + 1] = false;
     //            }
@@ -2410,7 +1758,7 @@ MedialAxis::remove_too_short_polylines(ThickPolylines& pp)
     //        std::cout << "reduce " << reduction << " points!\n";
     //        if (idx_endpoint % 2 == 0 ) {
     //            polyline.points_width.front() *= reduction;
-    //            if(pt.coincides_with_epsilon(polyline.last_point()))
+    //            if(pt.coincides_with_epsilon(polyline.back()))
     //                polyline.points_width.back() *= reduction;
     //        } else {
     //            polyline.points_width.back() *= reduction;
@@ -2418,10 +1766,10 @@ MedialAxis::remove_too_short_polylines(ThickPolylines& pp)
     //        //good, now find other points
     //        for (size_t idx_other_pp = (idx_endpoint / 2) + 1; idx_other_pp < pp.size(); idx_other_pp++) {
     //            ThickPolyline& other = pp[idx_other_pp];
-    //            if (pt.coincides_with_epsilon(other.first_point())) {
+    //            if (pt.coincides_with_epsilon(other.front())) {
     //                other.points_width.front() *= reduction;
     //            }
-    //            if (pt.coincides_with_epsilon(other.last_point())) {
+    //            if (pt.coincides_with_epsilon(other.back())) {
     //                other.points_width.back() *= reduction;
     //            }
     //        }
@@ -2484,7 +1832,7 @@ MedialAxis::remove_too_short_polylines(ThickPolylines& pp)
                 changes = true;
             }
             //delete null-length polylines
-            if (tp.length() < SCALED_EPSILON && tp.first_point().coincides_with_epsilon(tp.last_point())) {
+            if (tp.length() < SCALED_EPSILON && tp.front().coincides_with_epsilon(tp.back())) {
                 pp.erase(pp.begin() + polyidx);
                 --polyidx;
                 changes = true;
@@ -2562,7 +1910,7 @@ MedialAxis::simplify_polygon_frontier()
         for (size_t i = 0; i < this->m_expolygon.contour.points.size(); i++) {
             Point& p_check = this->m_expolygon.contour.points[i];
             //if (!find) {
-            if (!this->m_bounds->has_boundary_point(p_check)) {
+            if (!has_boundary_point(*this->m_bounds, p_check)) {
                 //check if we put it at a bound point instead of delete it
                 size_t prev_i = i == 0 ? this->m_expolygon.contour.points.size() - 1 : (i - 1);
                 size_t next_i = i == this->m_expolygon.contour.points.size() - 1 ? 0 : (i + 1);
@@ -2579,7 +1927,7 @@ MedialAxis::simplify_polygon_frontier()
             }
         }
         if (need_intersect) {
-            ExPolygons simplified_polygons = intersection_ex(this->m_expolygon, *this->m_bounds);
+            ExPolygons simplified_polygons = intersection_ex({this->m_expolygon}, {*this->m_bounds});
             if (simplified_polygons.size() == 1) {
                 this->m_expolygon = simplified_polygons[0];
             } else {
@@ -2795,7 +2143,7 @@ MedialAxis::build(ThickPolylines& polylines_out)
         }
         // voronoi bugfix: when we have a wheel, it creates a polyline at the center, completly out of the polygon. #651
         // note: can't reproduce in the new verison. This may have been fixed by another way.
-        //if (tp.endpoints.first && tp.endpoints.second && !this->m_expolygon.contains(tp.first_point()) && !this->m_expolygon.contains(tp.last_point()) && pp.size() > 1) {
+        //if (tp.endpoints.first && tp.endpoints.second && !this->m_expolygon.contains(tp.front()) && !this->m_expolygon.contains(tp.back()) && pp.size() > 1) {
         //    //delete this out-of-bounds polyline
         //    pp.erase(pp.begin() + tp_idx);
         //    --tp_idx;
@@ -2814,7 +2162,7 @@ MedialAxis::build(ThickPolylines& polylines_out)
             tp.points_width.erase(tp.points_width.end() - 2);
         }
         //delete null-length polylines
-        if (tp.length() < SCALED_EPSILON && tp.first_point().coincides_with_epsilon(tp.last_point())) {
+        if (tp.length() < SCALED_EPSILON && tp.front().coincides_with_epsilon(tp.back())) {
             pp.erase(pp.begin() + tp_idx);
             --tp_idx;
         }
@@ -3008,7 +2356,7 @@ MedialAxis::build(ThickPolylines& polylines_out)
     //    svg.Close();
     //}
     if (m_nozzle_diameter != this->m_min_width) {
-        grow_to_nozzle_diameter(pp, diff_ex(*this->m_bounds, this->m_expolygon));
+        grow_to_nozzle_diameter(pp, diff_ex({*this->m_bounds}, {this->m_expolygon}));
     }
     if (this->m_taper_size != 0) {
         taper_ends(pp);
@@ -3058,6 +2406,11 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
     for (int i = 0; i < (int)lines.size(); ++i) {
         ThickLine& line = lines[i];
 
+        for (int j = 0; j < i; j++) {
+            assert(lines[j].a_width == lines[j].b_width);
+            assert(!lines[j].a.coincides_with_epsilon(lines[j].b));
+        }
+
         const coordf_t line_len = line.length();
         const coordf_t prev_line_len = saved_line_len;
         saved_line_len = line_len;
@@ -3079,49 +2432,70 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                         width.push_back(line.a_width * (1 - percent_width) + line.b_width * percent_width);
                     }
                     pp.push_back(line.b);
-
+                    
+                    assert(pp[0] == line.a);
+                    assert(width.front() == line.a_width);
+                    assert(width.back() == line.b_width);
                     assert(pp.size() == segments + 1);
                     assert(width.size() == segments);
                 }
 
-                // delete this line and insert new ones
-                lines.erase(lines.begin() + i);
-                for (size_t j = 0; j < segments; ++j) {
-                    ThickLine new_line(pp[j], pp[j + 1]);
-                    new_line.a_width = width[j];
-                    new_line.b_width = width[j];
-                    lines.insert(lines.begin() + i + j, new_line);
+                // overwrite this line and insert new ones
+                line.b = pp[1];
+                line.b_width = width[0];
+                // from here, 'line' variable is invalid (vector is modified);
+                for (size_t j = 1; j < segments; ++j) {
+                    lines.emplace(lines.begin() + i + j, pp[j], pp[j + 1], width[j], width[j]);
                 }
-
-                // go back to the start of this loop iteration
-                --i;
+                
+                for (int j = i; j < i + segments; j++) {
+                    assert(lines[j].a_width == lines[j].b_width);
+                    assert(!lines[j].a.coincides_with_epsilon(lines[j].b));
+                }
+                // go after the split
+                i += segments - 1;
                 continue;
             } else if (thickness_delta > 0) {
                 //create a middle point
-                ThickLine new_line(line.a.interpolate(0.5, line.b), line.b);
-                new_line.a_width = line.b_width;
-                new_line.b_width = line.b_width;
-                line.b = new_line.a;
+                Point mid_point = line.a.interpolate(0.5, line.b);
+                Point next_point = line.b;
+                coordf_t next_width = line.b_width;
+                line.b = mid_point;
                 line.b_width = line.a_width;
-                lines.insert(lines.begin() + i + 1, new_line);
-
-                // go back to the start of this loop iteration
-                --i;
+                assert(!line.a.coincides_with_epsilon(line.b));
+                assert(!mid_point.coincides_with_epsilon(next_point));
+                lines.emplace(lines.begin() + i + 1, mid_point, next_point, next_width, next_width);
+                // from here, 'line' variable is invalid (vector is modified);
+                
+                assert(lines[i].a_width == lines[i].b_width);
+                assert(lines[i+1].a_width == lines[i+1].b_width);
+                // go after the next point
+                ++i;
                 continue;
+            } else {
+                assert(line.a_width == line.b_width);
             }
         } else if (i > 0 && resolution_internal > line_len + prev_line_len) {
             assert(prev_line_len > 0 && line_len > 0);
             //merge lines?
             //if it's a loop, merge only if the distance is high enough
-            if (polyline.first_point() == polyline.last_point() && polyline.length() < (line_len + prev_line_len) * 6)
+            if (polyline.front() == polyline.back() && polyline.length() < (line_len + prev_line_len) * 6) {
+                //set width as a middle-ground
+                line.a_width = (line.a_width + line.b_width) / 2;
+                line.b_width = line.a_width;
                 continue;
+            }
             ThickLine& prev_line = lines[i - 1];
             const coordf_t sum_length = prev_line_len + line_len;
             const coordf_t new_length = prev_line.a.distance_to(line.b);
             assert(sum_length - new_length > -0.0000000001);
             // only merge if the distance is almost the sum (90° = 0.707)
-            if(new_length < std::max(sum_length * 0.9,  std::max(prev_line_len + line_len/2 , prev_line_len /2 + line_len)))
+            if (new_length < std::max(sum_length * 0.9, std::max(prev_line_len + line_len / 2, prev_line_len / 2 + line_len))) {
+                //set width as a middle-ground
+                line.a_width = (line.a_width + line.b_width) / 2;
+                line.b_width = line.a_width;
                 continue;
+            }
             assert(new_length > prev_line_len && new_length > line_len);
             coordf_t width = prev_line_len * (prev_line.a_width + prev_line.b_width) / 2;
             width += line_len * (line.a_width + line.b_width) / 2;
@@ -3138,8 +2512,15 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             //set width as a middle-ground
             line.a_width = (line.a_width + line.b_width) / 2;
             line.b_width = line.a_width;
+        } else {
+            assert(line.a_width == line.b_width);
         }
     }
+    for (const ThickLine& line : lines) {
+        assert(line.a_width == line.b_width);
+        assert(!line.a.coincides_with_epsilon(line.b));
+    }
+
     for (int i = 0; i < (int)lines.size(); ++i) {
         ThickLine& line = lines[i];
 
@@ -3151,8 +2532,8 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
         assert(line.a_width == line.b_width);
         double wanted_width = unscaled(line.a_width);
         //if gapfill or arachne, the width is in fact the spacing.
-        if (role != erThinWall) {
-            if (role == erOverhangPerimeter && flow.bridge()) {
+        if (role != ExtrusionRole::ThinWall) {
+            if (role == ExtrusionRole::OverhangPerimeter && flow.bridge()) {
                 // for Arachne overhangs: keep the bridge width.
                 wanted_width = flow.width();
             } else {
@@ -3178,14 +2559,12 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                     current_flow = current_flow.with_width((float) wanted_width);
                 }
             }
-            path.polyline.append(line.a);
-            path.polyline.append(line.b);
             assert(!std::isnan(current_flow.mm3_per_mm()));
             assert(!std::isnan(current_flow.width()));
             assert(!std::isnan(current_flow.height()));
-            path.mm3_per_mm = current_flow.mm3_per_mm();
-            path.width = current_flow.width();
-            path.height = current_flow.height();
+			path = { ExtrusionAttributes{ role, current_flow }, false };
+            path.polyline.append(line.a);
+            path.polyline.append(line.b);
         } else {
             coord_t thickness_delta = scale_t(fabs(current_flow.width() - wanted_width));
             if (thickness_delta <= tolerance / 2) {
@@ -3193,9 +2572,11 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                 // within the accepted tolerance
                 path.polyline.append(line.b);
             } else {
+                assert(path.polyline.is_valid());
+                for (size_t idx = 1; idx < path.size(); ++idx)
+                    assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
                 // we need to initialize a new line
                 paths.push_back(path);
-                path = ExtrusionPath(role, false);
                 if (wanted_width != current_flow.width()) {
                     if (current_flow.bridge()) {
                         current_flow = Flow::bridging_flow(current_flow.height(), (float) wanted_width);
@@ -3203,26 +2584,28 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                         current_flow = current_flow.with_width((float) wanted_width);
                     }
                 }
-                path.polyline.append(line.a);
-                path.polyline.append(line.b);
                 assert(!std::isnan(current_flow.mm3_per_mm()));
                 assert(!std::isnan(current_flow.width()));
                 assert(!std::isnan(current_flow.height()));
-                path.mm3_per_mm = current_flow.mm3_per_mm();
-                path.width = current_flow.width();
-                path.height = current_flow.height();
+				path = { ExtrusionAttributes{ role, current_flow }, false };
+                path.polyline.append(line.a);
+                path.polyline.append(line.b);
             }
         }
         assert(path.polyline.size() > 2 || path.first_point() != path.last_point());
     }
-    if (path.polyline.is_valid())
+    if (path.polyline.is_valid()) {
+        for (size_t idx = 1; idx < path.size(); ++idx)
+            assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
         paths.push_back(path);
+    }
 
     return paths;
 }
 
 ExtrusionEntitiesPtr
-    thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, bool can_reverse)
+    thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, 
+    const coord_t resolution_internal, bool can_reverse)
 {
     assert(resolution_internal > SCALED_EPSILON);
 
@@ -3232,6 +2615,10 @@ ExtrusionEntitiesPtr
     const coord_t tolerance = flow.scaled_width() / 20;//scale_(0.05);
     ExtrusionEntitiesPtr coll;
     for (const ThickPolyline& p : polylines) {
+#if _DEBUG
+        for (size_t idx_pt = 1; idx_pt < p.size(); ++idx_pt)
+            assert(!p.points[idx_pt - 1].coincides_with_epsilon(p.points[idx_pt]));
+#endif
         ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance, can_reverse);
         // Append paths to collection.
         if (!multi_paths.empty()) {
@@ -3240,18 +2627,21 @@ ExtrusionEntitiesPtr
                 assert(it->polyline.size() >= 2);
                 assert(std::prev(it)->polyline.back() == it->polyline.front());
             }
+            for (auto it = multi_paths.paths.begin(); it != multi_paths.paths.end(); ++it) 
+                for (size_t idx_pt = 1; idx_pt < it->size(); ++idx_pt)
+                    assert(!it->polyline.get_point(idx_pt - 1).coincides_with_epsilon(it->polyline.get_point(idx_pt)));
 #endif
             if (multi_paths.paths.front().first_point().coincides_with_epsilon(multi_paths.paths.back().last_point())) {
                 coll.push_back(new ExtrusionLoop(std::move(multi_paths.paths)));
             } else {
-                if (role == erThinWall) {
+                if (role == ExtrusionRole::ThinWall) {
                     //thin walls : avoid to cut them, please.
                     //also, keep the start, as the start should be already in a frontier where possible.
                     ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(multi_paths.paths));
                     unsortable_coll->set_can_sort_reverse(false, false);
                     //TODO un-reversable multipath ?
                     coll.push_back(unsortable_coll);
-                } else if (role == erGapFill) {
+                } else if (role == ExtrusionRole::GapFill) {
                     if (multi_paths.size() == 1) {
                         coll.push_back(multi_paths.paths.front().clone_move());
                     } else {

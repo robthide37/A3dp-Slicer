@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2016 - 2021 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2014 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Maksim Derbasov @ntfshard
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "BridgeDetector.hpp"
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
@@ -529,7 +535,7 @@ void get_lines(const ExPolygon& expoly, std::vector<Line> &lines, coord_t spacin
 {
 
     // get all points of this ExPolygon
-    Points pp = expoly;
+    Points pp = to_points(expoly);
 
     if (pp.empty()) return;
 
@@ -582,7 +588,7 @@ Polygons BridgeDetector::coverage(double angle) const
             // are inside the anchors and not on their contours leading to false negatives.
             ExPolygons unsupported_bigger = offset_ex(unsupported, 0.5f * float(this->spacing));
             assert(unsupported_bigger.size() == 1); // growing don't split
-            ExPolygons small_anchors = intersection_ex(unsupported_bigger.front(), anchors);
+            ExPolygons small_anchors = intersection_ex({unsupported_bigger.front()}, anchors);
             unsupported_bigger       = small_anchors;
             unsupported_bigger.push_back(unsupported);
             unsupported_bigger = union_safety_offset_ex(unsupported_bigger);

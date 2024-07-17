@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Enrico Turri @enricoturri1966
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "MultiPoint.hpp"
 #include "BoundingBox.hpp"
 
@@ -18,7 +23,7 @@ void MultiPoint::scale(double factor_x, double factor_y)
     }
 }
 
-void MultiPoint::translate(const Point &v)
+void MultiPoint::translate(const Vector &v)
 {
     for (Point &pt : points)
         pt += v;
@@ -45,16 +50,6 @@ void MultiPoint::rotate(double angle, const Point &center)
     }
 }
 
-double MultiPoint::length() const
-{
-    const Lines& lines = this->lines();
-    double len = 0;
-    for (auto it = lines.cbegin(); it != lines.cend(); ++it) {
-        len += it->length();
-    }
-    return len;
-}
-
 int MultiPoint::find_point(const Point &point) const
 {
     for (const Point &pt : this->points)
@@ -79,12 +74,6 @@ int MultiPoint::find_point(const Point &point, coordf_t scaled_epsilon) const
         }
     }
     return dist2_min < eps2 ? idx_min : -1;
-}
-
-bool MultiPoint::has_boundary_point(const Point &point) const
-{
-    double dist = (point.projection_onto(*this) - point).cast<double>().norm();
-    return dist < SCALED_EPSILON;
 }
 
 BoundingBox MultiPoint::bounding_box() const
@@ -119,73 +108,8 @@ bool MultiPoint::remove_duplicate_points()
     return false;
 }
 
-bool MultiPoint::intersection(const Line& line, Point* intersection) const
-{
-    Lines lines = this->lines();
-    for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++it) {
-        if (it->intersection(line, intersection)) return true;
-    }
-    return false;
-}
-
-bool MultiPoint::first_intersection(const Line& line, Point* intersection) const
-{
-    bool   found = false;
-    double dmin  = 0.;
-    Line l;
-    //for (const Line &l : this->lines()) {
-    for (size_t idx = 1; idx < points.size(); ++idx) {
-        l.a = points[idx-1];
-        l.b = points[idx];
-        Point ip;
-        if (l.intersection(line, &ip)) {
-            if (! found) {
-                found = true;
-                dmin = (line.a - ip).cast<double>().norm();
-                *intersection = ip;
-            } else {
-                double d = (line.a - ip).cast<double>().norm();
-                if (d < dmin) {
-                    dmin = d;
-                    *intersection = ip;
-                }
-            }
-        }
-    }
-    /*last-to-first line */{
-        assert(!points.back().coincides_with_epsilon(points.front()));
-        l.a = points.back();
-        l.b = points.front();
-        Point ip;
-        if (l.intersection(line, &ip)) {
-            if (!found) {
-                found         = true;
-                dmin          = (line.a - ip).cast<double>().norm();
-                *intersection = ip;
-            } else {
-                double d = (line.a - ip).cast<double>().norm();
-                if (d < dmin) {
-                    dmin          = d;
-                    *intersection = ip;
-                }
-            }
-        }
-    }
-    return found;
-}
-
-bool MultiPoint::intersections(const Line &line, Points *intersections) const
-{
-    size_t intersections_size = intersections->size();
-    for (const Line &polygon_line : this->lines()) {
-        Point intersection;
-        if (polygon_line.intersection(line, &intersection))
-            intersections->emplace_back(std::move(intersection));
-    }
-    return intersections->size() > intersections_size;
-}
-
 // Projection of a point onto the polygon.
+//FIXME: delete this, it's moved somewhere.
 std::pair<Point, size_t> MultiPoint::point_projection(const Point &point) const {
     size_t pt_idx = size_t(-1);
     Point proj = point;
@@ -226,74 +150,6 @@ std::pair<Point, size_t> MultiPoint::point_projection(const Point &point) const 
     return {proj, pt_idx};
 }
 
-std::vector<Point> MultiPoint::_douglas_peucker(const std::vector<Point>& pts, const double tolerance)
-{
-    std::vector<Point> result_pts;
-	double tolerance_sq = tolerance * tolerance;
-    if (! pts.empty()) {
-        const Point  *anchor      = &pts.front();
-        size_t        anchor_idx  = 0;
-        const Point  *floater     = &pts.back();
-        size_t        floater_idx = pts.size() - 1;
-        result_pts.reserve(pts.size());
-        result_pts.emplace_back(*anchor);
-        if (anchor_idx != floater_idx) {
-            assert(pts.size() > 1);
-            std::vector<size_t> dpStack;
-            dpStack.reserve(pts.size());
-            dpStack.emplace_back(floater_idx);
-            for (;;) {
-                double max_dist_sq  = 0.0;
-                size_t furthest_idx = anchor_idx;
-                // find point furthest from line seg created by (anchor, floater) and note it
-                for (size_t i = anchor_idx + 1; i < floater_idx; ++ i) {
-                    double dist_sq = Line::distance_to_squared(pts[i], *anchor, *floater);
-                    if (dist_sq > max_dist_sq) {
-                        max_dist_sq  = dist_sq;
-                        furthest_idx = i;
-                    }
-                }
-                // remove point if less than tolerance
-                if (max_dist_sq <= tolerance_sq) {
-                    result_pts.emplace_back(*floater);
-                    anchor_idx = floater_idx;
-                    anchor     = floater;
-                    assert(dpStack.back() == floater_idx);
-                    dpStack.pop_back();
-                    if (dpStack.empty())
-                        break;
-                    floater_idx = dpStack.back();
-                } else {
-                    floater_idx = furthest_idx;
-                    dpStack.emplace_back(floater_idx);
-                }
-                floater = &pts[floater_idx];
-            }
-        }
-        assert(result_pts.front() == pts.front());
-        assert(result_pts.back()  == pts.back());
-
-#if 0
-        {
-            static int iRun = 0;
-			BoundingBox bbox(pts);
-			BoundingBox bbox2(result_pts);
-			bbox.merge(bbox2);
-            SVG svg(debug_out_path("douglas_peucker_%d.svg", iRun ++).c_str(), bbox);
-            if (pts.front() == pts.back())
-                svg.draw(Polygon(pts), "black");
-            else
-                svg.draw(Polyline(pts), "black");
-            if (result_pts.front() == result_pts.back())
-                svg.draw(Polygon(result_pts), "green", scale_(0.1));
-            else
-                svg.draw(Polyline(result_pts), "green", scale_(0.1));
-        }
-#endif
-    }
-    return result_pts;
-}
-
 /// <summary>
 /// douglas_peucker will keep only points that are more than 'tolerance' out of the current polygon.
 /// But when we want to ensure we don't have a segment less than min_length, it's not very usable.
@@ -306,9 +162,9 @@ std::vector<Point> MultiPoint::_douglas_peucker(const std::vector<Point>& pts, c
 /// <param name="tolerance"></param>
 /// <param name="min_length"></param>
 /// <returns></returns>
-std::vector<Point> MultiPoint::_douglas_peucker_plus(const std::vector<Point>& pts, const double tolerance, const double min_length)
+Points MultiPoint::douglas_peucker_plus(const Points& pts, const double tolerance, const double min_length)
 {
-    std::vector<Point> result_pts;
+    Points result_pts;
     std::vector<size_t> result_idx;
     const double tolerance_sq = tolerance * tolerance;
     if (!pts.empty()) {
@@ -479,7 +335,7 @@ struct vis_node{
     // other node if it's area is less than the other node's area
     bool operator<(const vis_node& other) { return (this->area < other.area); }
 };
-Points MultiPoint::visivalingam(const Points& pts, const double& tolerance)
+Points MultiPoint::visivalingam(const Points &pts, const double tolerance)
 {
     // Make sure there's enough points in "pts" to bother with simplification.
     assert(pts.size() >= 2);
@@ -588,14 +444,6 @@ void MultiPoint3::translate(double x, double y)
 void MultiPoint3::translate(const Point& vector)
 {
     this->translate(vector(0), vector(1));
-}
-
-double MultiPoint3::length() const
-{
-    double len = 0.0;
-    for (const Line3& line : this->lines())
-        len += line.length();
-    return len;
 }
 
 BoundingBox3 MultiPoint3::bounding_box() const

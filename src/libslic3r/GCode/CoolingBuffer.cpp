@@ -1,5 +1,16 @@
+///|/ Copyright (c) Prusa Research 2017 - 2023 Lukáš Matěna @lukasmatena, Pavel Mikuš @Godrak, Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2016 Alessandro Ranellucci @alranel
+///|/
+///|/ ported from lib/Slic3r/GCode/CoolingBuffer.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2017 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2016 Chow Loong Jin @hyperair
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "../GCode.hpp"
 #include "CoolingBuffer.hpp"
+#include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/log/trivial.hpp>
@@ -15,9 +26,11 @@
 
 #include <assert.h>
 
+#include <fast_float/fast_float.h>
+
 namespace Slic3r {
 
-CoolingBuffer::CoolingBuffer(GCode &gcodegen) : m_config(gcodegen.config()), m_current_extruder(0)
+CoolingBuffer::CoolingBuffer(GCodeGenerator &gcodegen) : m_config(gcodegen.config()), m_current_extruder(0)
 {
     this->reset(gcodegen.writer().get_position());
 
@@ -31,14 +44,16 @@ CoolingBuffer::CoolingBuffer(GCode &gcodegen) : m_config(gcodegen.config()), m_c
 
 void CoolingBuffer::reset(const Vec3d &position)
 {
-    m_current_pos.assign(7, 0.f);
-    m_current_pos[0] = float(position.x());
-    m_current_pos[1] = float(position.y());
-    m_current_pos[2] = float(position.z());
-    // 3 : e
-    m_current_pos[4] = float(m_config.travel_speed.value);
+    assert(m_current_pos.size() == 7);
+    m_current_pos[AxisIdx::X] = float(position.x());
+    m_current_pos[AxisIdx::Y] = float(position.y());
+    m_current_pos[AxisIdx::Z] = float(position.z());
+    m_current_pos[AxisIdx::E] = 0.f;
+    m_current_pos[AxisIdx::F] = float(m_config.travel_speed.value);
     // 5 : i (G2/G3)
     // 6 : j (G2/G3)
+    m_current_pos[AxisIdx::I] = 0.f;
+    m_current_pos[AxisIdx::J] = 0.f;
     m_fan_speed = -1;
 }
 
@@ -46,7 +61,7 @@ struct CoolingLine
 {
     enum Type : uint32_t {
         TYPE_NONE               = 0,
-        //first 5 bits are for the extrusiontype (not a flag)
+        //first 5 bits are for the gcodeextrusiontype (not a flag)
 
         TYPE_SET_TOOL           = 1 << 7,
         TYPE_EXTRUDE_START      = 1 << 8,
@@ -64,15 +79,25 @@ struct CoolingLine
         TYPE_G92                = 1 << 17,
         TYPE_STORE_FOR_WT       = 1 << 18,
         TYPE_RESTORE_AFTER_WT   = 1 << 19,
-        //BBS: add G2 G3 type
-        TYPE_G2                 = 1 << 20,
-        TYPE_G3                 = 1 << 21,
+        // G2 or G3: Arc interpolation
+        TYPE_G2G3              = 1 << 20,
+        //TYPE_G2                 = 1 << 20, == TYPE_G2G3_CW
+        //TYPE_G3                 = 1 << 21, == TYPE_G2G3_CCW
+        TYPE_G2_CW              = 1 << 20, //TODO: review it with prusa code: seems like G2 & G2 can be of 2 different types: XYR or XYIJ
+        // Arc interpolation, counter-clockwise.
+        TYPE_G3_CCW           = 1 << 21,
+        // Arc interpolation, arc defined by IJ (offset of arc center from its start position).
+        TYPE_G2G3_IJ            = 1 << 23,
+        // Arc interpolation, arc defined by R (arc radius, positive - smaller, negative - larger).
+        TYPE_G2G3_R             = 1 << 24,
         // Would be TYPE_ADJUSTABLE, but the block of G-code lines has zero extrusion length, thus the block
         // cannot have its speed adjusted. This should not happen (sic!). (delete the block if no g1)
-        TYPE_ADJUSTABLE_EMPTY   = 1 << 22,
-    };
-    static inline ExtrusionRole to_extrusion_role(uint32_t type) {
-        return ExtrusionRole(uint8_t(type & 0x1F));
+        TYPE_ADJUSTABLE_EMPTY   = 1 << 25,
+        // Custom fan speed (introduced for overhang fan speed)
+        TYPE_SET_FAN_SPEED      = 1 << 26,
+        TYPE_RESET_FAN_SPEED    = 1 << 27,    };
+    static inline GCodeExtrusionRole to_extrusion_role(uint32_t type) {
+        return GCodeExtrusionRole(uint8_t(type & 0x1F));
     }
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
@@ -89,7 +114,7 @@ struct CoolingLine
         return (this->type & TYPE_ADJUSTABLE) && this->time < this->time_max;
     }
 
-    size_t  type;
+    uint32_t  type;
     // Start of this line at the G-code snippet.
     size_t  line_start;
     // End of this line at the G-code snippet.
@@ -104,6 +129,8 @@ struct CoolingLine
     float   time;
     // Maximum duration of this segment.
     float   time_max;
+    // Requested fan speed
+    int     fan_speed;
     // If marked with the "slowdown" flag, the line has been slowed down.
     bool    slowdown;
     // for TYPE_SET_TOOL
@@ -379,7 +406,7 @@ std::string CoolingBuffer::process_layer(std::string &&gcode_in, size_t layer_id
 
 // Parse the layer G-code for the moves, which could be adjusted.
 // Return the list of parsed lines, bucketed by an extruder.
-std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::string &gcode, std::vector<float> &current_pos) const
+std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::string &gcode, std::array<float, 7> &current_pos) const
 {
     std::vector<PerExtruderAdjustments> per_extruder_adjustments(m_extruder_ids.size());
     std::vector<size_t>                 map_extruder_to_per_extruder_adjustment(m_num_extruders, 0);
@@ -405,6 +432,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
     // type to add to each next G1 (just for adjustable for now)
     size_t            current_stamp = CoolingLine::TYPE_NONE;
 
+    std::array<float, AxisIdx::Count> new_pos;
     auto finalize_sm = [&](bool ignore_empty) {
         if (active_speed_modifier != size_t(-1)) {
             assert(active_speed_modifier < adjustment->lines.size());
@@ -436,7 +464,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         while (*line_end != '\n' && *line_end != 0)
             ++ line_end;
         // sline will not contain the trailing '\n'.
-        std::string sline(line_start, line_end);
+        std::string_view sline(line_start, line_end - line_start);
         // CoolingLine will contain the trailing '\n'.
         if (*line_end == '\n')
             ++ line_end;
@@ -445,49 +473,61 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_G0;
         else if (boost::starts_with(sline, "G1 "))
             line.type = CoolingLine::TYPE_G1;
+        else if (boost::starts_with(sline, "G2 "))
+            // Arc, clockwise.
+            line.type = CoolingLine::TYPE_G2G3 | CoolingLine::TYPE_G2_CW;
+        else if (boost::starts_with(sline, "G3 "))
+            // Arc, counter-clockwise.
+            line.type = CoolingLine::TYPE_G2G3 | CoolingLine::TYPE_G3_CCW;
         else if (boost::starts_with(sline, "G92 "))
             line.type = CoolingLine::TYPE_G92;
-        else if (boost::starts_with(sline, "G2 "))
-            line.type = CoolingLine::TYPE_G2;
-        else if (boost::starts_with(sline, "G3 "))
-            line.type = CoolingLine::TYPE_G3;
         if (line.type) {
-            // G0, G1 or G92
+            // G0, G1, G2, G3 or G92
+            // Initialize current_pos from new_pos, set IJKR to zero.
+            std::fill(std::copy(std::begin(current_pos), std::end(current_pos), std::begin(new_pos)),
+                std::end(new_pos), 0.f);
             if (m_config.use_relative_e_distances.value)
                 // Reset extruder accumulator.
-                current_pos[3] = 0.f;
+                current_pos[AxisIdx::E] = 0.f;
             // Parse the G-code line.
-            std::vector<float> new_pos(current_pos);
-            const char *c = sline.data() + 3;
-            for (;;) {
+            for (auto c = sline.begin() + 3;;) {
                 // Skip whitespaces.
-                for (; *c == ' ' || *c == '\t'; ++ c);
-                if (*c == 0 || *c == ';')
+                for (; c != sline.end() && (*c == ' ' || *c == '\t'); ++ c);
+                if (c == sline.end() || *c == ';')
                     break;
 
-                assert(is_decimal_separator_point()); // for atof
                 // Parse the axis.
                 size_t axis = (*c >= 'X' && *c <= 'Z') ? (*c - 'X') :
-                              (*c == extrusion_axis) ? 3 : (*c == 'F') ? 4 :
-                              (*c == 'I') ? 5 : (*c == 'J') ? 6 : size_t(-1);
+                              (*c == extrusion_axis) ? AxisIdx::E : (*c == 'F') ? AxisIdx::F : 
+                              (*c >= 'I' && *c <= 'K') ? int(AxisIdx::I) + (*c - 'I') : 
+                              (*c == 'R') ? AxisIdx::R : size_t(-1);
                 line.has_move = line.has_move || axis != 4;
                 if (axis != size_t(-1)) {
-                    new_pos[axis] = float(atof(++c));
-                    if (axis == 4) {
+                    //auto [pend, ec] = 
+                        fast_float::from_chars(&*(++ c), sline.data() + sline.size(), new_pos[axis]);
+                    if (axis == AxisIdx::F) {
                         // Convert mm/min to mm/sec.
-                        new_pos[4] /= 60.f;
+                        new_pos[AxisIdx::F] /= 60.f;
                         if ((line.type & CoolingLine::TYPE_G92) == 0) {
                             // This is G0 or G1 line and it sets the feedrate. This mark is used for reducing the duplicate F calls.
                             line.type |= CoolingLine::TYPE_HAS_F;
                         }
-                    } else if (axis == 5 || axis == 6) {
-                        // BBS: get position of arc center
-                        new_pos[axis] += current_pos[axis - 5];
-                    }
+                    } else if (axis >= AxisIdx::I && axis <= AxisIdx::J)
+                        line.type |= CoolingLine::TYPE_G2G3_IJ;
+                    else if (axis == AxisIdx::R)
+                        line.type |= CoolingLine::TYPE_G2G3_R;
                 }
                 // Skip this word.
-                for (; *c != ' ' && *c != '\t' && *c != 0; ++ c);
+                for (; c != sline.end() && *c != ' ' && *c != '\t'; ++ c);
             }
+            // If G2 or G3, then either center of the arc or radius has to be defined.
+            assert(!(line.type & CoolingLine::TYPE_G2G3) ||
+                (line.type & (CoolingLine::TYPE_G2G3_IJ | CoolingLine::TYPE_G2G3_R)));
+            assert(!(line.type & CoolingLine::TYPE_G2G3) ||
+                (line.type & (CoolingLine::TYPE_G2_CW | CoolingLine::TYPE_G3_CCW)));
+            // Arc is defined either by IJ or by R, not by both.
+            assert(! ((line.type & CoolingLine::TYPE_G2G3_IJ) && (line.type & CoolingLine::TYPE_G2G3_R)));
+            assert(! ((line.type & CoolingLine::TYPE_G2_CW) && (line.type & CoolingLine::TYPE_G3_CCW)));
             bool wipe               = boost::contains(sline, ";_WIPE");
             if (wipe)
                 line.type |= CoolingLine::TYPE_WIPE;
@@ -502,31 +542,38 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 }
             }
             if ((line.type & CoolingLine::TYPE_G92) == 0) {
-                // G0 or G1. Calculate the duration.
+                // G0, G1, G2, G3. Calculate the duration.
+                assert((line.type & CoolingLine::TYPE_G0) != 0 + (line.type & CoolingLine::TYPE_G1) != 0 + (line.type & CoolingLine::TYPE_G2G3_IJ) != 0 == 1);
                 float dif[4];
                 for (size_t i = 0; i < 4; ++ i)
                     dif[i] = new_pos[i] - current_pos[i];
-                float dxy2 = 0;
-                //BBS: support to calculate length of arc
-                if (line.type & CoolingLine::TYPE_G2 || line.type & CoolingLine::TYPE_G3) {
-                    Vec3f start(current_pos[0], current_pos[1], 0);
-                    Vec3f end(new_pos[0], new_pos[1], 0);
-                    Vec3f center(new_pos[5], new_pos[6], 0);
-                    bool is_ccw = line.type & CoolingLine::TYPE_G3;
-                    float dxy = Slic3r::Geometry::ArcSegment::calc_arc_length(start, end, center, is_ccw);
-                    dxy2 = dxy * dxy;
-                } else {
-                    dxy2 = dif[0] * dif[0] + dif[1] * dif[1];
-                }
-                float dxyz2 = dxy2 + dif[2] * dif[2];
+                float dxy2;
+                if (line.type & CoolingLine::TYPE_G2G3) {
+                    // Measure arc length.
+                    if (line.type & CoolingLine::TYPE_G2G3_IJ) {
+                        dxy2 = sqr(Geometry::ArcWelder::arc_length(
+                            Vec2d(current_pos[AxisIdx::X], current_pos[AxisIdx::Y]),
+                            Vec2d(new_pos[AxisIdx::X], new_pos[AxisIdx::Y]),
+                            Vec2d(current_pos[AxisIdx::X] + new_pos[AxisIdx::I], current_pos[AxisIdx::Y] + new_pos[AxisIdx::J]),
+                            line.type & CoolingLine::TYPE_G3_CCW));
+                    } else if (line.type & CoolingLine::TYPE_G2G3_R) {
+                        dxy2 = sqr(Geometry::ArcWelder::arc_length(
+                            Vec2d(current_pos[AxisIdx::X], current_pos[AxisIdx::Y]),
+                            Vec2d(new_pos[AxisIdx::X], new_pos[AxisIdx::Y]),
+                            double(new_pos[AxisIdx::R])));
+                    } else
+                        dxy2 = 0;
+                } else
+                    dxy2 = sqr(dif[AxisIdx::X]) + sqr(dif[AxisIdx::Y]);
+                float dxyz2 = dxy2 + sqr(dif[AxisIdx::Z]);
                 if (dxyz2 > 0.f) {
                     // Movement in xyz, calculate time from the xyz Euclidian distance.
                     line.length = sqrt(dxyz2);
-                } else if (std::abs(dif[3]) > 0.f) {
+                } else if (std::abs(dif[AxisIdx::E]) > 0.f) {
                     // Movement in the extruder axis.
-                    line.length = std::abs(dif[3]);
+                    line.length = std::abs(dif[AxisIdx::E]);
                 }
-                line.feedrate = new_pos[4];
+                line.feedrate = new_pos[AxisIdx::F];
                 if (line.feedrate > 0.f && line.length > 0.f) {
                     assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0);
                     // there can be no active_speed_modifier in custom gcode. 
@@ -546,9 +593,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     if(adjustment->max_speed_reduction > 0)
                         line.time_max = std::min(line.time_max, line.time / (1- adjustment->max_speed_reduction));
                 }
-                // BBS: add G2 and G3 support
-                if (active_speed_modifier < adjustment->lines.size() && 
-                    ((line.type & CoolingLine::TYPE_G1) || (line.type & CoolingLine::TYPE_G2) || (line.type & CoolingLine::TYPE_G3))) {
+                if (active_speed_modifier < adjustment->lines.size() && (line.type & (CoolingLine::TYPE_G1 | CoolingLine::TYPE_G2G3))) {
                     // Inside the ";_EXTRUDE_SET_SPEED" blocks, there must not be a G1 Fxx entry.
                     assert((line.type & CoolingLine::TYPE_HAS_F) == 0);
                     CoolingLine &sm = adjustment->lines[active_speed_modifier];
@@ -565,7 +610,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     line.type = 0;
                 }
             }
-            current_pos = std::move(new_pos);
+            std::copy(std::begin(new_pos), std::begin(new_pos) + 5, std::begin(current_pos));
         } else if (boost::starts_with(sline, ";_EXTRUDE_END")) {
             // Closing a block of non-zero length extrusion moves.
             line.type = CoolingLine::TYPE_EXTRUDE_END;
@@ -575,7 +620,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_TOOLCHANGE")) {
             //not using m_toolchange_prefix anymore because there is no use case for it, there is always a _TOOLCHANGE for when a fan change is needed.
             int prefix = 13;
-            uint16_t new_extruder = (uint16_t)atoi(sline.c_str() + prefix);
+            uint16_t new_extruder = (uint16_t)atoi(sline.data() + 12);
+            auto res = std::from_chars(sline.data() + prefix, sline.data() + sline.size(), new_extruder);
+            if (res.ec != std::errc::invalid_argument) {
             // Only change extruder in case the number is meaningful. User could provide an out-of-range index through custom gcodes - those shall be ignored.
             if (new_extruder < map_extruder_to_per_extruder_adjustment.size()) {
                 // Switch the tool.
@@ -583,35 +630,54 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 line.new_tool = new_extruder;
                 if (new_extruder != current_extruder) {
                     current_extruder = new_extruder;
-                    adjustment       = &per_extruder_adjustments[map_extruder_to_per_extruder_adjustment[current_extruder]];
+                        adjustment         = &per_extruder_adjustments[map_extruder_to_per_extruder_adjustment[current_extruder]];
                 }
             } else {
                 // Only log the error in case of MM printer. Single extruder printers likely ignore any T anyway.
                 if (map_extruder_to_per_extruder_adjustment.size() > 1)
                     BOOST_LOG_TRIVIAL(error) << "CoolingBuffer encountered an invalid toolchange, maybe from a custom gcode: " << sline;
             }
-
+            }
         } else if (boost::starts_with(sline, ";_EXTRUDETYPE_") && sline.size() > 14) {
             //set the extrusiontype
             line.type |= CoolingLine::Type(sline[14] - 'A') | CoolingLine::Type::TYPE_EXTRUDE_START;
-            assert(CoolingLine::to_extrusion_role(uint32_t(sline[14] - 'A')) != 0);
-            if (CoolingLine::to_extrusion_role(uint32_t(sline[14] - 'A')) == 0) {
-                line.type |= ExtrusionRole::erCustom;
+            assert(CoolingLine::to_extrusion_role(uint32_t(sline[14] - 'A')) != GCodeExtrusionRole::None);
+            if (CoolingLine::to_extrusion_role(uint32_t(sline[14] - 'A')) == GCodeExtrusionRole::None) {
+                line.type |=  uint32_t(GCodeExtrusionRole::Custom);
             }
         } else if (boost::starts_with(sline, "G4 ")) {
             // Parse the wait time.
             line.type = CoolingLine::TYPE_G4;
             size_t pos_S = sline.find('S', 3);
             size_t pos_P = sline.find('P', 3);
-            assert(is_decimal_separator_point()); // for atof
-            line.time = line.time_max = float(
-                (pos_S > 0) ? atof(sline.c_str() + pos_S + 1) :
-                (pos_P > 0) ? atof(sline.c_str() + pos_P + 1) * 0.001 : 0.);
+            bool   has_S = pos_S > 0;
+            bool   has_P = pos_P > 0;
+            if (has_S || has_P) {
+                //auto [pend, ec] = 
+                    fast_float::from_chars(sline.data() + (has_S ? pos_S : pos_P) + 1, sline.data() + sline.size(), line.time);
+                if (has_P)
+                    line.time *= 0.001f;
+            } else
+                line.time = 0;
+            line.time_max = line.time;
         } else if (boost::starts_with(sline, ";_STORE_FAN_SPEED_WT")) {
             line.type = CoolingLine::TYPE_STORE_FOR_WT;
         } else if (boost::starts_with(sline, ";_RESTORE_FAN_SPEED_WT")) {
             line.type = CoolingLine::TYPE_RESTORE_AFTER_WT;
         }
+//FIXME use TYPE_EXTRUDE_START & to_extrusion_role_gcode
+        if (boost::contains(sline, ";_SET_FAN_SPEED")) {
+            auto speed_start = sline.find_last_of('D');
+            int  speed       = 0;
+            for (char num : sline.substr(speed_start + 1)) {
+                speed = speed * 10 + (num - '0');
+            }
+            line.type |= CoolingLine::TYPE_SET_FAN_SPEED;
+            line.fan_speed = speed;
+        } else if (boost::contains(sline, ";_RESET_FAN_SPEED")) {
+            line.type |= CoolingLine::TYPE_RESET_FAN_SPEED;
+        }
+
         if (line.type != 0)
             adjustment->lines.emplace_back(std::move(line));
     }
@@ -820,37 +886,37 @@ float CoolingBuffer::calculate_layer_slowdown(std::vector<PerExtruderAdjustments
 
 // list of fan that can be increased (erNone is the default) via fan_below_layer_time and slowdown_below_layer_time
 // the commented ones won't buldge even is the layer time is low.
-std::vector<uint8_t> etype_can_increase_fan = {
-    ExtrusionRole::erNone,
-    ExtrusionRole::erBridgeInfill,
-    ExtrusionRole::erInternalBridgeInfill,
-    //ExtrusionRole::erTopSolidInfill,
-    //ExtrusionRole::erIroning,
-    //ExtrusionRole::erSupportMaterialInterface,
-    //ExtrusionRole::erSupportMaterial,
-    ExtrusionRole::erExternalPerimeter,
-    ExtrusionRole::erThinWall,
-    ExtrusionRole::erPerimeter,
-    ExtrusionRole::erSolidInfill,
-    ExtrusionRole::erInternalInfill,
-    ExtrusionRole::erOverhangPerimeter,
-    ExtrusionRole::erGapFill };
+std::vector<GCodeExtrusionRole> etype_can_increase_fan = {
+     GCodeExtrusionRole::None,
+     GCodeExtrusionRole::BridgeInfill,
+     GCodeExtrusionRole::InternalBridgeInfill,
+    // GCodeExtrusionRole::TopSolidInfill,
+    // GCodeExtrusionRole::Ironing,
+    // GCodeExtrusionRole::SupportMaterialInterface,
+    // GCodeExtrusionRole::SupportMaterial,
+     GCodeExtrusionRole::ExternalPerimeter,
+     GCodeExtrusionRole::ThinWall,
+     GCodeExtrusionRole::Perimeter,
+     GCodeExtrusionRole::SolidInfill,
+     GCodeExtrusionRole::InternalInfill,
+     GCodeExtrusionRole::OverhangPerimeter,
+     GCodeExtrusionRole::GapFill };
 // list of fan that won't be reduced in the first layers by full_fan_speed_layer (after disable_fan_first_layers)
-std::vector<uint8_t> etype_can_ramp_up_fan = {
-    ExtrusionRole::erNone,
-    //ExtrusionRole::erBridgeInfill,
-    //ExtrusionRole::erInternalBridgeInfill,
-    ExtrusionRole::erTopSolidInfill,
-    ExtrusionRole::erIroning,
-    //ExtrusionRole::erSupportMaterialInterface,
-    ExtrusionRole::erSupportMaterial,
-    ExtrusionRole::erExternalPerimeter,
-    ExtrusionRole::erThinWall,
-    ExtrusionRole::erPerimeter,
-    ExtrusionRole::erSolidInfill,
-    ExtrusionRole::erInternalInfill,
-    //ExtrusionRole::erOverhangPerimeter,
-    ExtrusionRole::erGapFill };
+std::vector<GCodeExtrusionRole> etype_can_ramp_up_fan = {
+     GCodeExtrusionRole::None,
+    // GCodeExtrusionRole::BridgeInfill,
+    // GCodeExtrusionRole::InternalBridgeInfill,
+     GCodeExtrusionRole::TopSolidInfill,
+     GCodeExtrusionRole::Ironing,
+    // GCodeExtrusionRole::SupportMaterialInterface,
+     GCodeExtrusionRole::SupportMaterial,
+     GCodeExtrusionRole::ExternalPerimeter,
+     GCodeExtrusionRole::ThinWall,
+     GCodeExtrusionRole::Perimeter,
+     GCodeExtrusionRole::SolidInfill,
+     GCodeExtrusionRole::InternalInfill,
+    // GCodeExtrusionRole::OverhangPerimeter,
+     GCodeExtrusionRole::GapFill };
 
 // Apply slow down over G-code lines stored in per_extruder_adjustments, enable fan if needed.
 // Returns the adjusted G-code.
@@ -879,9 +945,9 @@ std::string CoolingBuffer::apply_layer_cooldown(
     // Second generate the adjusted G-code.
     std::string new_gcode;
     new_gcode.reserve(gcode.size() * 2);
-    bool fan_control[ExtrusionRole::erCount];
-    int fan_speeds[ExtrusionRole::erCount];
-    int default_fan_speed[ExtrusionRole::erCount];
+    bool fan_control[ uint8_t(GCodeExtrusionRole::Count)];
+    int fan_speeds[ uint8_t(GCodeExtrusionRole::Count)];
+    int default_fan_speed[ uint8_t(GCodeExtrusionRole::Count)];
 #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
     const int min_fan_speed             = m_config.fan_printer_min_speed;
     assert(min_fan_speed >= 0);
@@ -893,7 +959,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
     if (initial_default_fan_speed == 1)
         initial_default_fan_speed = 0;
     //initialise the speed array
-    for (int i = 0; i < ExtrusionRole::erCount; i++) {
+    for (uint8_t i = 0; i < uint8_t(GCodeExtrusionRole::Count); i++) {
         fan_control[i] = false;
         fan_speeds[i] = 0;
         default_fan_speed[i] = initial_default_fan_speed;
@@ -901,22 +967,22 @@ std::string CoolingBuffer::apply_layer_cooldown(
         if (default_fan_speed[i] == 1) default_fan_speed[i] = 0;
     }
     //set the fan controls
-    default_fan_speed[ExtrusionRole::erBridgeInfill] = EXTRUDER_CONFIG(bridge_fan_speed);
-    default_fan_speed[ExtrusionRole::erInternalBridgeInfill] = EXTRUDER_CONFIG(internal_bridge_fan_speed);
-    default_fan_speed[ExtrusionRole::erTopSolidInfill] = EXTRUDER_CONFIG(top_fan_speed);
-    default_fan_speed[ExtrusionRole::erIroning] = default_fan_speed[ExtrusionRole::erTopSolidInfill];
-    default_fan_speed[ExtrusionRole::erSupportMaterialInterface] = EXTRUDER_CONFIG(support_material_interface_fan_speed);
-    default_fan_speed[ExtrusionRole::erSupportMaterial] = EXTRUDER_CONFIG(support_material_fan_speed);
-    default_fan_speed[ExtrusionRole::erExternalPerimeter] = EXTRUDER_CONFIG(external_perimeter_fan_speed);
-    default_fan_speed[ExtrusionRole::erThinWall] = default_fan_speed[ExtrusionRole::erExternalPerimeter];
-    default_fan_speed[ExtrusionRole::erPerimeter] = EXTRUDER_CONFIG(perimeter_fan_speed);
-    default_fan_speed[ExtrusionRole::erSolidInfill] = EXTRUDER_CONFIG(solid_infill_fan_speed);
-    default_fan_speed[ExtrusionRole::erInternalInfill] = EXTRUDER_CONFIG(infill_fan_speed);
-    default_fan_speed[ExtrusionRole::erOverhangPerimeter] = EXTRUDER_CONFIG(overhangs_fan_speed);
-    default_fan_speed[ExtrusionRole::erGapFill] = EXTRUDER_CONFIG(gap_fill_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::BridgeInfill)] = EXTRUDER_CONFIG(bridge_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = EXTRUDER_CONFIG(internal_bridge_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] = EXTRUDER_CONFIG(top_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::Ironing)] = default_fan_speed[ uint8_t(GCodeExtrusionRole::TopSolidInfill)];
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::SupportMaterialInterface)] = EXTRUDER_CONFIG(support_material_interface_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::SupportMaterial)] = EXTRUDER_CONFIG(support_material_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] = EXTRUDER_CONFIG(external_perimeter_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::ThinWall)] = default_fan_speed[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)];
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::Perimeter)] = EXTRUDER_CONFIG(perimeter_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::SolidInfill)] = EXTRUDER_CONFIG(solid_infill_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::InternalInfill)] = EXTRUDER_CONFIG(infill_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::OverhangPerimeter)] = EXTRUDER_CONFIG(overhangs_fan_speed);
+    default_fan_speed[ uint8_t(GCodeExtrusionRole::GapFill)] = EXTRUDER_CONFIG(gap_fill_fan_speed);
     // if default is enabled, it takes over the settings that are disabled.
     if (initial_default_fan_speed >= 0) {
-        for (int i = 0; i < ExtrusionRole::erCount; i++) {
+        for (int i = 0; i < uint8_t(GCodeExtrusionRole::Count); i++) {
             // this setting is disbaled. As default is not, it will use the default value
             if (default_fan_speed[i] < 0) {
                 default_fan_speed[i] = initial_default_fan_speed;
@@ -926,6 +992,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
     auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, 
             &fan_control, &fan_speeds, &default_fan_speed, initial_default_fan_speed, min_fan_speed]()
     {
+        std::pair<int, int> custom_fan_speed_limits{fan_speeds[0], 100 }; // TODO REVIEW 2.7: min-max. min is min_fan_speed if always on.
         int disable_fan_first_layers = EXTRUDER_CONFIG(disable_fan_first_layers);
         // Is the fan speed ramp enabled?
         int full_fan_speed_layer = EXTRUDER_CONFIG(full_fan_speed_layer);
@@ -933,7 +1000,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             int   max_fan_speed             = EXTRUDER_CONFIG(max_fan_speed);
             float slowdown_below_layer_time = float(EXTRUDER_CONFIG(slowdown_below_layer_time));
             float fan_below_layer_time      = float(EXTRUDER_CONFIG(fan_below_layer_time));
-            for (int i = 0; i < ExtrusionRole::erCount; i++) {
+            for (int i = 0; i <  uint8_t(GCodeExtrusionRole::Count); i++) {
                 fan_speeds[i] = default_fan_speed[i];
             }
             //fan_speeds[0] carry the current default value. ensure it's not negative.
@@ -944,18 +1011,20 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 // Layer time very short. Enable the fan to a full throttle.
                 //fan_speed_new = std::max(max_fan_speed, fan_speed_new);
                 for (size_t etype_idx = 0; etype_idx < etype_can_increase_fan.size(); etype_idx++) {
-                    uint16_t idx = etype_can_increase_fan[etype_idx];
+                    uint16_t idx = uint8_t(etype_can_increase_fan[etype_idx]);
                     fan_speeds[idx] = std::max(max_fan_speed, fan_speeds[idx]);
                 }
+                custom_fan_speed_limits.first = fan_speeds[0];
             } else if (layer_time < fan_below_layer_time) {
                 // Layer time quite short. Enable the fan proportionally according to the current layer time.
                 assert(layer_time >= slowdown_below_layer_time);
                 double t = (layer_time - slowdown_below_layer_time) / (fan_below_layer_time - slowdown_below_layer_time);
                 for (size_t etype_idx = 0; etype_idx < etype_can_increase_fan.size(); etype_idx++) {
-                    uint16_t idx = etype_can_increase_fan[etype_idx];
+                    uint16_t idx = uint8_t(etype_can_increase_fan[etype_idx]);
                     if (fan_speeds[idx] < max_fan_speed) // if max speed is lower, this will reduce speed, so don't do it.
                         fan_speeds[idx] = std::clamp(int(t * (fan_speeds[idx] < 0 ? 0 : fan_speeds[idx]) + (1. - t) * max_fan_speed + 0.5), 0, 255);
                 }
+                custom_fan_speed_limits.first = fan_speeds[0];
             }
 
             // Is the fan speed ramp enabled?
@@ -966,52 +1035,54 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 // Ramp up the fan speed from disable_fan_first_layers to full_fan_speed_layer.
                 float factor = float(int(layer_id + 1) - disable_fan_first_layers) / float(full_fan_speed_layer - disable_fan_first_layers);
                 for (size_t etype_idx = 0; etype_idx < etype_can_ramp_up_fan.size(); etype_idx++) {
-                    uint16_t idx = etype_can_ramp_up_fan[etype_idx];
+                    uint16_t idx = uint8_t(etype_can_ramp_up_fan[etype_idx]);
                     if (fan_speeds[idx] > 0) {
                         fan_speeds[idx] = std::clamp(int(float(fan_speeds[idx] < 0 ? 0 : fan_speeds[idx]) * factor + 0.01f), 0, 255);
                     }
                 }
+                custom_fan_speed_limits.second = fan_speeds[0];
             }
             //only activate fan control if the fan speed is higher than min
             fan_control[0] = fan_speeds[0] >= 0;
-            for (size_t i = 1; i < ExtrusionRole::erCount; i++) {
+            for (size_t i = 1; i < uint8_t(GCodeExtrusionRole::Count); i++) {
                 fan_control[i] = fan_speeds[i] >= 0;
             }
 
             // if bridge_fan is disabled, it takes the value of default_fan
-            if (!fan_control[ExtrusionRole::erBridgeInfill] && fan_control[0]) {
-                fan_control[ExtrusionRole::erBridgeInfill] = true;
-                fan_speeds[ExtrusionRole::erBridgeInfill] = fan_speeds[0];
+            if (!fan_control[uint8_t(GCodeExtrusionRole::BridgeInfill)] && fan_control[0]) {
+                fan_control[uint8_t(GCodeExtrusionRole::BridgeInfill)] = true;
+                fan_speeds[uint8_t(GCodeExtrusionRole::BridgeInfill)] = fan_speeds[0];
             }
 
             // if internal_bridge_fan is disabled, it takes the value of bridge_fan
-            if (!fan_control[ExtrusionRole::erInternalBridgeInfill] && fan_control[ExtrusionRole::erBridgeInfill]) {
-                fan_control[ExtrusionRole::erInternalBridgeInfill] = true;
-                fan_speeds[ExtrusionRole::erInternalBridgeInfill] = fan_speeds[ExtrusionRole::erBridgeInfill];
+            if (!fan_control[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] && fan_control[ uint8_t(GCodeExtrusionRole::BridgeInfill)]) {
+                fan_control[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = true;
+                fan_speeds[ uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = fan_speeds[ uint8_t(GCodeExtrusionRole::BridgeInfill)];
             }
 
             // if external_perimeter_fan is disabled, it takes the value of perimeter_fan
-            if (!fan_control[ExtrusionRole::erExternalPerimeter] && fan_control[ExtrusionRole::erPerimeter]) {
-                fan_control[ExtrusionRole::erExternalPerimeter] = true;
-                fan_speeds[ExtrusionRole::erExternalPerimeter] = fan_speeds[ExtrusionRole::erPerimeter];
+            if (!fan_control[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] && fan_control[ uint8_t(GCodeExtrusionRole::Perimeter)]) {
+                fan_control[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] = true;
+                fan_speeds[ uint8_t(GCodeExtrusionRole::ExternalPerimeter)] = fan_speeds[ uint8_t(GCodeExtrusionRole::Perimeter)];
             }
 
             // if top_fan is disabled, it takes the value of solid_fan
-            if (!fan_control[ExtrusionRole::erTopSolidInfill] && fan_control[ExtrusionRole::erSolidInfill]) {
-                fan_control[ExtrusionRole::erTopSolidInfill] = true;
-                fan_speeds[ExtrusionRole::erTopSolidInfill] = fan_speeds[ExtrusionRole::erSolidInfill];
+            if (!fan_control[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] && fan_control[ uint8_t(GCodeExtrusionRole::SolidInfill)]) {
+                fan_control[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] = true;
+                fan_speeds[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] = fan_speeds[ uint8_t(GCodeExtrusionRole::SolidInfill)];
             }
 
-        } else {
+        } else { // fan disabled
             fan_control[0] = true;
             fan_speeds[0] = 0;
-            for (int i = 1; i < ExtrusionRole::erCount; i++) {
+            for (int i = 1; i < uint8_t(GCodeExtrusionRole::Count); i++) {
                 fan_control[i] = false;
                 fan_speeds[i] = 0;
             }
+            custom_fan_speed_limits.second = 0;
         }
         // apply min fan speed, after the eventual speedup.
-        for (int i = 1; i < ExtrusionRole::erCount; i++) {
+        for (uint8_t i = 1; i < uint8_t(GCodeExtrusionRole::Count); i++) {
             if (fan_control[i] && fan_speeds[i] > 0) {
                 fan_speeds[i] = std::max(fan_speeds[i], min_fan_speed);
             }
@@ -1022,15 +1093,18 @@ std::string CoolingBuffer::apply_layer_cooldown(
                                               EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
                                               std::string("set fan for new extruder"));
         }
+        custom_fan_speed_limits.first = std::min(custom_fan_speed_limits.first, custom_fan_speed_limits.second);
+        return custom_fan_speed_limits;
     };
     //set to know all fan modifiers that can be applied ( TYPE_BRIDGE_FAN_END, TYPE_TOP_FAN_START, TYPE_SUPP_INTER_FAN_START, TYPE_EXTERNAL_PERIMETER).
-    std::vector<ExtrusionRole> extrude_tree;
+    std::vector<GCodeExtrusionRole> extrude_tree;
     const char         *pos               = gcode.c_str();
     int                 current_feedrate  = 0;
     int                 stored_fan_speed  = m_fan_speed < 0 ? 0 : m_fan_speed;
     int                 current_fan_speed = -1;
+    int                 override_fan_speed = -1;
     const std::string   comment_speed = m_config.gcode_comments ? " ; speed changed by the cooling algorithm" : "";
-    change_extruder_set_fan();
+    std::pair<int,int> fan_speed_limits = change_extruder_set_fan();
     for (const CoolingLine *line : lines) {
         const char *line_start  = gcode.c_str() + line->line_start;
         const char *line_end    = gcode.c_str() + line->line_end;
@@ -1040,7 +1114,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
         if (line->type & CoolingLine::TYPE_SET_TOOL) {
             if (line->new_tool != m_current_extruder) {
                 m_current_extruder = line->new_tool;
-                change_extruder_set_fan();
+                fan_speed_limits = change_extruder_set_fan();
             }
             //write line if it's not a cooling marker comment
             if (!boost::starts_with(line_start, ";_")) {
@@ -1053,8 +1127,14 @@ std::string CoolingBuffer::apply_layer_cooldown(
                                               EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
                                               "restore fan after wipe tower");
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_START) {
-            assert(CoolingLine::to_extrusion_role(uint32_t(line->type)) != 0);
+            assert(CoolingLine::to_extrusion_role(uint32_t(line->type)) != GCodeExtrusionRole::None);
             extrude_tree.push_back(CoolingLine::to_extrusion_role(uint32_t(line->type)));
+            fan_need_set = true;
+        } else if (line->type & CoolingLine::TYPE_SET_FAN_SPEED) {
+            override_fan_speed = std::clamp(line->fan_speed, fan_speed_limits.first, fan_speed_limits.second);
+            fan_need_set = true;
+        } else if (line->type & CoolingLine::TYPE_RESET_FAN_SPEED){
+            override_fan_speed = -1;
             fan_need_set = true;
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             assert(extrude_tree.size() > 0);
@@ -1075,7 +1155,11 @@ std::string CoolingBuffer::apply_layer_cooldown(
             // Remove the F word from the current G-code line.
             bool        remove          = false;
             assert(fpos != nullptr);
-            new_feedrate = line->slowdown ? int(floor(60. * line->feedrate + 0.5)) : atoi(fpos);
+            if (line->slowdown)
+                new_feedrate = int(floor(60. * line->feedrate + 0.5));
+            else
+                //auto res = 
+                    std::from_chars(fpos, line_end, new_feedrate);
             if (new_feedrate == current_feedrate) {
                 // No need to change the F value.
                 if ((line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_ADJUSTABLE_MAYBE | CoolingLine::TYPE_WIPE)) || !line->has_move )
@@ -1164,31 +1248,37 @@ std::string CoolingBuffer::apply_layer_cooldown(
             new_gcode.append(line_start, line_end - line_start);
         }
         if (fan_need_set) {
-            //use the most current fan
-            bool fan_set = false;
-            for (size_t i = extrude_tree.size() - 1; i < extrude_tree.size(); --i) {
-                if (fan_control[extrude_tree[i]]) {
-                    if (current_fan_speed != fan_speeds[extrude_tree[i]]) {
-                        current_fan_speed = fan_speeds[extrude_tree[i]];
-                        new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments,
-                                                          fan_speeds[extrude_tree[i]],
-                                                          EXTRUDER_CONFIG(extruder_fan_offset),
-                                                          m_config.fan_percentage,
-                                                          std::string("set fan for ") + ExtrusionEntity::role_to_string(extrude_tree[i]));
+            if (override_fan_speed >= 0) {
+                    new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, override_fan_speed,
+                                                      EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                                      "set override fan");
+            } else {
+                //use the most current fan
+                bool fan_set = false;
+                for (size_t i = extrude_tree.size() - 1; i < extrude_tree.size(); --i) {
+                    if (fan_control[uint8_t(extrude_tree[i])]) {
+                        if (current_fan_speed != fan_speeds[uint8_t(extrude_tree[i])]) {
+                            current_fan_speed = fan_speeds[uint8_t(extrude_tree[i])];
+                            std::string extrusion_str = gcode_extrusion_role_to_string((extrude_tree[i]));
+                            new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments,
+                                                          fan_speeds[uint8_t(extrude_tree[i])],
+                                                          EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                                          std::string("set fan for ") + extrusion_str);
+                        }
+                        fan_set = true;
+                        break;
                     }
-                    fan_set = true;
-                    break;
                 }
-            }
-            if (!fan_set && m_fan_speed >= 0 ) {
-                if (current_fan_speed != m_fan_speed && (default_fan_speed[0] >= 0 || current_fan_speed > 0)) {
-                    current_fan_speed = m_fan_speed;
-                    // return to default
-                    new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed,
+                if (!fan_set && m_fan_speed >= 0 ) {
+                    if (current_fan_speed != m_fan_speed && (default_fan_speed[0] >= 0 || current_fan_speed > 0)) {
+                        current_fan_speed = m_fan_speed;
+                        // return to default
+                        new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed < 0 ? 0 : m_fan_speed,
                                                       EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
                                                       "set default fan");
+                    }
+                    fan_set = true;
                 }
-                fan_set = true;
             }
             fan_need_set = false;
         }

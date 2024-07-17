@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Pavel Mikuš @Godrak, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/ Copyright (c) SuperSlicer 2019 Remi Durand @supermerill
+///|/
+///|/ ported from lib/Slic3r/Fill/Base.pm:
+///|/ Copyright (c) Prusa Research 2016 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_FillBase_hpp_
 #define slic3r_FillBase_hpp_
 
@@ -12,6 +21,7 @@
 
 #include "../libslic3r.h"
 #include "../BoundingBox.hpp"
+#include "../Exception.hpp"
 #include "../PrintConfig.hpp"
 #include "../Exception.hpp"
 #include "../Utils.hpp"
@@ -20,7 +30,6 @@
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
 #include "../Flow.hpp"
-#include "../PrintConfig.hpp"
 
 namespace Slic3r {
 
@@ -77,8 +86,8 @@ struct FillParams
     // in this case we don't try to make more continuous paths
     bool        complete    { false };
 
-    // if role == erNone or ERCustom, this method have to choose the best role itself, else it must use the argument's role.
-    ExtrusionRole role      { erNone };
+    // if role == ExtrusionRole::None or ERCustom, this method have to choose the best role itself, else it must use the argument's role.
+    ExtrusionRole role{ExtrusionRole::None};
 
     // flow to use
     Flow        flow        {};
@@ -133,7 +142,11 @@ public:
 #endif
 protected:
     // in unscaled coordinates, please use init (after settings all others settings) as some algos want to modify the value
-    double spacing_priv;
+    double spacing_priv = -1.;
+
+    // PrintConfig and PrintObjectConfig are used by infills that use Arachne (Concentric and FillEnsuring).
+    const PrintConfig       *print_config        = nullptr;
+    const PrintObjectConfig *print_object_config = nullptr;
 
 public:
     virtual ~Fill() {}
@@ -142,6 +155,11 @@ public:
     static Fill* new_from_type(const InfillPattern type);
     static Fill* new_from_type(const std::string &type);
 
+    void set_config(const PrintConfig *print_config, const PrintObjectConfig *print_object_config)
+    {
+        this->print_config = print_config;
+        this->print_object_config = print_object_config;
+    }
     void         set_bounding_box(const Slic3r::BoundingBox &bbox) { bounding_box = bbox; }
     virtual void init_spacing(coordf_t spacing, const FillParams &params) { this->spacing_priv = spacing;  }
     double get_spacing() const { return spacing_priv; }
@@ -204,12 +222,12 @@ protected:
     double compute_unscaled_volume_to_fill(const Surface* surface, const FillParams& params) const;
 
     ExtrusionRole getRoleFromSurfaceType(const FillParams &params, const Surface *surface) const {
-        if (params.role == erNone || params.role == erCustom) {
+        if (params.role == ExtrusionRole::None) {
             return params.flow.bridge() ?
-                (surface->has_pos_bottom() ? erBridgeInfill : erInternalBridgeInfill) :
-                           (surface->has_fill_solid() ?
-                           ((surface->has_pos_top()) ? erTopSolidInfill : erSolidInfill) :
-                           erInternalInfill);
+                       (surface->has_pos_bottom() ? ExtrusionRole::BridgeInfill : ExtrusionRole::InternalBridgeInfill) :
+                                          (surface->has_fill_solid() ?
+                                               ((surface->has_pos_top()) ? ExtrusionRole::TopSolidInfill : ExtrusionRole::SolidInfill) :
+                                               ExtrusionRole::InternalInfill);
         }
         return params.role;
     }

@@ -1,17 +1,42 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Filip Sykala @Jony01, David Kocík @kocikdav, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Maksim Derbasov @ntfshard
+///|/ Copyright (c) 2015 Greg Thornton @xdissent
+///|/ Copyright (c) 2014 Kamil Kwolek
+///|/
+///|/ ported from lib/Slic3r/Config.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2022 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2017 Joseph Lenox @lordofhyphens
+///|/ Copyright (c) Slic3r 2011 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Alexander Rössler @machinekoder
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2012 Mark Hindess
+///|/ Copyright (c) 2012 Josh McCullough
+///|/ Copyright (c) 2011 - 2012 Michael Moon
+///|/ Copyright (c) 2012 Simon George
+///|/ Copyright (c) 2012 Johannes Reinhardt
+///|/ Copyright (c) 2011 Clarence Risher
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Config_hpp_
 #define slic3r_Config_hpp_
 
 #include <assert.h>
 #include <map>
 #include <climits>
+#include <limits>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <vector>
+#include <float.h>
 #include "libslic3r.h"
 #include "clonable_ptr.hpp"
 #include "Exception.hpp"
@@ -39,9 +64,9 @@ namespace Slic3r {
         template<class Archive> void serialize(Archive& ar) { ar(this->value); ar(this->percent); }
     };
 
-    inline bool operator==(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value == r.value && l.percent == r.percent; }
-    inline bool operator!=(const FloatOrPercent& l, const FloatOrPercent& r) throw() { return !(l == r); }
-    inline bool operator< (const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value < r.value || (l.value == r.value && int(l.percent) < int(r.percent)); }
+    inline bool operator==(const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return l.value == r.value && l.percent == r.percent; }
+    inline bool operator!=(const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return !(l == r); }
+    inline bool operator< (const FloatOrPercent& l, const FloatOrPercent& r) noexcept { return l.value < r.value || (l.value == r.value && int(l.percent) < int(r.percent)); }
     inline bool operator> (const FloatOrPercent& l, const FloatOrPercent& r) throw() { return l.value > r.value || (l.value == r.value && int(l.percent) > int(r.percent)); }
 
     struct GraphData
@@ -77,9 +102,9 @@ namespace Slic3r {
 
         //return false if data are not good
         bool validate() const;
-
+        
     //protected:
-        Pointfs graph_points;
+        Pointfs graph_points = {};
         size_t begin_idx = 0; //included
         size_t end_idx = 0; //excluded
         GraphType type = GraphType::LINEAR;
@@ -402,27 +427,24 @@ inline PrinterTechnology operator&=(PrinterTechnology& a, PrinterTechnology b) {
     a = a & b; return a;
 }
 
-/// 
-enum OutputFormat : uint16_t
-{
-    ofMaskedCWS = 1 << 0,
-    ofSL1 = 1 << 1,
-    ofGCode = 1 << 2,
-    ofUnknown = 1 << 15
+// defined here isntead of PrintConfig to be more visible.
+enum OutputFormat : uint16_t {
+    ofUnknown = 0,
+    ofGCode   = 1,
+    ofSL1,
+    ofSL1_SVG,
+    ofMaskedCWS,
+    ofAnycubicMono,
+    ofAnycubicMonoX,
+    ofAnycubicMonoSE,
 };
 
-inline OutputFormat operator|(OutputFormat a, OutputFormat b) {
-    return static_cast<OutputFormat>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
-}
-inline OutputFormat operator&(OutputFormat a, OutputFormat b) {
-    return static_cast<OutputFormat>(static_cast<uint8_t>(a)& static_cast<uint8_t>(b));
-}
-inline OutputFormat operator|=(OutputFormat& a, OutputFormat b) {
-    a = a | b; return a;
-}
-inline OutputFormat operator&=(OutputFormat& a, OutputFormat b) {
-    a = a & b; return a;
-}
+enum class BridgeType : uint8_t {
+    btNone,
+    btFromNozzle,
+    btFromHeight,
+    btFromFlow,
+};
 
 enum ForwardCompatibilitySubstitutionRule
 {
@@ -438,6 +460,7 @@ enum ForwardCompatibilitySubstitutionRule
     EnableSilentDisableSystem,
 };
 
+class  ConfigDef;
 class  ConfigOption;
 class  ConfigOptionDef;
 // For forward definition of ConfigOption in ConfigOptionUniquePtr, we have to define a custom deleter.
@@ -559,12 +582,68 @@ private:
 typedef ConfigOption*       ConfigOptionPtr;
 typedef const ConfigOption* ConfigOptionConstPtr;
 
+// Nill value will be defined in specializations
+template<class T, class En = void> struct NilValueTempl
+{
+    using NilType = T;
+    static_assert(always_false<T>::value, "Type has no well defined nil value");
+};
+
+template<class T> struct NilValueTempl<T, std::enable_if_t<std::is_integral_v<T>, void>> {
+    using NilType = T;
+    static constexpr auto value = std::numeric_limits<T>::max();
+};
+
+template<> struct NilValueTempl<bool> : public NilValueTempl<int>{};
+
+// For enums the nil is the max value of the underlying type.
+template<class T>
+struct NilValueTempl<T, std::enable_if_t<std::is_enum_v<T>, void>>
+{
+    using NilType = T;
+    static constexpr auto value = static_cast<T>(std::numeric_limits<std::underlying_type_t<T>>::max());
+};
+
+// For Graph the nil is an empty array (there are no nil usage anyway)
+template<class T>
+struct NilValueTempl<T, std::enable_if_t<std::is_same<GraphData, T>::value, void>>
+{
+    using NilType = GraphData::GraphType;
+    static constexpr auto value = GraphData::GraphType::COUNT;
+};
+
+template<class T> struct NilValueTempl<T, std::enable_if_t<std::is_floating_point_v<T>, void>> {
+    using NilType = T;
+    static constexpr auto value = std::numeric_limits<T>::quiet_NaN();
+};
+
+template<>
+struct NilValueTempl<FloatOrPercent> : public NilValueTempl<double> {};
+
+template<> struct NilValueTempl<std::string> {
+    using NilType = const char *;
+
+    static constexpr const char* value = "";
+};
+
+template<int N, class T> struct NilValueTempl<Vec<N, T>> {
+    using NilType = Vec<N, T>;
+    // No constexpr for Vec<N, T>
+    static inline const Vec<N, T> value = Vec<N, T>::Ones() * NilValueTempl<remove_cvref_t<T>>::value;
+};
+
+template<class T> using NilType = typename NilValueTempl<remove_cvref_t<T>>::NilType;
+
+// Define shortcut as a function instead of a static const var so that it can be constexpr
+// even if the NilValueTempl::value is not constexpr.
+template<class T> static constexpr NilType<T> NilValue() noexcept { return NilValueTempl<remove_cvref_t<T>>::value; }
+
 // Value of a single valued option (bool, int, float, string, point, enum)
-template <class T>
+template <class T, bool NULLABLE = false>
 class ConfigOptionSingle : public ConfigOption {
 public:
     T value;
-    explicit ConfigOptionSingle(T value) : value(value) {}
+    explicit ConfigOptionSingle(T value) : value(std::move(value)) {}
     operator T() const { return this->value; }
     boost::any get_any(int32_t idx = -1) const override { return boost::any(value); }
     void       set_any(boost::any anyval, int32_t idx = -1) override { value = boost::any_cast<T>(anyval); }
@@ -574,8 +653,8 @@ public:
     {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Assigning an incompatible type");
-        assert(dynamic_cast<const ConfigOptionSingle<T>*>(rhs));
-        this->value = static_cast<const ConfigOptionSingle<T>*>(rhs)->value;
+        assert(dynamic_cast<const ConfigOptionSingle*>(rhs));
+        this->value = static_cast<const ConfigOptionSingle*>(rhs)->value;
         this->flags = rhs->flags;
     }
 
@@ -584,7 +663,8 @@ public:
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Comparing incompatible types");
         assert(dynamic_cast<const ConfigOptionSingle<T>*>(&rhs));
-        return this->value == static_cast<const ConfigOptionSingle<T>*>(&rhs)->value 
+        return (this->value == static_cast<const ConfigOptionSingle<T>*>(&rhs)->value 
+                || this->is_nil() && rhs.is_nil())
             && this->is_enabled() == rhs.is_enabled()
             && this->is_phony() == rhs.is_phony();
         // should compare all flags?
@@ -602,10 +682,66 @@ public:
         return seed;
     }
 
+    // Is this option overridden by another option?
+    // An option overrides another option if it is not nil and not equal.
+    bool overriden_by(const ConfigOption *rhs) const override {
+        if (this->nullable())
+            throw ConfigurationError("Cannot override a nullable ConfigOption.");
+        if (rhs->type() != this->type())
+            throw ConfigurationError("ConfigOptionVector.overriden_by() applied to different types.");
+        auto rhs_co = static_cast<const ConfigOptionSingle*>(rhs);
+        if (! rhs->nullable())
+            // Overridding a non-nullable object with another non-nullable object.
+            return this->value != rhs_co->value;
+
+        return !rhs_co->is_nil() && rhs_co->value != this->value;
+    }
+    // Apply an override option, possibly a nullable one.
+    bool apply_override(const ConfigOption *rhs) override {
+        if (this->nullable())
+            throw ConfigurationError("Cannot override a nullable ConfigOption.");
+        if (rhs->type() != this->type())
+            throw ConfigurationError("ConfigOptionVector.apply_override() applied to different types.");
+        auto rhs_co = static_cast<const ConfigOptionSingle*>(rhs);
+        if (! rhs->nullable()) {
+            // Overridding a non-nullable object with another non-nullable object.
+            if (this->value != rhs_co->value) {
+                this->value = rhs_co->value;
+                return true;
+            }
+            return false;
+        }
+
+        if (!rhs_co->is_nil() && rhs_co->value != this->value) {
+            this->value = rhs_co->value;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool nullable() const override { return NULLABLE; }
+
+    static constexpr NilType<T> nil_value() { return NilValue<T>(); }
+
+    // A scalar is nil, or all values of a vector are nil.
+    bool is_nil(int32_t idx = -1) const override
+    {
+        bool ret = false;
+
+        if constexpr (NULLABLE)
+            ret = this->value == nil_value();
+
+        return ret;
+    }
+
 private:
 	friend class cereal::access;
 	template<class Archive> void serialize(Archive & ar) { ar(this->flags); ar(this->value); }
 };
+
+template<class T>
+using ConfigOptionSingleNullable = ConfigOptionSingle<T, true>;
 
 // Value of a vector valued option (bools, ints, floats, strings, points)
 class ConfigOptionVectorBase : public ConfigOption {
@@ -633,6 +769,8 @@ public:
 
     // Is this vector empty?
     virtual bool   empty() const = 0;
+    // Is the value nil? That should only be possible if this->nullable().
+    bool   is_nil(int32_t idx) const override = 0;
     // Get if the size of this vector is/should be the same as nozzle_diameter
     bool is_extruder_size() const { return (flags & FCO_EXTRUDER_ARRAY) != 0; }
     ConfigOptionVectorBase* set_is_extruder_size(bool is_extruder_size = true) {
@@ -672,6 +810,7 @@ public:
     // We just overloaded and hid two base class virtual methods.
     // Let's show it was intentional (warnings).
     using ConfigOption::set;
+    using ConfigOption::is_nil;
 
 
 protected:
@@ -713,7 +852,7 @@ protected:
 public:
 
     ConfigOptionVector() {}
-    explicit ConfigOptionVector(const T& default_val) : default_value(default_val) { assert (m_enabled.size() == size()); }
+    explicit ConfigOptionVector(T default_val) : default_value(default_val) { assert (m_enabled.size() == size()); }
     explicit ConfigOptionVector(size_t n, const T &value) : m_values(n, value), default_value(value) { this->m_enabled.resize(m_values.size(), ConfigOption::is_enabled()); assert (m_enabled.size() == size()); }
     explicit ConfigOptionVector(std::initializer_list<T> il) : m_values(std::move(il)) { set_default_from_values(); this->m_enabled.resize(m_values.size(), ConfigOption::is_enabled()); assert (m_enabled.size() == size()); }
     explicit ConfigOptionVector(const std::vector<T> &values) : m_values(values) { set_default_from_values(); this->m_enabled.resize(m_values.size(), ConfigOption::is_enabled()); assert (m_enabled.size() == size()); }
@@ -986,25 +1125,38 @@ private:
 	template<class Archive> void serialize(Archive & ar) { ar(this->m_values); ar(cereal::base_class<ConfigOptionVectorBase>(this)); }
 };
 
-class ConfigOptionFloat : public ConfigOptionSingle<double>
+template<bool NULLABLE = false>
+class ConfigOptionFloatTempl : public ConfigOptionSingle<double, NULLABLE>
 {
 public:
-    ConfigOptionFloat() : ConfigOptionSingle<double>(0) {}
-    explicit ConfigOptionFloat(double _value) : ConfigOptionSingle<double>(_value) {}
+    ConfigOptionFloatTempl() : ConfigOptionSingle<double, NULLABLE>(0) {}
+    explicit ConfigOptionFloatTempl(double _value) : ConfigOptionSingle<double, NULLABLE>(_value) {}
 
     static ConfigOptionType static_type() { return coFloat; }
     ConfigOptionType        type()      const override { return static_type(); }
     double                  get_float(size_t idx = 0) const override { return this->value; }
-    ConfigOption*           clone()     const override { return new ConfigOptionFloat(*this); }
-    bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
-    bool                    operator<(const ConfigOptionFloat &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
+    ConfigOption*           clone()     const override { return new ConfigOptionFloatTempl(*this); }
+    bool                    operator==(const ConfigOptionFloatTempl &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionFloatTempl &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     
     std::string serialize() const override
     {
         std::ostringstream ss;
+        double v = this->value;
         if (!this->is_enabled())
             ss << "!";
         ss << this->value;
+        if (is_nil())
+            if (NULLABLE)
+                ss << "nil";
+            else
+                throw ConfigurationError("Serializing NaN");
+        else if (std::isfinite(v)) {
+            ss << v;
+
+        } else if(std::isnan(v))
+            throw ConfigurationError("Serializing invalid number");
+
         return ss.str();
     }
     
@@ -1017,20 +1169,45 @@ public:
             this->set_enabled(true);
         }
         std::istringstream iss(this->is_enabled() ? str : str.substr(1));
-        iss >> this->value;
+
+        if (str == "nil") {
+            if (NULLABLE)
+                this->value = this->nil_value();
+            else
+                throw ConfigurationError("Deserializing nil into a non-nullable object");
+        } else {
+            iss >> this->value;
+        }
+
         return !iss.fail();
     }
 
-    ConfigOptionFloat& operator=(const ConfigOption *opt)
+    ConfigOptionFloatTempl& operator=(const ConfigOption *opt)
     {   
         this->set(opt);
         return *this;
     }
 
+    bool is_nil(int32_t idx = -1) const override
+    {
+        return std::isnan(this->value) || this->value == ConfigOptionSingle<double, NULLABLE>::nil_value();
+    }
+
+    static inline bool is_any_nil(const boost::any &to_check) {
+        double dlb_val = boost::any_cast<double>(to_check);
+        return std::isnan(dlb_val) || dlb_val == ConfigOptionSingle<double, NULLABLE>::nil_value();
+    }
+
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_any_nil() { return boost::any(ConfigOptionSingle<double, NULLABLE>::nil_value()); }
+
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double>>(this)); }
+    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double, NULLABLE>>(this)); }
 };
+
+using ConfigOptionFloat = ConfigOptionFloatTempl<false>;
+using ConfigOptionFloatNullable  = ConfigOptionFloatTempl<true>;
 
 template<bool NULLABLE>
 class ConfigOptionFloatsTempl : public ConfigOptionVector<double>
@@ -1068,22 +1245,16 @@ public:
     {
         if (idx < 0) {
             for (double v : this->m_values)
-                if (!std::isnan(v) && v != NIL_VALUE())
+                if (!std::isnan(v) && v != ConfigOptionFloatNullable::nil_value())
                     return false;
             return true;
         } else {
-            return idx < int32_t(this->size()) ? (std::isnan(this->m_values[idx]) || NIL_VALUE() == this->m_values[idx]) :
-                   this->empty()               ? (std::isnan(this->default_value) || NIL_VALUE() == this->default_value) :
-                                                 (std::isnan(this->m_values.front()) || NIL_VALUE() == this->m_values.front());
+            return idx < int32_t(this->size()) ? (std::isnan(this->m_values[idx])    || ConfigOptionFloatNullable::nil_value() == this->m_values[idx]) :
+                   this->empty()               ? (std::isnan(this->default_value)    || ConfigOptionFloatNullable::nil_value() == this->default_value) :
+                                                 (std::isnan(this->m_values.front()) || ConfigOptionFloatNullable::nil_value() == this->m_values.front());
         }
     }
     double                  get_float(size_t idx = 0) const override { return get_at(idx); }
-
-    static inline bool is_nil(const boost::any &to_check) {
-        return std::isnan(boost::any_cast<double>(to_check)) || boost::any_cast<double>(to_check) == NIL_VALUE();
-    }
-    // don't use it to compare, use is_nil() to check.
-    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -1128,15 +1299,15 @@ public:
             }
         	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-        			this->m_values.push_back(NIL_VALUE());
+                    this->m_values.push_back(ConfigOptionFloatNullable::nil_value());
         		else
         			throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
 	            std::istringstream iss(item_str);
 	            double value;
 	            iss >> value;
-	            this->m_values.push_back(value);
-	        }
+                this->m_values.push_back(value);
+            }
             this->m_enabled.push_back(enabled);
         }
         set_default_enabled();
@@ -1154,17 +1325,17 @@ public:
 protected:
     // Special "nil" value to be stored into the vector if this->supports_nil().
     //please use is_nil & create_nil, to better support nan
-    static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
+    //static double 			NIL_VALUE() { return std::numeric_limits<double>::quiet_NaN(); }
     void serialize_single_value(std::ostringstream &ss, const double v, const bool enabled) const {
         if (!enabled)
             ss << "!";
-        if (std::isfinite(v))
-            ss << v;
-        else if (std::isnan(v) || v == NIL_VALUE()) {
+        if (std::isnan(v) || v == ConfigOptionFloatNullable::nil_value())
             if (NULLABLE)
                 ss << NIL_STR_VALUE;
             else
                 throw ConfigurationError("Serializing NaN");
+        else if (std::isfinite(v)) {
+            ss << v;
         } else
             throw ConfigurationError("Serializing invalid number");
 	}
@@ -1173,7 +1344,7 @@ protected:
     		if (v1.size() != v2.size())
     			return false;
     		for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end(); ++ it1, ++ it2)
-                if (!(((std::isnan(*it1) || *it1 == NIL_VALUE()) && (std::isnan(*it2) || *it2 == NIL_VALUE())) ||
+                if (!(((std::isnan(*it1) || *it1 == ConfigOptionFloatNullable::nil_value()) && (std::isnan(*it2) || *it2 == ConfigOptionFloatNullable::nil_value())) ||
                       *it1 == *it2))
 	    			return false;
     		return true;
@@ -1184,8 +1355,8 @@ protected:
     static bool vectors_lower(const std::vector<double> &v1, const std::vector<double> &v2) {
         if (NULLABLE) {
             for (auto it1 = v1.begin(), it2 = v2.begin(); it1 != v1.end() && it2 != v2.end(); ++ it1, ++ it2) {
-                auto null1 = int(std::isnan(*it1) || *it1 == NIL_VALUE());
-                auto null2 = int(std::isnan(*it2) || *it2 == NIL_VALUE());
+                auto null1 = int(std::isnan(*it1) || *it1 == ConfigOptionFloatNullable::nil_value());
+                auto null2 = int(std::isnan(*it2) || *it2 == ConfigOptionFloatNullable::nil_value());
                 return (null1 < null2) || (null1 == null2 && *it1 < *it2);
             }
             return v1.size() < v2.size();
@@ -1202,27 +1373,35 @@ private:
 using ConfigOptionFloats 		 = ConfigOptionFloatsTempl<false>;
 using ConfigOptionFloatsNullable = ConfigOptionFloatsTempl<true>;
 
-class ConfigOptionInt : public ConfigOptionSingle<int32_t>
+template<bool NULLABLE = false>
+class ConfigOptionIntTempl : public ConfigOptionSingle<int32_t, NULLABLE>
 {
 public:
-    ConfigOptionInt() : ConfigOptionSingle<int32_t>(0) {}
-    explicit ConfigOptionInt(int32_t value) : ConfigOptionSingle<int32_t>(value) {}
-    explicit ConfigOptionInt(double _value) : ConfigOptionSingle<int32_t>(int32_t(floor(_value + 0.5))) {}
+    ConfigOptionIntTempl() : ConfigOptionSingle<int32_t, NULLABLE>(0) {}
+    explicit ConfigOptionIntTempl(int32_t value) : ConfigOptionSingle<int32_t, NULLABLE>(value) {}
+    explicit ConfigOptionIntTempl(double _value) : ConfigOptionSingle<int32_t, NULLABLE>(int32_t(floor(_value + 0.5))) {}
     
     static ConfigOptionType static_type() { return coInt; }
     ConfigOptionType        type()   const override { return static_type(); }
     int32_t                 get_int(size_t idx = 0) const override { return this->value; }
     double                  get_float(size_t idx = 0) const override { return this->value; }
-    ConfigOption*           clone()  const override { return new ConfigOptionInt(*this); }
-    bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
-    bool                    operator<(const ConfigOptionInt &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
+    ConfigOption*           clone()  const override { return new ConfigOptionIntTempl(*this); }
+    bool                    operator==(const ConfigOptionIntTempl &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
+    bool                    operator<(const ConfigOptionIntTempl &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     
     std::string serialize() const override 
     {
         std::ostringstream ss;
         if (!this->is_enabled())
             ss << "!";
-        ss << this->value;
+        if (this->value == this->nil_value()) {
+            if (NULLABLE)
+                ss << "nil";
+            else
+                throw ConfigurationError("Serializing NaN");
+        } else
+            ss << this->value;
+
         return ss.str();
     }
     
@@ -1235,20 +1414,40 @@ public:
             this->set_enabled(true);
         }
         std::istringstream iss(this->is_enabled() ? str : str.substr(1));
-        iss >> this->value;
+
+        if (str == "nil") {
+            if (NULLABLE)
+                this->value = this->nil_value();
+            else
+                throw ConfigurationError("Deserializing nil into a non-nullable object");
+        } else {
+            iss >> this->value;
+        }
+
         return !iss.fail();
     }
 
-    ConfigOptionInt& operator=(const ConfigOption *opt) 
+    ConfigOptionIntTempl& operator=(const ConfigOption *opt)
     {   
         this->set(opt);
         return *this;
     }
+    
+
+    static inline bool is_any_nil(const boost::any &to_check) {
+        return boost::any_cast<int32_t>(to_check) == ConfigOptionSingle<int32_t, NULLABLE>::nil_value();
+    }
+
+    // don't use it to compare, use is_nil() to check.
+    static inline boost::any create_any_nil() { return boost::any(ConfigOptionSingle<int32_t, NULLABLE>::nil_value()); }
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int32_t>>(this)); }
+    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int32_t, NULLABLE>>(this)); }
 };
+
+using ConfigOptionInt = ConfigOptionIntTempl<false>;
+using ConfigOptionIntNullable = ConfigOptionIntTempl<true>;
 
 template<bool NULLABLE>
 class ConfigOptionIntsTempl : public ConfigOptionVector<int32_t>
@@ -1268,21 +1467,21 @@ public:
     bool                    operator==(const ConfigOptionIntsTempl &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
     bool                    operator< (const ConfigOptionIntsTempl &rhs) const throw() { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
-    bool                    nullable() const override { return NULLABLE; }
+    bool 					nullable() const override { return NULLABLE; }
     // Special "nil" value to be stored into the vector if this->supports_nil().
-    static int32_t          NIL_VALUE() { return std::numeric_limits<int32_t>::max(); }
+    //static int32_t          NIL_VALUE() { return std::numeric_limits<int32_t>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool is_nil(int32_t idx = -1) const override
     {
         if (idx < 0) {
             for (int32_t v : this->m_values)
-                if (v != NIL_VALUE())
+                if (v != ConfigOptionIntNullable::nil_value())
                     return false;
             return true;
         } else {
-            return idx < int32_t(this->size()) ? NIL_VALUE() == this->m_values[idx] :
-                   this->empty()               ? NIL_VALUE() == this->default_value :
-                                                 NIL_VALUE() == this->get_at(0);
+            return idx < int32_t(this->size()) ? ConfigOptionIntNullable::nil_value() == this->m_values[idx] :
+                   this->empty()               ? ConfigOptionIntNullable::nil_value() == this->default_value :
+                                                 ConfigOptionIntNullable::nil_value() == this->get_at(0);
         }
     }
     int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
@@ -1329,15 +1528,15 @@ public:
             }
         	if (item_str == NIL_STR_VALUE) {
         		if (NULLABLE)
-                    this->m_values.push_back(NIL_VALUE());
+                    this->m_values.push_back(ConfigOptionIntNullable::nil_value());
         		else
                     throw ConfigurationError("Deserializing nil into a non-nullable object");
         	} else {
 	            std::istringstream iss(item_str);
 	            int32_t value;
 	            iss >> value;
-	            this->m_values.push_back(value);
-	        }
+                this->m_values.push_back(value);
+            }
             this->m_enabled.push_back(enabled);
         }
         set_default_enabled();
@@ -1346,16 +1545,16 @@ public:
     }
 
 private:
-	void serialize_single_value(std::ostringstream &ss, const int32_t v, bool enabled) const {
+    void serialize_single_value(std::ostringstream &ss, const int32_t v, bool enabled) const {
         if (!enabled)
             ss << "!";
-		if (v == NIL_VALUE()) {
-        	if (NULLABLE)
-        		ss << NIL_STR_VALUE;
-        	else
-                throw ConfigurationError("Serializing NaN");
+        if (v == ConfigOptionIntNullable::nil_value()) {
+            if (NULLABLE)
+               ss << NIL_STR_VALUE;
+            else
+                throw ConfigurationError("Serializing NaN int");
         } else
-        	ss << v;
+            ss << v;
 	}
 
 	friend class cereal::access;
@@ -1368,9 +1567,9 @@ using ConfigOptionIntsNullable = ConfigOptionIntsTempl<true>;
 class ConfigOptionString : public ConfigOptionSingle<std::string>
 {
 public:
-    ConfigOptionString() : ConfigOptionSingle<std::string>("") {}
-    explicit ConfigOptionString(const std::string &value) : ConfigOptionSingle<std::string>(value) {}
-    
+    ConfigOptionString() : ConfigOptionSingle<std::string>(std::string{}) {}
+    explicit ConfigOptionString(std::string value) : ConfigOptionSingle<std::string>(std::move(value)) {}
+
     static ConfigOptionType static_type() { return coString; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionString(*this); }
@@ -1407,8 +1606,8 @@ class ConfigOptionStrings : public ConfigOptionVector<std::string>
 {
 public:
     ConfigOptionStrings() : ConfigOptionVector<std::string>() {}
-    explicit ConfigOptionStrings(const std::string& value) : ConfigOptionVector<std::string>(value) {}
-    explicit ConfigOptionStrings(size_t n, const std::string& value) : ConfigOptionVector<std::string>(n, value) {}
+    explicit ConfigOptionStrings(std::string default_value) : ConfigOptionVector<std::string>(default_value) {}
+    explicit ConfigOptionStrings(size_t n, const std::string &value) : ConfigOptionVector<std::string>(n, value) {}
     explicit ConfigOptionStrings(std::initializer_list<std::string> il) : ConfigOptionVector<std::string>(std::move(il)) {}
     explicit ConfigOptionStrings(const std::vector<std::string> &values) : ConfigOptionVector<std::string>(values) {}
     explicit ConfigOptionStrings(std::vector<std::string> &&values) : ConfigOptionVector<std::string>(std::move(values)) {}
@@ -1535,7 +1734,7 @@ public:
             if (idx > 0)
                 ss << ",";
             this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
-            if (! (std::isnan(this->m_values[idx]) || this->m_values[idx] == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+            if (! (std::isnan(this->m_values[idx]) || this->m_values[idx] == ConfigOptionFloatNullable::nil_value()))
                 ss << "%";
         }
         std::string str = ss.str();
@@ -1549,7 +1748,7 @@ public:
         for (size_t idx = 0;idx < this->m_values.size(); ++idx) {
             std::ostringstream ss;
             this->serialize_single_value(ss, this->m_values[idx], this->is_enabled(idx));
-            if (! (std::isnan(this->m_values[idx]) || this->m_values[idx] == ConfigOptionFloatsTempl<NULLABLE>::NIL_VALUE()))
+            if (! (std::isnan(this->m_values[idx]) || this->m_values[idx] == ConfigOptionFloatNullable::nil_value()))
                 ss << "%";
             vv.push_back(ss.str());
         }
@@ -1578,14 +1777,14 @@ public:
     ConfigOptionType            type()  const override { return static_type(); }
     ConfigOption*               clone() const override { return new ConfigOptionFloatOrPercent(*this); }
     ConfigOptionFloatOrPercent& operator=(const ConfigOption* opt) { this->set(opt); return *this; }
-    bool operator==(const ConfigOption &rhs) const override
+    bool                        operator==(const ConfigOption &rhs) const override
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionFloatOrPercent: Comparing incompatible types");
         assert(dynamic_cast<const ConfigOptionFloatOrPercent*>(&rhs));
         return *this == *static_cast<const ConfigOptionFloatOrPercent*>(&rhs);
     }
-    bool operator==(const ConfigOptionFloatOrPercent &rhs) const throw()
+    bool                        operator==(const ConfigOptionFloatOrPercent &rhs) const throw()
         { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value && this->percent == rhs.percent; }
     size_t                      hash() const throw() override 
         { size_t seed = std::hash<double>{}(this->value); return this->percent ? seed ^ 0x9e3779b9 : seed; }
@@ -1706,13 +1905,13 @@ public:
         return this->get_at(idx).percent;
     }
 
-    static inline bool is_nil(const boost::any &to_check) {
+    static inline bool is_any_nil(const boost::any &to_check) {
         bool ok = std::isnan(boost::any_cast<FloatOrPercent>(to_check).value) || boost::any_cast<FloatOrPercent>(to_check).value == NIL_VALUE().value
             || boost::any_cast<FloatOrPercent>(to_check).value > std::numeric_limits<float>::max();
         return ok;
     }
     // don't use it to compare, use is_nil() to check.
-    static inline boost::any create_nil() { return boost::any(NIL_VALUE()); }
+    static inline boost::any create_any_nil() { return boost::any(NIL_VALUE()); }
 
     std::string serialize() const override
     {
@@ -1751,7 +1950,7 @@ public:
             if (!item_str.empty() && item_str.front() == '!') {
                 enabled = false;
                 item_str = item_str.substr(1);
-        	    boost::trim(item_str);
+                boost::trim(item_str);
             }
             if (item_str == NIL_STR_VALUE) {
                 if (NULLABLE)
@@ -1893,8 +2092,8 @@ class ConfigOptionPoints : public ConfigOptionVector<Vec2d>
 {
 public:
     ConfigOptionPoints() : ConfigOptionVector<Vec2d>() {}
-    explicit ConfigOptionPoints(const Vec2d& value) : ConfigOptionVector<Vec2d>(value) {}
-    explicit ConfigOptionPoints(size_t n, const Vec2d& value) : ConfigOptionVector<Vec2d>(n, value) {}
+    explicit ConfigOptionPoints(Vec2d default_value) : ConfigOptionVector<Vec2d>(default_value) {}
+    explicit ConfigOptionPoints(size_t n, const Vec2d &value) : ConfigOptionVector<Vec2d>(n, value) {}
     explicit ConfigOptionPoints(std::initializer_list<Vec2d> il) : ConfigOptionVector<Vec2d>(std::move(il)) {}
     explicit ConfigOptionPoints(const std::vector<Vec2d> &values) : ConfigOptionVector<Vec2d>(values) {}
 
@@ -2276,7 +2475,7 @@ public:
             return idx < int32_t(this->size()) ? NIL_VALUE() == this->m_values[idx] :
                    this->empty()               ? NIL_VALUE() == this->default_value :
                                                  NIL_VALUE() == this->m_values.front();
-        }
+    }
     }
     bool                    get_bool(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }
     int32_t                 get_int(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0 ? 1 : 0; }
@@ -2437,7 +2636,7 @@ public:
         return false;
     }
 
-    // Map from an enum name to an enum integer value.
+    // Map from an enum integer value to name.
     static const t_config_enum_names& get_enum_names();
     // Map from an enum name to an enum integer value.
     static const t_config_enum_values& get_enum_values();
@@ -2514,27 +2713,128 @@ private:
 	template<class Archive> void serialize(Archive& ar) { ar(cereal::base_class<ConfigOptionInt>(this)); }
 };
 
+// Definition of values / labels for a combo box.
+// Mostly used for closed enums (when type == coEnum), but may be used for 
+// open enums with ints resp. floats, if gui_type is set to GUIType::i_enum_open" resp. GUIType::f_enum_open.
+class ConfigOptionEnumDef {
+public:
+    bool                            has_values() const { return ! m_values.empty(); }
+    bool                            has_labels() const { return ! m_labels.empty(); }
+    const std::vector<std::string>& values() const { return m_values; }
+    const std::string&              value(int idx) const { return m_values[idx]; }
+    // Used for open enums (gui_type is set to GUIType::i_enum_open" resp. GUIType::f_enum_open).
+    // If values not defined, use labels.
+    const std::vector<std::string>& enums() const { 
+        assert(this->is_valid_open_enum());
+        return this->has_values() ? m_values : m_labels;
+    }
+    // Used for closed enums. If labels are not defined, use values instead.
+    const std::vector<std::string>& labels() const { return this->has_labels() ? m_labels : m_values; }
+    const std::string&              label(int idx) const { return this->labels()[idx]; }
+
+    // Look up a closed enum value of this combo box based on an index of the combo box value / label.
+    // Such a mapping should always succeed.
+    int index_to_enum(int index) const;
+
+    // Look up an index of value / label of this combo box based on enum value. 
+    // Such a mapping may fail, thus an optional is returned.
+    std::optional<int> enum_to_index(int enum_val) const;
+
+    // Look up an index of value / label of this combo box based on value string. 
+    std::optional<int> value_to_index(const std::string &value) const;
+
+    // Look up an index of label of this combo box. Used for open enums.
+    std::optional<int> label_to_index(const std::string &value) const;
+
+    std::optional<std::reference_wrapper<const std::string>> enum_to_value(int enum_val) const;
+
+    std::optional<std::reference_wrapper<const std::string>> enum_to_label(int enum_val) const;
+    
+    //should be only used for debugging, but the script executor uses it to know how to read/write into the enum_def
+    bool is_valid_closed_enum() const;
+#ifndef NDEBUG
+    bool is_valid_open_enum() const;
+#endif // NDEBUG
+
+    void                    clear();
+
+    ConfigOptionEnumDef*    clone() const { return new ConfigOptionEnumDef{ *this }; }
+
+private:
+    friend ConfigDef;
+    friend ConfigOptionDef;
+
+    // Only allow ConfigOptionEnumDef() to be created from ConfigOptionDef.
+    ConfigOptionEnumDef() = default;
+    ConfigOptionEnumDef(const ConfigOptionEnumDef &other) // default copy, but with a check for m_enum_names when it reference 'itself'
+        : m_values(other.m_values)
+        , m_labels(other.m_labels)
+        , m_values_ordinary(other.m_values_ordinary)
+        , m_enum_names(other.m_enum_names)
+        , m_enum_keys_map(other.m_enum_keys_map)
+    {
+        if (other.m_enum_names == &other.m_values) {
+            this->m_enum_names = &this->m_values;
+        }
+    }
+
+    void set_values(const std::vector<std::string> &v);
+    void set_values(const std::initializer_list<std::string_view> il);
+    void set_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il);
+    void set_values(const std::vector<std::pair<std::string, std::string>> il);
+    void set_labels(const std::initializer_list<std::string_view> il);
+    void finalize_closed_enum();
+
+    std::vector<std::string>        m_values;
+    std::vector<std::string>        m_labels;
+    // If true, then enum_values are sorted and they contain all the values, thus the UI element ordinary
+    // to enum value could be converted directly.
+    bool                            m_values_ordinary { false };
+
+    template<typename EnumType>
+    void set_enum_map()
+    {
+        m_enum_names    = &ConfigOptionEnum<EnumType>::get_enum_names();
+        m_enum_keys_map = &ConfigOptionEnum<EnumType>::get_enum_values();
+    }
+
+    // For enums (when type == coEnum). Maps enums to enum names.
+    // These are stored in a global static const storage, defined in PrintConfig
+    // for scripted widget, there is no hardcoded storage, so m_enum_names is m_values and m_enum_keys_map is m_enum_keys_map_storage_for_script
+    // Initialized by ConfigOptionEnum<xxx>::get_enum_names()
+    const t_config_enum_names*  m_enum_names{ nullptr };
+    // For enums (when type == coEnum). Maps enum_values to enums.
+    // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
+    const t_config_enum_values* m_enum_keys_map{ nullptr };
+    std::shared_ptr<t_config_enum_values> m_enum_keys_map_storage_for_script{ nullptr };
+};
+
 // Definition of a configuration value for the purpose of GUI presentation, editing, value mapping and config file handling.
 class ConfigOptionDef
 {
 public:
     enum class GUIType {
+        // closed enum
         undefined,
         // Open enums, integer value could be one of the enumerated values or something else.
         i_enum_open,
         // Open enums, float value could be one of the enumerated values or something else.
         f_enum_open,
+        // Open enums, string value could be one of the enumerated values or something else.
+        select_open,
         // Color picker, string value.
         color,
-        // ???
-        select_open,
         // Currently unused.
         slider,
         // Static text
         legend,
         // Vector value, but edited as a single string.
-        // one_string, // it's now the default for vector without any idx. If you want to edit the first value, set the idx to 0
+        // one_string,// it's now the default for vector without any idx. If you want to edit the first value, set the idx to 0
+        // Close parameter, string value could be one of the list values.
+        select_close,
     };
+    static bool is_gui_type_enum_open(const GUIType gui_type) 
+        { return gui_type == ConfigOptionDef::GUIType::i_enum_open || gui_type == ConfigOptionDef::GUIType::f_enum_open || gui_type == ConfigOptionDef::GUIType::select_open; }
 
 	// Identifier of this option. It is stored here so that it is accessible through the by_serialization_key_ordinal map.
 	t_config_option_key 				opt_key;
@@ -2545,6 +2845,7 @@ public:
     // Default value of this option. The default value object is owned by ConfigDef, it is released in its destructor.
     Slic3r::clonable_ptr<const ConfigOption> default_value;
     void 								set_default_value(const ConfigOption* ptr) {
+        assert(!ptr->is_vector());
         this->default_value = Slic3r::clonable_ptr<const ConfigOption>(ptr);
     }
     void 								set_default_value(ConfigOptionVectorBase* ptr) {
@@ -2558,9 +2859,13 @@ public:
     // Create a default option to be inserted into a DynamicConfig.
     ConfigOption*						create_default_option() const;
 
+    bool                                is_scalar()     const { return (int(this->type) & int(coVectorType)) == 0; }
+
     template<class Archive> ConfigOption* load_option_from_archive(Archive &archive) const {
         if (this->nullable) {
             switch (this->type) {
+            case coFloat:           { auto opt = new ConfigOptionFloatNullable();   archive(*opt); return opt; }
+            case coInt:             { auto opt = new ConfigOptionIntNullable();	    archive(*opt); return opt; }
             case coFloats:          { auto opt = new ConfigOptionFloatsNullable();  archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coInts:            { auto opt = new ConfigOptionIntsNullable();    archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coPercents:        { auto opt = new ConfigOptionPercentsNullable();archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
@@ -2587,7 +2892,7 @@ public:
             case coGraphs:          { auto opt = new ConfigOptionGraphs();          archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
             case coBool:            { auto opt = new ConfigOptionBool();            archive(*opt); return opt; }
             case coBools:           { auto opt = new ConfigOptionBools();           archive(*opt); opt->set_is_extruder_size(this->is_vector_extruder); return opt; }
-            case coEnum:            { auto opt = new ConfigOptionEnumGeneric(this->enum_keys_map); archive(*opt); return opt; }
+		    case coEnum:            { auto opt = new ConfigOptionEnumGeneric(this->enum_def->m_enum_keys_map); archive(*opt); return opt; }
 		    default:                throw ConfigurationError(std::string("ConfigOptionDef::load_option_from_archive(): Unknown option type for option ") + this->opt_key);
 		    }
 		}
@@ -2596,6 +2901,8 @@ public:
     template<class Archive> ConfigOption* save_option_to_archive(Archive &archive, const ConfigOption *opt) const {
     	if (this->nullable) {
 		    switch (this->type) {
+            case coFloat:           archive(*static_cast<const ConfigOptionFloatNullable*>(opt));  break;
+            case coInt:             archive(*static_cast<const ConfigOptionIntNullable*>(opt));  break;
 		    case coFloats:          archive(*static_cast<const ConfigOptionFloatsNullable*>(opt));  break;
 		    case coInts:            archive(*static_cast<const ConfigOptionIntsNullable*>(opt));    break;
 		    case coPercents:        archive(*static_cast<const ConfigOptionPercentsNullable*>(opt));break;
@@ -2634,6 +2941,7 @@ public:
     // Special values - "i_enum_open", "f_enum_open" to provide combo box for int or float selection,
     // "select_open" - to open a selection dialog (currently only a serial port selection).
     GUIType                             gui_type { GUIType::undefined };
+    bool                                is_gui_type_enum_open() const { return is_gui_type_enum_open(this->gui_type); }
     // Usually empty. Otherwise "serialized" or "show_value"
     // The flags may be combined.
     // "serialized" - vector valued option is entered in a single edit field. Values are separated by a semicolon.
@@ -2688,8 +2996,8 @@ public:
     // <min, max> limit of a numeric input.
     // If not set, the <min, max> is set to <INT_MIN, INT_MAX>
     // By setting min=0, only nonnegative input is allowed.
-    double                              min             = INT_MIN;
-    double                              max             = INT_MAX;
+    double                              min             = -FLT_MAX;
+    double                              max             =  FLT_MAX;
     // To check if it's not a typo and a % is missing. Ask for confirmation if the value is higher than that.
     // if negative, if it's lower than the opposite.
     // if percentage, multiply by the nozzle_diameter.
@@ -2704,13 +3012,6 @@ public:
     // Sometimes a single value may well define multiple values in a "beginner" mode.
     // Currently used for aliasing "solid_layers" to "top_solid_layers", "bottom_solid_layers".
     std::vector<t_config_option_key>    shortcut;
-    // Definition of values / labels for a combo box.
-    // Mostly used for enums (when type == coEnum), but may be used for ints resp. floats, if gui_type is set to "i_enum_open" resp. "f_enum_open".
-    std::vector<std::string>            enum_values;
-    std::vector<std::string>            enum_labels;
-    // For enums (when type == coEnum). Maps enum_values to enums.
-    // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
-    const t_config_enum_values         *enum_keys_map   = nullptr;
     
     // Initialized by ConfigOptionEnum<xxx>::get_enum_values()
     std::shared_ptr<GraphSettings>      graph_settings;
@@ -2721,14 +3022,65 @@ public:
     boost::any                          default_script_value;
     std::vector<std::string>            depends_on; // from Option
 
-    bool has_enum_value(const std::string &value) const {
-        if (!value.empty() && value.front() == '!')
-            return has_enum_value(value.substr(1));
-        for (const std::string &v : enum_values)
-            if (v == value)
-                return true;
-        return false;
+    // Definition of values / labels for a combo box.
+    Slic3r::clonable_ptr<ConfigOptionEnumDef> enum_def;
+
+protected:
+    // Don't let these methods avaialable: the gui type isn't checked!
+
+    void set_enum_values(const std::vector<std::string> il);
+
+    void set_enum_values(const std::initializer_list<std::string_view> il);
+
+    void set_enum_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il);
+
+    void set_enum_values(const std::vector<std::pair<std::string, std::string>> il);
+
+    template<typename Values, typename Labels>
+    void set_enum_values(Values &&values, Labels &&labels) {
+        this->enum_def_new();
+        enum_def->set_values(std::move(values));
+        enum_def->set_labels(std::move(labels));
     }
+
+public:
+    void set_enum_values(GUIType gui_type, const std::initializer_list<std::string_view> il);
+
+    void set_enum_as_closed_for_scripted_enum(const std::vector<std::pair<std::string, std::string>> il);
+
+    void set_enum_values(GUIType gui_type, const std::initializer_list<std::pair<std::string_view, std::string_view>> il);
+
+    void set_enum_values(GUIType gui_type, const std::vector<std::pair<std::string, std::string>> il);
+
+    void set_enum_values(GUIType gui_type, const std::vector<std::string> il);
+
+    void set_enum_labels(GUIType gui_type, const std::initializer_list<std::string_view> il);
+
+    template<typename EnumType>
+    void set_enum(std::initializer_list<std::string_view> il) {
+        this->set_enum_values(il);
+        enum_def->set_enum_map<EnumType>();
+    }
+
+    template<typename EnumType>
+    void set_enum(std::initializer_list<std::pair<std::string_view, std::string_view>> il) {
+        this->set_enum_values(il);
+        enum_def->set_enum_map<EnumType>();
+    }
+
+    template<typename EnumType, typename Values, typename Labels>
+    void set_enum(Values &&values, Labels &&labels) {
+        this->set_enum_values(std::move(values), std::move(labels));
+        enum_def->set_enum_map<EnumType>();
+    }
+
+    template<typename EnumType, typename Values>
+    void set_enum(Values &&values, const std::initializer_list<std::string_view> labels) {
+        this->set_enum_values(std::move(values), labels);
+        enum_def->set_enum_map<EnumType>();
+    }
+
+    bool has_enum_value(const std::string &value) const;
 
     // 0 is an invalid key.
     size_t 								serialization_key_ordinal = 0;
@@ -2739,10 +3091,17 @@ public:
 
     // Assign this key to cli to disable CLI for this option.
     static const constexpr char *nocli =  "~~~noCLI";
-    
-    
+
     static std::map<std::string, ConfigOptionMode> names_2_tag_mode;
     //static void init_mode();
+
+private:
+    void    enum_def_new() {
+        if (enum_def)
+            enum_def->clear();
+        else
+            enum_def = Slic3r::clonable_ptr<ConfigOptionEnumDef>(new ConfigOptionEnumDef{});
+    }
 };
 
 inline bool operator<(const ConfigSubstitution &lhs, const ConfigSubstitution &rhs) throw() {
@@ -2779,6 +3138,7 @@ public:
             out.push_back(kvp.first);
         return out;
     }
+    bool                    empty() const { return options.empty(); }
 
     // Iterate through all of the CLI options and write them to a stream.
     std::ostream&           print_cli_help(
@@ -2788,6 +3148,8 @@ public:
 protected:
     ConfigOptionDef*        add(const t_config_option_key &opt_key, ConfigOptionType type);
     ConfigOptionDef*        add_nullable(const t_config_option_key &opt_key, ConfigOptionType type);
+    // Finalize open / close enums, validate everything.
+    void                    finalize();
 };
 
 // A pure interface to resolving ConfigOptions.
@@ -2864,11 +3226,15 @@ protected:
     // Both opt_key and value may be modified by handle_legacy().
     // If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by handle_legacy().
     // handle_legacy() is called internally by set_deserialize().
-    virtual void                    handle_legacy(t_config_option_key&/*opt_key*/, std::string&/*value*/) const {}
-    // Verify whether the opt_key has to be converted or isn't present int prusaslicer
+    virtual void                    handle_legacy(t_config_option_key &/*opt_key*/, std::string &/*value*/) const {}
+    // Verify whether the opt_key has to be converted or isn't present in prusaslicer
     // Both opt_key and value may be modified by to_prusa().
     // If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by to_prusa().
     virtual void                    to_prusa(t_config_option_key&/*opt_key*/, std::string&/*value*/) const {}
+    // Called after a config is loaded as a whole.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    // For conversion of single options, the handle_legacy() method above is called.
+    virtual void                    handle_legacy_composite() {}
 
 public:
 	using ConfigOptionResolver::option;
@@ -2901,7 +3267,17 @@ public:
             throw BadOptionTypeException("Conversion to a wrong type");
         return static_cast<TYPE*>(opt);
     }
-    
+
+    template<class T> T*       opt(const t_config_option_key &opt_key, bool create = false)
+        { return dynamic_cast<T*>(this->optptr(opt_key, create)); }
+    template<class T> const T* opt(const t_config_option_key &opt_key) const
+        { return dynamic_cast<const T*>(this->optptr(opt_key)); }
+
+    // Get definition for a particular option.
+    // Returns null if such an option definition does not exist.
+    const ConfigOptionDef*           option_def(const t_config_option_key &opt_key) const
+        { return this->def()->get(opt_key); }
+
     // Apply all keys of other ConfigBase defined by this->def() to this ConfigBase.
     // An UnknownOptionException is thrown in case some option keys of other are not defined by this->def(),
     // or this ConfigBase is of a StaticConfig type and it does not support some of the keys, and ignore_nonexistent is not set.
@@ -2945,15 +3321,28 @@ public:
     struct SetDeserializeItem {
     	SetDeserializeItem(const char *opt_key, const char *opt_value, bool append = false) : opt_key(opt_key), opt_value(opt_value), append(append) {}
     	SetDeserializeItem(const std::string &opt_key, const std::string &opt_value, bool append = false) : opt_key(opt_key), opt_value(opt_value), append(append) {}
+        SetDeserializeItem(const std::string &opt_key, const std::string_view opt_value, bool append = false) : opt_key(opt_key), opt_value(opt_value), append(append) {}
     	SetDeserializeItem(const char *opt_key, const bool value, bool append = false) : opt_key(opt_key), opt_value(value ? "1" : "0"), append(append) {}
     	SetDeserializeItem(const std::string &opt_key, const bool value, bool append = false) : opt_key(opt_key), opt_value(value ? "1" : "0"), append(append) {}
     	SetDeserializeItem(const char *opt_key, const int32_t value, bool append = false) : opt_key(opt_key), opt_value(std::to_string(value)), append(append) {}
     	SetDeserializeItem(const std::string &opt_key, const int32_t value, bool append = false) : opt_key(opt_key), opt_value(std::to_string(value)), append(append) {}
+        SetDeserializeItem(const char *opt_key, const std::initializer_list<int32_t> values, bool append = false) : opt_key(opt_key), opt_value(format(values)), append(append) {}
+        SetDeserializeItem(const std::string &opt_key, const std::initializer_list<int32_t> values, bool append = false) : opt_key(opt_key), opt_value(format(values)), append(append) {}
         SetDeserializeItem(const char *opt_key, const float value, bool append = false) : opt_key(opt_key), opt_value(float_to_string_decimal_point(value)), append(append) {}
         SetDeserializeItem(const std::string &opt_key, const float value, bool append = false) : opt_key(opt_key), opt_value(float_to_string_decimal_point(value)), append(append) {}
         SetDeserializeItem(const char *opt_key, const double value, bool append = false) : opt_key(opt_key), opt_value(float_to_string_decimal_point(value)), append(append) {}
         SetDeserializeItem(const std::string &opt_key, const double value, bool append = false) : opt_key(opt_key), opt_value(float_to_string_decimal_point(value)), append(append) {}
+        SetDeserializeItem(const char *opt_key, const std::initializer_list<float> values, bool append = false) : opt_key(opt_key), opt_value(format(values)), append(append) {}
+        SetDeserializeItem(const std::string &opt_key, const std::initializer_list<float> values, bool append = false) : opt_key(opt_key), opt_value(format(values)), append(append) {}
+        SetDeserializeItem(const char *opt_key, const std::initializer_list<double> values, bool append = false) : opt_key(opt_key), opt_value(format(values)), append(append) {}
+        SetDeserializeItem(const std::string &opt_key, const std::initializer_list<double> values, bool append = false) : opt_key(opt_key), opt_value(format(values)), append(append) {}
+
     	std::string opt_key; std::string opt_value; bool append = false;
+
+    private:
+        static std::string format(std::initializer_list<int32_t> values);
+        static std::string format(std::initializer_list<float> values);
+        static std::string format(std::initializer_list<double> values);
     };
 	// May throw BadOptionTypeException() if the operation fails.
     void set_deserialize(std::initializer_list<SetDeserializeItem> items, ConfigSubstitutionContext& substitutions);
@@ -2962,7 +3351,38 @@ public:
 
     const ConfigOptionDef* get_option_def(const t_config_option_key& opt_key) const;
     double get_computed_value(const t_config_option_key &opt_key, int extruder_id = -1) const;
-    double get_abs_value(const t_config_option_key &opt_key, double ratio_over) const;
+    double get_abs_value(const t_config_option_key &opt_key, double ratio_over) const; //TODO: 2.7: use extruder_id, reform the gat_abs_value to have common signature.
+
+    std::string&        opt_string(const t_config_option_key &opt_key, bool create = false)     { return this->option<ConfigOptionString>(opt_key, create)->value; }
+    const std::string&  opt_string(const t_config_option_key &opt_key) const                    { return const_cast<ConfigBase*>(this)->opt_string(opt_key); }
+    std::string&        opt_string(const t_config_option_key &opt_key, size_t idx)              { return this->option<ConfigOptionStrings>(opt_key)->get_at(idx); }
+    const std::string&  opt_string(const t_config_option_key &opt_key, size_t idx) const        { return const_cast<ConfigBase*>(this)->opt_string(opt_key, idx); }
+
+    double&             opt_float(const t_config_option_key &opt_key)                           { return this->option<ConfigOptionFloat>(opt_key)->value; }
+    const double&       opt_float(const t_config_option_key &opt_key) const                     { return dynamic_cast<const ConfigOptionFloat*>(this->option(opt_key))->value; }
+    double&             opt_float(const t_config_option_key &opt_key, size_t idx)               { return this->option<ConfigOptionFloats>(opt_key)->get_at(idx); }
+    const double&       opt_float(const t_config_option_key &opt_key, size_t idx) const         { return dynamic_cast<const ConfigOptionFloats*>(this->option(opt_key))->get_at(idx); }
+
+    int32_t&            opt_int(const t_config_option_key &opt_key)                             { return this->option<ConfigOptionInt>(opt_key)->value; }
+    int32_t             opt_int(const t_config_option_key &opt_key) const                       { return dynamic_cast<const ConfigOptionInt*>(this->option(opt_key))->value; }
+    int32_t&            opt_int(const t_config_option_key &opt_key, size_t idx)                 { return this->option<ConfigOptionInts>(opt_key)->get_at(idx); }
+    int32_t             opt_int(const t_config_option_key &opt_key, size_t idx) const           { return dynamic_cast<const ConfigOptionInts*>(this->option(opt_key))->get_at(idx); }
+    
+    // no dynamic_cast
+    bool      get_bool(const t_config_option_key &opt_key, size_t idx = 0) const                 {return this->option(opt_key)->get_bool(idx);}
+    int32_t   get_int(const t_config_option_key &opt_key, size_t idx = 0) const                  {return this->option(opt_key)->get_int(idx);}
+    double    get_float(const t_config_option_key &opt_key, size_t idx = 0) const                {return this->option(opt_key)->get_float(idx);}
+
+    // In ConfigManipulation::toggle_print_fff_options, it is called on option with type ConfigOptionEnumGeneric* and also ConfigOptionEnum*.
+    // Thus the virtual method getInt() is used to retrieve the enum value.
+    template<typename ENUM>
+    ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->get_int()); }
+
+    bool                opt_bool(const t_config_option_key &opt_key) const                      { return this->option<ConfigOptionBool>(opt_key)->value != 0; }
+    bool                opt_bool(const t_config_option_key &opt_key, size_t idx) const          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx) != 0; }
+    bool&               opt_bool(const t_config_option_key &opt_key)                            { return this->option<ConfigOptionBool>(opt_key)->value; }
+    uint8_t&            opt_bool(const t_config_option_key &opt_key, size_t idx)          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx); }
+
     void setenv_() const;
     ConfigSubstitutions load(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule);
     ConfigSubstitutions load_from_ini(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule);
@@ -2970,7 +3390,8 @@ public:
     // Loading a "will be one day a legacy format" of configuration stored into 3MF or AMF.
     // Accepts the same data as load_from_ini_string(), only with each configuration line possibly prefixed with a semicolon (G-code comment).
     ConfigSubstitutions load_from_ini_string_commented(std::string &&data, ForwardCompatibilitySubstitutionRule compatibility_rule);
-    ConfigSubstitutions load_from_gcode_file(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule);
+    ConfigSubstitutions load_from_gcode_file(const std::string &filename, ForwardCompatibilitySubstitutionRule compatibility_rule);
+    ConfigSubstitutions load_from_binary_gcode_file(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule);
     ConfigSubstitutions load(const boost::property_tree::ptree &tree, ForwardCompatibilitySubstitutionRule compatibility_rule);
     void save(const std::string &file, bool to_prusa = false) const;
 
@@ -3092,10 +3513,6 @@ public:
     // Allow DynamicConfig to be instantiated on ints own without a definition.
     // If the definition is not defined, the method requiring the definition will throw NoDefinitionException.
     const ConfigDef*        def() const override { return nullptr; }
-    template<class T> T*    opt(const t_config_option_key &opt_key, bool create = false)
-        { return dynamic_cast<T*>(this->option(opt_key, create)); }
-    template<class T> const T* opt(const t_config_option_key &opt_key) const
-        { return dynamic_cast<const T*>(this->option(opt_key)); }
     // Overrides ConfigResolver::optptr().
     const ConfigOption*     optptr(const t_config_option_key &opt_key) const override;
     // Overrides ConfigBase::optptr(). Find ando/or create a ConfigOption instance for a given name.
@@ -3126,36 +3543,6 @@ public:
     t_config_option_keys diff(const DynamicConfig &other, bool even_phony=true) const;
     // Returns options being equal in the two configs, ignoring options not present in both configs.
     t_config_option_keys equal(const DynamicConfig &other) const;
-
-    std::string&        opt_string(const t_config_option_key &opt_key, bool create = false)     { return this->option<ConfigOptionString>(opt_key, create)->value; }
-    const std::string&  opt_string(const t_config_option_key &opt_key) const                    { return const_cast<DynamicConfig*>(this)->opt_string(opt_key); }
-    std::string&        opt_string(const t_config_option_key &opt_key, unsigned int idx)        { return this->option<ConfigOptionStrings>(opt_key)->get_at(idx); }
-    const std::string&  opt_string(const t_config_option_key &opt_key, unsigned int idx) const  { return const_cast<DynamicConfig*>(this)->opt_string(opt_key, idx); }
-
-    double&             opt_float(const t_config_option_key &opt_key)                           { return this->option<ConfigOptionFloat>(opt_key)->value; }
-    const double&       opt_float(const t_config_option_key &opt_key) const                     { return dynamic_cast<const ConfigOptionFloat*>(this->option(opt_key))->value; }
-    double&             opt_float(const t_config_option_key &opt_key, unsigned int idx)         { return this->option<ConfigOptionFloats>(opt_key)->get_at(idx); }
-    const double&       opt_float(const t_config_option_key &opt_key, unsigned int idx) const   { return dynamic_cast<const ConfigOptionFloats*>(this->option(opt_key))->get_at(idx); }
-
-    int32_t&             opt_int(const t_config_option_key &opt_key)                             { return this->option<ConfigOptionInt>(opt_key)->value; }
-    int32_t              opt_int(const t_config_option_key &opt_key) const                       { return dynamic_cast<const ConfigOptionInt*>(this->option(opt_key))->value; }
-    int32_t&             opt_int(const t_config_option_key &opt_key, unsigned int idx)           { return this->option<ConfigOptionInts>(opt_key)->get_at(idx); }
-    int32_t              opt_int(const t_config_option_key &opt_key, unsigned int idx) const     { return dynamic_cast<const ConfigOptionInts*>(this->option(opt_key))->get_at(idx); }
-
-    // no dynamic_cast
-    bool      get_bool(const t_config_option_key &opt_key, size_t idx = 0) const                 {return this->option(opt_key)->get_bool(idx);}
-    int32_t   get_int(const t_config_option_key &opt_key, size_t idx = 0) const                  {return this->option(opt_key)->get_int(idx);}
-    double    get_float(const t_config_option_key &opt_key, size_t idx = 0) const                {return this->option(opt_key)->get_float(idx);}
-
-    // In ConfigManipulation::toggle_print_fff_options, it is called on option with type ConfigOptionEnumGeneric* and also ConfigOptionEnum*.
-    // Thus the virtual method get_int() is used to retrieve the enum value.
-    template<typename ENUM>
-    ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->get_int()); }
-    
-    bool                opt_bool(const t_config_option_key &opt_key) const                      { return this->option<ConfigOptionBool>(opt_key)->value != 0; }
-    bool                opt_bool(const t_config_option_key &opt_key, unsigned int idx) const    { return this->option<ConfigOptionBools>(opt_key)->get_at(idx) != 0; }
-    bool&               opt_bool(const t_config_option_key &opt_key)                            { return this->option<ConfigOptionBool>(opt_key)->value; }
-    unsigned char&      opt_bool(const t_config_option_key &opt_key, unsigned int idx)          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx); }
 
     // Command line processing
     bool                read_cli(int argc, const char* const argv[], t_config_option_keys* extra, t_config_option_keys* keys = nullptr);

@@ -31,22 +31,38 @@ public:
     constexpr enum_bitmask(option_type o) : m_bits(mask_value(o)) {}
 
     // Set the bit corresponding to the given option.
-    constexpr enum_bitmask operator|(option_type t) { return enum_bitmask(m_bits | mask_value(t)); }
+    constexpr enum_bitmask operator|(option_type t) const { return enum_bitmask(m_bits | mask_value(t)); }
 
     // Combine with another enum_bitmask of the same type.
-    constexpr enum_bitmask operator|(enum_bitmask<option_type> t) { return enum_bitmask(m_bits | t.m_bits); }
+    constexpr enum_bitmask operator|(enum_bitmask<option_type> t) const { return enum_bitmask(m_bits | t.m_bits); }
+
+    // Set the bit corresponding to the given option.
+    constexpr void operator|=(option_type t) { m_bits = enum_bitmask(m_bits | mask_value(t)); }
+
+    // Combine with another enum_bitmask of the same type.
+    constexpr void operator|=(enum_bitmask<option_type> t) { m_bits = enum_bitmask(m_bits | t.m_bits); }
 
     // Get the value of the bit corresponding to the given option.
-    constexpr bool operator&(option_type t) { return m_bits & mask_value(t); }
-    constexpr bool has(option_type t) { return m_bits & mask_value(t); }
+    constexpr bool operator&(option_type t) const { return m_bits & mask_value(t); }
+    constexpr bool has(option_type t) const { return m_bits & mask_value(t); }
 
+    constexpr bool operator==(const enum_bitmask r) const { return m_bits == r.m_bits; }
+    constexpr bool operator!=(const enum_bitmask r) const { return m_bits != r.m_bits; }
+    // For sorting by the enum values.
+    constexpr bool lower(const enum_bitmask r) const { return m_bits < r.m_bits; }
+    
+    // For having ascees to the underlying_type, to use it as hash key, mostly.
+    // Can be modified, is it problematic?
+    constexpr underlying_type& operator*() { return m_bits; }
+    constexpr underlying_type operator*() const { return m_bits; }
 private:
     underlying_type m_bits = 0;
 };
 
+
 // For enabling free functions producing enum_bitmask<> type from bit operations on enums.
-template<typename Enum> struct is_enum_bitmask_type { static const bool enable = false; };
-#define ENABLE_ENUM_BITMASK_OPERATORS(x) template<> struct is_enum_bitmask_type<x> { static const bool enable = true; };
+template<typename Enum> struct is_enum_bitmask_type { static constexpr const bool enable = false; };
+#define ENABLE_ENUM_BITMASK_OPERATORS(x) template<> struct is_enum_bitmask_type<x> { static constexpr const bool enable = true; };
 template<class Enum> inline constexpr bool is_enum_bitmask_type_v = is_enum_bitmask_type<Enum>::enable;
 
 // Creates an enum_bitmask from two options, convenient for passing of options to a function:

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Repetier.hpp"
 
 #include <algorithm>
@@ -35,6 +39,31 @@ Repetier::Repetier(DynamicPrintConfig *config) :
 
 const char* Repetier::get_name() const { return "Repetier"; }
 
+
+
+static wxString validate_repetier(const boost::optional<std::string>& name,
+                              const boost::optional<std::string>& soft,
+                              const boost::optional<std::string>& printers)
+{
+    if (soft) {
+        // See https://github.com/prusa3d/PrusaSlicer/issues/7807:
+        // Repetier allows "rebranding", so the "name" value is not reliable when detecting
+        // server type. Newer Repetier versions send "software", which should be invariant.
+        if ((*soft) == "Repetier-Server")
+            return GUI::format_wxstr(_L("Mismatched type of print host: %s"), (soft ? *soft : "Repetier"));
+    } else {
+        // If there is no "software" value, validate there is at lest a printer field
+        if (!name.has_value())
+            return GUI::format_wxstr(_L("Can't process the repetier return message: missing field '%s'"), "name");
+        else if (!printers.has_value()) {
+            return GUI::format_wxstr(_L("Can't process the repetier return message: missing field '%s'"), "printers");
+        }
+    }
+    return "";
+}
+
+
+
 bool Repetier::test(wxString &msg) const
 {
     // Since the request is performed synchronously here,
@@ -55,7 +84,7 @@ bool Repetier::test(wxString &msg) const
             res = false;
             msg = format_error(body, error, status);
         })
-        .on_complete([&, this](std::string body, unsigned) {
+        .on_complete([&](std::string body, unsigned) {
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got version: %2%") % name % body;
 
             try {
@@ -63,13 +92,12 @@ bool Repetier::test(wxString &msg) const
                 pt::ptree ptree;
                 pt::read_json(ss, ptree);
 
-                res = ptree.get_optional<std::string>("name").has_value();
-                if (!res)
-                    msg = GUI::from_u8((boost::format(_u8L("Can't process the repetier return message: missing field '%s'")) % ("name")).str());
-                else {
-                    res = ptree.get_optional<std::string>("printers").has_value();
-                    if (!res)
-                        msg = GUI::from_u8((boost::format(_u8L("Can't process the repetier return message: missing field '%s'")) % ("printers")).str());
+                const auto text = ptree.get_optional<std::string>("name");
+                const auto soft = ptree.get_optional<std::string>("software");
+                const auto printers = ptree.get_optional<std::string>("printers");
+                wxString error_msg = validate_repetier(text, soft, printers);
+                if (! error_msg.empty()) {
+                    msg = error_msg;
                 }
             }
             catch (const std::exception &) {
@@ -84,13 +112,11 @@ bool Repetier::test(wxString &msg) const
 
 wxString Repetier::get_test_failed_msg (wxString &msg) const
 {
-        return GUI::from_u8((boost::format("%s: %s\n\n%s")
-        % (boost::format(_u8L("Could not connect to %s")) % get_name())
-        % std::string(msg.ToUTF8())
-        % _u8L("Note: Repetier version at least 0.90.0 is required.")).str());
+    return GUI::format_wxstr(_L("Could not connect to %s: %s\n\n%s"), get_name(), msg,
+                             _L("Note: Repetier version at least 0.90.0 is required."));
 }
 
-bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const
+bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
     const char *name = get_name();
 
@@ -121,12 +147,13 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
     auto http = Http::post(std::move(url));
     set_auth(http);
 
-    if (! upload_data.group.empty() && upload_data.group != _utf8(L("Default"))) {
+    if (! upload_data.group.empty() && upload_data.group != _u8L("Default")) {
         http.form_add("group", upload_data.group);
     }
 
     if(upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
         http.form_add("name", upload_filename.string());
+        http.form_add("autostart", "true"); // See https://github.com/prusa3d/PrusaSlicer/issues/7807#issuecomment-1235519371
     }
 
     http.form_add("a", "upload")
@@ -152,10 +179,7 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
     return res;
 }
 
-bool Repetier::validate_version_text(const boost::optional<std::string> &version_text) const
-{
-    return version_text ? boost::starts_with(*version_text, "Repetier") : true;
-}
+
 
 void Repetier::set_auth(Http &http) const
 {
@@ -204,7 +228,7 @@ bool Repetier::get_groups(wxArrayString& groups) const
 
                 BOOST_FOREACH(boost::property_tree::ptree::value_type &v, ptree.get_child("groupNames.")) {
                     if (v.second.data() == "#") {
-                        groups.push_back(_utf8(L("Default")));
+                        groups.push_back(_L("Default"));
                     } else {
                         // Is it safe to assume that the data are utf-8 encoded?
                         groups.push_back(GUI::from_u8(v.second.data()));

@@ -62,7 +62,7 @@ void Generator::generateInitialInternalOverhangs(const PrintObject &print_object
         throw_on_cancel_callback();
         Polygons infill_area_here;
         for (const LayerRegion* layerm : print_object.get_layer(layer_nr)->regions())
-            for (const Surface& surface : layerm->fill_surfaces.surfaces)
+            for (const Surface& surface : layerm->fill_surfaces())
                 if (surface.surface_type == (stPosInternal | stDensSparse) || surface.surface_type == (stPosInternal | stDensVoid))
                     append(infill_area_here, to_polygons(surface.expolygon));
 
@@ -93,7 +93,7 @@ void Generator::generateTrees(const PrintObject &print_object, const std::functi
     for (int layer_id = int(print_object.layers().size()) - 1; layer_id >= 0; layer_id--) {
         throw_on_cancel_callback();
         for (const LayerRegion *layerm : print_object.get_layer(layer_id)->regions())
-            for (const Surface &surface : layerm->fill_surfaces.surfaces)
+            for (const Surface &surface : layerm->fill_surfaces())
                 if (surface.surface_type == (stPosInternal | stDensSparse) || surface.surface_type == (stPosInternal | stDensVoid))
                     append(infill_outlines[layer_id], to_polygons(surface.expolygon));
 

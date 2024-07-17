@@ -1,3 +1,14 @@
+///|/ Copyright (c) Prusa Research 2017 - 2023 Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Lukáš Hejl @hejllukas, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ ported from lib/Slic3r/GUI/OptionsGroup.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) Slic3r 2011 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2013 Scott Penrose
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2011 Richard Goodwin
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_OptionsGroup_hpp_
 #define slic3r_OptionsGroup_hpp_
 
@@ -18,6 +29,11 @@
     #define wxOSX true
 #else
     #define wxOSX false
+#endif 
+#ifdef __WXGTK3__
+    #define wxGTK3 true
+#else
+    #define wxGTK3 false
 #endif
 
 #define BORDER(a, b) ((wxOSX ? a : b))
@@ -48,13 +64,13 @@ struct Option {
 		return  (rhs.opt_id == this->opt_id);
 	}
 
-	Option(const ConfigOptionDef& _opt, t_config_option_key id) :
-		opt(_opt), opt_id(id) {}
+	Option(const ConfigOptionDef& _opt, t_config_option_key id);
 };
 using t_option = std::unique_ptr<Option>;	//!
 
 /// Represents option lines
-class Line {
+class Line : public UndoValueUIManager
+{
 	bool		m_is_separator{ false };
 public:
     wxString	label;
@@ -62,8 +78,6 @@ public:
 	std::string	label_path;
 
     size_t		full_width {0}; 
-	wxColour*	full_Label_color {nullptr};
-	bool		blink	{false};
     widget_t	widget {nullptr};
     std::function<wxWindow*(wxWindow*)>	near_label_widget{ nullptr };
 	wxWindow*	near_label_widget_win {nullptr};
@@ -86,12 +100,19 @@ public:
 		label(_(label)), label_tooltip(_(tooltip)) {}
 	Line() : m_is_separator(true) {}
 
+	Line(const std::string& opt_key, const wxString& label, const wxString& tooltip) :
+		label(_(label)), label_tooltip(_(tooltip))
+	{
+		m_options.push_back(Option({ opt_key, coNone }, opt_key));
+	}
+
 	bool is_separator() const { return m_is_separator; }
+	bool has_only_option(const std::string& opt_key) const { return m_options.size() == 1 && m_options[0].opt_id == opt_key; }
+	void clear();
 
     const std::vector<widget_t>&	get_extra_widgets() const {return m_extra_widgets;}
 	const std::vector<Option>&		get_options() const { return m_options; }
 	std::vector<Option>&			get_options() { return m_options; }
-	bool*							get_blink_ptr() { return &blink; }
 
 private:
 	std::vector<Option>		m_options;//! {std::vector<Option>()};
@@ -125,12 +146,14 @@ public:
 
     std::function<void(wxWindow* win)> rescale_extra_column_item { nullptr };
     std::function<void(wxWindow* win)> rescale_near_label_widget { nullptr };
+
+    std::function<void(const t_config_option_key& opt_key)> edit_custom_gcode { nullptr };
     
     wxFont			sidetext_font {wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT) };
     wxFont			label_font {wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT) };
     int             sidetext_width{ -1 };
     int             label_width{ -1 };
-	int				sublabel_width{ -1 };
+	//int				sublabel_width{ -1 }; //never set
 
     /// Returns a copy of the pointer of the parent wxWindow.
     /// Accessor function is because users are not allowed to change the parent
@@ -160,6 +183,14 @@ public:
 							if (m_fields.find(id) == m_fields.end()) return nullptr;
 							return m_fields.at(id).get();
     }
+
+    inline Line*	get_line(const t_config_option_key& id) {
+		for (Line& line : m_lines)
+			if (line.has_only_option(id))
+				return &line;
+		return nullptr;
+    }
+
 	bool			set_value(const t_config_option_key& id, const boost::any& value, bool change_event = false) {
 							if (m_fields.find(id) == m_fields.end()) return false;
 							m_fields.at(id)->set_any_value(value, change_event);
@@ -176,9 +207,8 @@ public:
 	void			show_field(const t_config_option_key& opt_key, bool show = true);
 	void			hide_field(const t_config_option_key& opt_key) {  show_field(opt_key, false);  }
 
-	void			set_name(const wxString& new_name) {
-							stb->SetLabel(new_name);
-    }
+	void			set_name(const wxString& new_name) { stb->SetLabel(new_name); }
+	wxString		get_name() const { return stb->GetLabel(); }
 
 	inline void		enable() { for (auto& field : m_fields) field.second->enable(); }
     inline void		disable() { for (auto& field : m_fields) field.second->disable(); }
@@ -190,15 +220,18 @@ public:
 
 	OptionsGroup(	wxWindow* _parent, const wxString& title, bool is_tab_opt = false, 
                     column_t extra_clmn = nullptr);
-	~OptionsGroup() { clear(true); }
+	virtual ~OptionsGroup() { clear(true); }
 
     wxGridSizer*        get_grid_sizer() { return m_grid_sizer; }
 	const std::vector<Line>& get_lines() const { return m_lines; }
 	std::vector<Line>&  set_lines() { return m_lines; }
+	Line*				get_last_line()  { return m_lines.empty() ? nullptr : &m_lines[m_lines.size()-1]; }
 	bool				is_legend_line();
 	// if we have to set the same control alignment for different option groups, 
     // we have to set same max contrtol width to all of them
 	void				set_max_win_width(int max_win_width);
+	void				set_use_custom_ctrl(bool use_custom_ctrl) { m_use_custom_ctrl = use_custom_ctrl; }
+	const std::map<t_config_option_key, Option>& get_optioms_map() { return m_options; }
 
 	bool				is_activated() { return sizer != nullptr; }
 
@@ -260,6 +293,7 @@ public:
 		OptionsGroup(parent, title, is_tab_opt, extra_clmn), m_config(&config->get()), m_modelconfig(config), m_config_mutable(nullptr) {}
 	ConfigOptionsGroup(	wxWindow* parent) :
 		OptionsGroup(parent, wxEmptyString, true, nullptr) {}
+    ~ConfigOptionsGroup() override = default;
 
 	const wxString& config_category() const throw() { return m_config_category; }
 	int config_type() const throw() { return m_config_type; }

@@ -37,7 +37,7 @@ namespace Slic3r {
         else if (params.config != NULL && idx == 0) params_modifided.flow_mult *= (1.f - (float)params.config->fill_smooth_distribution.get_abs_value(1));
         else params_modifided.flow_mult *= (float)percentFlow[idx];
         //set role
-        if (rolePass[idx] != erNone)
+        if (rolePass[idx] != ExtrusionRole::None)
             params_modifided.role = rolePass[idx];
 
         //choose if we are going to extrude with or without overlap
@@ -79,8 +79,8 @@ namespace Slic3r {
         if (!polylines_layer.empty()) {
             //get the role
             ExtrusionRole good_role = params.role;
-            if (good_role == erNone || good_role == erCustom) {
-                good_role = params.flow.bridge() && idx == 0 ? erBridgeInfill : rolePass[idx];
+            if (good_role == ExtrusionRole::None) {
+                good_role = params.flow.bridge() && idx == 0 ? ExtrusionRole::BridgeInfill : rolePass[idx];
             }
             //get the flow
             float mult_flow = 1;
@@ -118,11 +118,15 @@ namespace Slic3r {
             this->debug_verify_flow_mult = mult_flow;
 #endif
             extrusion_entities_append_paths(
-                eec, std::move(polylines_layer),
-                good_role,
-                params.flow.mm3_per_mm() * params.flow_mult * mult_flow,
-                //min-reduced flow width for a better view (it's mostly a gui thing, but some support code can want to mess with it)
-                (float)(params.flow.width() * (params.flow_mult* mult_flow < 0.1 ? 0.1 : params.flow_mult * mult_flow)), (float)params.flow.height());
+                eec,
+                std::move(polylines_layer),
+                ExtrusionAttributes{good_role,
+                                    ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult * mult_flow,
+                                                    // min-reduced flow width for a better view (it's mostly a gui
+                                                    // thing, but some support code can want to mess with it)
+                                                    (float) (params.flow.width() * (params.flow_mult * mult_flow < 0.1 ? 0.1 : params.flow_mult * mult_flow)),
+                                                    (float) params.flow.height()}},
+                true);
         }
     }
 
@@ -138,8 +142,8 @@ namespace Slic3r {
 
         // first infill
         FillParams first_pass_params = params;
-        //if(first_pass_params.role != ExtrusionRole::erSupportMaterial && first_pass_params.role != ExtrusionRole::erSupportMaterialInterface)
-        //s    first_pass_params.role = ExtrusionRole::erSolidInfill;
+        //if(first_pass_params.role !=  ExtrusionRole::SupportMaterial && first_pass_params.role !=  ExtrusionRole::SupportMaterialInterface)
+        //s    first_pass_params.role =  ExtrusionRole::SolidInfill;
         perform_single_fill(0, *eecroot, *surface, first_pass_params);
 
         //use monotonic for ironing pass

@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2019 Spencer Owen @spuder
+///|/ Copyright (c) 2018 Martin Loidl @LoidlM
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "AstroBox.hpp"
 
 #include <algorithm>
@@ -14,6 +20,7 @@
 #include "libslic3r/PrintConfig.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/GUI.hpp"
+#include "slic3r/GUI/format.hpp"
 #include "Http.hpp"
 
 
@@ -66,7 +73,7 @@ bool AstroBox::test(wxString &msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (! res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "AstroBox")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "AstroBox"));
                 }
             }
             catch (const std::exception &) {
@@ -81,14 +88,13 @@ bool AstroBox::test(wxString &msg) const
 
 wxString AstroBox::get_test_failed_msg (wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s\n\n%s")
-        % (boost::format(_u8L("Could not connect to %s")) % get_name())
-        % std::string(msg.ToUTF8())
-        % _u8L("Note: AstroBox version at least 1.1.0 is required.")
-        ).str());
+    return GUI::format_wxstr("Could not connect to %s: %s\n\n%s"
+        , get_name()
+        , msg
+        , _L("Note: AstroBox version at least 1.1.0 is required."));
 }
 
-bool AstroBox::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const
+bool AstroBox::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
     const char *name = get_name();
 

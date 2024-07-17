@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_OpenGLManager_hpp_
 #define slic3r_OpenGLManager_hpp_
 
@@ -6,6 +10,9 @@
 class wxWindow;
 class wxGLCanvas;
 class wxGLContext;
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+class wxGLAttributes;
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 namespace Slic3r {
 namespace GUI {
@@ -24,21 +31,38 @@ public:
     class GLInfo
     {
         bool m_detected{ false };
+        bool m_core_profile{ false };
         int m_max_tex_size{ 0 };
         float m_max_anisotropy{ 0.0f };
 
-        std::string m_version;
-        std::string m_glsl_version;
+        std::string m_version_string;
+        Semver m_version = Semver::invalid();
+        bool m_version_is_mesa = false;
+
+        std::string m_glsl_version_string;
+        Semver m_glsl_version = Semver::invalid();
+
         std::string m_vendor;
         std::string m_renderer;
 
     public:
         GLInfo() = default;
 
-        const std::string& get_version() const;
-        const std::string& get_glsl_version() const;
+        const std::string& get_version_string() const;
+        const std::string& get_glsl_version_string() const;
         const std::string& get_vendor() const;
         const std::string& get_renderer() const;
+
+        bool is_core_profile() const { return m_core_profile; }
+
+        bool is_mesa() const;
+        bool is_es() const {
+#if ENABLE_OPENGL_ES
+            return true;
+#else
+            return false;
+#endif // ENABLE_OPENGL_ES
+        }
 
         int get_max_tex_size() const;
         float get_max_anisotropy() const;
@@ -49,6 +73,10 @@ public:
         // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
         // Otherwise HTML formatted for the system info dialog.
         std::string to_string(bool for_github) const;
+
+#if ENABLE_GL_CORE_PROFILE
+        std::vector<std::string> get_extensions_list() const;
+#endif // ENABLE_GL_CORE_PROFILE
 
     private:
         void detect() const;
@@ -74,6 +102,7 @@ private:
 
     bool m_gl_initialized{ false };
     wxGLContext* m_context{ nullptr };
+    bool m_debug_enabled{ false };
     GLShadersManager m_shaders_manager;
     static GLInfo s_gl_info;
 #ifdef __APPLE__ 
@@ -81,16 +110,21 @@ private:
     static OSInfo s_os_info;
 #endif //__APPLE__
     static bool s_compressed_textures_supported;
+    static bool s_force_power_of_two_textures;
+
     static EMultisampleState s_multisample;
     static EFramebufferType s_framebuffers_type;
 
-    static bool m_use_manually_generated_mipmaps;
 public:
     OpenGLManager() = default;
     ~OpenGLManager();
 
     bool init_gl();
+#if ENABLE_GL_CORE_PROFILE
+    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_compatibility_profile, bool enable_debug);
+#else
     wxGLContext* init_glcontext(wxGLCanvas& canvas);
+#endif // ENABLE_GL_CORE_PROFILE
 
     GLShaderProgram* get_shader(const std::string& shader_name) { return m_shaders_manager.get_shader(shader_name); }
     GLShaderProgram* get_current_shader() { return m_shaders_manager.get_current_shader(); }
@@ -101,10 +135,14 @@ public:
     static EFramebufferType get_framebuffers_type() { return s_framebuffers_type; }
     static wxGLCanvas* create_wxglcanvas(wxWindow& parent);
     static const GLInfo& get_gl_info() { return s_gl_info; }
-    static bool use_manually_generated_mipmaps() { return m_use_manually_generated_mipmaps; }
+    static bool force_power_of_two_textures() { return s_force_power_of_two_textures; }
 
 private:
+#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
+    static void detect_multisample(const wxGLAttributes& attribList);
+#else
     static void detect_multisample(int* attribList);
+#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 };
 
 } // namespace GUI

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include <numeric>
 
 #include "SlicesToTriangleMesh.hpp"
@@ -8,6 +12,8 @@
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
+
+#include <boost/log/trivial.hpp>
 
 namespace Slic3r {
 
@@ -52,7 +58,8 @@ indexed_triangle_set slices_to_mesh(
     Layers layers(slices.size());
     size_t len = slices.size() - 1;
 
-    tbb::parallel_for(size_t(0), len, [&slices, &layers, &grid](size_t i) {
+    auto threads_cnt = execution::max_concurrency(ex_tbb);
+    execution::for_each(ex_tbb, size_t(0), len, [&slices, &layers, &grid](size_t i) {
         const ExPolygons &upper = slices[i + 1];
         const ExPolygons &lower = slices[i];
 
@@ -64,14 +71,15 @@ indexed_triangle_set slices_to_mesh(
         its_merge(layers[i], triangulate_expolygons_3d(free_top, grid[i], NORMALS_UP));
         its_merge(layers[i], triangulate_expolygons_3d(overhang, grid[i], NORMALS_DOWN));
         its_merge(layers[i], straight_walls(upper, grid[i], grid[i + 1]));
-    });
+        }, threads_cnt);
 
     auto merge_fn = []( const indexed_triangle_set &a, const indexed_triangle_set &b ) {
         indexed_triangle_set res{a}; its_merge(res, b); return res;
     };
 
     auto ret = execution::reduce(ex_tbb, layers.begin(), layers.end(),
-                                 indexed_triangle_set{}, merge_fn);
+                                 indexed_triangle_set{}, merge_fn,
+                                 threads_cnt);
 
     its_merge(ret, triangulate_expolygons_3d(slices.front(), zmin, NORMALS_DOWN));
     its_merge(ret, straight_walls(slices.front(), zmin, grid.front()));
@@ -80,9 +88,14 @@ indexed_triangle_set slices_to_mesh(
     // FIXME: these repairs do not fix the mesh entirely. There will be cracks
     // in the output. It is very hard to do the meshing in a way that does not
     // leave errors.
-    its_merge_vertices(ret);
-    its_remove_degenerate_faces(ret);
-    its_compactify_vertices(ret);
+    int num_mergedv = its_merge_vertices(ret);
+    BOOST_LOG_TRIVIAL(debug) << "Merged vertices count: " << num_mergedv;
+
+    int remcnt = its_remove_degenerate_faces(ret);
+    BOOST_LOG_TRIVIAL(debug) << "Removed degenerate faces count: " << remcnt;
+
+    int num_erasedv = its_compactify_vertices(ret);
+    BOOST_LOG_TRIVIAL(debug) << "Erased vertices count: " << num_erasedv;
 
     return ret;
 }

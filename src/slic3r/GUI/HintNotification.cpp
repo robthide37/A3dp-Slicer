@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Oleksandra Iushchenko @YuSanka, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas
+///|/ Copyright (c) 2021 odaki @odaki
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "HintNotification.hpp"
 #include "ImGuiWrapper.hpp"
 #include "format.hpp"
@@ -14,12 +19,14 @@
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
+#include <map>
+
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/property_tree/ini_parser.hpp>
-#include <map>
+
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/string.hpp>
 #include <cereal/types/vector.hpp>
@@ -65,7 +72,7 @@ inline void push_style_color(ImGuiCol idx, const ImVec4& col, bool fading_out, f
 
 void write_used_binary(const std::vector<std::string>& ids)
 {
-	boost::filesystem::ofstream file((boost::filesystem::path(data_dir()) / "cache" / "hints.cereal"), std::ios::binary);
+	boost::nowide::ofstream file((boost::filesystem::path(data_dir()) / "cache" / "hints.cereal").string(), std::ios::binary);
 	cereal::BinaryOutputArchive archive(file);
 		HintsCerealData cd { ids };
 	try
@@ -84,7 +91,7 @@ void read_used_binary(std::vector<std::string>& ids)
 		BOOST_LOG_TRIVIAL(warning) << "Failed to load to hints.cereal. File does not exists. " << path.string();
 		return;
 	}
-	boost::filesystem::ifstream file(path);
+	boost::nowide::ifstream file(path.string(), std::ios::binary);
 	cereal::BinaryInputArchive archive(file);
 	HintsCerealData cd;
 	try
@@ -342,7 +349,7 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
 			bool		was_displayed = is_used(id_string);
 			//unescape text1
 			unescape_string_cstyle(dict["text"], fulltext);
-			fulltext = _utf8(fulltext);
+			fulltext = into_u8(_(fulltext));
 #ifdef __APPLE__
 			boost::replace_all(fulltext, "Ctrl+", "⌘");
 #endif //__APPLE__
@@ -368,19 +375,19 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
 				fulltext.erase(hypertext_start, HYPERTEXT_MARKER_START.size());
 				if (fulltext.find(HYPERTEXT_MARKER_START) != std::string::npos) {
 					// This must not happen - only 1 hypertext allowed
-					BOOST_LOG_TRIVIAL(error) << "Hint notification with multiple hypertexts: " << _utf8(dict["text"]);
+					BOOST_LOG_TRIVIAL(error) << "Hint notification with multiple hypertexts: " << dict["text"];
 					continue;
 				}
 				size_t hypertext_end = fulltext.find(HYPERTEXT_MARKER_END);
 				if (hypertext_end == std::string::npos) {
 					// hypertext was not correctly ended
-					BOOST_LOG_TRIVIAL(error) << "Hint notification without hypertext end marker: " << _utf8(dict["text"]);
+					BOOST_LOG_TRIVIAL(error) << "Hint notification without hypertext end marker: " << dict["text"];
 					continue;
 				}
 				fulltext.erase(hypertext_end, HYPERTEXT_MARKER_END.size());
 				if (fulltext.find(HYPERTEXT_MARKER_END) != std::string::npos) {
 					// This must not happen - only 1 hypertext end allowed
-					BOOST_LOG_TRIVIAL(error) << "Hint notification with multiple hypertext end markers: " << _utf8(dict["text"]);
+					BOOST_LOG_TRIVIAL(error) << "Hint notification with multiple hypertext end markers: " << dict["text"];
 					continue;
 				}
 				
@@ -422,9 +429,9 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
 					m_loaded_hints.emplace_back(hint_data);
 				// open preferences
 				} else if(dict["hypertext_type"] == "preferences") {
-					int			page = static_cast<Preset::Type>(std::atoi(dict["hypertext_preferences_page"].c_str()));
+					std::string	page = dict["hypertext_preferences_page"];
 					std::string	item = dict["hypertext_preferences_item"];
-					HintData	hint_data{ id_string, text1, weight, was_displayed, hypertext_text, follow_text, disabled_tags, enabled_tags, false, documentation_link, [page, item]() { wxGetApp().open_preferences(page, item); } };
+					HintData	hint_data{ id_string, text1, weight, was_displayed, hypertext_text, follow_text, disabled_tags, enabled_tags, false, documentation_link, [page, item]() { wxGetApp().open_preferences(item, page); } };
 					m_loaded_hints.emplace_back(hint_data);
 				} else if (dict["hypertext_type"] == "plater") {
 					std::string	item = dict["hypertext_plater_item"];
@@ -882,7 +889,7 @@ void NotificationManager::HintNotification::render_close_button(ImGuiWrapper& im
 	//render_right_arrow_button(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
 	render_logo(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
 	render_preferences_button(imgui, win_pos_x, win_pos_y);
-	if (!m_documentation_link.empty() && wxGetApp().app_config->get("suppress_hyperlinks") != "1")
+	if (!m_documentation_link.empty() && !wxGetApp().app_config->get_bool("suppress_hyperlinks"))
 	{
 		render_documentation_button(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
 	}
@@ -929,7 +936,7 @@ void NotificationManager::HintNotification::render_preferences_button(ImGuiWrapp
 	}
 	if (imgui.button(button_text.c_str(), button_size.x, button_size.y))
 	{
-		wxGetApp().open_preferences(2, "show_hints");
+		wxGetApp().open_preferences("show_hints", "GUI");
 	}
 
 	ImGui::PopStyleColor(5);

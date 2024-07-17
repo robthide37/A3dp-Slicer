@@ -1,6 +1,11 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Lukáš Matěna @lukasmatena, Pavel Mikuš @Godrak, Vojtěch Bubník @bubnikv, Filip Sykala @Jony01
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r.h"
 #include "ConvexHull.hpp"
 #include "BoundingBox.hpp"
+#include "../Geometry.hpp"
 
 #include <boost/multiprecision/integer.hpp>
 
@@ -19,13 +24,13 @@ Polygon convex_hull(Points pts)
         hull.points.resize(2 * n);
         // Build lower hull
         for (int i = 0; i < n; ++ i) {
-            while (k >= 2 && pts[i].ccw(hull[k-2], hull[k-1]) <= 0)
+            while (k >= 2 && Geometry::orient(pts[i], hull[k-2], hull[k-1]) != Geometry::ORIENTATION_CCW)
                 -- k;
             hull[k ++] = pts[i];
         }
         // Build upper hull
         for (int i = n-2, t = k+1; i >= 0; i--) {
-            while (k >= t && pts[i].ccw(hull[k-2], hull[k-1]) <= 0)
+            while (k >= t && Geometry::orient(pts[i], hull[k-2], hull[k-1]) != Geometry::ORIENTATION_CCW)
                 -- k;
             hull[k ++] = pts[i];
         }
@@ -58,7 +63,7 @@ Pointf3s convex_hull(Pointf3s points)
                 Point k1 = Point::new_scale(hull[k - 1](0), hull[k - 1](1));
                 Point k2 = Point::new_scale(hull[k - 2](0), hull[k - 2](1));
 
-                if (p.ccw(k2, k1) <= 0)
+                if (Geometry::orient(p, k2, k1) != Geometry::ORIENTATION_CCW)
                     --k;
                 else
                     break;
@@ -76,7 +81,7 @@ Pointf3s convex_hull(Pointf3s points)
                 Point k1 = Point::new_scale(hull[k - 1](0), hull[k - 1](1));
                 Point k2 = Point::new_scale(hull[k - 2](0), hull[k - 2](1));
 
-                if (p.ccw(k2, k1) <= 0)
+                if (Geometry::orient(p, k2, k1) != Geometry::ORIENTATION_CCW)
                     --k;
                 else
                     break;
@@ -103,6 +108,29 @@ Polygon convex_hull(const Polygons &polygons)
     return convex_hull(std::move(pp));
 }
 
+Polygon convex_hull(const ExPolygons &expolygons)
+{
+    Points pp;
+    size_t sz = 0;
+    for (const auto &expoly : expolygons)
+        sz += expoly.contour.size();
+    pp.reserve(sz);
+    for (const auto &expoly : expolygons)
+        pp.insert(pp.end(), expoly.contour.points.begin(), expoly.contour.points.end());
+    return convex_hull(pp);
+}
+
+Polygon convex_hulll(const Polylines &polylines)
+{
+    Points pp;
+    size_t sz = 0;
+    for (const auto &polyline : polylines)
+        sz += polyline.points.size();
+    pp.reserve(sz);
+    for (const auto &polyline : polylines)
+        pp.insert(pp.end(), polyline.points.begin(), polyline.points.end());
+    return convex_hull(pp);
+}
 
 namespace rotcalip {
 
@@ -374,7 +402,7 @@ bool inside_convex_polygon(const std::pair<std::vector<Vec2d>, std::vector<Vec2d
         // At min x.
         assert(pt.x() == it_bottom->x());
         assert(pt.x() == it_top->x());
-        assert(it_bottom->y() <= pt.y() && it_bottom->y() <= it_top->y());
+        assert(it_bottom->y() <= pt.y() && pt.y() <= it_top->y());
         return pt.y() >= it_bottom->y() && pt.y() <= it_top->y();
     }
 

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2021 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Serial.hpp"
 
 #include "libslic3r/Exception.hpp"
@@ -15,6 +19,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/optional.hpp>
+#include <boost/nowide/fstream.hpp>
 
 #if _WIN32
 	#include <Windows.h>
@@ -85,8 +90,8 @@ void parse_hardware_id(const std::string &hardware_id, SerialPortInfo &spi)
 #ifdef __linux__
 optional<std::string> sysfs_tty_prop(const std::string &tty_dev, const std::string &name)
 {
-	const auto prop_path = (boost::format("/sys/class/tty/%1%/device/../%2%") % tty_dev % name).str();
-	std::ifstream file(prop_path);
+	const std::string prop_path = (boost::format("/sys/class/tty/%1%/device/../%2%") % tty_dev % name).str();
+	boost::nowide::ifstream file(prop_path);
 	std::string res;
 
 	std::getline(file, res);

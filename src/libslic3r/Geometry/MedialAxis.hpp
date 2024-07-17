@@ -1,3 +1,8 @@
+///|/ Copyright (c) superslicer 2019 - 2023 Durand Rémi @supermerill
+///// Copyright (c) Prusa Research 2021 - 2022 Vojtěch Bubník @bubnikv
+///|/
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Geometry_MedialAxis_hpp_
 #define slic3r_Geometry_MedialAxis_hpp_
 
@@ -13,28 +18,41 @@
 using boost::polygon::voronoi_builder;
 using boost::polygon::voronoi_diagram;
 
-namespace Slic3r { namespace Geometry {
+namespace Slic3r::Geometry {
 #if 0 //PS
 class MedialAxis {
 public:
-    Lines lines;
-    const ExPolygon* expolygon;
-    double max_width;
-    double min_width;
-    MedialAxis(double _max_width, double _min_width, const ExPolygon* _expolygon = NULL)
-        : expolygon(_expolygon), max_width(_max_width), min_width(_min_width) {};
+    MedialAxis(double min_width, double max_width, const ExPolygon &expolygon);
     void build(ThickPolylines* polylines);
     void build(Polylines* polylines);
     
 private:
+    // Input
+    const ExPolygon     &m_expolygon;
+    Lines                m_lines;
+    // for filtering of the skeleton edges
+    double               m_min_width;
+    double               m_max_width;
+
+    // Voronoi Diagram.
     using VD = VoronoiDiagram;
-    VD vd;
-    std::set<const VD::edge_type*> edges, valid_edges;
-    std::map<const VD::edge_type*, std::pair<coordf_t,coordf_t> > thickness;
+    VD                   m_vd;
+
+    // Annotations of the VD skeleton edges.
+    struct EdgeData {
+        bool    active      { false };
+        double  width_start { 0 };
+        double  width_end   { 0 };
+    };
+    // Returns a reference to EdgeData and a "reversed" boolean.
+    std::pair<EdgeData&, bool> edge_data(const VD::edge_type &edge) {
+        size_t edge_id = &edge - &m_vd.edges().front();
+        return { m_edge_data[edge_id / 2], (edge_id & 1) != 0 };
+    }
+    std::vector<EdgeData> m_edge_data;
+
     void process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline);
     bool validate_edge(const VD::edge_type* edge);
-    const Line& retrieve_segment(const VD::cell_type* cell) const;
-    const Point& retrieve_endpoint(const VD::cell_type* cell) const;
 };
 #endif
 
@@ -61,7 +79,7 @@ public:
     /// create the polylines_out collection of variable-width polyline to extrude.
     void build(ThickPolylines& polylines_out);
     /// You shouldn't use this method as it doesn't give you the variable width. Can be useful for debugging.
-    void build(Polylines& polylines);
+    //void build(Polylines& polylines);
 
     /// optional parameter: anchor area in which the extrusion should extends into. Default : expolygon (no bound)
     MedialAxis& use_bounds(const ExPolygon& _bounds) { this->m_bounds = &_bounds; return *this; }
@@ -104,13 +122,14 @@ private:
     coord_t m_extension_length = 0;
 
     //voronoi stuff
-    class VD : public voronoi_diagram<double> {
-    public:
-        typedef double                                          coord_type;
-        typedef boost::polygon::point_data<coordinate_type>     point_type;
-        typedef boost::polygon::segment_data<coordinate_type>   segment_type;
-        typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
-    };
+    using VD = VoronoiDiagram;
+    //class VD : public voronoi_diagram<double> {
+    //public:
+    //    typedef double                                          coord_type;
+    //    typedef boost::polygon::point_data<coordinate_type>     point_type;
+    //    typedef boost::polygon::segment_data<coordinate_type>   segment_type;
+    //    typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
+    //};
     void process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline, std::set<const VD::edge_type*>& edges, std::set<const VD::edge_type*>& valid_edges, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness);
     bool validate_edge(const VD::edge_type* edge, Lines& lines, const ExPolygon& expolygon_touse, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness);
     const Line& retrieve_segment(const VD::cell_type* cell, Lines& lines) const;
@@ -163,6 +182,6 @@ ExtrusionMultiPath variable_width(const ThickPolyline& polyline, const Extrusion
 //prefer using multi_variable_width
 ExtrusionPaths unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance);
 
-} } // namespace Slicer::Geometry
+} // namespace Slicer::Geometry
 
 #endif // slic3r_Geometry_MedialAxis_hpp_

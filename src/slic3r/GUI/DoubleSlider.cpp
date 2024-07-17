@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Tomáš Mészáros @tamasmeszaros, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r/libslic3r.h"
 #include "DoubleSlider.hpp"
 #include "GUI.hpp"
@@ -7,7 +11,7 @@
 #include "ExtruderSequenceDialog.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/GCode.hpp"
-#include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
 #include "libslic3r/Print.hpp"
 #include "GUI_Utils.hpp"
 #include "MsgDialog.hpp"
@@ -89,29 +93,29 @@ Control::Control( wxWindow *parent,
 
     m_bmp_thumb_higher = (style == wxSL_HORIZONTAL ? ScalableBitmap(this, "thumb_right") : ScalableBitmap(this, "thumb_up"));
     m_bmp_thumb_lower  = (style == wxSL_HORIZONTAL ? ScalableBitmap(this, "thumb_left")  : ScalableBitmap(this, "thumb_down"));
-    m_thumb_size = m_bmp_thumb_lower.GetBmpSize();
+    m_thumb_size = m_bmp_thumb_lower.GetSize();
 
     m_bmp_add_tick_on  = ScalableBitmap(this, "colorchange_add");
     m_bmp_add_tick_off = ScalableBitmap(this, "colorchange_add_f");
     m_bmp_del_tick_on  = ScalableBitmap(this, "colorchange_del");
     m_bmp_del_tick_off = ScalableBitmap(this, "colorchange_del_f");
-    m_tick_icon_dim = m_bmp_add_tick_on.GetBmpWidth();
+    m_tick_icon_dim = m_bmp_add_tick_on.GetWidth();
 
     m_bmp_one_layer_lock_on    = ScalableBitmap(this, "lock_closed");
     m_bmp_one_layer_lock_off   = ScalableBitmap(this, "lock_closed_f");
     m_bmp_one_layer_unlock_on  = ScalableBitmap(this, "lock_open");
     m_bmp_one_layer_unlock_off = ScalableBitmap(this, "lock_open_f");
-    m_lock_icon_dim   = m_bmp_one_layer_lock_on.GetBmpWidth();
+    m_lock_icon_dim   = m_bmp_one_layer_lock_on.GetWidth();
 
     m_bmp_revert               = ScalableBitmap(this, "undo");
-    m_revert_icon_dim = m_bmp_revert.GetBmpWidth();
+    m_revert_icon_dim = m_bmp_revert.GetWidth();
     m_bmp_cog                  = ScalableBitmap(this, "cog");
-    m_cog_icon_dim    = m_bmp_cog.GetBmpWidth();
+    m_cog_icon_dim    = m_bmp_cog.GetWidth();
 
     m_dead_zone_height = m_lock_icon_dim / 2;
 
     m_selection = ssUndef;
-    m_ticks.set_pause_print_msg(_utf8(L("Place bearings in slots and resume printing")));
+    m_ticks.set_pause_print_msg(_u8L("Place bearings in slots and resume printing"));
     m_ticks.set_extruder_colors(&m_extruder_colors);
 
     // slider events
@@ -127,6 +131,10 @@ Control::Control( wxWindow *parent,
     this->Bind(wxEVT_KEY_UP,      &Control::OnKeyUp,    this);
     this->Bind(wxEVT_RIGHT_DOWN,  &Control::OnRightDown,this);
     this->Bind(wxEVT_RIGHT_UP,    &Control::OnRightUp,  this);
+    this->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
+        m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
+        event.Skip();
+    });
 
     // control's view variables
     SLIDER_MARGIN     = 4 + GUI::wxGetApp().em_unit();
@@ -154,66 +162,55 @@ Control::Control( wxWindow *parent,
     m_line_pens = { &DARK_GREY_PEN, &GREY_PEN, &LIGHT_GREY_PEN };
     m_segm_pens = { &DARK_COLOR_PEN, &COLOR_PEN, &LIGHT_COLOR_PEN };
 
+    FOCUS_RECT_PEN   = wxPen(wxColour(128, 128, 10), 1, wxPENSTYLE_DOT);
+    FOCUS_RECT_BRUSH = wxBrush(wxColour(0, 0, 0), wxBRUSHSTYLE_TRANSPARENT);
+
     m_font = GetFont();
     this->SetMinSize(get_min_size());
+
+    if (style == wxSL_VERTICAL)
+        m_ruler.set_parent(this->GetParent());
 }
 
 void Control::msw_rescale()
 {
     m_font = GUI::wxGetApp().normal_font();
 
-    m_bmp_thumb_higher.msw_rescale();
-    m_bmp_thumb_lower .msw_rescale();
-    m_thumb_size = m_bmp_thumb_lower.bmp().GetSize();
+    m_thumb_size = m_bmp_thumb_lower.GetSize();
+    m_tick_icon_dim     = m_bmp_add_tick_on.GetWidth();
+    m_lock_icon_dim     = m_bmp_one_layer_lock_on.GetWidth();
+    m_revert_icon_dim   = m_bmp_revert.GetWidth();
+    m_cog_icon_dim      = m_bmp_cog.GetWidth();
 
-    m_bmp_add_tick_on .msw_rescale();
-    m_bmp_add_tick_off.msw_rescale();
-    m_bmp_del_tick_on .msw_rescale();
-    m_bmp_del_tick_off.msw_rescale();
-    m_tick_icon_dim = m_bmp_add_tick_on.bmp().GetSize().x;
-
-    m_bmp_one_layer_lock_on   .msw_rescale();
-    m_bmp_one_layer_lock_off  .msw_rescale();
-    m_bmp_one_layer_unlock_on .msw_rescale();
-    m_bmp_one_layer_unlock_off.msw_rescale();
-    m_lock_icon_dim = m_bmp_one_layer_lock_on.bmp().GetSize().x;
 
     m_dead_zone_height = m_lock_icon_dim / 2;
-
-    m_bmp_revert.msw_rescale();
-    m_revert_icon_dim = m_bmp_revert.bmp().GetSize().x;
-    m_bmp_cog.msw_rescale();
-    m_cog_icon_dim = m_bmp_cog.bmp().GetSize().x;
-
     SLIDER_MARGIN = 4 + GUI::wxGetApp().em_unit();
 
     SetMinSize(get_min_size());
     GetParent()->Layout();
+
+    m_ruler.update_dpi();
+    m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 }
 
 void Control::sys_color_changed()
 {
     GUI::wxGetApp().UpdateDarkUI(GetParent());
 
-    m_bmp_add_tick_on .msw_rescale();
-    m_bmp_add_tick_off.msw_rescale();
-    m_bmp_del_tick_on .msw_rescale();
-    m_bmp_del_tick_off.msw_rescale();
-    m_tick_icon_dim = m_bmp_add_tick_on.GetBmpWidth();
+    m_bmp_add_tick_on .sys_color_changed();
+    m_bmp_add_tick_off.sys_color_changed();
+    m_bmp_del_tick_on .sys_color_changed();
+    m_bmp_del_tick_off.sys_color_changed();
 
-    m_bmp_one_layer_lock_on   .msw_rescale();
-    m_bmp_one_layer_lock_off  .msw_rescale();
-    m_bmp_one_layer_unlock_on .msw_rescale();
-    m_bmp_one_layer_unlock_off.msw_rescale();
-    m_lock_icon_dim = m_bmp_one_layer_lock_on.GetBmpWidth();
+    m_bmp_one_layer_lock_on   .sys_color_changed();
+    m_bmp_one_layer_lock_off  .sys_color_changed();
+    m_bmp_one_layer_unlock_on .sys_color_changed();
+    m_bmp_one_layer_unlock_off.sys_color_changed();
 
-    m_dead_zone_height = m_lock_icon_dim / 2;
+    m_bmp_revert.sys_color_changed();
+    m_bmp_cog   .sys_color_changed();
 
-    m_bmp_revert.msw_rescale();
-    m_revert_icon_dim = m_bmp_revert.GetBmpWidth();
-    m_bmp_cog.msw_rescale();
-    m_cog_icon_dim = m_bmp_cog.GetBmpWidth();
-}
+    m_dead_zone_height = m_lock_icon_dim / 2;}
 
 int Control::GetActiveValue() const
 {
@@ -275,7 +272,11 @@ void Control::SetMaxValue(const int max_tick)
 void Control::SetSliderValues(const std::vector<double>& values)
 {
     m_values = values;
-    m_ruler.init(m_values);
+    m_ruler.init(m_values, get_scroll_step());
+
+    // When "No sparce layer" is enabled, use m_layers_values for ruler update. 
+    // Because of m_values has duplicate values in this case.
+//    m_ruler.update(this->GetParent(), m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 }
 
 void Control::draw_scroll_line(wxDC& dc, const int lower_pos, const int higher_pos)
@@ -434,8 +435,11 @@ void Control::SetLayersTimes(const std::vector<float>& layers_times, float total
         if (m_layers_values.size() != m_layers_times.size())
             for (size_t i = m_layers_times.size(); i < m_layers_values.size(); i++)
                 m_layers_times.push_back(total_time);
+        m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
         m_need_refresh_and_update = true;
     }
+    else
+        m_ruler.update(m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 }
 
 void Control::SetLayersTimes(const std::vector<double>& layers_times)
@@ -530,15 +534,17 @@ void Control::get_lower_and_higher_position(int& lower_pos, int& higher_pos)
     }
 }
 
-void Control::draw_focus_rect()
+void Control::draw_focus_rect(wxDC& dc)
 {
     if (!m_is_focused) 
         return;
     const wxSize sz = GetSize();
-    wxPaintDC dc(this);
-    const wxPen pen = wxPen(wxColour(128, 128, 10), 1, wxPENSTYLE_DOT);
-    dc.SetPen(pen);
-    dc.SetBrush(wxBrush(wxColour(0, 0, 0), wxBRUSHSTYLE_TRANSPARENT));
+//    wxPaintDC dc(this);
+    //const wxPen pen = wxPen(wxColour(128, 128, 10), 1, wxPENSTYLE_DOT);
+    //dc.SetPen(pen);
+    //dc.SetBrush(wxBrush(wxColour(0, 0, 0), wxBRUSHSTYLE_TRANSPARENT));
+    dc.SetPen(FOCUS_RECT_PEN);
+    dc.SetBrush(FOCUS_RECT_BRUSH);
     dc.DrawRectangle(1, 1, sz.x - 2, sz.y - 2);
 }
 
@@ -550,10 +556,11 @@ void Control::render()
 #else
     SetBackgroundColour(GetParent()->GetBackgroundColour());
 #endif // _WIN32 
-    draw_focus_rect();
 
     wxPaintDC dc(this);
     dc.SetFont(m_font);
+
+    draw_focus_rect(dc);
 
     const wxCoord lower_pos = get_position_from_tick(m_lower_tick);
     const wxCoord higher_pos = get_position_from_tick(m_higher_tick);
@@ -566,26 +573,26 @@ void Control::render()
         draw_ruler(dc);
 
     if (!m_render_as_disabled) {
-    // draw line
-    draw_scroll_line(dc, lower_pos, higher_pos);
+        // draw line
+        draw_scroll_line(dc, lower_pos, higher_pos);
 
-    // draw color print ticks
-    draw_ticks(dc);
+        // draw color print ticks
+        draw_ticks(dc);
 
-    // draw both sliders
-    draw_thumbs(dc, lower_pos, higher_pos);
+        // draw both sliders
+        draw_thumbs(dc, lower_pos, higher_pos);
 
-    // draw lock/unlock
-    draw_one_layer_icon(dc);
+        // draw lock/unlock
+        draw_one_layer_icon(dc);
 
-    // draw revert bitmap (if it's shown)
-    draw_revert_icon(dc);
+        // draw revert bitmap (if it's shown)
+        draw_revert_icon(dc);
 
-    // draw cog bitmap (if it's shown)
-    draw_cog_icon(dc);
+        // draw cog bitmap (if it's shown)
+        draw_cog_icon(dc);
 
-    // draw mouse position
-    draw_tick_on_mouse_position(dc);
+        // draw mouse position
+        draw_tick_on_mouse_position(dc);
     }
 }
 
@@ -618,9 +625,12 @@ void Control::draw_action_icon(wxDC& dc, const wxPoint pt_beg, const wxPoint pt_
         return;
     }
 
-    wxBitmap* icon = m_focus == fiActionIcon ? &m_bmp_add_tick_off.bmp() : &m_bmp_add_tick_on.bmp();
+    //wxBitmap* icon = m_focus == fiActionIcon ? &m_bmp_add_tick_off.bmp() : &m_bmp_add_tick_on.bmp();
+    //if (m_ticks.ticks.find(TickCode{tick}) != m_ticks.ticks.end())
+    //    icon = m_focus == fiActionIcon ? &m_bmp_del_tick_off.bmp() : &m_bmp_del_tick_on.bmp();
+    ScalableBitmap* icon = m_focus == fiActionIcon ? &m_bmp_add_tick_off : &m_bmp_add_tick_on;
     if (m_ticks.ticks.find(TickCode{tick}) != m_ticks.ticks.end())
-        icon = m_focus == fiActionIcon ? &m_bmp_del_tick_off.bmp() : &m_bmp_del_tick_on.bmp();
+        icon = m_focus == fiActionIcon ? &m_bmp_del_tick_off : &m_bmp_del_tick_on;
 
     wxCoord x_draw, y_draw;
     is_horizontal() ? x_draw = pt_beg.x - 0.5*m_tick_icon_dim : y_draw = pt_beg.y - 0.5*m_tick_icon_dim;
@@ -629,10 +639,12 @@ void Control::draw_action_icon(wxDC& dc, const wxPoint pt_beg, const wxPoint pt_
     else
         is_horizontal() ? y_draw = pt_beg.y - m_tick_icon_dim-2 : x_draw = pt_end.x + 3;
 
-    if (m_draw_mode == dmSequentialFffPrint)
-        dc.DrawBitmap(create_scaled_bitmap("colorchange_add", nullptr, 16, true), x_draw, y_draw);
+    if (m_draw_mode == dmSequentialFffPrint) {
+        wxBitmap disabled_add = get_bmp_bundle("colorchange_add")->GetBitmapFor(this).ConvertToDisabled();
+        dc.DrawBitmap(disabled_add, x_draw, y_draw);
+    }
     else
-    dc.DrawBitmap(*icon, x_draw, y_draw);
+        dc.DrawBitmap((*icon).get_bitmap(), x_draw, y_draw);
 
     //update rect of the tick action icon
     m_rect_tick_action = wxRect(x_draw, y_draw, m_tick_icon_dim, m_tick_icon_dim);
@@ -739,28 +751,28 @@ static wxString short_and_splitted_time(const std::string& time)
         ::sscanf(time.c_str(), "%ds", &seconds);
 
     // Format the dhm time.
-    char buffer[64];
+    auto get_d = [days]()   { return format(_u8L("%1%d"), days); };
+    auto get_h = [hours]()  { return format(_u8L("%1%h"), hours); };
+    auto get_m = [minutes](){ return format(_u8L("%1%m"), minutes); };
+    auto get_s = [seconds](){ return format(_u8L("%1%s"), seconds); };
+
     if (days > 0)
-        ::sprintf(buffer, "%dd%dh\n%dm", days, hours, minutes);
-    else if (hours > 0) {
+        return format_wxstr("%1%%2%\n%3%", get_d(), get_h(), get_m());
+    if (hours > 0) {
         if (hours < 10 && minutes < 10 && seconds < 10)
-            ::sprintf(buffer, "%dh%dm%ds", hours, minutes, seconds);
-        else if (hours > 10 && minutes > 10 && seconds > 10)
-            ::sprintf(buffer, "%dh\n%dm\n%ds", hours, minutes, seconds);
-        else if ((minutes < 10 && seconds > 10) || (minutes > 10 && seconds < 10))
-            ::sprintf(buffer, "%dh\n%dm%ds", hours, minutes, seconds);
-        else
-            ::sprintf(buffer, "%dh%dm\n%ds", hours, minutes, seconds);
+            return format_wxstr("%1%%2%%3%", get_h(), get_m(), get_s());
+        if (hours > 10 && minutes > 10 && seconds > 10)
+            return format_wxstr("%1%\n%2%\n%3%", get_h(), get_m(), get_s());
+        if ((minutes < 10 && seconds > 10) || (minutes > 10 && seconds < 10))
+            return format_wxstr("%1%\n%2%%3%", get_h(), get_m(), get_s());
+        return format_wxstr("%1%%2%\n%3%", get_h(), get_m(), get_s());
     }
-    else if (minutes > 0) {
+    if (minutes > 0) {
         if (minutes > 10 && seconds > 10)
-            ::sprintf(buffer, "%dm\n%ds", minutes, seconds);
-        else
-            ::sprintf(buffer, "%dm%ds", minutes, seconds);
+            return format_wxstr("%1%\n%2%", get_m(), get_s());
+        return format_wxstr("%1%%2%", get_m(), get_s());
     }
-    else
-        ::sprintf(buffer, "%ds", seconds);
-    return wxString::FromUTF8(buffer);
+    return from_u8(get_s());
 }
 
 wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer*/) const
@@ -819,7 +831,7 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
     {
         if (label_type == ltEstimatedTime) {
             return time_idx < m_layers_times.size() ? short_and_splitted_time(get_time_dhms(m_layers_times[time_idx])) : "";
-        }
+            }
         if (label_type == ltHeightWithLayer) {
             bool show_lheight = GUI::wxGetApp().app_config->get("show_layer_height_doubleslider") == "1";
             bool show_ltime = GUI::wxGetApp().app_config->get("show_layer_time_doubleslider") == "1";
@@ -906,7 +918,7 @@ void Control::draw_tick_text(wxDC& dc, const wxPoint& pos, int tick, LabelType l
     }
 
     wxColour old_clr = dc.GetTextForeground();
-    const wxPen& pen = is_wipe_tower_layer(tick) && (tick == m_lower_tick || tick == m_higher_tick) ? DARK_COLOR_PEN : wxPen(old_clr);
+    const wxPen& pen = is_wipe_tower_layer(tick) && (tick == m_lower_tick || tick == m_higher_tick) ? DARK_COLOR_PEN : /*wxPen(old_clr)*/GREY_PEN;
     dc.SetPen(pen);
     dc.SetTextForeground(pen.GetColour());
 
@@ -927,7 +939,7 @@ void Control::draw_thumb_item(wxDC& dc, const wxPoint& pos, const SelectedSlider
 {
     wxCoord x_draw = pos.x - int(0.5 * m_thumb_size.x);
     wxCoord y_draw = pos.y - int(0.5 * m_thumb_size.y);
-    dc.DrawBitmap(selection == ssLower ? m_bmp_thumb_lower.bmp() : m_bmp_thumb_higher.bmp(), x_draw, y_draw);
+    dc.DrawBitmap(selection == ssLower ? m_bmp_thumb_lower.get_bitmap() : m_bmp_thumb_higher.get_bitmap(), x_draw, y_draw);
 
     // Update thumb rect
     update_thumb_rect(x_draw, y_draw, selection);
@@ -1039,12 +1051,12 @@ void Control::draw_ticks(wxDC& dc)
 
         // Draw icon for "Pause print", "Custom Gcode" or conflict tick
         if (!icon_name.empty())  {
-            wxBitmap icon = create_scaled_bitmap(icon_name);
+            wxBitmapBundle* icon = get_bmp_bundle(icon_name);
             wxCoord x_draw, y_draw;
             is_horizontal() ? x_draw = pos - 0.5 * m_tick_icon_dim : y_draw = pos - 0.5 * m_tick_icon_dim;
             is_horizontal() ? y_draw = mid + 22 : x_draw = mid + m_thumb_size.x + 3;
 
-            dc.DrawBitmap(icon, x_draw, y_draw);
+            dc.DrawBitmap(icon->GetBitmapFor(this), x_draw, y_draw);
         }
     }
 }
@@ -1145,8 +1157,10 @@ void Control::draw_colored_band(wxDC& dc)
     }
 }
 
-void Control::Ruler::init(const std::vector<double>& values)
+void Control::Ruler::init(const std::vector<double>& values, double scroll_step)
 {
+    if (!m_parent)
+        return;
     sequences.clear();
     if(values.empty())
         return;
@@ -1162,20 +1176,41 @@ void Control::Ruler::init(const std::vector<double>& values)
         last = values[idx];
     }
     sequences.emplace_back(start, last);
+
+    update(values, scroll_step);
 }
 
-void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, double scroll_step)
+void Control::Ruler::set_parent(wxWindow* parent)
 {
-    if (values.empty())
+    m_parent = parent;
+    update_dpi();
+}
+
+void Control::Ruler::update_dpi()
+{
+    if (m_parent)
+        m_DPI = GUI::get_dpi_for_window(m_parent);
+}
+
+void Control::Ruler::update(const std::vector<double>& values, double scroll_step)
+{
+    if (!m_parent || values.empty() ||
+        // check if need to update ruler in respect to input values
+        (values.front() == m_min_val && values.back() == m_max_val && m_scroll_step == scroll_step && sequences.size() == m_max_values_cnt))
         return;
+
+    m_min_val           = values.front(); 
+    m_max_val           = values.back();
+    m_scroll_step       = scroll_step;
+    m_max_values_cnt    = sequences.size();
+
     if (values.size() < 2) {
         long_step = -1.0;
         return;
     }
 
-    int DPI = GUI::get_dpi_for_window(win);
-    int pixels_per_long_step = lround((double)(DPI) * 5.0/25.4);
-    int pixels_per_small_step = lround((double)(DPI) * 1/25.4);
+    int pixels_per_long_step = lround((double)(m_DPI) * 5.0/25.4);
+    int pixels_per_small_step = lround((double)(m_DPI) * 1/25.4);
 
     //compute max number of visible steps
     if (pixels_per_long_step <= scroll_step) {
@@ -1195,19 +1230,21 @@ void Control::Ruler::update(wxWindow* win, const std::vector<double>& values, do
             }
         }
     }
+    if (long_step < 0)
+        short_step = long_step;
 }
 
 void Control::draw_ruler(wxDC& dc)
 {
-    if (m_values.empty())
+    if (m_values.empty() || !m_ruler.can_draw())
         return;
     // When "No sparce layer" is enabled, use m_layers_values for ruler update. 
     // Because of m_values has duplicate values in this case.
-    m_ruler.update(this->GetParent(), m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
+//    m_ruler.update(this->GetParent(), m_layers_values.empty() ? m_values : m_layers_values, get_scroll_step());
 
     int height, width;
     get_size(&width, &height);
-    const wxCoord mid = is_horizontal() ? 0.5 * height : 0.5 * width;    
+    const wxCoord mid = is_horizontal() ? 0.5 * height : 0.5 * width; 
 
     dc.SetPen(GREY_PEN);
     wxColour old_clr = dc.GetTextForeground();
@@ -1275,7 +1312,6 @@ void Control::draw_ruler(wxDC& dc)
                     draw_tick_text(dc, wxPoint(mid, pos), tick);
                     prev_y_pos = pos;
                 }
-
                 assert(short_tick >= 0);
                 draw_short_ticks(dc, short_tick, tick);
                 short_tick = tick;
@@ -1298,9 +1334,12 @@ void Control::draw_one_layer_icon(wxDC& dc)
     if (m_draw_mode == dmSequentialGCodeView)
         return;
 
-    const wxBitmap& icon = m_is_one_layer ?
-                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_lock_off.bmp()   : m_bmp_one_layer_lock_on.bmp() :
-                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_unlock_off.bmp() : m_bmp_one_layer_unlock_on.bmp();
+    //const wxBitmap& icon = m_is_one_layer ?
+    //                 m_focus == fiOneLayerIcon ? m_bmp_one_layer_lock_off.bmp()   : m_bmp_one_layer_lock_on.bmp() :
+    //                 m_focus == fiOneLayerIcon ? m_bmp_one_layer_unlock_off.bmp() : m_bmp_one_layer_unlock_on.bmp();
+    const ScalableBitmap& icon = m_is_one_layer ?
+                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_lock_off   : m_bmp_one_layer_lock_on :
+                     m_focus == fiOneLayerIcon ? m_bmp_one_layer_unlock_off : m_bmp_one_layer_unlock_on;
 
     int width, height;
     get_size(&width, &height);
@@ -1312,7 +1351,7 @@ void Control::draw_one_layer_icon(wxDC& dc)
     //add a little dead zone to ease mouse click
     y_draw += m_dead_zone_height;
 
-    dc.DrawBitmap(icon, x_draw, y_draw);
+    dc.DrawBitmap(icon.bmp().GetBitmapFor(this), x_draw, y_draw);
 
     //update rect of the lock/unlock icon
     m_rect_one_layer_icon = wxRect(x_draw, y_draw, m_lock_icon_dim, m_lock_icon_dim);
@@ -1333,7 +1372,7 @@ void Control::draw_revert_icon(wxDC& dc)
     //add a little dead zone to ease mouse click
     y_draw += m_dead_zone_height;
 
-    dc.DrawBitmap(m_bmp_revert.bmp(), x_draw, y_draw);
+    dc.DrawBitmap(m_bmp_revert.get_bitmap(), x_draw, y_draw);
 
     //update rect of the lock/unlock icon
     m_rect_revert_icon = wxRect(x_draw, y_draw, m_revert_icon_dim, m_revert_icon_dim);
@@ -1360,7 +1399,7 @@ void Control::draw_cog_icon(wxDC& dc)
     //add a little dead zone to ease mouse click
     y_draw += m_dead_zone_height;
 
-    dc.DrawBitmap(m_bmp_cog.bmp(), x_draw, y_draw);
+    dc.DrawBitmap(m_bmp_cog.get_bitmap(), x_draw, y_draw);
 
     //update rect of the lock/unlock icon
     m_rect_cog_icon = wxRect(x_draw, y_draw, m_cog_icon_dim, m_cog_icon_dim);
@@ -1703,12 +1742,13 @@ void Control::OnMotion(wxMouseEvent &event)
         // Set tooltips with information for each icon
         if (GUI::wxGetApp().is_editor()) {
             this->SetToolTip(get_tooltip(tick));
-        }
+            }
     }
     m_need_refresh_and_update = false;
     Refresh();
     Update();
     event.Skip();
+
     if (action || m_need_fire_scroll_change) {
         m_need_fire_scroll_change = false;
         wxCommandEvent e(wxEVT_SCROLL_CHANGED);
@@ -1733,7 +1773,7 @@ void Control::append_change_extruder_menu_item(wxMenu* menu, bool switch_current
     if (extruders_cnt > 1) {
         std::array<int, 2> active_extruders = get_active_extruders_for_tick(m_selection == ssLower ? m_lower_tick : m_higher_tick);
 
-        std::vector<wxBitmap*> icons = get_extruder_color_icons(true);
+        std::vector<wxBitmapBundle*> icons = get_extruder_color_icons(true);
 
         wxMenu* change_extruder_menu = new wxMenu();
 
@@ -1744,7 +1784,7 @@ void Control::append_change_extruder_menu_item(wxMenu* menu, bool switch_current
 
             if (m_mode == MultiAsSingle)
                 append_menu_item(change_extruder_menu, wxID_ANY, item_name, "",
-                    [this, i](wxCommandEvent&) { add_code_as_tick(ToolChange, i); }, *icons[i-1], menu,
+                    [this, i](wxCommandEvent&) { add_code_as_tick(ToolChange, i); }, icons[i-1], menu,
                     [is_active_extruder]() { return !is_active_extruder; }, GUI::wxGetApp().plater());
         }
 
@@ -1783,7 +1823,7 @@ void Control::append_add_color_change_menu_item(wxMenu* menu, bool switch_curren
                                    format_wxstr(_L("Switch code to Color change (%1%) for:"), gcode(ColorChange)) : 
                                    format_wxstr(_L("Add color change (%1%) for:"), gcode(ColorChange));
         wxMenuItem* add_color_change_menu_item = menu->AppendSubMenu(add_color_change_menu, menu_name, "");
-        add_color_change_menu_item->SetBitmap(create_menu_bitmap("colorchange_add_m"));
+        add_color_change_menu_item->SetBitmap(*get_bmp_bundle("colorchange_add_m"));
     }
 }
 
@@ -2062,7 +2102,7 @@ std::set<int> TickCodeInfo::get_used_extruders_for_tick(int tick, int only_extru
 
         std::set<int> used_extruders;
 
-        auto it_layer_tools = std::lower_bound(tool_ordering.begin(), tool_ordering.end(), LayerTools(print_z));
+        auto it_layer_tools = std::lower_bound(tool_ordering.begin(), tool_ordering.end(), print_z, [](const LayerTools &lhs, double rhs){ return lhs.print_z < rhs; });
         for (; it_layer_tools != tool_ordering.end(); ++it_layer_tools) {
             const std::vector<uint16_t>& extruders = it_layer_tools->extruders;
             for (const uint16_t& extruder : extruders)
@@ -2123,8 +2163,8 @@ void Control::show_add_context_menu()
     }
 
     if (!gcode(PausePrint).empty())
-    append_menu_item(&menu, wxID_ANY, _L("Add pause print") + " (" + gcode(PausePrint) + ")", "",
-        [this](wxCommandEvent&) { add_code_as_tick(PausePrint); }, "pause_print", &menu);
+        append_menu_item(&menu, wxID_ANY, _L("Add pause print") + " (" + gcode(PausePrint) + ")", "",
+            [this](wxCommandEvent&) { add_code_as_tick(PausePrint); }, "pause_print", &menu);
 
     if (!gcode(Template).empty())
         append_menu_item(&menu, wxID_ANY, _L("Add custom template") + " (" + gcode(Template) + ")", "",
@@ -2170,7 +2210,7 @@ void Control::show_cog_icon_context_menu()
     wxMenu menu;
 
     append_menu_item(&menu, wxID_ANY, _L("Jump to height") + " (Shift+G)", "",
-                     [this](wxCommandEvent&) { jump_to_value(); }, "", & menu);
+                    [this](wxCommandEvent&) { jump_to_value(); }, "", & menu);
 
     wxMenu* ruler_mode_menu = new wxMenu();
     if (ruler_mode_menu) {
@@ -2201,13 +2241,13 @@ void Control::show_cog_icon_context_menu()
     GUI::wxGetApp().plater()->PopupMenu(&menu);
 }
 
-bool check_color_change(PrintObject* object, size_t frst_layer_id, size_t layers_cnt, bool check_overhangs, std::function<bool(Layer*)> break_condition)
+bool check_color_change(const PrintObject* object, size_t frst_layer_id, size_t layers_cnt, bool check_overhangs, std::function<bool(const Layer*)> break_condition)
 {
     double prev_area = area(object->get_layer(frst_layer_id)->lslices);
 
     bool detected = false;
     for (size_t i = frst_layer_id+1; i < layers_cnt; i++) {
-        Layer* layer = object->get_layer(i);
+        const Layer* layer = object->get_layer(i);
         double cur_area = area(layer->lslices);
 
         // check for overhangs
@@ -2247,7 +2287,7 @@ void Control::auto_color_change()
         if (object->layer_count() < 2)
             continue;
 
-        check_color_change(object, 1, object->layers().size(), false, [this, extruders_cnt](Layer* layer)
+        check_color_change(object, 1, object->layers().size(), false, [this, extruders_cnt](const Layer* layer)
         {
             int tick = get_tick_from_value(layer->print_z);
             if (tick >= 0 && !m_ticks.has_tick(tick)) {
@@ -2329,7 +2369,7 @@ static std::string get_new_color(const std::string& color)
     data->SetChooseFull(1);
     data->SetColour(clr);
 
-    wxColourDialog dialog(nullptr, data);
+    wxColourDialog dialog(GUI::wxGetApp().GetTopWindow(), data);
     dialog.CenterOnParent();
     if (dialog.ShowModal() == wxID_OK)
         return dialog.GetColourData().GetColour().GetAsString(wxC2S_HTML_SYNTAX).ToStdString();
@@ -2387,8 +2427,8 @@ static std::string get_custom_code(const std::string& code_in, double height)
     bool valid = true;
     std::string value;
     do {
-    if (dlg.ShowModal() != wxID_OK)
-        return "";
+        if (dlg.ShowModal() != wxID_OK)
+            return "";
 
         value = into_u8(dlg.GetValue());
         valid = GUI::Tab::validate_custom_gcode("Custom G-code", value);
@@ -2722,36 +2762,46 @@ bool Control::check_ticks_changed_event(Type type)
 
 std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int extruder)
 {
+    auto opposite_one_color = [](const std::string& color) {
+        ColorRGB rgb;
+        decode_color(color, rgb);
+        return encode_color(opposite(rgb));
+    };
+    auto opposite_two_colors = [](const std::string& a, const std::string& b) {
+        ColorRGB rgb1; decode_color(a, rgb1);
+        ColorRGB rgb2; decode_color(b, rgb2);
+        return encode_color(opposite(rgb1, rgb2));
+    };
+
     if (mode == SingleExtruder && type == ColorChange && m_use_default_colors) {
 #if 1
         if (ticks.empty())
-            return color_generator.get_opposite_color((*m_colors)[0]);
-        
+            return opposite_one_color((*m_colors)[0]);
+
         auto before_tick_it = std::lower_bound(ticks.begin(), ticks.end(), tick);
-        if (before_tick_it == ticks.end()) 
-        {
+        if (before_tick_it == ticks.end()) {
             while (before_tick_it != ticks.begin())
                 if (--before_tick_it; before_tick_it->type == ColorChange)
                     break;
             if (before_tick_it->type == ColorChange)
-                return color_generator.get_opposite_color(before_tick_it->color);
-            return color_generator.get_opposite_color((*m_colors)[0]);
+                return opposite_one_color(before_tick_it->color);
+
+            return opposite_one_color((*m_colors)[0]);
         }
 
-        if (before_tick_it == ticks.begin())
-        {
+        if (before_tick_it == ticks.begin()) {
             const std::string& frst_color = (*m_colors)[0];
             if (before_tick_it->type == ColorChange)
-                return color_generator.get_opposite_color(frst_color, before_tick_it->color);
+                return opposite_two_colors(frst_color, before_tick_it->color);
 
             auto next_tick_it = before_tick_it;
             while (next_tick_it != ticks.end())
                 if (++next_tick_it; next_tick_it->type == ColorChange)
                     break;
             if (next_tick_it->type == ColorChange)
-                return color_generator.get_opposite_color(frst_color, next_tick_it->color);
+                return opposite_two_colors(frst_color, next_tick_it->color);
 
-            return color_generator.get_opposite_color(frst_color);
+            return opposite_one_color(frst_color);
         }
 
         std::string frst_color = "";
@@ -2772,13 +2822,15 @@ std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int
 
         if (before_tick_it->type == ColorChange) {
             if (frst_color.empty())
-                return color_generator.get_opposite_color(before_tick_it->color);
-            return color_generator.get_opposite_color(before_tick_it->color, frst_color);
+                return opposite_one_color(before_tick_it->color);
+
+            return opposite_two_colors(before_tick_it->color, frst_color);
         }
 
         if (frst_color.empty())
-            return color_generator.get_opposite_color((*m_colors)[0]);
-        return color_generator.get_opposite_color((*m_colors)[0], frst_color);
+            return opposite_one_color((*m_colors)[0]);
+
+        return opposite_two_colors((*m_colors)[0], frst_color);
 #else
         const std::vector<std::string>& colors = ColorPrintColors::get();
         if (ticks.empty())
@@ -2840,6 +2892,11 @@ bool TickCodeInfo::add_tick(const int tick, Type type, const int extruder, doubl
 
 bool TickCodeInfo::edit_tick(std::set<TickCode>::iterator it, double print_z)
 {
+    // Save previously value of the tick before the call a Dialog from get_... functions,
+    // otherwise a background process can change ticks values and current iterator wouldn't be valid for the moment of a Dialog close
+    // and PS will crash (see https://github.com/prusa3d/PrusaSlicer/issues/10941)
+    TickCode changed_tick = *it;
+
     std::string edited_value;
     if (it->type == ColorChange)
         edited_value = get_new_color(it->color);
@@ -2851,7 +2908,10 @@ bool TickCodeInfo::edit_tick(std::set<TickCode>::iterator it, double print_z)
     if (edited_value.empty())
         return false;
 
-    TickCode changed_tick = *it;
+    // Update iterator. For this moment its value can be invalid
+    if (it = ticks.find(changed_tick); it == ticks.end())
+        return false;
+
     if (it->type == ColorChange) {
         if (it->color == edited_value)
             return false;

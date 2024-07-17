@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_Utils_hpp_
 #define slic3r_GUI_Utils_hpp_
 
@@ -86,7 +90,7 @@ template<class P> class DPIAware : public P
 {
 public:
     DPIAware(wxWindow *parent, wxWindowID id, const wxString &title, const wxPoint &pos=wxDefaultPosition,
-        const wxSize &size=wxDefaultSize, long style=wxDEFAULT_FRAME_STYLE, const wxString &name=wxFrameNameStr)
+        const wxSize &size=wxDefaultSize, long style=wxDEFAULT_FRAME_STYLE, const wxString &name= wxFrameNameStr, const int font_point_size = -1)
         : P(parent, id, title, pos, size, style, name)
     {
         int dpi = get_dpi_for_window(this);
@@ -99,12 +103,15 @@ public:
         m_prev_scale_factor = m_scale_factor;
 		m_normal_font = get_default_font_for_dpi(this, dpi);
 
+        if (font_point_size > 0)
+            m_normal_font.SetPointSize(font_point_size);
+        else if (parent)
+            m_normal_font.SetPointSize(parent->GetFont().GetPointSize());
+
         /* Because of default window font is a primary display font, 
          * We should set correct font for window before getting em_unit value.
          */
-#ifndef __WXOSX__ // Don't call SetFont under OSX to avoid name cutting in ObjectList 
         this->SetFont(m_normal_font);
-#endif
         this->CenterOnParent();
 #ifdef _WIN32
         update_dark_ui(this);
@@ -113,7 +120,13 @@ public:
         // Linux specific issue : get_dpi_for_window(this) still doesn't responce to the Display's scale in new wxWidgets(3.1.3).
         // So, calculate the m_em_unit value from the font size, as before
 #if !defined(__WXGTK__)
-        m_em_unit = std::max<size_t>(10, 10.0f * m_scale_factor);
+#ifdef _WIN32
+        const double font_to_em_koef = 10./9.;// Default font point size on Windows is 9 pt
+#else // ifdef __WXOSX__
+        const double font_to_em_koef = 10./11.;// Default font point size on OSX is 11 pt
+#endif
+        m_em_unit_from_font_size = int(font_to_em_koef * m_normal_font.GetPointSize());
+        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
 #else
         // initialize default width_unit according to the width of the one symbol ("m") of the currently active font of this window.
         m_em_unit = std::max<size_t>(10, this->GetTextExtent("m").x - 1);
@@ -183,7 +196,6 @@ public:
     float   prev_scale_factor() const   { return m_prev_scale_factor; }
 
     int     em_unit() const             { return m_em_unit; }
-//    int     font_size() const           { return m_font_size; }
     const wxFont& normal_font() const   { return m_normal_font; }
     void enable_force_rescale()         { m_force_rescale = true; }
 
@@ -202,7 +214,7 @@ protected:
 private:
     float m_scale_factor;
     int m_em_unit;
-//    int m_font_size;
+    int m_em_unit_from_font_size {10};
 
     wxFont m_normal_font;
     float m_prev_scale_factor;
@@ -210,14 +222,6 @@ private:
     bool m_force_rescale{ false };
 
     int   m_new_font_point_size;
-
-//    void recalc_font()
-//    {
-//        wxClientDC dc(this);
-//        const auto metrics = dc.GetFontMetrics();
-//        m_font_size = metrics.height;
-//         m_em_unit = metrics.averageWidth;
-//    }
 
     // check if new scale is differ from previous
     bool    is_new_scale_factor() const { return fabs(m_scale_factor - m_prev_scale_factor) > 0.001; }
@@ -259,7 +263,7 @@ private:
         m_normal_font = this->GetFont();
 
         // update em_unit value for new window font
-        m_em_unit = std::max<int>(10, 10.0f * m_scale_factor);
+        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
 
         // rescale missed controls sizes and images
         on_dpi_changed(suggested_rect);
@@ -418,14 +422,6 @@ public:
 
 std::ostream& operator<<(std::ostream &os, const WindowMetrics& metrics);
 
-inline int hex_digit_to_int(const char c)
-{
-    return
-        (c >= '0' && c <= '9') ? int(c - '0') :
-        (c >= 'A' && c <= 'F') ? int(c - 'A') + 10 :
-        (c >= 'a' && c <= 'f') ? int(c - 'a') + 10 : -1;
-}
-
 class TaskTimer
 {
     std::chrono::milliseconds   start_timer;
@@ -434,6 +430,16 @@ public:
     TaskTimer(std::string task_name);
 
     ~TaskTimer();
+};
+
+class KeyAutoRepeatFilter
+{
+    size_t m_count{ 0 };
+
+public:
+    void increase_count() { ++m_count; }
+    void reset_count() { m_count = 0; }
+    bool is_first() const { return m_count == 0; }
 };
 
 }}

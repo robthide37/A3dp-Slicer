@@ -1,3 +1,11 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
+///|/
+///|/ ported from lib/Slic3r/GUI/2DBed.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2015 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "2DBed.hpp"
 #include "GUI_App.hpp"
 
@@ -39,8 +47,8 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 #else
 		auto color = wxSystemSettings::GetColour(wxSYS_COLOUR_3DLIGHT); //GetSystemColour
 #endif
-		dc.SetPen(*new wxPen(color, 1, wxPENSTYLE_SOLID));
-		dc.SetBrush(*new wxBrush(color, wxBRUSHSTYLE_SOLID));
+		dc.SetPen(wxPen(color, 1, wxPENSTYLE_SOLID));
+		dc.SetBrush(wxBrush(color, wxBRUSHSTYLE_SOLID));
 		auto rect = GetUpdateRegion().GetBox();
 		dc.DrawRectangle(rect.GetLeft(), rect.GetTop(), rect.GetWidth(), rect.GetHeight());
 	}
@@ -75,11 +83,15 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 
 	// draw bed fill
 	dc.SetBrush(wxBrush(wxColour(255, 255, 255), wxBRUSHSTYLE_SOLID));
+
 	wxPointList pt_list;
-    for (auto pt : shape)
-    {
-        Point pt_pix = to_pixels(pt, ch);
-        pt_list.push_back(new wxPoint(pt_pix(0), pt_pix(1)));
+	const size_t pt_cnt = shape.size();
+	std::vector<wxPoint> points;
+    points.reserve(pt_cnt);
+    for (const auto& shape_pt : shape) {
+        Point pt_pix = to_pixels(shape_pt, ch);
+		points.emplace_back(wxPoint(pt_pix(0), pt_pix(1)));
+        pt_list.Append(&points.back());
 	}
 	dc.DrawPolygon(&pt_list, 0, 0);
 

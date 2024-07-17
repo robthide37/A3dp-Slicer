@@ -1,11 +1,17 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_3DBed_hpp_
 #define slic3r_3DBed_hpp_
 
 #include "GLTexture.hpp"
 #include "3DScene.hpp"
-#include "GLModel.hpp"
+#include "CoordAxes.hpp"
+#include "MeshUtils.hpp"
 
-#include <libslic3r/BuildVolume.hpp>
+#include "libslic3r/BuildVolume.hpp"
+#include "libslic3r/ExPolygon.hpp"
 
 #include <tuple>
 #include <array>
@@ -15,54 +21,8 @@ namespace GUI {
 
 class GLCanvas3D;
 
-class GeometryBuffer
-{
-    struct Vertex
-    {
-        Vec3f position{ Vec3f::Zero() };
-        Vec2f tex_coords{ Vec2f::Zero() };
-    };
-
-    std::vector<Vertex> m_vertices;
-
-public:
-    bool set_from_triangles(const std::vector<Vec2f> &triangles, float z);
-    bool set_from_lines(const Lines& lines, float z);
-
-    const float* get_vertices_data() const;
-    unsigned int get_vertices_data_size() const { return (unsigned int)m_vertices.size() * get_vertex_data_size(); }
-    unsigned int get_vertex_data_size() const { return (unsigned int)(5 * sizeof(float)); }
-    size_t get_position_offset() const { return 0; }
-    size_t get_tex_coords_offset() const { return (size_t)(3 * sizeof(float)); }
-    unsigned int get_vertices_count() const { return (unsigned int)m_vertices.size(); }
-};
-
 class Bed3D
 {
-    class Axes
-    {
-    public:
-        static const float DefaultStemRadius;
-        static const float DefaultStemLength;
-        static const float DefaultTipRadius;
-        static const float DefaultTipLength;
-
-    private:
-        Vec3d m_origin{ Vec3d::Zero() };
-        float m_stem_length{ DefaultStemLength };
-        GLModel m_arrow;
-
-    public:
-        const Vec3d& get_origin() const { return m_origin; }
-        void set_origin(const Vec3d& origin) { m_origin = origin; }
-        void set_stem_length(float length) {
-            m_stem_length = length;
-            m_arrow.reset();
-        }
-        float get_total_length() const { return m_stem_length + DefaultTipLength; }
-        void render() const;
-    };
-
 public:
     enum class Type : unsigned char
     {
@@ -86,28 +46,30 @@ private:
     boost::filesystem::path m_model_path;
     // Print volume bounding box exteded with axes and model.
     BoundingBoxf3 m_extended_bounding_box;
+    // Print bed polygon
+    ExPolygon m_contour;
     // Slightly expanded print bed polygon, for collision detection.
     Polygon m_polygon;
-    GeometryBuffer m_triangles;
-    GeometryBuffer m_gridlines;
-    GeometryBuffer m_gridlines_big;
-    GeometryBuffer m_gridlines_small;
+    GLModel m_triangles;
+    GLModel m_gridlines;
+    GLModel m_gridlines_big;
+    GLModel m_gridlines_small;
+    GLModel m_contourlines;
     mutable GLTexture m_texture;
-    std::array<float, 4> m_model_color{ 0.235f, 0.235f, 0.235f, 1.0f };
-    std::array<float, 4> m_grid_color{ 0.9f, 0.9f, 0.9f, 0.6f };
+    ColorRGBA m_model_color{ 0.235f, 0.235f, 0.235f, 1.0f };
+    ColorRGBA m_grid_color{ 0.9f, 0.9f, 0.9f, 0.6f };
 
     // temporary texture shown until the main texture has still no levels compressed
     GLTexture m_temp_texture;
-    GLModel m_model;
+    PickingModel m_model;
     Vec3d m_model_offset{ Vec3d::Zero() };
-    unsigned int m_vbo_id{ 0 };
-    Axes m_axes;
+    CoordAxes m_axes;
 
     float m_scale_factor{ 1.0f };
 
 public:
     Bed3D();
-    ~Bed3D() { release_VBOs(); }
+    ~Bed3D() = default;
 
     // Update print bed model from configuration.
     // Return true if the bed shape changed, so the calee will update the UI.
@@ -131,24 +93,28 @@ public:
     bool contains(const Point& point) const;
     Point point_projection(const Point& point) const;
 
-    void render(GLCanvas3D& canvas, bool bottom, float scale_factor, bool show_axes, bool show_texture);
-    void render_for_picking(GLCanvas3D& canvas, bool bottom, float scale_factor);
+    void render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_texture);
+    void render_axes();
+    void render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor);
 
 private:
     // Calculate an extended bounding box from axes and current model for visualization purposes.
     BoundingBoxf3 calc_extended_bounding_box() const;
-    void calc_triangles(const ExPolygon& poly);
-    void calc_gridlines(const ExPolygon& poly, const BoundingBox& bed_bbox);
+    void init_triangles();
+    void init_gridlines();
+    void init_contourlines();
     static std::tuple<Type, std::string, std::string, bool> detect_type(const Pointfs& shape);
-    void render_internal(GLCanvas3D& canvas, bool bottom, float scale_factor,
-        bool show_axes, bool show_texture, bool picking);
-    void render_axes() const;
-    void render_system(GLCanvas3D& canvas, bool bottom, bool show_texture) const;
-    void render_texture(bool bottom, GLCanvas3D& canvas) const;
-    void render_model() const;
-    void render_custom(GLCanvas3D& canvas, bool bottom, bool show_texture, bool picking) const;
-    void render_default(bool bottom, bool picking) const;
-    void release_VBOs();
+    void render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
+        bool show_texture, bool picking);
+    void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture);
+    void render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix);
+    void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
+    void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking);
+    void render_default(bool bottom, bool picking, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix);
+    void render_contour(const Transform3d& view_matrix, const Transform3d& projection_matrix);
+    void render_grid(bool bottom, bool has_model);
+    
+    void register_raycasters_for_picking(const GLModel::Geometry& geometry, const Transform3d& trafo);
 };
 
 } // GUI

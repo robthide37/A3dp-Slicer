@@ -1,3 +1,23 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) 2018 fredizzimo @fredizzimo
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Maksim Derbasov @ntfshard
+///|/
+///|/ ported from lib/Slic3r/Config.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2022 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2017 Joseph Lenox @lordofhyphens
+///|/ Copyright (c) Slic3r 2011 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Alexander Rössler @machinekoder
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2012 Mark Hindess
+///|/ Copyright (c) 2012 Josh McCullough
+///|/ Copyright (c) 2011 - 2012 Michael Moon
+///|/ Copyright (c) 2012 Simon George
+///|/ Copyright (c) 2012 Johannes Reinhardt
+///|/ Copyright (c) 2011 Clarence Risher
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Config.hpp"
 #include "Flow.hpp"
 #include "format.hpp"
@@ -19,11 +39,14 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/nowide/cenv.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/format.hpp>
 #include <string.h>
+
+#include <LibBGCode/binarize/binarize.hpp>
 
 //FIXME for GCodeFlavor and gcfMarlin (for forward-compatibility conversion)
 // This is not nice, likely it would be better to pass the ConfigSubstitutionContext to handle_legacy().
@@ -587,6 +610,8 @@ ConfigOption* ConfigOptionDef::create_empty_option() const
 {
 	if (this->nullable) {
 	    switch (this->type) {
+        case coFloat:           return new ConfigOptionFloatNullable();
+        case coInt:             return new ConfigOptionIntNullable();
 	    case coFloats:          return new ConfigOptionFloatsNullable();
 	    case coInts:            return new ConfigOptionIntsNullable();
 	    case coPercents:        return new ConfigOptionPercentsNullable();
@@ -614,7 +639,7 @@ ConfigOption* ConfigOptionDef::create_empty_option() const
 	    case coGraphs:          return new ConfigOptionGraphs();
 	    case coBool:            return new ConfigOptionBool();
 	    case coBools:           return new ConfigOptionBools();
-	    case coEnum:            return new ConfigOptionEnumGeneric(this->enum_keys_map);
+	    case coEnum:            return new ConfigOptionEnumGeneric(this->enum_def->m_enum_keys_map);
 	    default:                throw ConfigurationError(std::string("Unknown option type for option ") + this->label);
 	    }
 	}
@@ -625,7 +650,7 @@ ConfigOption* ConfigOptionDef::create_default_option() const
     if (this->default_value)
         return (this->default_value->type() == coEnum) ?
             // Special case: For a DynamicConfig, convert a templated enum to a generic enum.
-            new ConfigOptionEnumGeneric(this->enum_keys_map, this->default_value->get_int()) :
+            new ConfigOptionEnumGeneric(this->enum_def->m_enum_keys_map, this->default_value->get_int()) :
             this->default_value->clone();
     return this->create_empty_option();
 }
@@ -649,10 +674,32 @@ ConfigOptionDef* ConfigDef::add_nullable(const t_config_option_key &opt_key, Con
 	return def;
 }
 
+void ConfigDef::finalize()
+{
+    // Validate & finalize open & closed enums.
+    for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options) {
+        ConfigOptionDef& def = kvp.second;
+        if (def.type == coEnum) {
+            assert(def.enum_def);
+            assert(def.enum_def->is_valid_closed_enum());
+            assert(! def.is_gui_type_enum_open());
+            def.enum_def->finalize_closed_enum();
+        } else if (def.is_gui_type_enum_open()) {
+            assert(def.enum_def);
+            assert(def.enum_def->is_valid_open_enum());
+            assert(def.gui_type != ConfigOptionDef::GUIType::i_enum_open || def.type == coInt || def.type == coInts);
+            assert(def.gui_type != ConfigOptionDef::GUIType::f_enum_open || def.type == coFloat || def.type == coPercent || def.type == coFloatOrPercent);
+            assert(def.gui_type != ConfigOptionDef::GUIType::select_open || def.type == coString || def.type == coStrings);
+        } else {
+            assert(! def.enum_def);
+        }
+    }
+}
+
 std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, std::function<bool(const ConfigOptionDef &)> filter) const
 {
     // prepare a function for wrapping text
-    auto wrap = [](std::string text, size_t line_length) -> std::string {
+    auto wrap = [](const std::string& text, size_t line_length) -> std::string {
         std::istringstream words(text);
         std::ostringstream wrapped;
         std::string word;
@@ -724,8 +771,8 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
                 descr += " (";
                 if (!def.sidetext.empty()) {
                     descr += def.sidetext + ", ";
-                } else if (!def.enum_values.empty()) {
-                    descr += boost::algorithm::join(def.enum_values, ", ") + "; ";
+                } else if (def.enum_def && def.enum_def->has_values()) {
+                    descr += boost::algorithm::join(def.enum_def->values(), ", ") + "; ";
                 }
                 descr += "default: " + def.default_value->serialize() + ")";
             }
@@ -744,6 +791,270 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
                 out << lines[i] << std::endl;
             }
         }
+    }
+    return out;
+}
+
+// Look up a closed enum value of this combo box based on an index of the combo box value / label.
+// Such a mapping should always succeed.
+int ConfigOptionEnumDef::index_to_enum(int index) const
+{
+    // It has to be a closed enum, thus values have to be defined.
+    assert(this->is_valid_closed_enum());
+    assert(index >= 0 && index < int(m_values.size()));
+    if (m_values_ordinary)
+        return index;
+    else {
+        auto it = m_enum_keys_map->find(m_values[index]);
+        assert(it != m_enum_keys_map->end());
+        return it->second;
+    }
+}
+
+// Look up an index of value / label of this combo box based on enum value.
+// Such a mapping may fail, thus an optional is returned.
+std::optional<int> ConfigOptionEnumDef::enum_to_index(int enum_val) const
+{
+    assert(this->is_valid_closed_enum());
+    assert(enum_val >= 0 && enum_val < int(m_enum_names->size()));
+    if (m_values_ordinary)
+        return {enum_val};
+    else {
+        auto it = std::find(m_values.begin(), m_values.end(), (*m_enum_names)[enum_val]);
+        return it == m_values.end() ? std::optional<int>{} : std::optional<int>{int(it - m_values.begin())};
+    }
+}
+
+// Look up an index of value / label of this combo box based on value string.
+std::optional<int> ConfigOptionEnumDef::value_to_index(const std::string &value) const
+{
+    assert(this->is_valid_open_enum() || this->is_valid_closed_enum());
+    auto it = std::find(m_values.begin(), m_values.end(), value);
+    return it == m_values.end() ? std::optional<int>{} : std::optional<int>{it - m_values.begin()};
+}
+
+// Look up an index of label of this combo box. Used for open enums.
+std::optional<int> ConfigOptionEnumDef::label_to_index(const std::string &value) const
+{
+    assert(is_valid_open_enum());
+    const auto &ls = this->labels();
+    auto        it = std::find(ls.begin(), ls.end(), value);
+    return it == ls.end() ? std::optional<int>{} : std::optional<int>{it - ls.begin()};
+}
+
+std::optional<std::reference_wrapper<const std::string>> ConfigOptionEnumDef::enum_to_value(int enum_val) const
+{
+    assert(this->is_valid_closed_enum());
+    auto opt = this->enum_to_index(enum_val);
+    return opt.has_value() ? std::optional<std::reference_wrapper<const std::string>>{this->value(*opt)} :
+                             std::optional<std::reference_wrapper<const std::string>>{};
+}
+
+std::optional<std::reference_wrapper<const std::string>> ConfigOptionEnumDef::enum_to_label(int enum_val) const
+{
+    assert(this->is_valid_closed_enum());
+    auto opt = this->enum_to_index(enum_val);
+    return opt.has_value() ? std::optional<std::reference_wrapper<const std::string>>{this->label(*opt)} :
+                             std::optional<std::reference_wrapper<const std::string>>{};
+}
+
+bool ConfigOptionEnumDef::is_valid_closed_enum() const
+{
+    return m_enum_names != nullptr && m_enum_keys_map != nullptr && !m_values.empty() &&
+           (m_labels.empty() || m_values.size() == m_labels.size());
+}
+#ifndef NDEBUG
+bool ConfigOptionEnumDef::is_valid_open_enum() const
+{
+    return m_enum_names == nullptr && m_enum_keys_map == nullptr && (!m_values.empty() || !m_labels.empty()) &&
+           (m_values.empty() || m_labels.empty() || m_values.size() == m_labels.size());
+}
+#endif // NDEBUG
+
+void ConfigOptionEnumDef::clear()
+{
+    m_values_ordinary = false;
+    m_enum_names      = nullptr;
+    m_enum_keys_map   = nullptr;
+    m_values.clear();
+    m_labels.clear();
+    m_enum_keys_map_storage_for_script.reset();
+}
+
+void ConfigOptionEnumDef::set_values(const std::vector<std::string> &v)
+{
+    m_values = v;
+    assert(m_labels.empty() || m_labels.size() == m_values.size());
+}
+void ConfigOptionEnumDef::set_values(const std::initializer_list<std::string_view> il)
+{
+    m_values.clear();
+    m_values.reserve(il.size());
+    for (const std::string_view &p : il)
+        m_values.emplace_back(p);
+    assert(m_labels.empty() || m_labels.size() == m_values.size());
+}
+void ConfigOptionEnumDef::set_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il)
+{
+    m_values.clear();
+    m_values.reserve(il.size());
+    m_labels.clear();
+    m_labels.reserve(il.size());
+    for (const std::pair<std::string_view, std::string_view> &p : il) {
+        m_values.emplace_back(p.first);
+        m_labels.emplace_back(p.second);
+    }
+}
+void ConfigOptionEnumDef::set_values(const std::vector<std::pair<std::string, std::string>> il)
+{
+    m_values.clear();
+    m_values.reserve(il.size());
+    m_labels.clear();
+    m_labels.reserve(il.size());
+    for (const std::pair<std::string, std::string> &p : il) {
+        m_values.emplace_back(p.first);
+        m_labels.emplace_back(p.second);
+    }
+}
+void ConfigOptionEnumDef::set_labels(const std::initializer_list<std::string_view> il)
+{
+    m_labels.clear();
+    m_labels.reserve(il.size());
+    for (const std::string_view &p : il)
+        m_labels.emplace_back(p);
+    assert(m_values.empty() || m_labels.size() == m_values.size());
+}
+void ConfigOptionEnumDef::finalize_closed_enum()
+{
+    assert(this->is_valid_closed_enum());
+    // Check whether def.enum_values contains all the values of def.enum_keys_map and
+    // that they are sorted by their ordinary values.
+    m_values_ordinary = true;
+    for (const auto &[enum_name, enum_int] : *m_enum_keys_map) {
+        assert(enum_int >= 0);
+        if (enum_int >= int(this->values().size()) || this->value(enum_int) != enum_name) {
+            m_values_ordinary = false;
+            break;
+        }
+    }
+}
+
+void ConfigOptionDef::set_enum_values(const std::vector<std::string> il)
+{
+    this->enum_def_new();
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_values(const std::initializer_list<std::string_view> il)
+{
+    this->enum_def_new();
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_values(const std::initializer_list<std::pair<std::string_view, std::string_view>> il)
+{
+    this->enum_def_new();
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_values(const std::vector<std::pair<std::string, std::string>> il)
+{
+    this->enum_def_new();
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_values(GUIType gui_type, const std::initializer_list<std::string_view> il)
+{
+    this->enum_def_new();
+    assert(is_gui_type_enum_open(gui_type));
+    this->gui_type = gui_type;
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_as_closed_for_scripted_enum(const std::vector<std::pair<std::string, std::string>> il)
+{
+    set_enum_values(il);
+    gui_type                                     = GUIType::undefined; // closed enum
+    enum_def->m_enum_names                       = &enum_def->m_values;
+    enum_def->m_enum_keys_map_storage_for_script = std::make_unique<t_config_enum_values>();
+    enum_def->m_enum_keys_map                    = enum_def->m_enum_keys_map_storage_for_script.get();
+    for (size_t i = 0; i < enum_def->m_values.size(); i++) {
+        (*enum_def->m_enum_keys_map_storage_for_script)[enum_def->m_values[i]] = i;
+    }
+    enum_def->finalize_closed_enum();
+    assert(enum_def->m_values_ordinary);
+}
+
+void ConfigOptionDef::set_enum_values(GUIType gui_type, const std::initializer_list<std::pair<std::string_view, std::string_view>> il)
+{
+    this->enum_def_new();
+    assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open);
+    this->gui_type = gui_type;
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_values(GUIType gui_type, const std::vector<std::pair<std::string, std::string>> il)
+{
+    this->enum_def_new();
+    assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open || gui_type == GUIType::select_close);
+    this->gui_type = gui_type;
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_values(GUIType gui_type, const std::vector<std::string> il)
+{
+    this->enum_def_new();
+    assert(gui_type == GUIType::select_open || gui_type == GUIType::color || gui_type == ConfigOptionDef::GUIType::select_close);
+    this->gui_type = gui_type;
+    enum_def->set_values(il);
+}
+
+void ConfigOptionDef::set_enum_labels(GUIType gui_type, const std::initializer_list<std::string_view> il)
+{
+    this->enum_def_new();
+    assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open || gui_type == ConfigOptionDef::GUIType::select_close);
+    this->gui_type = gui_type;
+    enum_def->set_labels(il);
+}
+
+bool ConfigOptionDef::has_enum_value(const std::string &value) const {
+    if (!value.empty() && value.front() == '!')
+        return has_enum_value(value.substr(1));
+    return enum_def && enum_def->value_to_index(value).has_value();
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<int> values)
+{
+    std::string out;
+    int i = 0;
+    for (int v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += std::to_string(v);
+    }
+    return out;
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<float> values)
+{
+    std::string out;
+    int i = 0;
+    for (float v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += float_to_string_decimal_point(double(v));
+    }
+    return out;
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<double> values)
+{
+    std::string out;
+    int i = 0;
+    for (float v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += float_to_string_decimal_point(v);
     }
     return out;
 }
@@ -1170,11 +1481,37 @@ void ConfigBase::setenv_() const
     }
 }
 
-ConfigSubstitutions ConfigBase::load(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
+ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
-    return is_gcode_file(file) ? 
-        this->load_from_gcode_file(file, compatibility_rule) :
-        this->load_from_ini(file, compatibility_rule);
+    enum class EFileType
+    {
+        Ini,
+        AsciiGCode,
+        BinaryGCode
+    };
+
+    EFileType file_type;
+
+    if (is_gcode_file(filename)) {
+        FILE* file = boost::nowide::fopen(filename.c_str(), "rb");
+        if (file == nullptr)
+            throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
+
+        std::vector<std::byte> cs_buffer(65536);
+        using namespace bgcode::core;
+        file_type = (is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
+        fclose(file);
+    }
+    else 
+        file_type = EFileType::Ini;
+
+    switch (file_type)
+    {
+    case EFileType::Ini:         { return this->load_from_ini(filename, compatibility_rule); }
+    case EFileType::AsciiGCode:  { return this->load_from_gcode_file(filename, compatibility_rule);}
+    case EFileType::BinaryGCode: { return this->load_from_binary_gcode_file(filename, compatibility_rule);}
+    default:                     { throw Slic3r::RuntimeError(format("Invalid file %1%", filename)); }
+    }
 }
 
 ConfigSubstitutions ConfigBase::load_from_ini(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
@@ -1266,6 +1603,9 @@ ConfigSubstitutions ConfigBase::load(const boost::property_tree::ptree &tree, Fo
             substitutions_ctxt.emplace(optdef, v.second.get_value<std::string>(), ConfigOptionUniquePtr(optdef->default_value->clone()));
         }
     }
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
     return std::move(substitutions_ctxt).data();
 }
 
@@ -1279,20 +1619,20 @@ std::map<t_config_option_key, std::string> ConfigBase::load_gcode_string_legacy(
     // Walk line by line in reverse until a non-configuration key appears.
     const char *data_start = str;
     // boost::nowide::ifstream seems to cook the text data somehow, so less then the 64k of characters may be retrieved.
-    const char *end                 = data_start + strlen(str);
+    const char *end = data_start + strlen(str);
     for (;;) {
         // Extract next line.
         for (--end; end > data_start && (*end == '\r' || *end == '\n'); --end)
             ;
         if (end == data_start)
             break;
-        const char *start = end++;
+        const char *start = end ++;
         for (; start > data_start && *start != '\r' && *start != '\n'; --start)
             ;
         if (start == data_start)
             break;
         // Extracted a line from start to end. Extract the key = value pair.
-        if (end - (++start) < 10 || start[0] != ';' || start[1] != ' ')
+        if (end - (++ start) < 10 || start[0] != ';' || start[1] != ' ')
             break;
         const char *key = start + 2;
         if (!((*key >= 'a' && *key <= 'z') || (*key >= 'A' && *key <= 'Z')))
@@ -1310,7 +1650,7 @@ std::map<t_config_option_key, std::string> ConfigBase::load_gcode_string_legacy(
         if (key_end - key < 3)
             break;
         // The key may contain letters, digits and underscores.
-        for (const char *c = key; c != key_end; ++c)
+        for (const char *c = key; c != key_end; ++ c)
             if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '_')) {
                 key = nullptr;
                 break;
@@ -1345,8 +1685,8 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
                     }
                 } else {
                     config.set_deserialize(opt_key, value, substitutions);
-                    ++num_key_value_pairs;
-                }
+            ++num_key_value_pairs;
+        }
             }
         }
         catch (UnknownOptionException & /* e */) {
@@ -1363,6 +1703,10 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
             substitutions.emplace(optdef, std::move(value), ConfigOptionUniquePtr(optdef->default_value->clone()));
         }
     }
+
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    config.handle_legacy_composite();
 
     return num_key_value_pairs;
 }
@@ -1434,10 +1778,10 @@ private:
 };
 
 // Load the config keys from the tail of a G-code file.
-ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
+ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
     // Read a 64k block from the end of the G-code.
-    boost::nowide::ifstream ifs(file, std::ifstream::binary);
+    boost::nowide::ifstream ifs(filename, std::ifstream::binary);
     // Look for Slic3r-like header.
     // Look for the header across the whole file as the G-code may have been extended at the start by a post-processing script or the user.
     bool has_delimiters = false;
@@ -1499,7 +1843,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
                 break;
             }
         if (! end_found)
-            throw Slic3r::RuntimeError(format("Configuration block closing tag \"; (.+)r_config = end\" not found when reading %1%", file));
+            throw Slic3r::RuntimeError(format("Configuration block closing tag \"; (.+)r_config = end\" not found when reading %1%", filename));
         std::string key, value;
         while (reader.getline(line)) {
             if (boost::algorithm::ends_with(line, "r_config = begin")) {
@@ -1523,7 +1867,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
                             }
                         } else {
                             this->set_deserialize(opt_key, value, substitutions_ctxt);
-                            ++key_value_pairs;
+                    ++ key_value_pairs;
                         }
                     }
                 } catch (UnknownOptionException & /* e */) {
@@ -1533,7 +1877,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
             }
         }
         if (! begin_found) 
-            throw Slic3r::RuntimeError(format("Configuration block opening tag \"; (.+)r_config = begin\" not found when reading %1%", file));
+            throw Slic3r::RuntimeError(format("Configuration block opening tag \"; (.+)r_config = begin\" not found when reading %1%", filename));
     }
     else
     {
@@ -1550,7 +1894,55 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
     }
 
     if (key_value_pairs < 80)
-        throw Slic3r::RuntimeError(format("Suspiciously low number of configuration values extracted from %1%: %2%", file, key_value_pairs));
+        throw Slic3r::RuntimeError(format("Suspiciously low number of configuration values extracted from %1%: %2%", filename, key_value_pairs));
+
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
+    return std::move(substitutions_ctxt).data();
+}
+
+ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
+{
+    ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
+
+    FilePtr file{ boost::nowide::fopen(filename.c_str(), "rb") };
+    if (file.f == nullptr)
+        throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
+
+    using namespace bgcode::core;
+    using namespace bgcode::binarize;
+    std::vector<std::byte> cs_buffer(65536);
+    EResult res = is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("File %1% does not contain a valid binary gcode\nError: %2%", filename,
+            std::string(translate_result(res))));
+
+    FileHeader file_header;
+    res = read_header(*file.f, file_header, nullptr);
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
+
+    // searches for config block
+    BlockHeader block_header;
+    res = read_next_block_header(*file.f, file_header, block_header, EBlockType::SlicerMetadata, cs_buffer.data(), cs_buffer.size());
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
+    if ((EBlockType)block_header.type != EBlockType::SlicerMetadata)
+        throw Slic3r::RuntimeError(format("Unable to find slicer metadata block in file %1%", filename));
+    SlicerMetadataBlock slicer_metadata_block;
+    res = slicer_metadata_block.read_data(*file.f, file_header, block_header);
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
+
+    // extracts data from block
+    for (const auto& [key, value] : slicer_metadata_block.raw_data) {
+        this->set_deserialize(key, value, substitutions_ctxt);
+    }
+
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
     return std::move(substitutions_ctxt).data();
 }
 
@@ -1617,25 +2009,32 @@ size_t DynamicConfig::remove_nil_options()
 
 ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key, bool create)
 {
-    auto it = options.find(opt_key);
-    if (it != options.end())
-        // Option was found.
-        return it->second.get();
-    if (! create)
+    if (create) {
+        // Use lower_bound instead of find for emplace_hint
+        auto it = options.lower_bound(opt_key);
+        if (it != options.end() && it->first == opt_key)
+            // Option was found.
+            return it->second.get();
+        // Try to create a new ConfigOption.
+        const ConfigDef *def = this->def();
+        if (def == nullptr)
+            throw NoDefinitionException(opt_key);
+        const ConfigOptionDef *optdef = def->get(opt_key);
+        if (optdef == nullptr)
+            //        throw ConfigurationError(std::string("Invalid option name: ") + opt_key);
+            // Let the parent decide what to do if the opt_key is not defined by this->def().
+            return nullptr;
+        ConfigOption *opt = optdef->create_default_option();
+        this->options.emplace_hint(it, opt_key, std::unique_ptr<ConfigOption>(opt));
+        return opt;
+    } else {
+        auto it = options.find(opt_key);
+        if (it != options.end())
+            // Option was found.
+            return it->second.get();
         // Option was not found and a new option shall not be created.
         return nullptr;
-    // Try to create a new ConfigOption.
-    const ConfigDef       *def    = this->def();
-    if (def == nullptr)
-        throw NoDefinitionException(opt_key);
-    const ConfigOptionDef *optdef = def->get(opt_key);
-    if (optdef == nullptr)
-//        throw ConfigurationError(std::string("Invalid option name: ") + opt_key);
-        // Let the parent decide what to do if the opt_key is not defined by this->def().
-        return nullptr;
-    ConfigOption *opt = optdef->create_default_option();
-    this->options.emplace_hint(it, opt_key, std::unique_ptr<ConfigOption>(opt));
-    return opt;
+    }
 }
 
 const ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key) const
@@ -1709,7 +2108,7 @@ bool DynamicConfig::read_cli(int argc, const char* const argv[], t_config_option
         }
 
         const t_config_option_key &opt_key = it->second;
-        const ConfigOptionDef     &optdef  = this->def()->options.at(opt_key);
+        const ConfigOptionDef     &optdef  = *this->option_def(opt_key);
 
         // If the option type expects a value and it was not already provided,
         // look for it in the next token.
@@ -1764,10 +2163,10 @@ bool DynamicConfig::read_cli(int argc, const char* const argv[], t_config_option
             ConfigSubstitutionContext context(ForwardCompatibilitySubstitutionRule::Disable);
             // Any scalar value of a type different from Bool and String.
             // here goes int options, like loglevel.
-            if (!this->set_deserialize_nothrow(opt_key, value, context, false)) {
-                boost::nowide::cerr << "Invalid value supplied for --" << token.c_str() << std::endl;
-                return false;
-            }
+            if (! this->set_deserialize_nothrow(opt_key, value, context, false)) {
+				boost::nowide::cerr << "Invalid value supplied for --" << token.c_str() << std::endl;
+				return false;
+			}
         }
     }
     return true;
@@ -1882,6 +2281,9 @@ CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<std::string>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<Slic3r::Vec2d>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<Slic3r::Vec3d>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<bool>)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingleNullable<double>)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingleNullable<int>)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingleNullable<bool>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVectorBase)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<double>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<int32_t>)
@@ -1889,9 +2291,11 @@ CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<std::string>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<Slic3r::Vec2d>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<unsigned char>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloat)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloatNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloats)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloatsNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionInt)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionIntNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionInts)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionIntsNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionString)
@@ -1921,6 +2325,9 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionS
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<Slic3r::Vec3d>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<Slic3r::GraphData>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<bool>) 
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingleNullable<double>)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingleNullable<int>)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingleNullable<bool>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionVectorBase) 
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<double>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<int32_t>)
@@ -1929,9 +2336,11 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::Con
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<Slic3r::GraphData>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<unsigned char>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<double>, Slic3r::ConfigOptionFloat)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingleNullable<double>, Slic3r::ConfigOptionFloatNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<double>, Slic3r::ConfigOptionFloats)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<double>, Slic3r::ConfigOptionFloatsNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<int32_t>, Slic3r::ConfigOptionInt)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingleNullable<int32_t>, Slic3r::ConfigOptionIntNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<int32_t>, Slic3r::ConfigOptionInts)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<int32_t>, Slic3r::ConfigOptionIntsNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<std::string>, Slic3r::ConfigOptionString)

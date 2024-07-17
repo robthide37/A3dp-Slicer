@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2021 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_ConfigManipulation_hpp_
 #define slic3r_ConfigManipulation_hpp_
 
@@ -63,7 +67,6 @@ public:
     void    toggle_printer_fff_options(DynamicPrintConfig* config, DynamicPrintConfig &full_config);
 
     // SLA print
-    void    update_print_sla_config(DynamicPrintConfig* config, const bool is_global_config = false);
     void    toggle_print_sla_options(DynamicPrintConfig* config);
 
     bool    is_initialized_support_material_overhangs_queried() { return m_is_initialized_support_material_overhangs_queried; }

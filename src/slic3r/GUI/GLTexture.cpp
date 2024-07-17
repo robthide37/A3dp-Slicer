@@ -1,8 +1,15 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Enrico Turri @enricoturri1966, Lukáš Hejl @hejllukas, Tomáš Mészáros @tamasmeszaros, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r/libslic3r.h"
 #include "GLTexture.hpp"
 
 #include "3DScene.hpp"
 #include "OpenGLManager.hpp"
+#include "GUI_App.hpp"
+#include "GLModel.hpp"
+#include "BitmapCache.hpp"
 
 #include <GL/glew.h>
 
@@ -19,8 +26,8 @@
 #define STB_DXT_IMPLEMENTATION
 #include "stb_dxt/stb_dxt.h"
 
-#include "nanosvg/nanosvg.h"
-#include "nanosvg/nanosvgrast.h"
+#include <nanosvg/nanosvg.h>
+#include <nanosvg/nanosvgrast.h>
 
 #include "libslic3r/Utils.hpp"
 
@@ -121,11 +128,7 @@ void GLTexture::Compressor::compress()
 GLTexture::Quad_UVs GLTexture::FullTextureUVs = { { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f } };
 
 GLTexture::GLTexture()
-    : m_id(0)
-    , m_width(0)
-    , m_height(0)
-    , m_source("")
-    , m_compressor(*this)
+    : m_compressor(*this)
 {
 }
 
@@ -205,7 +208,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
         if (!boost::algorithm::iends_with(filename, ".svg"))
             continue;
 
-        NSVGimage* image = nsvgParseFromFile(filename.c_str(), "px", 96.0f);
+        NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(filename.c_str(), "px", 96.0f, {});
         if (image == nullptr)
             continue;
 
@@ -224,7 +227,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
         float scale = (float)sprite_size_px / std::max(image->width, image->height);
 
         // offset by 1 to leave the first pixel empty (both in x and y)
-        nsvgRasterize(rast, image, 1, 1, scale, sprite_data.data(), sprite_size_px, sprite_size_px, sprite_stride);
+        nsvgRasterize(rast, image, 1, 1, scale, sprite_data.data(), sprite_size_px_ex, sprite_size_px_ex, sprite_stride);
 
         // makes white only copy of the sprite
         ::memcpy((void*)sprite_white_only_data.data(), (const void*)sprite_data.data(), sprite_bytes);
@@ -289,7 +292,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     glsafe(::glGenTextures(1, &m_id));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_id));
-    if (compress && GLEW_EXT_texture_compression_s3tc)
+    if (compress && OpenGLManager::are_compressed_textures_supported())
         glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
     else
         glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
@@ -347,27 +350,71 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+#if !ENABLE_GL_CORE_PROFILE && !ENABLE_OPENGL_ES
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE));
+#endif // !ENABLE_GL_CORE_PROFILE && !ENABLE_OPENGL_ES
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id));
 
-    ::glBegin(GL_QUADS);
-    ::glTexCoord2f(uvs.left_bottom.u, uvs.left_bottom.v); ::glVertex2f(left, bottom);
-    ::glTexCoord2f(uvs.right_bottom.u, uvs.right_bottom.v); ::glVertex2f(right, bottom);
-    ::glTexCoord2f(uvs.right_top.u, uvs.right_top.v); ::glVertex2f(right, top);
-    ::glTexCoord2f(uvs.left_top.u, uvs.left_top.v); ::glVertex2f(left, top);
-    glsafe(::glEnd());
+    GLModel::Geometry init_data;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P2T2 };
+    init_data.reserve_vertices(4);
+    init_data.reserve_indices(6);
+
+    // vertices
+    init_data.add_vertex(Vec2f(left, bottom),  Vec2f(uvs.left_bottom.u, uvs.left_bottom.v));
+    init_data.add_vertex(Vec2f(right, bottom), Vec2f(uvs.right_bottom.u, uvs.right_bottom.v));
+    init_data.add_vertex(Vec2f(right, top),    Vec2f(uvs.right_top.u, uvs.right_top.v));
+    init_data.add_vertex(Vec2f(left, top),     Vec2f(uvs.left_top.u, uvs.left_top.v));
+
+        // indices
+    init_data.add_triangle(0, 1, 2);
+    init_data.add_triangle(2, 3, 0);
+
+    GLModel model;
+    model.init_from(std::move(init_data));
+
+    GLShaderProgram* shader = wxGetApp().get_shader("flat_texture");
+    if (shader != nullptr) {
+        shader->start_using();
+        shader->set_uniform("view_model_matrix", Transform3d::Identity());
+        shader->set_uniform("projection_matrix", Transform3d::Identity());
+        model.render();
+        shader->stop_using();
+    }
 
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 
+#if !ENABLE_GL_CORE_PROFILE && !ENABLE_OPENGL_ES
     glsafe(::glDisable(GL_TEXTURE_2D));
+#endif // !ENABLE_GL_CORE_PROFILE && !ENABLE_OPENGL_ES
     glsafe(::glDisable(GL_BLEND));
+}
+
+static bool to_squared_power_of_two(const std::string& filename, int max_size_px, int& w, int& h)
+{
+    auto is_power_of_two = [](int v) { return v != 0 && (v & (v - 1)) == 0; };
+    auto upper_power_of_two = [](int v) { v--; v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; v++; return v; };
+
+    int new_w = std::max(w, h);
+    if (!is_power_of_two(new_w))
+        new_w = upper_power_of_two(new_w);
+
+    while (new_w > max_size_px) {
+        new_w /= 2;
+    }
+
+    const int new_h = new_w;
+    const bool ret = (new_w != w || new_h != h);
+    w = new_w;
+    h = new_h;
+    return ret;
 }
 
 bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECompressionType compression_type, bool apply_anisotropy)
 {
-    bool compression_enabled = (compression_type != None) && GLEW_EXT_texture_compression_s3tc;
+    const bool compression_enabled = (compression_type != None) && OpenGLManager::are_compressed_textures_supported();
 
     // Load a PNG with an alpha channel.
     wxImage image;
@@ -381,6 +428,11 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
     m_height = image.GetHeight();
 
     bool requires_rescale = false;
+
+    if (use_mipmaps && compression_enabled && OpenGLManager::force_power_of_two_textures()) {
+        if (to_squared_power_of_two(boost::filesystem::path(filename).filename().string(), OpenGLManager::get_gl_info().get_max_tex_size(), m_width, m_height))
+            requires_rescale = true;
+    }
 
     if (compression_enabled && compression_type == MultiThreaded) {
         // the stb_dxt compression library seems to like only texture sizes which are a multiple of 4
@@ -508,7 +560,7 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
 
     m_source = filename;
 
-    if (compression_enabled && compression_type == MultiThreaded)
+    if (compression_type == MultiThreaded)
         // start asynchronous compression
         m_compressor.start_compressing();
 
@@ -517,18 +569,24 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
 
 bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, bool compress, bool apply_anisotropy, unsigned int max_size_px)
 {
-    bool compression_enabled = compress && GLEW_EXT_texture_compression_s3tc;
+    const bool compression_enabled = compress && OpenGLManager::are_compressed_textures_supported();
 
-    NSVGimage* image = nsvgParseFromFile(filename.c_str(), "px", 96.0f);
+    NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(filename.c_str(), "px", 96.0f, {});
     if (image == nullptr) {
         reset();
         return false;
     }
 
-    float scale = (float)max_size_px / std::max(image->width, image->height);
+    const float scale = (float)max_size_px / std::max(image->width, image->height);
 
     m_width = (int)(scale * image->width);
     m_height = (int)(scale * image->height);
+
+    if (use_mipmaps && compression_enabled && OpenGLManager::force_power_of_two_textures())
+        to_squared_power_of_two(boost::filesystem::path(filename).filename().string(), max_size_px, m_width, m_height);
+
+    float scale_w = (float)m_width / image->width;
+    float scale_h = (float)m_height / image->height;
 
     if (compression_enabled) {
         // the stb_dxt compression library seems to like only texture sizes which are a multiple of 4
@@ -542,7 +600,7 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
             m_height += (4 - height_rem);
     }
 
-    int n_pixels = m_width * m_height;
+    const int n_pixels = m_width * m_height;
 
     if (n_pixels <= 0) {
         reset();
@@ -559,7 +617,7 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
 
     // creates the temporary buffer only once, with max size, and reuse it for all the levels, if generating mipmaps
     std::vector<unsigned char> data(n_pixels * 4, 0);
-    nsvgRasterize(rast, image, 0, 0, scale, data.data(), m_width, m_height, m_width * 4);
+    nsvgRasterizeXY(rast, image, 0, 0, scale_w, scale_h, data.data(), m_width, m_height, m_width * 4);
 
     // sends data to gpu
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
@@ -581,7 +639,7 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
     else
         glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
 
-    if (use_mipmaps && OpenGLManager::use_manually_generated_mipmaps()) {
+    if (use_mipmaps) {
         // we manually generate mipmaps because glGenerateMipmap() function is not reliable on all graphics cards
         int lod_w = m_width;
         int lod_h = m_height;
@@ -591,11 +649,12 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
 
             lod_w = std::max(lod_w / 2, 1);
             lod_h = std::max(lod_h / 2, 1);
-            scale /= 2.0f;
+            scale_w /= 2.0f;
+            scale_h /= 2.0f;
 
             data.resize(lod_w * lod_h * 4);
 
-            nsvgRasterize(rast, image, 0, 0, scale, data.data(), lod_w, lod_h, lod_w * 4);
+            nsvgRasterizeXY(rast, image, 0, 0, scale_w, scale_h, data.data(), lod_w, lod_h, lod_w * 4);
             if (compression_enabled) {
                 // initializes the texture on GPU 
                 glsafe(::glTexImage2D(GL_TEXTURE_2D, level, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, (GLsizei)lod_w, (GLsizei)lod_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
@@ -610,9 +669,8 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
             glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, level));
             glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
         }
-    } else if (use_mipmaps && !OpenGLManager::use_manually_generated_mipmaps()) {
-        glGenerateMipmap(GL_TEXTURE_2D);
-    } else {
+    }
+    else {
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
     }

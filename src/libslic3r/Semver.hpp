@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Semver_hpp_
 #define slic3r_Semver_hpp_
 
@@ -56,7 +60,6 @@ public:
 
 	Semver(const std::string &str) : ver(semver_zero())
 	{
-
 		auto parsed = parse(str);
 		if (! parsed) {
 			throw Slic3r::RuntimeError(std::string("Could not parse version string: ") + str);
@@ -113,8 +116,8 @@ public:
 	~Semver() { ::semver_free(&ver); }
 
 	// const accessors
-	//int 		maj()        const { return ver.counter_size > 0 ? ver.counters[0] : 0; }
-	//int 		min()        const { return ver.counter_size > 1 ? ver.counters[1] : 0; }
+	int 		maj()        const { return ver.counter_size > 0 ? ver.counters[0] : 0; }
+	int 		min()        const { return ver.counter_size > 1 ? ver.counters[1] : 0; }
 	//int 		counter()    const { return ver.counter_size > 2 ? ver.counters[2] : 0; }
 	//int 		patch() 	 const { return ver.counter_size > 3 ? ver.counters[3] : 0; }
 	const char*	prerelease() const { return ver.prerelease; }
@@ -125,10 +128,30 @@ public:
 	//void set_min(int min) { if (ver.counter_size > 1) ver.counters[1] = min; }
 	//void set_counter(int count) { if (ver.counter_size > 2) ver.counters[2] = count; }
 	//void set_patch(int patch) { if (ver.counter_size > 3) ver.counters[3] = patch; }
-	void set_metadata(boost::optional<const std::string&> meta) { ver.metadata = meta ? strdup(*meta) : nullptr; }
-	void set_metadata(const char *meta) { ver.metadata = meta ? strdup(meta) : nullptr; }
-	void set_prerelease(boost::optional<const std::string&> pre) { ver.prerelease = pre ? strdup(*pre) : nullptr; }
-	void set_prerelease(const char *pre) { ver.prerelease = pre ? strdup(pre) : nullptr; }
+    void set_metadata(boost::optional<const std::string &> meta)
+    {
+        if (ver.metadata)
+            free(ver.metadata);
+        ver.metadata = meta ? strdup(*meta) : nullptr;
+    }
+    void set_metadata(const char *meta)
+    {
+        if (ver.metadata)
+            free(ver.metadata);
+        ver.metadata = meta ? strdup(meta) : nullptr;
+    }
+    void set_prerelease(boost::optional<const std::string &> pre)
+    {
+        if (ver.prerelease)
+            free(ver.prerelease);
+        ver.prerelease = pre ? strdup(*pre) : nullptr;
+    }
+    void set_prerelease(const char *pre)
+    {
+        if (ver.prerelease)
+            free(ver.prerelease);
+        ver.prerelease = pre ? strdup(pre) : nullptr;
+    }
 
 	// Comparison
 	bool operator<(const Semver &b)  const { return ::semver_compare(ver, b.ver) == -1; }
@@ -180,7 +203,6 @@ public:
 	}
 private:
 	semver_t ver;
-
 
 	Semver(semver_t ver) : ver(ver) {}
 
