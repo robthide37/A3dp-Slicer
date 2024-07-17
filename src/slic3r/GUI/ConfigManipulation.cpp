@@ -670,7 +670,6 @@ void ConfigManipulation::update_printer_fff_config(DynamicPrintConfig *config,
 }
 void ConfigManipulation::toggle_printer_fff_options(DynamicPrintConfig *config, DynamicPrintConfig &full_config)
 {
-    Field* field;
 
     size_t extruder_count = config->option("nozzle_diameter")->size();
     toggle_field("toolchange_gcode", extruder_count > 1);
