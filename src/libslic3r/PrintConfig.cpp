@@ -564,7 +564,7 @@ void PrintConfigDef::init_common_params()
     def->category = OptionCategory::general;
     def->tooltip = L("Password for client certificate for 2-way ssl authentication. "
                    "Leave blank if no password is needed");
-    def->mode = comAdvanced | comSuSi;
+    def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionString(""));
 
     // For PrusaLink
@@ -918,7 +918,7 @@ void PrintConfigDef::init_fff_params()
     def->label      = L("Enable dynamic overhang speeds");
     def->category   = OptionCategory::speed;
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
-    def->mode       = comExpert;
+    def->mode       = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
     // TRN PrintSettings : "Dynamic overhang speed"
@@ -934,7 +934,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comExpert;
+    def->mode       = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_1", coFloatOrPercent);
@@ -943,7 +943,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comExpert;
+    def->mode       = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_2", coFloatOrPercent);
@@ -952,7 +952,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comExpert;
+    def->mode       = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
 
     def             = this->add("overhang_speed_3", coFloatOrPercent);
@@ -961,13 +961,13 @@ void PrintConfigDef::init_fff_params()
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comExpert;
+    def->mode       = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
 
     def          = this->add("enable_dynamic_fan_speeds", coBools);
     def->label   = L("Enable dynamic fan speeds");
     def->tooltip = L("This setting enables dynamic fan speed control on overhangs.");
-    def->mode    = comExpert;
+    def->mode    = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBools{false});
 
     // TRN FilamentSettings : "Dynamic fan speeds"
@@ -981,7 +981,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min      = 0;
     def->max      = 100;
-    def->mode     = comExpert;
+    def->mode     = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_1", coInts);
@@ -990,7 +990,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min      = 0;
     def->max      = 100;
-    def->mode     = comExpert;
+    def->mode     = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_2", coInts);
@@ -999,7 +999,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min      = 0;
     def->max      = 100;
-    def->mode     = comExpert;
+    def->mode     = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_3", coInts);
@@ -1008,7 +1008,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min      = 0;
     def->max      = 100;
-    def->mode     = comExpert;
+    def->mode     = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionInts{0});
 
     def = this->add("brim_width", coFloat);
@@ -1674,7 +1674,7 @@ void PrintConfigDef::init_fff_params()
     def->ratio_over = "perimeter_acceleration";
     def->min = 0;
     def->max_literal = { -200, false };
-    def->mode = comExpert | comSuSi;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
     def = this->add("external_perimeter_speed", coFloatOrPercent);
@@ -1746,7 +1746,7 @@ void PrintConfigDef::init_fff_params()
                     "extra perimeter paths. These paths are anchored to the nearby non-overhang area when possible."
                     "\nIf you use this setting, strongly consider also using overhangs_reverse.");
     def->aliases = {"extra_perimeters_overhangs"};
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("extra_perimeters_odd_layers", coBool);
@@ -2317,7 +2317,7 @@ void PrintConfigDef::init_fff_params()
     def->ratio_over = "";
     def->min = 0;
     def->max = 100;
-    def->mode = comExpert | comPrusa;
+    def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionPercents{ 100 });
 
@@ -3092,31 +3092,13 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
-    def = this->add("solid_infill_acceleration", coFloat);
-    def->label = L("Solid infill");
-    def->tooltip = L("This is the acceleration your printer will use for solid infill. Set zero to use "
-                     "the value for infill.");
-    def->sidetext = L("mm/s²");
-    def->min = 0;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(0));
-
-    def = this->add("top_solid_infill_acceleration", coFloat);
-    def->label = L("Top solid infill");
-    def->tooltip = L("This is the acceleration your printer will use for top solid infill. Set zero to use "
-                     "the value for solid infill.");
-    def->sidetext = L("mm/s²");
-    def->min = 0;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(0));
-
     def = this->add("travel_acceleration", coFloat);
     def->label = L("Travel");
     def->tooltip = L("This is the acceleration your printer will use for travel moves. Set zero to disable "
                      "acceleration control for travel.");
     def->sidetext = L("mm/s²");
     def->min = 0;
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("infill_every_layers", coInt);
@@ -3485,7 +3467,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::ironing;
     def->tooltip = L("This is the acceleration your printer will use for ironing. "
                 "\nCan be a % of the top solid infill acceleration"
-                "\nSet zero to use top solid infill acceleration for ironing.");
+                "\nSet zero or 100% to use top solid infill acceleration for ironing.");
     def->sidetext = L("mm/s² or %");
     def->ratio_over = "top_solid_infill_acceleration";
     def->min = 0;
@@ -3639,7 +3621,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Supports binary G-code");
     def->tooltip = L("Enable, if the firmware supports binary G-code format (bgcode). "
                      "To generate .bgcode files, make sure you have binary G-code enabled in Configuration->Preferences->Other.");
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("fan_kickstart", coFloat);
@@ -4751,7 +4733,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::extruders;
     def->tooltip = L("Z lift is not triggered when travel moves are shorter than this length.");
     def->sidetext = L("mm");
-    def->mode = comAdvancedE | comPrusa;
+    def->mode = comAdvancedE | comSuSi;
     def->min = 0;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloats { 2. });
@@ -5454,7 +5436,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Ensure that the slicer won't add heating, fan, extruder... commands before or just after your start-gcode."
                     "\nIf set to true, you have to write a good and complete start_gcode, as no checks are made anymore."
                     "\nExemple:\nG21 ; set units to millimeters\nG90 ; use absolute coordinates\n{if use_relative_e_distances}M83{else}M82{endif}\nG92 E0 ; reset extrusion distance");
-    def->mode = comExpert | comPrusa;
+    def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("start_filament_gcode", coStrings);
@@ -5524,14 +5506,14 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Solid ");
     def->full_label = L("Solid acceleration");
     def->category = OptionCategory::speed;
-    def->tooltip = L("This is the acceleration your printer will use for solid infills. "
+    def->tooltip = L("This is the acceleration your printer will use for solid infill. "
                 "\nCan be a % of the default acceleration"
-                "\nSet zero to use default acceleration for solid infills.");
+                "\nSet zero or 100% to use default acceleration for solid infill.");
     def->sidetext = L("mm/s² or %");
     def->ratio_over = "default_acceleration";
     def->min = 0;
     def->max_literal = { -200, false };
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
     def = this->add("solid_over_perimeters", coInt);
@@ -6361,14 +6343,14 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Top solid ");
     def->full_label = L("Top solid acceleration");
     def->category = OptionCategory::speed;
-    def->tooltip = L("This is the acceleration your printer will use for top solid infills. "
+    def->tooltip = L("This is the acceleration your printer will use for top solid infill. "
                 "\nCan be a % of the solid infill acceleration"
-                "\nSet zero to use solid infill acceleration for top solid infills.");
+                "\nSet zero or 100% to use solid infill acceleration for top solid infill.");
     def->sidetext = L("mm/s² or %");
     def->ratio_over = "solid_infill_acceleration";
     def->min = 0;
     def->max_literal = { -200, false };
-    def->mode = comExpert | comSuSi;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
     def = this->add("top_solid_infill_overlap", coPercent);
@@ -7267,7 +7249,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->tooltip = L("Diameter of the pointing side of the head");
     def->sidetext = L("mm");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0.4));
 
     def = this->add(prefix + "support_head_penetration", coFloat);
@@ -7275,7 +7257,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->category = OptionCategory::support;
     def->tooltip = L("How much the pinhead has to penetrate the model surface");
     def->sidetext = L("mm");
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.2));
 
@@ -7286,7 +7268,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("mm");
     def->min = 0;
     def->max = 20;
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(1.0));
 
     def = this->add(prefix + "support_pillar_diameter", coFloat);
@@ -7296,7 +7278,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("mm");
     def->min = 0;
     def->max = 15;
-    def->mode = comSimple;
+    def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(1.0));
 
     def = this->add(prefix + "support_small_pillar_diameter_percent", coPercent);
@@ -7307,7 +7289,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("%");
     def->min = 1;
     def->max = 100;
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionPercent(50));
 
     def = this->add(prefix + "support_max_bridges_on_pillar", coInt);
@@ -7317,7 +7299,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
         "hold support point pinheads and connect to pillars as small branches.");
     def->min = 0;
     def->max = 50;
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionInt(prefix == "branching" ? 2 : 3));
 
     def = this->add(prefix + "support_max_weight_on_model", coFloat);
@@ -7328,7 +7310,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
         "branches emanating from the endpoint.");
     def->sidetext = L("mm");
     def->min = 0;
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(10.));
 
     def = this->add(prefix + "support_pillar_connection_mode", coEnum);
@@ -7340,14 +7322,14 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->set_enum<SLAPillarConnectionMode>(
         ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_names(),
         { L("Zig-Zag"), L("Cross"), L("Dynamic") });
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum(SLAPillarConnectionMode::dynamic));
 
     def = this->add(prefix + "support_buildplate_only", coBool);
     def->label = L("Support on build plate only");
     def->category = OptionCategory::support;
     def->tooltip = L("Only create support if it lies on a build plate. Don't create support on a print.");
-    def->mode = comSimple;
+    def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add(prefix + "support_pillar_widening_factor", coFloat);
@@ -7362,7 +7344,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def->min = 0;
     def->max = 1;
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0.5));
 
     def = this->add(prefix + "support_base_diameter", coFloat);
@@ -7372,7 +7354,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("mm");
     def->min = 0;
     def->max = 30;
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(4.0));
 
     def = this->add(prefix + "support_base_height", coFloat);
@@ -7381,7 +7363,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->tooltip = L("The height of the pillar base cone");
     def->sidetext = L("mm");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(1.0));
 
     def = this->add(prefix + "support_base_safety_distance", coFloat);
@@ -7394,7 +7376,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("mm");
     def->min = 0;
     def->max = 10;
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(1));
 
     def = this->add(prefix + "support_critical_angle", coFloat);
@@ -7404,7 +7386,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("°");
                     def->min = 0;
     def->max = 90;
-    def->mode = comExpert;
+    def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionFloat(45));
 
     def = this->add(prefix + "support_max_bridge_length", coFloat);
@@ -7413,7 +7395,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->tooltip = L("The max length of a bridge");
     def->sidetext = L("mm");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
 
     double default_val = 15.0;
     if (prefix == "branching")
@@ -7428,7 +7410,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
                                " A zero value will prohibit pillar cascading.");
     def->sidetext = L("mm");
     def->min = 0;   // 0 means no linking
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(10.0));
 
     def = this->add(prefix + "support_object_elevation", coFloat);
@@ -7439,7 +7421,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->sidetext = L("mm");
     def->min = 0;
     def->max = 150; // This is the max height of print on SL1
-    def->mode = comAdvanced;
+    def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(5.0));
 }
 
@@ -7634,6 +7616,7 @@ void PrintConfigDef::init_sla_params()
     def->sidetext = L("°C");
     def->min = 0;
     def->max = max_temp;
+    def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionIntsNullable { ConfigOptionIntNullable::nil_value() });
 
     def = this->add("bottle_volume", coFloat);
@@ -8020,7 +8003,7 @@ void PrintConfigDef::init_sla_params()
 
     //def = this->add("sla_archive_format", coString);
     //def->label = L("Format of the output SLA archive");
-    //def->mode = comAdvanced | comPrusa;
+    //def->mode = comAdvancedE | comPrusa;
     //def->set_default_value(new ConfigOptionString("SL1"));
 
     def = this->add("output_format", coEnum);
@@ -8095,7 +8078,7 @@ static std::set<std::string> PrintConfigDef_ignore = {
     // Replaced by new concentric ensuring in 2.6.0-alpha5
     "ensure_vertical_shell_thickness",
     // Disabled in 2.6.0-alpha6, this option is problematic
-//    "infill_only_where_needed",
+//    "infill_only_where_needed", <- ignore only if deactivated
     "gcode_binary" // Introduced in 2.7.0-alpha1, removed in 2.7.1 (replaced by binary_gcode).
 };
 
@@ -8113,6 +8096,10 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         } catch (boost::bad_lexical_cast &) {
             value = "0";
         }
+    }
+    if ("infill_only_where_needed" == opt_key && "0" == value) {
+        opt_key = "";
+        value = "";
     }
     if (opt_key == "gcode_flavor") {
         if (value == "makerbot")
@@ -8142,14 +8129,23 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         oss << "0x0," << p.value(0) << "x0," << p.value(0) << "x" << p.value(1) << ",0x" << p.value(1);
         value = oss.str();
     }
-    if ((opt_key == "perimeter_acceleration" && value == "25")
-        || (opt_key == "infill_acceleration" && value == "50")) {
-        /*  For historical reasons, the world's full of configs having these very low values;
-            to avoid unexpected behavior we need to ignore them. Banning these two hard-coded
-            values is a dirty hack and will need to be removed sometime in the future, but it
-            will avoid lots of complaints for now. */
-        value = "0";
-    }
+    //if ((opt_key == "perimeter_acceleration" && value == "25")
+    //    || (opt_key == "infill_acceleration" && value == "50")) {
+    //    /*  For historical reasons, the world's full of configs having these very low values;
+    //        to avoid unexpected behavior we need to ignore them. Banning these two hard-coded
+    //        values is a dirty hack and will need to be removed sometime in the future, but it
+    //        will avoid lots of complaints for now. */
+    //    value = "0";
+    //} // i think it's time now.
+    //TODO: change defautl from 0 (no forbidden) to 100% for all speed & acceleration
+    //if ("0" == value && ("infill_acceleration" == opt_key || "solid_infill_acceleration" == opt_key ||
+    //    "top_solid_infill_acceleration" == opt_key || "bridge_acceleration" == opt_key ||
+    //    "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key || "overhangs_speed" == opt_key ||
+    //    "ironing_speed" == opt_key || "perimeter_speed" == opt_key || "infill_speed" == opt_key ||
+    //    "bridge_speed" == opt_key || "support_material_speed" == opt_key || "max_print_speed" == opt_key)) {
+    //    // 100% is the same, and easier to understand.
+    //    value = "100%";
+    //}
     if (opt_key == "support_material_pattern" && value == "pillars") {
         // Slic3r PE does not support the pillars. They never worked well.
         value = "rectilinear";
@@ -8409,6 +8405,17 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
     if ("first_layer_speed" == opt_key) {
         output["first_layer_min_speed"] = value;
         output["first_layer_infill_speed"] = value;
+    }
+    //dep between solid infill & infill accel are inverted for prusa.
+    if ("infill_acceleration" == opt_key) {
+        if (value == "0" && all_conf.get_float("solid_infill_acceleration") != 0) {
+            value = std::to_string(all_conf.get_computed_value("default_acceleration"));
+        }
+    }
+    if ("solid_infill_acceleration" == opt_key) {
+        if (value == "0" && all_conf.get_float("infill_acceleration") != 0) {
+            value = all_conf.get_float("infill_acceleration");
+        }
     }
     if ("brim_type" == opt_key) {
         opt_key = "";
@@ -8777,7 +8784,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "enforce_full_fill_volume",
 // "exact_last_layer_height",
 "external_infill_margin",
-"external_perimeter_acceleration",
 "external_perimeter_cut_corners",
 "external_perimeter_extrusion_spacing",
 "external_perimeter_extrusion_change_odd_layers",
@@ -8807,6 +8813,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_max_wipe_tower_speed",
 "filament_melt_zone_pause",
 "filament_max_overlap",
+"filament_retract_lift_before_travel",
 "filament_shrink",
 "filament_skinnydip_distance",
 "filament_toolchange_part_fan_speed",
@@ -8865,7 +8872,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "ironing_acceleration",
 "ironing_angle",
 "lift_min",
-"machine_max_acceleration_travel",
 "max_gcode_per_second",
 "max_speed_reduction",
 "milling_after_z",
@@ -8947,7 +8953,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "small_perimeter_min_length",
 "solid_fill_pattern",
 "solid_infill_extrusion_change_odd_layers",
-"solid_infill_acceleration",
 "solid_infill_extrusion_spacing",
 "solid_infill_fan_speed",
 "solid_infill_overlap",
@@ -8985,11 +8990,9 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "tool_name",
 "top_fan_speed",
 "top_infill_extrusion_spacing",
-"top_solid_infill_acceleration",
 "top_solid_infill_overlap",
 "travel_acceleration",
 "travel_deceleration_use_target",
-"travel_speed_z",
 "wipe_advanced_algo",
 "wipe_advanced_multiplier",
 "wipe_advanced_nozzle_melted_volume",
@@ -9025,6 +9028,7 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
 
     //looks if it's to be removed, or have to be transformed
     if (prusa_export_to_remove_keys.find(opt_key) != prusa_export_to_remove_keys.end()) {
+        assert((all_conf.def()->get(opt_key)->mode & comPrusa) == 0);
         opt_key = "";
         value = "";
         return new_entries;
@@ -9072,14 +9076,24 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
             // can't support %, so we uese the default accel a baseline for half-assed conversion
             value = std::to_string(all_conf.get_abs_value(opt_key, all_conf.get_computed_value("default_acceleration")));
         }
-    } else if ("infill_acceleration" == opt_key || "bridge_acceleration" == opt_key || "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key
+    } else if ("infill_acceleration" == opt_key || "solid_infill_acceleration" == opt_key || "top_solid_infill_acceleration" == opt_key
+        || "bridge_acceleration" == opt_key || "default_acceleration" == opt_key || "perimeter_acceleration" == opt_key
         || "overhangs_speed" == opt_key || "ironing_speed" == opt_key || "perimeter_speed" == opt_key 
         || "infill_speed" == opt_key || "bridge_speed" == opt_key || "support_material_speed" == opt_key
         || "max_print_speed" == opt_key
         ) {
-        // remove '%'
+        // remove '%', change 0 with different meanings
         if (value.find("%") != std::string::npos) {
-            value = std::to_string(all_conf.get_computed_value(opt_key));
+            if (value == "100%")
+                value = "0";
+            else
+                value = std::to_string(all_conf.get_computed_value(opt_key));
+        }
+        // infill_acceleration & solid_infill_acceleration dep are inverted
+        if ("infill_acceleration" == opt_key && value == "0") {
+            value = std::to_string(all_conf.get_computed_value("solid_infill_acceleration"));
+        } else if ("solid_infill_acceleration" == opt_key && value == "0") {
+            value = std::to_string(all_conf.get_computed_value("default_acceleration"));
         }
     } else if ("gap_fill_speed" == opt_key && all_conf.has("gap_fill_enabled") && !all_conf.option<ConfigOptionBool>("gap_fill_enabled")->value) {
         value = "0";
