@@ -937,6 +937,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "overhangs_reverse_threshold"
             || opt_key == "overhangs_speed_enforce"
             || opt_key == "perimeter_bonding"
+            || opt_key == "perimeter_direction"
             || opt_key == "perimeter_extrusion_change_odd_layers"
             || opt_key == "perimeter_extrusion_spacing"
             || opt_key == "perimeter_extrusion_width"

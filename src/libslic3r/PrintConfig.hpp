@@ -150,6 +150,13 @@ enum class IroningType {
     Count,
 };
 
+enum PerimeterDirection {
+   pdCCW_CW,
+   pdCCW_CCW,
+   pdCW_CCW,
+   pdCW_CW,
+};
+
 enum class SlicingMode
 {
     // Regular, applying ClipperLib::pftNonZero rule when creating ExPolygons.
@@ -307,6 +314,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BridgeType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FuzzySkinType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(InfillPattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(IroningType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterDirection)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialPattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialStyle)
@@ -956,7 +964,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       overhangs_reverse_threshold))
     ((ConfigOptionEnum<NoPerimeterUnsupportedAlgo>,  no_perimeter_unsupported_algo))
     ((ConfigOptionFloatOrPercent,       perimeter_acceleration))
-    ((ConfigOptionBool,                 perimeter_round_corners))
+    ((ConfigOptionEnum<PerimeterDirection>, perimeter_direction))
     ((ConfigOptionInt,                  perimeter_extruder))
     ((ConfigOptionFloatOrPercent,       perimeter_extrusion_width))
     ((ConfigOptionFloatOrPercent,       perimeter_extrusion_spacing))
@@ -965,6 +973,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<SeamPosition>,   perimeter_loop_seam))
     ((ConfigOptionPercent,              perimeter_overlap))
     ((ConfigOptionBool,                 perimeter_reverse))
+    ((ConfigOptionBool,                 perimeter_round_corners))
     ((ConfigOptionFloatOrPercent,       perimeter_speed))
     // Total number of perimeters.
     ((ConfigOptionInt,                  perimeters))

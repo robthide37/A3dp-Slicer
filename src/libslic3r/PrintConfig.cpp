@@ -204,6 +204,14 @@ static const t_config_enum_values s_keys_map_IroningType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(IroningType)
 
+static const t_config_enum_values s_keys_map_PerimeterDirection{
+    {"ccw_cw",  pdCCW_CW},
+    {"ccw_ccw", pdCCW_CCW},
+    {"cw_ccw",  pdCW_CCW},
+    {"cw_cw",   pdCW_CW},
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimeterDirection);
+
 static const t_config_enum_values s_keys_map_SlicingMode {
     { "regular",        int(SlicingMode::Regular) },
     { "even_odd",       int(SlicingMode::EvenOdd) },
@@ -1712,7 +1720,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("external_perimeters_nothole", coBool);
-    def->label = L("Only for outer side");
+    def->label = L("Only for contours");
     def->full_label = L("Ext peri first for outer side");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Only do the vase trick on the external side. Useful when the thickness is too low.");
@@ -1720,7 +1728,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("external_perimeters_hole", coBool);
-    def->label = L("Only for inner side");
+    def->label = L("Only for holes");
     def->full_label = L("ext peri first for inner side");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Only do the vase trick on the external side. Useful when you only want to remove seam from screw hole.");
@@ -4379,6 +4387,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def = this->add("perimeter_direction", coEnum);
+    def->label = L("Perimeter direction");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Default direction to print the perimeters (contours and holes): clockwise (CW) or counter-clockwise (CCW).");
+    def->set_enum<PerimeterDirection>({
+        { "ccw_cw", "Contour: CCW, Holes: CW" },
+        { "ccw_ccw","Contour & holes: CCW" },
+        { "cw_ccw", "Contour: CW, Holes: CCW" },
+        { "cw_cw","Contour & holes: CW" },
+    });
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionEnum<PerimeterDirection>(pdCCW_CW));
+
     def = this->add("perimeter_fan_speed", coInts);
     def->label = L("Internal Perimeter fan speed");
     def->category = OptionCategory::cooling;
@@ -4464,7 +4485,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Perimeters count");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("This option sets the number of perimeters to generate for each layer."
-                   "\nIf perimeters_hole is activated, then this number is only for contour periemters."
+                   "\nIf perimeters_hole is activated, then this number is only for contour perimeters."
                    "Note that if a contour perimeter encounter a hole, it will go around like a hole perimeter."
                    "\nNote that Slic3r may increase this number automatically when it detects "
                    "sloping surfaces which benefit from a higher number of perimeters "

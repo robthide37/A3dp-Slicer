@@ -2,11 +2,11 @@
 page:Perimeters & Shell:shell
 group:Vertical shells
 	line:Periemters
-		setting:label$Count:width$6:perimeters
-		setting:perimeter_generator
+		setting:label$Contour:width$6:perimeters
+        setting:label$Holes:width$6:perimeters_hole
 	end_line
-	setting:width$6:perimeters_hole
 	setting:tags$Simple$Expert$SuSi:script:float:depends$perimeter_spacing$external_perimeter_spacing:label$Wall Thickness:tooltip$Change the perimeter extrusion widths to ensure that there is an exact number of perimeters for this wall thickness value. It won't put the perimeter width below the nozzle diameter, and up to double.\nNote that the value displayed is just a view of the current perimeter thickness, like the info text below. The number of perimeters used to compute this value is one loop, or the custom variable 'wall_thickness_lines' (advanced mode) if defined.\nIf the value is too low, it will revert the widths to the saved value.\nIf the value is set to 0, it will show 0.:s_wall_thickness
+    setting:perimeter_generator
 	setting:spiral_vase
 	recommended_thin_wall_thickness_description
 group:Horizontal shells
@@ -49,6 +49,10 @@ group:Quality
 		setting:width$5:thin_walls_overlap
 		setting:thin_walls_merge
 	end_line
+	line:Perimeter Direction
+		setting:label$Default:width$18:perimeter_direction
+		setting:label$Reverse on Even layers:sidetext_width$2:perimeter_reverse
+	end_line
 group:Avoid crossing perimeters
 	line:Activate
 		setting:label$_:avoid_crossing_perimeters
@@ -68,7 +72,6 @@ group:label_width$12:Overhangs
 	line:Extrusion direction
 		setting:sidetext_width$2:overhangs_reverse
 		setting:label_width$12:width$5:overhangs_reverse_threshold
-		setting:label$All perimeters:sidetext_width$2:perimeter_reverse
 	end_line
 group:sidetext_width$5:Seam
 	line:Algorithm

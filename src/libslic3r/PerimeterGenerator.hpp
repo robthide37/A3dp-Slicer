@@ -239,9 +239,9 @@ private:
         const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls, int count_since_overhang = -1) const;
     ExtrusionEntityCollection _traverse_extrusions(const Parameters &params,
         std::vector<PerimeterGeneratorArachneExtrusion>& pg_extrusions);
-    // try to merge thin walls to a current periemter exrusion or just add it to the end of the list.
+    // try to merge thin walls to a current perimeter exrusion or just add it to the end of the list.
     void _merge_thin_walls(const Parameters &params, ExtrusionEntityCollection &extrusions, ThickPolylines &thin_walls) const;
-    // like _traverse_loops but with merging all periemter into one continuous loop
+    // like _traverse_loops but with merging all perimeter into one continuous loop
     ExtrusionLoop _traverse_and_join_loops(const Parameters &params,
         const PerimeterGeneratorLoop &loop, const PerimeterGeneratorLoops &childs, const Point entryPoint) const;
     // sub-function of _traverse_and_join_loops, transform a single loop as a cut extrusion to be merged with an other one.

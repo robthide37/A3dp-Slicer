@@ -170,7 +170,7 @@ public:
     //The following data structures hold all perimeter points for all PrintObject.
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
 
-    // if it's expected, we need to randomized at the external periemter.
+    // if it's expected, we need to randomized at the external perimeter.
     bool external_perimeters_first = false;
 
     void init(const Print &print, std::function<void(void)> throw_if_canceled_func);

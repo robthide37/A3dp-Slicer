@@ -496,6 +496,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
     const bool reverse_hole = (params.layer->id() == 0 && params.object_config.brim_width_interior.value > 0) || 
                            (params.config.external_perimeters_first.value && params.config.external_perimeters_hole.value);
     
+    const bool CCW_contour = params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
+    const bool CCW_hole = params.config.perimeter_direction.value == PerimeterDirection::pdCW_CCW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
+
 #if _DEBUG
     LoopAssertVisitor visitor;
     for(auto ee : coll)
@@ -562,8 +565,11 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
             }
             if ((loop.is_contour && !reverse_contour) || (!loop.is_contour && reverse_hole)) {
                 //note: params.layer->id() % 2 == 1 already taken into account in the is_steep_overhang compute (to save time).
-                // if contour: reverse if steep_overhang & odd. if hole: the opposite
-                bool clockwise = ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) == loop.is_contour;
+                // if CCW: reverse if steep_overhang & odd. if CW: the opposite
+                bool clockwise = ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) == (loop.is_contour ? CCW_contour : CCW_hole);
+                // has to reverse the direction if print external first, as the whole thing will be reverse afterwards
+                clockwise = clockwise != (loop.is_contour ? reverse_contour : reverse_hole);
+
                 if (clockwise)
                     if(!eloop->is_clockwise())
                         eloop->reverse(); // make_clockwise
@@ -585,7 +591,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
                     coll_out.append(*eloop);
                 }
             } else {
-                bool counter_clockwise = ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) != loop.is_contour;
+                bool counter_clockwise = ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) != (loop.is_contour ? CCW_contour : CCW_hole);
+                // has to reverse the direction if print external first, as the whole thing will be reverse afterwards
+                counter_clockwise = counter_clockwise != (loop.is_contour ? reverse_contour : reverse_hole);
                 // if hole: reverse if steep_overhang & odd. if contour: the opposite
                 if (counter_clockwise)
                     if(eloop->is_clockwise())
@@ -1015,6 +1023,9 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
 ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Parameters &                               params,
                                                                    std::vector<PerimeterGeneratorArachneExtrusion> &pg_extrusions)
 {
+    const bool CCW_contour = params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
+    const bool CCW_hole = params.config.perimeter_direction.value == PerimeterDirection::pdCW_CCW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
+
     ExtrusionEntityCollection extrusion_coll;
     size_t biggest_inset_idx = 0;
     for (PerimeterGeneratorArachneExtrusion& pg_extrusion : pg_extrusions) {
@@ -1139,7 +1150,8 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
                 ExtrusionLoop extrusion_loop(std::move(paths), loop_role);
                 // Restore the orientation of the extrusion loop.
                 //TODO: use if (loop.is_steep_overhang && params.layer->id() % 2 == 1) to make_clockwise => need to detect is_steep_overhang on the arachne path
-                bool need_ccw = ((params.config.perimeter_reverse /*|| pg_extrusion.is_steep_overhang*/ && params.layer->id() % 2 == 1) == pg_extrusion.is_contour);
+                bool need_ccw = ((params.config.perimeter_reverse /*|| pg_extrusion.is_steep_overhang*/ && params.layer->id() % 2 == 1)
+                                 == (pg_extrusion.is_contour ? CCW_contour : CCW_hole));
                 if (need_ccw != extrusion_loop.is_clockwise())
                     extrusion_loop.reverse();
 #if _DEBUG
@@ -2846,7 +2858,7 @@ void PerimeterGenerator::process(// Input:
             if (!extra_perimeters.empty()) {
                 //put these new overhangs into their own unsortable collection.
                 ExtrusionEntityCollection *this_islands_perimeters = new ExtrusionEntityCollection(false, false);
-                // put extra periemter as first printed
+                // put extra perimeter as first printed
                 for (ExtrusionPaths &paths : extra_perimeters)
                     this_islands_perimeters->append(std::move(paths));
                 assert(loops->entities().size() >= first_loop_coll_index);
@@ -3312,7 +3324,7 @@ void grow_contour_only(std::vector<ExPolygonAsynch> &unmoveable_holes, coordf_t 
         assert(-unmoveable_hole.offset_holes_inner + spacing/2 - overlap_spacing > 0);
         Polygons original_holes = get_holes_as_contour(expoly);
         Polygons offsetted_holes = offset(original_holes, -unmoveable_hole.offset_holes_inner + spacing/2 + overlap_spacing);
-        // remove fake periemter, i don't want them.
+        // remove fake perimeter, i don't want them.
         for (size_t i = 0; i < offsetted_holes.size(); ++i) {
             if (offsetted_holes[i].is_clockwise()) {
                 offsetted_holes.erase(offsetted_holes.begin() + i);
@@ -3350,7 +3362,7 @@ void grow_contour_only(std::vector<ExPolygonAsynch> &unmoveable_holes, coordf_t 
                 unmoveable_holes_size--;
             }
         }
-        //we shrink periemter, so it doesn't create holes, so we don't have anythign to add to next_onion.
+        //we shrink perimeter, so it doesn't create holes, so we don't have anythign to add to next_onion.
     }
 }
 
@@ -3482,7 +3494,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             // Calculate next onion shell of perimeters.
             // this variable stored the next onion
             ExPolygons next_onion;
-            // like next_onion, but with all polygons, even ones that didn't grow and so won't be added as periemter
+            // like next_onion, but with all polygons, even ones that didn't grow and so won't be added as perimeter
             ExPolygons area_used;
             ExPolygons* all_next_onion = &next_onion;
 
