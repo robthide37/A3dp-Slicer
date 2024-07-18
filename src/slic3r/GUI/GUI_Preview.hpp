@@ -101,8 +101,8 @@ class Preview : public wxTitledPanel
     wxPanel* m_bottom_toolbar_panel { nullptr };
 
     DynamicPrintConfig* m_config;
-    BackgroundSlicingProcess* m_process;
-    GCodeProcessorResult* m_gcode_result;
+    BackgroundSlicingProcess& m_process;
+    GCodeProcessorResult& m_gcode_result;
 
 #ifdef __linux__
     // We are getting mysterious crashes on Linux in gtk due to OpenGL context activation GH #1874 #1955.
@@ -147,8 +147,8 @@ public:
         ForceGcode
     };
 
-Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
-    GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process = []() {});
+Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess& process, 
+    GCodeProcessorResult& gcode_result, std::function<void()> schedule_background_process = []() {});
     virtual ~Preview();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }

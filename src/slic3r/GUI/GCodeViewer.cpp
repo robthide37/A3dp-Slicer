@@ -1358,9 +1358,19 @@ bool GCodeViewer::is_loaded(const GCodeProcessorResult& gcode_result) {
 
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print)
 {
+    if (!m_gcode_result.has_value())
+        m_gcode_result = gcode_result;
+    assert(&m_gcode_result->get() == &gcode_result);
+    if (!m_print.has_value())
+        m_print = print;
+    assert(&m_print->get() == &print);
+
     // avoid processing if called with the same gcode_result
+    // unless you switch to/from VolumetricRate/VolumetricFlow
     if (m_last_result_id == gcode_result.id &&
-        (m_last_view_type == m_view_type || (m_last_view_type != EViewType::VolumetricRate && m_view_type != EViewType::VolumetricRate)))
+        (m_last_view_type == m_view_type || 
+            (m_last_view_type != EViewType::VolumetricRate && m_view_type != EViewType::VolumetricRate &&
+             m_last_view_type != EViewType::VolumetricFlow && m_view_type != EViewType::VolumetricFlow)))
         return;
 
     m_last_result_id = gcode_result.id;
@@ -1450,6 +1460,9 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
 
     if (m_moves_count == 0)
         return;
+
+    // save for refresh without calling the glpreview/glcanvas
+    m_last_str_tool_colors = str_tool_colors;
 
     wxBusyCursor busy;
 
@@ -4332,7 +4345,13 @@ void GCodeViewer::render_legend(float& legend_height)
     if (old_view_type != view_type) {
         set_view_type(static_cast<EViewType>(view_type));
         wxGetApp().plater()->set_keep_current_preview_type(true);
-        wxGetApp().plater()->refresh_print();
+        //wxGetApp().plater()->refresh_print(); //doesn't work anymore, as there is a check to avoid redrawing uselessy, now call this->load(m_gcode_result->get(), m_print->get()) directly
+        if (m_gcode_result.has_value() && m_print.has_value()) {
+            this->load(m_gcode_result->get(), m_print->get());
+            this->refresh(m_gcode_result->get(), m_last_str_tool_colors);
+            wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
+            wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
+        }
         view_type_changed = true;
         ImGui::ResetMaxCursorScreenPos();
     }
@@ -4715,7 +4734,11 @@ void GCodeViewer::render_legend(float& legend_height)
           if (imgui.button(btn_text, ImVec2(-1.0f, 0.0f), true)) {
               m_extrusions.role_visibility_flags = custom_visible ? m_extrusions.role_visibility_flags & ~(1 << int(GCodeExtrusionRole::Custom)) :
                   m_extrusions.role_visibility_flags | (1 << int(GCodeExtrusionRole::Custom));
-              wxGetApp().plater()->refresh_print();
+              // note: the visibility doesn't deactivate if we change the m_view_type ...
+              // update buffers' render paths
+              refresh_render_paths(false, false);
+              wxGetApp().plater()->update_preview_moves_slider();
+              wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
           }
         }
     }
@@ -4978,13 +5001,22 @@ void GCodeViewer::render_legend(float& legend_height)
             set_options_visibility_from_flags(new_flags);
 
             const unsigned int diff_flags = flags ^ new_flags;
-            if (m_view_type == GCodeViewer::EViewType::Feedrate && is_flag_set(diff_flags, static_cast<unsigned int>(Preview::OptionType::Travel)))
-                wxGetApp().plater()->refresh_print();
-            else {
+            bool refreshed = false;
+            if (m_view_type == GCodeViewer::EViewType::Feedrate && is_flag_set(diff_flags, static_cast<unsigned int>(Preview::OptionType::Travel))) {
+                // don't need a full refresh_print, just a refresh to recompute the speed scale.
+                if (m_gcode_result.has_value()) {
+                    this->refresh(m_gcode_result->get(), m_last_str_tool_colors);
+                    refreshed = true;
+                }
+            }
+            if (!refreshed) {
                 bool keep_first = m_sequential_view.current.first != m_sequential_view.global.first;
                 bool keep_last = m_sequential_view.current.last != m_sequential_view.global.last;
-                wxGetApp().plater()->get_current_canvas3D()->refresh_gcode_preview_render_paths(keep_first, keep_last);
+                refresh_render_paths(keep_first, keep_last);
             }
+
+            wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
+            wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
             wxGetApp().plater()->update_preview_moves_slider();
         }
 

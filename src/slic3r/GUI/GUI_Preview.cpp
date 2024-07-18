@@ -191,9 +191,10 @@ void View3D::render()
         m_canvas->set_as_dirty();
 }
 
+// Note: BackgroundSlicingProcess & GCodeProcessorResult are stored inside the (priv) platter, they won't disapear. Hence why it's by reference.
 Preview::Preview(
     wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config,
-    BackgroundSlicingProcess* process, GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process_func)
+    BackgroundSlicingProcess& process, GCodeProcessorResult& gcode_result, std::function<void()> schedule_background_process_func)
     : m_config(config)
     , m_process(process)
     , m_gcode_result(gcode_result)
@@ -234,7 +235,7 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     m_canvas->allow_multisample(OpenGLManager::can_multisample());
     m_canvas->set_config(m_config);
     m_canvas->set_model(model);
-    m_canvas->set_process(m_process);
+    m_canvas->set_process(&m_process);
     m_canvas->enable_legend_texture(true);
     m_canvas->enable_dynamic_background(true);
 
@@ -312,7 +313,7 @@ void Preview::load_gcode_shells()
 
 void Preview::load_print(bool keep_z_range)
 {
-    PrinterTechnology tech = m_process->current_printer_technology();
+    PrinterTechnology tech = m_process.current_printer_technology();
     if (tech == ptFFF)
         load_print_as_fff(keep_z_range);
     else if (tech == ptSLA)
@@ -346,7 +347,7 @@ void Preview::reload_print(bool keep_volumes)
     }
 
     //test if gcode is up-to-date
-    if (m_gcode_result && m_canvas->is_gcode_preview_dirty(*m_gcode_result))
+    if (m_canvas->is_gcode_preview_dirty(m_gcode_result))
         refresh_print();
     else
         load_print();
@@ -426,7 +427,7 @@ void Preview::hide_layers_slider()
 
 bool Preview::can_display_gcode()
 {
-    return !m_gcode_result->moves.empty();
+    return !m_gcode_result.moves.empty();
 }
 
 bool Preview::can_display_volume()
@@ -565,7 +566,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool sho
     check_layers_slider_values(ticks_info_from_model.gcodes, layers_z);
 
     //first of all update extruder colors to avoid crash, when we are switching printer preset from MM to SM
-    m_layers_slider->SetExtruderColors(plater->get_extruder_colors_from_plater_config(wxGetApp().is_editor() ? nullptr : m_gcode_result));
+    m_layers_slider->SetExtruderColors(plater->get_extruder_colors_from_plater_config(wxGetApp().is_editor() ? std::optional<std::reference_wrapper<const GCodeProcessorResult>>() : m_gcode_result));
     m_layers_slider->SetSliderValues(layers_z);
     assert(m_layers_slider->GetMinValue() == 0);
     m_layers_slider->SetMaxValue(layers_z.empty() ? 0 : layers_z.size() - 1);
@@ -598,7 +599,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool sho
                 // do not fetch uncomplete data
                 m_layers_slider->SetLayersTimes({}, 0);
             } else {
-                auto print_mode_stat = m_gcode_result->print_statistics.modes.front();
+                auto print_mode_stat = m_gcode_result.print_statistics.modes.front();
                 m_layers_slider->SetLayersTimes(print_mode_stat.layers_times, print_mode_stat.time);
             }
         }
@@ -614,7 +615,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool sho
                 std::vector<float> areas;
                 for (auto [z, area] : layerz_to_area) areas.push_back(area);
                 m_layers_slider->SetLayersAreas(areas);
-                assert(areas.size() == m_gcode_result->print_statistics.modes.front().layers_times.size());
+                assert(areas.size() == m_gcode_result.print_statistics.modes.front().layers_times.size());
             }
         }
     } else {
@@ -802,19 +803,20 @@ void Preview::update_moves_slider()
     unsigned int last_gcode_id = view.gcode_ids[view.endpoints.first];
     for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
         assert(view.gcode_ids.size() > i);
-        if (i > view.endpoints.first && view.gcode_ids.size() > i) {
-            // skip consecutive moves with same gcode id (resulting from processing G2 and G3 lines)
-            if (last_gcode_id == view.gcode_ids[i]) {
-                values.back() = static_cast<double>(i + 1);
-                alternate_values.back() = static_cast<double>(view.gcode_ids[i]);
-                continue;
+        if (view.gcode_ids.size() > i) {
+            if (i > view.endpoints.first) {
+                // skip consecutive moves with same gcode id (resulting from processing G2 and G3 lines)
+                if (last_gcode_id == view.gcode_ids[i]) {
+                    values.back() = static_cast<double>(i + 1);
+                    alternate_values.back() = static_cast<double>(view.gcode_ids[i]);
+                    continue;
+                } else
+                    last_gcode_id = view.gcode_ids[i];
             }
-            else
-                last_gcode_id = view.gcode_ids[i];
-        }
 
-        values.emplace_back(static_cast<double>(i + 1));
-        alternate_values.emplace_back(static_cast<double>(view.gcode_ids[i]));
+            values.emplace_back(static_cast<double>(i + 1));
+            alternate_values.emplace_back(static_cast<double>(view.gcode_ids[i]));
+        }
     }
     // should the end of the horizontal slider stay at the end?
     bool max_is_max = m_moves_slider->GetMaxValue() == m_moves_slider->GetHigherValue();
@@ -824,6 +826,7 @@ void Preview::update_moves_slider()
     m_moves_slider->SetMaxValue(int(values.size()) - 1);
     m_moves_slider->SetSelectionSpan(values.front() - 1 - view.endpoints.first,
                                      max_is_max ? m_moves_slider->GetMaxValue() : values.back() - 1 - view.endpoints.first);
+    m_moves_slider->fire_update_if_needed();
 }
 
 void Preview::enable_moves_slider(bool enable)
@@ -841,14 +844,14 @@ void Preview::load_print_as_fff(bool keep_z_range)
         // avoid processing while mainframe is being constructed
         return;
 
-    if (m_loaded || m_process->current_printer_technology() != ptFFF)
+    if (m_loaded || m_process.current_printer_technology() != ptFFF)
         return;
 
     // we require that there's at least one object and the posSlice step
     // is performed on all of them(this ensures that _shifted_copies was
     // populated and we know the number of layers)
     bool has_layers = false;
-    const Print *print = m_process->fff_print();
+    const Print *print = m_process.fff_print();
     if (print->is_step_done(posSlice)) {
         for (const PrintObject* print_object : print->objects())
             if (! print_object->layers().empty()) {
@@ -874,7 +877,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
     }
 
     GCodeViewer::EViewType gcode_view_type = m_canvas->get_gcode_view_preview_type();
-    bool gcode_preview_data_valid = !m_gcode_result->moves.empty();
+    bool gcode_preview_data_valid = !m_gcode_result.moves.empty();
     gcode_preview_data_valid = gcode_preview_data_valid && current_force_state != ForceState::ForceExtrusions;
     // Collect colors per extruder.
     std::vector<std::string> colors;
@@ -932,7 +935,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
             // Load the real G-code preview.
             if (current_force_state == ForceState::NoForce)
                 m_canvas->set_items_show(false, true);
-            m_canvas->load_gcode_preview(*m_gcode_result, colors);
+            m_canvas->load_gcode_preview(m_gcode_result, colors);
             m_left_sizer->Layout();
             Refresh();
             zs = m_canvas->get_gcode_layers_zs();
@@ -997,11 +1000,11 @@ void Preview::reset_gcode_toolpaths()
 
 void Preview::load_print_as_sla()
 {
-    if (m_loaded || (m_process->current_printer_technology() != ptSLA))
+    if (m_loaded || (m_process.current_printer_technology() != ptSLA))
         return;
 
     unsigned int n_layers = 0;
-    const SLAPrint* print = m_process->sla_print();
+    const SLAPrint* print = m_process.sla_print();
 
     std::vector<double> zs;
     double initial_layer_height = print->material_config().initial_layer_height.value;
@@ -1038,7 +1041,7 @@ void Preview::load_print_as_sla()
 void Preview::on_layers_slider_scroll_changed(wxCommandEvent& event)
 {
     if (IsShown()) {
-        PrinterTechnology tech = m_process->current_printer_technology();
+        PrinterTechnology tech = m_process.current_printer_technology();
         if (tech == ptFFF) {
             m_canvas->set_volumes_z_range({ m_layers_slider->GetLowerValueD(), m_layers_slider->GetHigherValueD() });
             m_canvas->set_toolpaths_z_range({ static_cast<unsigned int>(m_layers_slider->GetLowerValue()), static_cast<unsigned int>(m_layers_slider->GetHigherValue()) });

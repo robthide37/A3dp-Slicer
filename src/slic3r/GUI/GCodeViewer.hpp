@@ -854,8 +854,14 @@ public:
 
 private:
     bool m_gl_data_initialized{ false };
+
+    // for refresh
     unsigned int m_last_result_id{ 0 };
+    std::optional<std::reference_wrapper<const GCodeProcessorResult>> m_gcode_result; // note: this is a reference to the GCodeProcessorResult stored&owned (eternally) in plater.priv
+    std::optional<std::reference_wrapper<const Print>> m_print;
+    std::vector<std::string> m_last_str_tool_colors;
     EViewType m_last_view_type{ EViewType::Count };
+
     size_t m_moves_count{ 0 };
     std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
     // bounding box of toolpaths

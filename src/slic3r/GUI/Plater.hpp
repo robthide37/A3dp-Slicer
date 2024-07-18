@@ -350,8 +350,8 @@ public:
     void force_print_bed_update();
     // On activating the parent window.
     void on_activate();
-    std::vector<std::string> get_extruder_colors_from_plater_config(const GCodeProcessorResult* const result = nullptr) const;
-    std::vector<std::string> get_colors_for_color_print(const GCodeProcessorResult* const result = nullptr) const;
+    std::vector<std::string> get_extruder_colors_from_plater_config(std::optional<std::reference_wrapper<const GCodeProcessorResult>> result = {}) const;
+    std::vector<std::string> get_colors_for_color_print(std::optional<std::reference_wrapper<const GCodeProcessorResult>> result = {}) const;
 
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;

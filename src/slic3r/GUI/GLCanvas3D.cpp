@@ -1432,7 +1432,7 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas *canvas, Bed3D &bed)
       m_slope(m_volumes),
       m_sla_view(*this),
       m_arrange_settings_db{get_app_config()},
-      m_arrange_settings_dialog{wxGetApp().imgui(), &m_arrange_settings_db}
+      m_arrange_settings_dialog{wxGetApp().imgui(), m_arrange_settings_db}
 {
     if (m_canvas != nullptr) {
         m_timer.SetOwner(m_canvas);
