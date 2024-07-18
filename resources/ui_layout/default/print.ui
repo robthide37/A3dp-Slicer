@@ -1,7 +1,7 @@
 #logs
 page:Perimeters & Shell:shell
 group:Vertical shells
-	line:Periemters
+	line:Perimeters
 		setting:label$Contour:width$6:perimeters
         setting:label$Holes:width$6:perimeters_hole
 	end_line

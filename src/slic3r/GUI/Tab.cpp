@@ -1418,7 +1418,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         update_wiping_button_visibility();
 
     if (opt_key == "extruders_count") {
-        wxGetApp().plater()->on_extruders_change(boost::any_cast<int>(value));
+        wxGetApp().plater()->on_extruders_change(boost::any_cast<int32_t>(value));
     }
 
     if (opt_key == "duplicate_distance") {
@@ -1468,6 +1468,22 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         // And call of the update() can causes a redundant check of the config values,
         // see https://github.com/prusa3d/PrusaSlicer/issues/7146
         return;
+    }
+    
+    if ("fill_density" == opt_key && m_config->get_float("fill_density") >= 100 && m_config->get_int("solid_infill_every_layers") != 1)
+    {
+        const wxString msg_text = _(L("You set the sparse infill to have 100% fill density. If you want to have only solid infill, you should set 'solid_infill_every_layers' to 1."
+            "\n\nIf not, then the sparse infill will still be considered as 'sparse' even at 100% density."
+            " This can be useful if you want the 'sparse area' to be printed quicker, or with wider extrusions."));
+        RichMessageDialog dialog(m_parent, msg_text, _(L("100% density on sparse infill")), wxICON_WARNING | wxYES_NO);
+        dialog.SetYesNoLabels(_L("Only solid"), _L("Keep sparse"));
+        int res = dialog.ShowModal();
+        if (res == wxID_YES) {
+            boost::any val = int32_t(1);
+            m_config->opt_int("solid_infill_every_layers") = 1;
+            //m_config->set_key_value("solid_infill_every_layers", new ConfigOptionInt(1));
+            this->on_value_change("solid_infill_every_layers", val);
+        }
     }
 
     update();

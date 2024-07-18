@@ -38,7 +38,7 @@ void ConfigManipulation::toggle_field(const std::string& opt_key, const bool tog
     cb_toggle_field(opt_key, toggle, opt_index);
 }
 
-// !! if using cb_value_change(X) or somthgin like that, you need a special code in Field.cpp (search for 'update_print_fff_config')
+// !! if using cb_value_change(X) or something like that, you need a special code in Field.cpp (search for 'update_print_fff_config')
 void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, const bool is_global_config)
 {
     // #ys_FIXME_to_delete
@@ -314,17 +314,23 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                     msg_text += "\n\n" + _L("Shall I switch to rectilinear fill pattern?");
                 MessageDialog dialog(m_msg_dlg_parent, msg_text, _L("Infill"),
                         wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
-                    DynamicPrintConfig new_conf = *config;
+                    DynamicPrintConfig new_conf;// = *config;
                     auto answer = dialog.ShowModal();
+                    std::string key_changed;
+                    boost::any new_value;
                     if (!is_global_config || answer == wxID_YES) {
                         new_conf.set_key_value("fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
-                        fill_density = 100;
-                    } else
+                        key_changed = "fill_pattern";
+                        new_value = new_conf.option("fill_pattern")->get_any();
+                    } else {
                         fill_density = wxGetApp().preset_bundle->fff_prints.get_selected_preset().config.option<ConfigOptionPercent>("fill_density")->value;
-                    new_conf.set_key_value("fill_density", new ConfigOptionPercent(fill_density));
+                        new_conf.set_key_value("fill_density", new ConfigOptionPercent(fill_density));
+                        key_changed = "fill_density";
+                        new_value = new_conf.option("fill_density")->get_any();
+                    }
                     apply(config, &new_conf);
                     if (cb_value_change)
-                        cb_value_change("fill_density", fill_density);
+                        cb_value_change(key_changed, new_value);
                 }
             }
         }
