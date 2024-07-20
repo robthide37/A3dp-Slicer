@@ -243,6 +243,9 @@ struct StoreParams
 };
 
 
+// Returns true if the 3mf file with the given filename is a bambu/orca project file (i.e. if it contains a config).
+extern bool is_project_bambu_3mf(const std::string& filename);
+
 //BBS: add plate data list related logic
 // add restore logic
 // Load the content of a 3mf file into the given model and preset bundle.

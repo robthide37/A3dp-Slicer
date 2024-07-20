@@ -1411,12 +1411,17 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         if (m_bambuslicer_generator_version)
             file_version = *m_bambuslicer_generator_version;
         if (result && plate_data_list.size() > 0) {
-            if(config.opt<ConfigOptionBool>("gcode_label_objects") == nullptr)
-                config.set_key_value("gcode_label_objects", config.get_option_def("gcode_label_objects")->default_value->clone());
-            bool has_label_objests = config.opt<ConfigOptionBool>("gcode_label_objects")->value;
-            for (PlateData *plate : plate_data_list)
-                has_label_objests = has_label_objests || plate->is_label_object_enabled;
-            config.opt<ConfigOptionBool>("gcode_label_objects")->value = has_label_objests;
+            if(config.opt<ConfigOptionEnum<LabelObjectsStyle>>("gcode_label_objects") == nullptr)
+                config.set_key_value("gcode_label_objects", new ConfigOptionEnum<LabelObjectsStyle>(LabelObjectsStyle::Disabled));
+            LabelObjectsStyle has_label_objests = config.opt<ConfigOptionEnum<LabelObjectsStyle>>("gcode_label_objects")->value;
+                config.opt<ConfigOptionEnum<LabelObjectsStyle>>("gcode_label_objects")->value;
+            if (has_label_objests == LabelObjectsStyle::Disabled) {
+                bool a_plate_has_label_obejct = false;
+                for (PlateData *plate : plate_data_list)
+                    a_plate_has_label_obejct = a_plate_has_label_obejct || plate->is_label_object_enabled;
+                if (a_plate_has_label_obejct)
+                    config.opt<ConfigOptionEnum<LabelObjectsStyle>>("gcode_label_objects")->value = LabelObjectsStyle::Both;
+            }
             std::string print_vars = config.opt<ConfigOptionString>("print_custom_variables") == nullptr ? "" : config.opt<ConfigOptionString>("print_custom_variables")->value;
             if (print_vars.find("plate_name") == std::string::npos && plate_data_list.front()) {
                 std::string plate_name = "";
@@ -8367,6 +8372,38 @@ bool load_bbs_3mf(const char* path, DynamicPrintConfig* config, ConfigSubstituti
     //handle_legacy_project_loaded(importer.version(), *config);
     return res;
 }
+
+
+bool is_project_bambu_3mf(const std::string& filename)
+{
+    mz_zip_archive archive;
+    mz_zip_zero_struct(&archive);
+
+    if (!open_zip_reader(&archive, filename))
+        return false;
+
+    mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
+
+    // loop the entries to search for config
+    mz_zip_archive_file_stat stat;
+    bool config_found = false;
+    for (mz_uint i = 0; i < num_entries; ++i) {
+        if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+            std::string name(stat.m_filename);
+            std::replace(name.begin(), name.end(), '\\', '/');
+
+            if (boost::algorithm::iequals(name, BBS_PROJECT_CONFIG_FILE)) {
+                config_found = true;
+                break;
+            }
+        }
+    }
+
+    close_zip_reader(&archive);
+
+    return config_found;
+}
+
 //
 //std::string bbs_3mf_get_thumbnail(const char *path)
 //{

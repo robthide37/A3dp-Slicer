@@ -90,7 +90,7 @@ void init()
     key_translation_map["is_infill_first"]                          = "infill_first";
     key_translation_map["bottom_shell_layers"]                      = "bottom_solid_layers";
     key_translation_map["bottom_shell_thickness"]                   = "bottom_solid_min_thickness";
-    key_translation_map["bottom_solid_infill_flow_ratio"]   = "first_layer_flow_ratio ";
+    key_translation_map["bottom_solid_infill_flow_ratio"]   = "first_layer_flow_ratio";
     //key_translation_map["bridge_acceleration"]                      = "bridge_acceleration";
     //key_translation_map["bridge_angle"]                             = "bridge_angle";
     key_translation_map["bridge_density"]                           = "bridge_overlap_min";
@@ -124,7 +124,7 @@ void init()
     key_translation_map["infill_wall_overlap"]                      = "infill_overlap";
     //key_translation_map["inherits"]                                 = "inherits";
     key_translation_map["line_width"]                               = "extrusion_width";
-    key_translation_map["print_flow_ratio"]                         = "extrusion_multiplier";
+    key_translation_map["print_flow_ratio"]                         = "print_extrusion_multiplier";
     key_translation_map["initial_layer_acceleration"]               = "first_layer_acceleration";
     key_translation_map["initial_layer_line_width"]                 = "first_layer_extrusion_width";
     key_translation_map["initial_layer_print_height"]               = "first_layer_height";
@@ -137,6 +137,9 @@ void init()
     key_translation_map["ironing_spacing"]                          = "ironing_spacing";
     key_translation_map["ironing_speed"]                            = "ironing_speed";
     //key_translation_map["layer_height"]                             = "layer_height";
+    //key_translation_map["make_overhang_printable"]                  = "";
+    //key_translation_map["make_overhang_printable_angle"]            = "";
+    //key_translation_map["make_overhang_printable_hole_size"]        = "";
     key_translation_map["max_travel_detour_distance"]               = "avoid_crossing_perimeters_max_detour";
     //key_translation_map["min_bead_width"]                           = "min_bead_width";
     //key_translation_map["min_feature_size"]                         = "min_feature_size";
@@ -225,9 +228,9 @@ void init()
     //key_translation_map["fuzzy_skin_thickness"]                     = "fuzzy_skin_thickness";
     //key_translation_map["fuzzy_skin"]                               = "fuzzy_skin";
     key_translation_map["bottom_surface_pattern"]                   = "bottom_fill_pattern";
+    //key_translation_map["internal_bridge_flow"]                   = "bridge_flow_ratio"; //TO ADD
     key_translation_map["bridge_flow"]                              = "bridge_flow_ratio";
     key_translation_map["top_solid_infill_flow_ratio"]              = "fill_top_flow_ratio";
-    key_translation_map["bottom_solid_infill_flow_ratio"]           = "initial_layer_flow_ratio";
     key_translation_map["infill_combination"]                       = "infill_every_layers";
     key_translation_map["print_sequence"]                           = "complete_objects";
     key_translation_map["brim_type"]                                = "brim_type"; //handled by from_prusa
@@ -254,10 +257,13 @@ void init()
     key_translation_map["initial_layer_infill_speed"]  = "first_layer_infill_speed";
 
 //    'filament' = >
-    key_translation_map["hot_plate_temp"]                   = "bed_temperature";
-    key_translation_map["cool_plate_temp"]                   = "bed_temperature";
-    key_translation_map["eng_plate_temp"]                   = "bed_temperature";
-    key_translation_map["textured_plate_temp"]                   = "bed_temperature";
+
+    // these bed temp : get the max ? or the only not-default ?
+    key_translation_map["hot_plate_temp"]                   = "bed_temperature"; //default to 45
+    //key_translation_map["cool_plate_temp"]                   = "bed_temperature"; //default to 35
+    //key_translation_map["eng_plate_temp"]                   = "bed_temperature"; //default to 45
+    //key_translation_map["textured_plate_temp"]                   = "bed_temperature"; //default to 45
+
     key_translation_map["overhang_fan_speed"]                   = "bridge_fan_speed";
     //key_translation_map["chamber_temperature"]                  = "chamber_temperature";
     key_translation_map["close_fan_the_first_x_layers"]         = "disable_fan_first_layers";
@@ -289,10 +295,13 @@ void init()
     //key_translation_map["filament_soluble"]                     = "filament_soluble";
     //key_translation_map["filament_type"]                        = "filament_type";
     //key_translation_map["filament_wipe"]                        = "filament_wipe";
-    key_translation_map["hot_plate_temp_initial_layer"]         = "first_layer_bed_temperature";
-    key_translation_map["cool_plate_temp_initial_layer"]        = "first_layer_bed_temperature";
-    key_translation_map["eng_plate_temp_initial_layer"]         = "first_layer_bed_temperature";
-    key_translation_map["textured_plate_temp_initial_layer"]    = "first_layer_bed_temperature";
+    
+    // these bed temp : get the max ? or the only not-default ?
+    key_translation_map["hot_plate_temp_initial_layer"]         = "first_layer_bed_temperature"; //default to 45
+    //key_translation_map["cool_plate_temp_initial_layer"]        = "first_layer_bed_temperature"; //default to 35
+    //key_translation_map["eng_plate_temp_initial_layer"]         = "first_layer_bed_temperature"; //default to 45
+    //key_translation_map["textured_plate_temp_initial_layer"]    = "first_layer_bed_temperature"; //default to 45
+
     key_translation_map["nozzle_temperature_initial_layer"]     = "first_layer_temperature";
     //key_translation_map["full_fan_speed_layer"]                 = "full_fan_speed_layer";
     //key_translation_map["inherits"]                             = "inherits";
@@ -488,9 +497,10 @@ void init()
     key_custom_settings_translation_map["plate_name"] = BBSettingType(bbstFFF_PRINT | bbstSLA_PRINT);
 }
 
-void complicated_convert(t_config_option_key &opt_key, std::string &value, const std::map<std::string, std::string> &input, std::map<std::string, std::string> &output)
-{
-    
+void complicated_convert(t_config_option_key &opt_key,
+                         std::string &value,
+                         const std::map<std::string, std::string> &input,
+                         std::map<std::string, std::string> &output) {
     if ("ironing_type" == opt_key && "no ironing" == value) {
         value = "top";
         output["ironing"] = "0";
@@ -518,12 +528,66 @@ void complicated_convert(t_config_option_key &opt_key, std::string &value, const
             value = "disabled";
         }
     }
-    //if ("enable_overhang_speed") {
+    // if ("enable_overhang_speed") {
     //
     //}
     if ("support_material_top_interface_pattern" == opt_key || "support_interface_pattern" == opt_key) {
         output["support_material_top_interface_pattern"] = value;
         output["support_material_bottom_interface_pattern"] = value;
+    }
+    if ("initial_layer_line_width" == opt_key || "first_layer_extrusion_width" == opt_key) {
+        output["skirt_extrusion_width"] = value;
+    }
+    if ("small_perimeter_threshold" == opt_key || "small_perimeter_min_length" == opt_key) {
+        output["small_perimeter_max_length"] = value;
+    }
+    if ("reduce_crossing_wall" == opt_key || "avoid_crossing_perimeters" == opt_key) {
+        output["avoid_crossing_not_first_layer"] = "0";
+    }
+
+    if ("resolution" == opt_key) {
+        if (std::stof(value.c_str()) < 0.01f)
+            value = 0.0;
+        output["resolution_internal"] = "0.0125";
+    }
+    if ("bridge_density" == opt_key || "bridge_overlap_min" == opt_key) {
+        output["bridge_overlap"] = std::to_string(int(std::stof(value.c_str()) * 1.3));
+    }
+}
+
+void very_complicated_convert(ConfigSubstitutionContext &unconverted_config, ConfigBase &conf_to_read_and_update) {
+    std::optional<ConfigSubstitution> substitution = unconverted_config.find("make_overhang_printable");
+    if (substitution) {
+        if (substitution->old_value == "1") {
+            double make_overhang_printable_angle = 0;
+            std::optional<ConfigSubstitution> angle_subst = unconverted_config.find("make_overhang_printable_angle");
+            if (!angle_subst) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__
+                                         << ": make_overhang_printable setting, but no "
+                                            "make_overhang_printable_angle in the orca config!";
+            }
+            make_overhang_printable_angle = std::stod(angle_subst->old_value.c_str());
+            assert(make_overhang_printable_angle <= 90 && make_overhang_printable_angle >= 0);
+            make_overhang_printable_angle = std::min(make_overhang_printable_angle, 90.);
+            make_overhang_printable_angle = std::max(make_overhang_printable_angle, 0.);
+
+            // now we have to compute a % from the angle: 1lh is 45°, 0% is 0°, 9999 for 90°
+            // get layer height
+            double layer_height = conf_to_read_and_update.get_computed_value("layer_height");
+
+            double overhangs_max_slope = std::tan(make_overhang_printable_angle) * layer_height;
+            conf_to_read_and_update.set_deserialize("overhangs_max_slope",
+                                                    Slic3r::to_string_nozero(overhangs_max_slope, 3));
+            conf_to_read_and_update.set_deserialize("overhangs_bridge_threshold", "-1");
+            conf_to_read_and_update.set_deserialize("overhangs_bridge_upper_layers", "-1");
+            unconverted_config.erase("make_overhang_printable");
+            unconverted_config.erase("make_overhang_printable_angle");
+        } else {
+            unconverted_config.erase("make_overhang_printable");
+            unconverted_config.erase("make_overhang_printable_angle");
+            conf_to_read_and_update.set_deserialize("overhangs_max_slope", "0");
+            conf_to_read_and_update.set_deserialize("overhangs_bridge_upper_layers", "0");
+        }
     }
 }
 
@@ -806,14 +870,50 @@ bool read_json_file_bambu(const std_path &temp_file,
     for (auto &entry : good_key_values) {
         if(config_def->has(entry.first))
             config.set_deserialize(entry.first, entry.second, config_substitutions);
-        else
-            config_substitutions.add(ConfigSubstitution(entry.first, entry.second));
     }
 
     // final transform
-    config.convert_from_prusa(with_phony);
+    //config.convert_from_prusa(with_phony);
+    std::map<t_config_option_key, std::string> settings_to_change;
+    for (auto &entry : good_key_values) {
+        if (!config_def->has(entry.first)) {
+            std::string opt_key = entry.first;
+            std::string value = entry.second;
+            std::map<std::string,std::string> result = PrintConfigDef::from_prusa(opt_key, value, config);
+            settings_to_change.insert(result.begin(), result.end());
+            if (!opt_key.empty())
+                //check if good this time
+                PrintConfigDef::handle_legacy(opt_key, value, false);
+            if (!opt_key.empty()) {
+                if (!config_def->has(opt_key)) {
+                    if (config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable) {
+                        config_substitutions.add(ConfigSubstitution(entry.first, value));
+                    }
+                } else {
+                    try {
+                        config.set_deserialize(opt_key, value, config_substitutions);
+                    } catch (BadOptionValueException &e) {
+                        if (config_substitutions.rule == ForwardCompatibilitySubstitutionRule::Disable)
+                            throw e;
+                        // log the error
+                        if (config_def == nullptr)
+                            throw e;
+                        const ConfigOptionDef *optdef = config_def->get(entry.first);
+                        config_substitutions.emplace(optdef, std::string(entry.second), ConfigOptionUniquePtr(optdef->default_value->clone()));
+                    }
+                }
+            }
+        }
+    }
+    for (const auto &entry : settings_to_change)
+        config.set_deserialize(entry.first, entry.second, config_substitutions);
 
     custom_gcode_transform(config);
+
+    
+    
+    //apply very_complicated_convert
+    very_complicated_convert(config_substitutions, config);
 
     return true;
 }
@@ -875,8 +975,13 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
             config_substitutions.add(ConfigSubstitution(entry.first, entry.second));
     }
     
-    // final transform
-    print_config.convert_from_prusa(with_phony);
+
+    // final transforms
+
+    //apply very_complicated_convert
+    very_complicated_convert(config_substitutions, print_config);
+    
+    //print_config.convert_from_prusa(with_phony);
     custom_gcode_transform(print_config);
 
     return true;
@@ -921,8 +1026,14 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
             config_substitutions.add(ConfigSubstitution(entry.first, entry.second));
     }
     
+    //apply very_complicated_convert
+    DynamicPrintConfig copy = object_config.get();
+    copy.parent = &print_config;
+    very_complicated_convert(config_substitutions, copy);
+    object_config.apply(copy);
+    
     // final transform
-    object_config.convert_from_prusa(print_config, with_phony);
+    //object_config.convert_from_prusa(print_config, with_phony);
     return true;
 }
 

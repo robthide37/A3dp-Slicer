@@ -8304,8 +8304,10 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         //need percent
         try {
             float val = boost::lexical_cast<float>(value);
-            if (val < 1.5)
+            if (val < 2)
                 value = boost::lexical_cast<std::string>(val*100) + "%";
+            else
+                value = "100%";
         }
         catch (boost::bad_lexical_cast&) {
             value = "100%";
@@ -8473,6 +8475,11 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
             output["brim_width"] = "0";
         } else if ("outer_and_inner" == value) {
             output["brim_width_interior"] = all_conf.get_computed_value("brim_width");
+        } else if ("auto_brim" == value) { //orca
+            output["brim_width"] = "2";
+            output["brim_width_interior"] = "0";
+        } else if ("brim_ears" == value) { //orca
+            output["brim_ears"] = "1";
         }
     }
     if ("support_material_contact_distance" == 0) {
@@ -8497,7 +8504,7 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
             value = "50%";
         }
     }
-    if ("resolution" == opt_key) {
+    if ("resolution" == opt_key && value == "0") {
         value = "0.0125";
     }
     if ("gcode_resolution" == opt_key) {

@@ -169,6 +169,7 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
             nb_entries_unknown++;
             continue;
         }
+        assert(conf_substitution.new_value);
         nb_entries_changes++;
 		switch (def->type) {
 		case coEnum:
@@ -205,7 +206,7 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
             } else assert(false);
             break;
 		default:
-			assert(false);
+            new_val = conf_substitution.new_value->serialize();
 		}
 
 		changes += format_wxstr("<tr><td><b>\"%1%\" (%2%)</b></td><td>: ", def->opt_key, _(def->label)) +
