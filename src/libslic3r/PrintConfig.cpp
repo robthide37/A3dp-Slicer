@@ -9229,26 +9229,6 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
             new_entries["fan_always_on"] = "1";
         }
     }
-    
-    if ("thumbnails" == opt_key) {
-    // add format to thumbnails
-        const ConfigOptionEnum<GCodeThumbnailsFormat> *format_opt = all_conf.option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format");
-        std::string format = format_opt->serialize();
-        std::vector<std::string> sizes;
-        boost::split(sizes, value, boost::is_any_of(","), boost::token_compress_off);
-        value = "";
-        std::string coma = "";
-        for (std::string &size : sizes) {
-            //if first or second dimension is 0: ignore.
-            size_t test1 = size.find("0x");
-            size_t test2 = size.find("x0");
-            if (size.find("0x") == 0 || size.find("x0") + 2 == size.size())
-                continue;
-            assert(size.find('/') == std::string::npos);
-            value = value + coma + size + std::string("/") + format;
-            coma = ",";
-        }
-    }
 
     // compute max & min height from % to flat value
     if ("min_layer_height" == opt_key || "max_layer_height" == opt_key) {

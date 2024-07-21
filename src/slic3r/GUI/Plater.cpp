@@ -1270,7 +1270,7 @@ void Sidebar::jump_to_option(size_t selected)
             }
         }
 
-        wxGetApp().get_tab(opt.type)->activate_option(opt.opt_key_with_idx(), boost::nowide::narrow(opt.category));
+        wxGetApp().get_tab(opt.type, false)->activate_option(opt.opt_key_with_idx(), boost::nowide::narrow(opt.category));
     }
 
 }
