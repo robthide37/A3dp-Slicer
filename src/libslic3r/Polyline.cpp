@@ -1042,8 +1042,246 @@ Geometry::ArcWelder::Path ArcPolyline::_from_polyline(std::initializer_list<Poin
     return path;
 }
 
+//TODO: unit tests
+// it will return the size of the buffer still used. It will try to not use d more than half, unless buffer_init < 0, then it will try to not use any at the end.
+//TODO: improvement: instead of watching at three point -> deleting the center (2 instead of 3), look at four -> add center of two center ones -> keep new & start & end (3 instead of 4)
+// choose between both based on the result: is the deviation better? is path less stuttery? 
+int ArcPolyline::simplify_straits(coordf_t min_tolerance,
+                                   coordf_t fl_min_point_distance,
+                                   coordf_t mean_dist_per_line,
+                                   const int buffer_size,
+                                   const int buffer_init)
+{
+    assert(is_valid());
+
+    // incentive to remove odds points
+    float squew[] = { 1, 0.94f, 0.98f, 0.96f, 0.99f, 0.93f, 0.97f, 0.95f};
+
+    //use a window of buffer size.
+    const coord_t min_point_distance = fl_min_point_distance;
+    int current_buffer_size = 0;
+    int max_buffer_size = buffer_size - buffer_init;
+    const int max_buffer_size_end = buffer_init < 0 ? 0 : buffer_size / 2;
+    const int max_buffer_size_start = std::max(1, buffer_init);
+    size_t idx_begin = 1;
+
+    coord_t buffer_length = 0;
+    coord_t min_buffer_length = 0;
+    std::deque<uint8_t> arc; // 0= strait, 1 = arc (don't touch), 2 = point before/after arc (don't touch)
+    std::deque<size_t> idxs;
+    std::deque<coord_t> line_length;
+    std::deque<float> weights;
+    //weight of poitns in the current window (idx%size()), to know which one to remove.
+    std::vector<size_t> erased;
+
+    idxs.push_back(0);
+    for (size_t idx_end = 1; idx_end < this->m_path.size(); ++idx_end) {
+        assert(current_buffer_size + 1 == idxs.size());
+        assert(current_buffer_size == arc.size());
+        assert(current_buffer_size == line_length.size());
+        assert(current_buffer_size == weights.size());
+
+        assert(buffer_length < min_buffer_length || current_buffer_size <= 1);
+
+        // compute max window (smaller at start & end)
+        if (idx_end > this->m_path.size() - buffer_size / 2) {
+            max_buffer_size = max_buffer_size_end + this->m_path.size() - idx_end;
+            assert(max_buffer_size >= max_buffer_size_end);
+            if (idx_end < buffer_size) {
+                max_buffer_size = std::min(max_buffer_size, std::max(buffer_size - max_buffer_size_start, int(idx_end)));
+            }
+            min_buffer_length = coord_t(max_buffer_size * mean_dist_per_line);
+        } else if (idx_end < buffer_size) {
+            max_buffer_size = std::max(buffer_size - max_buffer_size_start, int(idx_end));
+            min_buffer_length = coord_t(max_buffer_size * mean_dist_per_line);
+        }
+
+        // try add a point in the buffer
+        Point new_point = m_path[idx_end].point;
+        //TODO better arc (here the length is minimized)
+        coord_t new_seg_length = coord_t(m_path[idxs.front()].point.distance_to(new_point));
+
+        // be sure it's not filled
+        while (current_buffer_size >= max_buffer_size) {
+            // too many points, remove one
+//#ifdef _DEBUG
+//            std::vector<int> length;
+//#endif
+            
+            size_t worst_idx = 0;
+            float worst_weight = 0;
+            // compute weight & get worst
+            // push next point (to have next ofr tlast point)
+            idxs.push_back(idx_end);
+            for (size_t i = 0; i < current_buffer_size; ++i) {
+//#ifdef _DEBUG
+//                    Point previous = m_path[idxs[i]].point;
+//                    Point current = m_path[idxs[i+1]].point;
+//                    Point next = m_path[idxs[i+2]].point;
+//                    length.resize(current_buffer_size);
+//                    length[i] = previous.distance_to(current) + current.distance_to(next);
+//#endif
+                if (weights[i] < 0) {
+                    //compute weight : 0 is 'no not remove'. 1 is 'remove this first'
+                    assert(idxs.size() > i+2);
+                    assert(m_path.size() > idxs[i+2]);
+                    //Get previous & next point
+                    Point previous = m_path[idxs[i]].point;
+                    Point current = m_path[idxs[i+1]].point;
+                    Point next = m_path[idxs[i+2]].point;
+                    // check deviation
+                    coordf_t deviation = Line::distance_to(current, previous, next);
+                    if (deviation > min_tolerance) {
+                        weights[i] = 0;
+                    } else {
+                        coordf_t length = previous.distance_to(current) + current.distance_to(next);
+                        if (length < min_point_distance) {
+                            weights[i] = 3;
+                        } else {
+                            //add a squew to incentivise to remove every two points is equally spaced.
+                            length *= squew[idxs[i+1]%8];
+                            // angle: 0 : U-turn, PI: strait
+                            double angle = angle_ccw(previous - current, next - current);
+                            double absangle = std::abs(angle);
+                            assert(absangle <= PI);
+                            weights[i] = (absangle / PI) * (1 - deviation / min_tolerance) * (min_point_distance / length);
+                        }
+                    }
+                    assert(weights[i] >= 0 && weights[i] <= 1);
+                }
+                if (weights[i] > worst_weight) {
+                    worst_weight = weights[i];
+                    worst_idx = i;
+                }
+            }
+            //unpush next point
+            idxs.pop_back();
+
+            if (worst_weight == 0) {
+                // can't delete anything, we will just force through
+                break;
+            }
+//#ifdef _DEBUG
+            //std::cout<<"del idx"<<idxs[worst_idx + 1]<<"\n";
+            //for (size_t i = 0; i < current_buffer_size; ++i) {
+            //std::cout<<"  ("<<idxs[i + 1]<<") "<<length[i]<<" ("<<squew[idxs[i+1]%8]<<") "<<weights[i] <<"\n";}
+//#endif
+            // delete
+            assert(worst_idx < arc.size());
+            assert(arc[worst_idx] == 0);
+            erased.push_back(idxs[worst_idx + 1]);
+            idxs.erase(idxs.begin() + worst_idx + 1);
+            arc.erase(arc.begin() + worst_idx);
+            buffer_length -= line_length[worst_idx];
+            line_length.erase(line_length.begin() + worst_idx);
+            weights.erase(weights.begin() + worst_idx);
+            --current_buffer_size;
+            // recompute next point things
+            if (worst_idx < current_buffer_size) {
+                // recompute length from previous point
+                Point previous = m_path[worst_idx].point;
+                Point next = m_path[worst_idx + 1].point;
+                buffer_length -= line_length[worst_idx];
+                line_length[worst_idx] = previous.distance_to(next);
+                buffer_length += line_length[worst_idx];
+                // ask for recompute weight if not arc
+                if(arc[worst_idx] == 0)
+                    weights[worst_idx] = -1;
+            }
+            // ask for recompute previous weight if not arc
+            if (worst_idx > 0) {
+                if (arc[worst_idx - 1] == 0) {
+                    weights[worst_idx - 1] = -1;
+                }
+            }
+        }
+
+        //check if the previous point has enough dist at both end
+        if (current_buffer_size > 0 && arc.back() == 0 && 
+            min_point_distance > line_length.back() && min_point_distance > new_seg_length) {
+            // erase previous point
+            erased.push_back(idxs.back());
+            idxs.pop_back();
+            arc.pop_back();
+            buffer_length -= line_length.back();
+            line_length.pop_back();
+            weights.pop_back();
+            --current_buffer_size;
+            new_seg_length = coord_t(m_path[idxs.front()].point.distance_to(new_point));
+        }
+
+        // add new point
+        assert(new_seg_length > 0);
+        idxs.push_back(idx_end);
+        line_length.push_back(new_seg_length);
+        buffer_length += new_seg_length;
+        bool previous_is_arc = m_path[idx_end -1].radius != 0;
+        if(previous_is_arc)
+            assert(arc.empty() || arc.back() == 1);
+        if (m_path[idx_end].radius == 0) {
+            arc.push_back(previous_is_arc ? 2 : 0);
+        } else {
+            if (!previous_is_arc)
+                arc.back() = 2;
+            arc.push_back(1);
+        }
+        weights.push_back(arc.back() == 0 ? -1 : 0);
+        current_buffer_size++;
+
+        assert(current_buffer_size + 1 == idxs.size());
+        assert(current_buffer_size == arc.size());
+        assert(current_buffer_size == line_length.size());
+        assert(current_buffer_size == weights.size());
+        for (size_t i = 1; i < idxs.size(); ++i)
+            assert(idxs[i - 1] < idxs[i]);
+
+        //remove first point(s) if enough dist
+        while (buffer_length > min_buffer_length && current_buffer_size > 1) {
+            idxs.pop_front(); // this erase the idx before the first point. we keep first point idx as a 'previous'
+            arc.pop_front();
+            buffer_length -= line_length.front();
+            line_length.pop_front();
+            weights.pop_front();
+            --current_buffer_size;
+        }
+
+        assert(buffer_length < min_buffer_length || current_buffer_size <= 1);
+    }
+
+    std::sort(erased.begin(), erased.end());
+
+    for (size_t i = 1; i < erased.size(); ++i)
+        assert(erased[i - 1] < erased[i]);
+
+    //remove points
+    if (erased.size() < 5) {
+        for (size_t idx_to_erase = erased.size() - 1; idx_to_erase < erased.size(); --idx_to_erase) {
+            assert(erased[idx_to_erase] < this->m_path.size());
+            this->m_path.erase(this->m_path.begin() + erased[idx_to_erase]);
+        }
+    } else {
+        assert(!erased.empty());
+        // faster? to construct a new one. (TODO: speed tests)
+        Geometry::ArcWelder::Path new_path;
+        size_t erased_idx = 0;
+        size_t next_erased = erased[erased_idx];
+        erased.push_back(m_path.size());
+        for (size_t i = 0; i < m_path.size(); i++) {
+            if (next_erased == i) {
+                next_erased = erased[++erased_idx];
+            } else {
+                new_path.push_back(std::move(m_path[i]));
+            }
+        }
+        m_path = std::move(new_path);
+    }
+
+    //at the end, we should have the buffer no more than 1/2 filled.
+    return current_buffer_size;
+}
+
 // douglas_peuker and create arc if with_fitting_arc
-void ArcPolyline::simplify(coordf_t tolerance, ArcFittingType with_fitting_arc, double fit_percent_tolerance)
+void ArcPolyline::make_arc(ArcFittingType with_fitting_arc, coordf_t tolerance, double fit_percent_tolerance)
 {
     if (with_fitting_arc != ArcFittingType::Disabled) {
         // BBS: do arc fit first, then use DP simplify to handle the straight part to reduce point.
@@ -1109,6 +1347,15 @@ void ArcPolyline::simplify(coordf_t tolerance, ArcFittingType with_fitting_arc, 
             this->m_path.resize(size_t(it_end - this->m_path.begin()));
         }
     }
+}
+
+bool ArcPolyline::is_valid() const {
+#ifdef _DEBUG
+    for (size_t i = 1; i < m_path.size(); ++i) {
+        assert(m_path[i - 1].point.distance_to(m_path[i].point) > SCALED_EPSILON);
+    }
+#endif
+    return m_path.size() >= 2;
 }
 
 // return false if the length of this path is (now) too short. 

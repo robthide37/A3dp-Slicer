@@ -280,7 +280,7 @@ class ArcPolyline
 {
 protected:
     Geometry::ArcWelder::Path m_path;
-    bool cache_valid = true; // cache
+    //bool cache_valid = true; // cache
     bool m_only_strait = true; // cache
     //note: i don't keep the polyline, as it's easy to reconstruct from arc (to_polyline).
     // if it creates a big preformance problem, then add a cache here.
@@ -313,7 +313,7 @@ public:
     const Point &middle() const { return m_path[m_path.size() / 2].point; }
     const Point &back() const { return m_path.back().point; }
     bool         empty() const { return m_path.empty(); }
-    bool         is_valid() const { return m_path.size() >= 2; }
+    bool         is_valid() const;
     bool         is_closed() const { return this->m_path.front().point == this->m_path.back().point; }
 
     bool                                has_arc() const { return !m_only_strait; }
@@ -349,7 +349,9 @@ public:
     Point                 get_point_from_end(coord_t distance) const;
 
     // douglas_peuker and create arc if with_fitting_arc (don't touch the current arcs, only try in-between)
-    void simplify(coordf_t tolerance, ArcFittingType with_fitting_arc, double fit_tolerance);
+    void make_arc(ArcFittingType with_fitting_arc, coordf_t tolerance, double fit_percent_tolerance);
+    // remove strait segemnts that are too near each other, and will overlaod the firmware. Return the buffer lines it still uses a t the end.
+    int simplify_straits(coordf_t min_tolerance, coordf_t min_point_distance, coordf_t mean_dist_per_line, const int buffer_size, const int buffer_init);
 
     // remove points that are too near each other, and return false if the whole path is too small
     bool normalize();
