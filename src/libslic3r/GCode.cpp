@@ -1724,11 +1724,15 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
 
     // adds tag for processor
     preamble_to_put_start_layer.append(";").append(GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role)).append(gcode_extrusion_role_to_string(GCodeExtrusionRole::Custom)).append("\n");
+    
+    unset_last_pos();
 
     // Write the custom start G-code
     preamble_to_put_start_layer.append(start_gcode).append("\n");
 
-    unset_last_pos();
+    if (!last_pos_defined()) {
+        set_last_pos({0, 0});
+    }
 
     // Disable fan.
     if ((initial_extruder_id != (uint16_t) -1) && !this->config().start_gcode_manual && print.config().disable_fan_first_layers.get_at(initial_extruder_id)) {
