@@ -9654,7 +9654,7 @@ std::string DynamicPrintConfig::validate()
 }
 
 template<typename TYPE>
-const TYPE* find_option(const t_config_option_key &opt_key, DynamicPrintConfig* default_config, const std::vector<DynamicPrintConfig*> &other_config) {
+const TYPE* find_option(const t_config_option_key &opt_key,const  DynamicPrintConfig* default_config, const std::vector<const DynamicPrintConfig*> &other_config) {
     const TYPE* option = default_config->option<TYPE>(opt_key);
     if (option)
         return option;
@@ -9666,8 +9666,8 @@ const TYPE* find_option(const t_config_option_key &opt_key, DynamicPrintConfig* 
     return nullptr;
 }
 
-std::set<const DynamicPrintConfig*> DynamicPrintConfig::update_phony(const std::vector<DynamicPrintConfig*> config_collection, bool exclude_default_extrusion /*= false*/) {
-    std::set<const DynamicPrintConfig*> something_changed;
+const DynamicPrintConfig* DynamicPrintConfig::update_phony(const std::vector<const DynamicPrintConfig*> config_collection, bool exclude_default_extrusion /*= false*/) {
+    const DynamicPrintConfig* something_changed = nullptr;
     //update width/spacing links
     const char* widths[] = { "", "external_perimeter_", "perimeter_", "infill_", "solid_infill_", "top_infill_", "support_material_", "first_layer_", "skirt_" };
     for (size_t i = exclude_default_extrusion?1:0; i < sizeof(widths) / sizeof(widths[i]); ++i) {
@@ -9678,12 +9678,13 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::update_phony(const std::
         ConfigOptionFloatOrPercent* width_option = this->option<ConfigOptionFloatOrPercent>(key_width);
         ConfigOptionFloatOrPercent* spacing_option = this->option<ConfigOptionFloatOrPercent>(key_spacing);
         if (width_option && spacing_option){
-            std::set<const DynamicPrintConfig*> returned_values;
+            const DynamicPrintConfig* returned_value;
             if (!spacing_option->is_phony() && width_option->is_phony())
-                returned_values = value_changed(key_spacing, config_collection);
+                returned_value = value_changed(key_spacing, config_collection);
              else
-                returned_values = value_changed(key_width, config_collection);
-            something_changed.insert(returned_values.begin(), returned_values.end());
+                returned_value = value_changed(key_width, config_collection);
+             if (something_changed == nullptr)
+                something_changed = returned_value;
         }
     }
 
@@ -9691,25 +9692,25 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::update_phony(const std::
 }
 
 //note: width<-> spacing conversion is done via float, so max 6-7 digit of precision.
-std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_config_option_key& opt_key, const std::vector<DynamicPrintConfig*> config_collection) {
+const DynamicPrintConfig* DynamicPrintConfig::value_changed(const t_config_option_key& opt_key, const std::vector<const DynamicPrintConfig*> config_collection) {
     if (opt_key == "layer_height") {
         const ConfigOptionFloat* layer_height_option = find_option<ConfigOptionFloat>("layer_height", this, config_collection);
         //if bad layer height, slip to be able to go to the check part without outputing exceptions.
         if (layer_height_option && layer_height_option->value < EPSILON)
-            return {};
-        if (!update_phony(config_collection).empty())
-            return { this };
-        return {};
+            return nullptr;
+        if (this->update_phony(config_collection) != nullptr)
+            return this;
+        return nullptr;
     }
     if (opt_key == "filament_max_overlap" || opt_key == "perimeter_overlap" ||
         opt_key == "external_perimeter_overlap" || opt_key == "solid_infill_overlap" ||
         opt_key == "top_solid_infill_overlap") {
-        for (auto conf : config_collection) {
-            if (conf->option("extrusion_width"))
-                if (!conf->update_phony(config_collection).empty())
-                    return { conf };
+        if (this->option("extrusion_width")) {
+            if (this->update_phony(config_collection) != nullptr) {
+                return this;
+            }
         }
-        return {};
+        return nullptr;
     }
 
     bool something_changed = false;
@@ -10051,8 +10052,8 @@ std::set<const DynamicPrintConfig*> DynamicPrintConfig::value_changed(const t_co
     //    return {};
     //}
     if(something_changed)
-        return { this };
-    return {};
+        return this;
+    return nullptr;
 }
 
 //FIXME localize this function.

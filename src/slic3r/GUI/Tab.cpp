@@ -1433,11 +1433,23 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
 
     // update phony fields
     assert(m_config);
-    std::set<const DynamicPrintConfig*> changed = m_config->value_changed(opt_key, {
-        &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
-        &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
-        &wxGetApp().preset_bundle->printers.get_edited_preset().config,
-        /*&wxGetApp().preset_bundle->full_config()*/ });
+    std::set<const DynamicPrintConfig*> changed;
+    assert( m_config == &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config
+        || m_config == &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config
+        || m_config == &wxGetApp().preset_bundle->printers.get_edited_preset().config);
+    std::vector<const DynamicPrintConfig*> all_const_configs = {&wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
+             &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
+             &wxGetApp().preset_bundle->printers.get_edited_preset().config};
+    for (DynamicPrintConfig *conf : {&wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
+             &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
+             &wxGetApp().preset_bundle->printers.get_edited_preset().config}) {
+    //{
+    //    DynamicPrintConfig *conf = &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config;
+        if (auto config_updated = conf->value_changed(opt_key, all_const_configs); config_updated != nullptr) {
+            assert(config_updated == conf);
+            changed.insert(config_updated);
+        }
+    }
     if (changed.find(m_config) != changed.end()) {
         update_dirty();
         //# Initialize UI components with the config values.
@@ -4273,11 +4285,11 @@ void Tab::load_current_preset()
             if (type() == Preset::TYPE_FFF_PRINT) {
                 assert(m_config);
                 //verify that spacings are set
-                if (m_config && !m_config->update_phony({
+                if (m_config && m_config->update_phony({
                         &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
                         &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
                         &wxGetApp().preset_bundle->printers.get_edited_preset().config
-                    }).empty()) {
+                    }) != nullptr) {
                     update_dirty(); // will call on_presets_changed() again
                     reload_config();
                 }

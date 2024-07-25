@@ -7,6 +7,7 @@
 #include "../../nlohmann/json.hpp"
 
 #include <map>
+#include <regex>
 #include <string>
 
 #include <boost/algorithm/string/replace.hpp>
@@ -501,6 +502,14 @@ void complicated_convert(t_config_option_key &opt_key,
                          std::string &value,
                          const std::map<std::string, std::string> &input,
                          std::map<std::string, std::string> &output) {
+    // start PHONY
+    // no spacing from orca/bamabu, only width
+    if (opt_key.find("extrusion_width") != std::string::npos) {
+        t_config_option_key spacing_opt_key = std::regex_replace(opt_key, std::regex("extrusion_width"), "extrusion_spacing");
+        output[spacing_opt_key] = "";
+    }
+    // end PHONY
+
     if ("ironing_type" == opt_key && "no ironing" == value) {
         value = "top";
         output["ironing"] = "0";

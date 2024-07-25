@@ -1253,6 +1253,8 @@ ExternalPreset PresetCollection::load_external_preset(
     DynamicPrintConfig cfg(this->default_preset_for(combined_config).config);
     t_config_option_keys keys = cfg.keys();
     cfg.apply_only(combined_config, keys, true);
+    // update_phony shouldn't be needed, still, it's best to be sure.
+    cfg.update_phony({&combined_config});
     std::string                 &inherits = Preset::inherits(cfg);
     if (select == LoadAndSelect::Never) {
         // Some filament profile has been selected and modified already.
@@ -1301,7 +1303,7 @@ ExternalPreset PresetCollection::load_external_preset(
 
             // update dirty state only if it's needed
             if (!profile_print_params_same(it->config, cfg)) {
-            // The source config may contain keys from many possible preset types. Just copy those that relate to this preset.
+                // The source config may contain keys from many possible preset types. Just copy those that relate to this preset.
 
                 // Following keys are not used neither by the UI nor by the slicing core, therefore they are not important 
                 // Erase them from config apply to avoid redundant "dirty" parameter in loaded preset.
@@ -1309,19 +1311,19 @@ ExternalPreset PresetCollection::load_external_preset(
                                          "printer_model", "printer_variant", "default_print_profile", "default_filament_profile", "default_sla_print_profile", "default_sla_material_profile" })
                     keys.erase(std::remove(keys.begin(), keys.end(), key), keys.end());
 
-            this->get_edited_preset().config.apply_only(combined_config, keys, true);
-            this->update_dirty();
-            // Don't save the newly loaded project as a "saved into project" state.
-            //update_saved_preset_from_current_preset();
-            assert(this->get_edited_preset().is_dirty);
-        }
+                this->get_edited_preset().config.apply_only(combined_config, keys, true);
+                this->update_dirty();
+                // Don't save the newly loaded project as a "saved into project" state.
+                //update_saved_preset_from_current_preset();
+                assert(this->get_edited_preset().is_dirty);
+            }
             return ExternalPreset(&(*it), this->get_edited_preset().is_dirty, is_installed);
         }
         if (inherits.empty()) {
-    // Update the "inherits" field.
-        // There is a profile with the same name already loaded. Should we update the "inherits" field?
+            // Update the "inherits" field.
+            // There is a profile with the same name already loaded. Should we update the "inherits" field?
             inherits = it->vendor ? it->name : it->inherits();
-    }
+        }
     }
 
     // The external preset does not match an internal preset, load the external preset.
@@ -1794,15 +1796,15 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
             if (this_opt->is_vector()) {
                 this_opt_vector = static_cast<const ConfigOptionVectorBase*>(this_opt);
             }
-            if (this_opt_vector && !this_opt_vector->is_extruder_size()) {
+            if (opt_key == "default_filament_profile") {
+                // Ignore this field, it is not presented to the user, therefore showing a "modified" flag for this parameter does not help.
+                // Also the length of this field may differ, which may lead to a crash if the block below is used.
+            } else if (this_opt_vector && !this_opt_vector->is_extruder_size()) {
                 // Scalar variable, or a vector variable, which is independent from number of extruders,
                 // thus the vector is presented to the user as a single input.
                 // Merill: these are 'button' special settings.
                 // note that thumbnails are not here because it has individual # entries
                 diff.emplace_back(opt_key);
-            } else if (opt_key == "default_filament_profile") {
-                // Ignore this field, it is not presented to the user, therefore showing a "modified" flag for this parameter does not help.
-                // Also the length of this field may differ, which may lead to a crash if the block below is used.
             } else if (opt_key == "thumbnails") {
                 // "thumbnails" can not contain extensions in old config but they are valid and use PNG extension by default
                 // So, check if "thumbnails" is really changed
