@@ -32,23 +32,23 @@ std::vector<size_t> 				 chain_expolygons(const ExPolygons &expolygons, Point *s
 std::vector<std::pair<size_t, bool>> chain_extrusion_entities(const std::vector<ExtrusionEntity*> &entities, const Point *start_near = nullptr, const bool reversed = false);
 std::vector<std::pair<size_t, bool>> chain_extrusion_entities(const std::vector<const ExtrusionEntity*> &entities, const Point *start_near = nullptr, const bool reversed = false);
 // Reorder & reverse extrusion entities in place based on the "chain" ordering.
-template<typename ExtrusionEntityConstOrNot>
-void reorder_extrusion_entities(std::vector<ExtrusionEntityConstOrNot*> &entities, const std::vector<std::pair<size_t, bool>> &chain)
+//template<typename ExtrusionEntityConstOrNot>
+inline void reorder_extrusion_entities(std::vector<ExtrusionEntity*> &entities, const std::vector<std::pair<size_t, bool>> &chain)
 {
 	assert(entities.size() == chain.size());
-	std::vector<const ExtrusionEntity*> out;
+	std::vector<ExtrusionEntity*> out;
 	out.reserve(entities.size());
     for (const std::pair<size_t, bool> &idx : chain) {
 		assert(entities[idx.first] != nullptr);
         out.emplace_back(entities[idx.first]);
         if (idx.second)
-			out.back()->reverse();
+			entities[idx.first]->reverse();
     }
     entities.swap(out);
 }
 // Reorder & reverse extrusion entities in place.
-template<typename ExtrusionEntityConstOrNot>
-void chain_and_reorder_extrusion_entities(std::vector<ExtrusionEntityConstOrNot*> &entities, const Point *start_near = nullptr)
+//template<typename ExtrusionEntityConstOrNot>
+inline void chain_and_reorder_extrusion_entities(std::vector<ExtrusionEntity*> &entities, const Point *start_near = nullptr)
 {
 	reorder_extrusion_entities(entities, chain_extrusion_entities(entities, start_near));
 }

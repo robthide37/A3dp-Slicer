@@ -1,10 +1,10 @@
 #include "LabelObjects.hpp"
 
-#include "ClipperUtils.hpp"
-#include "Geometry\ConvexHull.hpp"
-#include "Model.hpp"
-#include "Print.hpp"
-#include "TriangleMeshSlicer.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/Print.hpp"
+#include "libslic3r/TriangleMeshSlicer.hpp"
 
 #include <boost/regex.hpp>
 

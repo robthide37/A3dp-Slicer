@@ -4778,6 +4778,11 @@ void Tab::transfer_options(const std::string &name_from, const std::string &name
 
     Preset* preset_from = m_presets->find_preset(name_from);
     Preset* preset_to = m_presets->find_preset(name_to);
+    
+    if (preset_from == nullptr || preset_to == nullptr){
+        assert(false);
+        return;
+    }
 
     if (m_type == Preset::TYPE_PRINTER) {
          auto it = std::find(options.begin(), options.end(), "extruders_count");

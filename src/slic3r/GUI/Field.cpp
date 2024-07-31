@@ -1158,8 +1158,8 @@ bool TextCtrl::value_was_changed()
     case coPoints:
         if (m_opt_idx < 0) {
             return boost::any_cast<std::vector<Vec2d>>(m_value) != boost::any_cast<std::vector<Vec2d>>(val);
-        } else if (boost::any_cast<std::vector<Vec2d>>(m_value).size() > m_opt_idx
-                && boost::any_cast<std::vector<Vec2d>>(val).size() > m_opt_idx) {
+        } else if (int(boost::any_cast<std::vector<Vec2d>>(m_value).size()) > m_opt_idx
+                && int(boost::any_cast<std::vector<Vec2d>>(val).size()) > m_opt_idx) {
             return boost::any_cast<std::vector<Vec2d>>(m_value)[m_opt_idx] != boost::any_cast<std::vector<Vec2d>>(val)[m_opt_idx];
         }
     case coPoint:
@@ -1293,18 +1293,11 @@ void TextCtrl::change_field_value(wxEvent& event)
 wxWindow* CheckBox::GetNewWin(wxWindow* parent, const wxString& label /*= wxEmptyString*/)
 {
 #ifdef __WXGTK2__
+    int my_em_unit = em_unit(parent);
     //gtk2 can't resize checkboxes, so we are using togglable buttons instead
-    if (m_em_unit > 14) {
-        size = wxSize(def_width_thinner() * m_em_unit / 2, def_width_thinner() * m_em_unit / 2);
-        auto temp = new wxToggleButton(m_parent, wxID_ANY, wxString(" "), wxDefaultPosition, size, m_opt.is_script ? wxCHK_3STATE : wxCHK_2STATE);
-        temp->Bind(wxEVT_TOGGLEBUTTON, ([this, temp](wxCommandEvent e) {
-            m_is_na_val = false;
-            if (temp->GetValue())
-                temp->SetLabel("X");
-            else
-                temp->SetLabel("");
-            on_change_field();
-        }), temp->GetId());
+    if (my_em_unit > 14) {
+        wxSize size = wxSize(def_width_thinner() * my_em_unit / 2, def_width_thinner() * my_em_unit / 2);
+        auto temp = new wxToggleButton(parent, wxID_ANY, wxString(" "), wxDefaultPosition, size, wxCHK_2STATE);
         // recast as a wxWindow to fit the calling convention
         return dynamic_cast<wxWindow*>(temp);
     }
@@ -1318,9 +1311,9 @@ wxWindow* CheckBox::GetNewWin(wxWindow* parent, const wxString& label /*= wxEmpt
 void CheckBox::SetValue(wxWindow* win, bool value)
 {
 #ifdef __WXGTK2__
-    if (wxToggleButton* tgl = dynamic_cast<wxToggleButton*>(window)) {
-        tgl->SetValue(new_val);
-        if (new_val)
+    if (wxToggleButton* tgl = dynamic_cast<wxToggleButton*>(win)) {
+        tgl->SetValue(value);
+        if (value)
             tgl->SetLabel("X");
         else
             tgl->SetLabel("");
@@ -1343,7 +1336,7 @@ void CheckBox::SetValue(wxWindow* win, bool value)
 bool CheckBox::GetValue(wxWindow* win)
 {
 #ifdef __WXGTK2__
-    if (wxToggleButton* chk = dynamic_cast<wxToggleButton*>(window))
+    if (wxToggleButton* chk = dynamic_cast<wxToggleButton*>(win))
         return chk->GetValue();
 #endif
     if (wxGetApp().suppress_round_corners())
@@ -1369,8 +1362,8 @@ void CheckBox::Rescale(wxWindow* win)
         return;
     }
 #ifdef __WXGTK2__
-    if (wxToggleButton* chk = dynamic_cast<wxToggleButton*>(window))
-        chk->Rescale();
+    if (wxToggleButton* chk = dynamic_cast<wxToggleButton*>(win))
+        chk->Update();
 #endif
 }
 
@@ -1405,11 +1398,25 @@ void CheckBox::BUILD() {
         window->Disable();
 
 	CheckBox::SetValue(window, check_value);
-
+    
+#ifdef __WXGTK2__
+    //gtk2 can't resize checkboxes, so we are using togglable buttons instead
+    window->Bind(wxEVT_TOGGLEBUTTON, ([this](wxCommandEvent e) {
+        if (wxToggleButton* chk = dynamic_cast<wxToggleButton*>(window)) {
+            m_is_na_val = false;
+            if (chk->GetValue())
+                chk->SetLabel("X");
+            else
+                chk->SetLabel("");
+            on_change_field();
+        }
+    }), window->GetId());
+#else
 	window->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent e) {
         m_is_na_val = false;
 	    on_change_field();
 	});
+#endif
 
     // you need to set the window before the tooltip
     this->set_tooltip(check_value ? "true" : "false");
@@ -1865,18 +1872,19 @@ void Choice::set_selection()
             field->SetSelection(*opt);
         else
             field->SetValue(text_value);
-		}
+	}
 }
 
 void Choice::set_text_value(const std::string &value, bool change_event) //! Redundant?
 {
 	m_disable_change_event = !change_event;
     choice_ctrl* field = dynamic_cast<choice_ctrl*>(window);
-    if (auto opt = m_opt.enum_def->value_to_index(value); opt.has_value())
+    if (auto opt = m_opt.enum_def->value_to_index(value); opt.has_value()) {
         // This enum has a value field of the same content as text_value. Select it.
         field->SetSelection(*opt);
-    else
+    } else {
         field->SetValue(value);
+    }
 	m_disable_change_event = false;
 }
 
@@ -2006,19 +2014,20 @@ boost::any& Choice::get_value()
     else if (m_opt.gui_type == ConfigOptionDef::GUIType::f_enum_open || m_opt.gui_type == ConfigOptionDef::GUIType::i_enum_open) {
         // Open enum: The combo box item index returned by the field 
         const int ret_enum = field->GetSelection();
-        if (m_opt.enum_def->has_values() && (m_opt.type == coString || m_opt.type == coStrings) && ret_enum >=0 && ret_enum < m_opt.enum_def->values().size()) {
+        if (m_opt.enum_def->has_values() && (m_opt.type == coString || m_opt.type == coStrings) && ret_enum >=0 && ret_enum < int(m_opt.enum_def->values().size())) {
             m_value = m_opt.enum_def->value(ret_enum);
         } else if (ret_enum < 0 || !m_opt.enum_def->has_values() || m_opt.type == coStrings ||
-            (into_u8(ret_str) != m_opt.enum_def->value(ret_enum) && ret_str != _(m_opt.enum_def->label(ret_enum))))
+            (into_u8(ret_str) != m_opt.enum_def->value(ret_enum) && ret_str != _(m_opt.enum_def->label(ret_enum)))) {
 			// modifies ret_string!
             get_value_by_opt_type(ret_str);
-        else if (m_opt.type == coFloatOrPercent) {
+        } else if (m_opt.type == coFloatOrPercent) {
             m_value = FloatOrPercent{string_to_double_decimal_point(m_opt.enum_def->value(ret_enum)),
                                      (m_opt.enum_def->value(ret_enum).find('%') != std::string::npos)};
-        } else if (m_opt.type == coInt)
+        } else if (m_opt.type == coInt) {
             m_value = atoi(m_opt.enum_def->value(ret_enum).c_str());
-        else
+        } else {
             m_value = string_to_double_decimal_point(m_opt.enum_def->value(ret_enum));
+        }
     }
 	else
 		// modifies ret_string!
@@ -2090,16 +2099,15 @@ void ColourPicker::BUILD()
 	// Validate the color
     wxColour clr = wxTransparentColour;
     if (m_opt.type == coStrings)
-        clr = wxColour{wxString{ m_opt.get_default_value<ConfigOptionStrings>()->get_at(m_opt_idx) }};
+        clr = wxColour{wxString{m_opt.get_default_value<ConfigOptionStrings>()->get_at(m_opt_idx)}};
     if (m_opt.type == coString)
-        clr = wxColour{ wxString{ m_opt.get_default_value<ConfigOptionString>()->value } };
+        clr = wxColour{wxString{m_opt.get_default_value<ConfigOptionString>()->value}};
     if (m_opt.type == coInts)
-        clr = wxColour{ (unsigned long)m_opt.get_default_value<ConfigOptionInts>()->get_at(m_opt_idx) };
+        clr = wxColour{(unsigned long) m_opt.get_default_value<ConfigOptionInts>()->get_at(m_opt_idx)};
     if (m_opt.type == coInt)
-        clr = wxColour{ (unsigned long)m_opt.get_default_value<ConfigOptionInt>()->value };
-	if (!clr.IsOk()) {
-		clr = wxTransparentColour;
-	}
+        clr = wxColour{(unsigned long) m_opt.get_default_value<ConfigOptionInt>()->value};
+    if (!clr.IsOk())
+        clr = wxTransparentColour;
 
 	auto temp = new wxColourPickerCtrl(m_parent, wxID_ANY, clr, wxDefaultPosition, size);
     if (parent_is_custom_ctrl && m_opt.height < 0)
@@ -2315,11 +2323,13 @@ void PointCtrl::BUILD()
     const wxSize field_size(4 * m_em_unit, -1);
 
     Vec2d default_pt;
-    if (m_opt.type == coPoint)
+    if (m_opt.type == coPoint) {
         default_pt = m_opt.get_default_value<ConfigOptionPoint>()->value;
-    else // coPoints
+    } else { // coPoints
+        assert(m_opt.type == coPoints);
         default_pt = m_opt.get_default_value<ConfigOptionPoints>()->get_at(0);
-	double val = default_pt(0);
+    }
+    double val = default_pt.x();
 	wxString X = val - int(val) == 0 ? wxString::Format(_T("%i"), int(val)) : wxNumberFormatter::ToString(val, 2, wxNumberFormatter::Style_None);
 	val = default_pt(1);
 	wxString Y = val - int(val) == 0 ? wxString::Format(_T("%i"), int(val)) : wxNumberFormatter::ToString(val, 2, wxNumberFormatter::Style_None);

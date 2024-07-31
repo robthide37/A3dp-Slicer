@@ -413,7 +413,7 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
     try {
         if (view_params.exact)
             pattern = std::wregex(wsearch, std::regex_constants::icase);
-    } catch (std::regex_error reg_err) {
+    } catch (std::regex_error) {
         // Happens when std::wregex("]") or similar. => no result //TODO: add warning message 'wrong regexp'
         fail_pattern = true;
     }

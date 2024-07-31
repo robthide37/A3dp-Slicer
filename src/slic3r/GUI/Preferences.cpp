@@ -244,7 +244,7 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 				int val_int = boost::any_cast<int>(value);
 				auto vector = field->m_opt.enum_def->enums();
 				assert(vector.size() > val_int && val_int >= 0);
-				if(vector.size() > val_int && val_int >= 0){
+				if(int(vector.size()) > val_int && val_int >= 0){
 					m_values[opt_key] = vector[val_int];
 				}
 			}
@@ -1657,7 +1657,7 @@ void PreferencesDialog::create_settings_font_widget(wxWindow* tab, std::shared_p
 		m_values[opt_key] = format("%1%", val);
 		stb_sizer->Layout();
 #ifdef __linux__
-		CallAfter([this]() { refresh_og(opt_grp); });
+		CallAfter([this, opt_grp]() { refresh_og(opt_grp); });
 #else
 		refresh_og(opt_grp);
 #endif

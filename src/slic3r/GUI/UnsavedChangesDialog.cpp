@@ -1095,6 +1095,7 @@ wxString graph_to_string(const GraphData &graph)
     case GraphData::GraphType::SQUARE: str = _L("Square") + ":"; break;
     case GraphData::GraphType::LINEAR: str = _L("Linear") + ":"; break;
     case GraphData::GraphType::SPLINE: str = _L("Spline") + ":"; break;
+    default: assert(false);
     }
     for (const Vec2d &pt : graph.data()) { str += format_wxstr(" %1%,%2%", pt.x(), pt.y()); }
     return str;
@@ -1119,17 +1120,18 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     case coInts: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionIntsNullable>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return from_u8((boost::format("%1%") % values->get_at(opt_idx)).str());
-            else
+            } else {
                 return from_u8(values->serialize());
-        }
-        else {
+            }
+        } else {
             auto values = config.opt<ConfigOptionInts>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return from_u8((boost::format("%1%") % values->get_at(opt_idx)).str());
-            else
+            } else {
                 return from_u8(values->serialize());
+            }
         }
         return _L("Undef");
     }
@@ -1138,17 +1140,19 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     case coBools: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionBoolsNullable>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return values->get_at(opt_idx) ? "true" : "false";
-            else
+            } else {
                 return from_u8(values->serialize());
+            }
         }
         else {
             auto values = config.opt<ConfigOptionBools>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return values->get_at(opt_idx) ? "true" : "false";
-            else
+            } else {
                 return from_u8(values->serialize());
+            }
         }
         return _L("Undef");
     }
@@ -1157,17 +1161,18 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     case coPercents: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionPercentsNullable>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return from_u8((boost::format("%1%%%") % values->get_at(opt_idx)).str());
-            else
+            } else {
                 return from_u8(values->serialize());
-        }
-        else {
+            }
+        } else {
             auto values = config.opt<ConfigOptionPercents>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return from_u8((boost::format("%1%%%") % values->get_at(opt_idx)).str());
-            else
+            } else {
                 return from_u8(values->serialize());
+            }
         }
         return _L("Undef");
     }
@@ -1176,17 +1181,18 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     case coFloats: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionFloatsNullable>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return double_to_string(values->get_at(opt_idx), opt->precision);
-            else
+            } else {
                 return from_u8(values->serialize());
-        }
-        else {
+            }
+        } else {
             auto values = config.opt<ConfigOptionFloats>(opt_key);
-            if (opt_idx < values->size())
+            if (opt_idx < values->size()) {
                 return double_to_string(values->get_at(opt_idx), opt->precision);
-            else
+            } else {
                 return from_u8(values->serialize());
+            }
         }
         return _L("Undef");
     }
@@ -1202,27 +1208,33 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         const ConfigOptionStrings* strings = config.opt<ConfigOptionStrings>(opt_key);
         if (strings) {
             if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
-                if (strings->empty())
-                    return _L("All"); 
-                for (size_t id = 0; id < strings->size(); id++)
+                if (strings->empty()) {
+                    return _L("All");
+                }
+                for (size_t id = 0; id < strings->size(); id++) {
                     out += from_u8(strings->get_at(id)) + "\n";
+                }
                 out.RemoveLast(1);
                 return out;
             }
             if (opt_key == "gcode_substitutions") {
-                if (!strings->empty())
-                    for (size_t id = 0; id < strings->size(); id += 4)
+                if (!strings->empty()) {
+                    for (size_t id = 0; id < strings->size(); id += 4) {
                         out +=  from_u8(strings->get_at(id))     + ";\t" + 
                                 from_u8(strings->get_at(id + 1)) + ";\t" + 
                                 from_u8(strings->get_at(id + 2)) + ";\t" +
                                 from_u8(strings->get_at(id + 3)) + ";\n";
+                    }
+                }
                 return out;
             }
-            if (!strings->empty())
-                if (opt_idx < strings->size())
+            if (!strings->empty()) {
+                if (opt_idx < strings->size()) {
                     return from_u8(strings->get_at(opt_idx));
-                else
+                } else {
                     return from_u8(strings->serialize());
+                }
+            }
         }
         break;
         }
@@ -1259,22 +1271,27 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         }
         
         const ConfigOptionPoints* opt_pts = config.opt<ConfigOptionPoints>(opt_key);
-        if (!opt_pts->empty())
-            if (opt_idx < opt_pts->size())
-                return from_u8((boost::format("[%1%]") % ConfigOptionPoint(opt_pts->get_at(opt_idx)).serialize()).str());
-            else
+        if (!opt_pts->empty()) {
+            if (opt_idx < opt_pts->size()) {
+                return from_u8(
+                    (boost::format("[%1%]") % ConfigOptionPoint(opt_pts->get_at(opt_idx)).serialize()).str());
+            } else {
                 return from_u8(opt_pts->serialize());
+            }
+        }
     }
     case coGraph: {
         return graph_to_string(config.option<ConfigOptionGraph>(opt_key)->value);
     }
     case coGraphs: {
         const ConfigOptionGraphs* opt_graphs = config.opt<ConfigOptionGraphs>(opt_key);
-        if (!opt_graphs->empty())
-            if (opt_idx < opt_graphs->size())
+        if (!opt_graphs->empty()) {
+            if (opt_idx < opt_graphs->size()) {
                 return graph_to_string(opt_graphs->get_at(opt_idx));
-            else
+            } else {
                 return from_u8(opt_graphs->serialize());
+            }
+        }
     }
     default:
         break;
@@ -2154,6 +2171,7 @@ std::string DiffPresetDialog::get_left_preset_name(Preset::Type type)
             return Preset::remove_suffix_modified(get_selection(preset_combos.presets_left));
         }
     }
+    return "";
 }
 
 std::string DiffPresetDialog::get_right_preset_name(Preset::Type type)
@@ -2163,6 +2181,7 @@ std::string DiffPresetDialog::get_right_preset_name(Preset::Type type)
             return Preset::remove_suffix_modified(get_selection(preset_combos.presets_right));
         }
     }
+    return "";
 }
 
 }
