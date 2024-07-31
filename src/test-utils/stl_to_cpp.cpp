@@ -4,10 +4,10 @@
 #include <fstream>
 #include <cstdlib>
 
+#include <libslic3r/AABBMesh.hpp>
 #include <libslic3r/Format/STL.hpp>
 #include <libslic3r/Model.hpp>
 #include <libslic3r/LocalesUtils.hpp>
-#include <libslic3r/SLA/IndexedMesh.hpp>
 
 #include "ClipboardXX/include/clipboardxx.hpp"
 
@@ -34,8 +34,8 @@ int main(int argc, char const *argv[])
         int idx_vol = 0;
         for(Slic3r::ModelVolume *vol : obj->volumes) {
             Slic3r::TriangleMesh mesh = vol->mesh();
-            Slic3r::sla::IndexedMesh indexed_mesh(mesh); // more user-friendly
-            out_cpp << "TriangleMesh vol_"<< idx_obj << "_" << idx_vol <<" = TriangleMesh(std::vector<Vec3f>{";
+            Slic3r::AABBMesh indexed_mesh(mesh); // more user-friendly
+            out_cpp << "AABBMesh vol_"<< idx_obj << "_" << idx_vol <<" = AABBMesh(std::vector<Vec3f>{";
             int ptidx= 0;
             for(const Slic3r::Vec3f &pt : indexed_mesh.vertices())
                 out_cpp << (0==ptidx++?"{":",{") << Slic3r::to_string_nozero(pt.x(), 7)
