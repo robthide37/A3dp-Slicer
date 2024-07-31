@@ -2149,14 +2149,20 @@ void DiffPresetDialog::button_event(Action act)
 
 std::string DiffPresetDialog::get_left_preset_name(Preset::Type type)
 {
-    PresetComboBox* cb = m_preset_combos[int(type - Preset::TYPE_FFF_PRINT)].presets_left;
-    return Preset::remove_suffix_modified(get_selection(cb));
+    for (auto preset_combos : m_preset_combos) {
+        if (preset_combos.presets_left->get_type() == type) {
+            return Preset::remove_suffix_modified(get_selection(preset_combos.presets_left));
+        }
+    }
 }
 
 std::string DiffPresetDialog::get_right_preset_name(Preset::Type type)
 {
-    PresetComboBox* cb = m_preset_combos[int(type - Preset::TYPE_FFF_PRINT)].presets_right;
-    return Preset::remove_suffix_modified(get_selection(cb));
+    for (auto preset_combos : m_preset_combos) {
+        if (preset_combos.presets_right->get_type() == type) {
+            return Preset::remove_suffix_modified(get_selection(preset_combos.presets_right));
+        }
+    }
 }
 
 }
