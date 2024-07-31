@@ -692,7 +692,7 @@ public:
     std::pair<PrintValidationError, std::string> validate(std::vector<std::string>* warnings = nullptr) const override;
     Flow                brim_flow(size_t extruder_id, const PrintObjectConfig &brim_config) const;
     Flow                skirt_flow(size_t extruder_id, bool first_layer=false) const;
-    double              get_first_layer_height() const;
+    double              get_min_first_layer_height() const;
     double              get_object_first_layer_height(const PrintObject& object) const;
 
     // get the extruders of these obejcts

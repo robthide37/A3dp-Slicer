@@ -125,7 +125,7 @@ void init()
     key_translation_map["infill_wall_overlap"]                      = "infill_overlap";
     //key_translation_map["inherits"]                                 = "inherits";
     key_translation_map["line_width"]                               = "extrusion_width";
-    key_translation_map["print_flow_ratio"]                         = "print_extrusion_multiplier";
+    //key_translation_map["print_flow_ratio"]                         = "print_extrusion_multiplier"; // need to *100
     key_translation_map["initial_layer_acceleration"]               = "first_layer_acceleration";
     key_translation_map["initial_layer_line_width"]                 = "first_layer_extrusion_width";
     key_translation_map["initial_layer_print_height"]               = "first_layer_height";
@@ -232,7 +232,7 @@ void init()
     //key_translation_map["internal_bridge_flow"]                   = "bridge_flow_ratio"; //TO ADD
     key_translation_map["bridge_flow"]                              = "bridge_flow_ratio";
     key_translation_map["top_solid_infill_flow_ratio"]              = "fill_top_flow_ratio";
-    key_translation_map["infill_combination"]                       = "infill_every_layers";
+    //key_translation_map["infill_combination"]                       = "infill_every_layers"; // bool -> int
     key_translation_map["print_sequence"]                           = "complete_objects";
     key_translation_map["brim_type"]                                = "brim_type"; //handled by from_prusa
     //key_translation_map["notes"]                                    = "notes";
@@ -537,9 +537,6 @@ void complicated_convert(t_config_option_key &opt_key,
             value = "disabled";
         }
     }
-    // if ("enable_overhang_speed") {
-    //
-    //}
     if ("support_material_top_interface_pattern" == opt_key || "support_interface_pattern" == opt_key) {
         output["support_material_top_interface_pattern"] = value;
         output["support_material_bottom_interface_pattern"] = value;
@@ -556,11 +553,24 @@ void complicated_convert(t_config_option_key &opt_key,
 
     if ("resolution" == opt_key) {
         if (std::stof(value.c_str()) < 0.01f)
-            value = 0.0;
+            value = "0.0";
         output["resolution_internal"] = "0.0125";
     }
     if ("bridge_density" == opt_key || "bridge_overlap_min" == opt_key) {
         output["bridge_overlap"] = std::to_string(int(std::stof(value.c_str()) * 1.3));
+    }
+    //check that the value is good.
+    if ("infill_combination" == opt_key) {
+        if ("0" == value) {
+            value = "1";
+        } else {
+            assert("1" == value);
+            value = "10";
+        }
+    }
+    if ("print_flow_ratio" == opt_key) {
+        opt_key = "print_extrusion_multiplier";
+        value = std::to_string(int(std::stof(value.c_str()) * 100));
     }
 }
 

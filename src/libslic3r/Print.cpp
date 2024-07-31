@@ -648,7 +648,7 @@ double Print::get_object_first_layer_height(const PrintObject& object) const {
     return object_first_layer_height;
 }
 
-double Print::get_first_layer_height() const
+double Print::get_min_first_layer_height() const
 {
     if (m_objects.empty())
         throw Slic3r::InvalidArgument("first_layer_height() can't be called without PrintObjects");
@@ -863,7 +863,7 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
                 return _u8L("One or more object were assigned an extruder that the printer does not have.");
 #endif
 
-        const double print_first_layer_height = get_first_layer_height();
+        const double print_first_layer_height = get_min_first_layer_height();
         for (PrintObject *object : m_objects) {
             if (object->has_support_material()) {
                 if ((object->config().support_material_extruder == 0 || object->config().support_material_interface_extruder == 0) && max_nozzle_diameter - min_nozzle_diameter > EPSILON) {
@@ -1071,7 +1071,7 @@ Flow Print::brim_flow(size_t extruder_id, const PrintObjectConfig& brim_config) 
         *Flow::extrusion_width_option("brim", tempConf),
         *Flow::extrusion_spacing_option("brim", tempConf),
         (float)m_config.nozzle_diameter.get_at(extruder_id),
-        (float)get_first_layer_height(),
+        (float)get_min_first_layer_height(),
         (extruder_id < m_config.nozzle_diameter.size()) ? brim_config.get_computed_value("filament_max_overlap", extruder_id) : 1
     );
 }
@@ -1103,7 +1103,7 @@ Flow Print::skirt_flow(size_t extruder_id, bool first_layer/*=false*/) const
         *Flow::extrusion_width_option("skirt", m_default_region_config),
         *Flow::extrusion_spacing_option("skirt", m_default_region_config),
         (float)max_nozzle_diam,
-        (float)get_first_layer_height(),
+        (float)get_min_first_layer_height(),
         1 // hard to say what extruder we have here(many) m_default_region_config.get_computed_value("filament_max_overlap", extruder -1),
     );
     
@@ -1618,7 +1618,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                 ExtrusionFlow{
                     float(mm3_per_mm),        // this will be overridden at G-code export time
                     flow.width(),
-                    float(get_first_layer_height()) // this will be overridden at G-code export time
+                    float(get_min_first_layer_height()) // this will be overridden at G-code export time
                 }
             },
             false
@@ -1919,8 +1919,15 @@ const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt, double nozzle_
         float width = float(m_config.wipe_tower_width);
         float unscaled_brim_width = m_config.wipe_tower_brim_width.get_abs_value(nozzle_diameter);
         // use min layer height, as it's what wil disctate the wipe tower width.
+        float layer_height = 0;
+        if (m_objects.empty()) {
+            // if no objects, then no extruder selected: use the first one.
+            layer_height = default_object_config().first_layer_height.get_abs_value(config().nozzle_diameter.get_at(0));
+        } else {
+            layer_height = get_min_first_layer_height();
+        }
         // FIXME: get layer height from layers instead of config.
-        float layer_height = std::min(default_object_config().layer_height.value, get_first_layer_height());
+        layer_height = std::min(layer_height, float(default_object_config().layer_height.value));
 
         const_cast<Print*>(this)->m_wipe_tower_data.depth = (maximum/layer_height)/width;
         const_cast<Print*>(this)->m_wipe_tower_data.height = -1.f; // unknown yet
@@ -1989,7 +1996,7 @@ void Print::_make_wipe_tower()
         wipe_tower.set_extruder(i);
 
     m_wipe_tower_data.priming = Slic3r::make_unique<std::vector<WipeTower::ToolChangeResult>>(
-        wipe_tower.prime((float)get_first_layer_height(), m_wipe_tower_data.tool_ordering.all_extruders(), false));
+        wipe_tower.prime((float)get_min_first_layer_height(), m_wipe_tower_data.tool_ordering.all_extruders(), false));
 
     // Lets go through the wipe tower layers and determine pairs of extruder changes for each
     // to pass to wipe_tower (so that it can use it for planning the layout of the tower)
@@ -2087,7 +2094,7 @@ void Print::_make_wipe_tower()
     m_wipe_tower_data.used_filament_until_layer = wipe_tower.get_used_filament_until_layer();
     m_wipe_tower_data.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
     m_wipe_tower_data.width = wipe_tower.width();
-    m_wipe_tower_data.first_layer_height = get_first_layer_height();
+    m_wipe_tower_data.first_layer_height = get_min_first_layer_height();
     m_wipe_tower_data.cone_angle = config().wipe_tower_cone_angle;
 }
 

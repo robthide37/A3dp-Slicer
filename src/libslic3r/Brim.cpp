@@ -818,7 +818,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
     //def: push into extrusions, in the right order
     float mm3_per_mm = float(flow.mm3_per_mm());
     float width = float(flow.width());
-    float height = float(print.get_first_layer_height());
+    float height = float(print.get_min_first_layer_height());
     int nextIdx = 0;
     std::function<void(BrimLoop&, ExtrusionEntityCollection*)>* extrude_ptr;
     std::function<void(BrimLoop&, ExtrusionEntityCollection*) > extrude = [&mm3_per_mm, &width, &height, &extrude_ptr, &nextIdx](BrimLoop& to_cut, ExtrusionEntityCollection* parent) {
@@ -1273,7 +1273,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
             reorder_brim_polyline(lines, out, flow),
             ExtrusionAttributes{ExtrusionRole::Skirt,
                                 {float(flow.mm3_per_mm()), float(flow.width()),
-                                    float(print.get_first_layer_height())}}
+                                    float(print.get_min_first_layer_height())}}
         );
 
         append(unbrimmable, offset_ex(mouse_ears_ex, flow.scaled_spacing() / 2));
@@ -1336,7 +1336,7 @@ void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectP
             }
         }
         if (!object->support_layers().empty()) {
-            spacing = scaled(object->config().support_material_interface_spacing.value) + support_material_flow(object, float(print.get_first_layer_height())).scaled_width() * 1.5;
+            spacing = scaled(object->config().support_material_interface_spacing.value) + support_material_flow(object, float(print.get_min_first_layer_height())).scaled_width() * 1.5;
             ExPolygons polys = closing_ex(
                 union_ex(object->support_layers().front()->support_fills.polygons_covered_by_spacing(flow.spacing_ratio(), float(SCALED_EPSILON)))
                 , spacing);
