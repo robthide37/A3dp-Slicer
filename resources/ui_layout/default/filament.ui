@@ -11,12 +11,11 @@ group:Temperature °C
 	line:Extruder
 		setting:id$0:first_layer_temperature
 		setting:id$0:temperature
+		setting:id$0:label$Idle:idle_temperature
 	end_line
-	line:toggle$idle_temperature:toggle_default$30:Idle temperature
-		setting:id$0:idle_temperature
 	line:Bed
 		setting:id$0:first_layer_bed_temperature
-		setting:id$0:label:Other layers:bed_temperature
+		setting:id$0:label$Other layers:bed_temperature
 	end_line
 	setting:id$0:chamber_temperature
 group:Filament properties

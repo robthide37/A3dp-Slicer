@@ -707,13 +707,16 @@ void ConfigManipulation::toggle_printer_fff_options(DynamicPrintConfig *config, 
     // Disable silent mode for non-marlin firmwares.
     toggle_field("silent_mode", is_marlin_flavor);
 
+    // only allow to disable autoemit_temperature_commands if it's not already disabled by start_gcode_manual
+    toggle_field("autoemit_temperature_commands", !config->get_bool("start_gcode_manual"));
+
     for (size_t i = 0; i < extruder_count; ++i) {
         
         bool have_retract_length = config->opt_float("retract_length", i) > 0;
         
         const bool ramping_lift = config->get_bool("travel_ramping_lift", i);
-        const bool lifts_z = (ramping_lift && config->get_float("travel_max_lift", i) > 0)
-                          || (! ramping_lift && config->get_float("retract_lift", i) > 0);
+        //const bool lifts_z = (ramping_lift && config->get_float("travel_max_lift", i) > 0)
+        //                  || (! ramping_lift && config->get_float("retract_lift", i) > 0);
 
         toggle_field("travel_max_lift", ramping_lift, i);
         toggle_field("travel_slope", ramping_lift, i);
@@ -770,6 +773,7 @@ void ConfigManipulation::toggle_printer_fff_options(DynamicPrintConfig *config, 
         bool toolchange_retraction = config->opt_float("retract_length_toolchange", i) > 0;
         toggle_field("retract_restart_extra_toolchange", extruder_count > 1 && toolchange_retraction, i);
     }
+
     if (config->opt_bool("single_extruder_multi_material") && extruder_count > 1) {
         bool have_advanced_wipe_volume = config->opt_bool("wipe_advanced");
         for (auto el : { "wipe_advanced_nozzle_melted_volume", "wipe_advanced_multiplier", "wipe_advanced_algo" }) {

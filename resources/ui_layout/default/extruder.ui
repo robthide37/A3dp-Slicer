@@ -18,9 +18,6 @@ group:Travel lift
 	setting:idx:travel_max_lift
 	setting:idx:travel_slope
 	setting:idx:travel_lift_before_obstacle
-group:Retraction
-	setting:idx:retract_length
-	setting:idx:retract_lift
 	line:Only lift Z
 		setting:idx:retract_lift_above
 		setting:idx:retract_lift_below
@@ -29,6 +26,8 @@ group:Retraction
 		setting:idx:retract_lift_first_layer
 		setting:idx:retract_lift_top
 	end_line
+group:Retraction
+	setting:idx:retract_length
 	line:Retraction Speed
 		setting:idx:retract_speed
 		setting:idx:label$Deretraction:deretract_speed

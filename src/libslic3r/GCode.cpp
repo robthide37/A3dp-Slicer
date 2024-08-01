@@ -2696,6 +2696,7 @@ void GCodeGenerator::_print_first_layer_bed_temperature(std::string &out, const 
 // M191 - Set chamber Temperature and Wait
 void GCodeGenerator::_print_first_layer_chamber_temperature(std::string &out, const Print &print, const std::string &gcode, uint16_t first_printing_extruder_id, bool wait)
 {
+    bool autoemit = print.config().autoemit_temperature_commands;
     // Initial bed temperature based on the first extruder.
     int  temp = print.config().chamber_temperature.get_at(first_printing_extruder_id);
     //disable bed temp control if 0
@@ -2703,12 +2704,12 @@ void GCodeGenerator::_print_first_layer_chamber_temperature(std::string &out, co
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode     = -1;
     bool temp_set_by_gcode = custom_gcode_sets_temperature(gcode, 141, 191, false, temp_by_gcode);
-    if (temp_set_by_gcode && temp_by_gcode >= 0 && temp_by_gcode < 1000)
+    if (autoemit && temp_set_by_gcode && temp_by_gcode >= 0 && temp_by_gcode < 1000)
         temp = temp_by_gcode;
     // Always call m_writer.set_chamber_temperature() so it will set the internal "current" state of the chamber temp as if
     // the custom start G-code emited these.
     std::string set_temp_gcode = m_writer.set_chamber_temperature(temp, wait);
-    if (!temp_set_by_gcode && !set_temp_gcode.empty())
+    if (autoemit && !temp_set_by_gcode && !set_temp_gcode.empty())
         out += (set_temp_gcode);
 }
 

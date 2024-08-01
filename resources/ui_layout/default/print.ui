@@ -35,10 +35,9 @@ group:Quality
 		setting:label$Minimum width:sidetext_width$7:min_width_top_surface
 	end_line
 	line:Extra perimeters
-		setting:label_width$8:extra_perimeters_on_overhangs
+		setting:label$On overhangs:label_width$8:extra_perimeters_on_overhangs
 		setting:label_width$10:extra_perimeters_odd_layers
 	end_line
-	setting: avoid_crossing_curled_overhangs
 	line:Overlapping external perimeter
 		setting:label$_:thin_perimeters
 		setting:label_width$12:label$Also for all perimeters:thin_perimeters_all
@@ -62,6 +61,7 @@ group:Avoid crossing perimeters
 		setting:label_width$12:label$Not on first layer:avoid_crossing_not_first_layer
         setting:avoid_crossing_top
 	end_line
+	setting:avoid_crossing_curled_overhangs
 group:label_width$12:Overhangs
 	line:threshold for
 		setting:script:bool:advanced:depends$overhangs_width_speed$overhangs_width:label$_:label_width$0:tooltip$Simple widget to enable/disable the overhangs detection (using 55% and 75% for the two thresholds)\nUse the expert mode to get more detailled widgets:s_overhangs
@@ -81,7 +81,7 @@ group:sidetext_width$5:Seam
 		setting:tags$Advanced$Expert$SuSi:width$3:sidetext_width$0:seam_travel_cost
 		setting:tags$Expert$SuSi:sidetext_width$0:seam_visibility
 	end_line
-	staggered_inner_seams
+	setting:staggered_inner_seams
 	line:Seam notch
 		setting:seam_notch_inner
 		setting:seam_notch_outer
@@ -339,19 +339,21 @@ group:Options for support material interface
 	end_line
 	setting:support_material_interface_contact_loops
 	
-group:Organic supports"
-	line:tree angle
-		setting:support_tree_angle
-		setting:support_tree_angle_slow
+group:Organic supports
+	line:Tree Branch angle
+		setting:label$Maximum:support_tree_angle
+		setting:label$Preferred:support_tree_angle_slow
 	end_line
-	line:branch diameter
-		setting:support_tree_branch_diameter
-		setting:support_tree_branch_diameter_angle
-		setting:support_tree_branch_diameter_double_wall
+	line:Branch diameter
+		setting:label$_:support_tree_branch_diameter
+		setting:label$Angle:support_tree_branch_diameter_angle
+        setting:support_tree_tip_diameter
 	end_line
-    setting:support_tree_tip_diameter
-    setting:support_tree_branch_distance
-    setting:support_tree_top_rate
+    setting:support_tree_branch_diameter_double_wall
+	line:Branch
+        setting:label$Distance:support_tree_branch_distance
+        setting:label$Density:support_tree_top_rate
+	end_line
 
 page:Speed:time
 group:label_width$8:sidetext_width$7:Speed for print moves
@@ -510,6 +512,7 @@ group:sidetext_width$2:Flow
 		setting:script:bool:advanced:depends$bridge_type$bridge_overlap$layer_height$nozzle_diameter:label$ Simulate Prusa 'no thick bridge':label_width$0:tooltip$Change the bridge type and the bridge overlap to compute the same extrusions as when the PrusaSlicer 'thick bridge' isn't selected.\nAs long as it's selected, it will modify them.\nUnselect it to deactivate this enforcement.:s_not_thick_bridge
 	end_line
 	setting:external_perimeter_cut_corners
+
 page:Multiple extruders:funnel
 group:Extruders
 	setting:perimeter_extruder
@@ -545,8 +548,8 @@ group:Wipe tower
 group:Advanced
 	setting:interface_shells
 	line:Segmented regions
-		setting:mmu_segmented_region_max_width
-		setting:mmu_segmented_region_interlocking_depth
+		setting:label$Maximum width:mmu_segmented_region_max_width
+		setting:label$Interlocking depth:mmu_segmented_region_interlocking_depth
 	end_line
 
 page:Output options:output+page_white

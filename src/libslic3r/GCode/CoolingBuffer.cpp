@@ -8,7 +8,7 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "../GCode.hpp"
+#include "libslic3r/GCode.hpp"
 #include "CoolingBuffer.hpp"
 #include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
