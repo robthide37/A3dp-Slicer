@@ -15,8 +15,21 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: install autoconf
+      run: brew install autoconf
+    - name: check autoconf version
+      run: autoconf --version
+    - name: update automake for mpfr
+      run: |
+        curl -O -L http://ftpmirror.gnu.org/automake/automake-1.16.5.tar.gz
+        tar -xzf automake-1.16.5.tar.gz
+        cd automake-*
+        ./configure
+        make
+        sudo make install
+        automake --version
     - name: build deps & slicer
-      run: ./BuildMacOS.sh -ia
+      run: ./BuildMacOS.sh -adsi
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:

@@ -12,7 +12,6 @@
 #include "libslic3r/Config.hpp"
 
 #include "BitmapCache.hpp"
-#include "format.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "GUI_ObjectList.hpp"
@@ -22,6 +21,7 @@
 #include "Plater.hpp"
 #include "../Utils/MacDarkMode.hpp"
 #include "BitmapComboBox.hpp"
+#include "format.hpp"
 
 namespace Slic3r{
 namespace GUI{
@@ -82,8 +82,8 @@ ModeButton::ModeButton(wxWindow *parent, const std::string &mode_name, int px_cn
 
 void ModeButton::Init(const wxString &mode)
 {
-    m_tt_focused  = format_wxstr(_L("Switch to the %s mode"), mode);
-    m_tt_selected = format_wxstr(_L("Current mode is %s"), mode);
+    m_tt_focused  = Slic3r::GUI::format_wxstr(_L("Switch to the %s mode"), mode);
+    m_tt_selected = Slic3r::GUI::format_wxstr(_L("Current mode is %s"), mode);
 
     SetBitmapMargins(3, 0);
 

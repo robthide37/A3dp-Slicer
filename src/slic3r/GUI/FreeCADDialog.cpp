@@ -8,9 +8,9 @@
 #include "GUI.hpp"
 #include "GUI_Utils.hpp"
 #include "GUI_ObjectList.hpp"
-#include "../Utils/Http.hpp"
-#include "Plater.hpp"
 #include "slic3r/Utils/Http.hpp"
+#include "slic3r/Utils/MacDarkMode.hpp"
+#include "Plater.hpp"
 #include "Tab.hpp"
 
 #include "MainFrame.hpp"

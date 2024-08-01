@@ -15,7 +15,7 @@ jobs:
       with:
         ref: 'rc'
     - name: build deps & slicer
-      run: ./BuildMacOS.sh -i
+      run: ./BuildMacOS.sh -dsi
     - name: Upload artifact
       uses: actions/upload-artifact@v1.0.0
       with:

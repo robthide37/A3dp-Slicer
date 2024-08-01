@@ -5,6 +5,7 @@
 ///|/
 
 #include "GCodeFormatter.hpp"
+#include <boost/spirit/include/karma.hpp>
 
 namespace Slic3r {
 
