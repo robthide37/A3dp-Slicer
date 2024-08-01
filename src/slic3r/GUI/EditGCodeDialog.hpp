@@ -75,7 +75,7 @@ enum class ParamType {
     Undef,
     Scalar,
     Vector,
-    FilamentVector,
+    FilamentVector, // == ExtruderVector
 };
 
 // On all of 3 different platforms Bitmap+Text icon column looks different 

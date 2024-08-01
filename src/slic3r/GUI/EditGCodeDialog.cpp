@@ -148,7 +148,17 @@ std::string EditGCodeDialog::get_edited_gcode() const
 
 static ParamType get_type(const std::string& opt_key, const ConfigOptionDef& opt_def)
 {
-    return opt_def.is_scalar() ? ParamType::Scalar : ParamType::Vector;
+    return opt_def.is_scalar() ? ParamType::Scalar : opt_def.is_vector_extruder ? ParamType::FilamentVector : ParamType::Vector;
+}
+
+static ParamType get_type(const ConfigOption *optptr) {
+    if (optptr->is_scalar()) {
+        return ParamType::Scalar;
+    } else {
+        assert(dynamic_cast<const ConfigOptionVectorBase *>(optptr));
+        return static_cast<const ConfigOptionVectorBase *>(optptr)->is_extruder_size() ? ParamType::FilamentVector :
+                                                                                         ParamType::Vector;
+    }
 }
 
 void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
@@ -256,17 +266,17 @@ wxDataViewItem EditGCodeDialog::add_presets_placeholders()
     wxDataViewItem print = m_params_list->AppendSubGroup(group, _L("Print settings"), "cog");
     for (const auto&opt : print_options)
         if (const ConfigOption *optptr = full_config.optptr(opt))
-            m_params_list->AppendParam(print, optptr->is_scalar() ? ParamType::Scalar : ParamType::Vector, opt);
+            m_params_list->AppendParam(print, get_type(optptr), opt);
     
     wxDataViewItem material = m_params_list->AppendSubGroup(group, _(is_fff ? L("Filament settings") : L("SLA Materials settings")), is_fff ? "spool" : "resin");
     for (const auto&opt : material_options)
         if (const ConfigOption *optptr = full_config.optptr(opt))
-            m_params_list->AppendParam(material, optptr->is_scalar() ? ParamType::Scalar : ParamType::FilamentVector, opt);
+            m_params_list->AppendParam(material, get_type(optptr), opt);
 
     wxDataViewItem printer = m_params_list->AppendSubGroup(group, _L("Printer settings"), is_fff ? "printer" : "sla_printer");
-    for (const auto&opt : printer_options)
+    for (const auto &opt : printer_options)
         if (const ConfigOption *optptr = full_config.optptr(opt))
-            m_params_list->AppendParam(printer, optptr->is_scalar() ? ParamType::Scalar : ParamType::Vector, opt);
+                m_params_list->AppendParam(printer, get_type(optptr), opt);
 
     return group;
 }
