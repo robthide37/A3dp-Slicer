@@ -139,6 +139,8 @@ endif (MINGW)
 if (NOT WIN32)
     # Binary name on unix like systems (Linux, Unix)
     set_target_properties(Slic3r PROPERTIES OUTPUT_NAME "${SLIC3R_APP_CMD}")
+    # move the exe so it won't collide with a dir (like Slic3r)
+    set_target_properties(Slic3r PROPERTIES RUNTIME_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/bin")
 endif ()
 
 target_link_libraries(Slic3r libslic3r libcereal)
