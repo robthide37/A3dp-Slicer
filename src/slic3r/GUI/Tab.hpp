@@ -155,7 +155,7 @@ public:
     void        refresh();
 	Field*		get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
 	Line*		get_line(const t_config_option_key& opt_key);
-	bool		set_value(const t_config_option_key& opt_key, const boost::any& value);
+	bool		set_value(const t_config_option_key& opt_key, const boost::any& value, bool enabled);
 	ConfigOptionsGroupShp	new_optgroup(const wxString& title, bool no_title = false, bool is_tab_opt = true, Preset::Type type_override = Preset::Type::TYPE_INVALID);
 	const ConfigOptionsGroupShp	get_optgroup(const wxString& title) const;
 
@@ -287,6 +287,13 @@ protected:
 	ScalableBitmap 			m_bmp_value_revert;
 	// Bitmaps to be shown on the "Undo user changes" button next to each input field.
 	ScalableBitmap 			m_bmp_edit_value;
+	// Bitmaps to be shown on the "enable/disable" checkbox next to each input field that can be disabled.
+	ScalableBitmap 			m_bmp_on;
+	ScalableBitmap 			m_bmp_off;
+	ScalableBitmap 			m_bmp_on_disabled;
+	ScalableBitmap 			m_bmp_off_disabled;
+	ScalableBitmap 			m_bmp_on_focused;
+	ScalableBitmap 			m_bmp_off_focused;
     
     std::vector<ScalableButton*>	m_scaled_buttons = {};    
     std::vector<ScalableBitmap*>	m_scaled_bitmaps = {};    
@@ -482,7 +489,7 @@ public:
 	PresetCollection*	get_presets() { return m_presets; }
 	const PresetCollection* get_presets() const { return m_presets; }
 
-    bool            set_value(const t_config_option_key& opt_key, const boost::any& value);
+    bool            set_value(const t_config_option_key& opt_key, const boost::any& value, bool enabled);
 	void			on_value_change(const std::string& opt_key, const boost::any& value);
 
     void            update_wiping_button_visibility();
@@ -587,8 +594,8 @@ protected:
     BitmapComboBox* m_extruders_cb {nullptr};
     int             m_active_extruder {0};
 
-    void            create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0);
-    void            update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0, bool is_checked = true);
+    //void            create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0);
+    //void            update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0, bool is_checked = true);
     void            update_filament_overrides_page();
     void            create_extruder_combobox();
 	void 			update_volumetric_flow_preset_hints();

@@ -158,13 +158,13 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
             this->m_downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
         }
 		for (const std::string& opt_key : {"suppress_hyperlinks", "downloader_url_registered"})
-			m_optkey_to_optgroup[opt_key]->set_value(opt_key, app_config->get_bool(opt_key));
+			m_optkey_to_optgroup[opt_key]->set_value(opt_key, app_config->get_bool(opt_key), true, false);
 
 		for (const std::string  opt_key : { "default_action_on_close_application"
 										   ,"default_action_on_new_project"
 										   ,"default_action_on_select_preset" })
-			m_optkey_to_optgroup[opt_key]->set_value(opt_key, app_config->get(opt_key) == "none");
-		m_optkey_to_optgroup["default_action_on_dirty_project"]->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty());
+			m_optkey_to_optgroup[opt_key]->set_value(opt_key, app_config->get(opt_key) == "none", true, false);
+		m_optkey_to_optgroup["default_action_on_dirty_project"]->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty(), true, false);
 
 		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
@@ -210,7 +210,8 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 	optgroup->title_width = 40;
 	optgroup->label_width = 40;
 	optgroup->set_config_category_and_type(title, int(Preset::TYPE_PREFERENCES));
-	optgroup->m_on_change = [this, tabs, optgroup](t_config_option_key opt_key, boost::any value) {
+	optgroup->m_on_change = [this, tabs, optgroup](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
 		Field* field = optgroup->get_field(opt_key);
 		if (auto it = m_values.find(opt_key); it != m_values.end()) { //TODO: test that
 			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
@@ -374,7 +375,7 @@ void PreferencesDialog::append_enum_option( std::shared_ptr<ConfigOptionsGroup> 
 								const std::string& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
-								const ConfigOption* def_val,
+								ConfigOption* def_val,
 								std::initializer_list<std::pair<std::string_view, std::string_view>> enum_values,
 								ConfigOptionMode mode)
 {
@@ -699,7 +700,8 @@ void PreferencesDialog::build()
 	create_options_tab(L("Camera"));
 	m_tabid_2_optgroups.back().emplace_back(create_options_group("", tabs, 1)); // no title -> no borders
 	m_tabid_2_optgroups.back().back()->set_config_category_and_type(_L("Camera"), int(Preset::TYPE_PREFERENCES));
-	m_tabid_2_optgroups.back().back()->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+	m_tabid_2_optgroups.back().back()->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
 		if (auto it = m_values.find(opt_key);it != m_values.end()) {
 			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
 			return;
@@ -1006,7 +1008,8 @@ void PreferencesDialog::build()
 		create_options_tab(L("Render"));
 		m_tabid_2_optgroups.back().emplace_back(create_options_group("", tabs, 1));
 		m_tabid_2_optgroups.back().back()->set_config_category_and_type(L("Render"), int(Preset::TYPE_PREFERENCES));
-		m_tabid_2_optgroups.back().back()->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+		m_tabid_2_optgroups.back().back()->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+            assert(enabled);
 			if (auto it = m_values.find(opt_key); it != m_values.end()) {
 				m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
 				return;
@@ -1269,7 +1272,7 @@ void PreferencesDialog::revert(wxEvent&)
 	if (m_use_custom_toolbar_size != (get_app_config()->get_bool("use_custom_toolbar_size"))) {
 		app_config->set("use_custom_toolbar_size", m_use_custom_toolbar_size ? "1" : "0");
 
-		m_optkey_to_optgroup["use_custom_toolbar_size"]->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
+		m_optkey_to_optgroup["use_custom_toolbar_size"]->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size, true, false);
 		m_icon_size_sizer->ShowItems(m_use_custom_toolbar_size);
 		refresh_og(m_optkey_to_optgroup["use_custom_toolbar_size"]);
 	}
@@ -1278,15 +1281,15 @@ void PreferencesDialog::revert(wxEvent&)
 		const std::string& key = value.first;
 		// special cases
 		if (key == "default_action_on_dirty_project") {
-			m_optkey_to_optgroup[key]->set_value(key, app_config->get(key).empty());
+			m_optkey_to_optgroup[key]->set_value(key, app_config->get(key).empty(), true, false);
 			continue;
 		}
 		if (key == "default_action_on_close_application" || key == "default_action_on_select_preset" || key == "default_action_on_new_project") {
-			m_optkey_to_optgroup[key]->set_value(key, app_config->get(key) == "none");
+			m_optkey_to_optgroup[key]->set_value(key, app_config->get(key) == "none", true, false);
 			continue;
 		}
 		if (key == "notify_release") {
-			m_optkey_to_optgroup[key]->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)));
+			m_optkey_to_optgroup[key]->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)), true, false);
 			continue;
 		}
 		if (key == "old_settings_layout_mode") {
@@ -1312,7 +1315,7 @@ void PreferencesDialog::revert(wxEvent&)
 		//general case
 		Field* field = m_optkey_to_optgroup[key]->get_field(key);
         if (field->m_opt.type == coBool) {
-			 m_optkey_to_optgroup[key]->set_value("",true);
+			 m_optkey_to_optgroup[key]->set_value("",true, true, false);
 			field->set_any_value(ConfigOptionBool(app_config->get_bool(key)).get_any(), false);
 			continue;
 		}

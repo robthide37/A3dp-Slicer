@@ -249,7 +249,7 @@ double Extruder::retract_before_wipe() const
 
 double Extruder::retract_length() const
 {
-    assert(!m_config->retract_length.is_nil());
+    assert(m_config->retract_length.is_enabled());
     assert(m_config->retract_length.get_at(m_id) < std::numeric_limits<int32_t>::max());
     assert(m_config->retract_length.get_at(m_id) > -std::numeric_limits<int32_t>::max());
     assert(m_config->retract_length.size() > m_id);
@@ -258,7 +258,7 @@ double Extruder::retract_length() const
 
 double Extruder::retract_lift() const
 {
-    assert(!m_config->retract_lift.is_nil());
+    assert(m_config->retract_lift.is_enabled());
     assert(m_config->retract_lift.get_at(m_id) < std::numeric_limits<int32_t>::max());
     assert(m_config->retract_lift.get_at(m_id) > -std::numeric_limits<int32_t>::max());
     assert(m_config->retract_lift.size() > m_id);
@@ -278,7 +278,7 @@ int Extruder::deretract_speed() const
 
 double Extruder::retract_restart_extra() const
 {
-    assert(!m_config->retract_restart_extra.is_nil());
+    assert(m_config->retract_restart_extra.is_enabled());
     assert(m_config->retract_restart_extra.get_at(m_id) < std::numeric_limits<int32_t>::max());
     assert(m_config->retract_restart_extra.get_at(m_id) > -std::numeric_limits<int32_t>::max());
     assert(m_config->retract_restart_extra.size() > m_id);
@@ -292,7 +292,7 @@ double Extruder::retract_length_toolchange() const
 
 double Extruder::retract_restart_extra_toolchange() const
 {
-    assert(!m_config->retract_restart_extra_toolchange.is_nil());
+    assert(m_config->retract_restart_extra_toolchange.is_enabled());
     assert(m_config->retract_restart_extra_toolchange.get_at(m_id) < std::numeric_limits<int32_t>::max());
     assert(m_config->retract_restart_extra_toolchange.get_at(m_id) > -std::numeric_limits<int32_t>::max());
     assert(m_config->retract_restart_extra_toolchange.size() > m_id);

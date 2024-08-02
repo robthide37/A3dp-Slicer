@@ -144,7 +144,7 @@ protected:
 								const std::string& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
-								const ConfigOption* def_val,
+								ConfigOption* def_val,
 								std::initializer_list<std::pair<std::string_view, std::string_view>> enum_values,
 								ConfigOptionMode mode = ConfigOptionMode::comNone);
 

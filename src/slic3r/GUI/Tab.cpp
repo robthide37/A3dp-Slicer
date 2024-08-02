@@ -237,7 +237,14 @@ void Tab::create_preset_tab()
     add_scaled_bitmap(this, m_bmp_white_bullet, "dot");
     // Bitmap to be shown on the "edit" button before to each editable input field.
     add_scaled_bitmap(this, m_bmp_edit_value, "edit");
-
+	// Bitmaps to be shown on the "enable/disable" checkbox next to each input field that can be disabled.
+    add_scaled_bitmap(this, m_bmp_on, "check_on");
+    add_scaled_bitmap(this, m_bmp_off, "check_off");
+    add_scaled_bitmap(this, m_bmp_on_disabled, "check_on_disabled");
+    add_scaled_bitmap(this, m_bmp_off_disabled, "check_off_disabled");
+    add_scaled_bitmap(this, m_bmp_on_focused, "check_on_focused");
+    add_scaled_bitmap(this, m_bmp_off_focused, "check_off_focused");
+    
     fill_icon_descriptions();
     set_tooltips_text();
 
@@ -731,7 +738,14 @@ void Tab::decorate()
 
         if (field->has_edit_ui())
             field->set_edit_bitmap(&m_bmp_edit_value);
-
+        
+        // enable/disable fake checkbox bmp (FIXME: should be done at creation)
+        if (field->m_opt.can_be_disabled && !field->has_enable_ui()) {
+            field->set_enable_bitmap(&m_bmp_on, &m_bmp_off);
+            field->set_enable_bitmap_disabled(&m_bmp_on_disabled, &m_bmp_off_disabled);
+            field->set_enable_bitmap_hover(&m_bmp_on_focused, &m_bmp_off_focused);
+            field->set_enable_tooltip(_L("This Setting can be disabled/enabled by clicking on this checkbox."));
+        }
     }
     for (const auto& opt_key2id : this->m_options_script) {
         Field* field = get_field(opt_key2id.first);
@@ -1305,7 +1319,7 @@ void Tab::toggle_option(const std::string& opt_key, bool toggle, int opt_index/*
         return;
     Field* field = m_active_page->get_field(opt_key, opt_index);
     if (field)
-        field->toggle(toggle);
+        field->toggle_widget_enable(toggle);
 };
 
 // To be called by custom widgets, load a value into a config,
@@ -1326,10 +1340,10 @@ void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bo
     update();
 }
 
-bool Tab::set_value(const t_config_option_key& opt_key, const boost::any& value) {
+bool Tab::set_value(const t_config_option_key& opt_key, const boost::any& value, bool enabled) {
     bool changed = false;
     for (auto page : m_pages) {
-        if (page->set_value(opt_key, value))
+        if (page->set_value(opt_key, value, enabled))
             changed = true;
     }
     return changed;
@@ -1782,10 +1796,10 @@ t_change Tab::set_or_add(t_change previous, t_change toadd) {
     if (previous == nullptr)
         return toadd;
     else
-        return [previous, toadd](t_config_option_key opt_key, boost::any value) {
+        return [previous, toadd](t_config_option_key opt_key, bool enable, boost::any value) {
         try {
-            toadd(opt_key, value);
-            previous(opt_key, value);
+            toadd(opt_key, enable, value);
+            previous(opt_key, enable, value);
 
         }
         catch (const std::exception & ex) {
@@ -1933,7 +1947,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
                     current_group->m_on_change = set_or_add(current_group->m_on_change,
                         [this, tab, current_group_wk = ConfigOptionsGroupWkp(current_group)]
-                        (t_config_option_key opt_key, boost::any value) {
+                        (t_config_option_key opt_key, bool enable, boost::any value) {
+                        assert(enable);
                         auto current_group_sh = current_group_wk.lock();
                         if (!current_group_sh)
                             return;
@@ -1996,7 +2011,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
                     current_group->m_on_change = set_or_add(current_group->m_on_change,
                         [this, tab, current_group_wk = ConfigOptionsGroupWkp(current_group)]
-                        (t_config_option_key opt_key, boost::any value) {
+                        (t_config_option_key opt_key, bool enable, boost::any value) {
+                        assert(enable);
                         auto current_group_sh = current_group_wk.lock();
                         if (!current_group_sh)
                             return;
@@ -2014,14 +2030,16 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 else if (params[i] == "silent_mode_event") {
                     TabPrinter* tab = nullptr;
                     if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
-                    current_group->m_on_change = set_or_add(current_group->m_on_change, [this, tab](t_config_option_key opt_key, boost::any value) {
+                    current_group->m_on_change = set_or_add(current_group->m_on_change, [this, tab](t_config_option_key opt_key, bool enable, boost::any value) {
+                        assert(enable);
                         tab->update_fff(); //check for kinematic rebuild
                         tab->build_unregular_pages(false);
                     });
                 }
                 else if (params[i] == "material_density_event") {
-                    current_group->m_on_change = set_or_add(current_group->m_on_change, [this](t_config_option_key opt_key, boost::any value)
+                    current_group->m_on_change = set_or_add(current_group->m_on_change, [this](t_config_option_key opt_key, bool enable, boost::any value)
                     {
+                        assert(enable);
                         assert(m_config);
                         DynamicPrintConfig new_conf = *m_config;
 
@@ -2046,8 +2064,9 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         }
                     });
                 } else if (params[i] == "filament_spool_weight_event") {
-                    current_group->m_on_change = set_or_add(current_group->m_on_change, [this](t_config_option_key opt_key, boost::any value)
+                    current_group->m_on_change = set_or_add(current_group->m_on_change, [this](t_config_option_key opt_key, bool enable, boost::any value)
                         {
+                            assert(enable);
                             update_dirty();
                             if (opt_key == "filament_spool_weight") {
                                 // Change of this option influences for an update of "Sliced Info"
@@ -2059,7 +2078,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         });
                 } else if (params[i] == "validate_gcode") {
                     current_group->m_on_change = set_or_add(current_group->m_on_change, [this, current_group_wk = ConfigOptionsGroupWkp(current_group)]
-                        (t_config_option_key opt_key, boost::any value) {
+                        (t_config_option_key opt_key, bool enable, boost::any value) {
+                        assert(enable);
                         auto current_group_sh = current_group_wk.lock();
                         if (!current_group_sh)
                         //validate_custom_gcode_cb(this, current_group, opt_key, value);
@@ -2415,7 +2435,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             current_line.label_tooltip = full_line;
         } else if (full_line == "update_nozzle_diameter") {
             current_group->m_on_change = set_or_add(current_group->m_on_change, [this, idx_page]
-                    (const t_config_option_key &opt_key, boost::any value) {
+                    (const t_config_option_key &opt_key, bool enable, boost::any value) {
+                assert(enable);
                 TabPrinter *tab = nullptr;
                 if ((tab = dynamic_cast<TabPrinter *>(this)) == nullptr)
                     return;
@@ -2846,7 +2867,7 @@ void TabFrequent::toggle_options()
                 if (opt && opt->opt.is_script && opt->script) {
                     Field *field = optgrp->get_field(key);
                     if (field)
-                        field->toggle(opt->script->call_script_function_is_enable(opt->opt));
+                        field->toggle_widget_enable(opt->script->call_script_function_is_enable(opt->opt));
                 }
             }
         }
@@ -2930,7 +2951,7 @@ void TabPrint::toggle_options()
                 if (opt && opt->opt.is_script && opt->script) {
                     Field *field = optgrp->get_field(key);
                     if (field)
-                        field->toggle(opt->script->call_script_function_is_enable(opt->opt));
+                        field->toggle_widget_enable(opt->script->call_script_function_is_enable(opt->opt));
                 }
             }
         }
@@ -3054,54 +3075,53 @@ void TabFilament::set_custom_gcode(const t_config_option_key& opt_key, const std
     load_config(new_conf);
 }
 
-void TabFilament::create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/)
-{
-        Line line {"",""};
-        if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
-            Option opt = optgroup->get_option_and_register(opt_key, 0);
-            opt.opt.label = opt.opt.get_full_label();
-            line = optgroup->create_single_option_line(opt);
-        } else {
-            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key, 0));
-        }
+//void TabFilament::create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/)
+//{
+//        Line line {"",""};
+//        if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
+//            Option opt = optgroup->get_option_and_register(opt_key, 0);
+//            opt.opt.label = opt.opt.get_full_label();
+//            line = optgroup->create_single_option_line(opt);
+//        } else {
+//            line = optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key, 0));
+//        }
+//
+//    line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
+//        wxWindow* check_box = CheckBox::GetNewWin(parent);
+//        wxGetApp().UpdateDarkUI(check_box);
+//
+//        check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
+//                const bool is_checked = evt.IsChecked();
+//            if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+//                if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
+//                    field->toggle_widget_enable(is_checked);
+//                }
+//            }
+//        });
+//
+//            m_overrides_options[opt_key] = check_box;
+//            return check_box;
+//        };
+//
+//        optgroup->append_line(line);
+//}
+//
+//void TabFilament::update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/, bool is_checked/* = true*/)
+//{
+//    if (!m_overrides_options[opt_key])
+//        return;
+//    m_overrides_options[opt_key]->Enable(is_checked);
+//
+//
+//    assert(opt_index < m_config->option(opt_key)->size());
+//    is_checked &= m_config->option(opt_key)->is_enabled(opt_index);
+//    CheckBox::SetValue(m_overrides_options[opt_key], is_checked);
+//
+//    Field* field = optgroup->get_fieldc(opt_key, opt_index);
+//    if (field != nullptr)
+//        field->toggle_widget_enable(is_checked);
+//}
 
-    line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
-        wxWindow* check_box = CheckBox::GetNewWin(parent);
-        wxGetApp().UpdateDarkUI(check_box);
-
-        check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
-                const bool is_checked = evt.IsChecked();
-            if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
-                if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
-                    field->toggle(is_checked);
-                    if (is_checked)
-                        field->set_last_meaningful_value();
-                    else
-                        field->set_na_value();
-                }
-            }
-        });
-
-            m_overrides_options[opt_key] = check_box;
-            return check_box;
-        };
-
-        optgroup->append_line(line);
-}
-
-void TabFilament::update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/, bool is_checked/* = true*/)
-{
-    if (!m_overrides_options[opt_key])
-        return;
-    m_overrides_options[opt_key]->Enable(is_checked);
-
-    is_checked &= !m_config->option(opt_key)->is_nil();
-    CheckBox::SetValue(m_overrides_options[opt_key], is_checked);
-
-    Field* field = optgroup->get_fieldc(opt_key, opt_index);
-    if (field != nullptr)
-        field->toggle(is_checked);
-}
 
 std::vector<std::pair<std::string, std::vector<std::string>>> fff_filament_override_option_keys {
     {"Travel lift", {
@@ -3152,7 +3172,8 @@ PageShp TabFilament::create_filament_overrides_page()
     for (const auto&[title, keys] : fff_filament_override_option_keys) {
         ConfigOptionsGroupShp optgroup = page->new_optgroup(L(title));
         for (const std::string &opt_key : keys) {
-            create_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
+            optgroup->append_line(optgroup->create_single_option_line(optgroup->get_option_and_register(opt_key, extruder_idx)));
+            //create_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
         }
     }
 
@@ -3182,26 +3203,28 @@ void TabFilament::update_filament_overrides_page()
 
     const int extruder_idx = 0; // #ys_FIXME
 
+    assert(m_config->option("filament_retract_length")->size() == 1);
+
     const bool have_retract_length = (
-        m_config->option("filament_retract_length")->is_nil()
+        !m_config->option("filament_retract_length")->is_enabled(0)
         || m_config->opt_float("filament_retract_length", extruder_idx) > 0
     );
 
     const bool uses_ramping_lift = (
-        m_config->option("filament_travel_ramping_lift")->is_nil()
+        !m_config->option("filament_travel_ramping_lift")->is_enabled(0)
         || m_config->opt_bool("filament_travel_ramping_lift", extruder_idx)
     );
 
     const bool is_lifting =  (
-        m_config->option("filament_travel_max_lift")->is_nil()
+       ! m_config->option("filament_travel_max_lift")->is_enabled(0)
         || m_config->opt_float("filament_travel_max_lift", extruder_idx) > 0
-        || m_config->option("filament_retract_lift")->is_nil()
+        || !m_config->option("filament_retract_lift")->is_enabled(0)
         || m_config->opt_float("filament_retract_lift", extruder_idx) > 0
     );
 
     for (const auto&[title, keys] : fff_filament_override_option_keys) {
         std::optional<ConfigOptionsGroupShp> optgroup{get_option_group_for_filament_overrides(page, title)};
-        if (!optgroup) {
+        if (!optgroup || !(*optgroup)) {
             continue;
         }
 
@@ -3219,7 +3242,7 @@ void TabFilament::update_filament_overrides_page()
                 title == "Travel lift"
                 && uses_ramping_lift
                 && opt_key == "filament_retract_lift"
-                && !m_config->option("filament_travel_ramping_lift")->is_nil()
+                && m_config->option("filament_travel_ramping_lift")->is_enabled(0)
                 && m_config->opt_bool("filament_travel_ramping_lift", extruder_idx)
             ) {
                 is_checked = false;
@@ -3247,7 +3270,10 @@ void TabFilament::update_filament_overrides_page()
                 is_checked = false;
             }
 
-            update_line_with_near_label_widget(*optgroup, opt_key, extruder_idx, is_checked);
+            Field* field = (*optgroup)->get_fieldc(opt_key, extruder_idx);
+            if (field != nullptr)
+                field->toggle_widget_enable(is_checked);
+            //update_line_with_near_label_widget(*optgroup, opt_key, extruder_idx, is_checked);
         }
     }
 }
@@ -3366,17 +3392,17 @@ void TabFilament::toggle_options()
     {
         // bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
 
-        //get_field("max_fan_speed")->toggle(m_config->opt_float("fan_below_layer_time", 0) > 0);
+        //get_field("max_fan_speed")->toggle_widget_enable(m_config->opt_float("fan_below_layer_time", 0) > 0);
         //toggle_option("min_print_speed", m_config->opt_float("slowdown_below_layer_time", 0) > 0);
 
         // hidden 'cooling', it's now deactivated.
              //for (auto el : { "min_fan_speed", "disable_fan_first_layers" })
         //for (auto el : { "max_fan_speed", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed" })
-        //    get_field(el)->toggle(cooling);
+        //    get_field(el)->toggle_widget_enable(cooling);
 
 
         //for (auto el : { "min_fan_speed", "disable_fan_first_layers" })
-        //    get_field(el)->toggle(fan_always_on);
+        //    get_field(el)->toggle_widget_enable(fan_always_on);
 
         toggle_option("max_fan_speed", 
             m_config->opt_float("fan_below_layer_time", 0) > 0 
@@ -3397,16 +3423,6 @@ void TabFilament::toggle_options()
 
     //if (m_active_page->title() == "Filament Overrides")
         update_filament_overrides_page();
-
-    //if (m_active_page->title() == "Filament")
-    {
-        Page* page = m_active_page;
-
-        const auto og_it = std::find_if(page->m_optgroups.begin(), page->m_optgroups.end(), 
-            [](const ConfigOptionsGroupShp og) { return og->get_field("idle_temperature") != nullptr; });
-        if (og_it != page->m_optgroups.end())
-            update_line_with_near_label_widget(*og_it, "idle_temperature");
-    }
 }
 
 void TabFilament::update()
@@ -3734,12 +3750,13 @@ PageShp TabPrinter::build_kinematics_page()
     page->descriptions.push_back("machine_limits");
 
     //TODO: check that if it's not annoying.
-    optgroup->m_on_change = [this](const t_config_option_key& opt_key, boost::any value)
+    optgroup->m_on_change = [this](const t_config_option_key& opt_key, bool enable, boost::any value)
     {
         if (opt_key == "machine_limits_usage" &&
             static_cast<MachineLimitsUsage>(boost::any_cast<int>(value)) == MachineLimitsUsage::EmitToGCode &&
             m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfKlipper)
         {
+            assert(enable);
             DynamicPrintConfig new_conf = *m_config;
 
             auto machine_limits_usage = static_cast<ConfigOptionEnum<MachineLimitsUsage>*>(m_config->option("machine_limits_usage")->clone());
@@ -3983,9 +4000,9 @@ void TabPrinter::reload_config()
     // "extruders_count" doesn't update from the update_config(),
     // so update it implicitly
     if (m_active_page && m_active_page->get_field("extruders_count"))
-        m_active_page->set_value("extruders_count", int(m_extruders_count));
+        m_active_page->set_value("extruders_count", int(m_extruders_count), true);
     if (m_active_page && m_active_page->get_field("milling_count"))
-        m_active_page->set_value("milling_count", int(m_milling_count));
+        m_active_page->set_value("milling_count", int(m_milling_count), true);
 }
 
 void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
@@ -3995,9 +4012,9 @@ void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
     // "extruders_count" doesn't update from the update_config(),
     // so update it implicitly
     if (m_active_page && m_active_page->get_field("extruders_count"))
-        m_active_page->set_value("extruders_count", int(m_extruders_count));
+        m_active_page->set_value("extruders_count", int(m_extruders_count), true);
     if (m_active_page && m_active_page->get_field("milling_count"))
-        m_active_page->set_value("milling_count", int(m_milling_count));
+        m_active_page->set_value("milling_count", int(m_milling_count), true);
 }
 
 void TabPrinter::clear_pages()
@@ -5152,7 +5169,7 @@ wxSizer* Tab::compatible_widget_create(wxWindow* parent, PresetDependencies &dep
         // All printers have been made compatible with this preset.
         if (is_checked)
             this->load_key_value(deps.key_list, std::vector<std::string> {});
-        this->get_field(deps.key_condition, setting_idx)->toggle(is_checked);
+        this->get_field(deps.key_condition, setting_idx)->toggle_widget_enable(is_checked);
         this->update_changed_ui();
     }) );
 
@@ -5928,7 +5945,7 @@ void Tab::compatible_widget_reload(PresetDependencies &deps)
     has_any ? deps.btn->Enable() : deps.btn->Disable();
     CheckBox::SetValue(deps.checkbox, !has_any);
 
-    field->toggle(! has_any);
+    field->toggle_widget_enable(! has_any);
 }
 
 void Tab::fill_icon_descriptions()
@@ -6112,10 +6129,10 @@ Line* Page::get_line(const t_config_option_key& opt_key)
     return nullptr;
 }
 
-bool Page::set_value(const t_config_option_key& opt_key, const boost::any& value) {
+bool Page::set_value(const t_config_option_key& opt_key, const boost::any& value, bool enabled) {
     bool changed = false;
     for(auto optgroup: m_optgroups) {
-        if (optgroup->set_value(opt_key, value))
+        if (optgroup->set_value(opt_key, value, enabled, false))
             changed = true ;
     }
     return changed;
@@ -6132,7 +6149,7 @@ ConfigOptionsGroupShp Page::new_optgroup(const wxString& title, bool no_title /*
 
     optgroup->set_config_category_and_type(m_title, 
         type_override == Preset::Type::TYPE_INVALID ? m_tab->type() : type_override);
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->m_on_change = [this](t_config_option_key opt_key, bool enable, boost::any value) {
         //! This function will be called from OptionGroup.
         //! Using of CallAfter is redundant.
         //! And in some cases it causes update() function to be recalled again
@@ -6287,11 +6304,7 @@ void TabSLAMaterial::create_line_with_near_label_widget(ConfigOptionsGroupShp op
                 auto opt_keys = get_override_opt_kyes_for_line(optgroup_sh->title.ToStdString(), key);
                 for (const std::string& opt_key : opt_keys)
                     if (Field* field = optgroup_sh->get_fieldc(opt_key, 0); field != nullptr) {
-                        field->toggle(is_checked);
-                        if (is_checked)
-                            field->set_last_meaningful_value();
-                        else
-                            field->set_na_value();
+                        field->toggle_widget_enable(is_checked);
                     }
             }
 
@@ -6349,20 +6362,20 @@ void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp op
     if (optgroup->title == "Support head" || optgroup->title == "Support pillar") {
         for (auto& prefix : { "", "branching" }) {
             std::string opt_key = preprefix + prefix + key;
-            is_checked = !m_config->option(opt_key)->is_nil();
+            is_checked = m_config->option(opt_key)->is_enabled();
             opt_keys.push_back(opt_key);
         }
     }
     else if (key == "relative_correction") {
         for (auto& axis : { "x", "y", "z" }) {
             std::string opt_key = preprefix + key + "_" + char(axis[0]);
-            is_checked = !m_config->option(opt_key)->is_nil();
+            is_checked = m_config->option(opt_key)->is_enabled();
             opt_keys.push_back(opt_key);
         }
     }
     else {
         std::string opt_key = preprefix + key;
-        is_checked = !m_config->option(opt_key)->is_nil();
+        is_checked = m_config->option(opt_key)->is_enabled();
         opt_keys.push_back(opt_key);
     }
 
@@ -6371,7 +6384,7 @@ void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp op
     for (const std::string& opt_key : opt_keys) {
         Field* field = optgroup->get_field(opt_key);
         if (field != nullptr)
-            field->toggle(is_checked);
+            field->toggle_widget_enable(is_checked);
     }
 }
 

@@ -182,15 +182,18 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 			break;
 		}
 		case coBool:
-			new_val = conf_substitution.new_value->get_bool() ? "true" : "false";
+            if (!conf_substitution.new_value->is_enabled()) {
+                new_val += "Disabled:";
+            }
+			new_val += conf_substitution.new_value->get_bool() ? "true" : "false";
 			break;
 		case coBools:
-			if (conf_substitution.new_value->nullable())
-				for (const char v : static_cast<const ConfigOptionBoolsNullable*>(conf_substitution.new_value.get())->get_values())
-					new_val += std::string(v == ConfigOptionBoolsNullable::NIL_VALUE() ? "nil" : v ? "true" : "false") + ", ";
-			else
-				for (const char v : static_cast<const ConfigOptionBools*>(conf_substitution.new_value.get())->get_values())
-					new_val += std::string(v ? "true" : "false") + ", ";
+            for (size_t idx = 0; idx < conf_substitution.new_value->size(); ++idx) {
+                if (!conf_substitution.new_value->is_enabled(idx)) {
+                    new_val += "Disabled:";
+                }
+                new_val += std::string(conf_substitution.new_value->get_bool(idx) ? "true" : "false") + ", ";
+            }
 			if (! new_val.empty())
 				new_val.erase(new_val.begin() + new_val.size() - 2, new_val.end());
 			break;
@@ -207,6 +210,9 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
             break;
 		default:
             new_val = conf_substitution.new_value->serialize();
+		}
+        if (def->type != coString && def->type != coStrings) {
+			new_val.Replace("!", "Disabled:");
 		}
 
 		changes += format_wxstr("<tr><td><b>\"%1%\" (%2%)</b></td><td>: ", def->opt_key, _(def->label)) +

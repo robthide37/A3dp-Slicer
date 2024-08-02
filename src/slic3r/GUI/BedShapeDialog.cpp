@@ -130,14 +130,16 @@ void BedShape::apply_optgroup_values(ConfigOptionsGroupShp optgroup)
 {
     switch (m_build_volume.type()) {
     case BuildVolume::Type::Circle:
-        optgroup->set_value("diameter", 2. * unscaled<double>(m_build_volume.circle().radius));
+        optgroup->set_value("diameter", 2. * unscaled<double>(m_build_volume.circle().radius), true, false);
         break;
     default:
         // rectangle, convex, concave...
         optgroup->set_value("rect_size", Vec2d(m_build_volume.bounding_volume().size().x(),
-                                               m_build_volume.bounding_volume().size().y()));
+                                               m_build_volume.bounding_volume().size().y()),
+                                               true, false);
         optgroup->set_value("rect_origin", Vec2d(-m_build_volume.bounding_volume().min.x(),
-                                                 -m_build_volume.bounding_volume().min.y()));
+                                                 -m_build_volume.bounding_volume().min.y()),
+                                                  true, false);
     }
 }
 
@@ -269,7 +271,8 @@ ConfigOptionsGroupShp BedShapePanel::init_shape_options_page(const wxString& tit
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Settings"));
 
     optgroup->title_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
         update_shape();
     };
 	
@@ -293,7 +296,8 @@ wxPanel* BedShapePanel::init_texture_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Texture"));
 
     optgroup->title_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
         update_shape();
     };
 
@@ -374,7 +378,8 @@ wxPanel* BedShapePanel::init_model_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Model"));
 
     optgroup->title_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
         update_shape();
     };
 

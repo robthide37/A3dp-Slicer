@@ -984,8 +984,6 @@ namespace client
             if (opt == nullptr)
                 ctx->throw_exception("Variable does not exist", opt_key);
             if (opt->is_scalar()) {
-                if (opt->is_nil())
-                    ctx->throw_exception("Trying to reference an undefined (nil) optional variable", opt_key);
                 output = opt->serialize();
             } else {
                 const ConfigOptionVectorBase *vec = static_cast<const ConfigOptionVectorBase*>(opt);
@@ -993,9 +991,7 @@ namespace client
                     ctx->throw_exception("Indexing an empty vector variable", opt_key);
                 if (idx >= vec->size())
                     idx = 0;
-                if (vec->is_nil(idx))
-                    ctx->throw_exception("Trying to reference an undefined (nil) element of vector of optional values", opt_key);
-                output = vec->vserialize()[idx];
+                output = vec->serialize_at(idx);
             }
         }
 
@@ -1038,9 +1034,7 @@ namespace client
                 ctx->throw_exception("Negative vector index", opt_key);
             if (idx >= (int)vec->size())
                 idx = 0;
-            if (vec->is_nil(idx))
-                ctx->throw_exception("Trying to reference an undefined (nil) element of vector of optional values", opt_key);
-			output = vec->vserialize()[idx];
+			output = vec->serialize_at(idx);
         }
 
         static void resolve_variable(
@@ -1128,10 +1122,6 @@ namespace client
                 if (!vector_opt->is_extruder_size())
                     ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
             }
-
-
-            if (opt.opt->is_nil())
-                ctx->throw_exception("Trying to reference an undefined (nil) optional variable", opt.it_range);
 
             switch (opt.opt->type()) {
             case coFloat:   output.set_d(opt.opt->get_float());   break;
@@ -1254,8 +1244,6 @@ namespace client
                 idx = size_t(opt.index);
             else if (!opt.has_index())
                 ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
-            if (vec->is_nil(idx))
-                ctx->throw_exception("Trying to reference an undefined (nil) element of vector of optional values", opt.it_range);
             switch (opt.opt->type()) {
             case coFloats:   output.set_d(static_cast<const ConfigOptionFloats  *>(opt.opt)->get_at(idx)); break;
             case coInts:     output.set_i(static_cast<const ConfigOptionInts    *>(opt.opt)->get_at(idx)); break;
@@ -1265,7 +1253,7 @@ namespace client
             case coPoints:   output.set_s(to_string(static_cast<const ConfigOptionPoints  *>(opt.opt)->get_at(idx))); break;
             case coGraphs:   output.set_s(static_cast<const ConfigOptionGraphs  *>(opt.opt)->get_at(idx).serialize()); break;
             case coBools:    output.set_b(static_cast<const ConfigOptionBools   *>(opt.opt)->get_at(idx) != 0); break;
-                //case coEnums:    output.set_s(opt.opt->vserialize()[idx]); break;
+                //case coEnums:    output.set_s(opt.opt->serialize_at(idx)); break;
             default:
                 ctx->throw_exception("Unsupported vector variable type", opt.it_range);
             }
@@ -1427,22 +1415,17 @@ namespace client
             output.it_range = opt.it_range;
         }
 
-        // Return a boolean value, true if the scalar variable referenced by "opt" is nullable and it has a nil value.
-        // Return a boolean value, true if an element of a vector variable referenced by "opt[index]" is nullable and it has a nil value.
+        // Return a boolean value, true if the scalar variable referenced by "opt" or "opt[index]" is enabled.
+        static void is_enabled_test(const MyContext *ctx, OptWithPos &opt, expr &output)
+        {
+            output.set_b(opt.opt->is_enabled(opt.index));
+            output.it_range = opt.it_range;
+        }
+        // Return a boolean value, true if an element of a variable referenced by "opt" or "opt[index]" is disabled.
         static void is_nil_test(const MyContext *ctx, OptWithPos &opt, expr &output)
         {
-            if (ctx->skipping()) {
-            } else if (opt.opt->is_vector()) {
-                if (! opt.has_index())
-                    ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
-                const ConfigOptionVectorBase *vec = static_cast<const ConfigOptionVectorBase*>(opt.opt);
-                if (vec->empty())
-                    ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
-                output.set_b(static_cast<const ConfigOptionVectorBase*>(opt.opt)->is_nil(opt.index >= int(vec->size()) ? 0 : size_t(opt.index)));
-            } else {
-                assert(opt.opt->is_scalar());
-                output.set_b(opt.opt->is_nil());
-            }
+            BOOST_LOG_TRIVIAL(warning) << "Warning: The macro 'is_nil' is deprecated. Please use '!is_enabled' instead.";
+            output.set_b(!opt.opt->is_enabled(opt.index));
             output.it_range = opt.it_range;
         }
 
@@ -1707,8 +1690,6 @@ namespace client
             assert(lhs.opt->is_vector());
             if (rhs.has_index() || ! rhs.opt->is_vector())
                 ctx->throw_exception("Cannot assign scalar to a vector", lhs.it_range);
-            if (rhs.opt->is_nil())
-                ctx->throw_exception("Some elements of the right hand side vector variable of optional values are undefined (nil)", rhs.it_range);
             if (lhs.opt->type() != rhs.opt->type()) {
                 // Vector types are not compatible.
                 switch (lhs.opt->type()) {
@@ -1745,8 +1726,6 @@ namespace client
                 if (rhs.has_index() || ! rhs.opt->is_vector())
                     // Stop parsing, let the other rules resolve this case.
                     return false;
-                if (rhs.opt->is_nil())
-                    ctx->throw_exception("Some elements of the right hand side vector variable of optional values are undefined (nil)", rhs.it_range);
                 // Clone the vector variable.
                 std::unique_ptr<ConfigOption> opt_new;
                 if (one_of(rhs.opt->type(), { coFloats, coInts, coStrings, coBools }))
@@ -1770,21 +1749,24 @@ namespace client
 
         static void is_vector_empty(const MyContext *ctx, OptWithPos &opt, expr &out)
         {
-            if (! ctx->skipping()) {
-                if (opt.has_index() || ! opt.opt->is_vector())
-                    ctx->throw_exception("parameter of empty() is not a vector variable", opt.it_range);
-                out.set_b(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size() == 0);
-            }
+            //if (! ctx->skipping()) {
+            //    if (opt.has_index() || ! opt.opt->is_vector())
+            //        ctx->throw_exception("parameter of empty() is not a vector variable", opt.it_range);
+            //    out.set_b(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size() == 0);
+            //}
+            out.set_b(opt.opt->size() == 0);
             out.it_range = opt.it_range;
         }
 
         static void vector_size(const MyContext *ctx, OptWithPos &opt, expr &out)
         {
-            if (! ctx->skipping()) {
-                if (opt.has_index() || ! opt.opt->is_vector())
-                    ctx->throw_exception("parameter of size() is not a vector variable", opt.it_range);
-                out.set_i(int(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size()));
-            }
+            //if (! ctx->skipping()) {
+            //    if (opt.has_index() || ! opt.opt->is_vector())
+            //        ctx->throw_exception("parameter of size() is not a vector variable", opt.it_range);
+            //    out.set_i(int(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size()));
+            //}
+
+            out.set_i(int(opt.opt->size()));
             out.it_range = opt.it_range;
         }
 
@@ -2429,7 +2411,8 @@ namespace client
                                                                     [ px::bind(&expr::digits<true>, _val, _2, _3) ]
                 |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
-                |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test, _r1, _1, _val)]
+                |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test, _r1, _1, _val)] // Deprecated same as !is_enabled
+                |   (kw["is_enabled"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_enabled_test, _r1, _1, _val)]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
                 |   (kw["empty"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_vector_empty, _r1, _1, _val)]
                 |   (kw["size"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::vector_size, _r1, _1, _val)]
@@ -2505,6 +2488,7 @@ namespace client
                 ("if")
                 ("int")
                 ("is_nil")
+                ("is_enabled")
                 ("local")
                 //("inf")
                 ("else")
@@ -2601,8 +2585,9 @@ namespace client
         qi::rule<Iterator, OptWithPos(const MyContext*), qi::locals<OptWithPos, int>, skipper> variable_reference;
         // Rule to translate an identifier to a ConfigOption, or to fail.
         qi::rule<Iterator, OptWithPos(const MyContext*), skipper> variable;
-        // Evaluating whether a nullable variable is nil.
+        // Evaluating whether a variable is enabled.
         qi::rule<Iterator, expr(const MyContext*), skipper> is_nil_test;
+        qi::rule<Iterator, expr(const MyContext*), skipper> is_enabled_test;
         // Evaluating "one of" list of patterns.
         qi::rule<Iterator, expr(const MyContext*), qi::locals<expr>, skipper> one_of;
         qi::rule<Iterator, expr(const MyContext*, const expr &param), skipper> one_of_list;

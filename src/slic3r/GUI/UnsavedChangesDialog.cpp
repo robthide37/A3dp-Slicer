@@ -1081,9 +1081,6 @@ static wxString get_full_label(std::string opt_key, const DynamicPrintConfig& co
 {
     opt_key = get_pure_opt_key(opt_key);
 
-    if (config.option(opt_key)->is_nil())
-        return _L("N/A");
-
     const ConfigOptionDef* opt = config.def()->get(opt_key);
     return opt->full_label.empty() ? opt->label : opt->full_label;
 }
@@ -1106,197 +1103,188 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     size_t opt_idx = get_id_from_opt_key(opt_key);
     opt_key = get_pure_opt_key(opt_key);
 
-    if (config.option(opt_key)->is_nil())
-        return _L("N/A");
+    wxString serialized_str = _L("Undef");
 
-    wxString out;
-
-    const ConfigOptionDef* opt = config.def()->get(opt_key);
-    bool is_nullable = opt->nullable;
-
-    switch (opt->type) {
+    const ConfigOptionDef* opt_def = config.def()->get(opt_key);
+    bool is_optional = opt_def->is_optional;
+    bool can_be_disable = opt_def->can_be_disabled;
+    
+    
+    const ConfigOption* option = config.option(opt_key);
+    bool full_serialize = option->size() > 1 && (opt_idx < 0 || opt_idx >= option->size());
+    if (!full_serialize && !option->is_scalar()) {
+        opt_idx = 0;
+    }
+    switch (opt_def->type) {
     case coInt:
-        return from_u8((boost::format("%1%") % config.option(opt_key)->get_int()).str());
     case coInts: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionIntsNullable>(opt_key);
-            if (opt_idx < values->size()) {
-                return from_u8((boost::format("%1%") % values->get_at(opt_idx)).str());
-            } else {
-                return from_u8(values->serialize());
-            }
+        if (!full_serialize) {
+            serialized_str = from_u8(config.option<ConfigOptionInts>(opt_key)->serialize_at(opt_idx));
         } else {
-            auto values = config.opt<ConfigOptionInts>(opt_key);
-            if (opt_idx < values->size()) {
-                return from_u8((boost::format("%1%") % values->get_at(opt_idx)).str());
-            } else {
-                return from_u8(values->serialize());
-            }
+            serialized_str = from_u8(option->serialize());
         }
-        return _L("Undef");
+        break;
     }
     case coBool:
-        return config.opt_bool(opt_key) ? "true" : "false";
     case coBools: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionBoolsNullable>(opt_key);
-            if (opt_idx < values->size()) {
-                return values->get_at(opt_idx) ? "true" : "false";
-            } else {
-                return from_u8(values->serialize());
-            }
+        if (!full_serialize) {
+            serialized_str = from_u8(config.option<ConfigOptionBools>(opt_key)->serialize_at(opt_idx));
+        } else {
+            serialized_str = from_u8(option->serialize());
         }
-        else {
-            auto values = config.opt<ConfigOptionBools>(opt_key);
-            if (opt_idx < values->size()) {
-                return values->get_at(opt_idx) ? "true" : "false";
-            } else {
-                return from_u8(values->serialize());
-            }
-        }
-        return _L("Undef");
+        serialized_str.Replace("0", "false");
+        serialized_str.Replace("1", "false");
+        serialized_str.Replace("!", "Disabled:");
+        break;
     }
     case coPercent:
-        return from_u8((boost::format("%1%%%") % int(config.optptr(opt_key)->get_float())).str());
     case coPercents: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionPercentsNullable>(opt_key);
-            if (opt_idx < values->size()) {
-                return from_u8((boost::format("%1%%%") % values->get_at(opt_idx)).str());
-            } else {
-                return from_u8(values->serialize());
-            }
+        if (!full_serialize) {
+            serialized_str = option->is_enabled(opt_idx) ? "" : "Disabled:";
+            serialized_str += from_u8((boost::format("%1%%%") % int(option->get_float(opt_idx))).str());
         } else {
-            auto values = config.opt<ConfigOptionPercents>(opt_key);
-            if (opt_idx < values->size()) {
-                return from_u8((boost::format("%1%%%") % values->get_at(opt_idx)).str());
-            } else {
-                return from_u8(values->serialize());
-            }
+            serialized_str = from_u8(option->serialize());
+            serialized_str.Replace("!", "Disabled:");
         }
-        return _L("Undef");
+        break;
     }
     case coFloat:
-        return double_to_string(config.option(opt_key)->get_float(), opt->precision);
     case coFloats: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionFloatsNullable>(opt_key);
-            if (opt_idx < values->size()) {
-                return double_to_string(values->get_at(opt_idx), opt->precision);
-            } else {
-                return from_u8(values->serialize());
-            }
+        if (!full_serialize) {
+            serialized_str = option->is_enabled(opt_idx) ? "" : "Disabled:";
+            serialized_str += double_to_string(option->get_float(opt_idx), opt_def->precision);
         } else {
-            auto values = config.opt<ConfigOptionFloats>(opt_key);
-            if (opt_idx < values->size()) {
-                return double_to_string(values->get_at(opt_idx), opt->precision);
-            } else {
-                return from_u8(values->serialize());
-            }
+            serialized_str = from_u8(option->serialize());
+            serialized_str.Replace("!", "Disabled:");
         }
-        return _L("Undef");
+        break;
     }
     case coString: {
+        const ConfigOptionString* option_str = config.option<ConfigOptionString>(opt_key);
+        assert(option_str);
         //character '<' '>' create strange problems for wxWidget, so remove them (only for the display)
-        std::string str = config.opt_string(opt_key);
+        std::string str = option->is_enabled() ? "" : "Disabled:";
+        str += option_str->value;
         boost::erase_all(str, "<");
         boost::erase_all(str, ">");
-        return from_u8(str);
+        serialized_str = from_u8(str);
+        break;
     }
-
     case coStrings: {
-        const ConfigOptionStrings* strings = config.opt<ConfigOptionStrings>(opt_key);
-        if (strings) {
-            if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
-                if (strings->empty()) {
-                    return _L("All");
-                }
-                for (size_t id = 0; id < strings->size(); id++) {
-                    out += from_u8(strings->get_at(id)) + "\n";
-                }
-                out.RemoveLast(1);
-                return out;
+        const ConfigOptionStrings* strings = config.option<ConfigOptionStrings>(opt_key);
+        assert(strings);
+        if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
+            if (strings->empty()) {
+                serialized_str = _L("All");
+                break;
             }
-            if (opt_key == "gcode_substitutions") {
-                if (!strings->empty()) {
-                    for (size_t id = 0; id < strings->size(); id += 4) {
-                        out +=  from_u8(strings->get_at(id))     + ";\t" + 
-                                from_u8(strings->get_at(id + 1)) + ";\t" + 
-                                from_u8(strings->get_at(id + 2)) + ";\t" +
-                                from_u8(strings->get_at(id + 3)) + ";\n";
-                    }
-                }
-                return out;
+            for (size_t id = 0; id < strings->size(); id++) {
+                serialized_str += from_u8(strings->get_at(id)) + "\n";
             }
+            serialized_str.RemoveLast(1);
+            break;
+        }
+        if (opt_key == "gcode_substitutions") {
             if (!strings->empty()) {
-                if (opt_idx < strings->size()) {
-                    return from_u8(strings->get_at(opt_idx));
-                } else {
-                    return from_u8(strings->serialize());
+                for (size_t id = 0; id < strings->size(); id += 4) {
+                    serialized_str +=   from_u8(strings->get_at(id))     + ";\t" + 
+                                        from_u8(strings->get_at(id + 1)) + ";\t" + 
+                                        from_u8(strings->get_at(id + 2)) + ";\t" +
+                                        from_u8(strings->get_at(id + 3)) + ";\n";
                 }
+            }
+            break;
+        }
+        if (!strings->empty()) {
+            if (opt_idx < strings->size()) {
+                serialized_str = option->is_enabled(opt_idx) ? "" : "Disabled:";
+                serialized_str += from_u8(strings->get_at(opt_idx));
+            } else {
+                serialized_str = "";
+                for (size_t i = 0; i < option->size(); ++i) {
+                    serialized_str += i==0 ? "\"" : "\",\"";
+                    serialized_str += option->is_enabled(i) ? "" : "Disabled:";
+                    serialized_str += from_u8(strings->get_at(i));
+                }
+                serialized_str += "\"";
             }
         }
         break;
-        }
+    }
     case coFloatOrPercent: {
-        const ConfigOptionFloatOrPercent* float_percent = config.opt<ConfigOptionFloatOrPercent>(opt_key);
-        if (float_percent)
-            out = double_to_string(float_percent->value, opt->precision) + (float_percent->percent ? "%" : "");
-        return out;
+        const ConfigOptionFloatOrPercent* float_percent = config.option<ConfigOptionFloatOrPercent>(opt_key);
+        assert(float_percent);
+        serialized_str = (float_percent->is_enabled() ? "" : "Disabled:");
+        serialized_str += double_to_string(float_percent->value, opt_def->precision);
+        serialized_str += (float_percent->percent ? "%" : "");
+        break;
     }
     case coFloatsOrPercents: {
-        const ConfigOptionFloatsOrPercents* floats_or_percents = config.opt<ConfigOptionFloatsOrPercents>(opt_key);
-        if (floats_or_percents) {
-            if (opt_idx < floats_or_percents->size()) {
-                const FloatOrPercent f_o_p = floats_or_percents->get_at(opt_idx);
-                out = double_to_string(f_o_p.value, opt->precision) + (f_o_p.percent ? "%" : "");
-            } else {
-                return from_u8(floats_or_percents->serialize());
-            }
+        const ConfigOptionFloatsOrPercents* floats_or_percents = config.option<ConfigOptionFloatsOrPercents>(opt_key);
+        assert(floats_or_percents);
+        if (!full_serialize) {
+            const FloatOrPercent f_o_p = floats_or_percents->get_at(opt_idx);
+            serialized_str = (floats_or_percents->is_enabled(opt_idx) ? "" : "Disabled:");
+            serialized_str += double_to_string(f_o_p.value, opt_def->precision);
+            serialized_str += (f_o_p.percent ? "%" : "");
+        } else {
+            serialized_str = from_u8(floats_or_percents->serialize());
+            serialized_str.Replace("!", "Disabled:");
         }
-        return out;
+        break;
     }
     case coEnum: {
-        auto opt = config.option_def(opt_key)->enum_def->enum_to_label(config.option(opt_key)->get_int());
-        return opt.has_value() ? _(from_u8(*opt)) : _L("Undef");
+        auto optional_str = config.option_def(opt_key)->enum_def->enum_to_label(config.option(opt_key)->get_int());
+        serialized_str = (option->is_enabled() ? "" : "Disabled:");
+        serialized_str += optional_str.has_value() ? _(from_u8(*optional_str)) : _L("Undef");
+        break;
     }
     case coPoint: {
         Vec2d pointd = config.opt<ConfigOptionPoint>(opt_key)->value;
-        return from_u8((boost::format("[%1%]") % ConfigOptionPoint(pointd).serialize()).str());
+        serialized_str = (option->is_enabled() ? "" : "Disabled:");
+        serialized_str += from_u8((boost::format("[%1%]") % ConfigOptionPoint(pointd).serialize()).str());
+        break;
     }
     case coPoints: {
-        if (opt_key == "bed_shape") {
-            BedShape shape(*config.option<ConfigOptionPoints>(opt_key));
-            return shape.get_full_name_with_params();
-        }
-        
         const ConfigOptionPoints* opt_pts = config.opt<ConfigOptionPoints>(opt_key);
+        if (opt_key == "bed_shape") {
+            BedShape shape(*opt_pts);
+            serialized_str = shape.get_full_name_with_params();
+            break;
+        }
         if (!opt_pts->empty()) {
-            if (opt_idx < opt_pts->size()) {
-                return from_u8(
-                    (boost::format("[%1%]") % ConfigOptionPoint(opt_pts->get_at(opt_idx)).serialize()).str());
+            if (!full_serialize) {
+                serialized_str = (option->is_enabled(opt_idx) ? "" : "Disabled:");
+                serialized_str += from_u8((boost::format("[%1%]") % opt_pts->serialize_at(opt_idx)).str());
             } else {
-                return from_u8(opt_pts->serialize());
+                serialized_str = from_u8(opt_pts->serialize());
+                serialized_str.Replace("!", "Disabled:");
             }
         }
+        break;
     }
     case coGraph: {
-        return graph_to_string(config.option<ConfigOptionGraph>(opt_key)->value);
+        serialized_str = (option->is_enabled() ? "" : "Disabled:");
+        serialized_str += graph_to_string(config.option<ConfigOptionGraph>(opt_key)->value);
+        break;
     }
     case coGraphs: {
         const ConfigOptionGraphs* opt_graphs = config.opt<ConfigOptionGraphs>(opt_key);
         if (!opt_graphs->empty()) {
-            if (opt_idx < opt_graphs->size()) {
-                return graph_to_string(opt_graphs->get_at(opt_idx));
+            if (!full_serialize) {
+                serialized_str = (option->is_enabled(opt_idx) ? "" : "Disabled:");
+                serialized_str += graph_to_string(opt_graphs->get_at(opt_idx));
             } else {
-                return from_u8(opt_graphs->serialize());
+                serialized_str = from_u8(opt_graphs->serialize());
+                serialized_str.Replace("!", "Disabled:");
             }
         }
+        break;
     }
     default:
         break;
     }
-    return out;
+    return serialized_str;
 }
 
 void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset, const wxString& header)

@@ -236,12 +236,11 @@ static t_config_option_keys print_config_diffs(const StaticPrintConfig     &curr
             //FIXME This may happen when executing some test cases.
             continue;
         const ConfigOption *opt_new_override = std::binary_search(overriden_keys.begin(), overriden_keys.end(), opt_key) ? new_full_config.option(material_ow_prefix + opt_key) : nullptr;
-        if (opt_new_override != nullptr && ! opt_new_override->is_nil()) {
+        if (opt_new_override != nullptr) {
             // An override is available at some of the material presets.
-            bool overriden = opt_new->overriden_by(opt_new_override);
-            if (overriden || *opt_old != *opt_new) {
+            if (*opt_old != *opt_new || opt_new->overriden_by(opt_new_override)) {
                 auto opt_copy = opt_new->clone();
-                opt_copy->apply_override(opt_new_override);
+                bool overriden = opt_copy->apply_override(opt_new_override);
                 bool changed = *opt_old != *opt_copy;
                 if (changed)
                     print_diff.emplace_back(opt_key);

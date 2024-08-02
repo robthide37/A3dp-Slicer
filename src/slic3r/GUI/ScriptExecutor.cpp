@@ -803,13 +803,22 @@ void as_ask_for_refresh()
     current_script->request_refresh();
 }
 
-bool as_is_enabled(std::string &key)
+bool as_is_widget_enabled(std::string &key)
 {
     Page *selected_page;
     Field *f = current_script->tab()->get_field(selected_page, key, -1);
     if (!f)
         return true;
-    return f->is_enabled();
+    return f->is_widget_enabled();
+}
+
+bool as_is_enabled(std::string &key, int idx)
+{
+    std::pair<const PresetCollection*, const ConfigOption*> result = get_coll(key);
+    const ConfigOption* opt = result.second;
+    if (opt == nullptr) //TODO check if  float, etc..
+        throw NoDefinitionExceptionEmitLog("is_enabled(): error, can't find string option " + key);
+    return opt->is_enabled(idx);
 }
 
 //function to reset a field
@@ -912,7 +921,8 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)", WRAP_FN(as_back_initial_value), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void back_custom_initial_value(int, string &in)", WRAP_FN(as_back_custom_initial_value), AngelScript::asCALL_GENERIC);
             m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()", WRAP_FN(as_ask_for_refresh), AngelScript::asCALL_GENERIC);
-            m_script_engine.get()->RegisterGlobalFunction("bool is_enabled(string &in)", WRAP_FN(as_is_enabled), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool is_enabled(string &in, int)", WRAP_FN(as_is_enabled), AngelScript::asCALL_GENERIC);
+            m_script_engine.get()->RegisterGlobalFunction("bool as_is_widget_enabled(string &in)", WRAP_FN(as_is_widget_enabled), AngelScript::asCALL_GENERIC);
 
 #else
             m_script_engine.get()->RegisterGlobalFunction("void print(string &in)",     AngelScript::asFUNCTION(as_print),          AngelScript::asCALL_CDECL);
@@ -957,7 +967,8 @@ void ScriptContainer::init(const std::string& tab_key, Tab* tab)
             m_script_engine.get()->RegisterGlobalFunction("void back_initial_value(string &in)",    AngelScript::asFUNCTION(as_back_initial_value), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void back_custom_initial_value(int, string &in)",    AngelScript::asFUNCTION(as_back_custom_initial_value), AngelScript::asCALL_CDECL);
             m_script_engine.get()->RegisterGlobalFunction("void ask_for_refresh()",                 AngelScript::asFUNCTION(as_ask_for_refresh),    AngelScript::asCALL_CDECL);
-            m_script_engine.get()->RegisterGlobalFunction("bool is_enabled(string &in)",                        AngelScript::asFUNCTION(as_is_enabled), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("bool is_enabled(string &in, int)",                        AngelScript::asFUNCTION(as_is_enabled), AngelScript::asCALL_CDECL);
+            m_script_engine.get()->RegisterGlobalFunction("bool as_is_widget_enabled(string &in)",                        AngelScript::asFUNCTION(as_is_widget_enabled), AngelScript::asCALL_CDECL);
 #endif
         }
 

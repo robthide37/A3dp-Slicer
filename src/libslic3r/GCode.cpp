@@ -179,8 +179,8 @@ namespace Slic3r {
         //        gcode += gcodegen.writer().travel_to_xy(unscale(standby_point), 0.0, "move to standby position");
         //}
         unsigned int extruder_id = gcodegen.writer().tool()->id();
-        const ConfigOptionIntsNullable& filament_idle_temp = gcodegen.config().idle_temperature;
-        if (filament_idle_temp.is_nil(extruder_id)) {
+        const ConfigOptionInts& filament_idle_temp = gcodegen.config().idle_temperature;
+        if (!filament_idle_temp.is_enabled(extruder_id)) {
             // There is no idle temperature defined in filament settings.
             // Use the delta value from print config.
             if (gcodegen.config().standby_temperature_delta.value != 0 && gcodegen.writer().tool_is_extruder() && this->_get_temp(gcodegen) > 0) {
@@ -2742,7 +2742,7 @@ void GCodeGenerator::_print_first_layer_extruder_temperatures(std::string &out, 
                 if (temp == 0)
                     temp = print.config().temperature.get_at(tool.id());
                 if (print.config().ooze_prevention.value && tool.id() != first_printing_extruder_id)
-                    if (print.config().idle_temperature.is_nil(tool.id()))
+                    if (!print.config().idle_temperature.is_enabled(tool.id()))
                         temp += print.config().standby_temperature_delta.value;
                     else
                         temp = print.config().idle_temperature.get_at(tool.id());
@@ -3881,7 +3881,7 @@ void GCodeGenerator::encode_full_config(const Print& print, std::vector<std::pai
     };
     config.reserve(config.size() + cfg.keys().size());
     for (const std::string& key : cfg.keys()) {
-        if (!is_banned(key) && !cfg.option(key)->is_nil())
+        if (!is_banned(key) && (cfg.option(key)->is_enabled() || !cfg.get_option_def(key)->is_optional))
             config.emplace_back(key, cfg.opt_serialize(key));
     }
     config.shrink_to_fit();

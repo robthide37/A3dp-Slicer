@@ -191,10 +191,13 @@ public:
 		return nullptr;
     }
 
-	bool			set_value(const t_config_option_key& id, const boost::any& value, bool change_event = false) {
-							if (m_fields.find(id) == m_fields.end()) return false;
-							m_fields.at(id)->set_any_value(value, change_event);
-							return true;
+	bool			set_value(const t_config_option_key &id, const boost::any &value, bool enabled, bool change_event /*= false*/) {
+        if (auto it = m_fields.find(id); it != m_fields.end()) {
+            it->second->set_enable_bitmap_checked(enabled);
+            it->second->set_any_value(value, change_event);
+            return true;
+        }
+        return false;
     }
 	boost::any		get_value(const t_config_option_key& id) {
 							boost::any out; 
@@ -210,8 +213,8 @@ public:
 	void			set_name(const wxString& new_name) { stb->SetLabel(new_name); }
 	wxString		get_name() const { return stb->GetLabel(); }
 
-	inline void		enable() { for (auto& field : m_fields) field.second->enable(); }
-    inline void		disable() { for (auto& field : m_fields) field.second->disable(); }
+	inline void		enable() { for (auto& field : m_fields) field.second->widget_enable(); }
+    inline void		disable() { for (auto& field : m_fields) field.second->widget_disable(); }
 	void			set_grid_vgap(int gap) { m_grid_sizer->SetVGap(gap); }
 
     void            clear_fields_except_of(const std::vector<std::string> left_fields);
@@ -273,7 +276,7 @@ protected:
 	const t_field&		build_field(const Option& opt);
 
     virtual void		on_kill_focus(const std::string& opt_key) {};
-	virtual void		on_change_OG(const t_config_option_key& opt_id, const boost::any& value);
+	virtual void		on_change_OG(const t_config_option_key& opt_id, bool enable, const boost::any& value);
 	virtual void		back_to_initial_value(const std::string& opt_key) {}
 	virtual void		back_to_sys_value(const std::string& opt_key) {}
 
@@ -334,7 +337,7 @@ public:
 		append_single_option_line(option, path);
 	}
 
-	void		on_change_OG(const t_config_option_key& opt_id, const boost::any& value) override;
+	void		on_change_OG(const t_config_option_key& opt_id, bool enable, const boost::any& value) override;
 	void		back_to_initial_value(const std::string& opt_key) override;
 	void		back_to_sys_value(const std::string& opt_key) override;
 	void		back_to_config_value(const DynamicPrintConfig& config, const std::string& opt_key);
@@ -366,7 +369,7 @@ private:
     int                         m_config_type;
 
     // Change an option on m_config, possibly call ModelConfig::touch().
-	void 	change_opt_value(const t_config_option_key& opt_key, const boost::any& value, int opt_index = 0);
+	void 	change_opt_value(const t_config_option_key& opt_key, bool enable, const boost::any& value, int opt_index = 0);
 };
 
 //  Static text shown among the options.

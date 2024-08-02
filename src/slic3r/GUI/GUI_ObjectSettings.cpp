@@ -128,7 +128,8 @@ bool ObjectSettings::update_settings_list()
             optgroup->title_width = 15;
             optgroup->sidetext_width = 5;
 
-            optgroup->m_on_change = [this, config](const t_config_option_key& opt_id, const boost::any& value) {
+            optgroup->m_on_change = [this, config](const t_config_option_key& opt_idv, bool enabled, const boost::any& value) {
+                                    assert(enabled);
                                     this->update_config_values(config);
                                     wxGetApp().obj_list()->changed_object(); };
 
@@ -161,10 +162,11 @@ bool ObjectSettings::update_settings_list()
             }
             optgroup->activate();
             for (auto& opt : cat.second)
-                optgroup->get_field(opt)->m_on_change = [optgroup](const std::string& opt_id, const boost::any& value) {
+                optgroup->get_field(opt)->m_on_change = [optgroup](const std::string& opt_id, bool enabled, const boost::any& value) {
+                    assert(enabled);
                     // first of all take a snapshot and then change value in configuration
                     wxGetApp().plater()->take_snapshot(format_wxstr(_L("Change Option %s"), opt_id));
-                    optgroup->on_change_OG(opt_id, value);
+                    optgroup->on_change_OG(opt_id, enabled, value);
                 };
 
             optgroup->reload_config();
@@ -251,7 +253,7 @@ void ObjectSettings::update_config_values(ModelConfig* config)
                 break;
         }
         if (field)
-            field->toggle(toggle);
+            field->toggle_widget_enable(toggle);
     };
 
     ConfigManipulation config_manipulation(load_config, toggle_field, nullptr, config);

@@ -126,7 +126,7 @@ void fill_slicerconf(ConfMap &m, const SLAPrint &print)
     
     auto &cfg = print.full_print_config();
     for (const std::string &key : cfg.keys())
-        if (! is_banned(key) && ! cfg.option(key)->is_nil())
+        if (!is_banned(key) && (cfg.option(key)->is_enabled() || !cfg.get_option_def(key)->is_optional))
             m[key] = cfg.opt_serialize(key);
     
 }

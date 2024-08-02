@@ -108,11 +108,11 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
     }
     // Grab a reference to fields for convenience
     const t_field& field = m_fields[id];
-	field->m_on_change = [this](const std::string& opt_id, const boost::any& value) {
+	field->m_on_change = [this](const std::string& opt_id, bool enabled, const boost::any& value) {
 			//! This function will be called from Field.
 			//! Call OptionGroup._on_change(...)
 			if (!m_disabled)
-				this->on_change_OG(opt_id, value);
+				this->on_change_OG(opt_id, enabled, value);
 	};
     field->m_on_kill_focus = [this](const std::string& opt_id) {
 			//! This function will be called from Field.
@@ -634,12 +634,12 @@ void OptionsGroup::clear_fields_except_of(const std::vector<std::string> left_fi
     }
 }
 
-void OptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::any& value) {
+void OptionsGroup::on_change_OG(const t_config_option_key& opt_id, bool enabled, const boost::any& value) {
     auto it = m_options.find(opt_id);
     if (it != m_options.end() && it->second.opt.is_script && it->second.script) {
         it->second.script->call_script_function_set(it->second.opt, value);
     }else if (m_on_change != nullptr)
-		m_on_change(opt_id, value);
+		m_on_change(opt_id, enabled, value);
 }
 
 void OptionsGroup::update_script_presets(bool init) {
@@ -650,7 +650,7 @@ void OptionsGroup::update_script_presets(bool init) {
                 if (val.empty()) {
                     MessageDialog(nullptr, "Error, can't find the script to get the value for the widget '" + key_opt.first + "'", _L("Error"), wxOK | wxICON_ERROR).ShowModal();
                 } else {
-                    this->set_value(key_opt.first, val);
+                    this->set_value(key_opt.first, val, true, false);
                 }
             } //if not, it will set at ConfigOptionsGroup::reload_config()
         }
@@ -696,14 +696,14 @@ void ConfigOptionsGroup::register_to_search(const std::string& opt_key, const Co
 }
 
 
-void ConfigOptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::any& value)
+void ConfigOptionsGroup::on_change_OG(const t_config_option_key& opt_id, bool enable, const boost::any& value)
 {
 	if (!m_opt_map.empty())
 	{
 		auto it = m_opt_map.find(opt_id);
 		if (it == m_opt_map.end())
 		{
-			OptionsGroup::on_change_OG(opt_id, value);
+			OptionsGroup::on_change_OG(opt_id, enable, value);
 			return;
 		}
 
@@ -711,10 +711,10 @@ void ConfigOptionsGroup::on_change_OG(const t_config_option_key& opt_id, const b
 		const std::string  &opt_key   = itOption.first;
 		int 			    opt_index = itOption.second;
 
-		this->change_opt_value(opt_key, value, opt_index);
+		this->change_opt_value(opt_key, enable, value, opt_index);
 	}
 
-	OptionsGroup::on_change_OG(opt_id, value);
+	OptionsGroup::on_change_OG(opt_id, enable, value);
 }
 
 void ConfigOptionsGroup::back_to_initial_value(const std::string& opt_key)
@@ -736,12 +736,17 @@ void ConfigOptionsGroup::back_to_sys_value(const std::string& opt_key)
 void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, const std::string& opt_key)
 {
 	boost::any value;
+    bool enabled = true;
     auto it_opt = m_options.find(opt_key);
     auto it_opt_map = m_opt_map.find(opt_key);
+    //opt_key can contains the id & the idx
+    std::string opt_short_key = opt_key;
+    int opt_index = -1;
 	if (opt_key == "bed_shape") {
         for (const std::string& key : {"bed_custom_texture", "bed_custom_model"}) {
-            value = config.opt_string(key);
-            this->change_opt_value(key, value);
+            const ConfigOptionString* option = config.option<ConfigOptionString>(key);
+            assert(option);
+            this->change_opt_value(key, option->is_enabled(), option->value);
         }
 	}
 	if (opt_key == "extruders_count") {
@@ -783,9 +788,10 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
                     const DynamicPrintConfig& initial_conf = tab->m_presets->get_selected_preset().config;
                     DynamicPrintConfig& edited_conf = tab->m_presets->get_edited_preset().config;
                     if (initial_conf.has(dep_key) && edited_conf.has(dep_key)) {
-                        ConfigOption* conf_opt = initial_conf.option(dep_key)->clone();
+                        const ConfigOption* conf_opt = initial_conf.option(dep_key);
+                        assert(conf_opt->is_scalar());
                         // update the field
-                        tab->set_value(dep_key, initial_conf.option(dep_key)->get_any());
+                        tab->set_value(dep_key, conf_opt->get_any(), conf_opt->is_enabled());
                         tab->on_value_change(dep_key, conf_opt->get_any());
                     }
                 }
@@ -799,19 +805,26 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
     } else if (it_opt_map == m_opt_map.end() ||
 		    // This option doesn't have corresponded field
              is_option_without_field(opt_key) ) {
-        value = config.option(opt_key)->get_any();
-        this->change_opt_value(opt_key, value);
-        OptionsGroup::on_change_OG(opt_key, value);
+        const ConfigOption* option = config.option(opt_key);
+        assert(option);
+        this->change_opt_value(opt_key, option->is_enabled(), option->get_any());
+        OptionsGroup::on_change_OG(opt_key, option->is_enabled(), value);
         return;
     } else {
 		auto opt_id = it_opt_map->first;
-		std::string opt_short_key = m_opt_map.at(opt_id).first;
-		int opt_index = m_opt_map.at(opt_id).second;
-        value = config.option(opt_short_key)->get_any(opt_index);
+        const auto& entry = m_opt_map.at(opt_id);
+        opt_short_key = entry.first;
+        opt_index = entry.second;
+        const ConfigOption* option = config.option(opt_short_key);
+        assert(option);
+        value = option->get_any(opt_index);
+        enabled = option->is_enabled(opt_index);
 	}
 
-    if(set_value(opt_key, value))
-        on_change_OG(opt_key, get_value(opt_key));
+    if (this->set_value(opt_key, value, enabled, false)) {
+        assert(config.option(opt_short_key));
+        on_change_OG(opt_key, config.option(opt_short_key)->is_enabled(opt_index), get_value(opt_key));
+    }
 }
 
 void ConfigOptionsGroup::on_kill_focus(const std::string& opt_key)
@@ -831,8 +844,8 @@ void ConfigOptionsGroup::reload_config()
 		const std::string &opt_key   = kvp.second.first;
 		// index in the vector option, zero for scalars
 		int 			   opt_index = kvp.second.second;
-		const ConfigOptionDef &option = m_options.at(opt_id).opt;
-        this->set_value(opt_id, m_config->option(opt_key)->get_any(opt_index));
+        const ConfigOption* option = m_config->option(opt_key);
+        this->set_value(opt_id, option->get_any(opt_index), option->is_enabled(opt_index), false);
 	}
     update_script_presets();
 }
@@ -1054,17 +1067,19 @@ std::pair<OG_CustomCtrl*, bool*> ConfigOptionsGroup::get_custom_ctrl_with_blinki
 }
 
 // Change an option on m_config, possibly call ModelConfig::touch().
-void ConfigOptionsGroup::change_opt_value(const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
+void ConfigOptionsGroup::change_opt_value(const t_config_option_key& opt_key, bool enable, const boost::any& value, int opt_index /*= 0*/)
 {
     if (m_config_mutable) {
         ConfigOption *opt = m_config_mutable->option(opt_key);
         assert(opt);
-        if(opt)
+        if (opt) {
             opt->set_any(value, opt_index);
+            opt->set_enabled(enable, opt_index);
+        }
         assert(!m_modelconfig);
     } else {
         assert(m_modelconfig);
-        m_modelconfig->set_any(opt_key, value, opt_index);
+        m_modelconfig->set_any(opt_key, enable, value, opt_index);
     }
 }
 

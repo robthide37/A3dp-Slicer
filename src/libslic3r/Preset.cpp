@@ -1315,7 +1315,9 @@ ExternalPreset PresetCollection::load_external_preset(
                 this->update_dirty();
                 // Don't save the newly loaded project as a "saved into project" state.
                 //update_saved_preset_from_current_preset();
-                assert(this->get_edited_preset().is_dirty);
+                
+                // the get_edited_preset can be 'not dirty' if it's exactly the same as a saved preset.
+                //assert(this->get_edited_preset().is_dirty);
             }
             return ExternalPreset(&(*it), this->get_edited_preset().is_dirty, is_installed);
         }

@@ -435,8 +435,9 @@ void FreqChangedParams::init()
             m_og->set_config(config);
             m_og->hide_labels();
             m_og->m_on_change =
-                Tab::set_or_add(m_og->m_on_change, [tab_freq_fff, this](t_config_option_key opt_key, boost::any value)
+                Tab::set_or_add(m_og->m_on_change, [tab_freq_fff, this](t_config_option_key opt_key, bool enabled, boost::any value)
                                 {
+                                    assert(enabled); //TODO fix & test
                                     const Option *opt_def = this->m_og->get_option_def(opt_key);
                                     if (opt_def && !opt_def->opt.is_script) {
                                         tab_freq_fff->update_dirty();
@@ -531,7 +532,9 @@ void FreqChangedParams::init()
             m_og_sla->hide_labels();
             m_og_sla->m_on_change = Tab::set_or_add(m_og_sla->m_on_change, [tab_freq_sla,
                                                                             this](t_config_option_key opt_key,
+                                                                                  bool                enabled,
                                                                                   boost::any          value) {
+                assert(enabled);
                 Option opt = this->m_og_other[ptSLA]->create_option_from_def(opt_key);
                 if (!opt.opt.is_script) {
                     tab_freq_sla->update_dirty();
@@ -2736,8 +2739,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         config.apply(loaded_printer_technology == ptFFF ?
                             static_cast<const ConfigBase&>(FullPrintConfig::defaults()) :
                             static_cast<const ConfigBase&>(SLAFullPrintConfig::defaults()));
-                        // Set all the nullable values in defaults to nils.
-                        config.null_nullables();
+                        // Disable all the optional values in defaults.
+                        config.disable_optionals();
                         // and place the loaded config over the base.
                         config += std::move(config_loaded);
                     }

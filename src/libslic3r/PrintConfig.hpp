@@ -1236,7 +1236,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionPercents,             filament_shrink))
     ((ConfigOptionInts,                 first_layer_bed_temperature))
     ((ConfigOptionInts,                 first_layer_temperature))
-    ((ConfigOptionIntsNullable,         idle_temperature))
+    ((ConfigOptionInts,                 idle_temperature))
     ((ConfigOptionInts,                 full_fan_speed_layer))
     ((ConfigOptionInts,                 gap_fill_fan_speed))
     ((ConfigOptionInts,                 infill_fan_speed))
@@ -1569,20 +1569,20 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                       material_correction_y))
     ((ConfigOptionFloat,                       material_correction_z))
     ((ConfigOptionEnum<SLAMaterialSpeed>,      material_print_speed))
-    ((ConfigOptionFloatNullable,               material_ow_support_pillar_diameter))
-    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_pillar_diameter))
-    ((ConfigOptionFloatNullable,               material_ow_support_head_front_diameter))
-    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_front_diameter))
-    ((ConfigOptionFloatNullable,               material_ow_support_head_penetration))
-    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_penetration))
-    ((ConfigOptionFloatNullable,               material_ow_support_head_width))
-    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_width))
-    ((ConfigOptionIntNullable,                 material_ow_support_points_density_relative))
+    ((ConfigOptionFloat,                       material_ow_support_pillar_diameter))
+    ((ConfigOptionFloat,                       material_ow_branchingsupport_pillar_diameter))
+    ((ConfigOptionFloat,                       material_ow_support_head_front_diameter))
+    ((ConfigOptionFloat,                       material_ow_branchingsupport_head_front_diameter))
+    ((ConfigOptionFloat,                       material_ow_support_head_penetration))
+    ((ConfigOptionFloat,                       material_ow_branchingsupport_head_penetration))
+    ((ConfigOptionFloat,                       material_ow_support_head_width))
+    ((ConfigOptionFloat,                       material_ow_branchingsupport_head_width))
+    ((ConfigOptionInt,                         material_ow_support_points_density_relative))
 
-    ((ConfigOptionFloatNullable,               material_ow_first_layer_size_compensation)) /* material_ow_elefant_foot_compensation */
-    ((ConfigOptionFloatNullable,               material_ow_relative_correction_x))
-    ((ConfigOptionFloatNullable,               material_ow_relative_correction_y))
-    ((ConfigOptionFloatNullable,               material_ow_relative_correction_z))
+    ((ConfigOptionFloat,                       material_ow_first_layer_size_compensation)) /* material_ow_elefant_foot_compensation */
+    ((ConfigOptionFloat,                       material_ow_relative_correction_x))
+    ((ConfigOptionFloat,                       material_ow_relative_correction_y))
+    ((ConfigOptionFloat,                       material_ow_relative_correction_z))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -1836,12 +1836,13 @@ public:
     bool         set_key_value(const std::string &opt_key, ConfigOption *opt) { bool out = m_data.set_key_value(opt_key, opt); this->touch(); return out; }
     template<typename T>
     void         set(const std::string &opt_key, T value) { m_data.set(opt_key, value, true); this->touch(); }
-    void set_any(const std::string &opt_key, boost::any value, int16_t extruder_id)
+    void set_any(const std::string &opt_key, bool enable, boost::any value, int16_t extruder_id)
     {
         ConfigOption *opt = m_data.option(opt_key, true);
         assert(opt);
         if (opt) {
             opt->set_any(value, extruder_id);
+            opt->set_enabled(enable, extruder_id);
             this->touch();
         }
     }

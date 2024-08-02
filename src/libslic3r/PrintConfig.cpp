@@ -387,6 +387,14 @@ namespace {
     const int max_temp = 1500;
 };
 
+ConfigOption *disable_defaultoption(ConfigOption *option) {
+    return option->set_can_be_disabled(true);
+}
+
+ConfigOptionVectorBase *disable_defaultoption(ConfigOptionVectorBase *option) {
+    return (ConfigOptionVectorBase *)option->set_can_be_disabled(true);
+}
+
 PrintConfigDef::PrintConfigDef()
 {
     this->init_common_params();
@@ -825,7 +833,6 @@ void PrintConfigDef::init_fff_params()
     def->min = -1;
     def->max = 100;
     def->mode = comAdvancedE | comSuSi;
-    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionEnum<BridgeType>{ BridgeType::btFromNozzle });
 
     def = this->add("bridge_flow_ratio", coPercent);
@@ -3654,7 +3661,6 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("machine_limits_usage", coEnum);
@@ -4355,7 +4361,6 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm or %");
     def->aliases = { "perimeters_extrusion_width" };
     def->ratio_over = "nozzle_diameter";
-    def->is_vector_extruder = true;
     def->min = 0;
     def->max = 1000;
     def->max_literal = { 10, true };
@@ -7026,37 +7031,39 @@ void PrintConfigDef::init_fff_params()
         "seam_gap"}) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
-        def = this->add_nullable(std::string("filament_") + opt_key, it_opt->second.type);
+        def = this->add(std::string("filament_") + opt_key, it_opt->second.type);
+        def->can_be_disabled = true;
+        def->is_optional = true;
         def->label      = it_opt->second.label;
         def->full_label = it_opt->second.full_label;
         def->tooltip    = it_opt->second.tooltip;
         def->sidetext   = it_opt->second.sidetext;
         def->mode       = it_opt->second.mode;
         // create default value with the default value is taken from the default value of the config.
-        // put a nil value as first entry.
+        // put a disbaled value as first entry.
         switch (def->type) {
         case coBools: {
-            ConfigOptionBoolsNullable* opt = new ConfigOptionBoolsNullable(it_opt->second.default_value.get()->get_bool());
-            opt->set_at(ConfigOptionBoolsNullable::NIL_VALUE(), 0);
+            ConfigOptionBools *opt = new ConfigOptionBools({it_opt->second.default_value.get()->get_bool()});
+            opt->set_can_be_disabled(true);
             def->set_default_value(opt);
             break;
         }
         case coFloats: {
-            ConfigOptionFloatsNullable *opt = new ConfigOptionFloatsNullable(it_opt->second.default_value.get()->get_float());
-            opt->set_any(ConfigOptionFloatNullable::create_any_nil(), 0);
+            ConfigOptionFloats *opt = new ConfigOptionFloats({it_opt->second.default_value.get()->get_float()});
+            opt->set_can_be_disabled(true);
             def->set_default_value(opt);
             break;
         }
         case coPercents: {
-            ConfigOptionPercentsNullable *opt = new ConfigOptionPercentsNullable(it_opt->second.default_value.get()->get_float());
-            opt->set_any(ConfigOptionFloatNullable::create_any_nil(), 0);
+            ConfigOptionPercents *opt = new ConfigOptionPercents({it_opt->second.default_value.get()->get_float()});
+            opt->set_can_be_disabled(true);
             def->set_default_value(opt);
             break;
         }
         case coFloatsOrPercents: {
-            ConfigOptionFloatsOrPercentsNullable*opt = new ConfigOptionFloatsOrPercentsNullable(
-                static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0));
-            opt->set_any(ConfigOptionFloatsOrPercents::create_any_nil(), 0);
+            ConfigOptionFloatsOrPercents*opt = new ConfigOptionFloatsOrPercents(
+                {static_cast<const ConfigOptionFloatsOrPercents*>(it_opt->second.default_value.get())->get_at(0)});
+            opt->set_can_be_disabled(true);
             def->set_default_value(opt);
             break;
         }
@@ -7654,15 +7661,16 @@ void PrintConfigDef::init_sla_params()
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0.3));
 
-    def = this->add_nullable("idle_temperature", coInts);
+    def = this->add("idle_temperature", coInts);
     def->label = L("Idle temperature");
     def->tooltip = L("Nozzle temperature when the tool is currently not used in multi-tool setups."
-                     "This is only used when 'Ooze prevention' is active in Print Settings.");
+                     "\nThis is only used when 'Ooze prevention' is active in Print Settings.");
     def->sidetext = L("°C");
     def->min = 0;
     def->max = max_temp;
+    def->can_be_disabled = true;
     def->mode = comSimpleAE | comPrusa;
-    def->set_default_value(new ConfigOptionIntsNullable { ConfigOptionIntNullable::nil_value() });
+    def->set_default_value(disable_defaultoption(new ConfigOptionInts{30}));
 
     def = this->add("bottle_volume", coFloat);
     def->label = L("Bottle volume");
@@ -8087,7 +8095,9 @@ void PrintConfigDef::init_sla_params()
         }) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
-        def = this->add_nullable(std::string("material_ow_") + opt_key, it_opt->second.type);
+        def = this->add(std::string("material_ow_") + opt_key, it_opt->second.type);
+        def->can_be_disabled = true;
+        def->is_optional = true;
         def->label = it_opt->second.label;
         def->full_label = it_opt->second.full_label;
         def->tooltip = it_opt->second.tooltip;
@@ -8095,11 +8105,7 @@ void PrintConfigDef::init_sla_params()
         def->min  = it_opt->second.min;
         def->max  = it_opt->second.max;
         def->mode = it_opt->second.mode;
-        switch (def->type) {
-        case coFloat: def->set_default_value(new ConfigOptionFloatNullable{ it_opt->second.default_value->get_float() }); break;
-        case coInt:   def->set_default_value(new ConfigOptionIntNullable{ it_opt->second.default_value->get_int() }); break;
-        default: assert(false);
-        }
+        def->set_default_value(it_opt->second.default_value->clone());
     }
 }
 
@@ -9550,7 +9556,7 @@ void DynamicPrintConfig::normalize_fdm()
             auto* opt = this->opt<ConfigOptionBools>("retract_layer_change", true);
             opt->set(std::vector<uint8_t>(opt->size(), false));  // set all values to false
             // Disable retract on layer change also for filament overrides.
-            auto* opt_n = this->opt<ConfigOptionBoolsNullable>("filament_retract_layer_change", true);
+            auto* opt_n = this->opt<ConfigOptionBools>("filament_retract_layer_change", true);
             opt_n->set(std::vector<uint8_t>(opt_n->size(), false));  // Set all values to false.
         }
         {
@@ -10204,8 +10210,8 @@ std::string validate(const FullPrintConfig& cfg)
         const ConfigOptionDef   *optdef = print_config_def.get(opt_key);
         assert(optdef != nullptr);
 
-        if (opt->nullable() && opt->is_nil()) {
-            // Do not check nil values
+        if (!opt->is_enabled()) {
+            // Do not check disabled values
             continue;
         }
 
@@ -10229,7 +10235,7 @@ std::string validate(const FullPrintConfig& cfg)
         {
             const auto* vec = static_cast<const ConfigOptionVector<double>*>(opt);
             for (size_t i = 0; i < vec->size(); ++i) {
-                if (vec->is_nil(i))
+                if (!vec->is_enabled(i))
                     continue;
                 double v = vec->get_at(i);
                 if (v < optdef->min || v > optdef->max) {
@@ -10243,7 +10249,7 @@ std::string validate(const FullPrintConfig& cfg)
         {
             const auto* vec = static_cast<const ConfigOptionVector<FloatOrPercent>*>(opt);
             for (size_t i = 0; i < vec->size(); ++i) {
-                if (vec->is_nil(i))
+                if (!vec->is_enabled(i))
                     continue;
                 const FloatOrPercent &v = vec->get_at(i);
                 if (v.value < optdef->min || v.value > optdef->max) {
@@ -10263,7 +10269,7 @@ std::string validate(const FullPrintConfig& cfg)
         {
             const auto* vec = static_cast<const ConfigOptionVector<int32_t>*>(opt);
             for (size_t i = 0; i < vec->size(); ++i) {
-                if (vec->is_nil(i))
+                if (!vec->is_enabled(i))
                     continue;
                 int v = vec->get_at(i);
                 if (v < optdef->min || v > optdef->max) {

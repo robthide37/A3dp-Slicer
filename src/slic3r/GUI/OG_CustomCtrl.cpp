@@ -186,8 +186,8 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
             if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
                 option_set.front().side_widget == nullptr && line.get_extra_widgets().size() == 0)
             {
-                h_pos += 2 * blinking_button_width;
                 Field* field = opt_group->get_field(option_set.front().opt_id);
+                h_pos += (field->has_enable_ui() ? 3 : 2) * blinking_button_width;
                 correct_line_height(ctrl_line.height, field->getWindow());
                 //correct_horiz_pos(h_pos, field); //TODO test
                 break;
@@ -201,7 +201,7 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
                 Field* field = opt_group->get_field(opt.opt_id);
                 correct_line_height(ctrl_line.height, field->getWindow());
 
-                ConfigOptionDef option = opt.opt;
+                const ConfigOptionDef& option = opt.opt; //should be called option_def...
                 // add label if any
                 if (is_multioption_line && !option.label.empty()) {
                     std::string opt_label = (option.label.empty() || option.label.back() != '_') ? option.label : option.label.substr(0, option.label.size() - 1);
@@ -257,8 +257,8 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
                 //round it to next m_em_unit
                 h_pos += (h_pos % m_em_unit == 0) ? 0 : m_em_unit - (h_pos % m_em_unit);
 
-                // size of little widget before the real one
-                h_pos += 2 * blinking_button_width;
+                // size of little widget before the real one (note: this happen before Tab::decorate, so it's not possibel to use field->has_enable_ui()
+                h_pos += (option.can_be_disabled ? 3 : 2) * blinking_button_width;
                 
                 if (field == field_in) {
                     //correct_horiz_pos(h_pos, field);
@@ -345,16 +345,21 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
 
         size_t undo_icons_cnt = line.rects_undo_icon.size();
         assert(line.rects_undo_icon.size() == line.rects_undo_to_sys_icon.size());
+        assert(line.rects_enable_icon.size() == line.rects_undo_to_sys_icon.size());
 
         const std::vector<Option>& option_set = line.og_line.get_options();
 
         for (size_t opt_idx = 0; opt_idx < undo_icons_cnt; opt_idx++) {
             const std::string& opt_key = option_set[opt_idx].opt_id;
+            Field *field = opt_group->get_field(opt_key);
+            if (field && field->has_enable_ui()) {
+                    field->enable_set_hover(false);
+            }
             if (is_point_in_rect(pos, line.rects_undo_icon[opt_idx])) {
                 const wxString* tooltip_ptr = nullptr;
                 if (line.og_line.has_undo_ui())
                     tooltip_ptr = line.og_line.undo_tooltip();
-                else if (Field* field = opt_group->get_field(opt_key))
+                else if (field)
                     tooltip_ptr = field->undo_tooltip();
                 if(tooltip_ptr)
                     tooltip = *tooltip_ptr;                break;
@@ -363,16 +368,24 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
                 const wxString* tooltip_ptr = nullptr;
                 if (line.og_line.has_undo_ui())
                     tooltip_ptr = line.og_line.undo_to_sys_tooltip();
-                else if (Field* field = opt_group->get_field(opt_key))
+                else if (field)
                     tooltip_ptr = field->undo_to_sys_tooltip();
                 if(tooltip_ptr)
                     tooltip = *tooltip_ptr;
                 break;
             }
             if (opt_idx < line.rects_edit_icon.size() && is_point_in_rect(pos, line.rects_edit_icon[opt_idx])) {
-                if (Field* field = opt_group->get_field(opt_key); field && field->has_edit_ui())
-                    if(const wxString* tooltip_ptr = field->edit_tooltip())
-                        tooltip = *tooltip_ptr;
+                if (field && field->has_edit_ui()) {
+                    tooltip = *field->edit_tooltip();
+                }
+                break;
+            }
+            if (opt_idx < line.rects_enable_icon.size() && is_point_in_rect(pos, line.rects_enable_icon[opt_idx])) {
+                if (field && field->has_enable_ui()) {
+                    tooltip = *field->enable_tooltip();
+                    field->enable_set_hover(true);
+                }
+                //TODO: activate bmp_focused
                 break;
             }
         }
@@ -428,6 +441,13 @@ void OG_CustomCtrl::OnLeftDown(wxMouseEvent& event)
             if (opt_idx < line.rects_edit_icon.size() && is_point_in_rect(pos, line.rects_edit_icon[opt_idx])) {
                 if (Field* field = opt_group->get_field(opt_key))
                     field->on_edit_value();
+                event.Skip();
+                return;
+            }
+
+            if (opt_idx < line.rects_enable_icon.size() && is_point_in_rect(pos, line.rects_enable_icon[opt_idx])) {
+                if (Field* field = opt_group->get_field(opt_key))
+                    field->on_enable_value();
                 event.Skip();
                 return;
             }
@@ -559,6 +579,7 @@ OG_CustomCtrl::CtrlLine::CtrlLine(  wxCoord         height,
     for (size_t i = 0; i < og_line.get_options().size(); i++) {
         rects_undo_icon.emplace_back(wxRect());
         rects_undo_to_sys_icon.emplace_back(wxRect());
+        rects_enable_icon.emplace_back(wxRect());
     }
 }
 
@@ -693,7 +714,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     if (draw_just_act_buttons) {
         if (front_field && front_field->has_undo_ui()) {
             // TODO chose between h_pos and 0 in wxPoint
-            const wxPoint pos = draw_act_bmps(dc, wxPoint(h_pos /*0*/, v_pos), front_field->undo_to_sys_bitmap(), front_field->undo_bitmap(), front_field->blink());
+            const wxPoint pos = draw_act_bmps(dc, wxPoint(h_pos /*0*/, v_pos), front_field->undo_to_sys_bitmap(), front_field->undo_bitmap(), front_field->enable_bitmap(), front_field->blink());
             // Add edit button, if it exists
             if (front_field->has_edit_ui())
                 draw_edit_bmp(dc, pos, front_field->edit_bitmap());
@@ -724,7 +745,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     // If there's a widget, build it and set result to the correct position.
     if (og_line.widget != nullptr) {
         if (og_line.has_undo_ui())
-            draw_act_bmps(dc, wxPoint(h_pos, v_pos), og_line.undo_to_sys_bitmap(), og_line.undo_bitmap(), og_line.blink());
+            draw_act_bmps(dc, wxPoint(h_pos, v_pos), og_line.undo_to_sys_bitmap(), og_line.undo_bitmap(), og_line.enable_bitmap(), og_line.blink());
         else
             draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), og_line.blink());
         return;
@@ -742,7 +763,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
     {
         if (front_field) {
             if (front_field && front_field->has_undo_ui())
-                h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), front_field->undo_to_sys_bitmap(), front_field->undo_bitmap(), front_field->blink()).x + ctrl->m_h_gap;
+                h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), front_field->undo_to_sys_bitmap(), front_field->undo_bitmap(), front_field->enable_bitmap(), front_field->blink()).x + ctrl->m_h_gap;
             else if (front_field && !front_field->has_undo_ui() && front_field->blink())
                 draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), front_field->blink());
             else
@@ -800,7 +821,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
 
         if (field) {
             if(field->has_undo_ui())
-                h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap(), field->undo_bitmap(), field->blink(), bmp_rect_id++).x;
+                h_pos = draw_act_bmps(dc, wxPoint(h_pos, v_pos), field->undo_to_sys_bitmap(), field->undo_bitmap(), field->enable_bitmap(), field->blink(), bmp_rect_id++).x;
             else
                 h_pos += 2 * blinking_button_width;
 
@@ -850,6 +871,11 @@ wxCoord OG_CustomCtrl::CtrlLine::draw_mode_bmp(wxDC& dc, wxCoord v_pos)
     if (og_line.get_options().front().opt.gui_type != ConfigOptionDef::GUIType::legend)
         dc.DrawBitmap(bmp->GetBitmapFor(ctrl), 0, y_draw);
 
+    if (!(get_bitmap_size(bmp, ctrl).GetWidth() == pix_cnt)) {
+        int measured_w = get_bitmap_size(bmp, ctrl).GetWidth();
+        int measured_h = get_bitmap_size(bmp, ctrl).GetHeight();
+        bmp = get_bmp_bundle("mode", pix_cnt, pix_cnt, wxGetApp().get_first_mode_btn_color(mode));
+    }
     assert(get_bitmap_size(bmp, ctrl).GetWidth() == pix_cnt); // sometimes bigger.
     return get_bitmap_size(bmp, ctrl).GetWidth() + ctrl->m_h_gap;
 }
@@ -927,18 +953,21 @@ wxPoint OG_CustomCtrl::CtrlLine::draw_blinking_bmp(wxDC& dc, wxPoint pos, bool i
     return wxPoint(h_pos, v_pos);
 }
 
-wxPoint OG_CustomCtrl::CtrlLine::draw_act_bmps(wxDC& dc, wxPoint pos, const wxBitmapBundle& bmp_undo_to_sys, const wxBitmapBundle& bmp_undo, bool is_blinking, size_t rect_id)
+wxPoint OG_CustomCtrl::CtrlLine::draw_act_bmps(wxDC& dc, wxPoint pos, const wxBitmapBundle& bmp_undo_to_sys, const wxBitmapBundle& bmp_undo, const wxBitmapBundle* bmp_enable, bool is_blinking, size_t rect_id)
 {
     wxCoord h_pos = pos.x;
     wxCoord v_pos = pos.y + height / 2 - this->ctrl->m_bmp_blinking_sz.GetHeight() / 2;
 
     if (m_has_icon) {
+        // undo_to_sys
         dc.DrawBitmap(bmp_undo_to_sys.GetBitmapFor(ctrl), h_pos, v_pos);
 
         int bmp_dim = get_bitmap_size(&bmp_undo_to_sys, ctrl).GetWidth();
         rects_undo_to_sys_icon[rect_id] = wxRect(h_pos, v_pos, bmp_dim, bmp_dim);
 
         h_pos += bmp_dim + ctrl->m_h_gap;
+
+        // undo & search arrow
         dc.DrawBitmap(bmp_undo.GetBitmapFor(ctrl), h_pos, v_pos);
 
         bmp_dim = get_bitmap_size(&bmp_undo, ctrl).GetWidth();
@@ -948,6 +977,16 @@ wxPoint OG_CustomCtrl::CtrlLine::draw_act_bmps(wxDC& dc, wxPoint pos, const wxBi
             draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), is_blinking);
 
         h_pos += bmp_dim + ctrl->m_h_gap;
+
+        // enable checkbox
+        if (bmp_enable) {
+            dc.DrawBitmap(bmp_enable->GetBitmapFor(ctrl), h_pos, v_pos);
+
+            bmp_dim = get_bitmap_size(bmp_enable, ctrl).GetWidth();
+            rects_enable_icon[rect_id] = wxRect(h_pos, v_pos, bmp_dim, bmp_dim);
+
+            h_pos += bmp_dim + ctrl->m_h_gap;
+        }
 
     } else if (is_blinking) {
         draw_blinking_bmp(dc, wxPoint(h_pos, v_pos), is_blinking);
