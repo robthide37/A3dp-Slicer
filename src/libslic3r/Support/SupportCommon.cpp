@@ -1798,7 +1798,9 @@ void generate_support_toolpaths(
                 if (top_contact_layer.could_merge(interface_layer) && ! raft_layer)
                     top_contact_layer.merge(std::move(interface_layer));
             } 
-            if ((config.support_material_interface_layers == 0 || config.support_material_bottom_interface_layers == 0) && support_params.can_merge_support_regions) {
+            if ( (config.support_material_interface_layers == 0 ||
+                    (config.support_material_bottom_interface_layers.is_enabled() && config.support_material_bottom_interface_layers.value == 0))
+                && support_params.can_merge_support_regions) {
                 if (base_layer.could_merge(bottom_contact_layer))
                     base_layer.merge(std::move(bottom_contact_layer));
                 else if (base_layer.empty() && ! bottom_contact_layer.empty() && ! bottom_contact_layer.layer->bridging)
@@ -1893,7 +1895,9 @@ void generate_support_toolpaths(
                 }
             };
             const bool top_interfaces = config.support_material_interface_layers.value != 0;
-            const bool bottom_interfaces = top_interfaces && config.support_material_bottom_interface_layers != 0;
+            const bool bottom_interfaces = config.support_material_bottom_interface_layers.is_enabled() ?
+                top_interfaces && config.support_material_bottom_interface_layers.value != 0 :
+                top_interfaces;
             extrude_interface(top_contact_layer,    raft_layer ? InterfaceLayerType::RaftContact : top_interfaces ? InterfaceLayerType::TopContact : InterfaceLayerType::InterfaceAsBase);
             extrude_interface(bottom_contact_layer, bottom_interfaces ? InterfaceLayerType::BottomContact : InterfaceLayerType::InterfaceAsBase);
             extrude_interface(interface_layer,      top_interfaces ? InterfaceLayerType::Interface : InterfaceLayerType::InterfaceAsBase);

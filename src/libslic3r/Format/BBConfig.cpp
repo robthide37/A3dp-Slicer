@@ -597,8 +597,8 @@ void very_complicated_convert(ConfigSubstitutionContext &unconverted_config, Con
             double overhangs_max_slope = std::tan(make_overhang_printable_angle) * layer_height;
             conf_to_read_and_update.set_deserialize("overhangs_max_slope",
                                                     Slic3r::to_string_nozero(overhangs_max_slope, 3));
-            conf_to_read_and_update.set_deserialize("overhangs_bridge_threshold", "-1");
-            conf_to_read_and_update.set_deserialize("overhangs_bridge_upper_layers", "-1");
+            conf_to_read_and_update.set_deserialize("overhangs_bridge_threshold", "!0");
+            conf_to_read_and_update.set_deserialize("overhangs_bridge_upper_layers", "!0");
             unconverted_config.erase("make_overhang_printable");
             unconverted_config.erase("make_overhang_printable_angle");
         } else {

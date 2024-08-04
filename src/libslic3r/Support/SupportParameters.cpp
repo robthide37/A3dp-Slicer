@@ -29,8 +29,9 @@ SupportParameters::SupportParameters(const PrintObject &object)
 
     {
         int num_top_interface_layers    = std::max(0, object_config.support_material_interface_layers.value);
-        int num_bottom_interface_layers = object_config.support_material_bottom_interface_layers < 0 ? 
-            num_top_interface_layers : object_config.support_material_bottom_interface_layers;
+        int num_bottom_interface_layers = object_config.support_material_bottom_interface_layers.is_enabled() ?
+            object_config.support_material_bottom_interface_layers :
+            num_top_interface_layers;
         this->has_top_contacts              = num_top_interface_layers    > 0;
         this->has_bottom_contacts           = num_bottom_interface_layers > 0;
         this->num_top_interface_layers      = this->has_top_contacts ? size_t(num_top_interface_layers - 1) : 0;

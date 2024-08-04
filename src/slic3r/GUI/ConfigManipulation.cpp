@@ -353,7 +353,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool has_spiral_vase = have_perimeters && config->opt_bool("spiral_vase");
     
-    bool have_arachne = have_perimeters && (config->opt_int("perimeters") == config->opt_int("perimeters_hole") || config->opt_int("perimeters_hole") < 0);
+    bool have_arachne = have_perimeters && (config->opt_int("perimeters") == config->opt_int("perimeters_hole") || !config->is_enabled("perimeters_hole"));
     toggle_field("perimeter_generator", have_arachne);
     have_arachne = have_arachne && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
     for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "min_feature_size", "min_bead_width", "aaa" })
@@ -472,6 +472,9 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     for (auto el : { "hole_to_polyhole_threshold", "hole_to_polyhole_twisted" })
         toggle_field(el, config->opt_bool("hole_to_polyhole"));
+
+    for (auto el : { "overhangs_bridge_threshold", "overhangs_bridge_upper_layers" })
+        toggle_field(el, config->get_float("overhangs_max_slope") > 0);
 
     bool have_skirt = config->opt_int("skirts") > 0;
     toggle_field("skirt_height", have_skirt && config->opt_enum<DraftShield>("draft_shield") != dsEnabled);

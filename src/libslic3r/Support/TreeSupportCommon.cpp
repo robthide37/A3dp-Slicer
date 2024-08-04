@@ -41,12 +41,14 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
     this->support_line_width        = support_material_flow(&print_object, config.layer_height).scaled_width();
     this->support_roof_line_width   = support_material_interface_flow(&print_object, config.layer_height).scaled_width();
     //FIXME add it to SlicingParameters and reuse in both tree and normal supports?
-    this->support_bottom_enable     = config.support_material_interface_layers.value > 0 && config.support_material_bottom_interface_layers.value != 0;
-    this->support_bottom_height     = this->support_bottom_enable ?
-        (config.support_material_bottom_interface_layers.value > 0 ?
+    this->support_bottom_enable = config.support_material_interface_layers.value > 0 &&
+        (!config.support_material_bottom_interface_layers.is_enabled() ||
+         config.support_material_bottom_interface_layers.value > 0);
+    this->support_bottom_height     = !this->support_bottom_enable ? 0 :
+        this->layer_height * (config.support_material_bottom_interface_layers.is_enabled() ?
             config.support_material_bottom_interface_layers.value :
-            config.support_material_interface_layers.value) * this->layer_height :
-        0;
+            config.support_material_interface_layers.value);
+        
     this->support_material_buildplate_only = config.support_material_buildplate_only;
     this->support_xy_distance       = scaled<coord_t>(config.support_material_xy_spacing.get_abs_value(external_perimeter_width));
     // Separation of interfaces, it is likely smaller than support_xy_distance.
@@ -57,9 +59,14 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 //    this->support_infill_angles     = 
     this->support_roof_enable       = config.support_material_interface_layers.value > 0;
     this->support_roof_layers       = this->support_roof_enable ? config.support_material_interface_layers.value : 0;
-    this->support_floor_enable      = config.support_material_interface_layers.value > 0 && config.support_material_bottom_interface_layers.value > 0;
-    this->support_floor_layers      = this->support_floor_enable ? config.support_material_bottom_interface_layers.value : 0;
-//    this->minimum_roof_area         = 
+    this->support_floor_enable = this->support_roof_enable &&
+        (!config.support_material_bottom_interface_layers.is_enabled() ||
+         config.support_material_bottom_interface_layers.value > 0);
+    this->support_floor_layers = !this->support_floor_enable ? 0 :
+        config.support_material_bottom_interface_layers.is_enabled() ?
+                                                               config.support_material_bottom_interface_layers.value :
+                                                               this->support_roof_layers;
+    //    this->minimum_roof_area         = 
 //    this->support_roof_angles       = 
     this->support_roof_pattern      = config.support_material_top_interface_pattern.value;
     this->support_pattern           = config.support_material_pattern;

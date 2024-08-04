@@ -2760,23 +2760,26 @@ void PerimeterGenerator::process(// Input:
 
         // detect how many perimeters must be generated for this island
         int nb_loop_contour = params.config.perimeters;
+        assert(nb_loop_contour >= 0);
+        assert(params.config.perimeters.is_enabled());
         if (nb_loop_contour > 0)
             nb_loop_contour += extra_odd_perimeter + surface.extra_perimeters;
-        int nb_loop_holes = params.config.perimeters_hole;
-        if (nb_loop_holes > 0)
+        assert(nb_loop_contour >= 0);
+        int nb_loop_holes = params.config.perimeters_hole.value;
+        assert(nb_loop_holes >= 0);
+        if (params.config.perimeters_hole.is_enabled() && nb_loop_holes > 0)
             nb_loop_holes += extra_odd_perimeter + surface.extra_perimeters;
+        assert(nb_loop_holes >= 0);
         
-        if (nb_loop_contour < 0)
-            nb_loop_contour = std::max(0, nb_loop_holes);
-        if (nb_loop_holes < 0)
+        if (!params.config.perimeters_hole.is_enabled())
             nb_loop_holes = std::max(0, nb_loop_contour);
 
-            if (params.print_config.spiral_vase) {
-                if (params.layer->id() >= params.config.bottom_solid_layers) {
-                    nb_loop_contour = 1;
-                    nb_loop_holes = 0;
-                }
+        if (params.print_config.spiral_vase) {
+            if (params.layer->id() >= params.config.bottom_solid_layers) {
+                nb_loop_contour = 1;
+                nb_loop_holes = 0;
             }
+        }
 
         if ((params.layer->id() == 0 && params.config.only_one_perimeter_first_layer) ||
             (params.config.only_one_perimeter_top && this->upper_slices == NULL)) {

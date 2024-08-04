@@ -3016,6 +3016,7 @@ public:
     bool      get_bool(const t_config_option_key &opt_key, size_t idx = 0) const                 {return this->option(opt_key)->get_bool(idx);}
     int32_t   get_int(const t_config_option_key &opt_key, size_t idx = 0) const                  {return this->option(opt_key)->get_int(idx);}
     double    get_float(const t_config_option_key &opt_key, size_t idx = 0) const                {return this->option(opt_key)->get_float(idx);}
+    bool      is_enabled(const t_config_option_key &opt_key, size_t idx = 0) const                {return this->option(opt_key)->is_enabled(idx);}
 
     // In ConfigManipulation::toggle_print_fff_options, it is called on option with type ConfigOptionEnumGeneric* and also ConfigOptionEnum*.
     // Thus the virtual method getInt() is used to retrieve the enum value.

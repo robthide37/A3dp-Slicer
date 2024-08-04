@@ -2267,7 +2267,7 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
             {
                 n_layers_top = m_object_config->support_material_interface_layers.value;
                 coordf_t height_top_interface = std::max(0., support_interface_layer_height * n_layers_top);
-                n_layers_bot = m_object_config->support_material_bottom_interface_layers.value >= 0 ? m_object_config->support_material_bottom_interface_layers.value : n_layers_top;
+                n_layers_bot = m_object_config->support_material_bottom_interface_layers.is_enabled() ? m_object_config->support_material_bottom_interface_layers.value : n_layers_top;
                 n_layers_bot = std::max(size_t(0), n_layers_bot - 1); //the first bot layer is already in the extreme list.
                 coordf_t height_bot_interface = (support_interface_layer_height * n_layers_bot);
                 if (dist <= height_top_interface + height_bot_interface) {
