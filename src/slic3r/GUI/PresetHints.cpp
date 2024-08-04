@@ -97,25 +97,34 @@ void format_double_fan_min_speed(wxString& out, int min_speed, int default_speed
     }
 }
 
+int get_fan_speed(const Preset &preset_fil, const std::string &opt_key) {
+    const ConfigOption* option = preset_fil.config.option(opt_key);
+    // only consider the first idx, as it's the current one.
+    if (option->is_enabled(0)) {
+        return option->get_int(0);
+    }
+    return -1;
+}
+
 #define MIN_BUF_LENGTH  4096
 std::string PresetHints::cooling_description(const Preset &preset_fil, const Preset& preset_printer)
 {
     wxString out;
     // -1 is disable, 0 or 1 is "no fan". (and 1 will be "low fan" in the future)
     const int    min_fan_speed             = preset_printer.config.get_int("fan_printer_min_speed");
-    const int    default_fan_speed         = preset_fil.config.get_int("default_fan_speed");
+    const int    default_fan_speed         = get_fan_speed(preset_fil, "default_fan_speed");
     const int    max_fan_speed             = preset_fil.config.opt_int("max_fan_speed", 0);
-    const int    peri_fan_speed            = preset_fil.config.opt_int("perimeter_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("perimeter_fan_speed");
-    const int    ext_peri_fan_speed        = preset_fil.config.opt_int("external_perimeter_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("external_perimeter_fan_speed");
-    const int    infill_fan_speed          = preset_fil.config.opt_int("infill_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("infill_fan_speed");
-    const int    solid_fan_speed           = preset_fil.config.opt_int("solid_infill_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("solid_infill_fan_speed");
-    const int    top_fan_speed             = preset_fil.config.opt_int("top_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("top_fan_speed");
-    const int    support_fan_speed         = preset_fil.config.opt_int("support_material_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("support_material_fan_speed");
-    const int    supp_inter_fan_speed      = preset_fil.config.opt_int("support_material_interface_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("support_material_interface_fan_speed");
-    const int    bridge_fan_speed          = preset_fil.config.opt_int("bridge_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("bridge_fan_speed");
-    const int    internal_bridge_fan_speed = preset_fil.config.opt_int("internal_bridge_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("internal_bridge_fan_speed");
-    const int    overhangs_fan_speed       = preset_fil.config.opt_int("overhangs_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("overhangs_fan_speed");
-    const int    gap_fill_fan_speed        = preset_fil.config.opt_int("gap_fill_fan_speed", 0) == 1 ? 0 : preset_fil.config.get_int("gap_fill_fan_speed");
+    const int    peri_fan_speed            = get_fan_speed(preset_fil, "perimeter_fan_speed");
+    const int    ext_peri_fan_speed        = get_fan_speed(preset_fil, "external_perimeter_fan_speed");
+    const int    infill_fan_speed          = get_fan_speed(preset_fil, "infill_fan_speed");
+    const int    solid_fan_speed           = get_fan_speed(preset_fil, "solid_infill_fan_speed");
+    const int    top_fan_speed             = get_fan_speed(preset_fil, "top_fan_speed");
+    const int    support_fan_speed         = get_fan_speed(preset_fil, "support_material_fan_speed");
+    const int    supp_inter_fan_speed      = get_fan_speed(preset_fil, "support_material_interface_fan_speed");
+    const int    bridge_fan_speed          = get_fan_speed(preset_fil, "bridge_fan_speed");
+    const int    internal_bridge_fan_speed = get_fan_speed(preset_fil, "internal_bridge_fan_speed");
+    const int    overhangs_fan_speed       = get_fan_speed(preset_fil, "overhangs_fan_speed");
+    const int    gap_fill_fan_speed        = get_fan_speed(preset_fil, "gap_fill_fan_speed");
     const int    disable_fan_first_layers  = preset_fil.config.opt_int("disable_fan_first_layers", 0);
     const int    full_fan_speed_layer      = preset_fil.config.opt_int("full_fan_speed_layer", 0);
     const float  slowdown_below_layer_time = preset_fil.config.opt_float("slowdown_below_layer_time", 0);
