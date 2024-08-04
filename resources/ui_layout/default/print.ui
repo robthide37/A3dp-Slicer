@@ -373,7 +373,9 @@ group:label_width$8:sidetext_width$7:Speed for print moves
 	line:Bridge speed
 		setting:width$4:bridge_speed
 		setting:width$4:bridge_speed_internal
+    line:Overhangs speed
 		setting:width$4:overhangs_speed
+        setting:overhangs_dynamic_speed
 	line:Gap fill speed
 		setting:width$4:label$Maximum speed:gap_fill_speed
 		setting:width$4:label$Cap with:sidetext$% of perimeter flow:sidetext_width$20:gap_fill_flow_match_perimeter
@@ -387,14 +389,6 @@ group:Speed for non-print moves
 	line:Travel speed
 		setting:label$xy:travel_speed
 		setting:label$z:travel_speed_z
-	end_line
-group:Dynamic Overhang speeds
-	line:Enable speed for a % overlap
-		setting:label$_:enable_dynamic_overhang_speeds
-		setting:label$0% (bridge):overhang_speed_0
-		setting:label$25%:overhang_speed_1
-		setting:label$50%:overhang_speed_2
-		setting:label$75%:overhang_speed_3
 	end_line
 group:sidetext_width$7:Modifiers
 	line:First layer speed

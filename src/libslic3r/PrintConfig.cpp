@@ -929,103 +929,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def             = this->add("enable_dynamic_overhang_speeds", coBool);
-    def->label      = L("Enable dynamic overhang speeds");
-    def->category   = OptionCategory::speed;
-    def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
-    def->mode       = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionBool(false));
-
-    // TRN PrintSettings : "Dynamic overhang speed"
-    auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
-                        "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
-                        "Speeds for overhang sizes in between are calculated via linear interpolation. "
-                        "If set as percentage, the speed is calculated over the external perimeter speed. "
-                        "Note that the speeds generated to gcode will never exceed the max volumetric speed value.");
-
-    def             = this->add("overhang_speed_0", coFloatOrPercent);
-    def->label      = L("speed for 0% overlap (bridge)");
-    def->category   = OptionCategory::speed;
-    def->tooltip    = overhang_speed_setting_description;
-    def->sidetext   = L("mm/s or %");
-    def->min        = 0;
-    def->mode       = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
-
-    def             = this->add("overhang_speed_1", coFloatOrPercent);
-    def->label      = L("speed for 25% overlap");
-    def->category   = OptionCategory::speed;
-    def->tooltip    = overhang_speed_setting_description;
-    def->sidetext   = L("mm/s or %");
-    def->min        = 0;
-    def->mode       = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
-
-    def             = this->add("overhang_speed_2", coFloatOrPercent);
-    def->label      = L("speed for 50% overlap");
-    def->category   = OptionCategory::speed;
-    def->tooltip    = overhang_speed_setting_description;
-    def->sidetext   = L("mm/s or %");
-    def->min        = 0;
-    def->mode       = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
-
-    def             = this->add("overhang_speed_3", coFloatOrPercent);
-    def->label      = L("speed for 75% overlap");
-    def->category   = OptionCategory::speed;
-    def->tooltip    = overhang_speed_setting_description;
-    def->sidetext   = L("mm/s or %");
-    def->min        = 0;
-    def->mode       = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
-
-    def          = this->add("enable_dynamic_fan_speeds", coBools);
-    def->label   = L("Enable dynamic fan speeds");
-    def->tooltip = L("This setting enables dynamic fan speed control on overhangs.");
-    def->mode    = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionBools{false});
-
-    // TRN FilamentSettings : "Dynamic fan speeds"
-    auto fan_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
-        "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
-        "Fan speeds for overhang sizes in between are calculated via linear interpolation.");
-
-    def           = this->add("overhang_fan_speed_0", coInts);
-    def->label    = L("speed for 0% overlap (bridge)");
-    def->tooltip  = fan_speed_setting_description;
-    def->sidetext = L("%");
-    def->min      = 0;
-    def->max      = 100;
-    def->mode     = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionInts{0});
-
-    def           = this->add("overhang_fan_speed_1", coInts);
-    def->label    = L("speed for 25% overlap");
-    def->tooltip  = fan_speed_setting_description;
-    def->sidetext = L("%");
-    def->min      = 0;
-    def->max      = 100;
-    def->mode     = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionInts{0});
-
-    def           = this->add("overhang_fan_speed_2", coInts);
-    def->label    = L("speed for 50% overlap");
-    def->tooltip  = fan_speed_setting_description;
-    def->sidetext = L("%");
-    def->min      = 0;
-    def->max      = 100;
-    def->mode     = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionInts{0});
-
-    def           = this->add("overhang_fan_speed_3", coInts);
-    def->label    = L("speed for 75% overlap");
-    def->tooltip  = fan_speed_setting_description;
-    def->sidetext = L("%");
-    def->min      = 0;
-    def->max      = 100;
-    def->mode     = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionInts{0});
-
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");
     def->category = OptionCategory::skirtBrim;
@@ -4137,35 +4040,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
-    def = this->add("overhangs_fan_speed", coInts);
-    def->label = L("Overhangs Perimeter fan speed");
-    def->category = OptionCategory::cooling;
-    def->tooltip = L("This fan speed is enforced during all Overhang Perimeter moves"
-        "\nSet to 1 to disable fan."
-        "\nSet to -1 to disable this override (Overhang Perimeter use default fan speed)."
-        "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
-    def->sidetext = L("%");
-    def->min = 0;
-    def->max = 100;
-    def->mode = comAdvancedE | comSuSi;
-    def->is_vector_extruder = true;
-    def->can_be_disabled = true;
-    def->set_default_value(disable_defaultoption(new ConfigOptionInts({ 100 })));
-
-    def = this->add("overhangs_max_slope", coFloatOrPercent);
-    def->label = L("Overhangs max slope");
-    def->full_label = L("Overhangs max slope");
-    def->category = OptionCategory::slicing;
-    def->tooltip = L("Maximum slope for overhangs. if at each layer, the overhangs hangs by more than this value, then the geometry will be cut."
-                    " It doesn't cut into detected bridgeable areas."
-                    "\nCan be a % of the highest nozzle diameter."
-                    "\nSet to 0 to disable.");
-    def->sidetext = L("mm or %");
-    def->ratio_over = "nozzle_diameter";
-    def->min = 0;
-    def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
-
     def = this->add("overhangs_bridge_threshold", coFloat);
     def->label = L("Bridge max length");
     def->category = OptionCategory::slicing;
@@ -4189,6 +4063,107 @@ void PrintConfigDef::init_fff_params()
     def->can_be_disabled = true;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionInt(2));
+
+    def             = this->add("overhangs_dynamic_fan_speed", coGraphs);
+    def->label      = L("Dynamic overhang speeds");
+    def->category   = OptionCategory::speed;
+    def->tooltip    = L("This setting can only works correctly if dynamic speed is also enabled (overhangs_dynamic_fan_speed)."
+        "\nOverhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
+        "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge)."
+        "\nFan speeds for overhang sizes in between are calculated via linear interpolation."
+        "\nIf enabled, overhangs_fan_speed is disabled, as the fan speed for full overhang is used.");
+    def->sidetext   = L("%");
+    def->is_vector_extruder = true;
+    def->can_be_disabled = true;
+    def->mode       = comExpert | comPrusa;
+    def->set_default_value(disable_defaultoption(new ConfigOptionGraphs({GraphData(0,4, GraphData::GraphType::LINEAR,
+        {{0,100},{25,80},{50,60},{75,40},{100,20}}
+    )})));
+    def->graph_settings = std::make_shared<GraphSettings>();
+    def->graph_settings->title       = L("Overhangs fan speed by % of overlap");
+    def->graph_settings->description = L("Choose the Overhangs maximu fan speed for each percentage of overlap with the layer below."
+        "If the current fan speed (from perimeter, external, of default) is higher, then this setting won't slow the fan."
+        "\n100% overlap is when the extrusion is fully on top of the previous layer's extrusion."
+        "\n0% overlap is when the extrusion centerline is at a distance of 'overhangs threshold for speed'(overhangs_bridge_threshold)"
+        "\nfrom the nearest extrusion of the previous layer.");
+    def->graph_settings->x_label     = L("overlap % with previous layer");
+    def->graph_settings->y_label     = L("Fan speed (%)");
+    def->graph_settings->null_label  = L("No fan speed");
+    def->graph_settings->label_min_x = L("");
+    def->graph_settings->label_max_x = L("");
+    def->graph_settings->label_min_y = L("");
+    def->graph_settings->label_max_y = L("");
+    def->graph_settings->min_x       = 0;
+    def->graph_settings->max_x       = 100;
+    def->graph_settings->step_x      = 1.;
+    def->graph_settings->min_y       = 0;
+    def->graph_settings->max_y       = 100;
+    def->graph_settings->step_y      = 1.;
+    def->graph_settings->allowed_types = {GraphData::GraphType::LINEAR, GraphData::GraphType::SQUARE, GraphData::GraphType::SPLINE};
+
+    def             = this->add("overhangs_dynamic_speed", coGraph);
+    def->label      = L("Dynamic overhang speeds");
+    def->category   = OptionCategory::speed;
+    def->tooltip    = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer:"
+                        " 100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge)."
+                        " Speeds for overhang sizes in between are calculated via linear interpolation,"
+                        " as a percentage between the (external) perimeter speed and the overhang speed."
+                        "\nNote that the speeds generated to gcode will never exceed the max volumetric speed value.");
+    def->sidetext   = L("mm/s");
+    def->can_be_disabled = true;
+    def->mode       = comExpert | comPrusa;
+    def->set_default_value(disable_defaultoption(new ConfigOptionGraph(GraphData(0,4, GraphData::GraphType::LINEAR,
+        {{0,0},{25,10},{50,40},{75,70},{100,100}}
+    ))));
+    def->graph_settings = std::make_shared<GraphSettings>();
+    def->graph_settings->title       = L("Overhangs speed ratio by % of overlap");
+    def->graph_settings->description = L("Choose the Overhangs speed for each percentage of overlap with the layer below."
+        "\nThe speed is a percentage ratio between overhangs speed (for 0% overlap) and perimeter / external perimeter speed (for 100% overlap)."
+        "\n100% overlap is when the extrusion is fully on top of the previous layer's extrusion."
+        "\n0% overlap is when the extrusion centerline is at a distance of 'overhangs threshold for speed'(overhangs_bridge_threshold)"
+        "\nfrom the nearest extrusion of the previous layer.");
+    def->graph_settings->x_label     = L("overlap % with previous layer");
+    def->graph_settings->y_label     = L("Speed ratio (%)");
+    def->graph_settings->null_label  = L("Uses overhangs speed");
+    def->graph_settings->label_min_x = L("");
+    def->graph_settings->label_max_x = L("");
+    def->graph_settings->label_min_y = L("");
+    def->graph_settings->label_max_y = L("");
+    def->graph_settings->min_x       = 0;
+    def->graph_settings->max_x       = 100;
+    def->graph_settings->step_x      = 1.;
+    def->graph_settings->min_y       = 0;
+    def->graph_settings->max_y       = 100;
+    def->graph_settings->step_y      = 1.;
+    def->graph_settings->allowed_types = {GraphData::GraphType::LINEAR, GraphData::GraphType::SQUARE, GraphData::GraphType::SPLINE};
+
+    def = this->add("overhangs_fan_speed", coInts);
+    def->label = L("Overhangs Perimeter fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all Overhang Perimeter moves"
+        "\nIf disabled, the previous (perimeter) fan speed will be used."
+        "\nCan be overriden by disable_fan_first_layers and increased by low layer time.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->can_be_disabled = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionInts({ 100 })));
+
+    def = this->add("overhangs_max_slope", coFloatOrPercent);
+    def->label = L("Overhangs max slope");
+    def->full_label = L("Overhangs max slope");
+    def->category = OptionCategory::slicing;
+    def->tooltip = L("Maximum slope for overhangs. if at each layer, the overhangs hangs by more than this value, then the geometry will be cut."
+                    " It doesn't cut into detected bridgeable areas."
+                    "\nCan be a % of the highest nozzle diameter."
+                    "\nSet to 0 to disable.");
+    def->sidetext = L("mm or %");
+    def->ratio_over = "nozzle_diameter";
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
     def = this->add("overhangs_speed", coFloatOrPercent);
     def->label = L("Overhangs");
@@ -4223,9 +4198,10 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Minimum unsupported width for an extrusion to apply the bridge fan & overhang speed to this overhang."
         " Can be in mm or in a % of the nozzle diameter."
-        " Set to 0 to deactivate overhangs.");
+        " If dynamic speed is used, then the dynamic speed will be used between 0% threshold and this setting threshold.");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
+    def->can_be_disabled = true;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(55,true));
 
@@ -4235,10 +4211,11 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Minimum unsupported width for an extrusion to apply the bridge flow to this overhang."
         " Can be in mm or in a % of the nozzle diameter."
-        " Set to 0 to deactivate bridge flow for overhangs.");
+        " It uses the threshold for overhangs speed if this one as a higher value as this one.");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->max_literal = { 10, true };
+    def->can_be_disabled = true;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(75, true));
 

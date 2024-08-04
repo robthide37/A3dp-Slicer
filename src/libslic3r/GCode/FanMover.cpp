@@ -546,7 +546,8 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
     // puts the line back into the gcode
     //if buffer too big, flush it.
     if (time >= 0) {
-        while (!m_buffer.empty() && (need_flush || m_buffer_time_size - m_buffer.front().time > nb_seconds_delay - EPSILON) ){
+        // Add EPSILON to allow to have a buffer even with 0 m_buffer_time_size, so multiple consecutive M106 can be culled.
+        while (!m_buffer.empty() && (need_flush || m_buffer_time_size - m_buffer.front().time > nb_seconds_delay + EPSILON) ){
             write_buffer_data();
         }
     }

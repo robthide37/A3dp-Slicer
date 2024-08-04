@@ -453,6 +453,7 @@ private:
     // Markers for the Pressure Equalizer to recognize the extrusion type.
     // The Pressure Equalizer removes the markers from the final G-code.
     bool                                m_enable_extrusion_role_markers;
+    int                                 m_check_markers = 0;
     // HACK to avoid multiple Z move.
     std::string                         m_delayed_layer_change;
     // Keeps track of the last extrusion role passed to the processor
@@ -484,14 +485,14 @@ private:
     // Support for the extrusion role markers. Which marker is active?
     GCodeExtrusionRole                  m_last_extrusion_role;
     // Not know the gapfill role for retract_lift_top
-    GCodeExtrusionRole                  m_last_notgapfill_extrusion_role;
+    GCodeExtrusionRole                  m_last_not_gapfill_extrusion_role;
     // Support for G-Code Processor
     double                              m_last_height{ 0.0 };
     double                              m_last_layer_z{ 0.0 };
     double                              m_max_layer_z{ 0.0 };
     double                              m_last_width{ 0.0 };
     // to pass between before_xtrude and after_extrude.
-    double                              m_last_fan_override{ -1.0 };
+    double                              m_overhang_fan_override{ -1.0 };
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     double                              m_last_mm3_per_mm;
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -557,7 +558,7 @@ private:
     void                      _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, ExtrusionRole role);
     void                      _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, Point& last_pos, const double path_width);
     std::string               _before_extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);
-    double_t                  _compute_speed_mm_per_sec(const ExtrusionPath &path_attrs, double speed, double &fan_speed, std::string *comment);
+    double_t                  _compute_speed_mm_per_sec(const ExtrusionPath &path_attrs, const double speed, double &fan_speed, std::string *comment);
     std::pair<double, double> _compute_acceleration(const ExtrusionPath &path);
     std::string               _after_extrude(const ExtrusionPath &path);
     void print_machine_envelope(GCodeOutputStream &file, const Print &print);

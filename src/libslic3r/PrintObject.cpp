@@ -727,14 +727,14 @@ void PrintObject::estimate_curled_extrusions()
     if (this->set_started(posEstimateCurledExtrusions)) {
         if (this->print()->config().avoid_crossing_curled_overhangs ||
             std::any_of(this->print()->m_print_regions.begin(), this->print()->m_print_regions.end(),
-                        [](const PrintRegion *region) { return region->config().enable_dynamic_overhang_speeds.value; })) {
+                        [](const PrintRegion *region) { return region->config().overhangs_dynamic_speed.is_enabled(); })) {
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - start";
             m_print->set_status(88, _u8L("Estimating curled extrusions"));
 
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float                         support_flow_width = support_material_flow(this, this->config().layer_height).width();
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.get_values(),
-                                                 float(this->print()->m_config.get_computed_value("perimeter_acceleration")),
+                                                 float(this->print()->full_print_config().get_computed_value("perimeter_acceleration")),
                                                  this->config().raft_layers.value, 
                                                  float(this->config().brim_width.value),
                                                  float(this->config().brim_width_interior.value)};
@@ -755,14 +755,14 @@ void PrintObject::calculate_overhanging_perimeters()
         std::set<uint16_t>                      extruders;
         std::unordered_set<const PrintRegion *> regions_with_dynamic_speeds;
         for (const PrintRegion *pr : this->print()->m_print_regions) {
-            if (pr->config().enable_dynamic_overhang_speeds.value) {
+            if (pr->config().overhangs_dynamic_speed.is_enabled()) {
                 regions_with_dynamic_speeds.insert(pr);
             }
             extruders.clear();
             pr->collect_object_printing_extruders(*this->print(), extruders);
             auto cfg = this->print()->config();
             if (std::any_of(extruders.begin(), extruders.end(),
-                            [&cfg](unsigned int extruder_id) { return cfg.enable_dynamic_fan_speeds.get_at(extruder_id); })) {
+                            [&cfg](unsigned int extruder_id) { return cfg.overhangs_dynamic_fan_speed.is_enabled(extruder_id); })) {
                 regions_with_dynamic_speeds.insert(pr);
             }
         }
@@ -791,11 +791,31 @@ void PrintObject::calculate_overhanging_perimeters()
                             continue;
                         }
                         size_t prev_layer_id = l->lower_layer ? l->lower_layer->id() : size_t(-1);
+                        assert(layer_region->region().config().overhangs_width_speed.is_enabled());
+                        const double nozzle_diameter_overhangs = layer_region->bridging_flow(frPerimeter).nozzle_diameter();
+                        const double max_width = layer_region->region().config().overhangs_width_speed.get_abs_value(nozzle_diameter_overhangs);
                         layer_region->m_perimeters =
                             ExtrusionProcessor::calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
                                                                                            unscaled_polygons_lines[prev_layer_id],
-                                                                                           curled_lines[l->id()]);
+                                                                                           curled_lines[l->id()],
+                                                                                           max_width);
                     }
+#ifdef _DEBUG
+                    {
+                        struct OverhangAssertVisitor : public ExtrusionVisitorRecursiveConst
+                        {
+                            virtual void default_use(const ExtrusionEntity &entity) override{};
+                            virtual void use(const ExtrusionPath &path) override {
+                                if (path.role().is_overhang())
+                                    assert(path.attributes().overhang_attributes.has_value());
+                            }
+                        };
+                        OverhangAssertVisitor ov_visitor;
+                        for (auto &reg : l->regions()) {
+                            reg->perimeters().visit(ov_visitor);
+                        }
+                    }
+#endif
                 }
             });
 
@@ -931,11 +951,12 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "only_one_perimeter_first_layer"
             || opt_key == "only_one_perimeter_top"
             || opt_key == "only_one_perimeter_top_other_algo"
-            || opt_key == "overhangs_width_speed"
-            || opt_key == "overhangs_width"
+            || opt_key == "overhangs_dynamic_speed"
             || opt_key == "overhangs_reverse"
             || opt_key == "overhangs_reverse_threshold"
             || opt_key == "overhangs_speed_enforce"
+            || opt_key == "overhangs_width_speed"
+            || opt_key == "overhangs_width"
             || opt_key == "perimeter_bonding"
             || opt_key == "perimeter_direction"
             || opt_key == "perimeter_extrusion_change_odd_layers"

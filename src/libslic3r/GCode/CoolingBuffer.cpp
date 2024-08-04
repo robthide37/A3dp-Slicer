@@ -95,7 +95,9 @@ struct CoolingLine
         TYPE_ADJUSTABLE_EMPTY   = 1 << 25,
         // Custom fan speed (introduced for overhang fan speed)
         TYPE_SET_FAN_SPEED      = 1 << 26,
-        TYPE_RESET_FAN_SPEED    = 1 << 27,    };
+        TYPE_RESET_FAN_SPEED    = 1 << 27,
+        TYPE_SET_MIN_FAN_SPEED      = 1 << 28,
+        TYPE_RESET_MIN_FAN_SPEED    = 1 << 29,    };
     static inline GCodeExtrusionRole to_extrusion_role(uint32_t type) {
         return GCodeExtrusionRole(uint8_t(type & 0x1F));
     }
@@ -666,6 +668,17 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_RESTORE_AFTER_WT;
         }
 //FIXME use TYPE_EXTRUDE_START & to_extrusion_role_gcode
+        if (boost::contains(sline, ";_SET_MIN_FAN_SPEED")) {
+            auto speed_start = sline.find_last_of('D');
+            int  speed       = 0;
+            for (char num : sline.substr(speed_start + 1)) {
+                speed = speed * 10 + (num - '0');
+            }
+            line.type |= CoolingLine::TYPE_SET_MIN_FAN_SPEED;
+            line.fan_speed = speed;
+        } else if (boost::contains(sline, ";_RESET_MIN_FAN_SPEED")) {
+            line.type |= CoolingLine::TYPE_RESET_MIN_FAN_SPEED;
+        }
         if (boost::contains(sline, ";_SET_FAN_SPEED")) {
             auto speed_start = sline.find_last_of('D');
             int  speed       = 0;
@@ -981,6 +994,11 @@ std::string CoolingBuffer::apply_layer_cooldown(
     default_fan_speed[ uint8_t(GCodeExtrusionRole::InternalInfill)] = FAN_CONFIG(infill_fan_speed);
     default_fan_speed[ uint8_t(GCodeExtrusionRole::OverhangPerimeter)] = FAN_CONFIG(overhangs_fan_speed);
     default_fan_speed[ uint8_t(GCodeExtrusionRole::GapFill)] = FAN_CONFIG(gap_fill_fan_speed);
+    if (m_config.overhangs_dynamic_fan_speed.is_enabled(m_current_extruder)) {
+        //const GraphData graph = m_config.overhangs_dynamic_fan_speed.get_at(m_current_extruder);
+        //default_fan_speed[ uint8_t(GCodeExtrusionRole::OverhangPerimeter)] = graph.data().front().y();
+        default_fan_speed[ uint8_t(GCodeExtrusionRole::OverhangPerimeter)] =  -1;
+    }
     // if disabled, and default is not default
     if (default_fan_speed[uint8_t(GCodeExtrusionRole::TopSolidInfill)] < 0) {
         default_fan_speed[ uint8_t(GCodeExtrusionRole::TopSolidInfill)] = default_fan_speed[ uint8_t(GCodeExtrusionRole::SolidInfill)];
@@ -995,7 +1013,8 @@ std::string CoolingBuffer::apply_layer_cooldown(
     if (initial_default_fan_speed >= 0) {
         for (int i = 0; i < uint8_t(GCodeExtrusionRole::Count); i++) {
             // this setting is disbaled. As default is not, it will use the default value
-            if (default_fan_speed[i] < 0) {
+            // (but for overhangs that use perimeter/external (they are given by the gcode tags)
+            if (default_fan_speed[i] < 0 && i != uint8_t(GCodeExtrusionRole::OverhangPerimeter)) {
                 default_fan_speed[i] = initial_default_fan_speed;
             }
         }
@@ -1114,6 +1133,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
     int                 stored_fan_speed  = m_fan_speed < 0 ? 0 : m_fan_speed;
     int                 current_fan_speed = -1;
     int                 override_fan_speed = -1;
+    int                 override_min_fan_speed = -1;
     const std::string   comment_speed = m_config.gcode_comments ? " ; speed changed by the cooling algorithm" : "";
     std::pair<int,int> fan_speed_limits = change_extruder_set_fan();
     for (const CoolingLine *line : lines) {
@@ -1140,6 +1160,12 @@ std::string CoolingBuffer::apply_layer_cooldown(
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_START) {
             assert(CoolingLine::to_extrusion_role(uint32_t(line->type)) != GCodeExtrusionRole::None);
             extrude_tree.push_back(CoolingLine::to_extrusion_role(uint32_t(line->type)));
+            fan_need_set = true;
+        } else if (line->type & CoolingLine::TYPE_SET_MIN_FAN_SPEED) {
+            override_min_fan_speed = std::clamp(line->fan_speed, fan_speed_limits.first, fan_speed_limits.second);
+            fan_need_set = true;
+        } else if (line->type & CoolingLine::TYPE_RESET_MIN_FAN_SPEED){
+            override_min_fan_speed = -1;
             fan_need_set = true;
         } else if (line->type & CoolingLine::TYPE_SET_FAN_SPEED) {
             override_fan_speed = std::clamp(line->fan_speed, fan_speed_limits.first, fan_speed_limits.second);
@@ -1259,34 +1285,55 @@ std::string CoolingBuffer::apply_layer_cooldown(
             new_gcode.append(line_start, line_end - line_start);
         }
         if (fan_need_set) {
-            if (override_fan_speed >= 0) {
-                    new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, override_fan_speed,
-                                                      EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
-                                                      "set override fan");
+            if (override_fan_speed >= 0 && override_fan_speed > current_fan_speed) {
+                current_fan_speed = override_fan_speed;
+                new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, current_fan_speed,
+                                                  EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                                  "set override fan");
             } else {
                 //use the most current fan
                 bool fan_set = false;
                 for (size_t i = extrude_tree.size() - 1; i < extrude_tree.size(); --i) {
+                    // if not overhangs, then get the prvious one (preimeter or external perimeter)
+                    if(extrude_tree[i] == GCodeExtrusionRole::OverhangPerimeter)
+                        std::cout<<"overhangs\n";
+                    // override_min_fan_speed override overhang speed.
+                    //if(override_min_fan_speed > 0 && extrude_tree[i] == GCodeExtrusionRole::OverhangPerimeter)
+                    //    continue;
                     if (fan_control[uint8_t(extrude_tree[i])]) {
-                        if (current_fan_speed != fan_speeds[uint8_t(extrude_tree[i])]) {
+                        if (std::max(override_min_fan_speed, fan_speeds[uint8_t(extrude_tree[i])]) != current_fan_speed) {
                             current_fan_speed = fan_speeds[uint8_t(extrude_tree[i])];
-                            std::string extrusion_str = gcode_extrusion_role_to_string((extrude_tree[i]));
+                            std::string comment;
+                            if (override_min_fan_speed > current_fan_speed) {
+                                current_fan_speed = override_min_fan_speed;
+                                comment = "set override fan";
+                            } else {
+                                comment = std::string("set fan for ") + gcode_extrusion_role_to_string((extrude_tree[i]));
+                            }
                             new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments,
-                                                          fan_speeds[uint8_t(extrude_tree[i])],
+                                                          current_fan_speed,
                                                           EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
-                                                          std::string("set fan for ") + extrusion_str);
+                                                          comment);
                         }
                         fan_set = true;
                         break;
                     }
                 }
-                if (!fan_set && m_fan_speed >= 0 ) {
-                    if (current_fan_speed != m_fan_speed && (default_fan_speed[0] >= 0 || current_fan_speed > 0)) {
+                if (!fan_set && m_fan_speed >= 0) {
+                    if(std::max(override_min_fan_speed, m_fan_speed) != current_fan_speed  && (default_fan_speed[0] >= 0 || current_fan_speed > 0)) {
                         current_fan_speed = m_fan_speed;
+                        std::string comment;
+                        if (override_min_fan_speed > current_fan_speed) {
+                            current_fan_speed = override_min_fan_speed;
+                            comment = "set override fan";
+                        } else {
+                            comment = "set default fan";;
+                        }
                         // return to default
-                        new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed < 0 ? 0 : m_fan_speed,
-                                                      EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
-                                                      "set default fan");
+                        new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments,
+                                                          current_fan_speed < 0 ? 0 : current_fan_speed,
+                                                          EXTRUDER_CONFIG(extruder_fan_offset),
+                                                          m_config.fan_percentage, comment);
                     }
                     fan_set = true;
                 }

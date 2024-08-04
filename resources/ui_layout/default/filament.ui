@@ -47,20 +47,12 @@ group:Fan speed - default
 		setting:id$0:label_width$12:label$Internal bridges:internal_bridge_fan_speed
 	line:Overhangs Perimeter fan speed
 		setting:id$0:label_width$12:label$Overhangs:overhangs_fan_speed
+        setting:id$0:overhangs_dynamic_fan_speed
 	line:Gap fill fan speed
 		setting:id$0:label_width$12:label$Gap fill:gap_fill_fan_speed
 	line:Disable fan for the first
 		setting:id$0:width$5:label$_:sidetext_width$7:disable_fan_first_layers
 		setting:id$0:width$5:label_width$18:full_fan_speed_layer
-	end_line
-		
-group:Dynamic Overhangs fan speeds
-	line:Enable fan speed for a % overlap
-		setting:id$0:label$_:enable_dynamic_fan_speeds
-		setting:id$0:label$0% (bridge):overhang_fan_speed_0
-		setting:id$0:label$25%:overhang_fan_speed_1
-		setting:id$0:label$50%:overhang_fan_speed_2
-		setting:id$0:label$75%:overhang_fan_speed_3
 	end_line
 group:Short layer time - began to increase base fan speed
 	setting:id$0:fan_below_layer_time

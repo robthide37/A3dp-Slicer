@@ -2533,7 +2533,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
         double wanted_width = unscaled(line.a_width);
         //if gapfill or arachne, the width is in fact the spacing.
         if (role != ExtrusionRole::ThinWall) {
-            if (role == ExtrusionRole::OverhangPerimeter && flow.bridge()) {
+            if (role.is_overhang() && flow.bridge()) {
                 // for Arachne overhangs: keep the bridge width.
                 wanted_width = flow.width();
             } else {

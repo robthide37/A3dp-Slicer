@@ -92,6 +92,7 @@ public:
     void        set_extra_lift(double extra_zlift) { this->m_extra_lift = extra_zlift; }
     double      get_extra_lift() const { return this->m_extra_lift; }
     double      get_lift() const { return this->m_lifted; } // for placeholder
+    double      set_lift() const { return this->m_lifted; } // for placeholder
     std::string lift(int layer_id);
     std::string unlift();
 

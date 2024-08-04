@@ -248,20 +248,19 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
     return points;
 }
 
-ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath                             &path,
-                                                          const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
-                                                          const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
+//ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath                             &path,
+//                                                          const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
+//                                                          const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
 
 ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(
     const ExtrusionEntityCollection                 *ecc,
     const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
-    const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
+    const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines,
+    const double max_width);
 
 std::pair<float, float> calculate_overhang_speed(const ExtrusionAttributes &attributes,
                                                  const FullPrintConfig     &config,
-                                                 size_t                     extruder_id,
-                                                 float                      external_perim_reference_speed,
-                                                 float                      default_speed);
+                                                 size_t                     extruder_id);
 
 }} // namespace Slic3r::ExtrusionProcessor
 

@@ -151,7 +151,7 @@ public:
     /// Returns a flattened copy of this ExtrusionEntityCollection. That is, all of the items in its entities() vector are not collections.
     /// You should be iterating over flatten().entities() if you are interested in the underlying ExtrusionEntities (and don't care about hierarchy).
     /// \param preserve_ordering Flag to method that will flatten if and only if the underlying collection is sortable when True (default: False).
-    ExtrusionEntityCollection flatten(bool preserve_ordering = false) const;
+    ExtrusionEntityCollection flatten(bool preserve_ordering) const;
     void flatten(bool preserve_ordering, ExtrusionEntityCollection& out) const;
     double total_volume() const override { double volume=0.; for (const auto& ent : entities()) volume+=ent->total_volume(); return volume; }
 

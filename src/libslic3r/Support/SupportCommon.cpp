@@ -1185,7 +1185,7 @@ static void modulate_extrusion_by_overlapping_layers(
         return;
 
     // TODO: should preserve the unsortable things
-    ExtrusionEntityCollection flatten_extrusions_in_out = extrusions_in_out.flatten();
+    ExtrusionEntityCollection flatten_extrusions_in_out = extrusions_in_out.flatten(false);
 
     // Get the initial extrusion parameters.
     GetFirstPath getFirstPathVisitor;

@@ -517,8 +517,8 @@ ObjectPart::ObjectPart(
         if (collection->empty()) {
             continue;
         }
-
-        for (const ExtrusionEntity* entity: collection->flatten()) {
+        ExtrusionEntityCollection coll = collection->flatten(false);
+        for (const ExtrusionEntity* entity: coll.entities()) {
             Polylines polylines;
             std::vector<float> widths;
 
@@ -1244,8 +1244,8 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
     for (SupportLayer *l : layers) {
         l->curled_lines.clear();
         std::vector<ExtrusionLine> current_layer_lines;
-
-        for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities()) {
+        ExtrusionEntityCollection coll = l->support_fills.flatten(false);
+        for (const ExtrusionEntity *extrusion : coll.entities()) {
             Polyline pl = extrusion->as_polyline().to_polyline(scale_t(flow_width*4));
             Polygon  pol(pl.points);
             pol.make_counter_clockwise();
@@ -1319,7 +1319,8 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
         AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
         std::vector<ExtrusionLine>           current_layer_lines;
         for (const LayerRegion *layer_region : l->regions()) {
-            for (const ExtrusionEntity *extrusion : layer_region->perimeters().flatten().entities()) {
+            ExtrusionEntityCollection collection = layer_region->perimeters().flatten(false);
+            for (const ExtrusionEntity *extrusion : collection.entities()) {
                 if (!extrusion->role().is_external_perimeter())
                     continue;
 

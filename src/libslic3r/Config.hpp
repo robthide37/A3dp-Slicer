@@ -556,7 +556,7 @@ public:
     // Like FCO_EXTRUDER_ARRAY that is a copy of the def, this is the copy of the def to replicate is_nullable()
     bool                        can_be_disabled()		const { return (flags & FCO_CAN_DISABLED) != 0; }
     // should only be set by configdef when a new item is requested. It also set it as disabled if you set the arg to true.
-    ConfigOption*               set_can_be_disabled(bool force_disabled = true) { this->flags |= FCO_CAN_DISABLED; if(force_disabled) set_enabled(false); return this; }
+    ConfigOption*               set_can_be_disabled(bool force_disabled = false) { this->flags |= FCO_CAN_DISABLED; if(force_disabled) set_enabled(false); return this; }
 
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }

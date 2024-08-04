@@ -68,10 +68,11 @@ struct Parameters
 
     // cached parameters
     Polygons lower_slices_bridge;
-    Polygons lower_slices_bridge_flow_small;
-    Polygons lower_slices_bridge_flow_big;
+    Polygons lower_slices_bridge_dynamic;
     Polygons lower_slices_bridge_speed_small;
     Polygons lower_slices_bridge_speed_big;
+    Polygons lower_slices_bridge_flow_small;
+    Polygons lower_slices_bridge_flow_big;
 
     Parameters(Layer                   *layer,
                Flow                     perimeter_flow,

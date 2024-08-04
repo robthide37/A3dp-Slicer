@@ -268,17 +268,17 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         // Ask only once.
         if (!m_support_material_overhangs_queried) {
             m_support_material_overhangs_queried = true;
-            if (config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed") == 0) {
+            if (!config->option("overhangs_width_speed")->is_enabled()) {
                 wxString msg_text = _(L("Supports work better, if the following feature is enabled:\n"
-                    "- overhangs with bridge speed & fan"));
+                    "- overhangs threshold for speed & fan"));
                 if (is_global_config) {
                     msg_text += "\n\n" + _(L("Shall I adjust those settings for supports?"));
-                MessageDialog dialog(m_msg_dlg_parent, msg_text, _L("Support Generator"), wxICON_WARNING | wxYES | wxNO);
-                    DynamicPrintConfig new_conf = *config;
-                    auto answer = dialog.ShowModal();
-                if (answer == wxID_YES) {
+                    MessageDialog dialog(m_msg_dlg_parent, msg_text, _L("Support Generator"), wxICON_WARNING | wxYES | wxNO);
+                        DynamicPrintConfig new_conf = *config;
+                        auto answer = dialog.ShowModal();
+                    if (answer == wxID_YES) {
                         // Enable "detect bridging perimeters".
-                        new_conf.set_key_value("overhangs_width_speed", new ConfigOptionFloatOrPercent(50, true));
+                        new_conf.set_key_value("overhangs_width_speed", config->option("overhangs_width_speed")->clone()->set_enabled(true));
                     } else if (answer == wxID_NO) {
                         // Do nothing, leave supports on and "detect bridging perimeters" off.
                     } else if (answer == wxID_CANCEL) {
@@ -346,7 +346,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         "overhangs",
         "seam_position","staggered_inner_seams",
         "perimeter_speed", "perimeter_reverse", "perimeter_generator",
-        "external_perimeter_speed", "small_perimeter_speed", "enable_dynamic_overhang_speeds",
+        "external_perimeter_speed", "small_perimeter_speed", "overhangs_dynamic_speed",
         "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
         "seam_notch_all", "seam_notch_inner", "seam_notch_outer"})
         toggle_field(el, have_perimeters);
@@ -372,7 +372,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("no_perimeter_unsupported_algo", have_perimeters);
     toggle_field("only_one_perimeter_top", have_perimeters);
     toggle_field("only_one_perimeter_first_layer", config->opt_int("perimeters") > 1);
-    toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0);
+    toggle_field("overhangs_width", config->option("overhangs_width_speed")->is_enabled());
     bool have_overhangs_reverse = have_perimeters && !have_arachne && !config->opt_bool("perimeter_reverse");
     toggle_field("overhangs_reverse", have_overhangs_reverse);
     toggle_field("overhangs_reverse_threshold", have_overhangs_reverse && config->opt_bool("overhangs_reverse"));

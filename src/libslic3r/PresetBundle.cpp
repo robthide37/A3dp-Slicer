@@ -783,6 +783,7 @@ DynamicPrintConfig PresetBundle::full_fff_config() const
                 // Setting a vector value from all filament_configs.
                 for (size_t i = 0; i < filament_opts.size(); ++ i)
                     filament_opts[i] = filament_configs[i]->option(key);
+                std::string opt_key_str = key;
                 static_cast<ConfigOptionVectorBase*>(opt_dst)->set(filament_opts);
             }
         }

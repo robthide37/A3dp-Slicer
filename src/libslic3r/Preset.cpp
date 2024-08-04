@@ -560,7 +560,7 @@ static std::vector<std::string> s_Preset_print_options {
         "first_layer_min_speed",
         "first_layer_speed_over_raft",
         "infill_speed",
-        "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3",
+        "overhangs_dynamic_speed",
         "perimeter_speed",
         "small_perimeter_speed",
         "small_perimeter_max_length",
@@ -822,6 +822,7 @@ static std::vector<std::string> s_Preset_filament_options {
         "infill_fan_speed",
         "internal_bridge_fan_speed",
         "overhangs_fan_speed",
+        "overhangs_dynamic_fan_speed",
         "perimeter_fan_speed",
         "solid_infill_fan_speed",
         "support_material_fan_speed",
@@ -834,8 +835,7 @@ static std::vector<std::string> s_Preset_filament_options {
         "max_speed_reduction",
         "min_print_speed",
         // custom gcode
-    "start_filament_gcode", "end_filament_gcode",
-    "enable_dynamic_fan_speeds", "overhang_fan_speed_0", "overhang_fan_speed_1", "overhang_fan_speed_2", "overhang_fan_speed_3",
+        "start_filament_gcode", "end_filament_gcode",
         // Retract overrides
         "filament_retract_length", "filament_retract_lift", "filament_retract_lift_above", "filament_retract_lift_below", 
         "filament_retract_length_toolchange",

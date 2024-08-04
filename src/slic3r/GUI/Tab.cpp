@@ -3393,7 +3393,8 @@ void TabFilament::toggle_options()
         // bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
 
         //get_field("max_fan_speed")->toggle_widget_enable(m_config->opt_float("fan_below_layer_time", 0) > 0);
-        //toggle_option("min_print_speed", m_config->opt_float("slowdown_below_layer_time", 0) > 0);
+        toggle_option("min_print_speed", m_config->opt_float("slowdown_below_layer_time", 0) > 0);
+        toggle_option("max_speed_reduction", m_config->opt_float("slowdown_below_layer_time", 0) > 0);
 
         // hidden 'cooling', it's now deactivated.
              //for (auto el : { "min_fan_speed", "disable_fan_first_layers" })
@@ -3406,12 +3407,9 @@ void TabFilament::toggle_options()
 
         toggle_option("max_fan_speed", 
             m_config->opt_float("fan_below_layer_time", 0) > 0 
-            || m_config->opt_float("slowdown_below_layer_time", 0) > 0);
+            || m_config->opt_float("slowdown_below_layer_time", 0) > 0, 0);
 
-        bool dynamic_fan_speeds = m_config->opt_bool("enable_dynamic_fan_speeds", 0);
-        for (int i = 0; i < 4; i++) {
-            toggle_option("overhang_fan_speed_"+std::to_string(i),dynamic_fan_speeds);
-        }
+        toggle_option("overhangs_fan_speed", !m_config->is_enabled("overhangs_dynamic_fan_speed", 0), 0);
     }
 
     //if (m_active_page->title() == "Advanced")

@@ -673,20 +673,11 @@ void Layer::make_perimeters()
                     if (! (*it)->slices().empty()) {
                         LayerRegion             *other_layerm                         = *it;
                         const PrintRegionConfig &other_config                         = other_layerm->region().config();
-                        bool                     dynamic_overhang_speed_compatibility = config.enable_dynamic_overhang_speeds ==
-                                                                    other_config.enable_dynamic_overhang_speeds;
-                        if (dynamic_overhang_speed_compatibility && config.enable_dynamic_overhang_speeds) {
-                            dynamic_overhang_speed_compatibility = config.overhang_speed_0 == other_config.overhang_speed_0 &&
-                                                                   config.overhang_speed_1 == other_config.overhang_speed_1 &&
-                                                                   config.overhang_speed_2 == other_config.overhang_speed_2 &&
-                                                                   config.overhang_speed_3 == other_config.overhang_speed_3;
-                        }
                         /// !!! add here the settings you want to be added in the per-object menu.
                         /// if you don't do that, objects will share the same region, and the same settings.
                         if (config.perimeter_extruder             == other_config.perimeter_extruder
                             && config.perimeters                  == other_config.perimeters
                             && config.external_perimeter_acceleration == other_config.external_perimeter_acceleration
-                            && dynamic_overhang_speed_compatibility
                             && config.external_perimeter_extrusion_width == other_config.external_perimeter_extrusion_width
                             && config.external_perimeter_overlap == other_config.external_perimeter_overlap
                             && config.external_perimeter_speed == other_config.external_perimeter_speed // it os mandatory? can't this be set at gcode.cpp?
@@ -715,6 +706,7 @@ void Layer::make_perimeters()
                             && config.only_one_perimeter_top    == other_config.only_one_perimeter_top
                             && config.only_one_perimeter_top_other_algo == other_config.only_one_perimeter_top_other_algo
                             && config.overhangs_acceleration    == other_config.overhangs_acceleration
+                            && config.overhangs_dynamic_speed   == other_config.overhangs_dynamic_speed
                             && config.overhangs_width_speed     == other_config.overhangs_width_speed
                             && config.overhangs_width           == other_config.overhangs_width
                             && config.overhangs_reverse         == other_config.overhangs_reverse
