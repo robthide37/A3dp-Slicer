@@ -543,6 +543,7 @@ private:
     std::string m_gcode_label_objects_start;
     std::string m_gcode_label_objects_end;
     bool m_gcode_label_objects_in_session = false;
+    ObjectID m_gcode_label_objects_last_object_id = -1;
     void _add_object_change_labels(std::string &gcode);
     void ensure_end_object_change_labels(std::string &gcode);
 

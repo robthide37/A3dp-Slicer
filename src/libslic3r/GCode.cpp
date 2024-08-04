@@ -3176,9 +3176,15 @@ LayerResult GCodeGenerator::process_layer(
         m_enable_loop_clipping = !enable;
     }
 
-
     std::string gcode;
     assert(is_decimal_separator_point()); // for the sprintfs
+
+    // unless this layer print only this object, it needs to end here so the layer change won't be skipped.
+    if (layers.size() > 1
+        || layers.front().object()->id() != m_gcode_label_objects_last_object_id
+        || layers.front().object()->instances().size() > 1) {
+        ensure_end_object_change_labels(gcode);
+    }
 
     // add tag for processor
     gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change) + "\n";
@@ -3211,6 +3217,7 @@ LayerResult GCodeGenerator::process_layer(
             print.config().before_layer_gcode.value, m_writer.tool()->id(), &config)
             + "\n";
     }
+
     // print z move to next layer UNLESS (HACK for superslicer#1775)
     // if it's going to the first layer, then we may want to delay the move in these condition:
     // there is no "after layer change gcode" and it's the first move from the unknown
@@ -3587,8 +3594,8 @@ void GCodeGenerator::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_current_instance = next_instance;
             this->set_origin(unscale(offset));
-            assert(!m_gcode_label_objects_in_session);
             m_gcode_label_objects_start = m_label_objects.start_object(instance, GCode::LabelObjects::IncludeName::No);
+            m_gcode_label_objects_last_object_id = print_object.id();
             
             if (!print_args.print_instance.print_object.config().object_gcode.value.empty()) {
                 DynamicConfig config;
