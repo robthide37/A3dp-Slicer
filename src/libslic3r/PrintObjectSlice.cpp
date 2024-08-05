@@ -12,6 +12,7 @@
 #include "MultiMaterialSegmentation.hpp"
 #include "Print.hpp"
 #include "ShortestPath.hpp"
+#include "Thread.hpp"
 
 #include <boost/log/trivial.hpp>
 
@@ -1356,10 +1357,8 @@ void PrintObject::slice_volumes()
         ////	0.f;
         // Uncompensated slices for the first layer in case the Elephant foot compensation is applied.
 	    //ExPolygons  lslices_1st_layer;
-	    tbb::parallel_for(
-	        tbb::blocked_range<size_t>(0, m_layers.size()),
-			[this](const tbb::blocked_range<size_t>& range) {
-	            for (size_t layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
+        Slic3r::parallel_for(size_t(0), m_layers.size(),
+            [this](const size_t layer_id) {
 	                m_print->throw_if_canceled();
 	                Layer *layer = m_layers[layer_id];
 	                // Apply size compensation and perform clipping of multi-part objects.
@@ -1496,9 +1495,9 @@ void PrintObject::slice_volumes()
                     //    m_layers.front()->lslices = offset_ex(std::move(m_layers.front()->lslices), -first_layer_compensation);
                     //    m_layers.front()->lslice_indices_sorted_by_print_order = chain_expolygons(layer.lslices);
                     //}
-	            }
-	        });
-	}
+                }
+            );
+    }
 
     m_print->throw_if_canceled();
     BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - make_slices in parallel - end";
@@ -1543,13 +1542,13 @@ std::vector<Polygons> PrintObject::slice_support_volumes(const ModelVolumeType m
         if (merge) {
             std::vector<Polygons*> to_merge;
             to_merge.reserve(zs.size());
-            for (size_t i = 0; i < zs.size(); ++ i)
-                if (merge_layers[i])
+            for (size_t i = 0; i < zs.size(); ++ i) {
+                if (merge_layers[i]) {
                     to_merge.emplace_back(&slices[i]);
-            tbb::parallel_for(
-                tbb::blocked_range<size_t>(0, to_merge.size()),
-                [&to_merge](const tbb::blocked_range<size_t> &range) {
-                    for (size_t i = range.begin(); i < range.end(); ++ i)
+                }
+            }
+            Slic3r::parallel_for(size_t(0), to_merge.size(),
+                [&to_merge](const size_t i) {
                         *to_merge[i] = union_(*to_merge[i]);
             });
         }

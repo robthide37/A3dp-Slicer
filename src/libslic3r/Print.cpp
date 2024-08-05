@@ -1150,13 +1150,13 @@ void Print::process()
     bool something_done = !is_step_done_unguarded(psSkirtBrim);
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_objects.size(), 1), [this](const tbb::blocked_range<size_t> &range) {
-        for (size_t idx = range.begin(); idx < range.end(); ++idx) {
+    Slic3r::parallel_for(size_t(0), m_objects.size(),
+        [this](const size_t idx) {
             m_objects[idx]->make_perimeters();
             m_objects[idx]->infill();
             m_objects[idx]->ironing();
         }
-    }, tbb::simple_partitioner());
+    );
 
     // The following step writes to m_shared_regions, it should not run in parallel.
     for (PrintObject *obj : m_objects)
@@ -1166,14 +1166,14 @@ void Print::process()
     alert_when_supports_needed();
 
     this->set_status(50, L("Generating support material"));
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_objects.size(), 1), [this](const tbb::blocked_range<size_t> &range) {
-        for (size_t idx = range.begin(); idx < range.end(); ++idx) {
+    Slic3r::parallel_for(size_t(0), m_objects.size(),
+        [this](const size_t idx) {
             PrintObject &obj = *m_objects[idx];
             obj.generate_support_material();
             obj.estimate_curled_extrusions();
             obj.calculate_overhanging_perimeters();
         }
-    }, tbb::simple_partitioner());
+    );
 
     if (this->set_started(psWipeTower)) {
         m_wipe_tower_data.clear();

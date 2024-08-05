@@ -18,6 +18,7 @@
 #include "PrintBase.hpp"
 #include "PrintConfig.hpp"
 #include "Tesselate.hpp"
+#include "Thread.hpp"
 #include "Utils.hpp"
 #include "libslic3r.h"
 #include "tbb/parallel_for.h"
@@ -259,16 +260,14 @@ PrecomputedSliceConnections precompute_slices_connections(const PrintObject *po)
         }
     }
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()), [po, &result](tbb::blocked_range<size_t> r) {
-        for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
+    Slic3r::parallel_for(size_t(0), po->layers().size(), [po, &result](size_t lidx) {
             const Layer *l = po->get_layer(lidx);
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, l->lslices_ex.size()), [lidx, l, &result](tbb::blocked_range<size_t> r2) {
-                for (size_t slice_idx = r2.begin(); slice_idx < r2.end(); slice_idx++) {
+            Slic3r::parallel_for(size_t(0), l->lslices_ex.size(), [lidx, l, &result](size_t slice_idx) {
                     result[lidx][slice_idx] = estimate_slice_connection(slice_idx, l);
                 }
-            });
+            );
         }
-    });
+    );
 
     return result;
 };

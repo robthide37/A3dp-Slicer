@@ -72,6 +72,15 @@ template<class Fn> inline boost::thread create_thread(Fn &&fn)
     return create_thread(attrs, std::forward<Fn>(fn));    
 }
 
+#ifdef _DEBUG
+// TODO: sort items idx by difficulty, so we can process the most difficult first.
+// for now, only used to swi
+void parallel_for(size_t begin, size_t size, std::function<void(size_t)> process_one_item);
+void not_parallel_for(size_t begin, size_t size, std::function<void(size_t)> process_one_item);
+#else
+using tbb::parallel_for;
+#endif
+
 class ThreadData {
 public:
     std::mt19937&   random_generator() {
