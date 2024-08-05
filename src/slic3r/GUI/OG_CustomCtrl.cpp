@@ -871,12 +871,7 @@ wxCoord OG_CustomCtrl::CtrlLine::draw_mode_bmp(wxDC& dc, wxCoord v_pos)
     if (og_line.get_options().front().opt.gui_type != ConfigOptionDef::GUIType::legend)
         dc.DrawBitmap(bmp->GetBitmapFor(ctrl), 0, y_draw);
 
-    if (!(get_bitmap_size(bmp, ctrl).GetWidth() == pix_cnt)) {
-        int measured_w = get_bitmap_size(bmp, ctrl).GetWidth();
-        int measured_h = get_bitmap_size(bmp, ctrl).GetHeight();
-        bmp = get_bmp_bundle("mode", pix_cnt, pix_cnt, wxGetApp().get_first_mode_btn_color(mode));
-    }
-    assert(get_bitmap_size(bmp, ctrl).GetWidth() == pix_cnt); // sometimes bigger.
+    // get_bitmap_size(bmp, ctrl).GetWidth() can be bigger than pix_cnt if the screen has a scaling
     return get_bitmap_size(bmp, ctrl).GetWidth() + ctrl->m_h_gap;
 }
 
