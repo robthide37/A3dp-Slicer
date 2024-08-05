@@ -15,6 +15,7 @@
 #include <boost/math/special_functions/pow.hpp>
 
 #include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
 
 // Forward declarations.
 namespace Slic3r {
@@ -185,8 +186,9 @@ std::vector<double> linspace(const double from, const double to, const unsigned 
 ElevatedTravelParams get_elevated_traval_params(
     const Polyline& xy_path,
     const FullPrintConfig &config,
-    const unsigned extruder_id,
-    const GCode::TravelObstacleTracker &obstacle_tracker
+    GCodeWriter writer,
+    const GCode::TravelObstacleTracker &obstacle_tracker,
+    size_t layer_id
 );
 
 /**
@@ -231,18 +233,6 @@ double get_first_crossed_line_distance(
     const std::function<bool(const ObjectOrExtrusionLinef &)> &predicate = [](const ObjectOrExtrusionLinef &) { return true; },
     bool ignore_starting_object_intersection = true);
 
-/**
- * @brief Extract parameters and decide wheather the travel can be elevated.
- * Then generate the whole travel 3D path - elevated if possible.
- */
-Points3 generate_travel_to_extrusion(
-    const Polyline &xy_path,
-    const FullPrintConfig &config,
-    const unsigned extruder_id,
-    const double initial_elevation,
-    const GCode::TravelObstacleTracker &obstacle_tracker,
-    const Point &xy_path_coord_origin
-);
 } // namespace Slic3r::GCode::Impl::Travels
 
 #endif // slic3r_GCode_Travels_hpp_

@@ -395,13 +395,19 @@ SmoothingParams get_smoothing_params(
 ElevatedTravelParams get_elevated_traval_params(
     const Polyline& xy_path,
     const FullPrintConfig &config,
-    const unsigned extruder_id,
-    const GCode::TravelObstacleTracker &obstacle_tracker
+    GCodeWriter writer,
+    const GCode::TravelObstacleTracker &obstacle_tracker,
+    size_t layer_id
 ) {
     ElevatedTravelParams elevation_params{};
+    assert(writer.tool());
+    uint16_t extruder_id  = writer.tool()->id();
     if (!config.travel_ramping_lift.get_at(extruder_id)) {
         elevation_params.slope_end = 0;
-        elevation_params.lift_height = config.retract_lift.get_at(extruder_id);
+        writer.lift(layer_id);
+        elevation_params.lift_height = writer.get_position().z();
+        writer.unlift();
+        elevation_params.lift_height -= writer.get_position().z();
         elevation_params.blend_width = 0;
         return elevation_params;
     }
@@ -445,44 +451,6 @@ std::vector<double> linspace(const double from, const double to, const unsigned 
         result.emplace_back(from + i * step);
     }
     result.emplace_back(to); // Make sure the last value is exactly equal to the value of "to".
-    return result;
-}
-
-Points3 generate_travel_to_extrusion(
-    const Polyline &xy_path,
-    const FullPrintConfig &config,
-    const unsigned extruder_id,
-    const double initial_elevation,
-    const GCode::TravelObstacleTracker &obstacle_tracker,
-    const Point &xy_path_coord_origin
-) {
-    const double upper_limit = config.retract_lift_below.get_at(extruder_id);
-    const double lower_limit = config.retract_lift_above.get_at(extruder_id);
-    if ((lower_limit > 0 && initial_elevation < lower_limit) ||
-        (upper_limit > 0 && initial_elevation > upper_limit)) {
-        return generate_flat_travel(xy_path.points, initial_elevation);
-    }
-
-    Points global_xy_path;
-    for (const Point &point : xy_path.points) {
-        global_xy_path.emplace_back(point + xy_path_coord_origin);
-    }
-
-    ElevatedTravelParams elevation_params{get_elevated_traval_params(
-        Polyline{std::move(global_xy_path)}, config, extruder_id, obstacle_tracker
-    )};
-
-    const std::vector<double> ensure_points_at_distances = linspace(
-        elevation_params.slope_end - elevation_params.blend_width / 2.0,
-        elevation_params.slope_end + elevation_params.blend_width / 2.0,
-        elevation_params.parabola_points_count
-    );
-    Points3 result{generate_elevated_travel(
-        xy_path.points, ensure_points_at_distances, initial_elevation,
-        ElevatedTravelFormula{elevation_params}
-    )};
-
-    result.emplace_back(xy_path.back().x(), xy_path.back().y(), scaled(initial_elevation));
     return result;
 }
 } // namespace Slic3r::GCode::Impl::Travels

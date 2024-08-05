@@ -153,11 +153,13 @@ public:
             return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
                 - m_writer.current_tool_offset();
         } else {
+            assert(false);
             const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
             return to_3d(gcode_point_xy, unscaled(point.z()));
         }
     }
-
+    Vec2d point2d_to_gcode(const Point &point) const;
+    Vec3d point3d_to_gcode(const Vec3crd &point) const;
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
     template<typename Derived>
     Vec2d           point_to_gcode_quantized(const Eigen::MatrixBase<Derived> &point) const {
@@ -165,7 +167,7 @@ public:
         Vec2d p = this->point_to_gcode(point);
         return m_writer.get_default_gcode_formatter().quantize(p);
     }
-    Vec3d           point_to_gcode(const Point &point, coord_t z_offset) const;
+    Vec3d           point_to_gcode(const Point &point, coord_t z_pos) const;
     Point           gcode_to_point(const Vec2d &point) const;
     const FullPrintConfig &config() const { return m_config; }
     const Layer*    layer() const { return m_layer; }
@@ -243,8 +245,6 @@ private:
     static ObjectsLayerToPrint         		                     collect_layers_to_print(const PrintObject &object, Print::StatusMonitor &status_monitor);
     static std::vector<std::pair<coordf_t, ObjectsLayerToPrint>> collect_layers_to_print(const Print &print, Print::StatusMonitor &status_monitor);
 
-    /** @brief Generates ramping travel gcode for layer change. */
-    std::string get_layer_change_gcode(const Vec3d& from, const Vec3d& to, const unsigned extruder_id);
 
     LayerResult process_layer(
         const Print                     &print,
@@ -284,11 +284,7 @@ private:
     
     void            set_extruders(const std::vector<uint16_t> &extruder_ids);
     std::string     preamble();
-    std::string change_layer(
-        double previous_layer_z,
-        double print_z,
-        bool vase_mode
-    );
+    std::string change_layer(double print_z);
 
     std::string      visitor_gcode;
     bool             visitor_flipped; //TODO use instead of reverse() at extrude_entity
@@ -383,8 +379,9 @@ private:
          bool& could_be_wipe_disabled
      );
     Polyline        travel_to(std::string& gcode, const Point &end_point, ExtrusionRole role);
-    void            write_travel_to(std::string& gcode, const Polyline& travel, std::string comment);
-    std::string     travel_to_first_position(const Vec3crd& point);
+    void            write_travel_to(std::string& gcode, Polyline& travel, std::string comment);
+    std::vector<coord_t> get_travel_elevation(Polyline& travel);
+    //std::string     travel_to_first_position(const Vec3crd& point);
     bool            can_cross_perimeter(const Polyline& travel, bool offset);
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None, coordf_t max_min_dist = 0);
 
@@ -502,10 +499,8 @@ private:
     const PrintInstance*                m_last_instance {nullptr};
     std::optional<Point>                m_last_pos;
 
-    std::optional<Vec3d>                m_previous_layer_last_position;
-    std::optional<Vec3d>                m_previous_layer_last_position_before_wipe;
-    // This needs to be populated during the layer processing!
-    std::optional<Vec3d>                m_current_layer_first_position;
+    bool                                m_new_layer = false;
+
     double                              m_current_perimeter_extrusion_width = 0.4;
     std::optional<unsigned>             m_layer_change_extruder_id;
     // bool                                m_already_unretracted{false};
