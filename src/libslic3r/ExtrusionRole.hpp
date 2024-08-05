@@ -179,7 +179,7 @@ struct ExtrusionRole
 {
 private:
     ExtrusionRoleModifier m;
-    static constexpr const ExtrusionRoleModifier BaseType{ERM_Perimeter | ERM_Infill | ERM_Support | ERM_Skirt | ERM_Wipe | ERM_Mill | ERM_Travel | ERM_Thin | ERM_Mixed};
+    static constexpr const ExtrusionRoleModifier BaseType{ERM_Perimeter | ERM_Infill | ERM_Support | ERM_Skirt | ERM_Wipe | ERM_Mill | ERM_Travel | ERM_Mixed};
 public:
     ExtrusionRole() = delete;
     ExtrusionRole(ExtrusionRoleModifier mods) : m(mods) {
@@ -227,8 +227,8 @@ public:
         ExtrusionRoleModifier::ERM_Infill | ExtrusionRoleModifier::ERM_Solid | ExtrusionRoleModifier::ERM_Bridge};
     // Gap fill extrusion, currently used for any variable width extrusion: Thin walls outside of the outer extrusion,
     // gap fill in between perimeters, gap fill between the inner perimeter and infill.
-    static constexpr const ExtrusionRoleModifier GapFill{ExtrusionRoleModifier::ERM_Thin};
-    static constexpr const ExtrusionRoleModifier ThinWall{ExtrusionRoleModifier::ERM_Thin |
+    static constexpr const ExtrusionRoleModifier GapFill{ExtrusionRoleModifier::ERM_Mixed |ExtrusionRoleModifier::ERM_Thin};
+    static constexpr const ExtrusionRoleModifier ThinWall{ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Thin |
                                                           ExtrusionRoleModifier::ERM_External};
     static constexpr const ExtrusionRoleModifier Skirt{ExtrusionRoleModifier::ERM_Skirt};
     // Support base material, printed with non-soluble plastic.
@@ -247,7 +247,7 @@ public:
     
     bool is_perimeter() const { return (m & ExtrusionRoleModifier::ERM_Perimeter); }
     bool is_external_perimeter() const { return this->is_perimeter() && this->is_external(); }
-    bool is_overhang() const { return (m & (ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Bridge)); }
+    bool is_overhang() const { return (m & (ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Bridge)) == (ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Bridge); }
     bool is_infill() const { return (m & ExtrusionRoleModifier::ERM_Infill); }
     bool is_solid_infill() const { return this->is_infill() && (m & ExtrusionRoleModifier::ERM_Solid); }
     bool is_sparse_infill() const { return this->is_infill() && !(m & ExtrusionRoleModifier::ERM_Solid); }
@@ -278,7 +278,7 @@ public:
     bool operator<( ExtrusionRole const & rhs ) const { return m < rhs.m; }
 
     // like operators but not operators
-    bool has(ExtrusionRoleModifier r) const { return m & r; }
+    bool has(ExtrusionRoleModifier r) const { return (m & r) == r; }
     
     // create ambiguity. need explicit
     explicit operator ExtrusionRoleModifier() const { return m; }
