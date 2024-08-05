@@ -8556,8 +8556,10 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
     if (("brim_width" == opt_key || "brim_width_interior" == opt_key) && all_conf.option("brim_separation") ) {
         // add brim_separation to brim_width & brim_width_interior
         float val = boost::lexical_cast<float>(value);
-        val += all_conf.option("brim_separation")->get_float();
-        value = boost::lexical_cast<std::string>(val);
+        if (val > 0) {
+            val += all_conf.option("brim_separation")->get_float();
+            value = boost::lexical_cast<std::string>(val);
+        }
     }
     if ("fill_pattern" == opt_key && "alignedrectilinear" == value) {
         value = "rectilinear";
