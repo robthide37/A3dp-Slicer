@@ -384,8 +384,8 @@ void GCodeViewer::Extrusions::Range::reset()
     m_full_precision_min = FLT_MAX;
     m_full_precision_max = -FLT_MAX;
     m_values_2_counts.clear();
-    m_user_min = 0;
-    m_user_max = 0;
+    //m_user_min = 0; //keep it, as a saved thing for the session
+    //m_user_max = 0;
     total_count = 0;
     for (size_t idx = 0; idx < 20; idx++) {
         counts[idx] = 0;
