@@ -4199,7 +4199,7 @@ void Tab::load_current_preset()
 
     // apply duplicate_distance for print preset
     if (type() == Preset::TYPE_FFF_PRINT || type() == Preset::TYPE_SLA_PRINT) {
-        wxGetApp().mainframe->plater()->canvas3D()->set_arrange_settings(m_presets->get_edited_preset().config, m_presets->get_edited_preset().printer_technology());
+        //wxGetApp().mainframe->plater()->canvas3D()->set_arrange_settings(m_presets->get_edited_preset().config, m_presets->get_edited_preset().printer_technology());
     }
 
 //	m_undo_to_sys_btn->Enable(!preset.is_default);
