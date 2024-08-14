@@ -1047,16 +1047,12 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                                         intersection_ex(ExPolygons{surface_fill.surface.expolygon}, f->no_overlap_expolygons);
                     double real_surface = 0;
                     for(auto &t : temp) real_surface += t.area();
-                    assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height + EPSILON);
+                    assert(compute_volume.volume < unscaled(unscaled(surface_fill.surface.area())) * surface_fill.params.layer_height * surface_fill.params.flow_mult + EPSILON);
                     double area = unscaled(unscaled(real_surface));
                     if(surface_fill.surface.has_pos_top())
-                        area *= surface_fill.params.config->fill_top_flow_ratio.value;
-                    if(surface_fill.surface.has_pos_bottom() && f->layer_id == 0)
-                        area *= surface_fill.params.config->first_layer_flow_ratio.value;
-                    if(surface_fill.surface.has_mod_bridge() && f->layer_id == 0)
-                        area *= surface_fill.params.config->first_layer_flow_ratio.value;
+                        area *= surface_fill.params.config->fill_top_flow_ratio.get_abs_value(1);
                     //TODO: over-bridge mod
-                    if(surface_fill.params.config->over_bridge_flow_ratio.value == 1){
+                    if(surface_fill.params.config->over_bridge_flow_ratio.get_abs_value(1) == 1){
                         assert(compute_volume.volume <= area * surface_fill.params.layer_height * 1.001 || f->debug_verify_flow_mult <= 0.8);
                         if(compute_volume.volume > 0) //can fail for thin regions
                             assert(
