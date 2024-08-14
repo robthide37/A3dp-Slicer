@@ -8378,14 +8378,25 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 
     //fan speed: activate disable.
     if (opt_key.find("_fan_speed") != std::string::npos) {
-        if ("max_fan_speed" != opt_key && "filament_toolchange_part_fan_speed" != opt_key) {
-            if (value == "-1") {
-                value = "!100";
-            } else if (value == "1") {
-                // for now, still consider "1" as a "0", to be able to import old config where the 1 means 0 (and 0
-                // was disable).
-                value = "0";
+        if ("max_fan_speed" != opt_key && "filament_toolchange_part_fan_speed" != opt_key && "min_fan_speed" != opt_key && "overhangs_dynamic_fan_speed" != opt_key) {
+            assert(print_config_def.get(opt_key) && print_config_def.get(opt_key)->type == coInts);
+            //if vector, split it.
+            ConfigOptionInts opt_decoder;
+            opt_decoder.set_can_be_disabled();
+            opt_decoder.deserialize(value);
+            for (size_t idx = 0; idx < opt_decoder.size(); ++idx) {
+                if (opt_decoder.is_enabled(idx)) {
+                    if (opt_decoder.get_at(idx) < 0) {
+                        opt_decoder.set_at(100, idx);
+                        opt_decoder.set_enabled(false, idx);
+                    } else if (opt_decoder.get_at(idx) <= 1) {
+                        // for now, still consider "1" as a "0", to be able to import old config where the 1 means 0
+                        // (and 0 was disable).
+                        opt_decoder.set_at(0, idx);
+                    }
+                }
             }
+            value = opt_decoder.serialize();
         }
     }
 

@@ -822,11 +822,18 @@ bool read_json_file_bambu(const std_path &temp_file,
             continue;
         if (auto it = key_translation_map.find(key); it != key_translation_map.end())
             key = it->second;
+        
         std::string check_val = values[0];
         PrintConfigDef::handle_legacy(key, values[0], false);
-        assert(check_val == values[0]); // can't change a vec value, sadly.
-        if (!key.empty())
+        if (!key.empty()) {
+            if (check_val != values[0]) {
+                for (size_t idx = 1; idx < values.size(); ++idx) {
+                    PrintConfigDef::handle_legacy(key, values[0], false);
+                    assert(!key.empty());
+                }
+            }
             good_key_vector_values[key] = values;
+        }
         //else
         //    config_substitutions.substitutions.push_back(ConfigSubstitution{ nullptr, entry.first+std::string(" : ")+(values.empty()?"":values.front()), nullptr});
     }
