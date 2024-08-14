@@ -3039,6 +3039,9 @@ public:
     ConfigSubstitutions load_from_binary_gcode_file(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule);
     ConfigSubstitutions load(const boost::property_tree::ptree &tree, ForwardCompatibilitySubstitutionRule compatibility_rule);
     void save(const std::string &file, bool to_prusa = false) const;
+#ifdef _DEBUG
+    std::string to_debug_string() const;
+#endif
 
     // Disable all the optional settings.
     void disable_optionals();

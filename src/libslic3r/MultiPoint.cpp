@@ -270,6 +270,21 @@ Points MultiPoint::visivalingam(const Points &pts, const double tolerance)
     return results;
 }
 
+#ifdef _DEBUG
+// to create a cpp multipoint to create test units.
+std::string MultiPoint::to_debug_string()
+{
+    std::string ret;
+    for (Point pt : points) {
+        ret += std::string(",Point{") + std::to_string(pt.x()) + std::string(",") + std::to_string(pt.y()) +
+            std::string("}");
+    }
+    ret[0] = '{';
+    ret += std::string("}");
+    return ret;
+}
+#endif
+
 void MultiPoint3::translate(double x, double y)
 {
     for (Vec3crd &p : points) {

@@ -223,6 +223,11 @@ public:
     inline auto rend()   const { return points.rend();   }
     inline auto crbegin()const { return points.crbegin(); }
     inline auto crend()  const { return points.crend(); }
+
+#ifdef _DEBUG
+    // to create a cpp multipoint to create test units.
+    std::string to_debug_string();
+#endif
 };
 
 class MultiPoint3
