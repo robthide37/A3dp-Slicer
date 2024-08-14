@@ -63,26 +63,31 @@
 
 
 namespace Slic3r::PerimeterGenerator {
+
+
+void assert_check_polygon(const Polygon &polygon) {
 #if _DEBUG
-struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
-    virtual void default_use(const ExtrusionEntity& entity) override {};
-    virtual void use(const ExtrusionPath &path) override {
-        for (size_t idx = 1; idx < path.size(); ++idx)
-            assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-    }
-    virtual void use(const ExtrusionLoop& loop) override {
-        Point last_pt = loop.last_point();
-        for (const ExtrusionPath &path : loop.paths) {
-            assert(path.polyline.size() >= 2);
-            assert(path.first_point() == last_pt);
-            for (size_t idx = 1; idx < path.size(); ++idx)
-                assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-            last_pt = path.last_point();
-        }
-        assert(loop.paths.front().first_point() == loop.paths.back().last_point());
-    }
-};
+    for (size_t i_pt = 1; i_pt < polygon.size(); ++i_pt)
+        assert(!polygon.points[i_pt - 1].coincides_with_epsilon(polygon.points[i_pt]));
+    assert(!polygon.points.front().coincides_with_epsilon(polygon.points.back()));
 #endif
+}
+
+void assert_check_polygons(const Polygons &polygons) {
+#if _DEBUG
+    for (const Polygon &polygon : polygons)
+        assert_check_polygon(polygon);
+#endif
+}
+void assert_check_loops(const std::vector<PerimeterGeneratorLoops> &loops) {
+#if _DEBUG
+    for (const PerimeterGeneratorLoops &pgls : loops) {
+        for (const PerimeterGeneratorLoop &pgl : pgls) {
+            assert_check_polygon(pgl.polygon);
+        }
+    }
+#endif
+}
 
 PerimeterGeneratorLoops get_all_Childs(PerimeterGeneratorLoop loop) {
     PerimeterGeneratorLoops ret;
@@ -500,9 +505,8 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
     const bool CCW_hole = params.config.perimeter_direction.value == PerimeterDirection::pdCW_CCW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
 
 #if _DEBUG
-    LoopAssertVisitor visitor;
     for(auto ee : coll)
-        ee->visit(visitor);
+        DEBUG_VISIT(*ee, LoopAssertVisitor())
 #endif
     //move from coll to coll_out and getting children of each in the same time. (deep first)
     for (const std::pair<size_t, bool> &idx : better_chain) {
@@ -525,10 +529,8 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
 #if _DEBUG
             for(auto ee : coll)
                 if(ee)
-                    ee->visit(visitor);
-            for (size_t i_pt = 1; i_pt < loop.polygon.size(); ++i_pt)
-                assert(!loop.polygon.points[i_pt - 1].coincides_with_epsilon(loop.polygon.points[i_pt]));
-            assert(!loop.polygon.points.front().coincides_with_epsilon(loop.polygon.points.back()));
+                    ee->visit(LoopAssertVisitor());
+            loop.polygon.assert_point_distance();
 #endif
             ExtrusionLoop* eloop = static_cast<ExtrusionLoop*>(coll[idx.first]);
             bool has_overhang = false;
@@ -554,7 +556,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
 #if _DEBUG
             for(auto ee : coll)
                 if(ee)
-                    ee->visit(visitor);
+                    ee->visit(LoopAssertVisitor());
 #endif
             assert(thin_walls.empty());
             ExtrusionEntityCollection children = this->_traverse_loops_classic(params, loop.children, thin_walls, has_overhang ? 1 : (count_since_overhang+1));
@@ -619,7 +621,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
         }
     }
 #if _DEBUG
-    coll_out.visit(visitor);
+    coll_out.visit(LoopAssertVisitor());
 #endif
     return coll_out;
 }
@@ -3391,6 +3393,13 @@ struct ExPolygonAsynch
     
 };
 
+void assert_check_ExPolygonAsynch(const std::vector<ExPolygonAsynch> &polygons_asynchs) {
+#if _DEBUG
+    for(const auto &polygon_asynch : polygons_asynchs)
+        assert_check_polygons(to_polygons(polygon_asynch.expoly));
+#endif
+}
+
 // next_onion can be partially filled
 void grow_holes_only(std::vector<ExPolygonAsynch> &unmoveable_contours,
                      ExPolygons &                      next_onion,
@@ -3917,7 +3926,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                         (params.use_round_perimeters() ? params.get_min_round_spacing() : 3));
                 }
                 
-                std::vector<ExPolygonAsynch> *touse;
+                std::vector<ExPolygonAsynch> *touse = nullptr;
                 std::vector<ExPolygonAsynch> copy;
                 if (perimeter_idx < std::max(contour_count, holes_count)) {
                     touse = &last_asynch;
@@ -3926,6 +3935,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                     copy = last_asynch;
                     touse = &copy;
                 }
+                assert(touse);
+                assert_check_ExPolygonAsynch(*touse);
                 bool round_peri = params.config.perimeter_round_corners.value;
                 float min_round_spacing = round_peri ? unscaled(params.get_perimeter_width()) / 10 : 0;
                 if (contour_count > perimeter_idx && holes_count <= perimeter_idx) {
@@ -3936,7 +3947,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                     grow_holes_only(*touse, next_onion, good_spacing,
                                     (1 - thin_perimeter) * params.get_perimeter_spacing() / 2, round_peri, min_round_spacing);
                 }
-
+                assert_check_ExPolygonAsynch(*touse);
                 bool special_area = contour_count == 0 || holes_count == 0;
                 if (special_area && (params.config.thin_walls || params.spiral_vase)) {
                     area_used = next_onion;
@@ -4027,45 +4038,62 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             const bool fuzzify_all = params.config.fuzzy_skin == FuzzySkinType::All && params.layer->id() > 0 ;
 
             //push last_asynch or next_onion into contours & holes
+            assert_check_ExPolygonAsynch(last_asynch);
+            assert_check_loops(contours);
+            assert_check_loops(holes);
             if (!last_asynch.empty()) {
                 // we already put the last hole, now add contours.
                 for (auto &exp : last_asynch) {
                     if (exp.type == ExPolygonAsynch::epatShrinkContour) {
                         assert(next_onion.empty());
                         assert(exp.expoly.contour.is_counter_clockwise());
-                        if (exp.expoly.contour.length() > SCALED_EPSILON) // TODO: atleastLength
+                        if (exp.expoly.contour.length() > SCALED_EPSILON) { // TODO: atleastLength
+                            assert_check_polygon(exp.expoly.contour);
                             contours[perimeter_idx].emplace_back(exp.expoly.contour, perimeter_idx, true,
                                                                  has_steep_overhang, fuzzify_contours || fuzzify_all);
+                        }
                     } else {
                         // we already put the last contour, now add holes
                         // contours from hole collapse is added via next_onion
                         assert(exp.type == ExPolygonAsynch::epatGrowHole);
                         for (auto &hole : exp.expoly.holes) {
                             assert(hole.is_clockwise());
-                            if(hole.length() > SCALED_EPSILON) // TODO: atleastLength
+                            if (hole.length() > SCALED_EPSILON) { // TODO: atleastLength
+                                assert_check_polygon(hole);
                                 holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang,
-                                                              fuzzify_contours || fuzzify_all);
+                                                                  fuzzify_contours || fuzzify_all);
+                            }
                         }
                     }
                 }
             }
-            for (const ExPolygon& expolygon : next_onion) {
-                //TODO: add width here to allow variable width (if we want to extrude a sightly bigger perimeter, see thin wall)
-                if(contour_count > perimeter_idx && expolygon.contour.length() > SCALED_EPSILON) // TODO: atleastLength
-                    contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang, fuzzify_contours || fuzzify_all);
-                if (!expolygon.holes.empty() && holes_count > perimeter_idx) {
-                    holes[perimeter_idx].reserve(holes[perimeter_idx].size() + expolygon.holes.size());
-                    for (const Polygon& hole : expolygon.holes)
-                        if(hole.length() > SCALED_EPSILON) // TODO: atleastLength
-                            holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes || fuzzify_all);
-                }
-            }
 
-            //simplify the loop to avoid artifacts when shrinking almost-0 segments
+            // simplify the loop to avoid artifacts when shrinking almost-0 segments
+            // also it ensure that there is no point at epsilon distance.
             resolution = get_resolution(perimeter_idx + 1, false, &surface);
             last.clear();
-            for (ExPolygon &exp : next_onion)
+            for (ExPolygon &exp : next_onion) {
                 exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), &last);
+            }
+            assert_check_polygons(to_polygons(last));
+
+            // Add contour & holes from last (wich is now simplified next_onion) 
+            for (const ExPolygon& expolygon : last) {
+                //TODO: add width here to allow variable width (if we want to extrude a sightly bigger perimeter, see thin wall)
+                if (contour_count > perimeter_idx && expolygon.contour.length() > SCALED_EPSILON) { // TODO: atleastLength
+                    assert_check_polygon(expolygon.contour);
+                    contours[perimeter_idx].emplace_back(expolygon.contour, perimeter_idx, true, has_steep_overhang, fuzzify_contours || fuzzify_all);
+                }
+                if (!expolygon.holes.empty() && holes_count > perimeter_idx) {
+                    holes[perimeter_idx].reserve(holes[perimeter_idx].size() + expolygon.holes.size());
+                    for (const Polygon &hole : expolygon.holes) {
+                        if (hole.length() > SCALED_EPSILON) { // TODO: atleastLength
+                            assert_check_polygon(hole);
+                            holes[perimeter_idx].emplace_back(hole, perimeter_idx, false, has_steep_overhang, fuzzify_holes || fuzzify_all);
+                        }
+                    }
+                }
+            }
 
             // store surface for top infill if only_one_perimeter_top
             if (perimeter_idx == 0 && (params.config.only_one_perimeter_top && this->upper_slices != NULL)
@@ -4092,6 +4120,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                 last_asynch_initialized = true;
             }
         }
+        assert_check_loops(contours);
+        assert_check_loops(holes);
 
         // fuzzify
         const bool fuzzify_gapfill = params.config.fuzzy_skin == FuzzySkinType::All && params.layer->id() > 0;
@@ -4116,6 +4146,9 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                             holes.emplace_back();
                         }
                         assert(contours.size() == contour_count);
+                        //there was an offset, simplify to avoid too small sections
+                        contour_expolygon = contour_expolygon.front().simplify(SCALED_EPSILON);
+                        assert(contour_expolygon.size() == 1);
                         //Add the new perimeter
                         contours[contours_size].emplace_back(contour_expolygon.front().contour, contours_size, true, has_steep_overhang, fuzzify_gapfill);
                         //create the new gapfills
@@ -4132,6 +4165,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                 }
             }
         }
+        assert_check_loops(contours);
+        assert_check_loops(holes);
         assert(contours.size() == contour_count);
         //assert(holes.size() == holes_count);
         // nest loops: holes first
@@ -4250,9 +4285,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             } else {
 #if _DEBUG
                 for (const PerimeterGeneratorLoop &epl : contours.front()) {
-                    for (size_t i_pt = 1; i_pt < epl.polygon.size(); ++i_pt)
-                        assert(!epl.polygon.points[i_pt - 1].coincides_with_epsilon(epl.polygon.points[i_pt]));
-                    assert(!epl.polygon.points.front().coincides_with_epsilon(epl.polygon.points.back()));
+                    assert_check_polygon(epl.polygon);
                 }
 #endif
                 if (params.object_config.thin_walls_merge.value) {

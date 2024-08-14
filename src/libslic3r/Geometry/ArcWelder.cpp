@@ -726,7 +726,7 @@ void reverse(Path &path)
     }
 }
 
-double clip_start(Path &path, const double len)
+double clip_start(Path &path, const coordf_t len)
 {
     reverse(path);
     double remaining = clip_end(path, len);
@@ -735,7 +735,7 @@ double clip_start(Path &path, const double len)
     return remaining;
 }
 
-double clip_end(Path &path, double distance)
+double clip_end(Path &path, coordf_t distance)
 {
     while (distance > 0) {
         const Segment last = path.back();
@@ -744,9 +744,9 @@ double clip_end(Path &path, double distance)
             break;
         if (last.linear()) {
             // Linear segment
-            Vec2d  v    = (path.back().point - last.point).cast<double>();
+            Vec2d  v    = (path.back().point - last.point).cast<coordf_t>();
             double lsqr = v.squaredNorm();
-            if (lsqr > sqr(distance)) {
+            if (lsqr > sqr(distance + SCALED_EPSILON)) {
                 path.push_back({ last.point + (v * (distance / sqrt(lsqr))).cast<coord_t>() });
                 // Length to go is zero.
                 return 0;
@@ -756,7 +756,7 @@ double clip_end(Path &path, double distance)
             // Circular segment
             double angle = arc_angle(path.back().point.cast<double>(), last.point.cast<double>(), last.radius);
             double len   = std::abs(last.radius) * angle;
-            if (len > distance) {
+            if (len > distance + SCALED_EPSILON) {
                 // Rotate the segment end point in reverse towards the start point.
                 if (last.ccw())
                     angle *= -1.;
@@ -770,9 +770,11 @@ double clip_end(Path &path, double distance)
             distance -= len;
         }
     }
+    assert(path.size() > 1);
+    assert(path[path.size() - 2].point.distance_to(path.back().point) > SCALED_EPSILON);
 
     // Return remaining distance to go.
-    assert(distance >= 0);
+    assert(distance >= -SCALED_EPSILON);
     return distance;
 }
 

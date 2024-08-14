@@ -72,7 +72,7 @@ template<class Fn> inline boost::thread create_thread(Fn &&fn)
     return create_thread(attrs, std::forward<Fn>(fn));    
 }
 
-#ifdef _DEBUG
+#ifdef _DEBUGINFO
 // TODO: sort items idx by difficulty, so we can process the most difficult first.
 // for now, only used to swi
 void parallel_for(size_t begin, size_t size, std::function<void(size_t)> process_one_item);

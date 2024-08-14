@@ -92,11 +92,13 @@ public:
     virtual void   collect_polylines(ArcPolylines &dst) const = 0;
     virtual void   collect_points(Points &dst) const = 0;
     virtual ArcPolylines as_polylines() const { ArcPolylines dst; this->collect_polylines(dst); return dst; }
-    virtual double length() const = 0;
+    virtual coordf_t length() const = 0;
     virtual bool empty() const = 0;
     virtual double total_volume() const = 0;
     virtual void visit(ExtrusionVisitor &visitor) = 0;
     virtual void visit(ExtrusionVisitorConst &visitor) const = 0;
+    void visit(ExtrusionVisitor &&visitor); // note: need 'using ExtrusionEntity::visit;' to be called from children classes
+    void visit(ExtrusionVisitorConst &&visitor) const;
 };
 
 
@@ -209,7 +211,7 @@ public:
     void subtract_expolygons(const ExPolygons &collection, ExtrusionEntityCollection* retval) const;
     void clip_end(coordf_t distance);
     virtual void simplify(coordf_t tolerance, ArcFittingType with_fitting_arc, double fitting_arc_tolerance);
-    double length() const override;
+    coordf_t length() const override;
    
     const ExtrusionAttributes&  attributes() const { return m_attributes; }
     ExtrusionRole               role() const override { return m_attributes.role; }
@@ -237,6 +239,7 @@ public:
     void          collect_polylines(ArcPolylines &dst) const override { if (! this->polyline.empty()) dst.emplace_back(this->polyline); }
     void          collect_points(Points &dst) const override { append(dst, this->polyline.to_polyline().points); }
     double      total_volume() const override { return m_attributes.mm3_per_mm * unscale<double>(length()); }
+    using ExtrusionEntity::visit;
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override { visitor.use(*this); };
 
@@ -293,6 +296,7 @@ public:
     }
     virtual ExtrusionPath3D* clone() const override { return new ExtrusionPath3D(*this); }
     virtual ExtrusionPath3D* clone_move() override { return new ExtrusionPath3D(std::move(*this)); }
+    using ExtrusionEntity::visit;
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override { visitor.use(*this); };
 
@@ -347,8 +351,8 @@ public:
     // Is it really what you can call a middle point?:
     const Point& middle_point() const override { auto &path = this->paths[this->paths.size() / 2]; return path.polyline.middle(); }
     size_t size() const { return this->paths.size(); }
-    double length() const override {
-        double len = 0;
+    coordf_t length() const override {
+        coordf_t len = 0;
         for (const THING &entity : this->paths)
             len += entity.length();
         return len;
@@ -414,6 +418,7 @@ public:
     virtual ExtrusionMultiPath* clone() const override { return new ExtrusionMultiPath(*this); }
     virtual ExtrusionMultiPath* clone_move() override { return new ExtrusionMultiPath(std::move(*this)); }
 
+    using ExtrusionEntity::visit;
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override { visitor.use(*this); };
 };
@@ -433,6 +438,7 @@ public:
     virtual ExtrusionMultiPath3D* clone() const override { return new ExtrusionMultiPath3D(*this); }
     virtual ExtrusionMultiPath3D* clone_move() override { return new ExtrusionMultiPath3D(std::move(*this)); }
 
+    using ExtrusionEntity::visit;
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override { visitor.use(*this); };
 
@@ -480,7 +486,7 @@ public:
     // Is it really what you can call a middle point?: 
     const Point&    middle_point() const override { auto& path = this->paths[this->paths.size() / 2]; return path.polyline.middle(); }
     Polygon polygon() const;
-    double length() const override;
+    coordf_t length() const override;
     bool empty() const override {
         for (const ExtrusionPath &path : paths)
             if (!path.empty())
@@ -521,6 +527,7 @@ public:
     }
     double total_volume() const override { double volume =0.; for (const auto& path : paths) volume += path.total_volume(); return volume; }
 
+    using ExtrusionEntity::visit;
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override { visitor.use(*this); };
 
@@ -628,19 +635,37 @@ struct HasThisRoleVisitor : public HasRoleVisitor{
 
 //call simplify for all paths.
 class ConfigOptionFloatOrPercent;
-class SimplifyVisitor : public ExtrusionVisitorRecursive {
+class SimplifyVisitor : public ExtrusionVisitor{
     ArcFittingType                    m_use_arc_fitting;
     coordf_t                          m_scaled_resolution;
     const ConfigOptionFloatOrPercent* m_arc_fitting_tolearance;
+    // when an entity is too small, this is set to true do the collection that is higher in the stack can merge & delete.
+    coord_t                           m_min_path_size = 0;
+    bool                              m_last_deleted = false;
 public:
+    using ExtrusionVisitor::use;
     SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance)
         : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance)
     {}
+    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance, coord_t min_path_size)
+        : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance), m_min_path_size(min_path_size)
+    {}
+    
     virtual void use(ExtrusionPath& path) override;
+    virtual void use(ExtrusionMultiPath& path) override;
     virtual void use(ExtrusionPath3D& path3D) override;
+    virtual void use(ExtrusionMultiPath3D& path) override;
+    virtual void use(ExtrusionLoop& loop) override;
+    virtual void use(ExtrusionEntityCollection& coll) override;
+    void start(ExtrusionEntityCollection &coll) {
+        m_last_deleted = false;
+        use(coll);
+    }
+    bool is_valid() { return !m_last_deleted; }
 };
 class GetPathsVisitor : public ExtrusionVisitorRecursive {
 public:
+    using ExtrusionVisitorRecursive::use;
     std::vector<ExtrusionPath*> paths;
     std::vector<ExtrusionPath3D*> paths3D;
     virtual void use(ExtrusionPath& path) override {
@@ -654,6 +679,7 @@ public:
 class ExtrusionVolume : public ExtrusionVisitorRecursiveConst {
     bool _with_gap_fill = true;
 public:
+    using ExtrusionVisitorRecursiveConst::use;
     double volume = 0; //unscaled
     ExtrusionVolume(bool with_gap_fill = true) : _with_gap_fill(with_gap_fill) {}
     void use(const ExtrusionPath &path) override {
@@ -666,29 +692,48 @@ public:
 class ExtrusionModifyFlow : public ExtrusionVisitorRecursive {
     double _flow_mult = 1.;
 public:
+    using ExtrusionVisitorRecursive::use;
     ExtrusionModifyFlow(double flow_mult) : _flow_mult(flow_mult) {}
     void use(ExtrusionPath &path) override { path.attributes_mutable().mm3_per_mm *= _flow_mult; path.attributes_mutable().width *= _flow_mult; }
     void use(ExtrusionPath3D &path3D) override { path3D.attributes_mutable().mm3_per_mm *= _flow_mult; path3D.attributes_mutable().width *= _flow_mult; }
     void set(ExtrusionEntityCollection &coll);
 };
 
-    
-#if _DEBUG
+
+#ifdef _DEBUGINFO
 struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
+    using ExtrusionVisitorRecursiveConst::use;
     virtual void default_use(const ExtrusionEntity& entity) override {};
-    virtual void use(const ExtrusionPath &path) override { assert(path.length() > SCALED_EPSILON); }
-    virtual void use(const ExtrusionLoop &loop) override {
+    virtual void use(const ExtrusionPath &path) override {
+        release_assert(path.length() > SCALED_EPSILON);
+        for (size_t idx = 1; idx < path.size(); ++idx)
+            release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+    }
+    virtual void use(const ExtrusionLoop& loop) override {
         for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
-            assert(it->polyline.size() >= 2);
-            assert(std::prev(it)->polyline.back() == it->polyline.front());
-}
-        for (auto it = loop.paths.begin(); it != loop.paths.end(); ++it) {
-            assert(it->length() > SCALED_EPSILON);
+            release_assert(std::prev(it)->polyline.back() == it->polyline.front());
         }
-        assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+        Point last_pt = loop.last_point();
+        for (const ExtrusionPath &path : loop.paths) {
+            release_assert(path.polyline.size() >= 2);
+            release_assert(path.length() > SCALED_EPSILON);
+            release_assert(path.first_point() == last_pt);
+            for (size_t idx = 1; idx < path.size(); ++idx)
+                release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+            last_pt = path.last_point();
+        }
+        release_assert(loop.paths.front().first_point() == loop.paths.back().last_point());
     }
 };
+#define DEBUGINFO_VISIT(ENTITY,VISITOR) (ENTITY).visit(VISITOR);
 #endif
+
+#ifdef _DEBUG
+#define DEBUG_VISIT(ENTITY,VISITOR) (ENTITY).visit(VISITOR);
+#else
+#define DEBUG_VISIT(ENTITY,VISITOR)
+#endif
+
 
 }
 

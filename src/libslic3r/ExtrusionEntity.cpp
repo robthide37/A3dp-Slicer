@@ -34,6 +34,13 @@ void ExtrusionVisitorConst::use(const ExtrusionMultiPath3D &multipath3D) { defau
 void ExtrusionVisitorConst::use(const ExtrusionLoop &loop) { default_use(loop); }
 void ExtrusionVisitorConst::use(const ExtrusionEntityCollection &collection) { default_use(collection); }
 
+void ExtrusionEntity::visit(ExtrusionVisitor &&visitor) {
+    this->visit(visitor);
+}
+void ExtrusionEntity::visit(ExtrusionVisitorConst &&visitor) const {
+    this->visit(visitor);
+}
+
 void ExtrusionPath::intersect_expolygons(const ExPolygons &collection, ExtrusionEntityCollection *retval) const
 {
     this->_inflate_collection(intersection_pl(Polylines{this->polyline.to_polyline()}, collection), retval);
@@ -72,7 +79,7 @@ void ExtrusionPath3D::simplify(coordf_t tolerance, ArcFittingType with_fitting_a
     //}
 }
 
-double ExtrusionPath::length() const { return this->polyline.length(); }
+coordf_t ExtrusionPath::length() const { return this->polyline.length(); }
 
 void ExtrusionPath::_inflate_collection(const Polylines &polylines, ExtrusionEntityCollection *collection) const
 {
@@ -332,7 +339,7 @@ ExtrusionPaths clip_end(ExtrusionPaths &paths, coordf_t distance)
     while (distance > 0 && !paths.empty()) {
         ExtrusionPath &last = paths.back();
         removed.push_back(last);
-        double len = last.length();
+        coordf_t len = last.length();
         if (len <= distance) {
             paths.pop_back();
             distance -= len;
@@ -342,6 +349,8 @@ ExtrusionPaths clip_end(ExtrusionPaths &paths, coordf_t distance)
             break;
         }
     }
+    for(auto& path : paths)
+        DEBUG_VISIT(path, LoopAssertVisitor())
     std::reverse(removed.begin(), removed.end());
     return removed;
 }
@@ -552,16 +561,131 @@ bool HasRoleVisitor::search(const ExtrusionEntitiesPtr &entities, HasRoleVisitor
 }
 
 void SimplifyVisitor::use(ExtrusionPath& path) {
-    for (int i = 1; i < path.polyline.size(); ++i)
-        assert(!path.polyline.get_point(i - 1).coincides_with_epsilon(path.polyline.get_point(i)));
-    size_t old_size = path.size();
-    ArcPolyline old_poly = path.polyline;
+    if (m_min_path_size > 0 && path.length() < m_min_path_size) {
+        m_last_deleted = true;
+        return;
+    }
+    assert(m_scaled_resolution >= SCALED_EPSILON);
     path.simplify(m_scaled_resolution, m_use_arc_fitting, scale_d(m_arc_fitting_tolearance->get_abs_value(path.width())));
+    for (int i = 1; i < path.polyline.size(); ++i)
+        if (path.polyline.get_point(i - 1).coincides_with_epsilon(path.polyline.get_point(i))) {
+            path.simplify(m_scaled_resolution, m_use_arc_fitting, scale_d(m_arc_fitting_tolearance->get_abs_value(path.width())));
+        }
     for (int i = 1; i < path.polyline.size(); ++i)
         assert(!path.polyline.get_point(i - 1).coincides_with_epsilon(path.polyline.get_point(i)));
 }
 void SimplifyVisitor::use(ExtrusionPath3D& path3D) {
+    if (m_min_path_size > 0 && path3D.length() < m_min_path_size) {
+        m_last_deleted = true;
+        return;
+    }
     path3D.simplify(m_scaled_resolution, m_use_arc_fitting, scale_d(m_arc_fitting_tolearance->get_abs_value(path3D.width())));
+}
+void SimplifyVisitor::use(ExtrusionMultiPath &multipath)
+{
+    for (size_t i = 0;i<multipath.paths.size() ;++i) {
+        ExtrusionPath *path = &multipath.paths[i];
+        //if (min_path_size > 0 && path.length() < min_path_size) {
+        path->visit(*this);
+        while (m_last_deleted) {
+            ExtrusionPath *path_merged = nullptr;
+            if (i > 0) {
+                ExtrusionPath &path_previous = multipath.paths[i - 1];
+                path_previous.polyline.append(path->polyline);
+                // erase us, move to previous
+                multipath.paths.erase(multipath.paths.begin() + i);
+                --i;
+            } else if (i + 1 < multipath.size()) {
+                ExtrusionPath &path_next = multipath.paths[i];
+                path->polyline.append(path_next.polyline);
+                // erase next
+                multipath.paths.erase(multipath.paths.begin() + i + 1);
+            } else {
+                //return, the caller need to delete me.
+                return;
+            }
+            m_last_deleted = false;
+            // refresh pointer, as multipath.paths was modified 
+            path = &multipath.paths[i];
+            //visit again to remove small segments
+            path->visit(*this);
+        }
+    }
+}
+void SimplifyVisitor::use(ExtrusionMultiPath3D &multipath3D)
+{
+    for (size_t i = 0;i<multipath3D.paths.size() ;++i) {
+        ExtrusionPath3D *path = &multipath3D.paths[i];
+        //if (min_path_size > 0 && path.length() < min_path_size) {
+        path->visit(*this);
+        while (m_last_deleted) {
+            ExtrusionPath *path_merged = nullptr;
+            if (i > 0) {
+                ExtrusionPath &path_previous = multipath3D.paths[i - 1];
+                path_previous.polyline.append(path->polyline);
+                // erase us, move to previous
+                multipath3D.paths.erase(multipath3D.paths.begin() + i);
+                --i;
+            } else if (i + 1 < multipath3D.size()) {
+                ExtrusionPath &path_next = multipath3D.paths[i];
+                path->polyline.append(path_next.polyline);
+                // erase next
+                multipath3D.paths.erase(multipath3D.paths.begin() + i + 1);
+            } else {
+                //return, the caller need to delete me.
+                return;
+            }
+            m_last_deleted = false;
+            // refresh pointer, as multipath.paths was modified 
+            path = &multipath3D.paths[i];
+            //visit again to remove small segments
+            path->visit(*this);
+        }
+    }
+}
+void SimplifyVisitor::use(ExtrusionLoop &loop)
+{
+    for (size_t i = 0;i<loop.paths.size() ;++i) {
+        ExtrusionPath *path = &loop.paths[i];
+        //if (min_path_size > 0 && path.length() < min_path_size) {
+        path->visit(*this);
+        while (m_last_deleted) {
+            ExtrusionPath *path_merged = nullptr;
+            if (i > 0) {
+                ExtrusionPath &path_previous = loop.paths[i - 1];
+                path_previous.polyline.append(path->polyline);
+                // erase us, move to previous
+                loop.paths.erase(loop.paths.begin() + i);
+                --i;
+            } else if (i + 1 < loop.paths.size()) {
+                ExtrusionPath &path_next = loop.paths[i];
+                path->polyline.append(path_next.polyline);
+                // erase next
+                loop.paths.erase(loop.paths.begin() + i + 1);
+            } else {
+                //return, the caller need to delete me.
+                return;
+            }
+            m_last_deleted = false;
+            // refresh pointer, as multipath.paths was modified 
+            path = &loop.paths[i];
+            //visit again to remove small segments
+            path->visit(*this);
+        }
+    }
+}
+void SimplifyVisitor::use(ExtrusionEntityCollection &collection)
+{
+    for (size_t i = 0; i < collection.size(); ++i) {
+        ExtrusionEntity *entity = collection.entities()[i];
+        // if (min_path_size > 0 && path.length() < min_path_size) {
+        entity->visit(*this);
+        if (m_last_deleted) {
+            // erase it, without any merge.
+            collection.remove(i);
+            --i;
+        }
+    }
 }
 
 //class ExtrusionTreeVisitor : ExtrusionVisitor {

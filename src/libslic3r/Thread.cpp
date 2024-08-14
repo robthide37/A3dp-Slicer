@@ -215,7 +215,7 @@ bool is_main_thread_active()
 	return get_main_thread_id() == boost::this_thread::get_id();
 }
 
-#ifdef _DEBUG
+#ifdef _DEBUGINFO
 void parallel_for(size_t begin, size_t size, std::function<void(size_t)> process_one_item) {
     // TODO: sort the idx by difficulty (difficult first) (number of points, region, surfaces, .. ?)
 

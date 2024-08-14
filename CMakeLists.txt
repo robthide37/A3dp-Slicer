@@ -358,6 +358,7 @@ if(WIN32)
         # Force the source code encoding to UTF-8. See PrusaSlicer GH pull request #5583
         add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
         add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+        add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:-D_RELWITHDEBINFO>")
     endif(MSVC)
 endif(WIN32)
 

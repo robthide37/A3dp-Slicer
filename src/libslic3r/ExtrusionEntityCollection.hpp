@@ -171,7 +171,7 @@ public:
             extrusion_entity->collect_points(dst);
     }
 
-    double length() const override {
+    coordf_t length() const override {
         throw Slic3r::RuntimeError("Calling length() on a ExtrusionEntityCollection");
         return 0.;        
     }
@@ -181,10 +181,9 @@ public:
                 return false;
         return true;
     }
+    using ExtrusionEntity::visit;
     virtual void visit(ExtrusionVisitor &visitor) override { visitor.use(*this); };
     virtual void visit(ExtrusionVisitorConst &visitor) const override{ visitor.use(*this); };
-    void start_visit(ExtrusionVisitor &&visitor) { visitor.use(*this); };
-    void start_visit(ExtrusionVisitorConst &&visitor) const{ visitor.use(*this); };
 };
 
 //// visitors /////

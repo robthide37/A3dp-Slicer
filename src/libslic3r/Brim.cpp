@@ -768,6 +768,8 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
     std::function<void(BrimLoop&)> cut_loop = [&frontiers, &flow, reversed](BrimLoop& to_cut) {
         Polylines result;
         if (to_cut.is_loop) {
+            to_cut.polygon().assert_point_distance();
+            for(auto& poly : frontiers) poly.assert_point_distance();
             result = intersection_pl(Polygons{ to_cut.polygon() }, frontiers);
         } else {
             result = intersection_pl(to_cut.lines, frontiers);
@@ -779,6 +781,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                 i--;
             }
         }
+        for(auto& poly : result) poly.assert_point_distance();
         if (result.empty()) {
             to_cut.lines.clear();
         } else {
@@ -822,6 +825,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
     int nextIdx = 0;
     std::function<void(BrimLoop&, ExtrusionEntityCollection*)>* extrude_ptr;
     std::function<void(BrimLoop&, ExtrusionEntityCollection*) > extrude = [&mm3_per_mm, &width, &height, &extrude_ptr, &nextIdx](BrimLoop& to_cut, ExtrusionEntityCollection* parent) {
+        DEBUG_VISIT(*parent, LoopAssertVisitor())
         int idx = nextIdx++;
         //bool i_have_line = !to_cut.line.points.empty() && to_cut.line.is_valid();
         bool i_have_line = to_cut.lines.size() > 0 && to_cut.lines.front().size() > 0 && to_cut.lines.front().is_valid();
@@ -830,6 +834,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
         } else if (i_have_line && to_cut.children.empty()) {
             ExtrusionEntitiesPtr to_add;
             for (Polyline& pline : to_cut.lines) {
+                pline.assert_point_distance();
                 assert(pline.size() > 0);
                 if (pline.back() == pline.front()) {
                     ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
@@ -837,9 +842,10 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                     to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
                     ExtrusionPath *extrusion_path = new ExtrusionPath({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
-                    to_add.push_back(extrusion_path);
                     extrusion_path->polyline = pline;
+                    to_add.push_back(extrusion_path);
                 }
+                DEBUG_VISIT(*to_add.back(), LoopAssertVisitor())
             }
             parent->append(std::move(to_add));
         } else if (!i_have_line && !to_cut.children.empty()) {
@@ -853,11 +859,13 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                 //remove un-needed collection if possible
                 if (mycoll->entities().size() == 1) {
                     parent->append(*mycoll->entities().front()); //add clone
+                    DEBUG_VISIT(*parent->entities().back(), LoopAssertVisitor())
                     delete mycoll; // remove coll & content
                 } else if (mycoll->entities().size() == 0) {
                     delete mycoll;// remove coll & content
                 } else {
                     parent->append(ExtrusionEntitiesPtr{ mycoll });
+                    DEBUG_VISIT(*parent->entities().back(), LoopAssertVisitor())
                 }
             }
         } else {
@@ -867,15 +875,17 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             ExtrusionEntitiesPtr to_add;
             for (Polyline& pline : to_cut.lines) {
                 assert(pline.size() > 0);
+                pline.assert_point_distance();
                 if (pline.back() == pline.front()) {
                     ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     path.polyline = pline;
                     to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
                     ExtrusionPath *extrusion_path = new ExtrusionPath({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
-                    to_add.push_back(extrusion_path);
                     extrusion_path->polyline = pline;
+                    to_add.push_back(extrusion_path);
                 }
+                DEBUG_VISIT(*to_add.back(), LoopAssertVisitor())
             }
             print_me_first->append(std::move(to_add));
             if (to_cut.children.size() == 1) {
@@ -894,9 +904,11 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                 } else {
                     print_me_first->append(ExtrusionEntitiesPtr{ children });
                 }
+                DEBUG_VISIT(*children, LoopAssertVisitor())
             }
             assert(print_me_first->entities().size() > 0);
         }
+        DEBUG_VISIT(*parent, LoopAssertVisitor())
     };
     extrude_ptr = &extrude;
 
@@ -984,7 +996,6 @@ Polylines reorder_brim_polyline(Polylines lines, ExtrusionEntityCollection& out,
     return lines_sorted;
 }
 
-
 //note: unbrimmable must keep its ordering. don't union_ex it.
 
 //TODO: test if no regression vs old _make_brim.
@@ -996,12 +1007,12 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     ExPolygons    islands;
     for (PrintObject* object : objects) {
         ExPolygons object_islands;
-        for (ExPolygon& expoly : object->layers().front()->lslices)
+        for (ExPolygon &expoly : object->layers().front()->lslices) {
             if (brim_config.brim_inside_holes && brim_config.brim_width_interior == 0) {
                 if (brim_offset == 0) {
                     object_islands.push_back(expoly);
                 } else {
-                    for (ExPolygon& grown_expoly : offset_ex(expoly, brim_offset)) {
+                    for (ExPolygon &grown_expoly : offset_ex(expoly, brim_offset)) {
                         object_islands.push_back(std::move(grown_expoly));
                     }
                 }
@@ -1009,11 +1020,12 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
                 if (brim_offset == 0) {
                     object_islands.push_back(to_expolygon(expoly.contour));
                 } else {
-                    for (ExPolygon& grown_expoly : offset_ex(to_expolygon(expoly.contour), brim_offset)) {
+                    for (ExPolygon &grown_expoly : offset_ex(to_expolygon(expoly.contour), brim_offset)) {
                         object_islands.push_back(std::move(grown_expoly));
                     }
                 }
             }
+        }
         if (!object->support_layers().empty()) {
             ExPolygons polys = union_ex(object->support_layers().front()->support_fills.polygons_covered_by_spacing(flow.spacing_ratio(), float(SCALED_EPSILON)));
             for (ExPolygon& poly : polys) {
@@ -1038,18 +1050,35 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     //simplify & merge
     //get brim resolution (lower resolution if no arc fitting)
     coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled)? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    scaled_resolution_brim = std::max(scaled_resolution_brim, coordf_t(SCALED_EPSILON * 10));
     ExPolygons unbrimmable_areas;
-    for (ExPolygon& expoly : islands)
-        for (ExPolygon& expoly : expoly.simplify(scaled_resolution_brim))
-            unbrimmable_areas.emplace_back(std::move(expoly));
+    for (ExPolygon &expoly : islands) {
+        for (ExPolygon &simple_expoly : expoly.simplify(scaled_resolution_brim)) {
+            simple_expoly.assert_point_distance();
+            unbrimmable_areas.emplace_back(std::move(simple_expoly));
+        }
+    }
+    for (ExPolygon &expoly : unbrimmable_areas) expoly.assert_point_distance();
     islands = union_safety_offset_ex(unbrimmable_areas);
-    unbrimmable_areas = islands;
+    // union_safety_offset_ex can shorten segments below epsilon. So we need to re-simplify a bit.
+    for (ExPolygon &expoly : islands) {
+        for (ExPolygon &simple_expoly : expoly.simplify(SCALED_EPSILON)) {
+            simple_expoly.assert_point_distance();
+            unbrimmable_areas.emplace_back(std::move(simple_expoly));
+        }
+    }
+    islands = unbrimmable_areas;
+    for (ExPolygon &expoly : islands) expoly.assert_point_distance();
+
 
     //get the brimmable area
     const size_t num_loops = size_t(floor(std::max(0., (brim_config.brim_width.value - brim_config.brim_separation.value)) / flow.spacing()));
     ExPolygons brimmable_areas;
     for (ExPolygon& expoly : islands) {
-        for (Polygon poly : offset(expoly.contour, num_loops* scaled_spacing, jtSquare)) {
+        expoly.contour.assert_point_distance();
+        for (Polygon &poly : offset(expoly.contour, num_loops * scaled_spacing, jtSquare)) {
+            poly.douglas_peucker(scaled_resolution_brim);
+            poly.assert_point_distance();
             brimmable_areas.emplace_back();
             brimmable_areas.back().contour = poly;
             brimmable_areas.back().contour.make_counter_clockwise();
@@ -1072,9 +1101,11 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     //grow a half of spacing, to go to the first extrusion polyline.
     Polygons unbrimmable_polygons;
     for (ExPolygon& expoly : islands) {
+        expoly.contour.assert_point_distance();
         unbrimmable_polygons.push_back(expoly.contour);
         //do it separately because we don't want to union them
         for (ExPolygon& big_expoly : offset_ex(expoly, double(scaled_spacing) * 0.5, jtSquare)) {
+            big_expoly.assert_point_distance();
             bigger_islands.emplace_back(big_expoly);
             unbrimmable_polygons.insert(unbrimmable_polygons.end(), big_expoly.holes.begin(), big_expoly.holes.end());
         }
@@ -1087,8 +1118,11 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
         // only grow the contour, not holes
         bigger_islands.clear();
         if (i > 0) {
-            for (ExPolygon& expoly : last_islands) {
-                for (ExPolygon& big_contour : offset_ex(expoly, double(scaled_spacing), jtSquare)) {
+            for (ExPolygon &expoly : last_islands) {
+                expoly.assert_point_distance();
+                for (ExPolygon &big_contour : offset_ex(expoly, double(scaled_spacing), jtSquare)) {
+                    big_contour.douglas_peucker(scaled_resolution_brim);
+                    big_contour.assert_point_distance();
                     bigger_islands.push_back(big_contour);
                     Polygons simplifiesd_big_contour = big_contour.contour.simplify(scaled_resolution_brim);
                     if (simplifiesd_big_contour.size() == 1) {
@@ -1096,15 +1130,22 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
                     }
                 }
             }
-        } else bigger_islands = islands;
+        } else {
+            bigger_islands = islands;
+        }
         last_islands = union_ex(bigger_islands);
-        for (ExPolygon& expoly : last_islands) {
+        for (ExPolygon &expoly : last_islands) {
+            expoly.assert_point_distance();
             loops.back().emplace_back(expoly.contour);
             // also add hole, in case of it's merged with a contour. see supermerill/SuperSlicer/issues/3050
-            for (Polygon &hole : expoly.holes)
-                //but remove the points that are inside the holes of islands
-                for (ExPolygon& pl : diff_ex(Polygons{ hole }, unbrimmable_polygons))
+            for (Polygon &hole : expoly.holes) {
+                hole.assert_point_distance();
+                // but remove the points that are inside the holes of islands
+                for (ExPolygon &pl : diff_ex(Polygons{hole}, unbrimmable_polygons)) {
+                    pl.assert_point_distance();
                     loops[i].emplace_back(pl.contour);
+                }
+            }
         }
     }
 
@@ -1117,6 +1158,8 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     Polygons frontiers;
     //use contour from brimmable_areas (external frontier)
     for (ExPolygon& expoly : brimmable_areas) {
+        expoly.douglas_peucker(scaled_resolution_brim);
+        expoly.assert_point_distance();
         frontiers.push_back(expoly.contour);
         frontiers.back().make_counter_clockwise();
     }
@@ -1124,6 +1167,7 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     frontiers.insert(frontiers.begin(), unbrimmable_polygons.begin(), unbrimmable_polygons.end());
 
     extrude_brim_from_tree(print, loops, frontiers, flow, out, false);
+    DEBUG_VISIT(out, LoopAssertVisitor())
 
     unbrimmable.insert(unbrimmable.end(), brimmable_areas.begin(), brimmable_areas.end());
 }

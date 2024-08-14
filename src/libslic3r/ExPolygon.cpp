@@ -183,6 +183,12 @@ bool ExPolygon::overlaps(const ExPolygon &other) const
            other.contains(this->contour.points.front());
 }
 
+void ExPolygon::douglas_peucker(coord_t tolerance) {
+    contour.douglas_peucker(tolerance);
+    for (Polygon &hole : holes)
+        hole.douglas_peucker(tolerance);
+}
+
 void
 ExPolygon::simplify_p(double tolerance, Polygons* polygons) const
 {

@@ -335,7 +335,7 @@ public:
 
 
     // Works on points & arc
-    double                length() const { return Geometry::ArcWelder::path_length<double>(m_path); }
+    coordf_t              length() const { return Geometry::ArcWelder::path_length<coordf_t>(m_path); }
     bool                  at_least_length(coordf_t length) const;
     std::pair<int, Point> foot_pt(const Point &pt) const;
     void                  split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const;

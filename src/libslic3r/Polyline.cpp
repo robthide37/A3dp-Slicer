@@ -1081,7 +1081,7 @@ int ArcPolyline::simplify_straits(coordf_t min_tolerance,
         assert(current_buffer_size == line_length.size());
         assert(current_buffer_size == weights.size());
 
-        assert(buffer_length < min_buffer_length || current_buffer_size <= 1);
+        assert(buffer_length <= min_buffer_length || current_buffer_size <= 1);
 
         // compute max window (smaller at start & end)
         if (idx_end > this->m_path.size() - buffer_size / 2) {
@@ -1147,7 +1147,7 @@ int ArcPolyline::simplify_straits(coordf_t min_tolerance,
                             weights[i] = (absangle / PI) * (1 - deviation / min_tolerance) * (min_point_distance / length);
                         }
                     }
-                    assert(weights[i] >= 0 && weights[i] <= 1);
+                    assert(weights[i]==3 || (weights[i] >= 0 && weights[i] <= 1));
                 }
                 if (weights[i] > worst_weight) {
                     worst_weight = weights[i];
@@ -1245,7 +1245,7 @@ int ArcPolyline::simplify_straits(coordf_t min_tolerance,
             --current_buffer_size;
         }
 
-        assert(buffer_length < min_buffer_length || current_buffer_size <= 1);
+        assert(buffer_length <= min_buffer_length || current_buffer_size <= 1);
     }
 
     std::sort(erased.begin(), erased.end());

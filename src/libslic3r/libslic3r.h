@@ -538,6 +538,28 @@ enum class ArcFittingType {
     EmitCenter // arcwelder
 };
 
+#ifdef _DEBUG
+#define _DEBUGINFO
+    #define release_assert(X) assert(X)
+#else
+#ifdef _RELWITHDEBINFO
+#define _DEBUGINFO
+inline void release_assert(bool valid) {
+    if (!valid)
+        throw new std::exception();
+}
+#endif
+//error if release, as it's purely a debug thingy that need to be cleaned
+#endif
+
+#ifdef _DEBUGINFO
+#ifdef WIN32
+#define UNOPTIMIZE __pragma(optimize("", off))
+#else
+//#define UNOPTIMIZE _Pragma("optimize(\"\", off)")
+#endif
+#endif
+
 } // namespace Slic3r
 
 #endif // _libslic3r_h_

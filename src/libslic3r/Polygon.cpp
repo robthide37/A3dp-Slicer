@@ -105,12 +105,14 @@ bool Polygon::make_clockwise()
     return false;
 }
 
-void Polygon::douglas_peucker(double tolerance)
+void Polygon::douglas_peucker(coord_t tolerance)
 {
+    if (this->size() < 3)
+        return;
     this->points.push_back(this->points.front());
-    Points p = MultiPoint::douglas_peucker(this->points, tolerance);
-    p.pop_back();
-    this->points = std::move(p);
+    MultiPoint::douglas_peucker(tolerance);
+    this->points.pop_back();
+    assert(this->points.size() > 1);
 }
 
 Polygons Polygon::simplify(double tolerance) const
