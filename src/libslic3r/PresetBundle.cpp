@@ -1449,6 +1449,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
             try {
                 auto parse_config_section = [&section, &alias_name, &renamed_from, &substitution_context, &path, &flags](DynamicPrintConfig &config) {
                     substitution_context.clear();
+                    std::vector<std::pair<t_config_option_key, std::string>> opts_deleted;
                     for (auto &kvp : section.second) {
                     	if (kvp.first == "alias")
                     		alias_name = kvp.second.data();
@@ -1459,7 +1460,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
                        		}
                     	}
                         // Throws on parsing error. For system presets, no substituion is being done, but an exception is thrown.
-                        std::string opt_key = kvp.first;
+                        t_config_option_key opt_key = kvp.first;
                         std::string value =  kvp.second.data();
                         if ("gcode_label_objects" == opt_key) {
                             std::string opt_key2 = kvp.first;
@@ -1469,10 +1470,13 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
                         // don't throw for an unknown key, just ignore it
                         if (!opt_key.empty()) {
                             config.set_deserialize(opt_key, value, substitution_context);
+                        } else {
+                            opts_deleted.emplace_back(kvp.first, value);
                         }
                     }
                     if (flags.has(LoadConfigBundleAttribute::ConvertFromPrusa))
                         config.convert_from_prusa(true);
+                    config.handle_legacy_composite(opts_deleted);
                 };
                 if (presets == &this->printers) {
                     // Select the default config based on the printer_technology field extracted from kvp.
@@ -1595,16 +1599,23 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
 
             substitution_context.clear();
             try {
+                std::vector<std::pair<t_config_option_key, std::string>> opts_deleted;
                 for (auto& kvp : section.second) {
                     std::string opt_key = kvp.first;
                     std::string value = kvp.second.data();
                     PrintConfigDef::handle_legacy(opt_key, value, true);
                     if (opt_key.empty()) {
-                        if (substitution_context.rule != ForwardCompatibilitySubstitutionRule::Disable) {
-                            substitution_context.add(ConfigSubstitution(kvp.first, value));
-                        }
+                        opts_deleted.emplace_back(kvp.first, value);
                     } else {
                         config.set_deserialize(opt_key, value, substitution_context);
+                    }
+                }
+                config.handle_legacy_composite(opts_deleted);
+                if (substitution_context.rule != ForwardCompatibilitySubstitutionRule::Disable) {
+                    for (auto &pair : opts_deleted) {
+                        if (!pair.first.empty()) {
+                            substitution_context.add(ConfigSubstitution(pair.first, pair.second));
+                        }
                     }
                 }
             } catch (const ConfigurationError &e) {

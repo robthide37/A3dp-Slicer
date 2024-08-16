@@ -39,6 +39,7 @@
 #include <boost/thread.hpp>
 #include <boost/nowide/iostream.hpp>
 
+#include <algorithm>
 #include <float.h>
 
 namespace Slic3r {
@@ -8124,6 +8125,8 @@ static std::set<std::string> PrintConfigDef_ignore = {
 //    "infill_only_where_needed", <- ignore only if deactivated
     "gcode_binary", // Introduced in 2.7.0-alpha1, removed in 2.7.1 (replaced by binary_gcode).
     "gcode_resolution", // now in printer config.
+    "enable_dynamic_fan_speeds", "overhang_fan_speed_0","overhang_fan_speed_1","overhang_fan_speed_2","overhang_fan_speed_3", // converted in composite_legacy
+    "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3", // converted in composite_legacy
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value, bool remove_unkown_keys)
@@ -8378,7 +8381,8 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 
     //fan speed: activate disable.
     if (opt_key.find("_fan_speed") != std::string::npos) {
-        if ("max_fan_speed" != opt_key && "filament_toolchange_part_fan_speed" != opt_key && "min_fan_speed" != opt_key && "overhangs_dynamic_fan_speed" != opt_key) {
+        if ("max_fan_speed" != opt_key && "filament_toolchange_part_fan_speed" != opt_key && "min_fan_speed" != opt_key
+            && "overhangs_dynamic_fan_speed" != opt_key && "enable_dynamic_fan_speeds" != opt_key && opt_key.find("overhang_fan_speed_") == std::string::npos) {
             assert(print_config_def.get(opt_key) && print_config_def.get(opt_key)->type == coInts);
             //if vector, split it.
             ConfigOptionInts opt_decoder;
@@ -8407,6 +8411,18 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         if ("support_material_bottom_interface_layers" == opt_key) {value = "!0";}
     }
 
+    //nil-> disabled
+    if (value.find("nil") != std::string::npos) {
+        const ConfigOptionDef *def = print_config_def.get(opt_key);
+        assert(def && def->can_be_disabled);
+        if (def && def->can_be_disabled) {
+            ConfigOption *default_opt = def->default_value->clone();
+            default_opt->set_enabled(false);
+            value = default_opt->serialize();
+            delete default_opt;
+        }
+    }
+
     if (!print_config_def.has(opt_key)) {
         //check the aliases
         for(const auto& entry : print_config_def.options) {
@@ -8430,6 +8446,128 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 // Don't convert single options here, implement such conversion in PrintConfigDef::handle_legacy() instead.
 void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted)
 {
+    std::map<t_config_option_key, std::string> useful_items;
+    for (auto& opt_pair : opt_deleted) {
+        t_config_option_key &opt_key = opt_pair.first;
+        std::string &value = opt_pair.second;
+        if (opt_key.find("overhang_fan_speed_") != std::string::npos) {
+            useful_items[opt_key] = value;
+            opt_key = "";
+        }
+        if ("enable_dynamic_fan_speeds" == opt_key) {
+            useful_items[opt_key] = value;
+            opt_key = "";
+        }
+        if (opt_key.find("overhang_speed_") != std::string::npos) {
+            useful_items[opt_key] = value;
+            opt_key = "";
+        }
+        if ("enable_dynamic_overhang_speeds" == opt_key) {
+            useful_items[opt_key] = value;
+            opt_key = "";
+        }
+    }
+    if (useful_items.find("enable_dynamic_overhang_speeds") != useful_items.end()) {
+        ConfigOptionBool enable_dynamic_overhang_speeds;
+        enable_dynamic_overhang_speeds.deserialize(useful_items["enable_dynamic_overhang_speeds"]);
+        std::vector<ConfigOptionFloatOrPercent> values;
+        values.resize(4);
+        values[0].deserialize(useful_items["overhang_speed_0"]);
+        values[1].deserialize(useful_items["overhang_speed_1"]);
+        values[2].deserialize(useful_items["overhang_speed_2"]);
+        values[3].deserialize(useful_items["overhang_speed_3"]);
+        double external_perimeter_speed = config.get_computed_value("external_perimeter_speed");
+        double max = external_perimeter_speed;
+        double min = external_perimeter_speed;
+        for (int x = 0; x < values.size(); ++x) {
+            if (values[x].percent) {
+                min = std::min(min, values[x].get_abs_value(external_perimeter_speed));
+                max = std::max(max, values[x].get_abs_value(external_perimeter_speed));
+            } else {
+                min = std::min(min, values[x].value);
+                max = std::max(max, values[x].value);
+            }
+        }
+        //can't have both (min < external_perimeter_speed) & (max > external_perimeter_speed) at same time.
+        if (min < external_perimeter_speed) {
+            config.set_key_value("overhangs_speed", new ConfigOptionFloatOrPercent(min, false));
+            max = external_perimeter_speed;
+        } else if (max > external_perimeter_speed) {
+            config.set_key_value("overhangs_speed", new ConfigOptionFloatOrPercent(max, false));
+            min = external_perimeter_speed;
+        } else {
+            assert(min == max && min ==external_perimeter_speed);
+        }
+        ConfigOptionGraph opt;
+        opt.set_can_be_disabled();
+        // extract values
+        Pointfs graph_curve;
+        for (int x = 0; x < values.size(); ++x) {
+            double speed = std::clamp(values[x].value, min, max);
+            if (values[x].percent) {
+                speed = values[x].get_abs_value(external_perimeter_speed);
+            }
+            double percent = (speed - min) / (max - min);
+            if (min == external_perimeter_speed) {
+                percent = 1 - percent;
+            }
+            graph_curve.push_back(Vec2d(x * 25, int(percent * 100)));
+        }
+        if (min == external_perimeter_speed) {
+            graph_curve.push_back(Vec2d(100, 0));
+        } else {
+            graph_curve.push_back(Vec2d(100, 100));
+        }
+        opt.value = GraphData(graph_curve);
+        opt.set_enabled(enable_dynamic_overhang_speeds.value);
+        config.set_key_value("overhangs_dynamic_speed", opt.clone());
+    }
+    if (useful_items.find("enable_dynamic_fan_speeds") != useful_items.end()) {
+        ConfigOptionBools enable_dynamic_fan_speeds;
+        enable_dynamic_fan_speeds.deserialize(useful_items["enable_dynamic_fan_speeds"]);
+        auto *external_perimeter_fan_speed = config.option<ConfigOptionInts>("external_perimeter_fan_speed");
+        auto *perimeter_fan_speed = config.option<ConfigOptionInts>("perimeter_fan_speed");
+        auto *default_fan_speed = config.option<ConfigOptionInts>("default_fan_speed");
+        double external_perimeter_speed = config.get_computed_value("external_perimeter_speed");
+        std::vector<ConfigOptionFloats> values;
+        values.resize(4);
+        values[0].deserialize(useful_items["overhang_fan_speed_0"]);
+        values[1].deserialize(useful_items["overhang_fan_speed_1"]);
+        values[2].deserialize(useful_items["overhang_fan_speed_2"]);
+        values[3].deserialize(useful_items["overhang_fan_speed_3"]);
+        ConfigOptionGraphs opt;
+        opt.set_can_be_disabled();
+        std::vector<GraphData> graph_data;
+        // while there is a value
+        assert(enable_dynamic_fan_speeds.size() == values[0].size());
+        assert(values[0].size() == values[1].size());
+        assert(values[0].size() == values[2].size());
+        assert(values[0].size() == values[3].size());
+        for(int idx = 0 ;idx < enable_dynamic_fan_speeds.size(); ++idx) {
+            // extract values
+            Pointfs graph_curve;
+            for (int x = 0; x < values.size(); ++x) {
+                graph_curve.push_back(Vec2d(x*25, values[x].get_at(idx)));
+            }
+            if (external_perimeter_fan_speed && external_perimeter_fan_speed->is_enabled(idx)) {
+                graph_curve.push_back(Vec2d(100, external_perimeter_fan_speed->get_at(idx)));
+            } else if (perimeter_fan_speed && perimeter_fan_speed->is_enabled(idx)) {
+                graph_curve.push_back(Vec2d(100, perimeter_fan_speed->get_at(idx)));
+            } else if (default_fan_speed && default_fan_speed->is_enabled(idx)) {
+                graph_curve.push_back(Vec2d(100, default_fan_speed->get_at(idx)));
+            } else {
+                graph_curve.push_back(Vec2d(100, graph_curve.back().y()));
+            }
+            graph_data.emplace_back(graph_curve);
+        }
+        // recreate fan speed graph
+        opt.set(graph_data);
+        for (int idx = 0; idx < enable_dynamic_fan_speeds.size(); ++idx) {
+            opt.set_enabled(enable_dynamic_fan_speeds.get_at(idx), idx);
+        }
+        config.set_key_value("overhangs_dynamic_fan_speed", opt.clone());
+    }
+
     //if (config.has("thumbnails")) {
     //    std::string extention;
     //    if (config.has("thumbnails_format")) {
@@ -8709,19 +8847,24 @@ void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::stri
                                            bool                                       with_phony,
                                            bool                                       check_prusa)
 {
-    std::map<t_config_option_key, std::string> unknown_keys;
+    std::vector<std::pair<t_config_option_key, std::string>> deleted_keys;
+    std::vector<std::pair<t_config_option_key, std::string>> unknown_keys;
     const ConfigDef *def = config.def();
     for (const auto &[key, value] : settings) {
         try {
             t_config_option_key opt_key = key;
             std::string opt_value = value;
             PrintConfigDef::handle_legacy(opt_key, opt_value, false);
-            if (!opt_key.empty())
-                if (!def->has(opt_key) || (check_prusa && prusa_import_to_review_keys.find(opt_key) != prusa_import_to_review_keys.end())) {
-                    unknown_keys.emplace(key, value);
+            if (!opt_key.empty()) {
+                if (!def->has(opt_key) ||
+                    (check_prusa && prusa_import_to_review_keys.find(opt_key) != prusa_import_to_review_keys.end())) {
+                    unknown_keys.emplace_back(key, value);
                 } else {
                     config.set_deserialize(opt_key, opt_value, config_substitutions);
                 }
+            } else {
+                deleted_keys.emplace_back(key, value);
+            }
         } catch (UnknownOptionException & /* e */) {
             // log & ignore
             if (config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable)
@@ -8738,6 +8881,7 @@ void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::stri
             config_substitutions.emplace(optdef,std::string(value), ConfigOptionUniquePtr(optdef->default_value->clone()));
         }
     }
+    config.handle_legacy_composite(deleted_keys);
     // from prusa: try again with from_prusa before handle_legacy
     if (check_prusa) {
         std::map<t_config_option_key, std::string> settings_to_change;

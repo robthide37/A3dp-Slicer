@@ -1877,6 +1877,8 @@ public:
     // utilities to help convert from prusa config.
     // if with_phony, then the phony settigns will be set to phony if needed.
     void convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony);
+    void handle_legacy_composite(std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted)
+        { PrintConfigDef::handle_legacy_composite(m_data, opt_deleted); }
 
 private:
     friend class cereal::access;
