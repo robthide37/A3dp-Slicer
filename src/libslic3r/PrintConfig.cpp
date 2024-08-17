@@ -7062,6 +7062,7 @@ void PrintConfigDef::init_fff_params()
         }
         default: assert(false);
         }
+        assert(!def->default_value->is_enabled());
     }
 }
 
@@ -8379,6 +8380,26 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             value = "disabled";
     }
 
+    if (!print_config_def.has(opt_key)) {
+        //check the aliases
+        for(const auto& entry : print_config_def.options) {
+            for (const std::string& alias : entry.second.aliases) {
+                if (alias == opt_key) {
+                    // translate
+                    opt_key = entry.first;
+                    goto use_alias;
+                }
+            }
+        }
+        if (remove_unkown_keys) {
+            opt_key = "";
+        }
+    use_alias:;
+        if (!print_config_def.has(opt_key)) {
+            return;
+        }
+    }
+
     //fan speed: activate disable.
     if (opt_key.find("_fan_speed") != std::string::npos) {
         if ("max_fan_speed" != opt_key && "filament_toolchange_part_fan_speed" != opt_key && "min_fan_speed" != opt_key
@@ -8410,7 +8431,36 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         if ("perimeters_hole" == opt_key) {value = "!0";}
         if ("support_material_bottom_interface_layers" == opt_key) {value = "!0";}
     }
-
+    //nil-> disabled
+    if (value.find("e+") != std::string::npos) {
+        const ConfigOptionDef *def = print_config_def.get(opt_key);
+        if (def && def->can_be_disabled) {
+            ConfigOption *default_opt = def->default_value->clone();
+            default_opt->deserialize(value);
+            float max_value = std::numeric_limits<int32_t>::max() / 2;
+            switch (default_opt->type()) {
+            case coInt:
+            case coPercent:
+            case coFloat:
+            case coFloatOrPercent:
+            case coInts:
+            case coPercents:
+            case coFloats:
+            case coFloatsOrPercents: {
+                for (size_t idx = 0; idx < default_opt->size(); idx++) {
+                    if (std::abs(default_opt->get_float(idx)) > std::numeric_limits<int>::max() / 2) {
+                        default_opt->set(def->default_value.get(), idx);
+                        default_opt->set_enabled(false, idx);
+                    }
+                }
+            }
+            break;
+            default:;
+            }
+            value = default_opt->serialize();
+            delete default_opt;
+        }
+    }
     //nil-> disabled
     if (value.find("nil") != std::string::npos) {
         const ConfigOptionDef *def = print_config_def.get(opt_key);
@@ -8421,23 +8471,6 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             value = default_opt->serialize();
             delete default_opt;
         }
-    }
-
-    if (!print_config_def.has(opt_key)) {
-        //check the aliases
-        for(const auto& entry : print_config_def.options) {
-            for (const std::string& alias : entry.second.aliases) {
-                if (alias == opt_key) {
-                    // translate
-                    opt_key = entry.first;
-                    return;
-                }
-            }
-        }
-        if (remove_unkown_keys) {
-            opt_key = "";
-        }
-        return;
     }
 }
 

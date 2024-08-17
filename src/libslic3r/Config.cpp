@@ -1358,6 +1358,7 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
         opt->set_phony(false);
     
     if (optdef->is_vector_extruder) {
+        assert(optdef->default_value->is_vector());
         assert(dynamic_cast<ConfigOptionVectorBase *>(opt));
         static_cast<ConfigOptionVectorBase *>(opt)->set_is_extruder_size(true);
     }

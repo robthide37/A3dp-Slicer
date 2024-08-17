@@ -533,7 +533,7 @@ public:
     virtual bool                deserialize(const std::string &str, bool append = false) = 0;
     virtual ConfigOption*       clone() const = 0;
     // Set a value from a ConfigOption. The two options should be compatible.
-    virtual void                set(const ConfigOption *option) = 0;
+    virtual void                set(const ConfigOption *option, int32_t idx = -1) = 0;
     // Getters, idx is ignored if it's a scalar value.
     virtual int32_t             get_int(size_t idx = 0)        const { throw BadOptionTypeException("Calling ConfigOption::get_int on a non-int ConfigOption"); }
     virtual double              get_float(size_t idx = 0)      const { throw BadOptionTypeException("Calling ConfigOption::get_float on a non-float ConfigOption"); }
@@ -575,7 +575,6 @@ public:
     // Apply an override option
     virtual bool                apply_override(const ConfigOption *rhs, int32_t idx = -1) {
         if (!rhs->is_enabled()) {
-            assert(false);
             return false;
         }
     	if (*this == *rhs) 
@@ -602,7 +601,7 @@ public:
     void       set_any(boost::any anyval, int32_t idx = -1) override { value = boost::any_cast<T>(anyval); }
     size_t     size() const override { return 1; }
     
-    void set(const ConfigOption *rhs) override
+    void set(const ConfigOption *rhs, int32_t idx = -1) override
     {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Assigning an incompatible type");
@@ -652,7 +651,6 @@ public:
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionSingle.apply_override() applied to different types.");
         if (!rhs->is_enabled()) {
-            assert(false);
             return false;
         }
         auto rhs_co = static_cast<const ConfigOptionSingle*>(rhs);
@@ -723,6 +721,7 @@ public:
         assert (m_enabled.size() == size());
         // reset evrything, use the default.
         if (idx < 0) {
+            assert(!enabled);
             for(size_t i=0; i<this->m_enabled.size(); ++i)
                 this->m_enabled[i] = enabled;
             ConfigOption::set_enabled(enabled);
@@ -797,13 +796,18 @@ public:
 
     const std::vector<T> &get_values() const { return m_values; }
 
-    void set(const ConfigOption *rhs) override
+    void set(const ConfigOption *rhs, int32_t idx = -1) override
     {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionVector: Assigning an incompatible type");
         assert(dynamic_cast<const ConfigOptionVector<T>*>(rhs));
-        this->m_values = static_cast<const ConfigOptionVector<T>*>(rhs)->m_values;
-        this->m_enabled = static_cast<const ConfigOptionVector<T>*>(rhs)->m_enabled;
+        assert(idx < int32_t(size()));
+        if (idx < 0) {
+            this->m_values = static_cast<const ConfigOptionVector<T>*>(rhs)->m_values;
+            this->m_enabled = static_cast<const ConfigOptionVector<T>*>(rhs)->m_enabled;
+        } else {
+            this->set_at(rhs, idx, idx);
+        }
         this->flags = rhs->flags;
         assert (m_enabled.size() == this->m_values.size());
     }
@@ -1010,8 +1014,17 @@ public:
     	auto rhs_vec = static_cast<const ConfigOptionVector<T>*>(rhs);
         assert(this->size() == rhs_vec->size());
         if (idx < 0 || idx >= size()) {
-            // FIXME not exact.
-            return rhs_vec->has_enabled() && (this->m_values != rhs_vec->m_values || this->m_enabled != rhs_vec->m_enabled);
+            if (this->empty()) {
+                assert(false);
+                return rhs_vec->has_enabled() && (this->m_values != rhs_vec->m_values || this->m_enabled != rhs_vec->m_enabled);;
+            }
+            // has at least one value to override.
+            for (size_t i = 0; i < this->size(); ++i) {
+                if (rhs_vec->m_enabled[i] && (this->m_values[i] != rhs_vec->m_values[i] || !this->m_enabled[i])) {
+                    return true;
+                }
+            }
+            return false;
         } else {
             return rhs_vec->m_enabled[idx] && (this->m_values[idx] != rhs_vec->m_values[idx] || !this->m_enabled[idx]);
         }
@@ -1117,11 +1130,11 @@ class ConfigOptionFloats : public ConfigOptionVector<double>
 {
 public:
     ConfigOptionFloats() : ConfigOptionVector<double>() {}
-    explicit ConfigOptionFloats(double default_value) : ConfigOptionVector<double>(default_value) {}
-    explicit ConfigOptionFloats(size_t n, double value) : ConfigOptionVector<double>(n, value) {}
-    explicit ConfigOptionFloats(std::initializer_list<double> il) : ConfigOptionVector<double>(std::move(il)) {}
-    explicit ConfigOptionFloats(const std::vector<double> &vec) : ConfigOptionVector<double>(vec) {}
-    explicit ConfigOptionFloats(std::vector<double> &&vec) : ConfigOptionVector<double>(std::move(vec)) {}
+    explicit ConfigOptionFloats(double default_value) : ConfigOptionVector<double>(default_value) { assert(std::abs(default_value) < 1000000000 && (std::abs(default_value) > 0.000000001 || default_value == 0));}
+    explicit ConfigOptionFloats(size_t n, double value) : ConfigOptionVector<double>(n, value) {assert(std::abs(default_value) < 1000000000 && (std::abs(default_value) > 0.000000001 || default_value == 0));}
+    explicit ConfigOptionFloats(std::initializer_list<double> il) : ConfigOptionVector<double>(std::move(il)) {assert(std::abs(default_value) < 1000000000 && (std::abs(default_value) > 0.000000001 || default_value == 0));}
+    explicit ConfigOptionFloats(const std::vector<double> &vec) : ConfigOptionVector<double>(vec) {assert(std::abs(default_value) < 1000000000 && (std::abs(default_value) > 0.000000001 || default_value == 0));}
+    explicit ConfigOptionFloats(std::vector<double> &&vec) : ConfigOptionVector<double>(std::move(vec)) {assert(std::abs(default_value) < 1000000000 && (std::abs(default_value) > 0.000000001 || default_value == 0));}
 
     static ConfigOptionType static_type() { return coFloats; }
     ConfigOptionType        type()  const override { return static_type(); }
@@ -1269,9 +1282,9 @@ class ConfigOptionInts : public ConfigOptionVector<int32_t>
 {
 public:
     ConfigOptionInts() : ConfigOptionVector<int32_t>() {}
-    explicit ConfigOptionInts(int32_t default_value) : ConfigOptionVector<int32_t>(default_value) {}
-    explicit ConfigOptionInts(size_t n, int32_t value) : ConfigOptionVector<int32_t>(n, value) {}
-    explicit ConfigOptionInts(std::initializer_list<int32_t> &&il) : ConfigOptionVector<int32_t>(std::move(il)) {}
+    explicit ConfigOptionInts(int32_t default_value) : ConfigOptionVector<int32_t>(default_value) {assert(std::abs(default_value) < 1000000000);}
+    explicit ConfigOptionInts(size_t n, int32_t value) : ConfigOptionVector<int32_t>(n, value) {assert(std::abs(default_value) < 1000000000);}
+    explicit ConfigOptionInts(std::initializer_list<int32_t> &&il) : ConfigOptionVector<int32_t>(std::move(il)) {assert(std::abs(default_value) < 1000000000);}
     //explicit ConfigOptionInts(const std::vector<int> &v) : ConfigOptionVector<int>(v) {}
     //explicit ConfigOptionInts(std::vector<int> &&v) : ConfigOptionVector<int>(std::move(v)) {}
 
@@ -1576,7 +1589,7 @@ public:
         this->percent  = fl_or_per.percent;
     }
 
-    void set(const ConfigOption *rhs) override {
+    void set(const ConfigOption *rhs, int32_t idx = -1) override {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionFloatOrPercent: Assigning an incompatible type");
         assert(dynamic_cast<const ConfigOptionFloatOrPercent*>(rhs));
@@ -1620,11 +1633,11 @@ class ConfigOptionFloatsOrPercents : public ConfigOptionVector<FloatOrPercent>
 {
 public:
     ConfigOptionFloatsOrPercents() : ConfigOptionVector<FloatOrPercent>() {}
-    explicit ConfigOptionFloatsOrPercents(FloatOrPercent default_value) : ConfigOptionVector<FloatOrPercent>(default_value) {}
-    explicit ConfigOptionFloatsOrPercents(size_t n, FloatOrPercent value) : ConfigOptionVector<FloatOrPercent>(n, value) {}
-    explicit ConfigOptionFloatsOrPercents(std::initializer_list<FloatOrPercent> il) : ConfigOptionVector<FloatOrPercent>(std::move(il)) {}
-    explicit ConfigOptionFloatsOrPercents(const std::vector<FloatOrPercent> &vec) : ConfigOptionVector<FloatOrPercent>(vec) {}
-    explicit ConfigOptionFloatsOrPercents(std::vector<FloatOrPercent> &&vec) : ConfigOptionVector<FloatOrPercent>(std::move(vec)) {}
+    explicit ConfigOptionFloatsOrPercents(FloatOrPercent default_value) : ConfigOptionVector<FloatOrPercent>(default_value) {assert(std::abs(default_value.value) < 1000000000 && (std::abs(default_value.value) > 0.000000001 || default_value.value == 0));}
+    explicit ConfigOptionFloatsOrPercents(size_t n, FloatOrPercent value) : ConfigOptionVector<FloatOrPercent>(n, value) {assert(std::abs(default_value.value) < 1000000000 && (std::abs(default_value.value) > 0.000000001 || default_value.value == 0));}
+    explicit ConfigOptionFloatsOrPercents(std::initializer_list<FloatOrPercent> il) : ConfigOptionVector<FloatOrPercent>(std::move(il)) {assert(std::abs(default_value.value) < 1000000000 && (std::abs(default_value.value) > 0.000000001 || default_value.value == 0));}
+    explicit ConfigOptionFloatsOrPercents(const std::vector<FloatOrPercent> &vec) : ConfigOptionVector<FloatOrPercent>(vec) {assert(std::abs(default_value.value) < 1000000000 && (std::abs(default_value.value) > 0.000000001 || default_value.value == 0));}
+    explicit ConfigOptionFloatsOrPercents(std::vector<FloatOrPercent> &&vec) : ConfigOptionVector<FloatOrPercent>(std::move(vec)) {assert(std::abs(default_value.value) < 1000000000 && (std::abs(default_value.value) > 0.000000001 || default_value.value == 0));}
 
     static ConfigOptionType static_type() { return coFloatsOrPercents; }
     ConfigOptionType        type()  const override { return static_type(); }
@@ -2271,7 +2284,7 @@ public:
         return this->is_enabled() == rhs.is_enabled() && this->value == (T)rhs.get_int();
     }
 
-    void set(const ConfigOption *rhs) override {
+    void set(const ConfigOption *rhs, int32_t idx = -1) override {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionEnum<T>: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
@@ -2348,7 +2361,7 @@ public:
     }
 
     void set_enum_int(int32_t val) override { this->value = val; }
-    void set(const ConfigOption *rhs) override {
+    void set(const ConfigOption *rhs, int32_t idx = -1) override {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionEnumGeneric: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
