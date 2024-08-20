@@ -1117,6 +1117,8 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     }
     switch (opt_def->type) {
     case coInt:
+        serialized_str = from_u8(option->serialize());
+        break;
     case coInts: {
         if (!full_serialize) {
             serialized_str = from_u8(config.option<ConfigOptionInts>(opt_key)->serialize_at(opt_idx));
@@ -1126,6 +1128,11 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         break;
     }
     case coBool:
+        serialized_str = from_u8(option->serialize());
+        serialized_str.Replace("0", "false");
+        serialized_str.Replace("1", "false");
+        serialized_str.Replace("!", "Disabled:");
+        break;
     case coBools: {
         if (!full_serialize) {
             serialized_str = from_u8(config.option<ConfigOptionBools>(opt_key)->serialize_at(opt_idx));
