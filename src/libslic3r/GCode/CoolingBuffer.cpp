@@ -1294,10 +1294,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 //use the most current fan
                 bool fan_set = false;
                 for (size_t i = extrude_tree.size() - 1; i < extrude_tree.size(); --i) {
-                    // if not overhangs, then get the prvious one (preimeter or external perimeter)
-                    if(extrude_tree[i] == GCodeExtrusionRole::OverhangPerimeter)
-                        std::cout<<"overhangs\n";
-                    // override_min_fan_speed override overhang speed.
+                    // if not overhangs, then get the previous one (perimeter or external perimeter)
                     //if(override_min_fan_speed > 0 && extrude_tree[i] == GCodeExtrusionRole::OverhangPerimeter)
                     //    continue;
                     if (fan_control[uint8_t(extrude_tree[i])]) {
