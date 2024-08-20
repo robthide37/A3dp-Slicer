@@ -8561,7 +8561,6 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
         auto *external_perimeter_fan_speed = config.option<ConfigOptionInts>("external_perimeter_fan_speed");
         auto *perimeter_fan_speed = config.option<ConfigOptionInts>("perimeter_fan_speed");
         auto *default_fan_speed = config.option<ConfigOptionInts>("default_fan_speed");
-        double external_perimeter_speed = config.get_computed_value("external_perimeter_speed");
         std::vector<ConfigOptionFloats> values;
         values.resize(4);
         values[0].deserialize(useful_items["overhang_fan_speed_0"]);
