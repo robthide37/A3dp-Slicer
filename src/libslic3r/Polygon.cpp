@@ -279,13 +279,17 @@ Points Polygon::concave_points(double angle_threshold) const
 template<typename FilterFn>
 std::vector<size_t> filter_points_idx_by_vectors(const Points &poly, FilterFn filter)
 {
-    // Last point is the first point visited.
-    Point p1 = poly.back();
+    assert(poly.size() > 2);
+    if (poly.size() < 3)
+        return {};
+
+    // first point is the first point visited.
+    Point p1 = poly.front();
     // Previous vector to p1.
-    Vec2d v1 = (p1 - *(poly.end() - 2)).cast<double>();
+    Vec2d v1 = (p1 - poly.back()).cast<double>();
 
     std::vector<size_t> out;
-    for (size_t idx = 0; idx < poly.size(); ++idx) {
+    for (size_t idx = 1; idx < poly.size(); ++idx) {
         const Point &p2 = poly[idx];
         // p2 is next point to the currently visited point p1.
         Vec2d v2 = (p2 - p1).cast<double>();
@@ -294,10 +298,14 @@ std::vector<size_t> filter_points_idx_by_vectors(const Points &poly, FilterFn fi
         v1 = v2;
         p1 = p2;
     }
-    if (out.front() >= poly.size()) {
-        out.erase(out.begin());
-        assert(std::find(out.begin(), out.end(), poly.size() - 1) == out.end());
-        out.push_back(poly.size() - 1);
+
+    // also check last point.
+    {
+        const Point &p2 = poly.front();
+        // p2 is next point to the currently visited point p1.
+        Vec2d v2 = (p2 - p1).cast<double>();
+        if (filter(v1, v2))
+            out.push_back(poly.size() - 1);
     }
     
     return out;
@@ -307,10 +315,12 @@ template<typename ConvexConcaveFilterFn>
 std::vector<size_t> filter_convex_concave_points_idx_by_angle_threshold(const Points &poly, double angle_threshold, ConvexConcaveFilterFn convex_concave_filter)
 {
     assert(angle_threshold >= 0.);
-    if (angle_threshold < EPSILON) {
-        double cos_angle  = cos(angle_threshold);
+    if (angle_threshold > EPSILON) {
+        const double cos_angle  = cos(angle_threshold);
         return filter_points_idx_by_vectors(poly, [convex_concave_filter, cos_angle](const Vec2d &v1, const Vec2d &v2){
-            return convex_concave_filter(v1, v2) && v1.normalized().dot(v2.normalized()) < cos_angle;
+            // if v1 and v2 has same direction = flat angle.
+            // if v1.dot(v2) is negative -> sharp angle
+            return convex_concave_filter(v1, v2) && v1.normalized().dot(v2.normalized()) < -cos_angle;
         });
     } else {
         return filter_points_idx_by_vectors(poly, [convex_concave_filter](const Vec2d &v1, const Vec2d &v2){

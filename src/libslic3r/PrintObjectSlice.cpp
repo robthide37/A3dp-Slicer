@@ -586,11 +586,11 @@ void PrintObject::slice()
     this->set_done(posSlice);
 }
 
-// modify the polygon so it doesn't have any angle spiker than 90°
+// modify the polygon so it doesn't have any concave angle spiker than 90°
 // used by _min_overhang_threshold
 void only_convex_90(Polygon &poly) {
     const bool ccw = poly.is_counter_clockwise();
-    std::vector<size_t> concave = ccw ? poly.concave_points_idx( 3 * PI/2 + EPSILON) : poly.convex_points_idx(PI/2 - EPSILON);
+    std::vector<size_t> concave = ccw ? poly.concave_points_idx( PI/2 - EPSILON) : poly.convex_points_idx(PI/2 - EPSILON);
     while (!concave.empty()) {
         assert(std::is_sorted(concave.begin(), concave.end()));
         Points new_pts;
@@ -613,15 +613,17 @@ void only_convex_90(Polygon &poly) {
                 // then get the distance to move in the big side
                 Point previous_point = ccw? (idx == 0 ? poly.back() : poly[idx - 1]) : (idx == poly.size() - 1 ? poly.front() : poly[idx + 1]);
                 Point next_point = ccw? (idx == poly.size() - 1 ? poly.front() : poly[idx + 1]) : (idx == 0 ? poly.back() : poly[idx - 1]);
-                assert(ccw_angle_old_test(poly[idx], previous_point, next_point) == abs_angle(angle_ccw(previous_point - poly[idx], next_point - poly[idx])));
+                assert(is_approx(ccw_angle_old_test(poly[idx], previous_point, next_point), abs_angle(angle_ccw(previous_point - poly[idx], next_point - poly[idx])), 0.00000001));
                 double angle = abs_angle(angle_ccw(previous_point - poly[idx], next_point - poly[idx]));
-                assert(angle < PI/2 && angle > 0);
+                assert(angle <= PI/2 && angle >= 0);
                 coordf_t dist_to_move = std::cos(angle) * poly[idx].distance_to(small_side_point) + SCALED_EPSILON / 2;
                 // if distance to move too big, just deleted point (don't add it)
                 if (dist_to_move < poly[idx].distance_to(big_side_point)) {
                     Line l(poly[idx], big_side_point);
                     l.extend_start(-dist_to_move);
                     new_pts.push_back(l.a);
+                    double angle_new = abs_angle(angle_ccw(previous_point - l.a, next_point - l.a));
+                    assert(angle_new != angle);
                 }
             }
         }
