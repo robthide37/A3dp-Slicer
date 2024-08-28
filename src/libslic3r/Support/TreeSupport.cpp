@@ -244,8 +244,8 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
                 } else
                     lower_layer_offset = scaled<float>(lower_layer.height / tan_threshold);
                 overhangs = lower_layer_offset == 0 ?
-                    diff(current_layer.lslices, lower_layer.lslices) :
-                    diff(current_layer.lslices, offset(lower_layer.lslices, lower_layer_offset));
+                    diff(current_layer.lslices(), lower_layer.lslices()) :
+                    diff(current_layer.lslices(), offset(lower_layer.lslices(), lower_layer_offset));
                 if (lower_layer_offset == 0) {
                     raw_overhangs = overhangs;
                     raw_overhangs_calculated = true;
@@ -263,8 +263,8 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
                 // Has some support enforcers at this layer, apply them to the overhangs, don't apply the support threshold angle.
                 //enforcers_layers[layer_id] = union_(enforcers_layers[layer_id]);
                 //check_self_intersections(enforcers_layers[layer_id], "generate_overhangs - enforcers");
-                //check_self_intersections(to_polygons(lower_layer.lslices), "generate_overhangs - lowerlayers");
-                if (Polygons enforced_overhangs = intersection(raw_overhangs_calculated ? raw_overhangs : diff(current_layer.lslices, lower_layer.lslices), enforcers_layers[layer_id] /*, ApplySafetyOffset::Yes */);
+                //check_self_intersections(to_polygons(lower_layer.lslices()), "generate_overhangs - lowerlayers");
+                if (Polygons enforced_overhangs = intersection(raw_overhangs_calculated ? raw_overhangs : diff(current_layer.lslices(), lower_layer.lslices()), enforcers_layers[layer_id] /*, ApplySafetyOffset::Yes */);
                     ! enforced_overhangs.empty()) {
                     //FIXME this is a hack to make enforcers work on steep overhangs.
                     //check_self_intersections(enforced_overhangs, "generate_overhangs - enforced overhangs1");
@@ -273,14 +273,14 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
                     //check_self_intersections(offset(union_ex(enforced_overhangs),
                     //FIXME enforcer_overhang_offset is a fudge constant!
                     enforced_overhangs = diff(offset(union_ex(enforced_overhangs), enforcer_overhang_offset),
-                        lower_layer.lslices);
+                        lower_layer.lslices());
 #ifdef TREESUPPORT_DEBUG_SVG
 //                    if (! intersecting_edges(enforced_overhangs).empty()) 
                     {
                         static int irun = 0;
                         SVG::export_expolygons(debug_out_path("treesupport-self-intersections-%d.svg", ++irun),
-                            { { { current_layer.lslices },        { "current_layer.lslices", "yellow", 0.5f } },
-                              { { lower_layer.lslices },          { "lower_layer.lslices", "gray", 0.5f } },
+                            { { { current_layer.lslices() },      { "current_layer.lslices", "yellow", 0.5f } },
+                              { { lower_layer.lslices() },        { "lower_layer.lslices", "gray", 0.5f } },
                               { { union_ex(enforced_overhangs) }, { "enforced_overhangs", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
                     }
 #endif // TREESUPPORT_DEBUG_SVG
@@ -301,11 +301,11 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
         Polygons       overhangs = 
             // Don't apply blockes on raft layer.
             //(! blockers_layers.empty() && ! blockers_layers[layer_id].empty() ? 
-            //    diff(first_layer.lslices, blockers_layers[layer_id], ApplySafetyOffset::Yes) :
-                to_polygons(first_layer.lslices);
+            //    diff(first_layer.lslices(), blockers_layers[layer_id], ApplySafetyOffset::Yes) :
+                to_polygons(first_layer.lslices());
 #if 0
         if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty()) {
-            if (Polygons enforced_overhangs = intersection(first_layer.lslices, enforcers_layers[layer_id] /*, ApplySafetyOffset::Yes */);
+            if (Polygons enforced_overhangs = intersection(first_layer.lslices(), enforcers_layers[layer_id] /*, ApplySafetyOffset::Yes */);
                 ! enforced_overhangs.empty()) {
                 //FIXME this is a hack to make enforcers work on steep overhangs.
                 //FIXME enforcer_overhang_offset is a fudge constant!
@@ -996,7 +996,7 @@ int generate_raft_contact(
         while (raft_contact_layer_idx > 0 && config.raft_layers[raft_contact_layer_idx] > print_object.slicing_parameters().raft_contact_top_z + EPSILON)
             -- raft_contact_layer_idx;
         // Create the raft contact layer.
-        const ExPolygons &lslices   = print_object.get_layer(0)->lslices;
+        const ExPolygons &lslices   = print_object.get_layer(0)->lslices();
         double            expansion = print_object.config().raft_expansion.value;
         interface_placer.add_roof_unguarded(expansion > 0 ? expand(lslices, scaled<float>(expansion)) : to_polygons(lslices), raft_contact_layer_idx, 0);
     }

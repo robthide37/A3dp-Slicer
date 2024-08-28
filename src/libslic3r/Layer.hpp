@@ -375,7 +375,11 @@ public:
     // order will be applied by the G-code generator to the extrusions fitting into these lslices.
     // These lslices are also used to detect overhangs and overlaps between successive layers, therefore it is important
     // that the 1st lslice is not compensated by the Elephant foot compensation algorithm.
-    ExPolygons 				lslices;
+protected:
+    ExPolygons 				m_lslices;
+public:
+    const ExPolygons &      lslices() const { return m_lslices; }
+    ExPolygons &            set_lslices() { return m_lslices; }
     std::vector<size_t>     lslice_indices_sorted_by_print_order;
     LayerSlices             lslices_ex;
 

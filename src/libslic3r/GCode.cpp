@@ -3425,7 +3425,7 @@ LayerResult GCodeGenerator::process_layer(
     for (const GCode::ObjectLayerToPrint &print_layer : layers) {
         //note: a layer can be null if the objetc doesn't have aanything to print at this height.
         if (print_layer.layer())
-            for (auto poly : print_layer.layer()->lslices) layer_area += poly.area();
+            for (auto poly : print_layer.layer()->lslices()) layer_area += poly.area();
     }
     layer_area = unscaled(unscaled(layer_area));
     status_monitor.stats().layer_area_stats.emplace_back(print_z, layer_area);
@@ -6779,7 +6779,7 @@ Polyline GCodeGenerator::travel_to(std::string &gcode, const Point &point, Extru
 
             //TODO: add bbox cache & checks like for can_cross_perimeter
             bool has_intersect = false;
-            for (const ExPolygon &expoly : m_layer->lslices) {
+            for (const ExPolygon &expoly : m_layer->lslices()) {
                 // first, check if it's inside the contour (still, it can go over holes)
                 Polylines diff_result = diff_pl(travel, expoly.contour);
                 if (diff_result.size() == 1 && diff_result.front() == travel)
@@ -7245,8 +7245,8 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
             if (m_layer_slices_offseted.layer != m_layer) {
                 m_layer_slices_offseted.layer    = m_layer;
                 m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) / 2;
-                ExPolygons slices                = m_layer->lslices;
-                ExPolygons slices_offsetted = offset_ex(m_layer->lslices, -m_layer_slices_offseted.diameter * 1.5f);
+                ExPolygons slices                = m_layer->lslices();
+                ExPolygons slices_offsetted = offset_ex(m_layer->lslices(), -m_layer_slices_offseted.diameter * 1.5f);
                 // remove top surfaces
                 for (const LayerRegion *reg : m_layer->regions()) {
                     m_throw_if_canceled();
@@ -7275,7 +7275,7 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
         //    std::stringstream stri;
         //    stri << this->m_layer->id() << "_avoid_" <<"_"<<(aodfjiaqsdz++) << ".svg";
         //    SVG svg(stri.str());
-        //    svg.draw(m_layer->lslices, "grey");
+        //    svg.draw(m_layer->lslices(), "grey");
         //    for (auto &entry : offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices) {
         //        bool checked  = (travel.size() > 1 && 
         //            (entry.second.contains(travel.front()) ||

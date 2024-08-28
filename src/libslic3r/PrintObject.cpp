@@ -874,7 +874,7 @@ void PrintObject::calculate_overhanging_perimeters()
             std::unordered_map<size_t, AABBTreeLines::LinesDistancer<Linef>>      unscaled_polygons_lines;
             for (const Layer *l : this->layers()) {
                 curled_lines[l->id()]            = AABBTreeLines::LinesDistancer<CurledLine>{l->curled_lines};
-                unscaled_polygons_lines[l->id()] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(l->lslices)};
+                unscaled_polygons_lines[l->id()] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(l->lslices())};
             }
             curled_lines[size_t(-1)]            = {};
             unscaled_polygons_lines[size_t(-1)] = {};
@@ -1924,7 +1924,7 @@ void PrintObject::detect_surfaces_type()
                     if (upper_layer) {
                         ExPolygons upper_slices = interface_shells ? 
                             diff_ex(layerm_slices_surfaces, upper_layer->get_region(region_id)->slices().surfaces, ApplySafetyOffset::Yes) :
-                            diff_ex(layerm_slices_surfaces, upper_layer->lslices, ApplySafetyOffset::Yes);
+                            diff_ex(layerm_slices_surfaces, upper_layer->lslices(), ApplySafetyOffset::Yes);
                         surfaces_append(top, opening_ex(upper_slices, offset), stPosTop | stDensSolid);
                     } else {
                         // if no upper layer, all surfaces of this one are solid
@@ -1950,7 +1950,7 @@ void PrintObject::detect_surfaces_type()
                         surfaces_append(
                             bottom,
                             opening_ex(
-                                diff_ex(layerm_slices_surfaces, lower_layer->lslices, ApplySafetyOffset::Yes),
+                                diff_ex(layerm_slices_surfaces, lower_layer->lslices(), ApplySafetyOffset::Yes),
                                 offset),
                             surface_type_bottom_other);
                         // if user requested internal shells, we need to identify surfaces
@@ -1962,7 +1962,7 @@ void PrintObject::detect_surfaces_type()
                                 bottom,
                                 opening_ex(
                                     diff_ex(
-                                        intersection(layerm_slices_surfaces, lower_layer->lslices), // supported
+                                        intersection(layerm_slices_surfaces, lower_layer->lslices()), // supported
                                         lower_layer->get_region(region_id)->slices().surfaces,
                                         ApplySafetyOffset::Yes),
                                     offset), //-+
@@ -2084,13 +2084,13 @@ void PrintObject::detect_surfaces_type()
             double total_area = 0;
             if (this->print()->config().complete_objects.value) {
                 // sequential printing: only consider myself
-                for (const ExPolygon &slice : my_layer->lslices) { total_area += slice.area(); }
+                for (const ExPolygon &slice : my_layer->lslices()) { total_area += slice.area(); }
             } else {
                 // parallel printing: get all objects
                 for (const PrintObject *object : this->print()->objects()) {
                     for (auto *layer : object->m_layers) {
                         if (std::abs(layer->print_z - my_layer->print_z) < EPSILON) {
-                            for (const ExPolygon &slice : layer->lslices) { total_area += slice.area(); }
+                            for (const ExPolygon &slice : layer->lslices()) { total_area += slice.area(); }
                         }
                     }
                 }
@@ -2160,7 +2160,7 @@ void PrintObject::process_external_surfaces()
 //		                			// Shrink the holes, let the layer above expand slightly inside the unsupported areas.
 //		                			polygons_append(voids, offset(surface.expolygon, unsupported_width));
 //		                }
-                        surfaces_covered[layer_idx] = to_polygons(this->m_layers[layer_idx]->lslices);
+                        surfaces_covered[layer_idx] = to_polygons(this->m_layers[layer_idx]->lslices());
                     }
             }
         );
@@ -2272,11 +2272,11 @@ void PrintObject::discover_vertical_shells()
                 // For a multi-material print, simulate perimeter / infill split as if only a single extruder has been used for the whole print.
                 if (perimeter_offset > 0.) {
                     // The layer.lslices are forced to merge by expanding them first.
-                    expolygons_append(cache.holes, offset2_ex(layer.lslices, 0.3f * perimeter_min_spacing, -perimeter_offset - 0.3f * perimeter_min_spacing));
+                    expolygons_append(cache.holes, offset2_ex(layer.lslices(), 0.3f * perimeter_min_spacing, -perimeter_offset - 0.3f * perimeter_min_spacing));
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
                     {
-                        Slic3r::SVG svg(debug_out_path("discover_vertical_shells-extra-holes-%d.svg", debug_idx), get_extents(layer.lslices));
-                        svg.draw(layer.lslices, "blue");
+                        Slic3r::SVG svg(debug_out_path("discover_vertical_shells-extra-holes-%d.svg", debug_idx), get_extents(layer.lslices()));
+                        svg.draw(layer.lslices(), "blue");
                         svg.draw(union_ex(cache.holes), "red");
                         svg.draw_outline(union_ex(cache.holes), "black", "blue", scale_(0.05));
                         svg.Close();
@@ -2447,7 +2447,7 @@ void PrintObject::discover_vertical_shells()
                             // perimeter width of area
                             ExPolygons anchor_area = intersection_ex(expand(cache_top_botom_regions[idx_layer].top_surfaces,
                                                                        layerm->flow(frExternalPerimeter).scaled_spacing()),
-                                                                to_polygons(m_layers[i]->lslices));
+                                                                to_polygons(m_layers[i]->lslices()));
                             combine_shells(anchor_area);
                         }
 
@@ -2484,7 +2484,7 @@ void PrintObject::discover_vertical_shells()
                         if (!at_least_one_bottom_projected && i >= 0) {
                             ExPolygons anchor_area = intersection_ex(expand(cache_top_botom_regions[idx_layer].bottom_surfaces,
                                                                        layerm->flow(frExternalPerimeter).scaled_spacing()),
-                                                                to_polygons(m_layers[i]->lslices));
+                                                                to_polygons(m_layers[i]->lslices()));
                             combine_shells(anchor_area);
                         }
 
@@ -2603,9 +2603,9 @@ void PrintObject::discover_vertical_shells()
                         Polygons object_volume;
                         Polygons internal_volume;
                         {
-                            Polygons shrinked_bottom_slice = idx_layer > 0 ? to_polygons(m_layers[idx_layer - 1]->lslices) : Polygons{};
+                            Polygons shrinked_bottom_slice = idx_layer > 0 ? to_polygons(m_layers[idx_layer - 1]->lslices()) : Polygons{};
                             Polygons shrinked_upper_slice  = (idx_layer + 1) < m_layers.size() ?
-                                                                 to_polygons(m_layers[idx_layer + 1]->lslices) :
+                                                                 to_polygons(m_layers[idx_layer + 1]->lslices()) :
                                                                  Polygons{};
                             object_volume = intersection(shrinked_bottom_slice, shrinked_upper_slice);
                             //internal_volume = closing(polygonsInternal, float(SCALED_EPSILON));
@@ -2846,7 +2846,7 @@ void PrintObject::bridge_over_infill()
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                             debug_draw(std::to_string(lidx) + "_candidate_surface_" + std::to_string(area(s->expolygon)),
-                                       to_lines(region->layer()->lslices), to_lines(s->expolygon), to_lines(worth_bridging),
+                                       to_lines(region->layer()->lslices()), to_lines(s->expolygon), to_lines(worth_bridging),
                                        to_lines(unsupported_area));
 #endif
 #ifdef DEBUG_BRIDGE_OVER_INFILL
@@ -2989,7 +2989,7 @@ void PrintObject::bridge_over_infill()
         );
 #ifdef DEBUG_BRIDGE_OVER_INFILL
         for (const auto &il : infill_lines) {
-            debug_draw(std::to_string(il.first) + "_infill_lines", to_lines(get_layer(il.first)->lslices), to_lines(il.second), {}, {});
+            debug_draw(std::to_string(il.first) + "_infill_lines", to_lines(get_layer(il.first)->lslices()), to_lines(il.second), {}, {});
         }
 #endif
     }
@@ -3493,7 +3493,7 @@ void PrintObject::bridge_over_infill()
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                     debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) + "_" + "_expanded_bridging" +  std::to_string(r),
-                               to_lines(layer->lslices), to_lines(boundary_plines), to_lines(candidate.new_polys), to_lines(bridging_area));
+                               to_lines(layer->lslices()), to_lines(boundary_plines), to_lines(candidate.new_polys), to_lines(bridging_area));
 #endif
 
                     expanded_surfaces.push_back(CandidateSurface(candidate.original_surface, candidate.layer_index, bridging_area,
@@ -3834,7 +3834,7 @@ bool PrintObject::update_layer_height_profile(const ModelObject& model_object, c
 //         {
 //             // Get perimeters area as the difference between slices and fill_surfaces
 //             // Only consider the area that is not supported by lower perimeters
-//             Polygons perimeters = intersection(diff(layer->lslices, fill_surfaces), lower_layer_fill_surfaces);
+//             Polygons perimeters = intersection(diff(layer->lslices(), fill_surfaces), lower_layer_fill_surfaces);
 //             // Only consider perimeter areas that are at least one extrusion width thick.
 //             //FIXME Offset2 eats out from both sides, while the perimeters are create outside in.
 //             //Should the pw not be half of the current value?

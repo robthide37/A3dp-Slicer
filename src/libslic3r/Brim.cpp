@@ -1007,7 +1007,7 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     ExPolygons    islands;
     for (PrintObject* object : objects) {
         ExPolygons object_islands;
-        for (ExPolygon &expoly : object->layers().front()->lslices) {
+        for (const ExPolygon &expoly : object->layers().front()->lslices()) {
             if (brim_config.brim_inside_holes && brim_config.brim_width_interior == 0) {
                 if (brim_offset == 0) {
                     object_islands.push_back(expoly);
@@ -1181,7 +1181,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
     for (PrintObject* object : objects) {
         ExPolygons object_islands;
         ExPolygons support_island;
-        for (const ExPolygon& expoly : object->layers().front()->lslices) {
+        for (const ExPolygon& expoly : object->layers().front()->lslices()) {
             if (brim_config.brim_inside_holes && brim_config.brim_width_interior == 0) {
                 if (brim_offset == 0) {
                     object_islands.push_back(expoly);
@@ -1370,7 +1370,7 @@ void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectP
     coordf_t spacing;
     for (PrintObject* object : objects) {
         ExPolygons object_islands;
-        for (const ExPolygon& expoly : object->layers().front()->lslices){
+        for (const ExPolygon& expoly : object->layers().front()->lslices()){
             if (brim_offset == 0) {
                 object_islands.push_back(expoly);
             } else {

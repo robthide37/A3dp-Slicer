@@ -56,7 +56,7 @@ void remove_bridges_from_contacts(
     {
         coordf_t nozzle_diameter = scale_t(print_config.nozzle_diameter.get_at(layerm.region().config().perimeter_extruder-1));
         // Surface supporting this layer, expanded by 0.5 * nozzle_diameter, as we consider this kind of overhang to be sufficiently supported.
-        Polygons lower_grown_slices = expand(lower_layer.lslices,
+        Polygons lower_grown_slices = expand(lower_layer.lslices(),
             //FIXME to mimic the decision in the perimeter generator, we should use half the external perimeter width.
             0.5f * float(nozzle_diameter),
             SUPPORT_SURFACES_OFFSET_PARAMETERS);
@@ -93,9 +93,9 @@ void remove_bridges_from_contacts(
                 //check if the first and last point are supported. If so, it's a bridge.
                 Point pts[2]       = { polyline.first_point(), polyline.last_point() };
                 bool  supported[2] = { false, false };
-                for (size_t i = 0; i < lower_layer.lslices.size() && ! (supported[0] && supported[1]); ++ i)
+                for (size_t i = 0; i < lower_layer.lslices().size() && ! (supported[0] && supported[1]); ++ i)
                     for (int j = 0; j < 2; ++ j)
-                        if (! supported[j] && lower_layer.lslices_ex[i].bbox.contains(pts[j]) && lower_layer.lslices[i].contains(pts[j]))
+                        if (! supported[j] && lower_layer.lslices_ex[i].bbox.contains(pts[j]) && lower_layer.lslices()[i].contains(pts[j]))
                             supported[j] = true;
                 if (supported[0] && supported[1])
                     // Offset a polyline into a thick line.
@@ -334,7 +334,7 @@ SupportGeneratorLayersPtr generate_raft_base(
         const bool     brim_outer      = object.config().brim_width > 0; // brim_type == btOuterOnly || brim_type == btOuterAndInner;
         const bool     brim_inner      = object.config().brim_width_interior > 0; //brim_type == btInnerOnly || brim_type == btOuterAndInner;
         const auto     brim_separation = scaled<float>(object.config().brim_separation.value + object.config().brim_width.value);
-        for (const ExPolygon &ex : object.layers().front()->lslices) {
+        for (const ExPolygon &ex : object.layers().front()->lslices()) {
             if (brim_outer && brim_inner)
                 polygons_append(brim, offset(ex, brim_separation));
             else {
@@ -445,7 +445,7 @@ SupportGeneratorLayersPtr generate_raft_base(
         if (columns_base != nullptr) {
             // Expand the bases of the support columns in the 1st layer.
             Polygons &raft     = columns_base->polygons;
-            Polygons  trimming = offset(object.layers().front()->lslices, (float)scale_(support_params.gap_xy), SUPPORT_SURFACES_OFFSET_PARAMETERS);
+            Polygons  trimming = offset(object.layers().front()->lslices(), (float)scale_(support_params.gap_xy), SUPPORT_SURFACES_OFFSET_PARAMETERS);
             if (inflate_factor_1st_layer > SCALED_EPSILON) {
                 // Inflate in multiple steps to avoid leaking of the support 1st layer through object walls.
                 auto  nsteps = std::max(5, int(ceil(inflate_factor_1st_layer / support_params.first_layer_flow.scaled_width())));

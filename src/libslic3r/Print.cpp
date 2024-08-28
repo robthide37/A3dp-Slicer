@@ -118,6 +118,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "extruder_extrusion_multiplier_speed",
         "extruder_offset",
         "extruder_fan_offset"
+        "extruder_pressure_factor"
         "extruder_temperature_offset",
         "extrusion_multiplier",
         "fan_below_layer_time",
@@ -128,6 +129,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "fan_percentage",
         "fan_printer_min_speed",
         "filament_colour",
+        "filament_compressibility_factor",
         "filament_custom_variables",
         "filament_diameter",
         "filament_density",
@@ -145,7 +147,9 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "gcode_comments",
         "gcode_filename_illegal_char",
         "gcode_label_objects",
+        "gcode_line_number",
         "gcode_min_length",
+        "gcode_no_comment",
         "gcode_precision_xyz",
         "gcode_precision_e",
         "gcode_substitutions",
@@ -178,6 +182,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "printer_notes",
         "remaining_times",
         "remaining_times_type",
+        "split_extrusion_acceleration",
         "travel_ramping_lift",
         "travel_initial_part_length",
         "travel_slope",
@@ -197,6 +202,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "retract_restart_extra",
         "retract_restart_extra_toolchange",
         "retract_speed",
+        "second_layer_flow_ratio",
         "silent_mode",
         "single_extruder_multi_material_priming",
         "slowdown_below_layer_time",
@@ -1406,7 +1412,7 @@ void Print::_make_skirt_brim() {
                     if (!object->m_layers.empty())
                         for (const PrintInstance &pt : object->m_instances) {
                             size_t first_idx = brim_area.size();
-                            brim_area.insert(brim_area.end(), object->m_layers.front()->lslices.begin(), object->m_layers.front()->lslices.end());
+                            brim_area.insert(brim_area.end(), object->m_layers.front()->lslices().begin(), object->m_layers.front()->lslices().end());
                             for (size_t i = first_idx; i < brim_area.size(); i++) {
                                 brim_area[i].translate(pt.shift.x(), pt.shift.y());
                             }
@@ -1522,7 +1528,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
         for (const Layer *layer : object->m_layers) {
             if (layer->print_z > skirt_height_z)
                 break;
-            for (const ExPolygon &expoly : layer->lslices)
+            for (const ExPolygon &expoly : layer->lslices())
                 // Collect the outer contour points only, ignore holes for the calculation of the convex hull.
                 append(object_points, expoly.contour.points);
         }
@@ -1550,7 +1556,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                     append(object_points, poly.points);
             }
             // get object
-            for (const ExPolygon& expoly : object->m_layers[0]->lslices)
+            for (const ExPolygon& expoly : object->m_layers[0]->lslices())
                 for (const Polygon& poly : offset(expoly.contour, scale_(object->config().brim_width)))
                     append(object_points, poly.points);
         }
@@ -1698,7 +1704,7 @@ Polygons Print::first_layer_islands() const
     Polygons islands;
     for (PrintObject *object : m_objects) {
         Polygons object_islands;
-        for (ExPolygon &expoly : object->m_layers.front()->lslices)
+        for (const ExPolygon &expoly : object->m_layers.front()->lslices())
             object_islands.push_back(expoly.contour);
         if (! object->support_layers().empty())
             //was polygons_covered_by_spacing, but is it really important?

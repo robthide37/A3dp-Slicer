@@ -615,7 +615,7 @@ static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uin
         auto point_inside_surface = [&layer](const size_t lslice_idx, const Point &point) {
             const BoundingBox &bbox = layer.lslices_ex[lslice_idx].bbox;
             return point.x() >= bbox.min.x() && point.x() < bbox.max.x() && point.y() >= bbox.min.y() && point.y() < bbox.max.y() &&
-                   layer.lslices[lslice_idx].contour.contains(point);
+                   layer.lslices()[lslice_idx].contour.contains(point);
         };
         Point point      = layer.get_region(fill_region_id)->fills().entities()[fill_begin]->first_point();
         int   lslice_idx = int(layer.lslices_ex.size()) - 1;
@@ -703,7 +703,7 @@ static void insert_ironings_into_islands(Layer &layer, uint32_t layer_region_id,
 	        const BoundingBox &bbox = layer.lslices_ex[lslice_idx].bbox;
 	        return point.x() >= bbox.min.x() && point.x() < bbox.max.x() &&
 	               point.y() >= bbox.min.y() && point.y() < bbox.max.y() &&
-	               layer.lslices[lslice_idx].contour.contains(point);
+	               layer.lslices()[lslice_idx].contour.contains(point);
 	    };
 	    Point point = layer.get_region(layer_region_id)->ironings().entities()[ironing_idx_begin]->first_point();
 	    int lslice_idx = int(layer.lslices_ex.size()) - 1;
@@ -1404,7 +1404,7 @@ void Layer::make_ironing()
                 polys = union_safety_offset(polys);
             }
             // Trim the top surfaces with half the nozzle diameter.
-            ironing_areas = intersection_ex(polys, offset(this->lslices, -float(scale_(0.5 * nozzle_dmr))));
+            ironing_areas = intersection_ex(polys, offset(this->lslices(), -float(scale_(0.5 * nozzle_dmr))));
         }
 
         // Create the filler object.
