@@ -546,6 +546,15 @@ public:
         }
     }
 
+    void secondary_status_counter_reset() {
+        m_secondary_state_counter = 0;
+        m_secondary_state_max = 0;
+    }
+    void secondary_status_counter_add_max(int32_t max_incr) { m_secondary_state_max += max_incr; }
+    int32_t secondary_status_counter_get_max() { return m_secondary_state_max; }
+    int32_t secondary_status_counter_increment(int32_t incr = 1) { return m_secondary_state_counter.fetch_add(incr); }
+
+
     typedef std::function<void()>  cancel_callback_type;
     // Various methods will call this callback to stop the background processing (the Print::process() call)
     // in case a successive change of the Print / PrintObject / PrintRegion instances changed
@@ -632,6 +641,8 @@ private:
     // The mutex will be used to guard the worker thread against entering a stage
     // while the data influencing the stage is modified.
     mutable std::mutex                      m_state_mutex;
+    std::atomic_int32_t                     m_secondary_state_counter;
+    std::atomic_int32_t                     m_secondary_state_max;
 
     friend PrintTryCancel;
 };

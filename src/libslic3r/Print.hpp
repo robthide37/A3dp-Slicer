@@ -104,6 +104,46 @@ enum PrintObjectStep : uint8_t {
     posCount,
 };
 
+/**
+* order:
+*            m_objects[idx]->make_perimeters();
+*                   -> slice()
+*                   -> make_perimeters()
+*            m_objects[idx]->infill();
+*            m_objects[idx]->ironing();
+*            obj->generate_support_spots();
+*            psAlertWhenSupportsNeeded
+*            obj.generate_support_material();
+*            obj.estimate_curled_extrusions();
+*            obj.calculate_overhanging_perimeters();
+*            _make_wipe_tower();
+*            _make_skirt();
+*            make_brim();
+*            simplify_extrusion_path();
+* 
+*           then export_gcode();
+* */
+
+// step % for starting this step
+inline std::map<PrintObjectStep, int> objectstep_2_percent = {{PrintObjectStep::posSlice, 0},
+                                                       {PrintObjectStep::posPerimeters, 10},
+                                                       {PrintObjectStep::posPrepareInfill, 20},
+                                                       {PrintObjectStep::posInfill, 30},
+                                                       {PrintObjectStep::posIroning, 40},
+                                                       {PrintObjectStep::posSupportSpotsSearch, 45},
+                                                       {PrintObjectStep::posSupportMaterial, 50},
+                                                       {PrintObjectStep::posEstimateCurledExtrusions, 60},
+                                                       {PrintObjectStep::posCalculateOverhangingPerimeters, 65},
+                                                       {PrintObjectStep::posSimplifyPath, 80},
+                                                       {PrintObjectStep::posCount, 85}};
+
+inline std::map<PrintStep, int> printstep_2_percent = {
+    {PrintStep::psAlertWhenSupportsNeeded, 45},
+    {PrintStep::psSkirtBrim, 70},
+    {PrintStep::psWipeTower, 75},
+    {PrintStep::psGCodeExport, 85},
+    {PrintStep::psCount, 100},
+};
 // A PrintRegion object represents a group of volumes to print
 // sharing the same config (including the same assigned extruder(s))
 class PrintRegion
@@ -790,6 +830,7 @@ public:
 protected:
 private:
 
+    void                _make_skirt_brim();
     void                _make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollection &out, std::optional<ExtrusionEntityCollection> &out_first_layer);
     void                _make_wipe_tower();
     void                finalize_first_layer_convex_hull();

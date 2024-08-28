@@ -1149,29 +1149,50 @@ void Print::process()
     name_tbb_thread_pool_threads_set_locale();
     bool something_done = !is_step_done_unguarded(psSkirtBrim);
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
-
+    secondary_status_counter_reset();
     Slic3r::parallel_for(size_t(0), m_objects.size(),
         [this](const size_t idx) {
             m_objects[idx]->make_perimeters();
+        }
+    );
+    secondary_status_counter_reset();
+    Slic3r::parallel_for(size_t(0), m_objects.size(),
+        [this](const size_t idx) {
             m_objects[idx]->infill();
+        }
+    );
+    secondary_status_counter_reset();
+    Slic3r::parallel_for(size_t(0), m_objects.size(),
+        [this](const size_t idx) {
             m_objects[idx]->ironing();
         }
     );
 
     // The following step writes to m_shared_regions, it should not run in parallel.
+    secondary_status_counter_reset();
     for (PrintObject *obj : m_objects)
         obj->generate_support_spots();
     // check data from previous step, format the error message(s) and send alert to ui
     // this also has to be done sequentially.
     alert_when_supports_needed();
-
-    this->set_status(50, L("Generating support material"));
+    
+    secondary_status_counter_reset();
+    Slic3r::parallel_for(size_t(0), m_objects.size(),
+        [this](const size_t idx) {
+            m_objects[idx]->generate_support_material();
+        }
+    );
+    secondary_status_counter_reset();
     Slic3r::parallel_for(size_t(0), m_objects.size(),
         [this](const size_t idx) {
             PrintObject &obj = *m_objects[idx];
-            obj.generate_support_material();
-            obj.estimate_curled_extrusions();
-            obj.calculate_overhanging_perimeters();
+            m_objects[idx]->estimate_curled_extrusions();
+        }
+    );
+    secondary_status_counter_reset();
+    Slic3r::parallel_for(size_t(0), m_objects.size(),
+        [this](const size_t idx) {
+            m_objects[idx]->calculate_overhanging_perimeters();
         }
     );
 
@@ -1179,7 +1200,7 @@ void Print::process()
         m_wipe_tower_data.clear();
         m_tool_ordering.clear();
         if (this->has_wipe_tower()) {
-            //this->set_status(50, _u8L("Generating wipe tower"));
+            this->set_status(printstep_2_percent[PrintStep::psWipeTower], _u8L("Generating wipe tower"));
             this->_make_wipe_tower();
         } else if (! this->config().complete_objects.value) {
             // Initialize the tool ordering, so it could be used by the G-code preview slider for planning tool changes and filament switches.
@@ -1189,9 +1210,134 @@ void Print::process()
         }
         this->set_done(psWipeTower);
     }
-    if (this->set_started(psSkirtBrim)) {
-        this->set_status(60, L("Generating skirt and brim"));
+    
+    secondary_status_counter_reset();
+    _make_skirt_brim();
 
+    if (this->has_wipe_tower()) {
+        // These values have to be updated here, not during wipe tower generation.
+        // When the wipe tower is moved/rotated, it is not regenerated.
+        m_wipe_tower_data.position = { m_config.wipe_tower_x, m_config.wipe_tower_y };
+        m_wipe_tower_data.rotation_angle = m_config.wipe_tower_rotation_angle;
+    }
+    auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(objects(), m_wipe_tower_data);
+
+    m_conflict_result = conflictRes;
+    if (conflictRes.has_value())
+        BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
+
+#ifdef _DEBUG
+    struct PointAssertVisitor : public ExtrusionVisitorRecursiveConst {
+        virtual void default_use(const ExtrusionEntity& entity) override {};
+        virtual void use(const ExtrusionPath &path) override {
+            for (size_t idx = 1; idx < path.size(); ++idx)
+                assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+        }
+        virtual void use(const ExtrusionLoop& loop) override {
+            Point last_pt = loop.last_point();
+            for (const ExtrusionPath &path : loop.paths) {
+                assert(path.polyline.size() >= 2);
+                assert(path.first_point() == last_pt);
+                for (size_t idx = 1; idx < path.size(); ++idx)
+                    assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+                last_pt = path.last_point();
+            }
+            assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+        }
+    } ptvisitor;
+    for (PrintObject* obj : m_objects)
+        for (Layer* lay : obj->layers())
+            for (LayerRegion* lr : lay->regions())
+                lr->perimeters().visit(ptvisitor);
+#endif
+    //simplify / make arc fitting
+    {
+        const bool spiral_mode = config().spiral_vase;
+        const bool enable_arc_fitting = config().arc_fitting.value != ArcFittingType::Disabled && !spiral_mode;
+        if (enable_arc_fitting) {
+            this->set_status(objectstep_2_percent[PrintObjectStep::posSimplifyPath], L("Creating arcs"));
+        } else {
+            this->set_status(objectstep_2_percent[PrintObjectStep::posSimplifyPath], L("Simplifying paths"));
+        }
+        secondary_status_counter_reset();
+        for (PrintObject* obj : m_objects) {
+            obj->simplify_extrusion_path();
+        }
+        //also simplify object skirt & brim
+        if (enable_arc_fitting && (!this->m_skirt.empty() || !this->m_brim.empty())) {
+            coordf_t scaled_resolution = scale_d(config().resolution.value);
+            if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
+            const ConfigOptionFloatOrPercent& arc_fitting_tolerance = config().arc_fitting_tolerance;
+
+            this->set_status(0, L("Optimizing skirt & brim %s%%"), { std::to_string(0) }, PrintBase::SlicingStatus::SECONDARY_STATE);
+            std::atomic<int> atomic_count{ 0 };
+            GetPathsVisitor visitor;
+            this->m_skirt.visit(visitor);
+            this->m_brim.visit(visitor);
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, visitor.paths.size() + visitor.paths3D.size()),
+                [this, &visitor, scaled_resolution, &arc_fitting_tolerance, &atomic_count](const tbb::blocked_range<size_t>& range) {
+                    size_t path_idx = range.begin();
+                    for (; path_idx < range.end() && path_idx < visitor.paths.size(); ++path_idx) {
+                        visitor.paths[path_idx]->simplify(scaled_resolution, config().arc_fitting.value, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width())));
+                        int nb_items_done = (++atomic_count);
+                        this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
+                    }
+                    for (; path_idx < range.end() && path_idx - visitor.paths.size() < visitor.paths3D.size(); ++path_idx) {
+                        visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, config().arc_fitting.value, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width())));
+                        int nb_items_done = (++atomic_count);
+                        this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
+                    }
+                }
+            );
+        }
+    }
+    
+#if _DEBUG
+    for (PrintObject* obj : m_objects) {
+        for (auto &l : obj->m_layers) {
+            for (auto &reg : l->regions()) { LoopAssertVisitor lav; reg->perimeters().visit(lav); }
+        }
+    }
+#endif
+
+    m_timestamp_last_change = std::time(0);
+    BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
+    //notify gui that the slicing/preview structs are ready to be drawed
+    if (something_done)
+        this->set_status(printstep_2_percent[PrintStep::psGCodeExport], L("Slicing done"), SlicingStatus::FlagBits::SLICING_ENDED);
+}
+
+// G-code export process, running at a background thread.
+// The export_gcode may die for various reasons (fails to process output_filename_format,
+// write error into the G-code, cannot execute post-processing scripts).
+// It is up to the caller to show an error message.
+std::string Print::export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
+{
+    // output everything to a G-code file
+    // The following call may die if the output_filename_format template substitution fails.
+    std::string path = this->output_filepath(path_template);
+    if (!path.empty() && result == nullptr) {
+        // Only show the path if preview_data is not set -> running from command line.
+        this->set_status(printstep_2_percent[PrintStep::psGCodeExport], L("Exporting G-code to %s"), {path});
+    } else {
+        this->set_status(printstep_2_percent[PrintStep::psGCodeExport], L("Generating G-code"));
+    }
+
+    // Create GCode on heap, it has quite a lot of data.
+    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator());
+    gcode->do_export(this, path.c_str(), result, thumbnail_cb);
+
+    if (m_conflict_result.has_value())
+        result->conflict_result = *m_conflict_result;
+
+    return path.c_str();
+}
+
+void Print::_make_skirt_brim() {
+    
+    if (this->set_started(psSkirtBrim)) {
+        this->set_status(printstep_2_percent[PrintStep::psSkirtBrim], L("Generating skirt and brim"));
         m_skirt.clear();
         m_skirt_first_layer.reset();
         //const bool draft_shield = config().draft_shield != dsDisabled;
@@ -1204,7 +1350,7 @@ void Print::process()
             obj->m_skirt_first_layer.reset();
         }
         if (this->has_skirt()) {
-            this->set_status(60, L("Generating skirt"));
+            this->set_status(printstep_2_percent[PrintStep::psSkirtBrim], L("Generating skirt"));
             if (config().complete_objects && !config().complete_objects_one_skirt){
                 for (PrintObject *obj : m_objects) {
                     //create a skirt "pattern" (one per object)
@@ -1270,7 +1416,7 @@ void Print::process()
         for (std::vector<PrintObject*> &obj_group : obj_groups) {
             const PrintObjectConfig &brim_config = obj_group.front()->config();
             if (brim_config.brim_width > 0 || brim_config.brim_width_interior > 0) {
-                this->set_status(70, L("Generating brim"));
+                this->set_status(printstep_2_percent[PrintStep::psSkirtBrim] + 2, L("Generating brim"));
                 if (brim_config.brim_per_object) {
                     for (PrintObject *obj : obj_group) {
                         //get flow
@@ -1346,127 +1492,6 @@ void Print::process()
         // the skirt gets invalidated, brim gets invalidated as well and the following line is called.
         this->set_done(psSkirtBrim);
     }
-
-    if (this->has_wipe_tower()) {
-        // These values have to be updated here, not during wipe tower generation.
-        // When the wipe tower is moved/rotated, it is not regenerated.
-        m_wipe_tower_data.position = { m_config.wipe_tower_x, m_config.wipe_tower_y };
-        m_wipe_tower_data.rotation_angle = m_config.wipe_tower_rotation_angle;
-    }
-    auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(objects(), m_wipe_tower_data);
-
-    m_conflict_result = conflictRes;
-    if (conflictRes.has_value())
-        BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
-
-#ifdef _DEBUG
-    struct PointAssertVisitor : public ExtrusionVisitorRecursiveConst {
-        virtual void default_use(const ExtrusionEntity& entity) override {};
-        virtual void use(const ExtrusionPath &path) override {
-            for (size_t idx = 1; idx < path.size(); ++idx)
-                assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-        }
-        virtual void use(const ExtrusionLoop& loop) override {
-            Point last_pt = loop.last_point();
-            for (const ExtrusionPath &path : loop.paths) {
-                assert(path.polyline.size() >= 2);
-                assert(path.first_point() == last_pt);
-                for (size_t idx = 1; idx < path.size(); ++idx)
-                    assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-                last_pt = path.last_point();
-            }
-            assert(loop.paths.front().first_point() == loop.paths.back().last_point());
-        }
-    } ptvisitor;
-    for (PrintObject* obj : m_objects)
-        for (Layer* lay : obj->layers())
-            for (LayerRegion* lr : lay->regions())
-                lr->perimeters().visit(ptvisitor);
-#endif
-    //simplify / make arc fitting
-    {
-        const bool spiral_mode = config().spiral_vase;
-        const bool enable_arc_fitting = config().arc_fitting.value != ArcFittingType::Disabled && !spiral_mode;
-        if (enable_arc_fitting) {
-            this->set_status(80, L("Creating arcs"));
-        } else {
-            this->set_status(80, L("Simplifying paths"));
-        }
-        for (PrintObject* obj : m_objects) {
-            obj->simplify_extrusion_path();
-        }
-        //also simplify object skirt & brim
-        if (enable_arc_fitting && (!this->m_skirt.empty() || !this->m_brim.empty())) {
-            coordf_t scaled_resolution = scale_d(config().resolution.value);
-            if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
-            const ConfigOptionFloatOrPercent& arc_fitting_tolerance = config().arc_fitting_tolerance;
-
-            this->set_status(0, L("Optimizing skirt & brim %s%%"), { std::to_string(0) }, PrintBase::SlicingStatus::SECONDARY_STATE);
-            std::atomic<int> atomic_count{ 0 };
-            GetPathsVisitor visitor;
-            this->m_skirt.visit(visitor);
-            this->m_brim.visit(visitor);
-            tbb::parallel_for(
-                tbb::blocked_range<size_t>(0, visitor.paths.size() + visitor.paths3D.size()),
-                [this, &visitor, scaled_resolution, &arc_fitting_tolerance, &atomic_count](const tbb::blocked_range<size_t>& range) {
-                    size_t path_idx = range.begin();
-                    for (; path_idx < range.end() && path_idx < visitor.paths.size(); ++path_idx) {
-                        visitor.paths[path_idx]->simplify(scaled_resolution, config().arc_fitting.value, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width())));
-                        int nb_items_done = (++atomic_count);
-                        this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
-                    }
-                    for (; path_idx < range.end() && path_idx - visitor.paths.size() < visitor.paths3D.size(); ++path_idx) {
-                        visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, config().arc_fitting.value, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width())));
-                        int nb_items_done = (++atomic_count);
-                        this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
-                    }
-                }
-            );
-        }
-    }
-    
-#if _DEBUG
-    for (PrintObject* obj : m_objects) {
-        for (auto &l : obj->m_layers) {
-            for (auto &reg : l->regions()) { LoopAssertVisitor lav; reg->perimeters().visit(lav); }
-        }
-    }
-#endif
-
-    m_timestamp_last_change = std::time(0);
-    BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
-    //notify gui that the slicing/preview structs are ready to be drawed
-    if (something_done)
-        this->set_status(85, L("Slicing done"), SlicingStatus::FlagBits::SLICING_ENDED);
-}
-
-// G-code export process, running at a background thread.
-// The export_gcode may die for various reasons (fails to process output_filename_format,
-// write error into the G-code, cannot execute post-processing scripts).
-// It is up to the caller to show an error message.
-std::string Print::export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
-{
-    // output everything to a G-code file
-    // The following call may die if the output_filename_format template substitution fails.
-    std::string path = this->output_filepath(path_template);
-    std::string message;
-    if (!path.empty() && result == nullptr) {
-        // Only show the path if preview_data is not set -> running from command line.
-        message = _u8L("Exporting G-code");
-        message += " to ";
-        message += path;
-    } else
-        message = _u8L("Generating G-code");
-    this->set_status(90, message);
-
-    // Create GCode on heap, it has quite a lot of data.
-    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator());
-    gcode->do_export(this, path.c_str(), result, thumbnail_cb);
-
-    if (m_conflict_result.has_value())
-        result->conflict_result = *m_conflict_result;
-
-    return path.c_str();
 }
 
 void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollection &out, std::optional<ExtrusionEntityCollection>& out_first_layer)
@@ -1736,7 +1761,7 @@ void Print::alert_when_supports_needed()
 {
     if (this->set_started(psAlertWhenSupportsNeeded)) {
         BOOST_LOG_TRIVIAL(debug) << "psAlertWhenSupportsNeeded - start";
-        set_status(69, _u8L("Alert if supports needed"));
+        set_status(printstep_2_percent[PrintStep::psAlertWhenSupportsNeeded], L("Alert if supports needed"));
 
         auto issue_to_alert_message = [](SupportSpotsGenerator::SupportPointCause cause, bool critical) {
             std::string message;
