@@ -1099,7 +1099,8 @@ int ArcPolyline::simplify_straits(coordf_t min_tolerance,
         // try add a point in the buffer
         Point new_point = m_path[idx_end].point;
         //TODO better arc (here the length is minimized)
-        coord_t new_seg_length = coord_t(m_path[idxs.front()].point.distance_to(new_point));
+        coord_t new_seg_length = coord_t(m_path[idxs.back()].point.distance_to(new_point));
+        assert(new_seg_length > 0);
 
         // be sure it's not filled
         while (current_buffer_size >= max_buffer_size) {
@@ -1198,7 +1199,10 @@ int ArcPolyline::simplify_straits(coordf_t min_tolerance,
 
         //check if the previous point has enough dist at both end
         if (current_buffer_size > 0 && arc.back() == 0 && 
-            min_point_distance > line_length.back() && min_point_distance > new_seg_length) {
+            min_point_distance > line_length.back() && min_point_distance > new_seg_length
+            // also make sure it's not an importnat point for a ponty tip.
+            && new_seg_length < m_path[idxs[idxs.size() - 2]].point.distance_to(new_point)
+            ) {
             // erase previous point
             erased.push_back(idxs.back());
             idxs.pop_back();
@@ -1207,7 +1211,8 @@ int ArcPolyline::simplify_straits(coordf_t min_tolerance,
             line_length.pop_back();
             weights.pop_back();
             --current_buffer_size;
-            new_seg_length = coord_t(m_path[idxs.front()].point.distance_to(new_point));
+            new_seg_length = coord_t(m_path[idxs.back()].point.distance_to(new_point));
+            assert(new_seg_length > 0);
         }
 
         // add new point
