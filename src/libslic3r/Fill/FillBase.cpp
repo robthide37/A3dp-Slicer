@@ -87,12 +87,16 @@ Fill* Fill::new_from_type(const std::string &type)
 Polylines Fill::fill_surface(const Surface *surface, const FillParams &params) const
 {
     assert(params.config != nullptr);
+    surface->expolygon.assert_valid();
     // Perform offset.
     Slic3r::ExPolygons expp = offset_ex(surface->expolygon, scale_d(0 - 0.5 * this->get_spacing()));
     // Create the infills for each of the regions.
     Polylines polylines_out;
-    for (ExPolygon &expoly : expp)
+    for (ExPolygon &expoly : expp) {
+        expoly.assert_valid();
         _fill_surface_single(params, surface->thickness_layers, _infill_direction(surface), std::move(expoly), polylines_out);
+        assert_valid(polylines_out);
+    }
     assert(get_spacing() >= 0);
     return polylines_out;
 }
@@ -270,6 +274,7 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
 
         } else {
             Polylines simple_polylines = this->fill_surface(surface, params);
+            assert_valid(simple_polylines);
 
             if (simple_polylines.empty())
                 return;
@@ -320,6 +325,9 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                                                                               (float) (params.flow.width() * params.flow_mult * mult_flow),
                                                                               (float) params.flow.height()}},
                                             !params.monotonic);
+#ifdef _DEBUGINFO
+            eec->visit(LoopAssertVisitor());
+#endif
         }
     } catch (InfillFailedException&) {
     }
@@ -3679,7 +3687,10 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
                                             ClipperLib::jtMiter, scale_d(this->get_spacing()) * 10);
     //fix a bug that can happens when (positive) offsetting with a big miter limit and two island merge. See https://github.com/supermerill/SuperSlicer/issues/609
     path_perimeter = intersection_ex(path_perimeter, offset_ex(surface->expolygon, scale_d(-this->get_spacing() / 2)));
+    ensure_valid(path_perimeter, params.fill_resolution);
     for (ExPolygon& expolygon : path_perimeter) {
+        expolygon.assert_valid();
+
         ExtrusionEntityCollection* eec_expoly = path_perimeter.size() == 1 ? eecroot : new ExtrusionEntityCollection();
         if (path_perimeter.size() > 1) eecroot->append(ExtrusionEntitiesPtr{ eec_expoly });
         eec_expoly->set_can_sort_reverse(false, false);
@@ -3710,7 +3721,9 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
             // === extrude infill ===
             //50% overlap with the new perimeter
             ExPolygons path_inner = offset2_ex(ExPolygons{ expolygon }, scale_d(-this->get_spacing() * (ratio_fill_inside+0.5)), scale_d(this->get_spacing()/2));
+            ensure_valid(path_inner, params.fill_resolution);
             for (ExPolygon& expolygon : path_inner) {
+                expolygon.assert_valid();
                 Surface surfInner(*surface, expolygon);
                 Polylines polys_infill = infill->fill_surface(&surfInner, params);
                 if (!polys_infill.empty()) {
@@ -3728,6 +3741,9 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
                                                                                                  params.flow.width() * params.flow_mult,
                                                                                                  params.flow.height()}},
                                                     true);
+#ifdef _DEBUGINFO
+                    eec_infill->visit(LoopAssertVisitor());
+#endif
                 }
             }
         }

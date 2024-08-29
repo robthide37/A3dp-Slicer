@@ -2928,6 +2928,8 @@ static void polylines_from_paths(const std::vector<MonotonicRegionLink>& path, c
 
 bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillParams &params, float angleBase, float pattern_shift, Polylines &polylines_out) const
 {
+    surface->expolygon.assert_valid();
+
     // At the end, only the new polylines will be rotated back.
     size_t n_polylines_out_initial = polylines_out.size();
 
@@ -3077,15 +3079,20 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
 #endif /* SLIC3R_DEBUG */
 
     // paths must be rotated back
-    for (Polylines::iterator it = polylines_out.begin() + n_polylines_out_initial; it != polylines_out.end(); ++ it) {
+    for (Polylines::iterator it = polylines_out.begin() + n_polylines_out_initial; it != polylines_out.end();) {
         // No need to translate, the absolute position is irrelevant.
         // it->translate(- rotate_vector.second(0), - rotate_vector.second(1));
-        //assert(! it->has_duplicate_points());
+        // assert(! it->has_duplicate_points());
         it->remove_duplicate_points();
         it->rotate(rotate_vector.first);
-        //FIXME rather simplify the paths to avoid very short edges?
-        //assert(! it->has_duplicate_points());
-        it->remove_duplicate_points();
+        // simplify the paths to avoid very short edges
+        it->douglas_peucker(params.fill_resolution);
+        if (it->length() <= params.fill_resolution) {
+            it = polylines_out.erase(it);
+        } else {
+            it->assert_valid();
+            ++it;
+        }
     }
 
 #ifdef SLIC3R_DEBUG
@@ -3166,6 +3173,9 @@ bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillPar
             params);
     }
 
+    assert_valid(fill_lines); // totest, remove if triggered, else remove this & ensure_valid
+    ensure_valid(fill_lines, params.fill_resolution);
+
     if (params.dont_connect() || fill_lines.size() <= 1) {
         if (fill_lines.size() > 1)
             fill_lines = chain_polylines(std::move(fill_lines));
@@ -3173,6 +3183,8 @@ bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillPar
     } else
         connect_infill(std::move(fill_lines), surface->expolygon, poly_with_offset_base.polygons_outer, polylines_out, scale_t(this->get_spacing()), params);
 
+    ensure_valid(polylines_out, params.fill_resolution);
+    assert_valid(polylines_out);
     return true;
 }
 
@@ -3489,8 +3501,10 @@ FillRectilinearWGapFill::split_polygon_gap_fill(const Surface &surface, const Fi
     ExPolygons rectilinear_areas2 = offset2_ex(ExPolygons{ surface.expolygon }, -params.flow.scaled_spacing() * factor2, params.flow.scaled_spacing() * factor2);
     //choose the best one
     rectilinear = rectilinear_areas1.size() <= rectilinear_areas2.size() + 1 || rectilinear_areas2.empty() ? rectilinear_areas1 : rectilinear_areas2;
+    ensure_valid(rectilinear);
     //get gapfill
     gapfill = diff_ex(ExPolygons{ surface.expolygon }, rectilinear);
+    ensure_valid(gapfill);
 }
 
 void
@@ -3523,7 +3537,7 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
     FillParams params_monotonic = params;
     params_monotonic.monotonic = is_monotonic();
     for (const ExPolygon &rectilinear_area : rectilinear_areas) {
-        rectilinear_surface.expolygon = rectilinear_area, 0 - 0.5 * params.flow.scaled_spacing();
+        rectilinear_surface.expolygon = rectilinear_area;
         if (!fill_surface_by_lines(&rectilinear_surface, params_monotonic, 0.f, 0.f, polylines_rectilinear)) {
             printf("FillRectilinear2::fill_surface() failed to fill a region.\n");
         }
@@ -3549,7 +3563,7 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
 
         coll_nosort->append(ExtrusionEntitiesPtr{ eec });
 
-        unextruded_areas = diff_ex(rectilinear_areas, union_safety_offset_ex(eec->polygons_covered_by_spacing(params.flow.spacing_ratio(), 10)));
+        unextruded_areas = ensure_valid(params.fill_resolution, diff_ex(rectilinear_areas, union_safety_offset_ex(eec->polygons_covered_by_spacing(params.flow.spacing_ratio(), 10))));
     }
     else
         unextruded_areas = rectilinear_areas;
@@ -3557,6 +3571,8 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
     //gapfill
     gapfill_areas.insert(gapfill_areas.end(), unextruded_areas.begin(), unextruded_areas.end());
     gapfill_areas = union_safety_offset_ex(gapfill_areas);
+    ensure_valid(gapfill_areas, params.fill_resolution);
+    assert_valid(gapfill_areas);
     if (gapfill_areas.size() > 0) {
         const double minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
         for (int i = 0; i < gapfill_areas.size(); i++) {

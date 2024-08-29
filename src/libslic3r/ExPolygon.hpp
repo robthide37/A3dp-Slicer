@@ -76,12 +76,12 @@ public:
     // Namely expolygons touching at a vertical boundary are considered overlapping, while expolygons touching
     // at a horizontal boundary are NOT considered overlapping.
     bool overlaps(const ExPolygon &other) const;
-    
+
     void douglas_peucker(coord_t tolerance);
-    void simplify_p(double tolerance, Polygons* polygons) const;
-    Polygons simplify_p(double tolerance) const;
-    ExPolygons simplify(double tolerance) const;
-    void simplify(double tolerance, ExPolygons* expolygons) const;
+    void simplify_p(coord_t tolerance, Polygons* polygons) const;
+    Polygons simplify_p(coord_t tolerance) const;
+    ExPolygons simplify(coord_t tolerance) const;
+    void simplify(coord_t tolerance, ExPolygons* expolygons) const;
     void remove_point_too_near(const coord_t tolerance);
     void medial_axis(double max_width, double min_width, ThickPolylines &polylines) const;
     void medial_axis(double max_width, double min_width, Polylines &polylines) const;
@@ -93,15 +93,15 @@ public:
     const Polygon& 	contour_or_hole(size_t idx) const 	{ return (idx == 0) ? this->contour : this->holes[idx - 1]; }
 
 #ifdef _DEBUGINFO
-    void assert_point_distance() const {
-        contour.assert_point_distance();
+    void assert_valid() const {
+        contour.assert_valid();
         for (const Polygon& hole : holes)
-            hole.assert_point_distance();
+            hole.assert_valid();
     }
     // to create a cpp multipoint to create test units.
     std::string to_debug_string();
 #else
-    void assert_point_distance() const {}
+    void assert_valid() const {}
 #endif
 };
 
@@ -540,6 +540,16 @@ std::vector<BoundingBox> get_extents_vector(const ExPolygons &polygons);
 // Test for duplicate points. The points are copied, sorted and checked for duplicates globally.
 bool has_duplicate_points(const ExPolygon &expoly);
 bool has_duplicate_points(const ExPolygons &expolys);
+
+// remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polygons that are too small to be valid
+void ensure_valid(ExPolygons &expolygons, coord_t resolution = SCALED_EPSILON);
+ExPolygons ensure_valid(ExPolygons &&expolygons, coord_t resolution = SCALED_EPSILON);
+ExPolygons ensure_valid(coord_t resolution, ExPolygons &&expolygons);
+#ifdef _DEBUGINFO
+void assert_valid(const ExPolygons &expolygons);
+#else
+void assert_valid(const ExPolygons &expolygons) {}
+#endif
 
 // Return True when erase some otherwise False.
 bool remove_same_neighbor(ExPolygons &expolys);

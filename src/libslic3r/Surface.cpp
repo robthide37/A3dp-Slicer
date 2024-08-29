@@ -91,6 +91,24 @@ BoundingBox get_extents(const SurfacesConstPtr &surfaces)
     return bbox;
 }
 
+void ensure_valid(Surfaces &surfaces, coord_t resolution /*= SCALED_EPSILON*/)
+{
+    for (size_t i = 0; i < surfaces.size(); ++i) {
+        surfaces[i].expolygon.douglas_peucker(resolution);
+        if (surfaces[i].expolygon.contour.size() < 3) {
+            surfaces.erase(surfaces.begin() + i);
+            --i;
+        } else {
+            for (size_t i_hole = 0; i_hole < surfaces[i].expolygon.holes.size(); ++i_hole) {
+                if (surfaces[i].expolygon.holes[i_hole].size() < 3) {
+                    surfaces[i].expolygon.holes.erase(surfaces[i].expolygon.holes.begin() + i_hole);
+                    --i_hole;
+                }
+            }
+        }
+    }
+}
+
 const char* surface_type_to_color_name(const SurfaceType surface_type)
 {
     if ((surface_type & stPosTop) != 0) return "rgb(255,0,0)"; // "red";

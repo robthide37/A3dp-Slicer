@@ -190,14 +190,14 @@ void ExPolygon::douglas_peucker(coord_t tolerance) {
 }
 
 void
-ExPolygon::simplify_p(double tolerance, Polygons* polygons) const
+ExPolygon::simplify_p(coord_t tolerance, Polygons* polygons) const
 {
     Polygons pp = this->simplify_p(tolerance);
     polygons->insert(polygons->end(), pp.begin(), pp.end());
 }
 
 Polygons
-ExPolygon::simplify_p(double tolerance) const
+ExPolygon::simplify_p(coord_t tolerance) const
 {
     Polygons pp;
     pp.reserve(this->holes.size() + 1);
@@ -220,13 +220,13 @@ ExPolygon::simplify_p(double tolerance) const
 }
 
 ExPolygons
-ExPolygon::simplify(double tolerance) const
+ExPolygon::simplify(coord_t tolerance) const
 {
     return union_ex(this->simplify_p(tolerance));
 }
 
 void
-ExPolygon::simplify(double tolerance, ExPolygons* expolygons) const
+ExPolygon::simplify(coord_t tolerance, ExPolygons* expolygons) const
 {
     append(*expolygons, this->simplify(tolerance));
 }
@@ -429,6 +429,43 @@ bool has_duplicate_points(const ExPolygons &expolys)
     return false;
 #endif
 }
+
+void ensure_valid(ExPolygons &expolygons, coord_t resolution /*= SCALED_EPSILON*/)
+{
+    for (size_t i = 0; i < expolygons.size(); ++i) {
+        expolygons[i].douglas_peucker(resolution);
+        if (expolygons[i].contour.size() < 3) {
+            expolygons.erase(expolygons.begin() + i);
+            --i;
+        } else {
+            for (size_t i_hole = 0; i_hole < expolygons[i].holes.size(); ++i_hole) {
+                expolygons[i].holes[i_hole].douglas_peucker(resolution);
+                if (expolygons[i].holes[i_hole].size() < 3) {
+                    expolygons[i].holes.erase(expolygons[i].holes.begin() + i_hole);
+                    --i_hole;
+                }
+            }
+        }
+    }
+}
+
+ExPolygons ensure_valid(ExPolygons &&expolygons, coord_t resolution /*= SCALED_EPSILON*/)
+{
+    ensure_valid(expolygons, resolution);
+    return std::move(expolygons);
+}
+
+ExPolygons ensure_valid(coord_t resolution, ExPolygons &&expolygons) {
+    return ensure_valid(std::move(expolygons), resolution);
+}
+
+#ifdef _DEBUGINFO
+void assert_valid(const ExPolygons &expolygons) {
+    for (const ExPolygon &expolygon : expolygons) {
+        expolygon.assert_valid();
+    }
+}
+#endif
 
 bool remove_same_neighbor(ExPolygons &expolygons)
 {

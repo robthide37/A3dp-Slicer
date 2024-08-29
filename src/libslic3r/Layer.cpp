@@ -62,7 +62,7 @@ void Layer::make_slices()
                 polygons_append(slices_p, to_polygons(layerm->slices().surfaces));
             slices = union_safety_offset_ex(slices_p);
         }
-        for (ExPolygon &poly : slices) poly.assert_point_distance();
+        for (ExPolygon &poly : slices) poly.assert_valid();
         // lslices are sorted by topological order from outside to inside from the clipper union used above
         this->set_lslices() = slices;
     }
@@ -573,12 +573,12 @@ void Layer::restore_untyped_slices()
     if (layer_needs_raw_backup(this)) {
         for (LayerRegion *layerm : m_regions) {
             layerm->m_slices.set(layerm->m_raw_slices, stPosInternal | stDensSparse);
-            for(auto &srf : layerm->m_slices) srf.expolygon.assert_point_distance();
+            for(auto &srf : layerm->m_slices) srf.expolygon.assert_valid();
         }
     } else {
         assert(m_regions.size() == 1);
         m_regions.front()->m_slices.set(this->lslices(), stPosInternal | stDensSparse);
-        for(auto &srf :  m_regions.front()->m_slices) srf.expolygon.assert_point_distance();
+        for(auto &srf :  m_regions.front()->m_slices) srf.expolygon.assert_valid();
     }
 }
 

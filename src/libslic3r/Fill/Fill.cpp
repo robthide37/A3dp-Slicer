@@ -924,9 +924,12 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         //params.resolution        = resolution;
         //params.use_arachne       = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipEnsuring;
         //params.layer_height      = layerm->layer()->height;
+        surface_fill.params.fill_resolution = std::max(SCALED_EPSILON, scale_t(this->object()->print()->config().resolution_internal.value));
 
         //union with safety offset to avoid separation from the appends of different surface with same settings.
         surface_fill.expolygons = union_safety_offset_ex(surface_fill.expolygons);
+        //simplify (also, it's possible rn that some point are below EPSILON distance).
+        ensure_valid(surface_fill.expolygons, surface_fill.params.fill_resolution);
 
         //store default values, before modification.
         bool dont_adjust = surface_fill.params.dont_adjust;
@@ -1116,7 +1119,7 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
 {
     std::vector<SurfaceFill>  surface_fills = group_fills(*this);
     const Slic3r::BoundingBox bbox          = this->object()->bounding_box();
-    const auto                resolution    = this->object()->print()->config().resolution_internal.value;
+    const coord_t             resolution    = std::max(SCALED_EPSILON, scale_t(this->object()->print()->config().resolution_internal.value));
 
     Polylines sparse_infill_polylines{};
 
@@ -1189,7 +1192,7 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         params.dont_adjust       = false; //  surface_fill.params.dont_adjust;
         params.anchor_length     = surface_fill.params.anchor_length;
         params.anchor_length_max = surface_fill.params.anchor_length_max;
-        params.resolution        = resolution;
+        params.fill_resolution        = resolution;
         params.use_arachne       = false;
         params.layer_height      = layerm.layer()->height;
 

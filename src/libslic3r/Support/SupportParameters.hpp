@@ -69,6 +69,9 @@ struct SupportParameters {
 
 	coordf_t				gap_xy;
 
+    //scaled, resolution for supports
+    coord_t                 resolution = SCALED_EPSILON;
+
     float    				base_angle;
 	double                  base_angle_height; // unscaled
     float                   interface_angle;

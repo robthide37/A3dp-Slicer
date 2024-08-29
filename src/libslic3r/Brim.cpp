@@ -768,8 +768,8 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
     std::function<void(BrimLoop&)> cut_loop = [&frontiers, &flow, reversed](BrimLoop& to_cut) {
         Polylines result;
         if (to_cut.is_loop) {
-            to_cut.polygon().assert_point_distance();
-            for(auto& poly : frontiers) poly.assert_point_distance();
+            to_cut.polygon().assert_valid();
+            for(auto& poly : frontiers) poly.assert_valid();
             result = intersection_pl(Polygons{ to_cut.polygon() }, frontiers);
         } else {
             result = intersection_pl(to_cut.lines, frontiers);
@@ -781,7 +781,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                 i--;
             }
         }
-        for(auto& poly : result) poly.assert_point_distance();
+        for(auto& poly : result) poly.assert_valid();
         if (result.empty()) {
             to_cut.lines.clear();
         } else {
@@ -834,7 +834,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
         } else if (i_have_line && to_cut.children.empty()) {
             ExtrusionEntitiesPtr to_add;
             for (Polyline& pline : to_cut.lines) {
-                pline.assert_point_distance();
+                pline.assert_valid();
                 assert(pline.size() > 0);
                 if (pline.back() == pline.front()) {
                     ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
@@ -875,7 +875,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             ExtrusionEntitiesPtr to_add;
             for (Polyline& pline : to_cut.lines) {
                 assert(pline.size() > 0);
-                pline.assert_point_distance();
+                pline.assert_valid();
                 if (pline.back() == pline.front()) {
                     ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     path.polyline = pline;
@@ -1054,31 +1054,30 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     ExPolygons unbrimmable_areas;
     for (ExPolygon &expoly : islands) {
         for (ExPolygon &simple_expoly : expoly.simplify(scaled_resolution_brim)) {
-            simple_expoly.assert_point_distance();
+            simple_expoly.assert_valid();
             unbrimmable_areas.emplace_back(std::move(simple_expoly));
         }
     }
-    for (ExPolygon &expoly : unbrimmable_areas) expoly.assert_point_distance();
+    for (ExPolygon &expoly : unbrimmable_areas) expoly.assert_valid();
     islands = union_safety_offset_ex(unbrimmable_areas);
     // union_safety_offset_ex can shorten segments below epsilon. So we need to re-simplify a bit.
     for (ExPolygon &expoly : islands) {
         for (ExPolygon &simple_expoly : expoly.simplify(SCALED_EPSILON)) {
-            simple_expoly.assert_point_distance();
+            simple_expoly.assert_valid();
             unbrimmable_areas.emplace_back(std::move(simple_expoly));
         }
     }
     islands = unbrimmable_areas;
-    for (ExPolygon &expoly : islands) expoly.assert_point_distance();
+    for (ExPolygon &expoly : islands) expoly.assert_valid();
 
 
     //get the brimmable area
     const size_t num_loops = size_t(floor(std::max(0., (brim_config.brim_width.value - brim_config.brim_separation.value)) / flow.spacing()));
     ExPolygons brimmable_areas;
     for (ExPolygon& expoly : islands) {
-        expoly.contour.assert_point_distance();
-        for (Polygon &poly : offset(expoly.contour, num_loops * scaled_spacing, jtSquare)) {
-            poly.douglas_peucker(scaled_resolution_brim);
-            poly.assert_point_distance();
+        expoly.contour.assert_valid();
+        for (Polygon &poly : ensure_valid(scaled_resolution_brim, offset(expoly.contour, num_loops * scaled_spacing, jtSquare))) {
+            poly.assert_valid();
             brimmable_areas.emplace_back();
             brimmable_areas.back().contour = poly;
             brimmable_areas.back().contour.make_counter_clockwise();
@@ -1101,11 +1100,11 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     //grow a half of spacing, to go to the first extrusion polyline.
     Polygons unbrimmable_polygons;
     for (ExPolygon& expoly : islands) {
-        expoly.contour.assert_point_distance();
+        expoly.contour.assert_valid();
         unbrimmable_polygons.push_back(expoly.contour);
         //do it separately because we don't want to union them
-        for (ExPolygon& big_expoly : offset_ex(expoly, double(scaled_spacing) * 0.5, jtSquare)) {
-            big_expoly.assert_point_distance();
+        for (ExPolygon& big_expoly : ensure_valid(scaled_resolution_brim, offset_ex(expoly, double(scaled_spacing) * 0.5, jtSquare))) {
+            big_expoly.assert_valid();
             bigger_islands.emplace_back(big_expoly);
             unbrimmable_polygons.insert(unbrimmable_polygons.end(), big_expoly.holes.begin(), big_expoly.holes.end());
         }
@@ -1119,10 +1118,9 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
         bigger_islands.clear();
         if (i > 0) {
             for (ExPolygon &expoly : last_islands) {
-                expoly.assert_point_distance();
-                for (ExPolygon &big_contour : offset_ex(expoly, double(scaled_spacing), jtSquare)) {
-                    big_contour.douglas_peucker(scaled_resolution_brim);
-                    big_contour.assert_point_distance();
+                expoly.assert_valid();
+                for (ExPolygon &big_contour : ensure_valid(scaled_resolution_brim, offset_ex(expoly, double(scaled_spacing), jtSquare))) {
+                    big_contour.assert_valid();
                     bigger_islands.push_back(big_contour);
                     Polygons simplifiesd_big_contour = big_contour.contour.simplify(scaled_resolution_brim);
                     if (simplifiesd_big_contour.size() == 1) {
@@ -1134,15 +1132,16 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
             bigger_islands = islands;
         }
         last_islands = union_ex(bigger_islands);
+        ensure_valid(last_islands, scaled_resolution_brim);
         for (ExPolygon &expoly : last_islands) {
-            expoly.assert_point_distance();
+            expoly.assert_valid();
             loops.back().emplace_back(expoly.contour);
             // also add hole, in case of it's merged with a contour. see supermerill/SuperSlicer/issues/3050
             for (Polygon &hole : expoly.holes) {
-                hole.assert_point_distance();
+                hole.assert_valid();
                 // but remove the points that are inside the holes of islands
                 for (ExPolygon &pl : diff_ex(Polygons{hole}, unbrimmable_polygons)) {
-                    pl.assert_point_distance();
+                    pl.assert_valid();
                     loops[i].emplace_back(pl.contour);
                 }
             }
@@ -1156,10 +1155,10 @@ void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& obje
     //intersection
     brimmable_areas = intersection_ex(brimmable_areas, offset_ex(last_islands, double(scaled_spacing) * 0.5, jtSquare));
     Polygons frontiers;
+    ensure_valid(brimmable_areas, scaled_resolution_brim);
     //use contour from brimmable_areas (external frontier)
     for (ExPolygon& expoly : brimmable_areas) {
-        expoly.douglas_peucker(scaled_resolution_brim);
-        expoly.assert_point_distance();
+        expoly.assert_valid();
         frontiers.push_back(expoly.contour);
         frontiers.back().make_counter_clockwise();
     }
@@ -1218,13 +1217,13 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
             }
         }
         islands.reserve(islands.size() + object_islands.size() * object->instances().size());
-        coord_t ear_detection_length = scale_t(object->config().brim_ears_detection_length.value);
+        coord_t ear_detection_length = std::max(scale_t(object->config().brim_ears_detection_length.value), SCALED_EPSILON);
         // duplicate & translate for each instance
         for (const PrintInstance& copy_pt : object->instances()) {
             for (const ExPolygon& poly : object_islands) {
                 islands.push_back(poly);
                 islands.back().translate(copy_pt.shift.x(), copy_pt.shift.y());
-                Polygon decimated_polygon = poly.contour;
+                Polygon decimated_polygon;
                 // brim_ears_detection_length codepath
                 if (ear_detection_length > 0) {
                     //decimate polygon
@@ -1234,6 +1233,8 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
                     if (points.size() > 4) { //don't decimate if it's going to be below 4 points, as it's surely enough to fill everything anyway
                         points.erase(points.end() - 1);
                         decimated_polygon.points = points;
+                    } else {
+                        decimated_polygon.points = MultiPoint::douglas_peucker(poly.contour.points, SCALED_EPSILON);
                     }
                 }
                 for (const Point& p : decimated_polygon.convex_points(brim_config.brim_ears_max_angle.value* PI / 180.0)) {

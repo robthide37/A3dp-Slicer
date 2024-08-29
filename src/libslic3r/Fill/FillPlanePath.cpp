@@ -111,7 +111,7 @@ void FillPlanePath::_fill_surface_single(
         coord_t  min_y = coord_t(ceil(coordf_t(bounding_box.min.y()) / distance_between_lines));
         coord_t  max_x = coord_t(ceil(coordf_t(bounding_box.max.x()) / distance_between_lines));
         coord_t  max_y = coord_t(ceil(coordf_t(bounding_box.max.y()) / distance_between_lines));
-        coordf_t resolution = scale_d(params.resolution) / distance_between_lines;
+        coordf_t resolution = coordf_t(params.fill_resolution) / distance_between_lines;
         if (align) {
             // Filling in a bounding box over the whole object, clip generated polyline against the snug bounding box.
             snug_bounding_box.translate(-shift.x(), -shift.y());

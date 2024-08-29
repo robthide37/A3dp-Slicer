@@ -34,11 +34,32 @@ class Polygon : public MultiPoint
 {
 public:
     Polygon() = default;
-    explicit Polygon(const Points &points) : MultiPoint(points) {}
-	Polygon(std::initializer_list<Point> points) : MultiPoint(points) {}
-    Polygon(const Polygon &other) : MultiPoint(other.points) {}
-    Polygon(Polygon &&other) : MultiPoint(std::move(other.points)) {}
-	static Polygon new_scale(const std::vector<Vec2d> &points) { 
+    explicit Polygon(const Points &points) : MultiPoint(points) {
+        assert(points.size() != 1);
+        if (points.size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    explicit Polygon(Points &&points) : MultiPoint(points) {
+        assert(points.size() != 1);
+        if (points.size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    Polygon(std::initializer_list<Point> points) : MultiPoint(points) {
+        assert(this->size() != 1);
+        assert(this->empty() || !this->front().coincides_with(this->back()));
+        if (this->size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    Polygon(const Polygon &other) : MultiPoint(other.points) {
+        assert(this->empty() || !this->front().coincides_with(this->back()));
+    }
+    Polygon(Polygon &&other) : MultiPoint(std::move(other.points)) {
+        assert(this->size() != 1);
+        assert(this->empty() || !this->front().coincides_with(this->back()));
+        if (this->size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    static Polygon new_scale(const std::vector<Vec2d> &points) {
         Polygon pgn;
         pgn.points.reserve(points.size());
         for (const Vec2d &pt : points)
@@ -64,7 +85,7 @@ public:
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_first_point() const { return this->split_at_index(0); }
     Points   equally_spaced_points(double distance) const { return this->split_at_first_point().equally_spaced_points(distance); }
-    
+
     static double area(const Points &pts);
     double area() const;
     bool is_counter_clockwise() const;
@@ -106,13 +127,14 @@ public:
     size_t remove_collinear_angle(double angle);
 
 #ifdef _DEBUGINFO
-    void assert_point_distance() const override {
+    void assert_valid() const override {
+        assert(size() > 2);
         for (size_t i_pt = 1; i_pt < size(); ++i_pt)
             release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
         release_assert(!points.front().coincides_with_epsilon(points.back()));
     }
 #else
-    void assert_point_distance() const {}
+    void assert_valid() const {}
 #endif
 
     using iterator = Points::iterator;
@@ -140,6 +162,15 @@ bool        has_duplicate_points(const Polygons &polys);
 // Return True when erase some otherwise False.
 bool remove_same_neighbor(Polygon &polygon);
 bool remove_same_neighbor(Polygons &polygons);
+// remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polygons that are too small to be valid
+void ensure_valid(Polygons &polygons, coord_t resolution = SCALED_EPSILON);
+Polygons ensure_valid(Polygons &&polygons, coord_t resolution = SCALED_EPSILON);
+Polygons ensure_valid(coord_t resolution, Polygons &&polygons);
+#ifdef _DEBUGINFO
+void assert_valid(const Polygons &polygons);
+#else
+void assert_valid(const Polygons &polygons) const {}
+#endif
 
 inline double total_length(const Polygons &polylines) {
     double total = 0;

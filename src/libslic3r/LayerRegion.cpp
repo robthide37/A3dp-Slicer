@@ -80,7 +80,6 @@ Flow LayerRegion::bridging_flow(FlowRole role, BridgeType force_type) const
 // Fill in layerm->m_fill_surfaces by trimming the layerm->slices by layerm->fill_expolygons.
 void LayerRegion::slices_to_fill_surfaces_clipped(coord_t opening_offset)
 {
-
     // Collect polygons per surface type.
     std::map<SurfaceType, ExPolygons> polygons_by_surface;
     for (const Surface &surface : this->slices().surfaces) {
@@ -91,6 +90,7 @@ void LayerRegion::slices_to_fill_surfaces_clipped(coord_t opening_offset)
     for (auto const& [srf_type, expoly] : polygons_by_surface) {
         if (!expoly.empty())
             for (ExPolygon& expoly_to_test : intersection_ex(expoly, this->fill_expolygons())) {
+                expoly_to_test.douglas_peucker(std::max(SCALED_EPSILON, scale_t(this->layer()->object()->print()->config().resolution.value)));
                 if (!opening_ex({ expoly_to_test }, opening_offset).empty()) {
                     this->m_fill_surfaces.append({ expoly_to_test }, srf_type);
                 }
@@ -1010,22 +1010,28 @@ double LayerRegion::infill_area_threshold() const
 void LayerRegion::trim_surfaces(const Polygons &trimming_polygons)
 {
 #ifndef NDEBUG
-    for (const Surface &surface : this->slices())
+    for (const Surface &surface : this->slices()) {
         assert(surface.surface_type == (stPosInternal | stDensSparse));
+        surface.expolygon.assert_valid();
+    }
 #endif /* NDEBUG */
     this->m_slices.set(intersection_ex(this->slices().surfaces, trimming_polygons), stPosInternal | stDensSparse);
+    for(auto &srf : this->m_slices) srf.expolygon.assert_valid();
 }
 
 void LayerRegion::elephant_foot_compensation_step(const float elephant_foot_compensation_perimeter_step, const Polygons &trimming_polygons)
 {
 #ifndef NDEBUG
-    for (const Surface &surface : this->slices())
+    for (const Surface &surface : this->slices()) {
         assert(surface.surface_type == (stPosInternal | stDensSparse));
+        surface.expolygon.assert_valid();
+    }
 #endif /* NDEBUG */
     assert(elephant_foot_compensation_perimeter_step >= 0);
     Polygons tmp = intersection(this->slices().surfaces, trimming_polygons);
     append(tmp, diff(this->slices().surfaces, opening(this->slices().surfaces, elephant_foot_compensation_perimeter_step)));
     this->m_slices.set(union_ex(tmp), stPosInternal | stDensSparse);
+    for(auto &srf : this->m_slices) srf.expolygon.assert_valid();
 }
 
 void LayerRegion::export_region_slices_to_svg(const char *path) const

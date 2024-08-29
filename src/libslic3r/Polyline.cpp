@@ -243,6 +243,17 @@ bool remove_same_neighbor(Polylines &polylines){
     return exist;
 }
 
+void ensure_valid(Polylines &polylines, coord_t resolution) {
+    for (size_t i = 0; i < polylines.size(); ++i) {
+        assert(polylines[i].size() > 1);
+        polylines[i].douglas_peucker(resolution);
+        assert(polylines[i].size() > 1);
+        if (polylines[i].size() == 2 && polylines[i].front().coincides_with_epsilon(polylines[i].back())) {
+            polylines.erase(polylines.begin() + i);
+            --i;
+        }
+    }
+}
 
 const Point& leftmost_point(const Polylines &polylines)
 {
@@ -274,6 +285,14 @@ bool remove_degenerate(Polylines &polylines)
         polylines.erase(polylines.begin() + j, polylines.end());
     return modified;
 }
+
+#ifdef _DEBUGINFO
+void assert_valid(const Polylines &polylines) {
+    for (const Polyline &polyline : polylines) {
+        polyline.assert_valid();
+    }
+}
+#endif
 
 std::pair<int, Point> foot_pt(const Points &polyline, const Point &pt)
 {

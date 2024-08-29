@@ -15,7 +15,7 @@ SupportParameters::SupportParameters(const PrintObject &object)
     const PrintObjectConfig &object_config  = object.config();
     const SlicingParameters &slicing_params = object.slicing_parameters();
 
-    this->default_region_config = object.print()->default_region_config();
+    this->default_region_config = object.default_region_config(object.print()->default_region_config());
     this->default_region_config.parent = &object_config;
 
     this->soluble_interface = slicing_params.soluble_interface;
@@ -51,7 +51,9 @@ SupportParameters::SupportParameters(const PrintObject &object)
     this->support_material_interface_flow    = Slic3r::support_material_interface_flow(&object, float(slicing_params.layer_height));
     this->raft_flow                          = Slic3r::raft_flow(&object, float(slicing_params.base_raft_layer_height));
     this->raft_interface_flow                = Slic3r::raft_interface_flow(&object, float(slicing_params.interface_raft_layer_height));
-    this->raft_bridge_flow_ratio             = object.print()->default_region_config().bridge_flow_ratio.get_abs_value(1.);
+    this->raft_bridge_flow_ratio             = this->default_region_config.bridge_flow_ratio.get_abs_value(1.);
+
+    this->resolution                         = scale_t(object.print()->config().resolution_internal);
 
     // Calculate a minimum support layer height as a minimum over all extruders, but not smaller than 10um.
     this->support_layer_height_min                       = 1000000.;

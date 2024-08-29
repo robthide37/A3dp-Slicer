@@ -227,8 +227,9 @@ void PrintObject::make_perimeters()
                     const coord_t ext_perimeter_width   = ext_perimeter_flow.scaled_width();
                     const coord_t ext_perimeter_spacing = ext_perimeter_flow.scaled_spacing();
 
-                    // slice is not const because slice.extra_perimeters is being incremented.
-                    for (Surface &slice : layerm.m_slices.surfaces) {
+                    // slice_mutable is not const because slice.extra_perimeters is being incremented.
+                    for (Surface &slice_mutable : layerm.m_slices.surfaces) {
+                        const Surface &slice = slice_mutable;
                         for (;;) {
                             // compute the total thickness of perimeters
                             const coord_t perimeters_thickness = ext_perimeter_width/2 + ext_perimeter_spacing/2
@@ -256,7 +257,7 @@ void PrintObject::make_perimeters()
                                 );
                             }
                             */
-                            ++ slice.extra_perimeters;
+                            ++ slice_mutable.extra_perimeters;
                         }
 #ifdef DEBUG
                             if (slice.extra_perimeters > 0)
@@ -1891,13 +1892,15 @@ void PrintObject::detect_surfaces_type()
             stPosBottom | stDensSolid :
             stPosBottom | stDensSolid | stModBridge;
         
+        coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(print()->config().resolution.value));
+
         Slic3r::parallel_for(size_t(0), 
             spiral_vase ?
             		// In spiral vase mode, reserve the last layer for the top surface if more than 1 layer is planned for the vase bottom.
             		((num_layers > 1) ? num_layers - 1 : num_layers) :
             		// In non-spiral vase mode, go over all layers.
             		m_layers.size(),
-            [this, region_id, interface_shells, &surfaces_new, has_bridges, surface_type_bottom_other]
+            [this, region_id, interface_shells, &surfaces_new, has_bridges, surface_type_bottom_other, scaled_resolution]
                 (const size_t idx_layer) {
                     PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                     m_print->throw_if_canceled();
@@ -1916,22 +1919,29 @@ void PrintObject::detect_surfaces_type()
                     if (layerm->region().config().no_perimeter_unsupported_algo.value == npuaFilled) {
                         append(layerm_slices_surfaces, to_expolygons(layerm->fill_surfaces().surfaces));
                         layerm_slices_surfaces = union_ex(layerm_slices_surfaces);
+                        assert_valid(layerm_slices_surfaces);
                     }
 
                     // find top surfaces (difference between current surfaces
                     // of current layer and upper one)
                     Surfaces top;
                     if (upper_layer) {
+                        for(auto &srf : top) srf.expolygon.assert_valid();
                         ExPolygons upper_slices = interface_shells ? 
                             diff_ex(layerm_slices_surfaces, upper_layer->get_region(region_id)->slices().surfaces, ApplySafetyOffset::Yes) :
                             diff_ex(layerm_slices_surfaces, upper_layer->lslices(), ApplySafetyOffset::Yes);
-                        surfaces_append(top, opening_ex(upper_slices, offset), stPosTop | stDensSolid);
+                        ExPolygons new_top_surfaces = opening_ex(upper_slices, offset);
+                        ensure_valid(new_top_surfaces, scaled_resolution);
+                        assert_valid(new_top_surfaces);
+                        surfaces_append(top, std::move(new_top_surfaces), stPosTop | stDensSolid);
+                        for(Surface &srf : top) srf.expolygon.assert_valid();
                     } else {
                         // if no upper layer, all surfaces of this one are solid
                         // we clone surfaces because we're going to clear the slices collection
                         top = layerm->slices().surfaces;
                         for (Surface &surface : top)
                             surface.surface_type = stPosTop | stDensSolid;
+                        for(Surface &srf : top) srf.expolygon.assert_valid();
                     }
                     
                     // Find bottom surfaces (difference between current surfaces of current layer and lower one).
@@ -1947,26 +1957,31 @@ void PrintObject::detect_surfaces_type()
                             surface_type_bottom_other);
 #else
                         // Any surface lying on the void is a true bottom bridge (an overhang)
+                        ExPolygons new_bot_surfs = opening_ex(
+                            diff_ex(layerm_slices_surfaces, lower_layer->lslices(), ApplySafetyOffset::Yes),
+                            offset);
+                        ensure_valid(new_bot_surfs, scaled_resolution);
+                        assert_valid(new_bot_surfs);
+                        for(Surface &srf : bottom) srf.expolygon.assert_valid();
                         surfaces_append(
                             bottom,
-                            opening_ex(
-                                diff_ex(layerm_slices_surfaces, lower_layer->lslices(), ApplySafetyOffset::Yes),
-                                offset),
+                            std::move(new_bot_surfs),
                             surface_type_bottom_other);
+                        for(auto &srf : bottom) srf.expolygon.assert_valid();
                         // if user requested internal shells, we need to identify surfaces
                         // lying on other slices not belonging to this region
                         if (interface_shells) {
                             // non-bridging bottom surfaces: any part of this layer lying 
                             // on something else, excluding those lying on our own region
-                            surfaces_append(
-                                bottom,
-                                opening_ex(
-                                    diff_ex(
-                                        intersection(layerm_slices_surfaces, lower_layer->lslices()), // supported
-                                        lower_layer->get_region(region_id)->slices().surfaces,
-                                        ApplySafetyOffset::Yes),
-                                    offset), //-+
-                                stPosBottom | stDensSolid);
+                            ExPolygons new_bot_interface_surfs =
+                                opening_ex(diff_ex(intersection(layerm_slices_surfaces,
+                                                                lower_layer->lslices()), // supported
+                                                   lower_layer->get_region(region_id)->slices().surfaces,
+                                                   ApplySafetyOffset::Yes),
+                                           offset); //-+
+                            ensure_valid(new_bot_interface_surfs, scaled_resolution);
+                            surfaces_append(bottom, std::move(new_bot_interface_surfs), stPosBottom | stDensSolid);
+                            for(Surface &srf : bottom) srf.expolygon.assert_valid();
                         }
 #endif
                     } else {
@@ -1988,8 +2003,13 @@ void PrintObject::detect_surfaces_type()
                         //                Slic3r::debugf "  layer %d contains %d membrane(s)\n", $layerm->layer->id, scalar(@$overlapping)
                         //                    if $Slic3r::debug;
                         Polygons top_polygons = to_polygons(std::move(top));
+                        assert_valid(top_polygons);
+                        for(auto &srf : bottom) srf.expolygon.assert_valid();
                         top.clear();
-                        surfaces_append(top, diff_ex(top_polygons, bottom), stPosTop | stDensSolid);
+                        ExPolygons diff = diff_ex(top_polygons, bottom);
+                        ensure_valid(diff, scaled_resolution);
+                        assert_valid(diff);
+                        surfaces_append(top, std::move(diff), stPosTop | stDensSolid);
                     }
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
@@ -2008,6 +2028,7 @@ void PrintObject::detect_surfaces_type()
                     Surfaces  surfaces_backup;
                     if (! interface_shells) {
                         surfaces_backup = std::move(surfaces_out);
+                        for(auto &srf : surfaces_backup) srf.expolygon.assert_valid();
                         surfaces_out.clear();
                     }
                     //const Surfaces &surfaces_prev = interface_shells ? layerm_slices_surfaces : surfaces_backup;
@@ -2017,9 +2038,16 @@ void PrintObject::detect_surfaces_type()
                     {
                         Polygons topbottom = to_polygons(top);
                         polygons_append(topbottom, to_polygons(bottom));
-                        surfaces_append(surfaces_out, diff_ex(surfaces_prev_expolys, topbottom), stPosInternal | stDensSparse);
+                        assert_valid(topbottom);
+                        assert_valid(surfaces_prev_expolys);
+                        ExPolygons diff = diff_ex(surfaces_prev_expolys, topbottom);
+                        ensure_valid(diff, scaled_resolution);
+                        assert_valid(diff);
+                        surfaces_append(surfaces_out, std::move(diff), stPosInternal | stDensSparse);
                     }
-
+                    
+                    for(Surface &srf : top) srf.expolygon.assert_valid();
+                    for(Surface &srf : bottom) srf.expolygon.assert_valid();
                     surfaces_append(surfaces_out, std::move(top));
                     surfaces_append(surfaces_out, std::move(bottom));
                     

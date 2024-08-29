@@ -530,7 +530,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
             for(auto ee : coll)
                 if(ee)
                     ee->visit(LoopAssertVisitor());
-            loop.polygon.assert_point_distance();
+            loop.polygon.assert_valid();
 #endif
             ExtrusionLoop* eloop = static_cast<ExtrusionLoop*>(coll[idx.first]);
             bool has_overhang = false;
@@ -636,6 +636,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
         assert(!loop_polygons.points[idx - 1].coincides_with_epsilon(loop_polygons.points[idx]));
 #endif
     ExtrusionPaths paths;
+    coord_t resolution = std::max(SCALED_EPSILON, this->get_resolution(0,false, nullptr));
     bool speed_enabled = params.config.overhangs_width_speed.is_enabled();
     bool flow_enabled = speed_enabled && params.config.overhangs_width.is_enabled();
     bool dynamic_enabled = params.config.overhangs_dynamic_speed.is_enabled();
@@ -715,18 +716,18 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
                 ClipperUtils::clip_clipper_polygons_with_subject_bbox(params.lower_slices_bridge_speed_small, bbox);
             if (!lower_slices_bridge_speed_small_clipped.empty()) {
                 small_speed = diff_pl(*previous, lower_slices_bridge_speed_small_clipped);
-#ifdef _DEBUG
-                for (Polyline& poly : small_speed) //                       assert small_speed
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert small_speed
-                        assert(!poly.points[i].coincides_with_epsilon(poly.points[i + 1])); //    assert small_speed
-#endif
+                for (Polyline &poly : small_speed) {
+                    poly.douglas_peucker(SCALED_EPSILON);
+                    assert(poly.size() > 1);
+                    if(poly.size() > 2) poly.assert_valid();
+                }
                 if (!small_speed.empty()) {
                     *previous = intersection_pl(*previous, lower_slices_bridge_speed_small_clipped);
-#ifdef _DEBUG
-                    for (Polyline& poly : *previous) //                         assert previous
-                        for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                            assert(!poly.points[i].coincides_with_epsilon(poly.points[i + 1])); //    assert previous
-#endif
+                    for (Polyline &poly : *previous) {
+                        poly.douglas_peucker(SCALED_EPSILON);
+                        assert(poly.size() > 1);
+                        if(poly.size() > 2) poly.assert_valid();
+                    }
                     previous = &small_speed;
                 } 
             }
@@ -736,18 +737,18 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
                 ClipperUtils::clip_clipper_polygons_with_subject_bbox(params.lower_slices_bridge_speed_big, bbox);
             if (!lower_slices_bridge_speed_big_clipped.empty()) {
                 big_speed = diff_pl(*previous, lower_slices_bridge_speed_big_clipped);
-#ifdef _DEBUG
-                for (Polyline& poly : big_speed) //                         assert big_speed
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert big_speed
-                        assert(poly.points[i] != poly.points[i + 1]); //    assert big_speed
-#endif
+                for (Polyline &poly : big_speed) {
+                    poly.douglas_peucker(SCALED_EPSILON);
+                    assert(poly.size() > 1);
+                    if(poly.size() > 2) poly.assert_valid();
+                }
                 if (!big_speed.empty()) {
                     *previous = intersection_pl(*previous, lower_slices_bridge_speed_big_clipped);
-#ifdef _DEBUG
-                    for (Polyline& poly : *previous) //                         assert previous
-                        for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                            assert(poly.points[i] != poly.points[i + 1]); //    assert previous
-#endif
+                    for (Polyline &poly : *previous) {
+                        poly.douglas_peucker(SCALED_EPSILON);
+                        assert(poly.size() > 1);
+                        if(poly.size() > 2) poly.assert_valid();
+                    }
                     previous = &big_speed;
                 }
             }
@@ -759,18 +760,18 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
                 ClipperUtils::clip_clipper_polygons_with_subject_bbox(params.lower_slices_bridge_flow_small, bbox);
             if (!lower_slices_bridge_flow_small_clipped.empty()) {
                 small_flow = diff_pl(*previous, lower_slices_bridge_flow_small_clipped);
-#ifdef _DEBUG
-                for (Polyline& poly : small_flow) //                        assert small_flow
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert small_flow
-                        assert(poly.points[i] != poly.points[i + 1]); //    assert small_flow
-#endif
+                for (Polyline &poly : small_flow) {
+                    poly.douglas_peucker(SCALED_EPSILON);
+                    assert(poly.size() > 1);
+                    if(poly.size() > 2) poly.assert_valid();
+                }
                 if (!small_flow.empty()) {
                     *previous = intersection_pl(*previous, lower_slices_bridge_flow_small_clipped);
-#ifdef _DEBUG
-                    for (Polyline& poly : *previous) //                         assert previous
-                        for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                            assert(poly.points[i] != poly.points[i + 1]); //    assert previous
-#endif
+                    for (Polyline &poly : *previous) {
+                        poly.douglas_peucker(SCALED_EPSILON);
+                        assert(poly.size() > 1);
+                        if(poly.size() > 2) poly.assert_valid();
+                    }
                     previous = &small_flow;
                 }
             }
@@ -780,18 +781,18 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
                 ClipperUtils::clip_clipper_polygons_with_subject_bbox(params.lower_slices_bridge_flow_big, bbox);
             if (!lower_slices_bridge_flow_big_clipped.empty()) {
                 big_flow = diff_pl(*previous, lower_slices_bridge_flow_big_clipped);
-#ifdef _DEBUG
-                for (Polyline& poly : big_flow) //                          assert big_flow
-                    for (int i = 0; i < poly.points.size() - 1; i++) //     assert big_flow
-                        assert(poly.points[i] != poly.points[i + 1]); //    assert big_flow
-#endif
+                for (Polyline &poly : big_flow) {
+                    poly.douglas_peucker(SCALED_EPSILON);
+                    assert(poly.size() > 1);
+                    if(poly.size() > 2) poly.assert_valid();
+                }
                 if (!big_flow.empty()) {
                     *previous = intersection_pl(*previous, lower_slices_bridge_flow_big_clipped);
-#ifdef _DEBUG
-                    for (Polyline& poly : *previous) //                         assert previous
-                        for (int i = 0; i < poly.points.size() - 1; i++) //     assert previous
-                            assert(poly.points[i] != poly.points[i + 1]); //    assert previous
-#endif
+                    for (Polyline &poly : *previous) {
+                        poly.douglas_peucker(SCALED_EPSILON);
+                        assert(poly.size() > 1);
+                        if(poly.size() > 2) poly.assert_valid();
+                    }
                     previous = &big_flow;
                 }
             }
@@ -1057,8 +1058,17 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
             paths.erase(paths.begin() + 1);
         }
     }
+
+    //now that very small paths has been merge, remove useless points
+    for (ExtrusionPath &path : paths) {
+        assert(!path.polyline.has_arc());
+        path.polyline.make_arc(ArcFittingType::Disabled, std::max(SCALED_EPSILON * 2, scale_t(params.print_config.resolution)), 0);
+        assert(!path.polyline.has_arc());
+    }
+
     //set correct height
 #ifdef _DEBUG
+    for (ExtrusionPath& path : paths) path.polyline.is_valid();
     assert(!paths.empty());
     // maybe not a loop?
     Point last_pt = loop_polygons.first_point() == loop_polygons.last_point() ? paths.back().last_point() : paths.front().first_point();
@@ -3968,13 +3978,13 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                         (params.use_round_perimeters() ? ClipperLib::JoinType::jtRound : ClipperLib::JoinType::jtMiter),
                         (params.use_round_perimeters() ? params.get_min_round_spacing() : 3));
                     if (perimeter_idx == 1) {
-                        append(gaps, diff_ex(
+                        append(gaps, ensure_valid(diff_ex(
                             offset_ex(last, -0.5f * params.get_ext_perimeter_spacing()),
-                            no_last_gapfill));  // safety offset
+                            no_last_gapfill), resolution));  // safety offset
                     } else {
-                        append(gaps, diff_ex(
+                        append(gaps, ensure_valid(diff_ex(
                             offset_ex(last, -0.5f * params.get_perimeter_spacing()),
-                            no_last_gapfill));  // safety offset
+                            no_last_gapfill), resolution));  // safety offset
                     }
                 }
             }

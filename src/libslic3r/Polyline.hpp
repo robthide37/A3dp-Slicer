@@ -110,6 +110,8 @@ extern BoundingBox get_extents(const Polylines& polylines);
 // Return True when erase some otherwise False.
 bool remove_same_neighbor(Polyline &polyline);
 bool remove_same_neighbor(Polylines &polylines);
+// remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polylines that are too small to be valid
+void ensure_valid(Polylines &polylines, coord_t resolution = SCALED_EPSILON);
 
 inline double total_length(const Polylines &polylines) {
     double total = 0;
@@ -200,6 +202,12 @@ inline void polylines_merge(PointsType &dst, bool dst_first, PointsType &&src, b
 const Point& leftmost_point(const Polylines &polylines);
 
 bool remove_degenerate(Polylines &polylines);
+
+#ifdef _DEBUGINFO
+void assert_valid(const Polylines &polylines);
+#else
+void assert_valid(const Polylines &polylines) const {}
+#endif
 
 // Returns index of a segment of a polyline and foot point of pt on polyline.
 //std::pair<int, Point> foot_pt(const Points &polyline, const Point &pt);

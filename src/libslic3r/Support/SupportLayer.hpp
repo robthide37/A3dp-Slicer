@@ -108,6 +108,8 @@ public:
 	size_t 	 idx_object_layer_below { size_t(-1) };
 	// Use a bridging flow when printing this support layer.
 	bool 	 bridging { false };
+	// support resolution
+	coord_t resolution = SCALED_EPSILON;
 
 	// Polygons to be filled by the support pattern.
 	Polygons polygons;

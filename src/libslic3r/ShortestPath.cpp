@@ -1994,6 +1994,7 @@ static inline void reorder_by_three_exchanges_with_segment_flipping2(std::vector
 // and to order the brim lines.
 static inline void improve_ordering_by_two_exchanges_with_segment_flipping(Polylines &polylines, bool fixed_start)
 {
+	assert_valid(polylines);
 #ifndef NDEBUG
 	auto cost = [&polylines]() {
 		double sum = 0.;
@@ -2024,15 +2025,18 @@ static inline void improve_ordering_by_two_exchanges_with_segment_flipping(Polyl
 	out.reserve(polylines.size());
 	for (const FlipEdge &edge : edges) {
 		Polyline &pl = polylines[edge.source_index];
+		pl.assert_valid();
 		out.emplace_back(std::move(pl));
-		if (edge.p2 == pl.first_point().cast<double>()) {
+		if (edge.p2 == out.back().first_point().cast<double>()) {
 			// Polyline is flipped.
 			out.back().reverse();
 		} else {
 			// Polyline is not flipped.
-			assert(edge.p1 == pl.first_point().cast<double>());
+			assert(edge.p1 == out.back().first_point().cast<double>());
 		}
+		out.back().assert_valid();
 	}
+	polylines = out;
 
 #ifndef NDEBUG
 	double cost_final = cost();

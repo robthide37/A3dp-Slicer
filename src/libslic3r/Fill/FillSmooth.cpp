@@ -13,6 +13,7 @@ namespace Slic3r {
     {
         //ERROR: you shouldn't call that. Default to the rectilinear one.
         printf("FillSmooth::fill_surface() : you call the wrong method (fill_surface instead of fill_surface_extrusion).\n");
+        assert(false);
         Polylines polylines_out;
         return polylines_out;
     }
@@ -160,10 +161,14 @@ namespace Slic3r {
             perform_single_fill(2, *eecroot, *surface, monotonic_params);
         }
         
-        if (!eecroot->entities().empty()) 
+        if (!eecroot->entities().empty()) {
+#ifdef _DEBUGINFO
+            eecroot->visit(LoopAssertVisitor());
+#endif
             out.push_back(eecroot);
-        else delete eecroot;
-
+        } else {
+            delete eecroot;
+        }
     }
 
 } // namespace Slic3r

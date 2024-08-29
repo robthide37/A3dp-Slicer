@@ -301,7 +301,7 @@ inline void surfaces_append(Surfaces &dst, ExPolygons &&src, SurfaceType surface
 { 
     dst.reserve(dst.size() + src.size());
     for (ExPolygon &expoly : src) {
-        expoly.assert_point_distance();
+        expoly.assert_valid();
         dst.emplace_back(Surface(surfaceType, std::move(expoly)));
     }
     src.clear();
@@ -337,6 +337,10 @@ inline bool surfaces_could_merge(const Surface &s1, const Surface &s2)
         s1.thickness_layers  == s2.thickness_layers &&
         s1.bridge_angle      == s2.bridge_angle;
 }
+
+// remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polygons that are too small to be valid
+void ensure_valid(Surfaces &surfaces, coord_t resolution = SCALED_EPSILON);
+
 
 class SVG;
 

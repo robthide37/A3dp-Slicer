@@ -111,8 +111,16 @@ void Polygon::douglas_peucker(coord_t tolerance)
         return;
     this->points.push_back(this->points.front());
     MultiPoint::douglas_peucker(tolerance);
-    this->points.pop_back();
     assert(this->points.size() > 1);
+    if (points.size() == 2) {
+        // not a good polygon : too small. clear it
+        points.clear();
+    } else {
+        assert(this->points.front().coincides_with(this->points.back()));
+        this->points.pop_back();
+        assert(!this->points.front().coincides_with_epsilon(this->points.back()));
+        assert(this->points.size() > 1);
+    }
 }
 
 Polygons Polygon::simplify(double tolerance) const
@@ -622,6 +630,34 @@ bool remove_same_neighbor(Polygons &polygons)
     polygons.erase(std::remove_if(polygons.begin(), polygons.end(), [](const Polygon &p) { return p.points.size() <= 2; }), polygons.end());
     return exist;
 }
+
+void ensure_valid(Polygons &polygons, coord_t resolution /*= SCALED_EPSILON*/) {
+    for (size_t i = 0; i < polygons.size(); ++i) {
+        polygons[i].douglas_peucker(resolution);
+        if (polygons[i].size() < 3) {
+            polygons.erase(polygons.begin() + i);
+            --i;
+        }
+    }
+}
+
+Polygons ensure_valid(Polygons &&polygons, coord_t resolution /*= SCALED_EPSILON*/)
+{
+    ensure_valid(polygons, resolution);
+    return std::move(polygons);
+}
+
+Polygons ensure_valid(coord_t resolution, Polygons &&polygons) {
+    return ensure_valid(std::move(polygons), resolution);
+}
+
+#ifdef _DEBUGINFO
+void assert_valid(const Polygons &polygons) {
+    for (const Polygon &polygon : polygons) {
+        polygon.assert_valid();
+    }
+}
+#endif
 
 static inline bool is_stick(const Point &p1, const Point &p2, const Point &p3)
 {
