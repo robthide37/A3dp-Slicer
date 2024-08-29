@@ -1539,7 +1539,9 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         // Order object instances using a nearest neighbor search.
         print_object_instances_ordering = chain_print_object_instances(print);
         // prusaslicer replaced the previous m_layer_count set by `m_layer_count=tool_ordering.layer_tools().size()` here
-        assert(object_layer_count() == tool_ordering.layer_tools().size());
+        assert(object_layer_count() == tool_ordering.layer_tools().size() ||
+               m_layer_with_support_count == tool_ordering.layer_tools().size() ||
+               m_layer_with_support_count == tool_ordering.layer_tools().size() + 1);
     }
     if (initial_extruder_id == (uint16_t)-1) {
         // Nothing to print!
