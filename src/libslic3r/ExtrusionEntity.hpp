@@ -547,17 +547,21 @@ private:
 inline void extrusion_paths_append(ExtrusionPaths &dst, Polylines &polylines, const ExtrusionAttributes &attributes, bool can_reverse = true)
 {
     dst.reserve(dst.size() + polylines.size());
-    for (Polyline &polyline : polylines)
+    for (Polyline &polyline : polylines) {
+        assert(polyline.is_valid());
         if (polyline.is_valid())
             dst.emplace_back(polyline, attributes, can_reverse);
+    }
 }
 
 inline void extrusion_paths_append(ExtrusionPaths &dst, Polylines &&polylines, const ExtrusionAttributes &attributes, bool can_reverse = true)
 {
     dst.reserve(dst.size() + polylines.size());
-    for (Polyline &polyline : polylines)
+    for (Polyline &polyline : polylines) {
+        assert(polyline.is_valid());
         if (polyline.is_valid())
             dst.emplace_back(std::move(polyline), attributes, can_reverse);
+    }
     polylines.clear();
 }
 

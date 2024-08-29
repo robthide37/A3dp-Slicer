@@ -300,8 +300,10 @@ inline void surfaces_append(Surfaces &dst, const Surfaces &src)
 inline void surfaces_append(Surfaces &dst, ExPolygons &&src, SurfaceType surfaceType) 
 { 
     dst.reserve(dst.size() + src.size());
-    for (ExPolygon &expoly : src)
+    for (ExPolygon &expoly : src) {
+        expoly.assert_point_distance();
         dst.emplace_back(Surface(surfaceType, std::move(expoly)));
+    }
     src.clear();
 }
 
