@@ -465,6 +465,9 @@ static Direction get_shortest_direction(const AvoidCrossingPerimeters::Boundary 
 // Straighten the travel path as long as it does not collide with the contours stored in edge_grid.
 static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::Boundary &boundary, const std::vector<TravelPoint> &travel)
 {
+    if(travel.size() < 3)
+        return travel;
+
     FirstIntersectionVisitor visitor(boundary.grid);
     std::vector<TravelPoint> simplified_path;
     simplified_path.reserve(travel.size());
@@ -473,13 +476,33 @@ static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::B
     // Try to skip some points in the path.
     //FIXME maybe use a binary search to trim the line?
     //FIXME how about searching tangent point at long segments? 
+    Point current_point = travel.front().point;
     for (size_t point_idx = 1; point_idx < travel.size(); ++point_idx) {
-        const Point &current_point = travel[point_idx - 1].point;
         TravelPoint  next          = travel[point_idx];
+        assert(current_point == simplified_path.back().point);
+
+        // check for first point dist, if same point as next, then fuse them.
+        if (point_idx == 1 && current_point.coincides_with_epsilon(next.point)) {
+            simplified_path.front().do_not_remove = next.do_not_remove;
+            simplified_path.front().border_idx = next.border_idx;
+            continue;
+        }
+
+        if (current_point.coincides_with_epsilon(next.point) && point_idx + 1 < travel.size()) {
+            if (next.do_not_remove && !simplified_path.back().do_not_remove) {
+                simplified_path.back() = next;
+                current_point = next.point;
+            }
+            continue;
+        }
 
         visitor.pt_current = &current_point;
-
-        if (!next.do_not_remove)
+        if (!next.do_not_remove) {
+            // if same point (but not the last) -> skip it
+            if (current_point.coincides_with_epsilon(next.point) && point_idx + 1 < travel.size()) {
+                continue;
+            }
+            // search for useless points after this one to skip them.
             for (size_t point_idx_2 = point_idx + 1; point_idx_2 < travel.size(); ++point_idx_2) {
                 // Workaround for some issue in MSVC 19.29.30037 32-bit compiler.
 #if defined(_WIN32) && !defined(_WIN64)
@@ -489,8 +512,8 @@ static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::B
                 if (travel[point_idx_2].do_not_remove)
                     break;
 #endif
-                if (travel[point_idx_2].point == current_point) {
-                    next      = travel[point_idx_2];
+                if (travel[point_idx_2].point.coincides_with_epsilon(current_point)) {
+                    next = travel[point_idx_2];
                     point_idx = point_idx_2;
                     continue;
                 }
@@ -499,14 +522,28 @@ static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::B
                 boundary.grid.visit_cells_intersecting_line(*visitor.pt_current, *visitor.pt_next, visitor);
                 // Check if deleting point causes crossing a boundary
                 if (!visitor.intersect) {
-                    next      = travel[point_idx_2];
+                    next = travel[point_idx_2];
                     point_idx = point_idx_2;
                 }
             }
+        }
 
         simplified_path.emplace_back(next);
+        current_point = next.point;
     }
 
+    // check for last point dist
+    if (simplified_path.size() > 2 &&
+        simplified_path.back().point.coincides_with_epsilon(simplified_path[simplified_path.size() - 2].point)) {
+        auto & previous = simplified_path[simplified_path.size() - 2];
+        previous.point = simplified_path.back().point;
+        simplified_path.pop_back();
+    }
+
+    for (size_t idx = 1; idx < simplified_path.size(); ++idx)
+        assert(!simplified_path[idx - 1].point.coincides_with_epsilon(simplified_path[idx].point));
+    assert(simplified_path.front().point == travel.front().point);
+    assert(simplified_path.back().point == travel.back().point);
     return simplified_path;
 }
 
