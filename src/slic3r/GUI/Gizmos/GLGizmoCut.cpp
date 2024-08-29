@@ -1489,7 +1489,7 @@ bool GLGizmoCut3D::on_is_activable() const
 
 bool GLGizmoCut3D::on_is_selectable() const
 {
-    return wxGetApp().get_mode() != comSimple;
+    return wxGetApp().get_mode() != comSimple || get_app_config()->get_bool("objects_always_expert");
 }
 
 Vec3d GLGizmoCut3D::mouse_position_in_local_plane(GrabberID axis, const Linef3& mouse_ray) const
