@@ -670,30 +670,32 @@ void PrintObject::_min_overhang_threshold() {
         // get bridgeable area
         for (size_t region_idx = 0; region_idx < my_layer->m_regions.size(); ++region_idx) {
             LayerRegion* lregion = my_layer->get_region(region_idx);
+            Flow bridge_flow = lregion->bridging_flow(FlowRole::frSolidInfill);
             if (lregion->region().config().overhangs_bridge_threshold.value != 0 ||
                     !lregion->region().config().overhangs_bridge_threshold.is_enabled()) {
                 const Surfaces & my_surfaces = lregion->m_slices.surfaces;
                 ExPolygons unsupported = to_expolygons(my_surfaces);
                 unsupported            = diff_ex(unsupported, lower_layer->lslices(), ApplySafetyOffset::Yes);
-                Flow bridgeFlow = lregion->bridging_flow(FlowRole::frSolidInfill);
 
                 if (!unsupported.empty()) {
                     ExPolygons unsupported_filtered;
-                    // remove small overhangs
-                    unsupported_filtered = offset2_ex(unsupported, double(-max_nz_diam), double(max_nz_diam));
+                    // remove small overhangs (but also good bridges to a cylinder)
+                    unsupported_filtered = offset2_ex(unsupported, double(-max_nz_diam/2), double(max_nz_diam), Slic3r::ClipperLib::jtMiter, 5);
+                    unsupported_filtered = intersection_ex(unsupported, unsupported_filtered);
                     for (const ExPolygon &to_bridge : unsupported_filtered) {
                         BridgeDetector detector(to_bridge,
                                                 lower_layer->lslices(),
-                                                bridgeFlow.scaled_spacing(),
-                                                scale_t(this->print()->config().bridge_precision.get_abs_value(bridgeFlow.spacing())),
+                                                bridge_flow.scaled_spacing(),
+                                                scale_t(this->print()->config().bridge_precision.get_abs_value(bridge_flow.spacing())),
                                                 layer_idx);
                         if (lregion->region().config().overhangs_bridge_threshold.is_enabled()) {
                             detector.max_bridge_length = scale_d(std::max(0., lregion->region().config().overhangs_bridge_threshold.value));
                         } else {
                             detector.max_bridge_length = -1;
                         }
-                        if (detector.detect_angle(0))
+                        if (detector.detect_angle()) {
                             append(bridged_area, union_ex(detector.coverage()));
+                        }
                     }
                     // then, check other layers
                     size_t max_layer_idx = lregion->region().config().overhangs_bridge_upper_layers.value;
@@ -704,7 +706,7 @@ void PrintObject::_min_overhang_threshold() {
                         max_layer_idx = std::min(max_layer_idx, this->layers().size());
                         // compute the area still unsupported
                         ExPolygons still_unsupported = diff_ex(unsupported, bridged_area);
-                        still_unsupported = offset2_ex(still_unsupported, double(-bridgeFlow.scaled_spacing()/2), double(bridgeFlow.scaled_spacing()/2));
+                        still_unsupported = intersection_ex(still_unsupported, offset2_ex(still_unsupported, double(-bridge_flow.scaled_spacing()/2), double(bridge_flow.scaled_spacing()),  Slic3r::ClipperLib::jtMiter, 5));
                         // compute the support (without the enlarged part,as we don't know yet where it will be) 
                         ExPolygons previous_supported = supported_area;
                         append(previous_supported, bridged_area);
@@ -727,8 +729,8 @@ void PrintObject::_min_overhang_threshold() {
                                         if(offset(to_bridge, -enlargement).empty())
                                             continue;
 
-                                        BridgeDetector detector(to_bridge, previous_supported, bridgeFlow.scaled_spacing(),
-                                                     scale_t(this->print()->config().bridge_precision.get_abs_value(bridgeFlow.spacing())),
+                                        BridgeDetector detector(to_bridge, previous_supported, bridge_flow.scaled_spacing(),
+                                                     scale_t(this->print()->config().bridge_precision.get_abs_value(bridge_flow.spacing())),
                                                      other_layer_bridge_idx);
                                         detector.layer_id = other_layer_bridge_idx;
                                         if (lregion->region().config().overhangs_bridge_threshold.is_enabled()) {
@@ -736,7 +738,7 @@ void PrintObject::_min_overhang_threshold() {
                                         } else {
                                             detector.max_bridge_length = -1;
                                         }
-                                        if (detector.detect_angle(0)) {
+                                        if (detector.detect_angle()) {
                                             append(new_bridged_area, union_ex(detector.coverage()));
                                         }
                                     }
@@ -748,7 +750,7 @@ void PrintObject::_min_overhang_threshold() {
                                 // update the area still unsupported
                                 still_unsupported = diff_ex(still_unsupported, new_bridged_area);
                                 still_unsupported = offset2_ex(still_unsupported, 
-                                    double(-bridgeFlow.scaled_spacing()/2), double(bridgeFlow.scaled_spacing()/2));
+                                    double(-bridge_flow.scaled_spacing()/2), double(bridge_flow.scaled_spacing()/2));
                             }
                             // update support area from this layer
                             if (other_layer_bridge_idx + 1 < max_layer_idx) {
@@ -787,6 +789,10 @@ void PrintObject::_min_overhang_threshold() {
                     Surfaces &my_surfaces = my_layer->m_regions[region_idx]->m_slices.surfaces;
                     for (size_t surf_idx = 0; surf_idx < my_surfaces.size(); surf_idx++) {
                         ExPolygons polys = intersection_ex({my_surfaces[surf_idx].expolygon}, enlarged_support);
+                        // if bridge, smooth enlargment so ther ewon't be spikes near bridges.
+                        if (!bridged_other_layers_area.empty()) {
+                            polys = offset2_ex(polys, double(-enlargement / 2), double(enlargement / 2));
+                        }
                         if (polys.empty()) {
                             my_surfaces.erase(my_surfaces.begin() + surf_idx);
                             surf_idx--;
@@ -799,11 +805,11 @@ void PrintObject::_min_overhang_threshold() {
                     }
                     for(auto &srf : to_add) srf.expolygon.assert_valid();
                     append(my_surfaces, std::move(to_add));
+                    ensure_valid(my_surfaces, resolution);
+                    for(auto &srf : my_surfaces) srf.expolygon.assert_valid();
                     append(modified, union_ex(enlarged_support));
                     ensure_valid(modified, resolution);
                     assert_valid(modified);
-                    ensure_valid(my_surfaces, resolution);
-                    for(auto &srf : my_surfaces) srf.expolygon.assert_valid();
                 }
             }
             //also lslices
