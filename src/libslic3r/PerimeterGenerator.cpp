@@ -206,8 +206,7 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
     //not always a loop, with arachne
     bool is_loop = paths.front().first_point() == last_point;
 #ifdef _DEBUG
-    if (is_loop)
-        assert(paths.back().last_point() == paths.front().first_point());
+    if (is_loop) assert(paths.back().last_point() == paths.front().first_point());
     for (int i = 1; i < paths.size(); i++) {
         assert(paths[i - 1].last_point() == paths[i].first_point());
     }
@@ -271,8 +270,7 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
         paths.back().polyline.append(last_point);
     }
 #ifdef _DEBUG
-    if (is_loop)
-        assert(paths.back().last_point() == paths.front().first_point());
+    if (is_loop) assert(paths.back().last_point() == paths.front().first_point());
     for (int i = 1; i < paths.size(); i++) {
         assert(paths[i - 1].last_point() == paths[i].first_point());
     }
@@ -308,13 +306,15 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
         size_t point_idx = std::max(size_t(0), poly.size() - 2);
         while (out.size() < 3) {
             out.emplace_back(poly[point_idx]);
-            if (point_idx == 0)
+            if (point_idx == 0) {
                 break;
+            }
             --point_idx;
         }
     }
-    if (out.size() >= 3)
+    if (out.size() >= 3) {
         poly.points = std::move(out);
+    }
 }
 
 // Thanks Cura developers for this function.
@@ -351,16 +351,19 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
     while (out.size() < 3) {
         size_t point_idx = ext_lines.size() - 2;
         out.emplace_back(ext_lines[point_idx].p, ext_lines[point_idx].w, ext_lines[point_idx].perimeter_index);
-        if (point_idx == 0)
+        if (point_idx == 0) {
             break;
+        }
         -- point_idx;
     }
 
-    if (ext_lines.back().p == ext_lines.front().p) // Connect endpoints.
+    if (ext_lines.back().p == ext_lines.front().p) { // Connect endpoints.
         out.front().p = out.back().p;
+    }
 
-    if (out.size() >= 3)
+    if (out.size() >= 3) {
         ext_lines.junctions = std::move(out);
+    }
 }
 
 ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Parameters &params,
@@ -403,8 +406,10 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
 
         bool can_overhang = params.config.overhangs_width_speed.is_enabled()
             && params.layer->id() > params.object_config.raft_layers;
-        if(params.object_config.support_material && params.object_config.support_material_contact_distance_type.value == zdNone)
+        if (params.object_config.support_material &&
+            params.object_config.support_material_contact_distance_type.value == zdNone) {
             can_overhang = false;
+        }
         if (can_overhang) {
             paths = this->create_overhangs_classic(params, loop.polygon.split_at_first_point(), role, is_external);
 #if _DEBUG
@@ -467,10 +472,11 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
     //result is  [idx, needReverse] ?
     std::vector<std::pair<size_t, bool>> chain = chain_extrusion_entities(coll, &zero_point);
     assert(coll.size() == chain.size());
-    for(const ExtrusionEntity *loop : coll)
-        assert(loop);
+    for(const ExtrusionEntity *loop : coll) assert(loop);
     ExtrusionEntityCollection coll_out;
-    if (chain.empty()) return coll_out;
+    if (chain.empty()) {
+        return coll_out;
+    }
 
     // little check: if you have external holes with only one extrusion and internal things, please draw the internal first, just in case it can help print the hole better.
     std::vector<std::pair<size_t, bool>> better_chain;
@@ -479,14 +485,16 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
         std::vector<std::pair<size_t, bool>> keep_ordering;
         std::vector<std::pair<size_t, bool>> thin_walls;
         for (const std::pair<size_t, bool> &idx : chain) {
-            if (idx.first < loops.size())
+            if (idx.first < loops.size()) {
                 if (!loops[idx.first].is_external() ||
-                    (!loops[idx.first].is_contour && !loops[idx.first].children.empty()))
+                    (!loops[idx.first].is_contour && !loops[idx.first].children.empty())) {
                     alone_holes.push_back(idx);
-                else
+                } else {
                     keep_ordering.push_back(idx);
-            else
+                }
+            } else {
                 thin_walls.push_back(idx);
+            }
         }
         append(better_chain, std::move(alone_holes));
         append(better_chain, std::move(keep_ordering));
@@ -505,8 +513,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
     const bool CCW_hole = params.config.perimeter_direction.value == PerimeterDirection::pdCW_CCW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
 
 #if _DEBUG
-    for(auto ee : coll)
-        DEBUG_VISIT(*ee, LoopAssertVisitor())
+    for(auto ee : coll) DEBUG_VISIT(*ee, LoopAssertVisitor())
 #endif
     //move from coll to coll_out and getting children of each in the same time. (deep first)
     for (const std::pair<size_t, bool> &idx : better_chain) {
@@ -516,20 +523,20 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
             // let's get it from the sorted collection as it might have been reversed
             coll_out.set_entities().emplace_back(coll[idx.first]);
             coll[idx.first] = nullptr;
-            if (idx.second)
+            if (idx.second) {
                 coll_out.entities().back()->reverse();
+            }
             //if thin extrusion is a loop, make it ccw like a normal contour.
             if (ExtrusionLoop* loop = dynamic_cast<ExtrusionLoop*>(coll_out.entities().back())) {
-                if(loop->is_clockwise())
+                if (loop->is_clockwise()) {
                     loop->reverse();
+                }
             }
         } else {
             const PerimeterGeneratorLoop &loop = loops[idx.first];
             
 #if _DEBUG
-            for(auto ee : coll)
-                if(ee)
-                    ee->visit(LoopAssertVisitor());
+            for(auto ee : coll) if(ee) ee->visit(LoopAssertVisitor());
             loop.polygon.assert_valid();
 #endif
             ExtrusionLoop* eloop = static_cast<ExtrusionLoop*>(coll[idx.first]);
@@ -554,9 +561,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
 
             }
 #if _DEBUG
-            for(auto ee : coll)
-                if(ee)
-                    ee->visit(LoopAssertVisitor());
+            for(auto ee : coll) if(ee) ee->visit(LoopAssertVisitor());
 #endif
             assert(thin_walls.empty());
             ExtrusionEntityCollection children = this->_traverse_loops_classic(params, loop.children, thin_walls, has_overhang ? 1 : (count_since_overhang+1));
@@ -572,12 +577,15 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
                 // has to reverse the direction if print external first, as the whole thing will be reverse afterwards
                 clockwise = clockwise != (loop.is_contour ? reverse_contour : reverse_hole);
 
-                if (clockwise)
-                    if(!eloop->is_clockwise())
+                if (clockwise) {
+                    if (!eloop->is_clockwise()) {
                         eloop->reverse(); // make_clockwise
-                else
-                    if(eloop->is_clockwise())
-                        eloop->reverse(); //make_couter_clockwise
+                    }
+                } else {
+                    if (eloop->is_clockwise()) {
+                        eloop->reverse(); // make_couter_clockwise
+                    }
+                }
                 //ensure that our children are printed before us
                 if (!children.empty()) {
                     ExtrusionEntityCollection print_child_beforeplz;
@@ -597,12 +605,15 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
                 // has to reverse the direction if print external first, as the whole thing will be reverse afterwards
                 counter_clockwise = counter_clockwise != (loop.is_contour ? reverse_contour : reverse_hole);
                 // if hole: reverse if steep_overhang & odd. if contour: the opposite
-                if (counter_clockwise)
-                    if(eloop->is_clockwise())
-                        eloop->reverse(); //make_couter_clockwise
-                else
-                    if(!eloop->is_clockwise())
+                if (counter_clockwise) {
+                    if (eloop->is_clockwise()) {
+                        eloop->reverse(); // make_couter_clockwise
+                    }
+                } else {
+                    if (!eloop->is_clockwise()) {
                         eloop->reverse(); // make_clockwise
+                    }
+                }
                 // ensure that our children are printed after us
                 if (!children.empty()) {
                     ExtrusionEntityCollection print_child_afterplz;
@@ -1104,9 +1115,10 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
             last_pt = paths[idx_path-1].last_point();
 #endif
         }
-        if(!need_erase){
+        if (!need_erase) {
             last_type_fh = int(path.attributes_mutable().height);
-            path.attributes_mutable().height = path.height() < idx_lh_size - 2 ? (float)params.layer->height : params.overhang_flow.height();
+            path.attributes_mutable().height = path.height() < idx_lh_size - 2 ? (float) params.layer->height :
+                                                                                 params.overhang_flow.height();
 #ifdef _DEBUG
             assert(last_pt == path.first_point());
             for (size_t idx = 1; idx < path.size(); ++idx) {
@@ -1151,8 +1163,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
     }
     for (PerimeterGeneratorArachneExtrusion& pg_extrusion : pg_extrusions) {
         Arachne::ExtrusionLine* extrusion = pg_extrusion.extrusion;
-        if (extrusion->is_zero_length())
+        if (extrusion->is_zero_length()) {
             continue;
+        }
 
         const bool    is_external = extrusion->inset_idx == 0;
         ExtrusionLoopRole loop_role = ExtrusionLoopRole::elrDefault;
@@ -1187,14 +1200,14 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
             BoundingBox extrusion_path_bbox;
             for (const Arachne::ExtrusionJunction& ej : extrusion->junctions) {
                 //remove duplicate points from arachne
-                if(extrusion_path.empty() || 
-                    (ej.p.x() != extrusion_path.back().x() || ej.p.y() != extrusion_path.back().y()))
+                if (extrusion_path.empty() ||
+                    (ej.p.x() != extrusion_path.back().x() || ej.p.y() != extrusion_path.back().y())) {
                     extrusion_path.emplace_back(ej.p.x(), ej.p.y(), ej.w);
+                }
                 extrusion_path_bbox.merge(Point{ej.p.x(), ej.p.y()});
             }
             extrusion_path_bbox.offset(SCALED_EPSILON);
-            if(extrusion->is_closed)
-                assert((extrusion_path.front() - extrusion_path.back()).norm() < SCALED_EPSILON);
+            if(extrusion->is_closed) assert((extrusion_path.front() - extrusion_path.back()).norm() < SCALED_EPSILON);
             paths = this->create_overhangs_arachne(params, extrusion_path, extrusion_path_bbox, role, is_external);
             
             // Reapply the nearest point search for starting point.
@@ -1233,10 +1246,8 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
                 }
 
                 chain_and_reorder_extrusion_paths(paths, &start_point);
-                for(size_t i = 1; i< paths.size(); ++i)
-                    assert(paths[i-1].last_point().coincides_with_epsilon(paths[i].first_point()));
-                if(extrusion->is_closed)
-                    assert(paths.back().last_point().coincides_with_epsilon(paths.front().first_point()));
+                for(size_t i = 1; i< paths.size(); ++i) assert(paths[i-1].last_point().coincides_with_epsilon(paths[i].first_point()));
+                if(extrusion->is_closed) assert(paths.back().last_point().coincides_with_epsilon(paths.front().first_point()));
             }
         } else {
             append(paths, Geometry::unsafe_variable_width(Arachne::to_thick_polyline(*extrusion),
@@ -1257,8 +1268,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
         // Append paths to collection.
         if (!paths.empty()) {
             for (size_t idx_path = 0; idx_path < paths.size(); ++idx_path) {
-                if (idx_path > 0)
+                if (idx_path > 0) {
                     assert(paths[idx_path - 1].last_point().coincides_with_epsilon(paths[idx_path].first_point()));
+                }
                 for (size_t idx_pt = 1; idx_pt < paths[idx_path].size(); ++idx_pt) {
                     assert(!paths[idx_path].polyline.get_point(idx_pt - 1).coincides_with_epsilon(paths[idx_path].polyline.get_point(idx_pt)));
                 }
@@ -1270,8 +1282,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
                 //TODO: use if (loop.is_steep_overhang && params.layer->id() % 2 == 1) to make_clockwise => need to detect is_steep_overhang on the arachne path
                 bool need_ccw = ((params.config.perimeter_reverse /*|| pg_extrusion.is_steep_overhang*/ && params.layer->id() % 2 == 1)
                                  == (pg_extrusion.is_contour ? CCW_contour : CCW_hole));
-                if (need_ccw != extrusion_loop.is_clockwise())
+                if (need_ccw != extrusion_loop.is_clockwise()) {
                     extrusion_loop.reverse();
+                }
 #if _DEBUG
                 for (auto it = std::next(extrusion_loop.paths.begin()); it != extrusion_loop.paths.end(); ++it) {
                     assert(it->polyline.size() >= 2);
