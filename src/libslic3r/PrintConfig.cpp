@@ -24,6 +24,7 @@
 #include "Flow.hpp"
 #include "format.hpp"
 #include "I18N.hpp"
+#include "Semver.hpp"
 #include "Utils.hpp"
 
 #include "SLA/SupportTree.hpp"
@@ -415,6 +416,14 @@ void PrintConfigDef::init_common_params()
 {
     ConfigOptionDef* def;
 
+    // version of the settings:
+    // 4 letters for the software (SUSI, PRSA, BMBU, ORCA)
+    // a '_'
+    // version in X.X.X.X
+    def = this->add("print_version", coString);
+    // defautl to none : only set if loaded. only write our version
+    def->set_default_value(new ConfigOptionStringVersion());
+
     def = this->add("printer_technology", coEnum);
     def->label = L("Printer technology");
     def->tooltip = L("Printer technology");
@@ -794,11 +803,13 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Bridging");
     def->full_label = L("Bridging angle");
     def->category = OptionCategory::infill;
-    def->tooltip = L("Bridging angle override. If left to zero, the bridging angle will be calculated "
-                   "automatically. Otherwise the provided angle will be used for all bridges. "
-                   "Use 180° for zero angle.");
+    def->tooltip = L("Bridging angle override."
+                   "\nIf disabled, the bridging angle will be calculated automatically."
+                   " Otherwise the provided angle will be used for all bridges."
+                   "Note: 180° is the same as zero angle.");
     def->sidetext = L("°");
     def->min = 0;
+    def->can_be_disabled = true;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0.));
 
@@ -8500,6 +8511,28 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
             opt_key = "";
         }
     }
+    if (config.has("bridge_angle") && config.get_float("bridge_angle") == 0 && config.is_enabled("bridge_angle")) {
+        bool old = true;
+        if (config.has("print_version")) {
+            std::string str_version = config.option<ConfigOptionString>("print_version")->value;
+            old = str_version.size() < 4+1+7;
+            old = old || str_version.substr(0,4) != "SUSI";
+            assert(old || str_version[4] == '_');
+            if (!old) {
+                std::optional<Semver> version = Semver::parse(str_version.substr(5));
+                if (version) {
+                    if (version->maj() <= 2 && version->min() <= 6) {
+                        old = true;
+                    }
+                } else {
+                    old = true;
+                }
+            }
+        }
+        if (old) {
+            config.option("bridge_angle")->set_enabled(false);
+        }
+    }
     if (useful_items.find("enable_dynamic_overhang_speeds") != useful_items.end()) {
         ConfigOptionBool enable_dynamic_overhang_speeds;
         enable_dynamic_overhang_speeds.deserialize(useful_items["enable_dynamic_overhang_speeds"]);
@@ -8727,6 +8760,9 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         //min_fan_speed is already converted to default_fan_speed, just has to deactivate it if not always_on
         if (value != "1")
             output["default_fan_speed"] = "0";
+    }
+    if ("bridge_angle" == opt_key && "0" == value) {
+        value = "!0";
     }
     if ("thumbnails_format" == opt_key) {
         // by default, no thumbnails_tag_format for png output

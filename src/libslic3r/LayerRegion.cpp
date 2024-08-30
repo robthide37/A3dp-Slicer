@@ -495,9 +495,11 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         BOOST_LOG_TRIVIAL(trace) << "Processing external surface, detecting bridges. layer" << this->layer()->print_z;
         const double custom_angle = this->region().config().bridge_angle.value;
         const auto   expansion_params_into_solid_infill  = RegionExpansionParameters::build(expansion_bottom_bridge, expansion_step, max_nr_expansion_steps);
-        bridges.surfaces = custom_angle > 0 ?
-            expand_merge_surfaces(m_fill_surfaces.surfaces, stPosBottom | stDensSolid | stModBridge, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius, Geometry::deg2rad(custom_angle)) :
-            expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius);
+        if (this->region().config().bridge_angle.is_enabled()) {
+            bridges.surfaces = expand_merge_surfaces(m_fill_surfaces.surfaces, stPosBottom | stDensSolid | stModBridge, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius, Geometry::deg2rad(custom_angle));
+        } else {
+            bridges.surfaces = expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius);
+        }
         BOOST_LOG_TRIVIAL(trace) << "Processing external surface, detecting bridges - done";
 #if 0
         {
@@ -788,8 +790,8 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
 
 // new fast bridge direction estimation which "minimizes amount of unanchored bridge endpoints"
 #if 0 
-                double custom_angle = Geometry::deg2rad(this->region().config().bridge_angle.value);
-                if (custom_angle > 0.0) {
+                if (this->region().config().bridge_angle.is_enabled()) {
+                    double custom_angle = Geometry::deg2rad(this->region().config().bridge_angle.value);
                     // Bridge was not detected (likely it is only supported at one side). Still it is a surface filled in
                     // using a bridging flow, therefore it makes sense to respect the custom bridging direction.
                     bridges[idx_last].bridge_angle = custom_angle;
@@ -824,12 +826,12 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
                 #ifdef SLIC3R_DEBUG
                 printf("Processing bridge at layer %zu:\n", this->layer()->id());
                 #endif
-				double custom_angle = Geometry::deg2rad(this->region().config().bridge_angle.value);
-                if (custom_angle > 0) {
+                if (this->region().config().bridge_angle.is_enabled()) {
+                    double custom_angle = Geometry::deg2rad(this->region().config().bridge_angle.value);
                     // Bridge was not detected (likely it is only supported at one side). Still it is a surface filled in
                     // using a bridging flow, therefore it makes sense to respect the custom bridging direction.
                     bridges[idx_last].bridge_angle = custom_angle;
-				}else if (bd.detect_angle(custom_angle)) {
+				} else if (bd.detect_angle()) {
                     bridges[idx_last].bridge_angle = bd.angle;
                     if (this->layer()->object()->has_support()) {
 //                        polygons_append(this->bridged, intersection(bd.coverage(), to_polygons(initial)));

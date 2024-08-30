@@ -464,6 +464,7 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
 }
 
 static std::vector<std::string> s_Preset_print_options {
+        "print_version",
         "layer_height", 
         "first_layer_height",
         "perimeters",
@@ -938,6 +939,7 @@ static std::vector<std::string> s_Preset_printer_options {
 };
 
 static std::vector<std::string> s_Preset_sla_print_options {
+    "print_version",
     "layer_height",
     "faded_layers",
     "print_custom_variables", // only for scripted widgets

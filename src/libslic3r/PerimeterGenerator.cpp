@@ -3179,8 +3179,10 @@ void PerimeterGenerator::processs_no_bridge(const Parameters params, Surfaces& a
                                 params.overhang_flow.scaled_spacing(),
                                 scale_t(params.print_config.bridge_precision.get_abs_value(params.overhang_flow.spacing())),
                                 params.layer->id());
-                            if (detector.detect_angle(Geometry::deg2rad(params.config.bridge_angle.value)))
+                            double angle = Geometry::deg2rad(params.config.bridge_angle.value);
+                            if (detector.detect_angle(params.config.bridge_angle.is_enabled() ? angle :  -1)) {
                                 expolygons_append(bridgeable, union_ex(detector.coverage()));
+                            }
                         }
                         if (!bridgeable.empty()) {
                             //check if we get everything or just the bridgeable area
@@ -3659,7 +3661,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                         params.overhang_flow.scaled_spacing(),
                         scale_t(params.print_config.bridge_precision.get_abs_value(params.overhang_flow.spacing())),
                         params.layer->id());
-                    if (detector.detect_angle(Geometry::deg2rad(params.config.bridge_angle.value)))
+                    double angle = Geometry::deg2rad(params.config.bridge_angle.value);
+                    if (detector.detect_angle(params.config.bridge_angle.is_enabled() ? angle : -1))
                         expolygons_append(bridgeable, union_ex(detector.coverage()));
                 }
                 if (!bridgeable.empty()) {

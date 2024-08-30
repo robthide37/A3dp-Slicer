@@ -62,6 +62,7 @@ void Layer::make_slices()
                 polygons_append(slices_p, to_polygons(layerm->slices().surfaces));
             slices = union_safety_offset_ex(slices_p);
         }
+        ensure_valid(slices, std::max(scale_t(this->object()->print()->config().resolution), SCALED_EPSILON));
         for (ExPolygon &poly : slices) poly.assert_valid();
         // lslices are sorted by topological order from outside to inside from the clipper union used above
         this->set_lslices() = slices;

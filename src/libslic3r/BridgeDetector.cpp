@@ -100,14 +100,14 @@ void BridgeDetector::initialize()
     */
 }
 
-bool BridgeDetector::detect_angle(double bridge_direction_override)
+bool BridgeDetector::detect_angle(double bridge_direction_override /* = -1*/)
 {
     if (this->_edges.empty() || this->_anchor_regions.empty()) 
         // The bridging region is completely in the air, there are no anchors available at the layer below.
         return false;
 
     std::vector<BridgeDirection> candidates;
-    if (bridge_direction_override == 0.) {
+    if (bridge_direction_override < 0.) {
         candidates = bridge_direction_candidates();
     } else
         candidates.emplace_back(BridgeDirection(bridge_direction_override));
