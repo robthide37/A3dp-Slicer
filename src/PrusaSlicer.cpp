@@ -189,7 +189,7 @@ int CLI::run(int argc, char **argv)
     if (it != m_actions.end()) {
         const Semver opengl_minimum = Semver(3,2,0,0);
         const std::string opengl_version_str = m_config.opt_string("opengl-version");
-        boost::optional<Semver> semver = Semver::parse(opengl_version_str);
+        std::optional<Semver> semver = Semver::parse(opengl_version_str);
         if (semver.has_value() && (*semver) >= opengl_minimum ) {
             opengl_version.first = semver->maj();
             opengl_version.second = semver->min();

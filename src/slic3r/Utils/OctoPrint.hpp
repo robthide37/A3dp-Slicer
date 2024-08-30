@@ -6,10 +6,10 @@
 #ifndef slic3r_OctoPrint_hpp_
 #define slic3r_OctoPrint_hpp_
 
+#include <optional>
 #include <string>
 #include <wx/string.h>
 #include <wx/arrstr.h>
-#include <boost/optional.hpp>
 #include <boost/asio/ip/address.hpp>
 
 #include "PrintHost.hpp"
@@ -45,7 +45,7 @@ protected:
 #ifdef WIN32
     virtual bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn, const boost::asio::ip::address& resolved_addr) const;
 #endif
-    virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;
+    virtual bool validate_version_text(const std::optional<std::string> &version_text) const;
     virtual void set_http_send(Http& request, const PrintHostUpload& upload_data) const;
     virtual bool upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const;
 
@@ -78,7 +78,7 @@ public:
     PrintHostPostUploadActions get_post_upload_actions() const override { return {}; }
 
 protected:
-    bool validate_version_text(const boost::optional<std::string>& version_text) const override;
+    bool validate_version_text(const std::optional<std::string>& version_text) const override;
     void set_http_send(Http& request, const PrintHostUpload& upload_data) const override;
 
 };
@@ -100,7 +100,7 @@ public:
     bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override;
 protected:
     bool test(wxString& curl_msg) const override;
-    bool validate_version_text(const boost::optional<std::string>& version_text) const override;
+    bool validate_version_text(const std::optional<std::string>& version_text) const override;
     bool upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
     void set_auth(Http& http) const override;
@@ -126,7 +126,7 @@ private:
     bool m_show_after_message;
 
 #if 0
-    bool version_check(const boost::optional<std::string>& version_text) const;
+    bool version_check(const std::optional<std::string>& version_text) const;
 #endif
 };
 
@@ -157,7 +157,7 @@ public:
     PrintHostPostUploadActions get_post_upload_actions() const override { return {}; }
 
 protected:
-    bool validate_version_text(const boost::optional<std::string>& version_text) const override;
+    bool validate_version_text(const std::optional<std::string>& version_text) const override;
 };
 
 }

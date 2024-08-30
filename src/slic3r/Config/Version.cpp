@@ -168,7 +168,7 @@ size_t Index::load(const boost::filesystem::path &path)
 		if (key_value_pair)
 			value = left_trim(value + 1);
 		*key_end = 0;
-    	boost::optional<Semver> semver;
+    	std::optional<Semver> semver;
         if (maybe_semver)
     		semver = Semver::parse(key);
         if (key_value_pair) {

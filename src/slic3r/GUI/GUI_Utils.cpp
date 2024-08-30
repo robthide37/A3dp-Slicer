@@ -238,13 +238,13 @@ WindowMetrics WindowMetrics::from_window(wxTopLevelWindow *window)
     return res;
 }
 
-boost::optional<WindowMetrics> WindowMetrics::deserialize(const std::string &str)
+std::optional<WindowMetrics> WindowMetrics::deserialize(const std::string &str)
 {
     std::vector<std::string> metrics_str;
     metrics_str.reserve(5);
 
     if (!unescape_strings_cstyle(str, metrics_str) || metrics_str.size() != 5) {
-        return boost::none;
+        return std::nullopt;
     }
 
     int metrics[5];
@@ -253,7 +253,7 @@ boost::optional<WindowMetrics> WindowMetrics::deserialize(const std::string &str
             metrics[i] = boost::lexical_cast<int>(metrics_str[i]);
         }
     } catch(const boost::bad_lexical_cast &) {
-        return boost::none;
+        return std::nullopt;
     }
 
     if ((metrics[4] & ~1) != 0) {    // Checks if the maximized flag is 1 or 0

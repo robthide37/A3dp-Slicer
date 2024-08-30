@@ -1077,7 +1077,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         std::string m_backup_path;
         std::string m_origin_file;
         // Semantic version of Orca Slicer, that generated this 3MF.
-        boost::optional<Semver> m_bambuslicer_generator_version;
+        std::optional<Semver> m_bambuslicer_generator_version;
         unsigned int m_fdm_supports_painting_version = 0;
         unsigned int m_seam_painting_version         = 0;
         unsigned int m_mm_painting_version           = 0;
@@ -2708,7 +2708,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             preset->is_dirty = false;
 
             std::string version_str = key_values[BBL_JSON_KEY_VERSION];
-            boost::optional<Semver> version = Semver::parse(version_str);
+            std::optional<Semver> version = Semver::parse(version_str);
             if (version) {
                 //preset->version = *version; //Susi_not_impl
             } else {

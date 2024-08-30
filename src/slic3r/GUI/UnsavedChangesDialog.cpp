@@ -7,10 +7,10 @@
 #include "UnsavedChangesDialog.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 #include <boost/algorithm/string.hpp>
-#include <boost/optional.hpp>
 
 #include <wx/tokenzr.h>
 
@@ -29,7 +29,7 @@
 
 #include "PresetComboBoxes.hpp"
 
-using boost::optional;
+using std::optional;
 
 #ifdef __linux__
 #define wxLinux true

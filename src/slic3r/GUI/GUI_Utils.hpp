@@ -9,8 +9,7 @@
 #include <string>
 #include <ostream>
 #include <functional>
-
-#include <boost/optional.hpp>
+#include <optional>
 
 #include <wx/frame.h>
 #include <wx/dialog.h>
@@ -411,7 +410,7 @@ private:
     WindowMetrics() : maximized(false) {}
 public:
     static WindowMetrics from_window(wxTopLevelWindow *window);
-    static boost::optional<WindowMetrics> deserialize(const std::string &str);
+    static std::optional<WindowMetrics> deserialize(const std::string &str);
 
     const wxRect& get_rect() const { return rect; }
     bool get_maximized() const { return maximized; }

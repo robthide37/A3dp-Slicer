@@ -7,6 +7,7 @@
 #include "libslic3r/Exception.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <vector>
 #include <chrono>
@@ -18,7 +19,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
-#include <boost/optional.hpp>
 #include <boost/nowide/fstream.hpp>
 
 #if _WIN32
@@ -61,7 +61,7 @@
 	#include <asm-generic/ioctls.h>
 #endif
 
-using boost::optional;
+using std::optional;
 
 
 namespace Slic3r {
@@ -96,16 +96,16 @@ optional<std::string> sysfs_tty_prop(const std::string &tty_dev, const std::stri
 
 	std::getline(file, res);
 	if (file.good()) { return res; }
-	else { return boost::none; }
+	else { return std::nullopt; }
 }
 
 optional<unsigned long> sysfs_tty_prop_hex(const std::string &tty_dev, const std::string &name)
 {
 	auto prop = sysfs_tty_prop(tty_dev, name);
-	if (!prop) { return boost::none; }
+	if (!prop) { return std::nullopt; }
 
 	try { return std::stoul(*prop, 0, 16); }
-	catch (const std::exception&) { return boost::none; }
+	catch (const std::exception&) { return std::nullopt; }
 }
 #endif
 

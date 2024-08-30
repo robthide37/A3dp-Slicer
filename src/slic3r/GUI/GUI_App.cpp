@@ -956,7 +956,7 @@ bool GUI_App::init_opengl()
 }
 
 // gets path to PrusaSlicer.ini, returns semver from first line comment
-static boost::optional<Semver> parse_semver_from_ini(std::string path)
+static std::optional<Semver> parse_semver_from_ini(std::string path)
 {
     boost::nowide::ifstream stream(path);
     std::stringstream buffer;
@@ -964,7 +964,7 @@ static boost::optional<Semver> parse_semver_from_ini(std::string path)
     std::string body = buffer.str();
     size_t start = body.find("PrusaSlicer ");
     if (start == std::string::npos)
-        return boost::none;
+        return std::nullopt;
     body = body.substr(start + 12);
     size_t end = body.find_first_of(" \n");
     if (end < body.size())
@@ -1087,7 +1087,7 @@ std::string GUI_App::check_older_app_config(Semver current_version, bool backup)
     for (const auto& candidate : candidates) {
         if (boost::filesystem::exists(candidate)) {
             // parse
-            boost::optional<Semver>other_semver = parse_semver_from_ini(candidate.string());
+            std::optional<Semver>other_semver = parse_semver_from_ini(candidate.string());
             if (other_semver && *other_semver > last_semver) {
                 last_semver = *other_semver;
                 older_data_dir_path = candidate.parent_path().string();
@@ -1333,8 +1333,8 @@ bool GUI_App::on_init_inner()
         wxPoint splashscreen_pos = wxDefaultPosition;
         bool default_splashscreen_pos = true;
         if (app_config->has("window_mainframe") && app_config->get_bool("restore_win_position")) {
-            auto metrics = WindowMetrics::deserialize(app_config->get("window_mainframe"));
-            default_splashscreen_pos = metrics == boost::none;
+            std::optional<WindowMetrics> metrics = WindowMetrics::deserialize(app_config->get("window_mainframe"));
+            default_splashscreen_pos = metrics.has_value();
             if (!default_splashscreen_pos)
                 splashscreen_pos = metrics->get_rect().GetPosition();
         }

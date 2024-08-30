@@ -5,8 +5,8 @@
 #ifndef slic3r_AppUpdate_hpp_
 #define slic3r_AppUpdate_hpp_
 
+#include <optional>
 #include <boost/filesystem.hpp>
-#include <boost/optional.hpp>
 #include "libslic3r/Utils.hpp"
 #include "wx/event.h"
 
@@ -23,7 +23,7 @@ struct DownloadAppData
 {
 	std::string				url;
 	bool					start_after;
-	boost::optional<Semver> version;
+	std::optional<Semver> version;
 	size_t				    size;
 	boost::filesystem::path target_path;
 };

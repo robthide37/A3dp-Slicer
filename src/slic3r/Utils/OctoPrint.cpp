@@ -217,7 +217,7 @@ bool OctoPrint::test_with_resolved_ip(wxString &msg) const
                     return;
                 }
 
-                const auto text = ptree.get_optional<std::string>("text");
+                const std::optional<std::string> text = to_std_opt_str(ptree.get_optional<std::string>("text"));
                 res = validate_version_text(text);
                 if (!res) {
                     msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : name));
@@ -272,8 +272,8 @@ bool OctoPrint::test(wxString& msg) const
                 }
 
                 BOOST_LOG_TRIVIAL(info) << "text?";
-                const auto text = ptree.get_optional<std::string>("text");
-                BOOST_LOG_TRIVIAL(info) << "text="<<text;
+                const auto text = to_std_opt_str(ptree.get_optional<std::string>("text"));
+                BOOST_LOG_TRIVIAL(info) << "text="<<(text?*text:"nullptr");
                 res = validate_version_text(text);
                 BOOST_LOG_TRIVIAL(info) << "version validated=" << res;
                 if (! res) {
@@ -535,7 +535,7 @@ void OctoPrint::set_http_send(Http& http, const PrintHostUpload& upload_data) co
         .form_add_file("file", upload_data.source_path.string(), upload_filename.string());
 }
 
-bool OctoPrint::validate_version_text(const boost::optional<std::string> &version_text) const
+bool OctoPrint::validate_version_text(const std::optional<std::string> &version_text) const
 {
     return version_text ? boost::starts_with(*version_text, "OctoPrint") : true;
 }
@@ -594,7 +594,7 @@ wxString MiniDeltaLCD::get_test_failed_msg(wxString &msg) const
     return GUI::format_wxstr("%s: %s", _L("Could not connect to Monoprice lcd"), msg);
 }
 
-bool MiniDeltaLCD::validate_version_text(const boost::optional<std::string>& version_text) const
+bool MiniDeltaLCD::validate_version_text(const std::optional<std::string>& version_text) const
 {
     return version_text ? boost::starts_with(*version_text, "MiniDeltaLCD") : false;
 }
@@ -617,7 +617,7 @@ wxString SL1Host::get_test_failed_msg (wxString &msg) const
     return GUI::format_wxstr("%s: %s", _L("Could not connect to Prusa SLA"), msg);
 }
 
-bool SL1Host::validate_version_text(const boost::optional<std::string> &version_text) const
+bool SL1Host::validate_version_text(const std::optional<std::string> &version_text) const
 {
     return version_text ? boost::starts_with(*version_text, "Prusa SLA") : false;
 }
@@ -644,7 +644,7 @@ wxString PrusaLink::get_test_failed_msg(wxString& msg) const
     return GUI::format_wxstr("%s: %s", _L("Could not connect to PrusaLink"), msg);
 }
 
-bool PrusaLink::validate_version_text(const boost::optional<std::string>& version_text) const
+bool PrusaLink::validate_version_text(const std::optional<std::string>& version_text) const
 {
     return version_text ? (boost::starts_with(*version_text, "PrusaLink") || boost::starts_with(*version_text, "OctoPrint")) : false;
 }
@@ -670,7 +670,7 @@ void PrusaLink::set_auth(Http& http) const
 }
 
 #if 0
-bool PrusaLink::version_check(const boost::optional<std::string>& version_text) const
+bool PrusaLink::version_check(const std::optional<std::string>& version_text) const
 {
     // version_text is in format OctoPrint 1.2.3
     // true (= use PUT) should return: 
@@ -728,7 +728,7 @@ bool PrusaLink::test(wxString& msg) const
                     return;
                 }
 
-                const auto text = ptree.get_optional<std::string>("text");
+                const std::optional<std::string> text = to_std_opt_str(ptree.get_optional<std::string>("text"));
                 res = validate_version_text(text);
                 if (!res) {
                     msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
@@ -891,7 +891,7 @@ bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
                 return;
             }
 
-            const auto text = ptree.get_optional<std::string>("text");
+            const std::optional<std::string> text = to_std_opt_str(ptree.get_optional<std::string>("text"));
             res = validate_version_text(text);
             if (!res) {
                 msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
@@ -972,7 +972,7 @@ bool PrusaLink::test_with_resolved_ip_and_method_check(wxString& msg, bool& use_
                     return;
                 }
 
-                const auto text = ptree.get_optional<std::string>("text");
+                const std::optional<std::string> text = to_std_opt_str(ptree.get_optional<std::string>("text"));
                 res = validate_version_text(text);
                 if (!res) {
                     msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));

@@ -5,11 +5,11 @@
 #include "Search.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <regex>
 #include <string>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/optional.hpp>
 #include <boost/nowide/convert.hpp>
 
 #include "wx/dataview.h"
@@ -28,7 +28,7 @@
 
 #include "imgui/imconfig.h"
 
-using boost::optional;
+using std::optional;
 
 namespace Slic3r {
 

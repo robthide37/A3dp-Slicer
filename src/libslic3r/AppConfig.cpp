@@ -548,7 +548,8 @@ void AppConfig::init_ui_layout() {
                         ifs.open(version_path.string());
                         boost::property_tree::read_ini(ifs, tree_ini);
                         std::string name = tree_ini.get<std::string>("name");
-                        Semver version = Semver::parse(tree_ini.get<std::string>("version")).get();
+                        assert(Semver::parse(tree_ini.get<std::string>("version")));
+                        Semver version = *Semver::parse(tree_ini.get<std::string>("version"));
                         std::string description = tree_ini.get<std::string>("description");
                         name_2_version_description_path[name] = LayoutEntry(name, description, entry.path(), version);
                     }
@@ -769,8 +770,8 @@ std::string AppConfig::load(const std::string &path)
     if (ini_ver) {
         m_orig_version = *ini_ver;
         // Make 1.40.0 alphas compare well
-        ini_ver->set_metadata(boost::none);
-        ini_ver->set_prerelease(boost::none);
+        ini_ver->set_metadata(std::nullopt);
+        ini_ver->set_prerelease(std::nullopt);
         m_legacy_datadir = ini_ver < Semver(1, 40, 0, 0);
     }
 

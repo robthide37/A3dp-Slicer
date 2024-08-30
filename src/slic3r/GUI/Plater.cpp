@@ -24,13 +24,13 @@
 #include <algorithm>
 #include <chrono>
 #include <numeric>
+#include <optional>
 #include <vector>
 #include <string>
 #include <regex>
 #include <future>
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/cstdio.hpp>
-#include <boost/optional.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -144,7 +144,7 @@
 
 #include "Widgets/CheckBox.hpp"
 
-using boost::optional;
+using std::optional;
 namespace fs = boost::filesystem;
 using Slic3r::_3DScene;
 using Slic3r::Preset;

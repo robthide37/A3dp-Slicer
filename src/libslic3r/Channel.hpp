@@ -9,8 +9,8 @@
 #include <deque>
 #include <condition_variable>
 #include <mutex>
+#include <optional>
 #include <utility>
-#include <boost/optional.hpp>
 
 
 namespace Slic3r {
@@ -69,11 +69,11 @@ public:
         return item;
     }
 
-    boost::optional<T> try_pop()
+    std::optional<T> try_pop()
     {
         UniqueLock lock(m_mutex);
         if (m_queue.empty()) {
-            return boost::none;
+            return std::nullopt;
         } else {
             auto item = std::move(m_queue.front());
             m_queue.pop();

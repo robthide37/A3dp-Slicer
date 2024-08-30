@@ -6,9 +6,9 @@
 #ifndef slic3r_Moonraker_hpp_
 #define slic3r_Moonraker_hpp_
 
+#include <optional>
 #include <string>
 #include <wx/string.h>
-#include <boost/optional.hpp>
 #include <boost/asio/ip/address.hpp>
 
 #include "PrintHost.hpp"
@@ -45,7 +45,7 @@ protected:
 #ifdef WIN32
     virtual bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn, const boost::asio::ip::address& resolved_addr) const;
 #endif
-    virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;
+    virtual bool validate_version_text(const std::optional<std::string> &version_text) const;
     virtual bool upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const;
 */
     std::string m_host;

@@ -7,9 +7,9 @@
 #ifndef slic3r_AstroBox_hpp_
 #define slic3r_AstroBox_hpp_
 
+#include <optional>
 #include <string>
 #include <wx/string.h>
-#include <boost/optional.hpp>
 
 #include "PrintHost.hpp"
 
@@ -35,7 +35,7 @@ public:
     std::string get_host() const override { return host; }
     
 protected:
-    bool validate_version_text(const boost::optional<std::string> &version_text) const;
+    bool validate_version_text(const std::optional<std::string> &version_text) const;
 
 private:
     std::string host;

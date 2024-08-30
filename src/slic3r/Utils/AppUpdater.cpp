@@ -363,7 +363,7 @@ Semver get_version(const std::string &str, const std::regex &regexp) {
 	std::smatch match;
 	if (std::regex_match(str, match, regexp)) {
 		std::string version_cleaned = match[0];
-		const boost::optional<Semver> version = Semver::parse(version_cleaned);
+		const std::optional<Semver> version = Semver::parse(version_cleaned);
 		if (version.has_value()) {
 			return *version;
 		}
@@ -490,7 +490,7 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 				// release version - save and send to UI layer
 				if (data.first == "release") {
 					std::string version = data.second.data();
-					boost::optional<Semver> release_version = Semver::parse(version);
+					std::optional<Semver> release_version = Semver::parse(version);
 					if (!release_version) {
 						BOOST_LOG_TRIVIAL(error) << format("Received invalid contents from version file: Not a correct semver: `%1%`", version);
 						return;
@@ -513,10 +513,10 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 				}
 			}
 			// find recent version that is newer than last full release.
-			boost::optional<Semver> recent_version;
+			std::optional<Semver> recent_version;
 			std::string				version_string;
 			for (const std::string& ver_string : prerelease_versions) {
-				boost::optional<Semver> ver = Semver::parse(ver_string);
+				std::optional<Semver> ver = Semver::parse(ver_string);
 				if (ver && *new_data.version < *ver && ((recent_version && *recent_version < *ver) || !recent_version)) {
 					recent_version = ver;
 					version_string = ver_string;
@@ -555,7 +555,7 @@ void AppUpdater::priv::parse_version_string_old(const std::string& body) const
 		version = body.substr(0, first_nl_pos);
 	else
 		version = body;
-	boost::optional<Semver> release_version = Semver::parse(version);
+	std::optional<Semver> release_version = Semver::parse(version);
 	if (!release_version) {
 		BOOST_LOG_TRIVIAL(error) << format("Received invalid contents from `%1%`: Not a correct semver: `%2%`", SLIC3R_APP_NAME, version);
 		return;
@@ -597,9 +597,9 @@ void AppUpdater::priv::parse_version_string_old(const std::string& body) const
 		}
 	}
 	// find recent version that is newer than last full release.
-	boost::optional<Semver> recent_version;
+	std::optional<Semver> recent_version;
 	for (const std::string& ver_string : prerelease_versions) {
-		boost::optional<Semver> ver = Semver::parse(ver_string);
+		std::optional<Semver> ver = Semver::parse(ver_string);
 		if (ver && *release_version < *ver && ((recent_version && *recent_version < *ver) || !recent_version)) {
 			recent_version = ver;
 			version = ver_string;

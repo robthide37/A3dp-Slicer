@@ -9,7 +9,7 @@
 #include <cstring>
 #include <ostream>
 #include <stdexcept>
-#include <boost/optional.hpp>
+#include <optional>
 #include <boost/format.hpp>
 
 #include "semver/semver.h"
@@ -30,7 +30,7 @@ public:
 	Semver() : ver(semver_zero()) {}
 
 	Semver(int major, int minor, int counter, int patch,
-		boost::optional<const std::string&> metadata, boost::optional<const std::string&> prerelease)
+		std::optional<std::string> metadata, std::optional<std::string> prerelease)
 		: ver(semver_zero())
 	{
 		semver_free(&ver);
@@ -68,13 +68,13 @@ public:
 		parsed->ver = semver_zero();
 	}
 
-	static boost::optional<Semver> parse(const std::string &str)
+	static std::optional<Semver> parse(const std::string &str)
 	{
 		semver_t ver = semver_zero();
 		if (::semver_parse(str.c_str(), &ver) == 0) {
 			return Semver(ver);
 		} else {
-			return boost::none;
+			return std::nullopt;
 		}
 	}
 
@@ -128,7 +128,7 @@ public:
 	//void set_min(int min) { if (ver.counter_size > 1) ver.counters[1] = min; }
 	//void set_counter(int count) { if (ver.counter_size > 2) ver.counters[2] = count; }
 	//void set_patch(int patch) { if (ver.counter_size > 3) ver.counters[3] = patch; }
-    void set_metadata(boost::optional<const std::string &> meta)
+    void set_metadata(std::optional<std::string> meta)
     {
         if (ver.metadata)
             free(ver.metadata);
@@ -140,7 +140,7 @@ public:
             free(ver.metadata);
         ver.metadata = meta ? strdup(meta) : nullptr;
     }
-    void set_prerelease(boost::optional<const std::string &> pre)
+    void set_prerelease(std::optional<std::string> pre)
     {
         if (ver.prerelease)
             free(ver.prerelease);

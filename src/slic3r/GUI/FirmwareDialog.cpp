@@ -4,6 +4,7 @@
 ///|/
 #include <numeric>
 #include <algorithm>
+#include <optional>
 #include <thread>
 #include <condition_variable>
 #include <stdexcept>
@@ -11,7 +12,6 @@
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/optional.hpp>
 
 #if _WIN32
 	#include <regex>
@@ -50,7 +50,7 @@
 namespace fs = boost::filesystem;
 namespace asio = boost::asio;
 using boost::system::error_code;
-using boost::optional;
+using std::optional;
 
 
 namespace Slic3r {
@@ -547,7 +547,7 @@ void FirmwareDialog::priv::prepare_mk3()
 
 void FirmwareDialog::priv::prepare_avr109(Avr109Pid usb_pid)
 {
-	port = boost::none;
+	port = std::nullopt;
 	avr109_lookup_port(usb_pid);
 	if (! port) {
 		queue_error(_(L("The %s device could not have been found")), avr109_dev_name(usb_pid));
@@ -594,7 +594,7 @@ bool FirmwareDialog::priv::get_serial_port()
 #endif
 			port = SerialPortInfo(std::move(path_u8));
 		} else {
-			port = boost::none;
+			port = std::nullopt;
 		}
 	}
 

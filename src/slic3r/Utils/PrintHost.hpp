@@ -7,10 +7,12 @@
 #define slic3r_PrintHost_hpp_
 
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <functional>
 #include <boost/filesystem/path.hpp>
+#include <boost/optional.hpp>
 
 #include <wx/string.h>
 
@@ -42,6 +44,14 @@ struct PrintHostUpload
 
     PrintHostPostUploadAction post_action { PrintHostPostUploadAction::None };
 };
+
+inline std::optional<std::string> to_std_opt_str(const boost::optional<std::string> &str) {
+    std::optional<std::string> std_str;
+    if (str) {
+        std_str = str.get();
+    }
+    return std_str;
+}
 
 class PrintHost
 {

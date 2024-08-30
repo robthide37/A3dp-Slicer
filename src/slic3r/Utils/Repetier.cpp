@@ -41,9 +41,9 @@ const char* Repetier::get_name() const { return "Repetier"; }
 
 
 
-static wxString validate_repetier(const boost::optional<std::string>& name,
-                              const boost::optional<std::string>& soft,
-                              const boost::optional<std::string>& printers)
+static wxString validate_repetier(const std::optional<std::string>& name,
+                              const std::optional<std::string>& soft,
+                              const std::optional<std::string>& printers)
 {
     if (soft) {
         // See https://github.com/prusa3d/PrusaSlicer/issues/7807:
@@ -92,9 +92,9 @@ bool Repetier::test(wxString &msg) const
                 pt::ptree ptree;
                 pt::read_json(ss, ptree);
 
-                const auto text = ptree.get_optional<std::string>("name");
-                const auto soft = ptree.get_optional<std::string>("software");
-                const auto printers = ptree.get_optional<std::string>("printers");
+                const std::optional<std::string> text = to_std_opt_str(ptree.get_optional<std::string>("name"));
+                const std::optional<std::string> soft = to_std_opt_str(ptree.get_optional<std::string>("software"));
+                const std::optional<std::string> printers = to_std_opt_str(ptree.get_optional<std::string>("printers"));
                 wxString error_msg = validate_repetier(text, soft, printers);
                 if (! error_msg.empty()) {
                     msg = error_msg;

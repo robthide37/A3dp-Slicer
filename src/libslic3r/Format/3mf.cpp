@@ -506,7 +506,7 @@ namespace Slic3r {
         bool m_trying_read_prusa = false;
 
         // Semantic version of PrusaSlicer, that generated this 3MF.
-        boost::optional<Semver> m_prusaslicer_generator_version;
+        std::optional<Semver> m_prusaslicer_generator_version;
         unsigned int m_fdm_supports_painting_version = 0;
         unsigned int m_seam_painting_version         = 0;
         unsigned int m_mm_painting_version           = 0;
@@ -541,7 +541,7 @@ namespace Slic3r {
 
         bool load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, bool check_version);
         unsigned int version() const { return m_version; }
-        boost::optional<Semver> prusaslicer_generator_version() const { return m_prusaslicer_generator_version; }
+        std::optional<Semver> prusaslicer_generator_version() const { return m_prusaslicer_generator_version; }
 
     private:
         void _destroy_xml_parser();
@@ -3898,7 +3898,7 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
 }
 
 // Perform conversions based on the config values available.
-static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config, const boost::optional<Semver>& prusaslicer_generator_version)
+static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config, const std::optional<Semver>& prusaslicer_generator_version)
 {
     // SuSi: don't do that. It's hidden behavior.
     //if (! config.has("brim_separation")) {
