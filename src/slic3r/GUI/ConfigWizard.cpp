@@ -2877,6 +2877,7 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 	// which is compatible with it.
     const auto printer_models_missing_materials = [this, only_for_model_id](PrinterTechnology technology, const std::string &section, bool no_templates)
     {
+        assert((technology & ptAny) != ptAny); // check tech has been chosen
 		const std::map<std::string, std::string> &appconfig_presets = appconfig_new.has_section(section) ? appconfig_new.get_section(section) : std::map<std::string, std::string>();
     	std::set<const VendorProfile::PrinterModel*> printer_models_without_material;
         for (const auto &pair : bundles) {
@@ -3040,7 +3041,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;
-#ifdef ALLOW_PRUSA_FIRST
     auto get_preferred_printer_technology = 
             [enabled_vendors, enabled_vendors_old, suppress_sla_printer]
             (const std::string& bundle_name, const Bundle& bundle) {
@@ -3071,11 +3071,15 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         }
         return ptAny;
     };
+#ifdef ALLOW_PRUSA_FIRST
     // Prusa printers are considered first, then 3rd party.
     if (preferred_pt = get_preferred_printer_technology(ALLOW_PRUSA_FIRST, bundles.prusa_bundle());
         preferred_pt == ptAny || (preferred_pt == ptSLA && suppress_sla_printer)) {
+#endif
         for (const auto& bundle : bundles) {
+#ifdef ALLOW_PRUSA_FIRST
             if (bundle.second.is_prusa_bundle) { continue; }
+#endif
             if (PrinterTechnology pt = get_preferred_printer_technology(bundle.first, bundle.second); pt == ptAny)
                 continue;
             else if (preferred_pt == ptAny)
@@ -3083,6 +3087,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
             if(!(preferred_pt == ptAny || (preferred_pt == ptSLA && suppress_sla_printer)))
                 break;
         }
+#ifdef ALLOW_PRUSA_FIRST
     }
 #endif
     if (preferred_pt == ptSLA && !wxGetApp().may_switch_to_SLA_preset(caption))
@@ -3191,7 +3196,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         for (const auto& model : bundle.vendor_profile->models) {
             if (const auto model_it = config->second.find(model.id);
                 model_it != config->second.end() && model_it->second.size() > 0 &&
-                preferred_pt == model.technology) {
+                (preferred_pt & model.technology) != 0) {
                 variant = *model_it->second.begin();
                 const auto config_old = enabled_vendors_old.find(bundle_name);
                 if (config_old == enabled_vendors_old.end())
@@ -3216,12 +3221,16 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     // Prusa printers are considered first, then 3rd party.
     if (preferred_model = get_preferred_printer_model("PrusaResearch", bundles.prusa_bundle(), preferred_variant);
         preferred_model.empty()) {
+#endif
         for (const auto& bundle : bundles) {
+#ifdef ALLOW_PRUSA_FIRST
             if (bundle.second.is_prusa_bundle) { continue; }
+#endif
             if (preferred_model = get_preferred_printer_model(bundle.first, bundle.second, preferred_variant);
                 !preferred_model.empty())
                     break;
         }
+#ifdef ALLOW_PRUSA_FIRST
     }
 #endif
     // if unsaved changes was not cheched till this moment

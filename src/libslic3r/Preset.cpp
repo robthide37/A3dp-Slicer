@@ -1707,13 +1707,13 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
         if (selected)
             preset_selected.is_compatible = preset_edited.is_compatible;
         if (preset_edited.vendor && preset_edited.vendor->templates_profile) {
-            if (preset_selected.is_visible)
+            if (preset_selected.is_visible) {
                 indices_of_template_presets.push_back(idx_preset);
-            else {
+            } else {
                 preset_selected.is_compatible = false;
                 if (selected)
                     m_idx_selected = size_t(-1);
-    }
+            }
         }
     }
     // filter out template profiles where profile with same alias and compability exists
