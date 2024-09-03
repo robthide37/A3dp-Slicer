@@ -638,9 +638,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
 }
 
 ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &params,
-                                                            const Polyline &                      loop_polygons,
-                                                            const ExtrusionRole                   role,
-                                                            const bool                            is_external) const
+                                                            const Polyline &loop_polygons,
+                                                            const ExtrusionRole role,
+                                                            const bool is_external) const
 {
 #if _DEBUG
     for (size_t idx = 1; idx < loop_polygons.size(); ++idx)
@@ -918,6 +918,24 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
     if(!paths.empty())
         chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
 
+    
+    {
+        static int isaqsdsdfsdfqzfn = 0;
+        std::stringstream stri;
+        stri << params.layer->id() << "_overhangs_before_" << isaqsdsdfsdfqzfn++ << ".svg";
+        SVG svg(stri.str());
+        svg.draw(Polygon(loop_polygons.points), "blue");
+        for (ExtrusionPath &p : paths) {
+            std::string color = "grey";
+            if(p.height() == 0) color = "orange";
+            else if(p.height() == 1) color = "brown";
+            else if(p.height() == 2) color = "yellow";
+            else if(p.height() == 3) color = "cyan";
+            else if(p.height() == 4) color = "blue";
+            svg.draw(p.polyline.to_polyline(), color);
+        }
+        svg.Close();
+    }
     //bool has_normal = !ok_polylines.empty();
     //bool has_speed = !small_speed.empty() || !big_speed.empty();
     //bool has_flow = !small_flow.empty() || !big_flow.empty();
@@ -1146,6 +1164,24 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_classic(const Parameters &pa
         }
     }
 #endif
+    
+    {
+        static int isaqsdsdfsdfqzfn = 0;
+        std::stringstream stri;
+        stri << params.layer->id() << "_overhangs_after_" << isaqsdsdfsdfqzfn++ << ".svg";
+        SVG svg(stri.str());
+        svg.draw(Polygon(loop_polygons.points), "blue");
+        for (ExtrusionPath &p : paths) {
+            std::string color = "grey";
+            if(p.height() == 0) color = "orange";
+            else if(p.height() == 1) color = "brown";
+            else if(p.height() == 2) color = "yellow";
+            else if(p.height() == 3) color = "cyan";
+            else if(p.height() == 4) color = "blue";
+            svg.draw(p.polyline.to_polyline(), color);
+        }
+        svg.Close();
+    }
 
     return paths;
 }
