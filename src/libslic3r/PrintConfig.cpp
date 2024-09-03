@@ -402,8 +402,8 @@ PrintConfigDef::PrintConfigDef()
     this->init_common_params();
     //assign params that are not already allocated to FFF+SLA (default from slic3rPE)
     assign_printer_technology_to_unknown(this->options, ptFFF | ptSLA);
-    this->init_fff_params();
     this->init_extruder_option_keys();
+    this->init_fff_params();
     assign_printer_technology_to_unknown(this->options, ptFFF);
     this->init_sla_params();
     assign_printer_technology_to_unknown(this->options, ptSLA);
@@ -7018,21 +7018,25 @@ void PrintConfigDef::init_fff_params()
     /////// End of Arachne settings /////
 
     // Declare retract values for filament profile, overriding the printer's extruder profile.
-    for (const char *opt_key : {
-        // floats
-        "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", 
-        "travel_max_lift",
-        "deretract_speed", "retract_restart_extra", "retract_before_travel", "retract_lift_before_travel",
-        "retract_length_toolchange", "retract_restart_extra_toolchange",
-        "wipe_extra_perimeter", "wipe_speed",
-        "wipe_inside_depth", "wipe_inside_end", "wipe_inside_start",
-        // bools
-        "retract_layer_change", "wipe", "wipe_only_crossing",
-        "travel_lift_before_obstacle", "travel_ramping_lift", "travel_slope",
-        // percents
-        "retract_before_wipe", "travel_slope",
-        // floatsOrPercents
-        "seam_gap"}) {
+    for (const std::string &opt_key : m_filament_override_option_keys
+        //{
+        //// floats
+        //"retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", 
+        //"travel_max_lift",
+        //"deretract_speed", "retract_restart_extra", "retract_before_travel", "retract_lift_before_travel",
+        //"retract_length_toolchange", "retract_restart_extra_toolchange",
+        //"wipe_extra_perimeter", "wipe_speed",
+        //"wipe_inside_depth", "wipe_inside_end", "wipe_inside_start",
+        //// bools
+        //"retract_layer_change", "wipe", "wipe_only_crossing",
+        //"travel_lift_before_obstacle", "travel_ramping_lift", "travel_slope",
+        //// percents
+        //"retract_before_wipe", "travel_slope",
+        //// floatsOrPercents
+        //"seam_gap"
+        //}
+
+        ) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
         def = this->add(std::string("filament_") + opt_key, it_opt->second.type);
@@ -7153,6 +7157,33 @@ void PrintConfigDef::init_extruder_option_keys()
         "wipe_speed",
     };
     assert(std::is_sorted(m_extruder_retract_keys.begin(), m_extruder_retract_keys.end()));
+    m_filament_override_option_keys = {
+        "deretract_speed",
+        "retract_before_travel",
+        "retract_before_wipe",
+        "retract_layer_change",
+        "retract_length",
+        "retract_length_toolchange",
+        "retract_lift",
+        "retract_lift_above",
+        "retract_lift_before_travel",
+        "retract_lift_below",
+        "retract_restart_extra",
+        "retract_restart_extra_toolchange",
+        "retract_speed",
+        "seam_gap",
+        "travel_lift_before_obstacle",
+        "travel_max_lift",
+        "travel_ramping_lift",
+        "travel_slope",
+        "wipe",
+        "wipe_extra_perimeter",
+        "wipe_inside_depth",
+        "wipe_inside_end",
+        "wipe_inside_start",
+        "wipe_only_crossing",
+        "wipe_speed",
+    };
 }
 
 void PrintConfigDef::init_milling_params()
@@ -7484,6 +7515,22 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
 void PrintConfigDef::init_sla_params()
 {
+    m_material_overrides_option_keys = {
+        "branchingsupport_head_front_diameter",
+        "branchingsupport_head_penetration",
+        "branchingsupport_head_width",
+        "branchingsupport_pillar_diameter",
+        "first_layer_size_compensation",
+        "relative_correction_x",
+        "relative_correction_y",
+        "relative_correction_z",
+        "support_head_front_diameter",
+        "support_head_penetration",
+        "support_head_width",
+        "support_pillar_diameter",
+        "support_points_density_relative",
+    };
+
     ConfigOptionDef* def;
 
     // SLA Printer settings
@@ -8087,17 +8134,7 @@ void PrintConfigDef::init_sla_params()
     def->set_default_value(new ConfigOptionFloat(0.001));
 
     // Declare retract values for material profile, overriding the print and printer profiles.
-    for (const char* opt_key : {
-        // float
-        "support_head_front_diameter", "branchingsupport_head_front_diameter", 
-        "support_head_penetration", "branchingsupport_head_penetration", 
-        "support_head_width", "branchingsupport_head_width",
-        "support_pillar_diameter", "branchingsupport_pillar_diameter",
-        "relative_correction_x", "relative_correction_y", "relative_correction_z", 
-        "first_layer_size_compensation",
-        // int
-        "support_points_density_relative"
-        }) {
+    for (const std::string &opt_key : m_material_overrides_option_keys) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
         def = this->add(std::string("material_ow_") + opt_key, it_opt->second.type);
@@ -8110,7 +8147,10 @@ void PrintConfigDef::init_sla_params()
         def->min  = it_opt->second.min;
         def->max  = it_opt->second.max;
         def->mode = it_opt->second.mode;
-        def->set_default_value(it_opt->second.default_value->clone());
+        ConfigOption *default_opt = it_opt->second.default_value->clone();
+        default_opt->set_can_be_disabled(true);
+        def->set_default_value(default_opt);
+        assert(!def->default_value->is_enabled());
     }
 }
 
@@ -8475,12 +8515,14 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     //nil-> disabled
     if (value.find("nil") != std::string::npos) {
         const ConfigOptionDef *def = print_config_def.get(opt_key);
-        assert(def && def->can_be_disabled);
-        if (def && def->can_be_disabled) {
-            ConfigOption *default_opt = def->default_value->clone();
-            default_opt->set_enabled(false);
-            value = default_opt->serialize();
-            delete default_opt;
+        if (def->type != coString && def->type != coStrings) {
+            assert(def && def->can_be_disabled);
+            if (def && def->can_be_disabled) {
+                ConfigOption *default_opt = def->default_value->clone();
+                default_opt->set_enabled(false);
+                value = default_opt->serialize();
+                delete default_opt;
+            }
         }
     }
 }
@@ -8755,6 +8797,8 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
     if ("fill_pattern" == opt_key && "alignedrectilinear" == value) {
         value = "rectilinear";
         output["fill_angle_increment"] = "90";
+    } else if ("alignedrectilinear" == value) {
+        value = "rectilinear";
     }
     if ("fan_always_on" == opt_key) {
         //min_fan_speed is already converted to default_fan_speed, just has to deactivate it if not always_on
@@ -9400,8 +9444,11 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         value = boost::lexical_cast<std::string>(all_conf.option<ConfigOptionPercent>("bridge_flow_ratio")->get_abs_value(1));
     } else if ("overhangs_width" == opt_key) {
         opt_key = "overhangs";
-        if (value != "0")
+        if ((!value.empty() && value.front() == '!') || all_conf.is_enabled("overhangs_width_speed")) {
+            value = "0";
+        } else {
             value = "1";
+        }
     } else if ("support_material_contact_distance_top" == opt_key) {
         opt_key = "support_material_contact_distance";
         //default : get the top value or 0.2 if a %
@@ -9548,6 +9595,33 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
             assert(size.find('/') == std::string::npos);
             value = value + coma + size + std::string("/") + format;
             coma = ",";
+        }
+    }
+
+    // disabled
+    if (!value.empty() && value.front() == '!') {
+        // ----- -1 -> disabled -----
+        static const std::set<t_config_option_key> minus_1_is_disabled = {"overhangs_bridge_threshold",
+              "overhangs_bridge_upper_layers", "perimeters_hole", "support_material_bottom_interface_layers"};
+        // ---- filament override ------
+        if (boost::starts_with(opt_key, "filament_") != std::string::npos) {
+            std::string extruder_key = opt_key.substr(strlen("filament_"));
+            if (print_config_def.filament_override_option_keys().find(extruder_key) !=
+                print_config_def.filament_override_option_keys().end()) {
+                value = "nil";
+            }
+        }
+        if (boost::starts_with(opt_key, "material_ow_") != std::string::npos) {
+            std::string normal_key = opt_key.substr(strlen("material_ow_"));
+            if (print_config_def.material_overrides_option_keys().find(opt_key) !=
+                print_config_def.material_overrides_option_keys().end()) {
+                value = "nil";
+            }
+        }
+        if ("idle temperature" == opt_key) {
+            value = "nil";
+        } else if (minus_1_is_disabled.find(opt_key) != minus_1_is_disabled.end()) {
+            value = "-1";
         }
     }
 

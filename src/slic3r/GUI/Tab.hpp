@@ -600,7 +600,7 @@ protected:
     void            create_extruder_combobox();
 	void 			update_volumetric_flow_preset_hints();
 
-    std::map<std::string, wxWindow*> m_overrides_options;
+    //std::map<std::string, wxWindow*> m_overrides_options;
 public:
 	TabFilament(wxBookCtrlBase* parent) :
 		Tab(parent, _(L("Filament Settings")), Slic3r::Preset::TYPE_FFF_FILAMENT) {}
@@ -679,7 +679,7 @@ public:
 	size_t		m_sys_milling_count = 0;
 	size_t		m_cache_milling_count = 0;
 
-    PrinterTechnology               m_printer_technology = ptFFF;
+    PrinterTechnology               m_printer_technology = ptFFF | ptSLA;
 
     TabPrinter(wxBookCtrlBase* parent) :
         Tab(parent, _L("Printer Settings"), Slic3r::Preset::TYPE_PRINTER) {}
@@ -705,7 +705,7 @@ public:
 	void		build_unregular_pages(bool from_initial_build = false);
 	void		on_preset_loaded() override;
 	void		init_options_list() override;
-	PrinterTechnology get_printer_technology() const override { return ptFFF | ptSLA; }
+	PrinterTechnology get_printer_technology() const override { assert((m_printer_technology & (ptFFF | ptSLA)) != 0); return m_printer_technology; }
 
 	wxSizer*	create_bed_shape_widget(wxWindow* parent);
 	void		cache_extruder_cnt(const DynamicPrintConfig* config = nullptr);
@@ -715,11 +715,11 @@ public:
 
 class TabSLAMaterial : public Tab
 {
-	void		create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key);
-	void		update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, bool is_checked = true);
+	//void		create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key);
+	//void		update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, bool is_checked = true);
 	void		update_material_overrides_page();
 
-	std::map<std::string, wxWindow*> m_overrides_options;
+	//std::map<std::string, wxWindow*> m_overrides_options;
 public:
     TabSLAMaterial(wxBookCtrlBase* parent) :
 		Tab(parent, _(L("Material Settings")), Slic3r::Preset::TYPE_SLA_MATERIAL) {}

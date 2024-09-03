@@ -356,12 +356,14 @@ public:
 
     // Array options growing with the number of extruders
     const std::vector<std::string>& extruder_option_keys() const { return m_extruder_option_keys; }
+    const std::set<std::string>&    filament_override_option_keys() const { return m_filament_override_option_keys; }
     // Options defining the extruder retract properties. These keys are sorted lexicographically.
     // The extruder retract keys could be overidden by the same values defined at the Filament level
     // (then the key is further prefixed with the "filament_" prefix).
     const std::vector<std::string>& extruder_retract_keys() const { return m_extruder_retract_keys; }
     // Array options growing with the number of milling cutters
     const std::vector<std::string>& milling_option_keys() const { return m_milling_option_keys; }
+    const std::set<std::string>&    material_overrides_option_keys() const { return m_material_overrides_option_keys; }
 
 private:
     void init_common_params();
@@ -372,8 +374,10 @@ private:
     void init_milling_params();
 
     std::vector<std::string>    m_extruder_option_keys;
+    std::set<std::string>       m_filament_override_option_keys;
     std::vector<std::string>    m_extruder_retract_keys;
     std::vector<std::string>    m_milling_option_keys;
+    std::set<std::string>       m_material_overrides_option_keys;
 };
 
 
