@@ -103,12 +103,16 @@ ToolOrdering::ToolOrdering(const PrintObject &object, uint16_t first_extruder, b
 
     // Initialize the print layers for just a single object.
     {
-        std::vector<coordf_t> zs;
+        std::vector<double> zs;
         zs.reserve(zs.size() + object.layers().size() + object.support_layers().size());
-        for (auto layer : object.layers())
+        for (auto layer : object.layers()) {
             zs.emplace_back(layer->print_z);
-        for (auto layer : object.support_layers())
-            zs.emplace_back(layer->print_z);
+        }
+        for (auto layer : object.support_layers()) {
+            if (layer->has_extrusions()) {
+                zs.emplace_back(layer->print_z);
+            }
+        }
         this->initialize_layers(zs);
     }
     double max_layer_height = calc_max_layer_height(object.print()->config(), object.config().layer_height);
@@ -136,20 +140,25 @@ ToolOrdering::ToolOrdering(const Print &print, uint16_t first_extruder, bool pri
     coordf_t object_bottom_z = 0.;
     coordf_t max_layer_height = 0.;
     {
-        std::vector<coordf_t> zs;
-        for (auto object : print.objects()) {
+        std::vector<double> zs;
+        for (const PrintObject *object : print.objects()) {
             zs.reserve(zs.size() + object->layers().size() + object->support_layers().size());
-            for (auto layer : object->layers())
+            for (auto layer : object->layers()) {
                 zs.emplace_back(layer->print_z);
-            for (auto layer : object->support_layers())
-                zs.emplace_back(layer->print_z);
+            }
+            for (auto layer : object->support_layers()) {
+                if (layer->has_extrusions()) {
+                    zs.emplace_back(layer->print_z);
+                }
+            }
 
             // Find first object layer that is not empty and save its print_z
-            for (const Layer* layer : object->layers())
+            for (const Layer *layer : object->layers()) {
                 if (layer->has_extrusions()) {
                     object_bottom_z = layer->print_z - layer->height;
                     break;
                 }
+            }
 
             max_layer_height = std::max(max_layer_height, object->config().layer_height.value);
         }
@@ -237,6 +246,8 @@ void ToolOrdering::collect_extruders(
 ) {
     // Collect the support extruders.
     for (auto support_layer : object.support_layers()) {
+        if(!support_layer->has_extrusions())
+            continue;
         LayerTools   &layer_tools = this->tools_for_layer(support_layer->print_z);
         ExtrusionRole role = support_layer->support_fills.role();
         bool         has_support        = role == ExtrusionRole::Mixed || role == ExtrusionRole::SupportMaterial;

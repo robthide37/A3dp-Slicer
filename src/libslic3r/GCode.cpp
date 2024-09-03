@@ -1327,11 +1327,16 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             zs.reserve(object->layers().size());
             zs_with_supp.reserve(object->layers().size() + object->support_layers().size());
             for (auto layer : object->layers()) {
+                if (layer->has_extrusions()) {
                 zs.push_back(layer->print_z);
                 zs_with_supp.push_back(layer->print_z);
             }
-            for (auto layer : object->support_layers())
+            }
+            for (auto layer : object->support_layers()) {
+                if (layer->has_extrusions()) {
                 zs_with_supp.push_back(layer->print_z);
+                }
+            }
             std::sort(zs.begin(), zs.end());
             std::sort(zs_with_supp.begin(), zs_with_supp.end());
             m_layer_with_support_count += (uint32_t)(object->instances().size()
@@ -1340,22 +1345,40 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         }
     } else {
         // Print all objects with the same print_z together.
-        std::vector<coordf_t> zs;
-        std::vector<coordf_t> zs_with_supp;
+        std::vector<coord_t> zs;
+        std::vector<coord_t> zs_with_supp;
         for (auto object : print.objects()) {
             zs.reserve(zs.size() + object->layers().size());
             zs_with_supp.reserve(zs.size() + object->layers().size() + object->support_layers().size());
             for (auto layer : object->layers()) {
-                zs.push_back(layer->print_z);
-                zs_with_supp.push_back(layer->print_z);
+                if (layer->has_extrusions()) {
+                    zs.push_back(scale_t(layer->print_z));
+                    zs_with_supp.push_back(scale_t(layer->print_z));
             }
-            for (auto layer : object->support_layers())
-                zs_with_supp.push_back(layer->print_z);
+        }
+            for (auto layer : object->support_layers()) {
+                if (layer->has_extrusions()) {
+                    zs_with_supp.push_back(scale_t(layer->print_z));
+                }
+            }
         }
         std::sort(zs.begin(), zs.end());
         std::sort(zs_with_supp.begin(), zs_with_supp.end());
+#ifdef _DEBUGINFO
+        auto end_it = std::unique(zs.begin(), zs.end());
+        for (auto it = zs.begin(); it != end_it; ++it) {
+            m_layers_z.push_back(*it);
+        }
+        m_layer_count = (uint32_t)(end_it - zs.begin());
+        end_it = std::unique(zs_with_supp.begin(), zs_with_supp.end());
+        for (auto it = zs_with_supp.begin(); it != end_it; ++it) {
+            m_layers_with_supp_z.push_back(*it);
+        }
+        m_layer_with_support_count = (uint32_t)(end_it - zs_with_supp.begin());
+#else
         m_layer_count = (uint32_t)(std::unique(zs.begin(), zs.end()) - zs.begin());
         m_layer_with_support_count = (uint32_t)(std::unique(zs_with_supp.begin(), zs_with_supp.end()) - zs_with_supp.begin());
+#endif
     }
      this->m_throw_if_canceled();
 
@@ -1539,9 +1562,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         // Order object instances using a nearest neighbor search.
         print_object_instances_ordering = chain_print_object_instances(print);
         // prusaslicer replaced the previous m_layer_count set by `m_layer_count=tool_ordering.layer_tools().size()` here
-        assert(object_layer_count() == tool_ordering.layer_tools().size() ||
-               m_layer_with_support_count == tool_ordering.layer_tools().size() ||
-               m_layer_with_support_count == tool_ordering.layer_tools().size() + 1);
+        assert(layer_count() == tool_ordering.layer_tools().size());
     }
     if (initial_extruder_id == (uint16_t)-1) {
         // Nothing to print!

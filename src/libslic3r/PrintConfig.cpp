@@ -9604,14 +9604,14 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         static const std::set<t_config_option_key> minus_1_is_disabled = {"overhangs_bridge_threshold",
               "overhangs_bridge_upper_layers", "perimeters_hole", "support_material_bottom_interface_layers"};
         // ---- filament override ------
-        if (boost::starts_with(opt_key, "filament_") != std::string::npos) {
+        if (boost::starts_with(opt_key, "filament_")) {
             std::string extruder_key = opt_key.substr(strlen("filament_"));
             if (print_config_def.filament_override_option_keys().find(extruder_key) !=
                 print_config_def.filament_override_option_keys().end()) {
                 value = "nil";
             }
         }
-        if (boost::starts_with(opt_key, "material_ow_") != std::string::npos) {
+        if (boost::starts_with(opt_key, "material_ow_")) {
             std::string normal_key = opt_key.substr(strlen("material_ow_"));
             if (print_config_def.material_overrides_option_keys().find(opt_key) !=
                 print_config_def.material_overrides_option_keys().end()) {
