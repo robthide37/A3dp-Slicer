@@ -2521,14 +2521,23 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             lines.erase(lines.begin() + i);
             --i;
             continue;
+        } else if (line_len < SCALED_EPSILON) {
+            assert(i == 0);
+            //erase second point
+            if (lines.size() > 1) {
+                lines[1].a = lines.front().a;
+                lines[1].a_width = lines.front().a_width;
+            }
+            lines.erase(lines.begin());
+            --i;
         } else if (thickness_delta > 0) {
             //set width as a middle-ground
             line.a_width = (line.a_width + line.b_width) / 2;
             line.b_width = line.a_width;
-            assert(line.a.distance_to(line.b) > SCALED_EPSILON);
+            assert(!line.a.coincides_with_epsilon(line.b));
         } else {
             assert(line.a_width == line.b_width);
-            assert(line.a.distance_to(line.b) > SCALED_EPSILON);
+            assert(!line.a.coincides_with_epsilon(line.b));
         }
     }
     

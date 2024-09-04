@@ -4669,7 +4669,7 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
 #if _DEBUG
             LoopAssertVisitor loop_assert_visitor;
             searcher.search_result.loop->visit(loop_assert_visitor);
-            ExtrusionLoop orig_loop = *searcher.search_result.loop;
+            const ExtrusionLoop orig_loop = *searcher.search_result.loop;
 #endif
             if (!searcher.search_result.from_start)
                 tw.reverse();
@@ -4680,62 +4680,60 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
             //we have to create 3 paths: 1: thinwall extusion, 2: thinwall return, 3: end of the path
             //create new path : end of the path
             ArcPolyline poly_after;
-            poly_after.append(point);
             ArcPolyline first_part;
-            //poly_after.points.insert(poly_after.points.end(),
-            //    searcher.search_result.path->polyline.get_points().begin() + searcher.search_result.idx_line + 1,
-            //    searcher.search_result.path->polyline.get_points().end());
-            //searcher.search_result.path->polyline.set_points().erase(
-            //    searcher.search_result.path->polyline.set_points().begin() + searcher.search_result.idx_line + 1,
-            //    searcher.search_result.path->polyline.set_points().end());
+            assert(searcher.search_result.path->polyline.length() > SCALED_EPSILON);
             searcher.search_result.path->polyline.split_at_index(searcher.search_result.idx_line, first_part, poly_after);
-            
-            size_t idx_path_before = searcher.search_result.idx_path;
-            size_t idx_path_to_add = idx_path_before + 1;
-            //check if the first part of the split polyline is long enough.
-            assert(!searcher.search_result.loop->paths[idx_path_before].empty());
-            if (searcher.search_result.loop->paths[idx_path_before].length() 
-                + searcher.search_result.loop->paths[idx_path_before].polyline.back().distance_to(point) < SCALED_EPSILON) {
-                //not long enough, move point to first point and destroy it
-                assert(!searcher.search_result.loop->paths[idx_path_before].empty());
-                point = searcher.search_result.loop->paths[idx_path_before].first_point();
-                searcher.search_result.loop->paths.erase(searcher.search_result.loop->paths.begin() + idx_path_before);
-                idx_path_to_add = idx_path_before;
-                idx_path_before--;
-            } else {
-                //long enough
-                if (!searcher.search_result.loop->paths[idx_path_before].polyline.back().coincides_with_epsilon(point)) {
-                    // add the point to previous path
-                    searcher.search_result.loop->paths[idx_path_before].polyline.append(point);
-                } else {
-                    //point too near of the start, just move the point
-                    point                     = searcher.search_result.loop->paths[idx_path_before].polyline.back();
-                    poly_after.set_front(point);
-                }
-            }
+            first_part.append(point);
+            poly_after.append_before(point);
             // remove next point if too near to point for the poly_after
             if (poly_after.size() > 1 && poly_after.front().coincides_with_epsilon(poly_after.get_point(1))) {
                 Point pt_front = poly_after.front();
                 poly_after.pop_front();
                 poly_after.set_front(pt_front);
             }
+            // same for first_part
+            if (first_part.size() > 1 && first_part.back().coincides_with_epsilon(first_part.get_point(first_part.size() - 2))) {
+                Point pt_back = first_part.back();
+                first_part.pop_back();
+                first_part.set_back(pt_back);
+            }
+            assert(first_part.size() == 2 || first_part.is_valid());
+            assert(poly_after.size() == 2 || poly_after.is_valid());
+
+            size_t idx_path_before = searcher.search_result.idx_path;
+            size_t idx_path_to_add = idx_path_before + 1;
+            //check if the first part of the split polyline is long enough.
+            assert(!first_part.empty());
+            bool point_moved = false;
+            if (first_part.size() <= 1 || first_part.length() < SCALED_EPSILON) {
+                assert(first_part.size() == 2);
+                assert(searcher.search_result.loop->paths.size() > 1);
+                //not long enough, move point to first point and destroy it
+                assert(!searcher.search_result.loop->paths[idx_path_before].empty());
+                point = searcher.search_result.loop->paths[idx_path_before].last_point();
+                assert(first_part.front().coincides_with_epsilon(poly_after.back()));
+                poly_after.set_front(first_part.front());
+                first_part.clear();
+                point_moved = true;
+            } else {
+                //long enough
+                assert(first_part.front() == searcher.search_result.loop->paths[idx_path_before].polyline.front());
+                assert(first_part.back() == point);
+                searcher.search_result.loop->paths[idx_path_before].polyline = first_part;
+            }
             assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].size() >= 2);
             assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].length() > SCALED_EPSILON);
             // check if poly_after is big enough to be added
             if (poly_after.size() <= 1 || poly_after.length()  < SCALED_EPSILON) {
-                //if there is a path after it, then move a little bit the first point
-                if (searcher.search_result.loop->paths.size() > idx_path_to_add) {
-                    assert(searcher.search_result.loop->paths[idx_path_to_add].first_point().coincides_with_epsilon(point));
-                    searcher.search_result.loop->paths[idx_path_to_add].polyline.set_front(point);
-                    // set return point, to move our return point
-                    poly_after.clear();
-                    poly_after.append(point);//points.push_back(point);
-                } else {
-                    //use last point as the end pos
-                    Point end_pt = poly_after.back();
-                    poly_after.clear();
-                    poly_after.append(end_pt);//.points.push_back(end_pt);
-                }
+                assert(poly_after.size() == 2);
+                assert(!point_moved);
+                //use last point as the end pos
+                assert(searcher.search_result.loop->paths[idx_path_before].polyline.back() != poly_after.back());
+                assert(searcher.search_result.loop->paths[idx_path_before].polyline.back().coincides_with_epsilon(poly_after.back()));
+                searcher.search_result.loop->paths[idx_path_before].polyline.set_back(poly_after.back());
+                point = poly_after.back();
+                poly_after.clear();
+                point_moved = true;
             } else {
                 assert(poly_after.length() > SCALED_EPSILON);
                 searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add, 
@@ -4743,8 +4741,11 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
             }
             assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].polyline.size() > 1);
             assert(poly_after.size() > 0);
+#if _DEBUG
+            searcher.search_result.loop->visit(loop_assert_visitor);
+#endif
             
-            //create thin wall path exttrusion
+            //create thin wall path extrusion
             ExtrusionEntityCollection tws;
             tws.append(Geometry::thin_variable_width({tw}, ExtrusionRole::ThinWall, params.ext_perimeter_flow,
                                                      std::max(params.ext_perimeter_flow.scaled_width() / 10,
@@ -4752,6 +4753,7 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
                                                      false));
             assert(!tws.entities().empty());
 #if _DEBUG
+            searcher.search_result.loop->visit(loop_assert_visitor);
             tws.visit(loop_assert_visitor);
 #endif
             ChangeFlow change_flow(std::max(scale_t(params.print_config.resolution.value), SCALED_EPSILON));
