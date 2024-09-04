@@ -9444,7 +9444,7 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         value = boost::lexical_cast<std::string>(all_conf.option<ConfigOptionPercent>("bridge_flow_ratio")->get_abs_value(1));
     } else if ("overhangs_width" == opt_key) {
         opt_key = "overhangs";
-        if ((!value.empty() && value.front() == '!') || all_conf.is_enabled("overhangs_width_speed")) {
+        if ((!value.empty() && value.front() == '!') || !all_conf.is_enabled("overhangs_width_speed")) {
             value = "0";
         } else {
             value = "1";
