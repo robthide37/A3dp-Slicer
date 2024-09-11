@@ -58,10 +58,10 @@ TriangleMesh mesh(TestMesh m, Vec3f translate, double scale = 1.0);
 
 /// Templated function to see if two values are equivalent (+/- epsilon)
 template <typename T>
-bool _equiv(const T& a, const T& b) { return abs(a - b) < Slic3r::Geometry::epsilon; }
+bool _equiv(const T& a, const T& b) { return abs(a - b) < EPSILON; }
 
 template <typename T>
-bool _equiv(const T& a, const T& b, double epsilon) { return abs(a - b) < epsilon; }
+bool _equiv(const T& a, const T& b, double epsilon) { return abs(a - b) < EPSILON; }
 
 //Slic3r::Model model(const std::string& model_name, TestMesh m, Vec3f translate = Vec3f(0,0,0), Vec3f scale = Vec3f(1.0,1.0,1.0));
 //Slic3r::Model model(const std::string& model_name, TestMesh m, Vec3f translate = Vec3f(0,0,0), double scale = 1.0);

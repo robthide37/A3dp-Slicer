@@ -133,7 +133,8 @@ Polygons Polygon::simplify(double tolerance) const
     Points points = this->points;
     points.push_back(points.front());
     Polygon p(MultiPoint::douglas_peucker(points, tolerance));
-    p.points.pop_back();
+    // last point remove in polygon contructor
+    assert(!p.front().coincides_with_epsilon(p.back()));
     
     Polygons pp;
     pp.push_back(p);
@@ -772,6 +773,7 @@ static inline void simplify_polygon_impl(const Points &points, double tolerance,
 {
     Points simplified = MultiPoint::douglas_peucker(points, tolerance);
     // then remove the last (repeated) point.
+    assert(simplified.front().coincides_with_epsilon(simplified.back()));
     simplified.pop_back();
     // Simplify the decimated contour by ClipperLib.
     bool ccw = ClipperLib::Area(simplified) > 0.;

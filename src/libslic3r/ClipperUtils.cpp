@@ -128,6 +128,10 @@ namespace ClipperUtils {
                 // the edge possibly cuts corner of the bounding box.
                 (sides_prev & sides_this & sides_next) == 0)
                 out.emplace_back(src.back());
+        // hack bugfix https://github.com/prusa3d/PrusaSlicer/issues/13356
+        if(out.size() < 3)
+            out.clear();
+        assert(out.size() > 2 || out.empty());
     }
 
     void clip_clipper_polygon_with_subject_bbox(const Points &src, const BoundingBox &bbox, Points &out)

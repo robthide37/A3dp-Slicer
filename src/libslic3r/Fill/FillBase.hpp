@@ -221,16 +221,7 @@ protected:
 
     double compute_unscaled_volume_to_fill(const Surface* surface, const FillParams& params) const;
 
-    ExtrusionRole getRoleFromSurfaceType(const FillParams &params, const Surface *surface) const {
-        if (params.role == ExtrusionRole::None) {
-            return params.flow.bridge() ?
-                       (surface->has_pos_bottom() ? ExtrusionRole::BridgeInfill : ExtrusionRole::InternalBridgeInfill) :
-                                          (surface->has_fill_solid() ?
-                                               ((surface->has_pos_top()) ? ExtrusionRole::TopSolidInfill : ExtrusionRole::SolidInfill) :
-                                               ExtrusionRole::InternalInfill);
-        }
-        return params.role;
-    }
+    ExtrusionRole getRoleFromSurfaceType(const FillParams &params, const Surface *surface) const;
 
 public:
     static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
