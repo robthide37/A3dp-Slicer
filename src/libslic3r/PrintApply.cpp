@@ -979,6 +979,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 	new_full_config.option("filament_settings_id",         true);
 	new_full_config.option("printer_settings_id",          true);
     new_full_config.option("physical_printer_settings_id", true);
+    new_full_config.option("print_settings_modified",      true);
+    new_full_config.option("filament_settings_modified",   true);
+    new_full_config.option("printer_settings_modified",    true);
     new_full_config.normalize_fdm();
 
     // Find modified keys of the various configs. Resolve overrides extruder retract values by filament profiles.

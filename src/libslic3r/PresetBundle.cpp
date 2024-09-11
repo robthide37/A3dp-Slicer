@@ -815,6 +815,15 @@ DynamicPrintConfig PresetBundle::full_fff_config() const
     out.option<ConfigOptionString >("printer_settings_id",  true)->value  = this->printers.get_selected_preset_name();
     out.option<ConfigOptionString >("physical_printer_settings_id", true)->value = this->physical_printers.get_selected_printer_name();
 
+    out.option<ConfigOptionBool >("print_settings_modified",    true)->value  = this->fff_prints.get_selected_preset().is_dirty;
+    std::vector<uint8_t> filament_settings_modifieds;
+    for (const auto &extr_filaments : this->extruders_filaments) {
+        assert(extr_filaments.get_selected_preset());
+        filament_settings_modifieds.push_back(extr_filaments.get_selected_preset()->is_dirty?1:0);
+    }
+    out.option<ConfigOptionBools>("filament_settings_modified", true)->set(filament_settings_modifieds);
+    out.option<ConfigOptionBool >("printer_settings_modified",  true)->value  = this->printers.get_selected_preset().is_dirty;
+
     // Serialize the collected "compatible_printers_condition" and "inherits" fields.
     // There will be 1 + num_exturders fields for "inherits" and 2 + num_extruders for "compatible_printers_condition" stored.
     // The vector will not be stored if all fields are empty strings.
@@ -866,6 +875,10 @@ DynamicPrintConfig PresetBundle::full_sla_config() const
     out.option<ConfigOptionString >("sla_material_settings_id", true)->value  = this->sla_materials.get_selected_preset_name();
     out.option<ConfigOptionString >("printer_settings_id",      true)->value  = this->printers.get_selected_preset_name();
     out.option<ConfigOptionString >("physical_printer_settings_id", true)->value = this->physical_printers.get_selected_printer_name();
+
+    out.option<ConfigOptionBool >("sla_print_settings_id",      true)->value  = this->sla_prints.get_selected_preset().is_dirty;
+    out.option<ConfigOptionBool >("sla_material_settings_id",   true)->value  = this->sla_materials.get_selected_preset().is_dirty;
+    out.option<ConfigOptionBool >("printer_settings_id",        true)->value  = this->printers.get_selected_preset().is_dirty;
 
     // Serialize the collected "compatible_printers_condition" and "inherits" fields.
     // There will be 1 + num_exturders fields for "inherits" and 2 + num_extruders for "compatible_printers_condition" stored.

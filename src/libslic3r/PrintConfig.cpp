@@ -2336,6 +2336,11 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionStrings { "" });
     def->cli = ConfigOptionDef::nocli;
 
+    def = this->add("filament_settings_modified", coBools);
+    def->mode = comNone | comPrusa; // note: hidden setting
+    def->set_default_value(new ConfigOptionBools({false}));
+    def->cli = ConfigOptionDef::nocli;
+
     def = this->add("filament_vendor", coString);
     def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString(L("(Unknown)")));
@@ -4601,9 +4606,19 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
 
+    def = this->add("print_settings_modified", coBool);
+    def->mode = comNone | comPrusa; // note: hidden setting
+    def->set_default_value(new ConfigOptionBool(false));
+    def->cli = ConfigOptionDef::nocli;
+
     def = this->add("printer_settings_id", coString);
     def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString(""));
+    def->cli = ConfigOptionDef::nocli;
+
+    def = this->add("printer_settings_modified", coBool);
+    def->mode = comNone | comPrusa; // note: hidden setting
+    def->set_default_value(new ConfigOptionBool(false));
     def->cli = ConfigOptionDef::nocli;
 
     def = this->add("physical_printer_settings_id", coString);
@@ -7867,6 +7882,10 @@ void PrintConfigDef::init_sla_params()
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
 
+    def = this->add("sla_material_settings_modified", coBool);
+    def->set_default_value(new ConfigOptionBool(false));
+    def->cli = ConfigOptionDef::nocli;
+
     def = this->add("default_sla_print_profile", coString);
     def->label = L("Default SLA material profile");
     def->tooltip = L("Default print profile associated with the current printer profile. "
@@ -7874,7 +7893,11 @@ void PrintConfigDef::init_sla_params()
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
 
-    def = this->add("sla_print_settings_id", coString);
+    def = this->add("sla_print_settings_id", coBool);
+    def->set_default_value(new ConfigOptionBool(false));
+    def->cli = ConfigOptionDef::nocli;
+
+    def = this->add("sla_print_settings_modified", coString);
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
 

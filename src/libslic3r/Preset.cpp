@@ -1227,6 +1227,7 @@ static bool profile_print_params_same(const DynamicPrintConfig &cfg_old, const D
     for (const char *key : { "compatible_prints", "compatible_prints_condition",
                              "compatible_printers", "compatible_printers_condition", "inherits",
                              "print_settings_id", "filament_settings_id", "sla_print_settings_id", "sla_material_settings_id", "printer_settings_id", "filament_vendor",
+                             "print_settings_modified", "filament_settings_modified", "sla_print_settings_modified", "sla_material_settings_modified", "printer_settings_modified",
                              "printer_model", "printer_variant", "default_print_profile", "default_filament_profile", "default_sla_print_profile", "default_sla_material_profile",
                              //FIXME remove the print host keys?
                              "print_host", "printhost_apikey", "printhost_cafile", "printhost_port" })
@@ -1310,6 +1311,7 @@ ExternalPreset PresetCollection::load_external_preset(
                 // Following keys are not used neither by the UI nor by the slicing core, therefore they are not important 
                 // Erase them from config apply to avoid redundant "dirty" parameter in loaded preset.
                 for (const char* key : { "print_settings_id", "filament_settings_id", "sla_print_settings_id", "sla_material_settings_id", "printer_settings_id", "filament_vendor", 
+                                         "print_settings_modified", "filament_settings_modified", "sla_print_settings_modified", "sla_material_settings_modified", "printer_settings_modified",
                                          "printer_model", "printer_variant", "default_print_profile", "default_filament_profile", "default_sla_print_profile", "default_sla_material_profile" })
                     keys.erase(std::remove(keys.begin(), keys.end(), key), keys.end());
 
