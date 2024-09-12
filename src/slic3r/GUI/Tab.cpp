@@ -3475,7 +3475,7 @@ bool TabFilament::save_current_preset(const std::string &new_name, bool detach)
     const bool is_saved = Tab::save_current_preset(new_name, detach);
     if (is_saved) {
         m_preset_bundle->reset_extruder_filaments();
-        m_preset_bundle->extruders_filaments[m_active_extruder].select_filament(m_presets->get_idx_selected());
+        m_preset_bundle->extruders_filaments[m_active_extruder].select_filament(m_presets->get_selected_idx());
     }
     return is_saved;
 }
@@ -4345,7 +4345,7 @@ bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
         if (delete_current) {
             // Find an alternate preset to be selected after the current preset is deleted.
             const std::deque<Preset> &presets 		= m_presets->get_presets();
-            size_t    				  idx_current   = m_presets->get_idx_selected();
+            size_t    				  idx_current   = m_presets->get_selected_idx();
             // Find the next visible preset.
             size_t 				      idx_new       = idx_current + 1;
             if (idx_new < presets.size())

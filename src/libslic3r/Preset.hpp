@@ -436,8 +436,8 @@ public:
     // Select a preset. If an invalid index is provided, the first visible preset is selected.
     Preset&         select_preset(size_t idx);
     // Return the selected preset, without the user modifications applied.
-    Preset&         get_selected_preset()       { return m_presets[m_idx_selected]; }
-    const Preset&   get_selected_preset() const { return m_presets[m_idx_selected]; }
+    Preset&         get_selected_preset()       { assert(m_idx_selected < m_presets.size()); return m_presets[m_idx_selected]; }
+    const Preset&   get_selected_preset() const { assert(m_idx_selected < m_presets.size()); return m_presets[m_idx_selected]; }
     size_t          get_selected_idx()    const { return m_idx_selected; }
     // Returns the name of the selected preset, or an empty string if no preset is selected.
     std::string     get_selected_preset_name() const { return (m_idx_selected == size_t(-1)) ? std::string() : this->get_selected_preset().name; }
@@ -465,7 +465,7 @@ public:
 
 	// used to update preset_choice from Tab
 	const std::deque<Preset>&	get_presets() const	{ return m_presets; }
-    size_t                      get_idx_selected()	{ return m_idx_selected; }
+    //size_t                      get_idx_selected()	{ return m_idx_selected; } // duplicate of get_selected_idx
 	static const std::string&	get_suffix_modified();
 
     // Return a preset possibly with modifications.
@@ -476,6 +476,7 @@ public:
     Preset&         preset(size_t idx, bool respect_active_preset = true)          { return (idx == m_idx_selected && respect_active_preset) ? m_edited_preset : m_presets[idx]; }
     const Preset&   preset(size_t idx, bool respect_active_preset = true) const    { return const_cast<PresetCollection*>(this)->preset(idx); }
     void            discard_current_changes() {
+        assert(m_idx_selected < m_presets.size());
         m_presets[m_idx_selected].reset_dirty();
         m_edited_preset = m_presets[m_idx_selected];
         // Don't save the resetted preset state as a "saved into project" state.
@@ -826,8 +827,8 @@ public:
     std::vector<std::string> get_printers_with_only_preset( const std::string &preset_name);
 
     // Return the selected preset, without the user modifications applied.
-    PhysicalPrinter&        get_selected_printer() { return m_printers[m_idx_selected]; }
-    const PhysicalPrinter&  get_selected_printer() const { return m_printers[m_idx_selected]; }
+    PhysicalPrinter&        get_selected_printer() { assert(m_idx_selected < m_printers.size()); return m_printers[m_idx_selected]; }
+    const PhysicalPrinter&  get_selected_printer() const { assert(m_idx_selected < m_printers.size()); return m_printers[m_idx_selected]; }
 
     size_t                  get_selected_idx()    const { return m_idx_selected; }
     // Returns the name of the selected preset, or an empty string if no preset is selected.

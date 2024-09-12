@@ -1835,7 +1835,7 @@ void PresetBundle::update_filaments_compatible(PresetSelectCompatibleType select
         update_filament_compatible(extruder_idx);
 
     // validate selection in filaments
-    bool invalid_selection = this->filaments.get_idx_selected() == size_t(-1);
+    bool invalid_selection = this->filaments.get_selected_idx() == size_t(-1);
     if (!invalid_selection) {
         invalid_selection = true;
         const std::string selected_filament_name = this->filaments.get_selected_preset_name();
