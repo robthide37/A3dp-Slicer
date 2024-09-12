@@ -2532,10 +2532,10 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     wxWindow *win = collpane->GetPane();
                     collpane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [tab](wxEvent &) { tab->Layout(); });
 
-                    const wxBitmapBundle *bmp_width     = get_bmp_bundle("explanation_width", 80);
-                    wxStaticBitmap *image_width   = new wxStaticBitmap(win, wxID_ANY, bmp_width->GetBitmap(wxDefaultSize));
-                    const wxBitmapBundle *bmp_spacing   = get_bmp_bundle("explanation_spacing", 80);
-                    wxStaticBitmap *image_spacing = new wxStaticBitmap(win, wxID_ANY, bmp_spacing->GetBitmap(wxDefaultSize));
+                    const wxBitmapBundle *bmp_width     = get_bmp_bundle("explanation_width", 170, 90);
+                    wxStaticBitmap *image_width   = new wxStaticBitmap(win, wxID_ANY, bmp_width->GetBitmap(bmp_width->GetDefaultSize()));
+                    const wxBitmapBundle *bmp_spacing   = get_bmp_bundle("explanation_spacing", 650, 100);
+                    wxStaticBitmap *image_spacing = new wxStaticBitmap(win, wxID_ANY, bmp_spacing->GetBitmap(bmp_spacing->GetDefaultSize()));
                     auto            sizerV        = new wxBoxSizer(wxVERTICAL);
                     auto            sizerH2       = new wxBoxSizer(wxHORIZONTAL);
                     auto            sizerH3       = new wxBoxSizer(wxHORIZONTAL);
