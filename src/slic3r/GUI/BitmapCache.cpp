@@ -483,6 +483,7 @@ wxBitmapBundle* BitmapCache::from_png(const std::string& bitmap_name, unsigned w
 //            color_str = "#" + color_str;
 //        if (color_str.size() == 7) {
 //            replaces["#ED6B21"] = color_str;
+//            replaces["#ed6b21"] = color_str;
 //            replaces["#2172eb"] = color_str;
 //        }
 //    }

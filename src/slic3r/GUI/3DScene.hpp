@@ -77,6 +77,7 @@ public:
     static const ColorRGBA SUPPORT_BLOCKER_COLOR;
     static const ColorRGBA SUPPORT_ENFORCER_COLOR;
     static const ColorRGBA SEAM_POSITION_COLOR;
+    static const ColorRGBA BRIM_PATCH_COLOR;
 
     enum EHoverState : unsigned char
     {
