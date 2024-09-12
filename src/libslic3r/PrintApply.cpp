@@ -37,7 +37,7 @@ namespace Slic3r {
             // For support modifiers, the type may have been switched from blocker to enforcer and vice versa.
             assert((model_volume_dst->is_support_modifier() && model_volume_src->is_support_modifier()) || model_volume_dst->type() == model_volume_src->type());
             model_object_dst.volumes.emplace_back(model_volume_dst);
-            if (model_volume_dst->is_support_modifier() || model_volume_dst->is_seam_position()) {
+            if (model_volume_dst->is_support_modifier() || model_volume_dst->is_seam_position() || model_volume_dst->is_brim_patch()) {
                 // For support modifiers, the type may have been switched from blocker to enforcer and vice versa.
                 model_volume_dst->set_type(model_volume_src->type());
                 model_volume_dst->set_transformation(model_volume_src->get_transformation());
@@ -45,7 +45,7 @@ namespace Slic3r {
             assert(model_volume_dst->get_matrix().isApprox(model_volume_src->get_matrix()));
         } else {
             // The volume was not found in the old list. Create a new copy.
-            assert(model_volume_src->is_support_modifier() || model_volume_src->is_seam_position());
+            assert(model_volume_src->is_support_modifier() || model_volume_src->is_seam_position() || model_volume_src->is_brim_patch());
             model_object_dst.volumes.emplace_back(new ModelVolume(*model_volume_src));
             model_object_dst.volumes.back()->set_model_object(&model_object_dst);
         }
@@ -1178,6 +1178,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         bool model_origin_translation_differ = model_object.origin_translation != model_object_new.origin_translation;
         auto print_objects_range        = print_object_status_db.get_range(model_object);
         bool seam_position_differ       = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SEAM_POSITION);
+        bool brim_patch_differ          = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::BRIM_PATCH);
         // The list actually can be empty if all instances are out of the print bed.
         //assert(print_objects_range.begin() != print_objects_range.end());
         // All PrintObjects in print_objects_range shall point to the same prints_objects_regions
@@ -1207,7 +1208,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             model_object.assign_copy(model_object_new);
         } else {
             model_object_status.print_object_regions_status = ModelObjectStatus::PrintObjectRegionsStatus::Valid;
-            if (supports_differ || seam_position_differ || model_custom_supports_data_changed(model_object, model_object_new)) {
+            if (supports_differ || seam_position_differ || brim_patch_differ || model_custom_supports_data_changed(model_object, model_object_new)) {
                 // First stop background processing before shuffling or deleting the ModelVolumes in the ModelObject's list.
                 if (supports_differ) {
                     this->call_cancel_callback();
@@ -1226,6 +1227,13 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                     update_apply_status(false);
                     // Invalidate just the gcode step.
                     invalidate_step(psGCodeExport);
+                    // Copy just the seam volumes.
+                    model_volume_list_update_supports_seams(model_object, model_object_new);
+                } else if (brim_patch_differ) {
+                    this->call_cancel_callback();
+                    update_apply_status(false);
+                    // Invalidate just the gcode step.
+                    invalidate_step(psSkirtBrim);
                     // Copy just the seam volumes.
                     model_volume_list_update_supports_seams(model_object, model_object_new);
                 }

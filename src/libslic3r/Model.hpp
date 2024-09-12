@@ -336,6 +336,7 @@ enum class ModelVolumeType : int {
     SUPPORT_BLOCKER,
     SUPPORT_ENFORCER,
     SEAM_POSITION,
+    BRIM_PATCH,
 };
 
 // A printable object, possibly having multiple print volumes (each with its own set of parameters and materials),
@@ -858,6 +859,7 @@ public:
 	bool                is_support_blocker()    const { return m_type == ModelVolumeType::SUPPORT_BLOCKER; }
     bool                is_support_modifier()   const { return m_type == ModelVolumeType::SUPPORT_BLOCKER || m_type == ModelVolumeType::SUPPORT_ENFORCER; }
     bool                is_seam_position()      const { return m_type == ModelVolumeType::SEAM_POSITION; }
+    bool                is_brim_patch()         const { return m_type == ModelVolumeType::BRIM_PATCH; }
     bool                is_text()               const { return text_configuration.has_value(); }
     bool                is_svg() const { return emboss_shape.has_value()  && !text_configuration.has_value(); }
     bool                is_the_only_one_part() const; // behave like an object

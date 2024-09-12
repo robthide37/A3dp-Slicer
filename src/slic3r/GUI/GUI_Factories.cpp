@@ -178,7 +178,7 @@ wxBitmapBundle* SettingsFactory::get_category_bitmap(const Slic3r::OptionCategor
 //-------------------------------------
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
-static const constexpr std::array<std::pair<const char *, const char *>, 6> ADD_VOLUME_MENU_ITEMS = {{
+static const constexpr std::array<std::pair<const char *, const char *>, 7> ADD_VOLUME_MENU_ITEMS = {{
     //       menu_item Name              menu_item bitmap name
     {L("Add part"),              "add_part" },           // ~ModelVolumeType::MODEL_PART
     {L("Add negative volume"),   "add_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
@@ -186,6 +186,7 @@ static const constexpr std::array<std::pair<const char *, const char *>, 6> ADD_
     {L("Add support blocker"),   "support_blocker"},     // ~ModelVolumeType::SUPPORT_BLOCKER
     {L("Add support enforcer"),  "support_enforcer"},    // ~ModelVolumeType::SUPPORT_ENFORCER
     {L("Add seam position"),     "add_seam"},            // ~ModelVolumeType::SEAM_POSITION
+    {L("Add brim patch"),        "add_brim_patch"},      // ~ModelVolumeType::BRIM_PATCH
 }};
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
@@ -200,6 +201,7 @@ static const constexpr std::array<std::pair<const char *, const char *>, 3> SVG_
     {L("Add SVG part"),     "svg_part"},     // ~ModelVolumeType::MODEL_PART
     {L("Add negative SVG"), "svg_negative"}, // ~ModelVolumeType::NEGATIVE_VOLUME
     {L("Add SVG modifier"), "svg_modifier"}, // ~ModelVolumeType::PARAMETER_MODIFIER
+    //TODO: svg brim patch
 }};
 
 static Plater* plater()
@@ -575,18 +577,23 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
         sub_menu->AppendSeparator();
     }
 
-        std::vector<std::string> items = { L("Box"), L("Cylinder"), L("Sphere"), L("Slab") };
-        if (type == ModelVolumeType::SEAM_POSITION) items = { "Sphere" };
-        for (auto& item : items)
-        {
-            if (type == ModelVolumeType::INVALID && strncmp(item.c_str(), "Slab", 4) == 0)
-                continue;
-            append_menu_item(sub_menu, wxID_ANY, _(item), "",
-                [type, item](wxCommandEvent&) { obj_list()->load_generic_subobject(item, type); }, "", menu);
-        }
-
-    append_menu_item_add_text(sub_menu, type);
-    append_menu_item_add_svg(sub_menu, type);
+    std::vector<std::string> items = { L("Box"), L("Cylinder"), L("Sphere"), L("Slab") };
+    if (type == ModelVolumeType::SEAM_POSITION) items = { "Sphere" };
+    if (type == ModelVolumeType::BRIM_PATCH) items = { "Circle" };
+    for (auto& item : items)
+    {
+        if (type == ModelVolumeType::INVALID && strncmp(item.c_str(), "Slab", 4) == 0)
+            continue;
+        append_menu_item(sub_menu, wxID_ANY, _(item), "",
+            [type, item](wxCommandEvent&) { obj_list()->load_generic_subobject(item, type); }, "", menu);
+    }
+    if (type == ModelVolumeType::MODEL_PART || type == ModelVolumeType::NEGATIVE_VOLUME ||
+        type == ModelVolumeType::PARAMETER_MODIFIER ||
+        type == ModelVolumeType::INVALID // cannot use gizmo without selected object
+    ) {
+        append_menu_item_add_text(sub_menu, type);
+        append_menu_item_add_svg(sub_menu, type);
+    }
 
     if ( (mode >= comAdvanced || get_app_config()->get_bool("objects_always_expert"))
             && type != ModelVolumeType::SEAM_POSITION) {
@@ -631,14 +638,15 @@ static void append_menu_itemm_add_(const wxString& name, GLGizmosManager::EType 
         }        
     };
 
-    if (type == ModelVolumeType::MODEL_PART || type == ModelVolumeType::NEGATIVE_VOLUME || type == ModelVolumeType::PARAMETER_MODIFIER ||
-        type == ModelVolumeType::INVALID || type == ModelVolumeType::SEAM_POSITION // cannot use gizmo without selected object
-    ) {
+    // It's the job of the caller to filter out
+    //if (type == ModelVolumeType::MODEL_PART || type == ModelVolumeType::NEGATIVE_VOLUME || type == ModelVolumeType::PARAMETER_MODIFIER ||
+    //    type == ModelVolumeType::INVALID // cannot use gizmo without selected object
+    //) {
         wxString item_name = wxString(is_submenu_item ? "" : _(ADD_VOLUME_MENU_ITEMS[int(type)].first) + ": ") + name;
         menu->AppendSeparator();
         const std::string icon_name = is_submenu_item ? "" : ADD_VOLUME_MENU_ITEMS[int(type)].second;
         append_menu_item(menu, wxID_ANY, item_name, "", add_, icon_name, menu);
-    }
+    //}
 }
 
 void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, bool is_submenu_item/* = true*/){
@@ -690,17 +698,26 @@ void MenuFactory::append_menu_items_add_volume(MenuType menu_type)
             [this](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Sphere"), ModelVolumeType::SEAM_POSITION); },
             ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SEAM_POSITION)].second, nullptr,
             [this]() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+        append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::BRIM_PATCH)].first), "",
+            [this](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Circle"), ModelVolumeType::BRIM_PATCH); },
+            ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::BRIM_PATCH)].second, nullptr,
+            [this]() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
 
         return;
     }
 
     for (size_t type = 0; type < ADD_VOLUME_MENU_ITEMS.size(); type++) {
         auto& item = ADD_VOLUME_MENU_ITEMS[type];
-        if (menu_type == mtObjectSLA && (ModelVolumeType(type) == ModelVolumeType::PARAMETER_MODIFIER || ModelVolumeType(type) == ModelVolumeType::SEAM_POSITION))
+        if (menu_type == mtObjectSLA && (ModelVolumeType(type) == ModelVolumeType::PARAMETER_MODIFIER || ModelVolumeType(type) == ModelVolumeType::SEAM_POSITION || ModelVolumeType(type) == ModelVolumeType::BRIM_PATCH))
             continue;
         if (type == int(ModelVolumeType::SEAM_POSITION)) {
             append_menu_item(menu, wxID_ANY, _(item.first), "",
                 [this](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Sphere"), ModelVolumeType::SEAM_POSITION); },
+                item.second, nullptr,
+                [this]() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+        } else if (type == int(ModelVolumeType::BRIM_PATCH)) {
+            append_menu_item(menu, wxID_ANY, _(item.first), "",
+                [this](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Circle"), ModelVolumeType::BRIM_PATCH); },
                 item.second, nullptr,
                 [this]() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
         } else {

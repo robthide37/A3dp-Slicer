@@ -1362,6 +1362,44 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
 
 }
 
+void make_brim_patch(const Print &print,
+                     const Flow &flow,
+                     const Polygons &patches,
+                     ExPolygons &unbrimmable_areas,
+                     ExtrusionEntityCollection &out)
+{
+    coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    for (const Polygon &contour : patches) {
+        contour.simplify(scaled_resolution_brim);
+        if (contour.empty()) {
+            continue;
+        }
+        // remove unbrimable area
+        ExPolygons next = diff_ex({ExPolygon(contour)}, unbrimmable_areas);
+        ensure_valid(next, scaled_resolution_brim);
+        
+        // create polygons
+        std::vector<std::vector<BrimLoop>> loops;
+        next = offset2_ex(next, -flow.scaled_width() / 2 - flow.scaled_spacing() / 4, flow.scaled_spacing() / 4, jtSquare);
+        while (!next.empty()) {
+            loops.emplace_back();
+            for (ExPolygon &expoly : next) {
+                loops.back().emplace_back(expoly.contour);
+                for (Polygon &poly : expoly.holes) {
+                    loops.back().emplace_back(poly);
+                }
+            }
+            next = ensure_valid(offset2_ex(next, - (flow.scaled_spacing() * 5) / 4, flow.scaled_spacing() / 4, jtSquare), scaled_resolution_brim);
+        }
+
+        // create extrusions
+        extrude_brim_from_tree(print, loops, {Polygon(contour)}, flow, out, true);
+        
+        unbrimmable_areas.push_back(ExPolygon(contour));
+        union_ex(unbrimmable_areas);
+    }
+}
+
 void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectPtrs& objects, ExPolygons& unbrimmable_areas, ExtrusionEntityCollection& out) {
     // Brim is only printed on first layer and uses perimeter extruder.
 
