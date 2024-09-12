@@ -81,7 +81,6 @@ std::string GCodeWriter::get_default_color_change_gcode(const GCodeConfig &confi
 
 void GCodeWriter::apply_print_config(const PrintConfig &print_config)
 {
-    this->multiple_extruders = false;
     this->config.apply(print_config, true);
     m_extrusion_axis = get_extrusion_axis(this->config);
     m_single_extruder_multi_material = print_config.single_extruder_multi_material.value;

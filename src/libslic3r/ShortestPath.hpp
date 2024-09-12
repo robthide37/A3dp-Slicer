@@ -55,6 +55,7 @@ inline void chain_and_reorder_extrusion_entities(std::vector<ExtrusionEntity*> &
 
 // Chain extrusion entities by a shortest distance. Returns the ordered extrusions together with a "reverse" flag.
 // Set input "reversed" to true if the vector of "entities" is to be considered to be reversed.
+// FIXME: change const Point* by optional<Point>
 template<typename ExtrusionEntityConstOrNot>
 ExtrusionEntityReferences chain_extrusion_references(const std::vector<ExtrusionEntityConstOrNot*> &entities, const Point *start_near = nullptr, const bool reversed = false)
 {

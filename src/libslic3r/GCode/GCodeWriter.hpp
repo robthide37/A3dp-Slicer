@@ -26,7 +26,7 @@ namespace Slic3r {
 class GCodeWriter {
 public:
     GCodeConfig config;
-    bool multiple_extruders;
+    bool multiple_extruders = false;
     // override from region
     const PrintRegionConfig* config_region = nullptr;
     
