@@ -331,19 +331,23 @@ void PresetUpdater::priv::get_or_copy_missing_resource(const std::string& vendor
 				return;
 			}
 	if (!fs::exists(file_in_cache)) { // No file to copy. Download it to straight to the vendor dir.
-		if (!boost::starts_with(url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
+		/*if (!boost::starts_with(url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
 			!boost::starts_with(url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
 		{
 			throw Slic3r::CriticalException(GUI::format("URL outside prusa3d.com network: %1%", url));
-		}
-		BOOST_LOG_TRIVIAL(info) << "Downloading resources missing in cache directory: " << vendor << " / " << filename;
+		}*/
+        if (url.size() > 10 && boost::starts_with(url, "http")) {
+            BOOST_LOG_TRIVIAL(info) << "Downloading resources missing in cache directory: " << vendor << " / "
+                                    << filename;
 
-		const auto resource_url = format("%1%%2%%3%", url, url.back() == '/' ? "" : "/", escaped_filename); // vendor should already be in url 
+            const auto resource_url = format("%1%%2%%3%", url, url.back() == '/' ? "" : "/",
+                                             escaped_filename); // vendor should already be in url
 
-		if (!fs::exists(file_in_vendor.parent_path()))
-			fs::create_directory(file_in_vendor.parent_path());
+            if (!fs::exists(file_in_vendor.parent_path()))
+                fs::create_directory(file_in_vendor.parent_path());
 
-		get_file(resource_url, file_in_vendor);
+            get_file(resource_url, file_in_vendor);
+        }
 		return;
 	}
 
