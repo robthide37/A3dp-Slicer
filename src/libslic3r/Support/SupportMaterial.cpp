@@ -1192,7 +1192,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
     Polygons enforcer_polygons;
 
     assert_valid(lower_layer_polygons);
-
+    const coord_t resolution = std::max(SCALED_EPSILON, scale_t(layer.object()->print()->config().resolution.value));
     const bool   support_auto    = object_config.support_material.value && object_config.support_material_auto.value;
     const bool   buildplate_only = ! annotations.buildplate_covered.empty();
     // If user specified a custom angle threshold, convert it to radians.
@@ -1224,7 +1224,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
 
         // Cache support trimming polygons derived from lower layer polygons, possible merged with "on build plate only" trimming polygons.
         auto slices_margin_update = 
-            [&slices_margin, &lower_layer, &lower_layer_polygons, buildplate_only, has_enforcer, &annotations, layer_id]
+            [&slices_margin, &lower_layer, &lower_layer_polygons, buildplate_only, has_enforcer, &annotations, layer_id, resolution]
             (float slices_margin_offset, float no_interface_offset) {
             if (slices_margin.offset != slices_margin_offset) {
                 slices_margin.offset = slices_margin_offset;
@@ -1237,7 +1237,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                         // Make a backup of trimming polygons before enforcing "on build plate only".
                         slices_margin.all_polygons = slices_margin.polygons;
                     // Trim the inflated contact surfaces by the top surfaces as well.
-                    slices_margin.polygons = union_(slices_margin.polygons, annotations.buildplate_covered[layer_id]);
+                    slices_margin.polygons = ensure_valid(union_(slices_margin.polygons, annotations.buildplate_covered[layer_id]), resolution);
                 }
             }
         };
@@ -1272,8 +1272,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                     // This step is done before the contact surface is calculated by growing the overhang region.
                     diff_polygons = diff(diff_polygons, annotations.buildplate_covered[layer_id]);
                 }
-                ensure_valid(diff_polygons, std::max(SCALED_EPSILON, scale_t(layer.object()->print()->config().resolution.value)));
-                assert_valid(diff_polygons);
+                ensure_valid(diff_polygons, resolution);
             } else if (support_auto) {
                 // Get the regions needing a suport, collapse very tiny spots.
                 //FIXME cache the lower layer offset if this layer has multiple regions.
@@ -1308,8 +1307,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                         lower_layer_polygons);
                 }
                 //FIXME add user defined filtering here based on minimal area or minimum radius or whatever.
-                ensure_valid(diff_polygons, std::max(SCALED_EPSILON, scale_t(layer.object()->print()->config().resolution.value)));
-                assert_valid(diff_polygons);
+                ensure_valid(diff_polygons, resolution);
             }
 
             if (diff_polygons.empty())
@@ -1323,8 +1321,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                 // residues of diff_polygons that would then be supported.
                 diff_polygons = diff(diff_polygons,
                     expand(union_(annotations.blockers_layers[layer_id]), float(1000.*SCALED_EPSILON)));
-                ensure_valid(diff_polygons, std::max(SCALED_EPSILON, scale_t(layer.object()->print()->config().resolution.value)));
-                assert_valid(diff_polygons);
+                ensure_valid(diff_polygons, resolution);
             }
 
             #ifdef SLIC3R_DEBUG
@@ -1385,8 +1382,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                         slices_margin.polygons);
                 }
 #else
-                diff_polygons = diff(diff_polygons, slices_margin.polygons);
-                assert_valid(diff_polygons);
+                diff_polygons = ensure_valid(diff(diff_polygons, slices_margin.polygons), resolution);
 #endif
             }
             polygons_append(contact_polygons, diff_polygons);
@@ -1412,8 +1408,7 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                       { { union_safety_offset_ex(enforcer_polygons) }, { "new_contacts",               "red",    "black", "", scaled<coord_t>(0.1f), 0.5f } } });
     #endif /* SLIC3R_DEBUG */
                 if (! enforcer_polygons.empty()) {
-                    ensure_valid(enforcer_polygons, std::max(SCALED_EPSILON, scale_t(layer.object()->print()->config().resolution.value)));
-                    assert_valid(enforcer_polygons);
+                    ensure_valid(enforcer_polygons, resolution);
                     polygons_append(overhang_polygons, enforcer_polygons);
                     slices_margin_update(std::min(lower_layer_offset, float(scale_(gap_xy))), no_interface_offset);
                     polygons_append(contact_polygons, diff(enforcer_polygons, slices_margin.all_polygons.empty() ? slices_margin.polygons : slices_margin.all_polygons));

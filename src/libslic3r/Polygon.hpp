@@ -169,7 +169,7 @@ Polygons ensure_valid(coord_t resolution, Polygons &&polygons);
 #ifdef _DEBUGINFO
 void assert_valid(const Polygons &polygons);
 #else
-void assert_valid(const Polygons &polygons) const {}
+inline void assert_valid(const Polygons &polygons) {}
 #endif
 
 inline double total_length(const Polygons &polylines) {

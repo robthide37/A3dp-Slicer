@@ -643,15 +643,7 @@ void Layer::make_perimeters()
     SurfacesPtr                                             surfaces_to_merge_temp;
 
     auto layer_region_reset_perimeters = [](LayerRegion &layerm) {
-        layerm.m_perimeters.clear();
-        layerm.m_fills.clear();
-        layerm.m_ironings.clear();
-        layerm.m_thin_fills.clear();
-        layerm.m_fill_expolygons.clear();
-        layerm.m_fill_expolygons_bboxes.clear();
-        layerm.m_fill_expolygons_composite.clear();
-        layerm.m_fill_expolygons_composite_bboxes.clear();
-        layerm.m_fill_no_overlap_expolygons.clear();
+        layerm.clear();
     };
 
     // Remove layer islands, remove references to perimeters and fills from these layer islands to LayerRegion ExtrusionEntities.
@@ -798,10 +790,11 @@ void Layer::make_perimeters()
                             layerm.m_fill_no_overlap_expolygons = (layerm_config)->fill_no_overlap_expolygons();
                             //layerm.perimeters = (layerm_config)->perimeters;
                             //layerm.thin_fills = (layerm_config)->thin_fills;
-                            layerm.m_fill_surfaces.clear();
+                            layerm.set_fill_surfaces().clear();
                             for (Surface &surf: new_slices.surfaces) {
                                 ExPolygons exp = intersection_ex(ExPolygons{ surf.expolygon }, fill_expolygons);
-                                layerm.m_fill_surfaces.append(std::move(exp), surf);
+                                assert_valid(exp);
+                                layerm.set_fill_surfaces().append(std::move(exp), surf);
                             }
                         }
                     }
@@ -988,10 +981,11 @@ void Layer::sort_perimeters_into_islands(
                 assert(l.m_fill_no_overlap_expolygons.empty());
                 l.m_fill_no_overlap_expolygons = this_layer_region.m_fill_no_overlap_expolygons;
                 // ensure fill_surface is good (this was deleted in prusa2.7, i wonder if prusa ever used fill_surfaces after perimetergeneration)
-                l.m_fill_surfaces.clear();
+                l.set_fill_surfaces().clear();
                 for (const Surface &surf: slices) {
                     ExPolygons exp = intersection_ex(ExPolygons{ surf.expolygon }, l_slices_exp);
-                    l.m_fill_surfaces.append(std::move(exp), surf);
+                    assert_valid(exp);
+                    l.set_fill_surfaces().append(std::move(exp), surf);
                 }
                 //bounding boxes
                 l.m_fill_expolygons_bboxes.reserve(l.fill_expolygons().size());

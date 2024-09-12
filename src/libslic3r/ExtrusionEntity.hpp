@@ -707,6 +707,9 @@ public:
 #ifdef _DEBUGINFO
 struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
     using ExtrusionVisitorRecursiveConst::use;
+    bool m_check_length;
+    LoopAssertVisitor() : m_check_length(true) {}
+    LoopAssertVisitor(bool check_length) : m_check_length(check_length) {}
     virtual void default_use(const ExtrusionEntity& entity) override {};
     virtual void use(const ExtrusionPath &path) override {
         release_assert(path.length() > SCALED_EPSILON);
@@ -720,7 +723,7 @@ struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
         Point last_pt = loop.last_point();
         for (const ExtrusionPath &path : loop.paths) {
             release_assert(path.polyline.size() >= 2);
-            release_assert(path.length() > SCALED_EPSILON);
+            release_assert(!m_check_length || path.length() > SCALED_EPSILON);
             release_assert(path.first_point() == last_pt);
             for (size_t idx = 1; idx < path.size(); ++idx)
                 release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));

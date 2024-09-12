@@ -423,6 +423,7 @@ void PrintConfigDef::init_common_params()
     def = this->add("print_version", coString);
     // defautl to none : only set if loaded. only write our version
     def->set_default_value(new ConfigOptionStringVersion());
+    def->cli = ConfigOptionDef::nocli;
 
     def = this->add("printer_technology", coEnum);
     def->label = L("Printer technology");
@@ -9357,6 +9358,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "xy_size_compensation",
 "xy_inner_size_compensation",
 "z_step",
+
+"print_version",
 };
 
 std::unordered_set<std::string> prusa_export_to_change_keys =

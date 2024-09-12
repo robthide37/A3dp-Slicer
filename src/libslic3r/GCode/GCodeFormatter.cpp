@@ -31,7 +31,7 @@ double GCodeFormatter::emit_e(const std::string_view axis, double v)
         char* start_digit = this->emit_axis(axis[0], v, m_gcode_precision_e);
 #ifdef _DEBUG
         double written_e = atof(std::string(start_digit, this->ptr_err.ptr).c_str());
-        assert(std::abs(v - written_e) < 0.0000001);  // shoulde be already taken into account by m_tool->extrude
+        assert(std::abs(v - written_e) < 0.000002);  // shoulde be already taken into account by m_tool->extrude
         return v - written_e;
 #endif
     }

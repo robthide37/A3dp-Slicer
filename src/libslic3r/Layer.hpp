@@ -149,7 +149,11 @@ public:
     // (this collection contains only ExtrusionEntityCollection objects)
     [[nodiscard]] const ExtrusionEntityCollection&  fills() const { return m_fills; }
     [[nodiscard]] const ExtrusionEntityCollection&  ironings() const { return m_ironings; }
-    
+    // only for Layer & PrintObject
+    [[nodiscard]] ExtrusionEntityCollection& set_fills() { return m_fills; }
+    [[nodiscard]] ExtrusionEntityCollection& set_ironings() { return m_ironings; }
+    void                                     clear();
+
     Flow     flow(FlowRole role) const;
     Flow     flow(FlowRole role, double layer_height) const;
     coordf_t bridging_height_avg() const;

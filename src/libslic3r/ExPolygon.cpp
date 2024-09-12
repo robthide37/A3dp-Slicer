@@ -199,23 +199,41 @@ ExPolygon::simplify_p(coord_t tolerance, Polygons* polygons) const
 Polygons
 ExPolygon::simplify_p(coord_t tolerance) const
 {
+    //Polygons pp;
+    //pp.reserve(this->holes.size() + 1);
+    //// contour
+    //{
+    //    Polygon p = this->contour;
+    //    p.points.push_back(p.points.front());
+    //    p.points = MultiPoint::douglas_peucker(p.points, tolerance);
+    //    p.points.pop_back();
+    //    pp.emplace_back(std::move(p));
+    //}
+    //// holes
+    //for (Polygon p : this->holes) {
+    //    p.points.push_back(p.points.front());
+    //    p.points = MultiPoint::douglas_peucker(p.points, tolerance);
+    //    p.points.pop_back();
+    //    pp.emplace_back(std::move(p));
+    //}
+    //return simplify_polygons(pp);
     Polygons pp;
     pp.reserve(this->holes.size() + 1);
     // contour
     {
         Polygon p = this->contour;
-        p.points.push_back(p.points.front());
-        p.points = MultiPoint::douglas_peucker(p.points, tolerance);
-        p.points.pop_back();
-        pp.emplace_back(std::move(p));
+        p.douglas_peucker(tolerance);
+        if(p.size() > 2)
+            pp.emplace_back(std::move(p));
     }
+    if(pp.empty()) return pp;
     // holes
     for (Polygon p : this->holes) {
-        p.points.push_back(p.points.front());
-        p.points = MultiPoint::douglas_peucker(p.points, tolerance);
-        p.points.pop_back();
-        pp.emplace_back(std::move(p));
+        p.douglas_peucker(tolerance);
+        if(p.size() > 2)
+            pp.emplace_back(std::move(p));
     }
+    // union
     return simplify_polygons(pp);
 }
 
@@ -446,6 +464,7 @@ void ensure_valid(ExPolygons &expolygons, coord_t resolution /*= SCALED_EPSILON*
                 }
             }
         }
+        // do we need to do an union_ex() here? -> it's possible that the new hoels cut into the new periemter, so yes... even if unlikely
     }
 }
 

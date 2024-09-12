@@ -206,7 +206,7 @@ bool remove_degenerate(Polylines &polylines);
 #ifdef _DEBUGINFO
 void assert_valid(const Polylines &polylines);
 #else
-void assert_valid(const Polylines &polylines) const {}
+inline void assert_valid(const Polylines &polylines) {}
 #endif
 
 // Returns index of a segment of a polyline and foot point of pt on polyline.

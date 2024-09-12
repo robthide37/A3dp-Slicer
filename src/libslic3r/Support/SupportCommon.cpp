@@ -488,7 +488,7 @@ SupportGeneratorLayersPtr generate_raft_base(
             } else
                 raft = diff(raft, trimming);
             if (! interface_polygons.empty())
-                columns_base->polygons = diff(columns_base->polygons, interface_polygons);
+                columns_base->polygons = ensure_valid(diff(columns_base->polygons, interface_polygons), support_params.resolution);
             assert_valid(raft);
             assert_valid(columns_base->polygons);
         }

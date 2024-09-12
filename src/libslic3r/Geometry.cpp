@@ -73,7 +73,7 @@ void simplify_polygons(const Polygons &polygons, double tolerance, Polygons* ret
         if (simplified.size() > 3) {
             simplified.pop_back();
             simplified_raw.push_back(Polygon{ std::move(simplified) });
-    }
+        }
     }
     *retval = Slic3r::simplify_polygons(simplified_raw);
 }

@@ -1840,8 +1840,16 @@ void PrintObject::tag_under_bridge() {
             // now set the new surfaces
             for (size_t idx_layer = 0; idx_layer < this->layers().size() - 1; ++idx_layer) {
                 LayerRegion* lr = layeridx2lregion[idx_layer];
-                if(lr != nullptr && layeridx2lregion[idx_layer +  1] != nullptr)
+                if(lr != nullptr && layeridx2lregion[idx_layer +  1] != nullptr) {
+                    for(size_t i = 0; i < new_surfaces[idx_layer].size(); ++i) {
+                        new_surfaces[idx_layer][i].expolygon.assert_valid();
+                        if(new_surfaces[idx_layer][i].expolygon.contour.size() < 3){
+                            new_surfaces[idx_layer].erase(new_surfaces[idx_layer].begin() + i);
+                            --i;
+                        }
+                    }
                     lr->set_fill_surfaces().surfaces = new_surfaces[idx_layer];
+                }
             }
         }
     }
@@ -2691,6 +2699,9 @@ void PrintObject::discover_vertical_shells()
                     // Assign resulting internal surfaces to layer.
                     layerm->m_fill_surfaces.keep_types({ stPosTop | stDensSolid, stPosBottom | stDensSolid, stPosBottom | stDensSolid | stModBridge });
                     //layerm->m_fill_surfaces.keep_types_flag(stPosTop | stPosBottom);
+                    assert_valid(new_internal);
+                    assert_valid(new_internal_void);
+                    assert_valid(new_internal_solid);
                     layerm->m_fill_surfaces.append(new_internal, stPosInternal | stDensSparse);
                     layerm->m_fill_surfaces.append(new_internal_void, stPosInternal | stDensVoid);
                     layerm->m_fill_surfaces.append(new_internal_solid, stPosInternal | stDensSolid);
@@ -2735,6 +2746,7 @@ template<typename T> void debug_draw(std::string name, const T& a, const T& b, c
 void PrintObject::replaceSurfaceType(SurfaceType st_to_replace, SurfaceType st_replacement, SurfaceType st_under_it)
 {
     BOOST_LOG_TRIVIAL(info) << "overextrude over Bridge...";
+    coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(print()->config().resolution.value));
 
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id) {
         const PrintRegion& region = this->printing_region(region_id);
@@ -2771,19 +2783,23 @@ void PrintObject::replaceSurfaceType(SurfaceType st_to_replace, SurfaceType st_r
             if (poly_to_replace.empty()) continue;
 
             // compute the remaning internal solid surfaces as difference
-            ExPolygons not_expoly_to_replace = diff_ex(poly_to_check, poly_to_replace, ApplySafetyOffset::Yes);
+            ExPolygons not_expoly_to_replace = ensure_valid(diff_ex(poly_to_check, poly_to_replace, ApplySafetyOffset::Yes), scaled_resolution);
             // build the new collection of fill_surfaces
             {
                 Surfaces new_surfaces;
                 for (Surfaces::const_iterator surface = layerm->fill_surfaces().surfaces.begin(); surface != layerm->fill_surfaces().surfaces.end(); ++surface) {
-                    if (surface->surface_type != st_to_replace)
+                    if (surface->surface_type != st_to_replace) {
+                        surface->expolygon.assert_valid();
                         new_surfaces.push_back(*surface);
+                    }
                 }
 
                 for (ExPolygon& ex : union_ex(poly_to_replace)) {
+                    ex.assert_valid();
                     new_surfaces.push_back(Surface(st_replacement, ex));
                 }
                 for (ExPolygon& ex : not_expoly_to_replace) {
+                    ex.assert_valid();
                     new_surfaces.push_back(Surface(st_to_replace, ex));
                 }
 
@@ -2940,6 +2956,8 @@ void PrintObject::bridge_over_infill()
                         region->m_fill_surfaces); // Make backup copy by move!! so that pointers in candidate surfaces stay valid
                     // Copy the surfaces back, this will make copy, but we will later discard it anyway
                     region->m_fill_surfaces = backup_surfaces[lidx][region];
+                    for(auto &srf : region->m_fill_surfaces)
+                        srf.expolygon.assert_valid();
                 }
 
                 for (LayerRegion *region : layer->regions()) {
@@ -2961,9 +2979,11 @@ void PrintObject::bridge_over_infill()
 
                     region->m_fill_surfaces.remove_types({stPosInternal | stDensSolid, stPosInternal | stDensSparse});
                     for (const ExPolygon &ep : solid_infill) {
+                        ep.assert_valid();
                         region->m_fill_surfaces.surfaces.emplace_back(stPosInternal | stDensSolid, ep);
                     }
                     for (const ExPolygon &ep : sparse_infill) {
+                        ep.assert_valid();
                         region->m_fill_surfaces.surfaces.emplace_back(stPosInternal | stDensSparse, ep);
                     }
                 }
@@ -2980,6 +3000,8 @@ void PrintObject::bridge_over_infill()
             for (LayerRegion *region : layer->regions()) {
                 if (backup_surfaces[lidx].find(region) != backup_surfaces[lidx].end()) {
                     region->m_fill_surfaces = std::move(backup_surfaces[lidx][region]);
+                    for(auto &srf : region->m_fill_surfaces)
+                        srf.expolygon.assert_valid();
                 }
             }
         }
@@ -3538,6 +3560,7 @@ void PrintObject::bridge_over_infill()
     Slic3r::parallel_for(size_t(0), this->layers().size(),
         [po = this, &surfaces_by_layer]
         (const size_t lidx) {
+        coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(po->print()->config().resolution.value));
         PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
         if (!(surfaces_by_layer.find(lidx) == surfaces_by_layer.end() && surfaces_by_layer.find(lidx + 1) == surfaces_by_layer.end())) {
             Layer *layer = po->get_layer(lidx);
@@ -3568,6 +3591,7 @@ void PrintObject::bridge_over_infill()
                 SurfacesPtr internal_infills = region->m_fill_surfaces.filter_by_type((stPosInternal | stDensSparse));
                 ExPolygons new_internal_infills = diff_ex(internal_infills, cut_from_infill);
                 new_internal_infills            = diff_ex(new_internal_infills, additional_ensuring);
+                ensure_valid(new_internal_infills, scaled_resolution);
                 for (const ExPolygon &ep : new_internal_infills) {
                     new_surfaces.emplace_back((stPosInternal | stDensSparse), ep);
                 }
@@ -3580,7 +3604,7 @@ void PrintObject::bridge_over_infill()
                                 Surface tmp{*surface, {}};
                                 tmp.surface_type = (stPosInternal | stDensSolid | stModBridge);
                                 tmp.bridge_angle = cs.bridge_angle;
-                                for (const ExPolygon &ep : union_ex(cs.new_polys)) {
+                                for (const ExPolygon &ep : ensure_valid(union_ex(cs.new_polys), scaled_resolution)) {
                                     new_surfaces.emplace_back(tmp, ep);
                                 }
                                 break;
@@ -3592,6 +3616,7 @@ void PrintObject::bridge_over_infill()
                 new_internal_solids.insert(new_internal_solids.end(), additional_ensuring.begin(), additional_ensuring.end());
                 new_internal_solids = diff_ex(new_internal_solids, cut_from_infill);
                 new_internal_solids = union_safety_offset_ex(new_internal_solids);
+                ensure_valid(new_internal_solids, scaled_resolution);
                 for (const ExPolygon &ep : new_internal_solids) {
                     new_surfaces.emplace_back((stPosInternal | stDensSolid), ep);
                 }
@@ -3606,6 +3631,8 @@ void PrintObject::bridge_over_infill()
 #endif
 
                 region->m_fill_surfaces.remove_types({(stPosInternal | stDensSolid), (stPosInternal | stDensSparse)});
+                for(auto &srf : new_surfaces)
+                    srf.expolygon.assert_valid();
                 region->m_fill_surfaces.append(new_surfaces);
             }
         }
@@ -3960,10 +3987,12 @@ void merge_surfaces(LayerRegion* lregion) {
         for (auto& entry : type2srfs) {
             if (type2newpolys.find(entry.first) == type2newpolys.end()) {
                 for (const Surface* srfPtr : entry.second) {
+                    srfPtr->expolygon.assert_valid();
                     newSrfs.emplace_back(*srfPtr);
                 }
             } else {
                 for (ExPolygon& expoly : type2newpolys[entry.first]) {
+                    expoly.assert_valid();
                     newSrfs.emplace_back(*entry.second.front(), expoly);
                 }
             }
@@ -4084,29 +4113,34 @@ void PrintObject::combine_infill()
                   region.config().fill_pattern.value == ipLine          ||
                   region.config().fill_pattern.value == ipHoneycomb) ? 1.5f : 0.5f) *
                     layerms.back()->flow(frSolidInfill).scaled_width();
-            for (ExPolygon& expoly : intersection)
+            for (ExPolygon& expoly : intersection) {
+                expoly.assert_valid();
                 polygons_append(intersection_with_clearance, offset(expoly, clearance_offset));
+            }
             for (LayerRegion *layerm : layerms) {
                 Polygons internal = to_polygons(layerm->fill_surfaces().filter_by_type(stPosInternal | stDensSparse));
                 layerm->m_fill_surfaces.remove_type(stPosInternal | stDensSparse);
-                layerm->m_fill_surfaces.append(diff_ex(internal, intersection_with_clearance), stPosInternal | stDensSparse);
+                ExPolygons only_internal = diff_ex(internal, intersection_with_clearance);
+                assert_valid(only_internal);
+                layerm->m_fill_surfaces.append(std::move(only_internal), stPosInternal | stDensSparse);
                 if (layerm == layerms.back()) {
                     // Apply surfaces back with adjusted depth to the uppermost layer.
                     Surface templ(stPosInternal | stDensSparse, ExPolygon());
                     templ.thickness = 0.;
-                    for (LayerRegion* layerm2 : layerms)
+                    for (LayerRegion* layerm2 : layerms) {
                         templ.thickness += layerm2->layer()->height;
+                    }
                     templ.thickness_layers = (unsigned short)layerms.size();
                     layerm->m_fill_surfaces.append(intersection, templ);
                 } else {
                     // Save void surfaces.
-                    layerm->m_fill_surfaces.append(
-                        intersection_ex(internal, intersection_with_clearance),
-                            stPosInternal | stDensVoid);
-                    }
+                    ExPolygons only_void = intersection_ex(internal, intersection_with_clearance);
+                    assert_valid(only_void);
+                    layerm->m_fill_surfaces.append(std::move(only_void), stPosInternal | stDensVoid);
                 }
             }
         }
+    }
 } // void PrintObject::combine_infill()
 
 void PrintObject::_generate_support_material()

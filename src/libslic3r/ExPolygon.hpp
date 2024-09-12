@@ -548,7 +548,7 @@ ExPolygons ensure_valid(coord_t resolution, ExPolygons &&expolygons);
 #ifdef _DEBUGINFO
 void assert_valid(const ExPolygons &expolygons);
 #else
-void assert_valid(const ExPolygons &expolygons) {}
+inline void assert_valid(const ExPolygons &expolygons) {}
 #endif
 
 // Return True when erase some otherwise False.
