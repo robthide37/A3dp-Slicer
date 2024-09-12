@@ -2131,6 +2131,9 @@ std::string Print::output_filename(const std::string &filename_base) const
     // These values will be just propagated into the output file name.
     DynamicConfig config = this->finished() ? this->print_statistics().config() : this->print_statistics().placeholders();
     config.set_key_value("num_extruders", new ConfigOptionInt((int)m_config.nozzle_diameter.size()));
+    config.set_key_value("extruders_count", new ConfigOptionInt((int)m_config.nozzle_diameter.size()));
+    config.set_key_value("num_milling", new ConfigOptionInt((int)m_config.milling_diameter.size()));
+    config.set_key_value("milling_count", new ConfigOptionInt((int)m_config.milling_diameter.size()));
     config.set_key_value("default_output_extension", new ConfigOptionString(".gcode"));
 
     // Handle output_filename_format. There is a hack related to binary G-codes: gcode / bgcode substitution.

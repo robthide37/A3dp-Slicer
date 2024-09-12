@@ -11162,6 +11162,10 @@ OtherPresetsConfigDef::OtherPresetsConfigDef()
     def->label = L("Number of extruders");
     def->tooltip = L("Total number of extruders, regardless of whether they are used in the current print.");
 
+    def = this->add("num_milling", coInt);
+    def->label = L("Number of mills");
+    def->tooltip = L("Total number of mills, regardless of whether they are used in the current print.");
+
     def = this->add("print_preset", coString);
     def->label = L("Print preset name");
     def->tooltip = L("Name of the print preset used for slicing.");
