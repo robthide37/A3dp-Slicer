@@ -1653,6 +1653,9 @@ static TriangleMesh create_mesh(const std::string& type_name, const BoundingBoxf
     if (type_name == "Box")
         // Sitting on the print bed, left front front corner at (0, 0).
         mesh = its_make_cube(side, side, side);
+    else if (type_name == "Square")
+        // Centered around 0, sitting on the print bed.
+        mesh = its_make_cube(side, side, 0.1);
     else if (type_name == "Cylinder")
         // Centered around 0, sitting on the print bed.
         // The cylinder has the same volume as the box above.

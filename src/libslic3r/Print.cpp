@@ -1340,11 +1340,11 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     return path.c_str();
 }
 
-Polygons get_brim_patch(const PrintObject &obj, const PrintInstance *instance = nullptr) {
+Polygons get_brim_patch(const PrintObject &obj, ModelVolumeType brim_type, const PrintInstance *instance = nullptr) {
     Polygons polys;
     for (const ModelVolume *v : obj.model_object()->volumes) {
         assert(v);
-        if (v->is_brim_patch()) {
+        if (v->type() == brim_type) {
             if (instance == nullptr) {
                 for (const PrintInstance &inst : obj.instances()) {
                     Polygons vol_outline;
@@ -1367,23 +1367,23 @@ Polygons get_brim_patch(const PrintObject &obj, const PrintInstance *instance = 
     return polys;
 }
 
-bool has_brim_patch(const PrintObject &obj)
+bool has_brim_patch(const PrintObject &obj, ModelVolumeType brim_type)
 {
     bool found = false;
     for (const ModelVolume *v : obj.model_object()->volumes) {
         assert(v);
-        if (v->is_brim_patch()) {
+        if (v->type() == brim_type) {
             found = true;
             break;
         }
     }
     return found;
 }
-bool has_brim_patch(const std::vector<PrintObject*> &objs_group)
+bool has_brim_patch(const std::vector<PrintObject*> &objs_group, ModelVolumeType brim_type)
 {
     bool found = false;
     for (const PrintObject *obj : objs_group) {
-        if (has_brim_patch(*obj)) {
+        if (has_brim_patch(*obj, brim_type)) {
             found = true;
             break;
         }
@@ -1457,22 +1457,33 @@ void Print::_make_skirt_brim() {
         }
         ExPolygons brim_area;
         //get the objects areas, to not print brim on it (if needed)
-        if (obj_groups.size() > 1 || brim_per_object || (!obj_groups.empty() && has_brim_patch(obj_groups.front()))) {
-            for (std::vector<PrintObject*> &obj_group : obj_groups)
-                for (const PrintObject *object : obj_group)
-                    if (!object->m_layers.empty())
+        if (obj_groups.size() > 1 || brim_per_object || 
+            (!obj_groups.empty() && (has_brim_patch(obj_groups.front(), ModelVolumeType::BRIM_PATCH) || has_brim_patch(obj_groups.front(), ModelVolumeType::BRIM_NEGATIVE)))) {
+            for (std::vector<PrintObject *> &obj_group : obj_groups) {
+                for (const PrintObject *object : obj_group) {
+                    if (!object->m_layers.empty()) {
                         for (const PrintInstance &pt : object->m_instances) {
                             size_t first_idx = brim_area.size();
-                            brim_area.insert(brim_area.end(), object->m_layers.front()->lslices().begin(), object->m_layers.front()->lslices().end());
+                            brim_area.insert(brim_area.end(),
+                                             object->m_layers.front()->lslices().begin(),
+                                             object->m_layers.front()->lslices().end());
                             for (size_t i = first_idx; i < brim_area.size(); i++) {
                                 brim_area[i].translate(pt.shift.x(), pt.shift.y());
                             }
                         }
+                    }
+                    if (has_brim_patch(*object, ModelVolumeType::BRIM_NEGATIVE)) {
+                        for(Polygon &poly : get_brim_patch(*object, ModelVolumeType::BRIM_NEGATIVE)){
+                            brim_area.push_back(ExPolygon(std::move(poly)));
+                        }
+                    }
+                }
+            }
         }
         //print brim per brim region
         for (std::vector<PrintObject*> &obj_group : obj_groups) {
             const PrintObjectConfig &brim_config = obj_group.front()->config();
-            if (brim_config.brim_width > 0 || brim_config.brim_width_interior > 0 || has_brim_patch(obj_group)) {
+            if (brim_config.brim_width > 0 || brim_config.brim_width_interior > 0 || has_brim_patch(obj_group, ModelVolumeType::BRIM_PATCH)) {
                 this->set_status(printstep_2_percent[PrintStep::psSkirtBrim] + 2, L("Generating brim"));
                 if (brim_config.brim_per_object) {
                     for (PrintObject *obj : obj_group) {
@@ -1497,7 +1508,7 @@ void Print::_make_skirt_brim() {
                             if (brim_config.brim_width_interior > 0) {
                                 make_brim_interior(*this, flow, { obj }, brim_area, obj->m_brim);
                             }
-                            make_brim_patch(*this, flow, get_brim_patch(*obj), brim_area, obj->m_brim);
+                            make_brim_patch(*this, flow, get_brim_patch(*obj, ModelVolumeType::BRIM_PATCH), brim_area, obj->m_brim);
                             obj->m_instances = copies;
                         } else {
                             brim_area = union_ex(brim_area);
@@ -1516,7 +1527,7 @@ void Print::_make_skirt_brim() {
                                 if (brim_config.brim_width_interior > 0) {
                                     make_brim_interior(*this, flow, { obj }, brim_area, entity_brim);
                                 }
-                                make_brim_patch(*this, flow, get_brim_patch(*obj), brim_area, entity_brim);
+                                make_brim_patch(*this, flow, get_brim_patch(*obj, ModelVolumeType::BRIM_PATCH), brim_area, entity_brim);
                                 obj->m_brim.append(std::move(entity_brim));
                             }
                             obj->m_instances = copies;
@@ -1540,7 +1551,7 @@ void Print::_make_skirt_brim() {
                         // create a brim per instance
                         for (const PrintInstance &instance : obj->instances()) {
                             ExtrusionEntityCollection entity_brim;
-                            make_brim_patch(*this, flow, get_brim_patch(*obj, &instance), brim_area, entity_brim);
+                            make_brim_patch(*this, flow, get_brim_patch(*obj, ModelVolumeType::BRIM_PATCH, &instance), brim_area, entity_brim);
                             obj->m_brim.append(std::move(entity_brim));
                         }
                     }
@@ -1619,9 +1630,9 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                 for (const Polygon& poly : offset(expoly.contour, scale_(object->config().brim_width)))
                     append(object_points, poly.points);
             // get brim patchs
-            if (has_brim_patch(*object)) {
+            if (has_brim_patch(*object, ModelVolumeType::BRIM_PATCH)) {
                 assert(!object->instances().empty());
-                for (Polygon &poly : get_brim_patch(*object, &object->instances().front())) {
+                for (Polygon &poly : get_brim_patch(*object, ModelVolumeType::BRIM_PATCH, &object->instances().front())) {
                     // remove shift
                     for (Point &pt : poly.points)
                         pt -= object->instances().front().shift;
