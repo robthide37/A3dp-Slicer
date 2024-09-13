@@ -1880,6 +1880,8 @@ ModelVolumeType ModelVolume::type_from_string(const std::string &s)
         return ModelVolumeType::SEAM_POSITION;
     if (s == "BrimPatch")
         return ModelVolumeType::BRIM_PATCH;
+    if (s == "BrimNegative")
+        return ModelVolumeType::BRIM_NEGATIVE;
     assert(s == "0");
     // Default value if invalud type string received.
 	return ModelVolumeType::MODEL_PART;
@@ -1895,6 +1897,7 @@ std::string ModelVolume::type_to_string(const ModelVolumeType t)
 	case ModelVolumeType::SUPPORT_BLOCKER:    return "SupportBlocker";
     case ModelVolumeType::SEAM_POSITION:      return "SeamPosition";
     case ModelVolumeType::BRIM_PATCH:         return "BrimPatch";
+    case ModelVolumeType::BRIM_NEGATIVE:      return "BrimNegative";
     default:
         assert(false);
         return "ModelPart";

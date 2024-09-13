@@ -178,7 +178,7 @@ wxBitmapBundle* SettingsFactory::get_category_bitmap(const Slic3r::OptionCategor
 //-------------------------------------
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
-static const constexpr std::array<std::pair<const char *, const char *>, 7> ADD_VOLUME_MENU_ITEMS = {{
+static const constexpr std::array<std::pair<const char *, const char *>, 8> ADD_VOLUME_MENU_ITEMS = {{
     //       menu_item Name              menu_item bitmap name
     {L("Add part"),              "add_part" },           // ~ModelVolumeType::MODEL_PART
     {L("Add negative volume"),   "add_negative" },       // ~ModelVolumeType::NEGATIVE_VOLUME
@@ -187,6 +187,7 @@ static const constexpr std::array<std::pair<const char *, const char *>, 7> ADD_
     {L("Add support enforcer"),  "support_enforcer"},    // ~ModelVolumeType::SUPPORT_ENFORCER
     {L("Add seam position"),     "add_seam"},            // ~ModelVolumeType::SEAM_POSITION
     {L("Add brim patch"),        "add_brim_patch"},      // ~ModelVolumeType::BRIM_PATCH
+    {L("Add brim negative"),     "add_brim_negative"},   // ~ModelVolumeType::BRIM_NEGATIVE
 }};
 
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
@@ -201,7 +202,7 @@ static const constexpr std::array<std::pair<const char *, const char *>, 3> SVG_
     {L("Add SVG part"),     "svg_part"},     // ~ModelVolumeType::MODEL_PART
     {L("Add negative SVG"), "svg_negative"}, // ~ModelVolumeType::NEGATIVE_VOLUME
     {L("Add SVG modifier"), "svg_modifier"}, // ~ModelVolumeType::PARAMETER_MODIFIER
-    //TODO: svg brim patch
+    //TODO: svg brim patch & negative
 }};
 
 static Plater* plater()
@@ -580,6 +581,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
     std::vector<std::string> items = { L("Box"), L("Cylinder"), L("Sphere"), L("Slab") };
     if (type == ModelVolumeType::SEAM_POSITION) items = { "Sphere" };
     if (type == ModelVolumeType::BRIM_PATCH) items = { "Circle" };
+    if (type == ModelVolumeType::BRIM_NEGATIVE) items = {"Square", "Circle" };
     for (auto& item : items)
     {
         if (type == ModelVolumeType::INVALID && strncmp(item.c_str(), "Slab", 4) == 0)
@@ -701,6 +703,10 @@ void MenuFactory::append_menu_items_add_volume(MenuType menu_type)
         append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::BRIM_PATCH)].first), "",
             [this](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Circle"), ModelVolumeType::BRIM_PATCH); },
             ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::BRIM_PATCH)].second, nullptr,
+            [this]() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+        append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::BRIM_NEGATIVE)].first), "",
+            [this](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Square"), ModelVolumeType::BRIM_NEGATIVE); },
+            ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::BRIM_NEGATIVE)].second, nullptr,
             [this]() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
 
         return;
