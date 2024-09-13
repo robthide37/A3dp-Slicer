@@ -85,9 +85,13 @@ private:
     MenuWithSeparators m_instance_menu;
 
     // Removed/Prepended Items according to the view mode
-    std::array<wxMenuItem*, mtCount> items_increase;
-    std::array<wxMenuItem*, mtCount> items_decrease;
-    std::array<wxMenuItem*, mtCount> items_set_number_of_copies;
+    // note: submenu are deleted by the main menu, so only pointer are allowed here.
+    wxMenu     *m_object_instances_menu = nullptr;
+    wxMenuItem *m_object_instances_menu_item = nullptr;
+    wxMenu     *m_sla_object_instances_menu = nullptr;
+    wxMenuItem *m_sla_object_instances_menu_item = nullptr;
+    wxMenu     *m_scale_submenu = nullptr;
+    wxMenu     *m_sla_scale_submenu = nullptr;
 
     void        create_default_menu();
     void        create_common_object_menu(wxMenu *menu);
@@ -98,7 +102,7 @@ private:
     void        create_svg_part_menu();
     void        create_instance_menu();
 
-    wxMenu*     append_submenu_add_generic(wxMenu* menu, ModelVolumeType type);
+    void        append_submenu_add_generic(wxMenu* menu, wxMenu* submenu, ModelVolumeType type);
     void        append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, bool is_submenu_item = true);
     void        append_menu_item_add_svg(wxMenu *menu, ModelVolumeType type, bool is_submenu_item = true);    
     void        append_menu_items_add_volume(MenuType type);
@@ -116,7 +120,7 @@ private:
     void        append_menu_item_replace_with_stl(wxMenu* menu);
     void        append_menu_item_change_extruder(wxMenu* menu);
     void        append_menu_item_delete(wxMenu* menu);
-    void        append_menu_item_scale_selection_to_fit_print_volume(wxMenu* menu);
+    void        append_menu_item_scale(wxMenu* menu);
     void        append_menu_items_convert_unit(wxMenu* menu, int insert_pos = 1); // Add "Conver/Revert..." menu items (from/to inches/meters) after "Reload From Disk"
     void        append_menu_item_merge_to_multipart_object(wxMenu *menu);
 //    void        append_menu_item_merge_to_single_object(wxMenu *menu);

@@ -1667,6 +1667,9 @@ static TriangleMesh create_mesh(const std::string& type_name, const BoundingBoxf
         // Centered around 0, half the sphere below the print bed, half above.
         // The sphere has the same volume as the box above.
         mesh = its_make_sphere(0.62 * side, PI / 18);
+    else if (type_name == "SmallSphere")
+        // Centered around 0, half the sphere below the print bed, half above.
+        mesh = its_make_sphere(0.1 * side, PI / 18);
     else if (type_name == "Slab")
         // Sitting on the print bed, left front front corner at (0, 0).
         mesh = its_make_cube(bb.size().x() * 1.5, bb.size().y() * 1.5, bb.size().z() * 0.5);
