@@ -1292,7 +1292,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     //klipper can hide gcode into a macro, so add guessed init gcode to the processor.
     if (this->config().start_gcode_manual) {
         // from m_writer.preamble();
-        m_processor.process_preamble(true/*unit_mm*/, true/*absolute_coords*/, m_writer.config.use_relative_e_distances.value, 0/*G92*/);
+        m_processor.process_preamble(true/*unit_mm*/, true/*absolute_coords*/, !m_writer.config.use_relative_e_distances.value/*absolute e?*/, 0/*G92*/);
     }
 
     if (! print.config().gcode_substitutions.empty()) {
