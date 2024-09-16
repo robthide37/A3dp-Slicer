@@ -3762,13 +3762,14 @@ void PrintConfigDef::init_fff_params()
                    "the variable layer height and support layer height. Maximum recommended layer height "
                    "is 75% of the extrusion width to achieve reasonable inter-layer adhesion. "
                    "\nCan be a % of the nozzle diameter."
-                   "\nIf set to 0, layer height is limited to 75% of the nozzle diameter.");
+                   "\nIf disabled, layer height is limited to 75% of the nozzle diameter.");
     def->sidetext = L("mm or %");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->max_literal = { 1, true };
     def->mode = comSimpleAE | comPrusa;
     def->is_vector_extruder = true;
+    def->can_be_disabled = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{ 75, true} });
 
     def = this->add("max_print_speed", coFloatOrPercent);
@@ -8499,7 +8500,9 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             value = opt_decoder.serialize();
         }
     }
-
+    if ("max_layer_height" == opt_key && "0" == value) {
+        value = "!75%";
+    }
     if (value == "-1") {
         if ("overhangs_bridge_threshold" == opt_key) {value = "!0";}
         if ("overhangs_bridge_upper_layers" == opt_key) {value = "!2";}
@@ -9591,16 +9594,20 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
 
     // compute max & min height from % to flat value
     if ("min_layer_height" == opt_key || "max_layer_height" == opt_key) {
-        ConfigOptionFloats computed_opt;
-        const ConfigOptionFloatsOrPercents *current_opt = all_conf.option<ConfigOptionFloatsOrPercents>(opt_key);
-        const ConfigOptionFloats *nozzle_diameters = all_conf.option<ConfigOptionFloats>("nozzle_diameter");
-        assert(current_opt && nozzle_diameters);
-        assert(current_opt->size() == nozzle_diameters->size());
-        for (int i = 0; i < current_opt->size(); i++) {
-            computed_opt.set_at(current_opt->get_abs_value(i, nozzle_diameters->get_at(i)), i);
+        if ("max_layer_height" == opt_key && !value.empty() && value.front() == '!') {
+            value = "0";
+        } else {
+            ConfigOptionFloats computed_opt;
+            const ConfigOptionFloatsOrPercents *current_opt = all_conf.option<ConfigOptionFloatsOrPercents>(opt_key);
+            const ConfigOptionFloats *nozzle_diameters = all_conf.option<ConfigOptionFloats>("nozzle_diameter");
+            assert(current_opt && nozzle_diameters);
+            assert(current_opt->size() == nozzle_diameters->size());
+            for (int i = 0; i < current_opt->size(); i++) {
+                computed_opt.set_at(current_opt->get_abs_value(i, nozzle_diameters->get_at(i)), i);
+            }
+            assert(computed_opt.size() == nozzle_diameters->size());
+            value = computed_opt.serialize();
         }
-        assert(computed_opt.size() == nozzle_diameters->size());
-        value = computed_opt.serialize();
     }
     if ("arc_fitting" == opt_key && "bambu" == value) {
         value = "emit_center";
