@@ -628,10 +628,24 @@ void ConfigManipulation::update_printer_fff_config(DynamicPrintConfig *config,
                                                    const bool          is_global_config)
 {
     const std::vector<double> &nozzle_sizes = config->option<ConfigOptionFloats>("nozzle_diameter")->get_values();
+    double min_step_size = config->option("z_step")->get_float();
     //for each extruder
     for (size_t extruder_idx = 0; extruder_idx < nozzle_sizes.size(); ++extruder_idx) {
         double min_lh = config->get_computed_value("min_layer_height", extruder_idx);
-        double max_lh = config->get_computed_value("max_layer_height", extruder_idx);
+        double max_lh = config->option("max_layer_height")->is_enabled() ? config->get_computed_value("max_layer_height", extruder_idx) : nozzle_sizes[extruder_idx] * 0.75f;
+        if (config->option("max_layer_height")->is_enabled() && (max_lh < min_step_size || max_lh < EPSILON)) {
+            const wxString msg_text = _(
+                L("Maximum layer height is not valid, it can't be lower than minimum z step, and not 0.\n\nThe maximum layer height will be deactivated (set to 75% of the nozzle diameter)."));
+            MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Maximum layer height")), wxICON_WARNING | wxOK);
+            DynamicPrintConfig new_conf = *config;
+            is_msg_dlg_already_exist    = true;
+            dialog.ShowModal();
+            new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->set_at(FloatOrPercent{75., true}, extruder_idx);
+            new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->set_enabled(false, extruder_idx);
+            apply(config, &new_conf);
+            is_msg_dlg_already_exist = false;
+            max_lh = config->get_computed_value("max_layer_height", extruder_idx);
+        }
         if (max_lh > nozzle_sizes[extruder_idx]) {
             const wxString msg_text = _(
                 L("Maximum layer height is not valid, it can't be higher than the nozzle diameter.\n\nThe maximum layer height will be set to 100% of the nozzle diameter."));
@@ -641,6 +655,7 @@ void ConfigManipulation::update_printer_fff_config(DynamicPrintConfig *config,
             dialog.ShowModal();
             new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->set_at(FloatOrPercent{100., true}, extruder_idx);
             apply(config, &new_conf);
+            max_lh = config->get_computed_value("max_layer_height", extruder_idx);
             is_msg_dlg_already_exist = false;
         }
         if (min_lh >= max_lh) {
@@ -652,6 +667,7 @@ void ConfigManipulation::update_printer_fff_config(DynamicPrintConfig *config,
             dialog.ShowModal();
             new_conf.option<ConfigOptionFloatsOrPercents>("min_layer_height")->set_at(FloatOrPercent{0.0, false}, extruder_idx);
             apply(config, &new_conf);
+            min_lh = config->get_computed_value("min_layer_height", extruder_idx);
             is_msg_dlg_already_exist = false;
         }
         
