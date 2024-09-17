@@ -503,6 +503,8 @@ def parse_ui_file(file_path):
 							current_line = TranslationLine();
 							current_line.header_comment = "\n#: "+file_path+" : l"+str(line_idx);
 							current_line.msgid = item.split("$")[-1].strip();
+							if current_line.msgid.endswith('_'):
+								current_line.msgid = current_line.msgid[:-1]
 							current_line.raw_msgid = "msgid \""+current_line.msgid+"\"";
 							current_line.raw_msgstr = "msgstr \"\"";
 							current_line.msgstr = "";
