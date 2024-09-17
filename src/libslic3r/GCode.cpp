@@ -4692,8 +4692,8 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
 
     std::string gcode;
 
-    coordf_t point_dist_for_vec = scale_t(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), nozzle_diam)) / 2;
-    assert(point_dist_for_vec >= 0);
+    coordf_t point_dist_for_vec = std::max(scale_t(nozzle_diam) / 100, scale_t(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), nozzle_diam)) / 2);
+    assert(point_dist_for_vec > 0);
 
     // generate the unretracting/wipe start move (same thing than for the end, but on the other side)
     assert(!wipe_paths.empty() && wipe_paths.front().size() > 1 && !wipe_paths.back().empty());
