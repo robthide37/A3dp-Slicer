@@ -1446,9 +1446,10 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     }
 
     // update phony fields
-    assert(m_config);
+    assert(m_config_base);
     std::set<const DynamicPrintConfig*> changed;
-    assert( m_config == &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config
+    assert( dynamic_cast<TabFrequent*>(this)
+        || m_config == &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config
         || m_config == &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config
         || m_config == &wxGetApp().preset_bundle->printers.get_edited_preset().config);
     std::vector<const DynamicPrintConfig*> all_const_configs = {&wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
@@ -1464,7 +1465,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
             changed.insert(config_updated);
         }
     }
-    if (changed.find(m_config) != changed.end()) {
+    if (m_config && changed.find(m_config) != changed.end()) {
         update_dirty();
         //# Initialize UI components with the config values.
         reload_config();
@@ -1497,7 +1498,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         return;
     }
     
-    if ("fill_density" == opt_key && m_config->get_float("fill_density") >= 100 && m_config->get_int("solid_infill_every_layers") != 1)
+    if ("fill_density" == opt_key && m_config_base->get_float("fill_density") >= 100 && m_config_base->get_int("solid_infill_every_layers") != 1)
     {
         const wxString msg_text = _(L("You set the sparse infill to have 100% fill density. If you want to have only solid infill, you should set 'solid_infill_every_layers' to 1."
             "\n\nIf not, then the sparse infill will still be considered as 'sparse' even at 100% density."
@@ -1507,7 +1508,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         int res = dialog.ShowModal();
         if (res == wxID_YES) {
             boost::any val = int32_t(1);
-            m_config->opt_int("solid_infill_every_layers") = 1;
+            m_config_base->opt_int("solid_infill_every_layers") = 1;
             //m_config->set_key_value("solid_infill_every_layers", new ConfigOptionInt(1));
             this->on_value_change("solid_infill_every_layers", val);
         }
