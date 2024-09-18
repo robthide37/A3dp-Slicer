@@ -382,6 +382,22 @@ bool decode_colors(const std::vector<std::string>& colors_in, std::vector<ColorR
 	return true;
 }
 
+static const std::array<ColorRGBA, 12> COLOR_ROTATION = {{
+	ColorRGBA::GREEN(),
+	ColorRGBA::RED(),
+	ColorRGBA::BLUE(),
+	ColorRGBA::YELLOW(),
+	ColorRGBA::MAGENTA(),
+	ColorRGBA::CYAN(),
+	ColorRGBA::ORANGE(),
+	ColorRGBA::GREENISH(),
+	ColorRGBA(1.0f, 0.f, 0.5f, 1.0f),//PINK(),
+	ColorRGBA::LIGHT_GRAY(),
+	ColorRGBA::BLUEISH(),
+	ColorRGBA::REDISH(),
+}};
+ColorRGBA get_a_color(size_t idx){ return COLOR_ROTATION[idx % 12]; }
+
 std::string encode_color(const ColorRGB& color)
 {
 	char buffer[64];

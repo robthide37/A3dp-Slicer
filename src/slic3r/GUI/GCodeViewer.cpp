@@ -198,7 +198,7 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessorResult::MoveVertex& move
     paths.push_back({ move.type, move.extrusion_role, move.delta_extruder,
         move.height, move.width,
         move.feedrate, move.fan_speed, move.temperature,
-        move.volumetric_rate(), move.mm3_per_mm, move.extruder_id, move.cp_color_id, { { endpoint, endpoint } }, move.move_time });
+        move.volumetric_rate(), move.mm3_per_mm, move.extruder_id, move.cp_color_id, move.object_id, { { endpoint, endpoint } }, move.move_time });
 }
 
 void GCodeViewer::COG::render()
@@ -794,6 +794,7 @@ float GCodeViewer::Path::get_value(EViewType type) const
     case EViewType::VolumetricFlow: { return this->volumetric_flow; }
     case EViewType::Tool:           { return float(this->extruder_id); }
     case EViewType::Filament:       { return float(this->extruder_id); }
+    case EViewType::Object:         { return float(this->object_id); }
     default: return 0.f;
     }
 }
@@ -2282,6 +2283,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         return;
 
     m_extruders_count = gcode_result.extruders_count;
+    m_objects_count = gcode_result.object_names.size();
+    m_objects_ids = gcode_result.object_names;
 
     unsigned int progress_count = 0;
     static const unsigned int progress_threshold = 1000;
@@ -3121,6 +3124,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::VolumetricFlow: { color = m_extrusions.ranges.volumetric_flow.get_color_at(path.volumetric_flow); break; }
         case EViewType::Tool:           { color = m_tool_colors[path.extruder_id]; break; }
         case EViewType::Filament:       { color = m_filament_colors[path.extruder_id]; break; }
+        case EViewType::Object:         { color = path.object_id == 0 ? ColorRGBA::DARK_GRAY() : get_a_color(path.object_id); break; }
         case EViewType::ColorPrint:     {
             if (path.cp_color_id >= static_cast<unsigned char>(m_tool_colors.size()))
                 color = ColorRGBA::GRAY();
@@ -4372,6 +4376,50 @@ void GCodeViewer::render_legend(float& legend_height)
         offsets = calculate_offsets(labels, times, { "Extruder NNN", longest_used_filament_string }, icon_size);
     }
 
+    if (m_view_type == EViewType::Object) {
+        // calculate used filaments data
+        used_filaments_m = std::vector<double>(m_objects_count, 0.0);
+        used_filaments_g = std::vector<double>(m_objects_count, 0.0);
+        std::string longest_name = "";
+        if (m_gcode_result) {
+            for (const std::string &name : m_objects_ids) {
+                if (longest_name.size() < name.size()) {
+                    longest_name = name;
+                }
+            }
+        }
+        assert(m_objects_count == m_print_statistics.volumes_per_role_per_extruder_per_object.size());
+        for (auto [object_idx, volumes_per_role_per_extruder] : m_print_statistics.volumes_per_role_per_extruder_per_object) {
+            assert(object_idx < m_objects_count);
+            for (size_t extruder_id : m_extruder_ids) {
+                if (volumes_per_role_per_extruder.find(extruder_id) == volumes_per_role_per_extruder.end()) {
+                    continue;
+                }
+                const std::map<GCodeExtrusionRole, double> &volume_per_role = volumes_per_role_per_extruder.at(extruder_id);
+                // only use roles selected in the feature legend (and so shown in the preview)
+                for (GCodeExtrusionRole role : m_roles) {
+                    if (role >= GCodeExtrusionRole::Count || !is_visible(role) || volume_per_role.find(role) == volume_per_role.end())
+                        continue;
+                    double volume = volume_per_role.at(role);
+                    auto [used_filament_m, used_filament_g] = get_used_filament_from_volume(volume, extruder_id);
+                    used_filaments_m[object_idx] += used_filament_m;
+                    used_filaments_g[object_idx] += used_filament_g;
+                }
+            }
+        }
+        std::string longest_used_filament_string;
+        for (double item : used_filaments_m) {
+            char buffer[64];
+            ::sprintf(buffer, imperial_units ? "%.2f in" : "%.2f m", item);
+            if (::strlen(buffer) > longest_used_filament_string.length())
+                longest_used_filament_string = buffer;
+        }
+        //i don't know why but it's too small without it
+        longest_name += std::string("eee");
+
+        offsets = calculate_offsets(labels, times, { longest_name, longest_used_filament_string }, icon_size);
+    }
+
     // selection section
     bool view_type_changed = false;
     EViewType old_view_type = get_view_type();
@@ -4396,8 +4444,9 @@ void GCodeViewer::render_legend(float& legend_height)
                          _u8L("Chronology"),
                          _u8L("Tool"),
                          _u8L("Filament"),
-                         _u8L("Color Print") };
-        view_options_id = { 0, 1, 2, 3, 4, 5, 8, 9, 6, 7, 10, 11, 12 };
+                         _u8L("Color Print"),
+                         _u8L("Object") };
+        view_options_id = { 0, 1, 2, 3, 4, 5, 8, 9, 6, 7, 10, 11, 12, 13 };
         assert(view_options_id.size() == size_t(EViewType::Count));
         assert(view_options_id.back() < size_t(EViewType::Count));
     }
@@ -4412,8 +4461,9 @@ void GCodeViewer::render_legend(float& legend_height)
                          _u8L("Extrusion section (mm³/mm)"),
                          _u8L("Tool"),
                          _u8L("Filament"),
-                         _u8L("Color Print") };
-        view_options_id = { 0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12 };
+                         _u8L("Color Print"),
+                         _u8L("Object") };
+        view_options_id = { 0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13 };
         assert(view_options_id.size() == size_t(EViewType::Count) - 2);
         assert(view_options_id.back() < size_t(EViewType::Count));
         if (view_type == EViewType::LayerTime || view_type == EViewType::Chronology )
@@ -4527,6 +4577,22 @@ void GCodeViewer::render_legend(float& legend_height)
                     append_item(EItemType::Rect, m_filament_colors[extruder_id], _u8L("Filament") + " " + std::to_string(extruder_id + 1),
                                 true, "", 0.0f, 0.0f, offsets, used_filaments_m[i], used_filaments_g[i]);
                     i++;
+                }
+            }
+            break;
+        }
+        case EViewType::Object:
+        {
+            size_t i = 0;
+            if (m_gcode_result) {
+                for (size_t object_id = 0; object_id < m_objects_ids.size(); ++object_id) {
+                    // shows only Object actually used
+                    if (used_filaments_m[object_id] > 0) {
+                        append_item(EItemType::Rect,
+                                    (object_id == 0 ? ColorRGBA::DARK_GRAY() : get_a_color(object_id)),
+                                    m_objects_ids[object_id], true, "", 0.0f, 0.0f, offsets,
+                                    used_filaments_m[object_id], used_filaments_g[object_id]);
+                    }
                 }
             }
             break;
