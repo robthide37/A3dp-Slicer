@@ -9657,6 +9657,10 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
             value = "-1";
         }
     }
+    
+    if ("bridge_angle" == opt_key && !value.empty() && value.front() == '!') {
+        value = "0";
+    }
 
     // ---- custom gcode: ----
     static const std::vector<std::pair<std::string, std::string>> custom_gcode_replace =
