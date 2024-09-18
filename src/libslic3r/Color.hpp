@@ -161,6 +161,8 @@ bool decode_color(const std::string& color_in, ColorRGBA& color_out);
 
 bool decode_colors(const std::vector<std::string>& colors_in, std::vector<ColorRGB>& colors_out);
 bool decode_colors(const std::vector<std::string>& colors_in, std::vector<ColorRGBA>& colors_out);
+    
+ColorRGBA get_a_color(size_t idx);
 
 std::string encode_color(const ColorRGB& color);
 std::string encode_color(const ColorRGBA& color);
