@@ -155,7 +155,8 @@ public:
     PlaterPresetComboBox(wxWindow *parent, Preset::Type preset_type);
     ~PlaterPresetComboBox();
 
-    ScalableButton* edit_btn { nullptr };
+    ScalableButton *edit_btn { nullptr };
+    wxStaticText   *label { nullptr };
 
     void set_extruder_idx(const int extr_idx)   { m_extruder_idx = extr_idx; }
     int  get_extruder_idx() const               { return m_extruder_idx; }
