@@ -1370,7 +1370,7 @@ void Layer::make_ironing()
                 //TODO just_infill is currently not used.
                 ironing_params.type         = config.ironing_type;
                 ironing_params.just_infill  = false;
-                ironing_params.line_spacing = config.ironing_spacing;
+                ironing_params.line_spacing = config.get_computed_value("ironing_spacing", ironing_params.extruder);
                 ironing_params.height       = default_layer_height * 0.01 * config.ironing_flowrate;
                 ironing_params.acceleration = config.ironing_acceleration;
                 ironing_params.speed        = config.ironing_speed;
@@ -1378,8 +1378,9 @@ void Layer::make_ironing()
                     ironing_params.angle = float(Geometry::deg2rad(config.ironing_angle.value));
                 } else {
                     ironing_params.angle = compute_fill_angle(config, layerm->layer()->id());
-                    if (config.ironing_angle.value < -1)
+                    if (config.ironing_angle.value < -1) {
                         ironing_params.angle += float(Geometry::deg2rad(-config.ironing_angle.value));
+                    }
                 }
                 ironing_params.layerm         = layerm;
                 ironing_params.layer_region_id= layer_region_id;
