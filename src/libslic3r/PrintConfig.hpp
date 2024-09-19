@@ -942,7 +942,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                ironing_angle))
     ((ConfigOptionEnum<IroningType>,    ironing_type))
     ((ConfigOptionPercent,              ironing_flowrate))
-    ((ConfigOptionFloat,                ironing_spacing))
+    ((ConfigOptionFloatOrPercent,       ironing_spacing))
     ((ConfigOptionFloatOrPercent,       ironing_speed))
     // milling options
     ((ConfigOptionFloatOrPercent,       milling_after_z))
