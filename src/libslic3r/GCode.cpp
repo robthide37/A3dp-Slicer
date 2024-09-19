@@ -3500,8 +3500,8 @@ void GCodeGenerator::process_layer_single_object(
             // When starting a new object, use the external motion planner for the first travel move.
             const Point &offset = instance.shift;
             GCode::PrintObjectInstance next_instance = {&print_object, int(print_args.print_instance.instance_id)};
-            if (m_current_instance != next_instance)
-                m_avoid_crossing_perimeters.use_external_mp_once();
+            //if (m_current_instance != next_instance) // commented because now internal will be togthe nearest internal point first.
+            //    m_avoid_crossing_perimeters.use_external_mp_once();
             m_current_instance = next_instance;
             this->set_origin(unscale(offset));
             assert(m_gcode_label_objects_start.empty());
@@ -6827,7 +6827,6 @@ Polyline GCodeGenerator::travel_to(std::string &gcode, const Point &point, Extru
             assert(travel.size() > 1);
             for (size_t i = 1; i < travel.size(); i++)
                 assert(!travel.points[i - 1].coincides_with_epsilon(travel.points[i]));
-            travel = m_avoid_crossing_perimeters.travel_to(*this, point, &could_be_wipe_disabled);
         }
     }
 

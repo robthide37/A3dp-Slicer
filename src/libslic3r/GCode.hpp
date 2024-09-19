@@ -114,7 +114,7 @@ struct PrintObjectInstance
     int                instance_idx = -1;
 
     bool operator==(const PrintObjectInstance &other) const {return print_object == other.print_object && instance_idx == other.instance_idx; }
-    bool operator!=(const PrintObjectInstance &other) const { return *this == other; }
+    bool operator!=(const PrintObjectInstance &other) const { return !(*this == other); }
 };
 
 } // namespace GCode
