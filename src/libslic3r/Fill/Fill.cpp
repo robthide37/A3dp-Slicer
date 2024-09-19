@@ -622,9 +622,9 @@ void export_group_fills_to_svg(const char *path, const std::vector<SurfaceFill> 
 }
 #endif
 
-static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uint32_t fill_begin, uint32_t fill_end)
-{
-    if (fill_begin < fill_end) {
+static LayerIsland *get_fill_island(Layer &layer,
+                                           uint32_t fill_region_id,
+                                           Point point) {
         // Sort the extrusion range into its LayerIsland.
         // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
         // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
@@ -633,7 +633,6 @@ static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uin
             return point.x() >= bbox.min.x() && point.x() < bbox.max.x() && point.y() >= bbox.min.y() && point.y() < bbox.max.y() &&
                    layer.lslices()[lslice_idx].contour.contains(point);
         };
-        Point point      = layer.get_region(fill_region_id)->fills().entities()[fill_begin]->first_point();
         int   lslice_idx = int(layer.lslices_ex.size()) - 1;
         for (; lslice_idx >= 0; --lslice_idx)
             if (point_inside_surface(lslice_idx, point))
@@ -704,9 +703,10 @@ static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uin
             }
             assert(island);
             if (island)
-                island->add_fill_range(LayerExtrusionRange{fill_region_id, {fill_begin, fill_end}});
+                return island;
         }
-    }
+    assert(false);
+    return nullptr;
 }
 
 static void insert_ironings_into_islands(Layer &layer, uint32_t layer_region_id, uint32_t ironing_idx_begin, uint32_t ironing_idx_end)
@@ -834,26 +834,65 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         export_group_fills_to_svg(debug_out_path("Layer-fill_surfaces-10_fill-final-%d.svg", iRun ++).c_str(), surface_fills);
     }
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
-    std::vector<ExtrusionEntityCollection*> fills_by_priority;
+    std::vector<std::vector<ExtrusionEntityCollection*>> fills_by_priority;
     auto store_fill = [&fills_by_priority, this](size_t region_id) {
         LayerRegion *layerm = this->m_regions[region_id];
         uint32_t     fill_begin = layerm->fills().size();
-        if (fills_by_priority.size() == 1) {
-            layerm->set_fills().append(fills_by_priority[0]->entities());
-            insert_fills_into_islands(*this, uint32_t(region_id), fill_begin, uint32_t(layerm->fills().size()));
-            delete fills_by_priority[0];
-        } else {
-            layerm->set_fills().set_can_sort_reverse(false, false);
-            ExtrusionEntityCollection* eec = new ExtrusionEntityCollection();
-            eec->set_can_sort_reverse(false, false);
-            for (ExtrusionEntityCollection* per_priority : fills_by_priority) {
-                if (!per_priority->entities().empty())
-                    eec->append(ExtrusionEntitiesPtr{per_priority});
-                else
-                    delete per_priority;
+        assert(!layerm->fills().can_reverse() && !layerm->fills().can_sort());
+        std::map<LayerIsland*, std::vector<std::vector<ExtrusionEntityCollection*>>> island_2_fillsby_priority;
+        for (size_t priority = 0; priority < fills_by_priority.size(); ++priority) {
+            for (size_t fill_idx = 0; fill_idx < fills_by_priority[priority].size(); ++fill_idx) {
+                if (fills_by_priority[priority][fill_idx]->empty()) {
+                    delete fills_by_priority[priority][fill_idx];
+                    fills_by_priority[priority][fill_idx] = nullptr;
+                    continue;
+                }
+                LayerIsland *island = get_fill_island(*this, uint32_t(region_id), fills_by_priority[priority][fill_idx]->first_point());
+                if (island == nullptr) {
+                    assert(false);
+                    assert(!this->lslices_ex.empty());
+                    assert(!this->lslices_ex.front().islands.empty());
+                    island = &this->lslices_ex.front().islands.front();
+                }
+                std::vector<std::vector<ExtrusionEntityCollection*>> &fillsbypriority = island_2_fillsby_priority[island];
+                while(fillsbypriority.size() < fills_by_priority[priority].size())
+                    fillsbypriority.emplace_back();
+                if (!fills_by_priority[priority][fill_idx]->empty()) {
+                    fillsbypriority[priority].push_back(fills_by_priority[priority][fill_idx]);
+                } else {
+                    assert(false);
+                }
             }
-            layerm->set_fills().append(ExtrusionEntitiesPtr{ eec });
-            insert_fills_into_islands(*this, uint32_t(region_id), fill_begin, uint32_t(layerm->fills().size()));
+        }
+        //now it's ordered, by island and then by priority
+        for (auto &[island, prio2fills] : island_2_fillsby_priority) {
+            if (prio2fills.empty()) {
+                assert(false);//not possible
+            } else {
+                ExtrusionEntityCollection eec_priority;
+                eec_priority.set_can_sort_reverse(false, false);
+                for (std::vector<ExtrusionEntityCollection*> &fills_same_prio : prio2fills) {
+                    if (fills_same_prio.size() == 1) {
+                        assert(!fills_same_prio.front()->empty());
+                        eec_priority.append(ExtrusionEntitiesPtr{fills_same_prio.front()});
+                    } else if (fills_same_prio.size() > 1) {
+                        ExtrusionEntityCollection eec_same_prio;
+                        for (ExtrusionEntityCollection *ecc : fills_same_prio) {
+                            assert(!ecc->empty());
+                            eec_same_prio.append(ExtrusionEntitiesPtr{ecc});
+                        }
+                        assert(!eec_same_prio.empty());
+                        eec_priority.append(eec_same_prio);
+                    }
+                }
+                assert(!eec_priority.empty());
+                // add the new fill collection
+                layerm->set_fills().append(eec_priority);
+                // affect it to the island
+                island->add_fill_range(LayerExtrusionRange{uint32_t(region_id),
+                                                            {uint32_t(layerm->fills().size() - 1),
+                                                            uint32_t(layerm->fills().size())}});
+            }
         }
         fills_by_priority.clear();
     };
@@ -1043,23 +1082,22 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
                 //make fill
                 while ((size_t)surface_fill.params.priority >= fills_by_priority.size())
-                    fills_by_priority.push_back(new ExtrusionEntityCollection());
-#if _DEBUG
-                const size_t idx_start = fills_by_priority[(size_t)surface_fill.params.priority]->entities().size();
-#endif
-                f->fill_surface_extrusion(&surface_fill.surface, surface_fill.params, fills_by_priority[(size_t)surface_fill.params.priority]->set_entities());
+                    fills_by_priority.emplace_back();
+                // note: fills_by_priority[idx] is a vector that store all the entities of this priority, but that can be in multiple islands
+                //       the collection in fills_by_priority[idx][idx2) can be reordered, so put evrythgin in a new unorderable collection if it'ts needed
+                fills_by_priority[(size_t)surface_fill.params.priority].push_back(new ExtrusionEntityCollection());
+                f->fill_surface_extrusion(&surface_fill.surface, surface_fill.params, fills_by_priority[(size_t)surface_fill.params.priority].back()->set_entities());
                 // normalize result, just in case the filling algorihtm is messing things up (some are).
-                fills_by_priority[(size_t)surface_fill.params.priority]->visit(normalize_visitor);
+                fills_by_priority[(size_t)surface_fill.params.priority].back()->visit(normalize_visitor);
 #if _DEBUG
                 //check no over or underextrusion if fill_exactly
                 if(surface_fill.params.fill_exactly && surface_fill.params.density == 1 && !surface_fill.params.flow.bridge()) {
                     ExtrusionVolume compute_volume;
                     ExtrusionVolume compute_volume_no_gap_fill(false);
-                    const size_t idx_end = fills_by_priority[(size_t)surface_fill.params.priority]->entities().size();
                     //check that it doesn't overextrude
-                    for(size_t idx = idx_start; idx < idx_end; ++idx){
-                        fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume);
-                        fills_by_priority[(size_t)surface_fill.params.priority]->entities()[idx]->visit(compute_volume_no_gap_fill);
+                    for(size_t idx = 0; idx < fills_by_priority[(size_t)surface_fill.params.priority].back()->size(); ++idx){
+                        fills_by_priority[(size_t)surface_fill.params.priority].back()->entities()[idx]->visit(compute_volume);
+                        fills_by_priority[(size_t)surface_fill.params.priority].back()->entities()[idx]->visit(compute_volume_no_gap_fill);
                     }
                     ExPolygons temp = f->no_overlap_expolygons.empty() ?
                                         ExPolygons{surface_fill.surface.expolygon} :
@@ -1093,7 +1131,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
     // add thin fill regions
     // i.e, move from layerm.m_thin_fills to layerm.m_fills
     // note: if some need to be ordered, please put them into an unsaortable collection before.
-	for (LayerSlice &lslice : this->lslices_ex)
+	for (LayerSlice &lslice : this->lslices_ex) {
 		for (LayerIsland &island : lslice.islands) {
 			if (! island.thin_fills.empty()) {
 				// Copy thin fills into fills packed as a collection.
@@ -1127,7 +1165,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 				island.fills.erase(island.fills.begin() + k, island.fills.end());
 			}
 		}
-
+    }
 }
 
 //TODO: 
