@@ -287,6 +287,30 @@ void BoundingBox::align_to_grid(const coord_t cell_size)
     }
 }
 
+Point BoundingBox::nearest_point(const Point &outside_pt) const
+{
+    assert(this->defined || this->min.x() >= this->max.x() || this->min.y() >= this->max.y());
+    Point best = this->min;
+    double best_dist_sqr = Line(this->min, Point(this->min.x(), this->max.y())).distance_to_squared(outside_pt, &best);
+    Point candidate;
+    double candidate_dist_sqr = Line(Point(this->min.x(), this->max.y()), this->max).distance_to_squared(outside_pt, &candidate);
+    if (candidate_dist_sqr < best_dist_sqr) {
+        best_dist_sqr = candidate_dist_sqr;
+        best = candidate;
+    }
+    candidate_dist_sqr = Line(this->max, Point(this->max.x(), this->min.y())).distance_to_squared(outside_pt, &candidate);
+    if (candidate_dist_sqr < best_dist_sqr) {
+        best_dist_sqr = candidate_dist_sqr;
+        best = candidate;
+    }
+    candidate_dist_sqr = Line(Point(this->max.x(), this->min.y()), this->min).distance_to_squared(outside_pt, &candidate);
+    if (candidate_dist_sqr < best_dist_sqr) {
+        best_dist_sqr = candidate_dist_sqr;
+        best = candidate;
+    }
+    return best;
+}
+
 BoundingBoxf3 BoundingBoxf3::transformed(const Transform3d& matrix) const
 {
     typedef Eigen::Matrix<double, 3, 8, Eigen::DontAlign> Vertices;
