@@ -1710,11 +1710,12 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
         // Generate the skirt centerline.
         Polygon loop;
         {
-            Polygons loops = offset(convex_hull, distance, ClipperLib::jtRound, float(scale_(0.1)));
+            Polygons loops = offset(convex_hull, distance, ClipperLib::jtRound, float(flow.scaled_width() / 10));
             //make sure the skirt is simple enough
             Geometry::simplify_polygons(loops, flow.scaled_width() / 10, &loops);
 			if (loops.empty())
 				break;
+            assert(loops.size() == 1);
 			loop = loops.front();
         }
         distance += float(scale_(spacing / 2));
