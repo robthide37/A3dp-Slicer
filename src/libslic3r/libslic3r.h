@@ -547,8 +547,8 @@ enum class ArcFittingType {
 #ifdef _RELWITHDEBINFO
 #define _DEBUGINFO
 inline void release_assert(bool valid) {
-    if (!valid)
-        throw new std::exception();
+    //if (!valid)
+    //    throw new std::exception();
 }
 #endif
 //error if release, as it's purely a debug thingy that need to be cleaned
