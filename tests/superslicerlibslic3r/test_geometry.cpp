@@ -8,6 +8,7 @@
 #include <libslic3r/Line.hpp>
 #include <libslic3r/Geometry.hpp>
 #include <libslic3r/ClipperUtils.hpp>
+#include <libslic3r/SVG.hpp>
 
 using namespace Slic3r;
 
@@ -31,12 +32,12 @@ TEST_CASE("Polygon::contains works properly", ""){
 
 SCENARIO("Intersections of line segments"){
     GIVEN("Integer coordinates"){
-        Line line1{ Point{5,15},Point{30,15} };
-        Line line2{ Point{10,20}, Point{10,10} };
+        Line line1{ Point::new_scale(5,15),Point::new_scale(30,15) };
+        Line line2{ Point::new_scale(10,20), Point::new_scale(10,10) };
         THEN("The intersection is valid"){
             Point point;
             line1.intersection(line2,&point);
-            REQUIRE(Point{ 10,15 } == point);
+            REQUIRE(Point::new_scale(10,15) == point);
         }
     }
 
@@ -47,6 +48,124 @@ SCENARIO("Intersections of line segments"){
             Point point;
             REQUIRE(line1.intersection(line2,&point));
         }
+    }
+}
+
+    inline void my_clip_clipper_polygon_with_subject_bbox_templ(const Points &src, const BoundingBox &bbox, Points &out)
+    {
+
+        out.clear();
+        const size_t cnt = src.size();
+        if (cnt < 3)
+            return;
+
+        enum class Side {
+            Left   = 1,
+            Right  = 2,
+            Top    = 4,
+            Bottom = 8
+        };
+
+        auto sides = [bbox](const Point &p) {
+            return  int(p.x() < bbox.min.x()) * int(Side::Left) +
+                    int(p.x() > bbox.max.x()) * int(Side::Right) +
+                    int(p.y() < bbox.min.y()) * int(Side::Bottom) +
+                    int(p.y() > bbox.max.y()) * int(Side::Top);
+        };
+
+        int sides_prev = sides(src.back());
+        int sides_this = sides(src.front());
+        const size_t last = cnt - 1;
+        for (size_t i = 0; i < last; ++ i) {
+            int sides_next = sides(src[i + 1]);
+            if (// This point is inside. Take it.
+                sides_this == 0 ||
+                // Either this point is outside and previous or next is inside, or
+                // the edge possibly cuts corner of the bounding box.
+                (sides_prev & sides_this & sides_next) == 0) {
+                out.emplace_back(src[i]);
+                sides_prev = sides_this;
+            } else {
+                // All the three points (this, prev, next) are outside at the same side.
+                // Ignore this point.
+            }
+            sides_this = sides_next;
+        }
+
+        // Never produce just a single point output polygon.
+        if (! out.empty())
+            if (int sides_next = sides(out.front());
+                // The last point is inside. Take it.
+                sides_this == 0 ||
+                // Either this point is outside and previous or next is inside, or
+                // the edge possibly cuts corner of the bounding box.
+                (sides_prev & sides_this & sides_next) == 0)
+                out.emplace_back(src.back());
+        //assert(out.size() > 2 || out.empty());
+    }
+
+SCENARIO("clip_clipper_polygon_with_subject_bbox"){
+    BoundingBox bb(Point::new_scale(0,0),Point::new_scale(10,10));
+    GIVEN("inside"){
+        Slic3r::Polygon poly({Point::new_scale(3,1),Point::new_scale(6,2),Point::new_scale(4,8)});
+        THEN("The intersection is valid"){
+            Slic3r::Polygon result = ClipperUtils::clip_clipper_polygon_with_subject_bbox(poly, bb);
+            REQUIRE(poly == result);
+        }
+    }
+    
+    GIVEN("both"){
+        Slic3r::Polygon poly({Point::new_scale(-15,1),Point::new_scale(1,1),Point::new_scale(9,1),Point::new_scale(15,1),
+            Point::new_scale(9,7),Point::new_scale(7,9),Point::new_scale(5,11),
+            Point::new_scale(3,9),Point::new_scale(1,7)});
+        THEN("The intersection is valid"){
+            Slic3r::Polygon result = ClipperUtils::clip_clipper_polygon_with_subject_bbox(poly, bb);
+            //Slic3r::Polygon poly_result({Point::new_scale(1,1),Point::new_scale(9,1),
+            //Point::new_scale(9,7),Point::new_scale(7,9),
+            //Point::new_scale(3,9),Point::new_scale(1,7)});
+            REQUIRE(poly == result);
+        }
+    }
+
+    GIVEN("outside but crossing"){
+        Slic3r::Polygon poly({Point::new_scale(-3,-1),Point::new_scale(6,-2),Point::new_scale(4,11)});
+        THEN("The intersection is valid"){
+            Slic3r::Polygon result = ClipperUtils::clip_clipper_polygon_with_subject_bbox(poly, bb);
+            REQUIRE(poly == result);
+        }
+    }
+
+    GIVEN("outside, including the bb inside"){
+        Slic3r::Polygon poly({Point::new_scale(-3,-3),Point::new_scale(20,-3),Point::new_scale(20,20),Point::new_scale(-3,20)});
+        THEN("The intersection is valid"){
+            Slic3r::Polygon result = ClipperUtils::clip_clipper_polygon_with_subject_bbox(poly, bb);
+            REQUIRE(poly == result);
+        }
+    }
+
+    GIVEN("outside not crossing"){
+        Slic3r::Polygon poly({Point::new_scale(-3,-1),Point::new_scale(-6,-2),Point::new_scale(-4,-11)});
+        THEN("The intersection is none"){
+            Slic3r::Polygon result = ClipperUtils::clip_clipper_polygon_with_subject_bbox(poly, bb);
+            REQUIRE(result.empty());
+        }
+    }
+
+    GIVEN("weird thing"){
+        Slic3r::Polygon polytest({Point{-5253696,6941803},Point{-5390322,7004051},Point{-5529994,7112838},Point{-5642583,7262245},Point{-5708854,7426076},Point{-5731772,7600991},Point{-5710375,7774699},Point{-5643429,7942791},Point{-3001108,11534999},Point{-2782155,11687851},Point{-2602580,11739919},Point{-2335818,11727897},Point{-2161635,11659878},Point{-1955359,11486297},Point{-1830017,11244692},Point{-1806677,10973499},Point{-1888105,10716510},Point{-4515353,7139500},Point{-4638040,7031082},Point{-4773007,6958051},Point{-4924657,6915497},Point{-5069276,6907438}});
+        BoundingBox boxtest(Point{-1854941, 7335228}, Point{4734351, 9668157});
+        Slic3r::Polygon result = ClipperUtils::clip_clipper_polygon_with_subject_bbox(polytest, boxtest);
+        //Slic3r::Polygon result;
+        //my_clip_clipper_polygon_with_subject_bbox_templ(polytest.points, boxtest, result.points);
+        //::Slic3r::SVG svg("weird.svg");
+        //svg.draw(boxtest.polygon(), "grey");
+        //svg.draw(polytest.split_at_first_point(), "blue", scale_t(0.05));
+        //for(Point pt : result.points)
+        //    svg.draw(pt, "green", scale_t(0.03));
+        //svg.Close();
+
+        //REQUIRE(result.size() > 2);
+        REQUIRE(result.empty());
     }
 }
 
@@ -129,35 +248,36 @@ SCENARIO("polygon_is_convex works"){
 
 TEST_CASE("Creating a polyline generates the obvious lines"){
     auto polyline = Slic3r::Polyline();
-    polyline.points = std::vector<Point>({Point{0, 0}, Point{10, 0}, Point{20, 0}});
-    REQUIRE(polyline.lines().at(0).a == Point{0,0});
-    REQUIRE(polyline.lines().at(0).b == Point{10,0});
-    REQUIRE(polyline.lines().at(1).a == Point{10,0});
-    REQUIRE(polyline.lines().at(1).b == Point{20,0});
+    polyline.points = Points({Point::new_scale(0, 0), Point::new_scale(10, 0), Point::new_scale(20, 0)});
+    REQUIRE(polyline.lines().at(0).a == Point::new_scale(0,0));
+    REQUIRE(polyline.lines().at(0).b == Point::new_scale(10,0));
+    REQUIRE(polyline.lines().at(1).a == Point::new_scale(10,0));
+    REQUIRE(polyline.lines().at(1).b == Point::new_scale(20,0));
 }
 
 TEST_CASE("Splitting a Polygon generates a polyline correctly"){
-    auto polygon = Slic3r::Polygon(std::vector<Point>({Point{0, 0}, Point{10, 0}, Point{5, 5}}));
-    auto split = polygon.split_at_index(1);
-    REQUIRE(split.points[0]==Point{10,0});
-    REQUIRE(split.points[1]==Point{5,5});
-    REQUIRE(split.points[2]==Point{0,0});
-    REQUIRE(split.points[3]==Point{10,0});
+    Slic3r::Polygon polygon = Slic3r::Polygon({Point::new_scale(0, 0), Point::new_scale(10, 0), Point::new_scale(5, 5)});
+    Slic3r::Polyline split = polygon.split_at_index(1);
+    REQUIRE(split.points.size() == 4);
+    REQUIRE(split.points[0]==Point::new_scale(10,0));
+    REQUIRE(split.points[1]==Point::new_scale(5,5));
+    REQUIRE(split.points[2]==Point::new_scale(0,0));
+    REQUIRE(split.points[3]==Point::new_scale(10,0));
 }
 
 
 TEST_CASE("Bounding boxes are scaled appropriately"){
-    auto bb = BoundingBox(std::vector<Point>({Point{0, 1}, Point{10, 2}, Point{20, 2}}));
+    Slic3r::BoundingBox bb(Points{Point::new_scale(0, 1), Point::new_scale(10, 2), Point::new_scale(20, 2)});
     bb.scale(2);
-    REQUIRE(bb.min == Point{0,2});
-    REQUIRE(bb.max == Point{40,4});
+    REQUIRE(bb.min == Point::new_scale(0,2));
+    REQUIRE(bb.max == Point::new_scale(40,4));
 }
 
 
 TEST_CASE("Offseting a line generates a polygon correctly"){
     Slic3r::Polyline tmp(Points{{10,10},{20,10} });
-    Slic3r::Polygon area = offset(tmp,5).at(0);
-    REQUIRE(area.area() == Slic3r::Polygon(std::vector<Point>({Point{10,5},Point{20,5},Point{20,15},Point{10,15}})).area());
+    Slic3r::Polygon area = offset(tmp, scale_d(5)).at(0);
+    REQUIRE(area.area() == Slic3r::Polygon({Point::new_scale(10,5),Point::new_scale(20,5),Point::new_scale(20,15),Point::new_scale(10,15)}).area());
 }
 
 SCENARIO("Circle Fit, TaubinFit with Newton's method") {
@@ -256,7 +376,7 @@ SCENARIO("Circle Fit, TaubinFit with Newton's method") {
 //TEST_CASE("Chained path working correctly"){
 //    // if chained_path() works correctly, these points should be joined with no diagonal paths
 //    // (thus 26 units long)
-//    std::vector<Point> points = {Point{26,26},Point{52,26},Point{0,26},Point{26,52},Point{26,0},Point{0,52},Point{52,52},Point{52,0}};
+//    std::vector<Point> points = {Point::new_scale(26,26),Point::new_scale(52,26),Point::new_scale(0,26),Point::new_scale(26,52),Point::new_scale(26,0),Point::new_scale(0,52),Point::new_scale(52,52),Point::new_scale(52,0)};
 //    std::vector<Points::size_type> indices;
 //    Geometry::chained_path(points,indices);
 //    for(Points::size_type i = 0; i < indices.size()-1;i++){
@@ -267,27 +387,27 @@ SCENARIO("Circle Fit, TaubinFit with Newton's method") {
 
 SCENARIO("Line distances"){
     GIVEN("A line"){
-        Line line{ Point{0, 0}, Point{20, 0} };
+        Line line{ Point::new_scale(0, 0), Point::new_scale(20, 0) };
         THEN("Points on the line segment have 0 distance"){
-            REQUIRE(Point{0, 0}.distance_to(line)  == 0);
-            REQUIRE(Point{20, 0}.distance_to(line) == 0);
-            REQUIRE(Point{10, 0}.distance_to(line) == 0);
+            REQUIRE(line.distance_to(Point::new_scale(0, 0))  == 0);
+            REQUIRE(line.distance_to(Point::new_scale(20, 0)) == 0);
+            REQUIRE(line.distance_to(Point::new_scale(10, 0)) == 0);
         
         }
         THEN("Points off the line have the appropriate distance"){
-            REQUIRE(Point{10, 10}.distance_to(line) == 10);
-            REQUIRE(Point{50, 0}.distance_to(line) == 30);
+            REQUIRE(line.distance_to(Point::new_scale(10, 10)) == scale_t(10));
+            REQUIRE(line.distance_to(Point::new_scale(50, 0)) == scale_t(30));
         }
     }
 }
 
 SCENARIO("Polygon convex/concave detection"){
     GIVEN(("A Square with dimension 100")){
-        Slic3r::Polygon square/*new_scale*/{ std::vector<Point>{
-            Point{100,100},
-            Point{200,100},
-            Point{200,200},
-            Point{100,200}}};
+        Slic3r::Polygon square/*new_scale*/( Points{
+            Point::new_scale(100,100),
+            Point::new_scale(200,100),
+            Point::new_scale(200,200),
+            Point::new_scale(100,200)});
         THEN("It has 4 convex points counterclockwise"){
             REQUIRE(square.concave_points(PI*4/3).size() == 0);
             REQUIRE(square.convex_points(PI*2/3).size() == 4);
@@ -299,24 +419,24 @@ SCENARIO("Polygon convex/concave detection"){
         }
     }
     GIVEN("A Square with an extra colinearvertex"){
-        Slic3r::Polygon square /*new_scale*/{ std::vector<Point>{
-            Point{150,100},
-            Point{200,100},
-            Point{200,200},
-            Point{100,200},
-            Point{100,100}} };
+        Slic3r::Polygon square /*new_scale*/( Points{
+            Point::new_scale(150,100),
+            Point::new_scale(200,100),
+            Point::new_scale(200,200),
+            Point::new_scale(100,200),
+            Point::new_scale(100,100)} );
         THEN("It has 4 convex points counterclockwise"){
             REQUIRE(square.concave_points(PI*4/3).size() == 0);
             REQUIRE(square.convex_points(PI*2/3).size() == 4);
         }
     }
     GIVEN("A Square with an extra collinear vertex in different order"){
-        Slic3r::Polygon square /*new_scale*/{ std::vector<Point>{
-            Point{200,200},
-            Point{100,200},
-            Point{100,100},
-            Point{150,100},
-            Point{200,100}} };
+        Slic3r::Polygon square /*new_scale*/( Points{
+            Point::new_scale(200,200),
+            Point::new_scale(100,200),
+            Point::new_scale(100,100),
+            Point::new_scale(150,100),
+            Point::new_scale(200,100)} );
         THEN("It has 4 convex points counterclockwise"){
             REQUIRE(square.concave_points(PI*4/3).size() == 0);
             REQUIRE(square.convex_points(PI*2/3).size() == 4);
@@ -324,11 +444,11 @@ SCENARIO("Polygon convex/concave detection"){
     }
 
     GIVEN("A triangle"){
-        Slic3r::Polygon triangle{ std::vector<Point>{
+        Slic3r::Polygon triangle( Points{
             Point{16000170,26257364},
             Point{714223,461012},
             Point{31286371,461008}
-        } };
+        } );
         THEN("it has three convex vertices"){
             REQUIRE(triangle.concave_points(PI*4/3).size() == 0);
             REQUIRE(triangle.convex_points(PI*2/3).size() == 3);
@@ -336,12 +456,12 @@ SCENARIO("Polygon convex/concave detection"){
     }
 
     GIVEN("A triangle with an extra collinear point"){
-        Slic3r::Polygon triangle{ std::vector<Point>{
+        Slic3r::Polygon triangle( Points{
             Point{16000170,26257364},
             Point{714223,461012},
             Point{20000000,461012},
             Point{31286371,461012}
-        } };
+        } );
         THEN("it has three convex vertices"){
             REQUIRE(triangle.concave_points(PI*4/3).size() == 0);
             REQUIRE(triangle.convex_points(PI*2/3).size() == 3);
@@ -350,7 +470,7 @@ SCENARIO("Polygon convex/concave detection"){
     GIVEN("A polygon with concave vertices with angles of specifically 4/3pi"){
         // Two concave vertices of this polygon have angle = PI*4/3, so this test fails
         // if epsilon is not used.
-        Slic3r::Polygon polygon{ std::vector<Point>{
+        Slic3r::Polygon polygon( Points{
             Point{60246458,14802768},Point{64477191,12360001},
             Point{63727343,11060995},Point{64086449,10853608},
             Point{66393722,14850069},Point{66034704,15057334},
@@ -359,7 +479,7 @@ SCENARIO("Polygon convex/concave detection"){
             Point{61137680,41850279},Point{67799985,30310848},
             Point{51399866,1905506},Point{38092663,1905506},
             Point{38092663,692699},Point{52100125,692699}
-        } };
+        } );
         THEN("the correct number of points are detected"){
             REQUIRE(polygon.concave_points(PI*4/3).size() == 6);
             REQUIRE(polygon.convex_points(PI*2/3).size() == 10);
@@ -368,9 +488,9 @@ SCENARIO("Polygon convex/concave detection"){
 }
 
 TEST_CASE("Triangle Simplification does not result in less than 3 points"){
-    Slic3r::Polygon triangle{ std::vector<Point>{
+    Slic3r::Polygon triangle( Points{
         Point{16000170,26257364}, Point{714223,461012}, Point{31286371,461008}
-    } };
+    } );
     REQUIRE(triangle.simplify(250000).at(0).points.size() == 3);
 }
 

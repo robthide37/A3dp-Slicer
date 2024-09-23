@@ -3,7 +3,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
-#include "Jobs/ArrangeJob.hpp"
+// #include "Jobs/ArrangeJob2.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI.hpp"
 #include "GUI_ObjectList.hpp"
@@ -232,7 +232,7 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         current_obj->config.set_key_value("fill_density", new ConfigOptionPercent(0));
         //current_obj->config.set_key_value("fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
         current_obj->config.set_key_value("only_one_perimeter_top", new ConfigOptionBool(false));
-        current_obj->config.set_key_value("overhangs_width_speed", new ConfigOptionFloatOrPercent(0,false));
+        current_obj->config.set_key_value("overhangs_width_speed", (new ConfigOptionFloatOrPercent(0,false))->set_can_be_disabled(true));
         current_obj->config.set_key_value("thin_walls", new ConfigOptionBool(true));
         current_obj->config.set_key_value("thin_walls_min_width", new ConfigOptionFloatOrPercent(2,true));
         current_obj->config.set_key_value("gap_fill_enabled", new ConfigOptionBool(false));
@@ -283,11 +283,12 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        arranger.prepare_all();
-        arranger.process();
-        arranger.finalize();
+        plat->arrange();
+        // std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
+        // ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
+        // arranger.prepare_all();
+        // arranger.process();
+        // arranger.finalize();
     }
 
     plat->reslice();

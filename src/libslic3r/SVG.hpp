@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2016 - 2022 Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/
+///|/ ported from lib/Slic3r/SVG.pm:
+///|/ Copyright (c) Prusa Research 2018 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_SVG_hpp_
 #define slic3r_SVG_hpp_
 
@@ -53,8 +62,8 @@ public:
     void draw_outline(const Surface &surface, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
     void draw(const Surfaces &surfaces, std::string fill = "grey", const float fill_opacity=1.f);
     void draw_outline(const Surfaces &surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
-    void draw(const SurfacesPtr& surfaces, std::string fill = "grey", const float fill_opacity = 1.f);
-    void draw_outline(const SurfacesPtr& surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
+    //void draw(const SurfacesPtr& surfaces, std::string fill = "grey", const float fill_opacity = 1.f);
+    //void draw_outline(const SurfacesPtr& surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
     void draw(const SurfacesConstPtr& surfaces, std::string fill = "grey", const float fill_opacity = 1.f);
     void draw_outline(const SurfacesConstPtr& surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
  
@@ -171,9 +180,9 @@ public:
         { export_expolygons(path.c_str(), expolygons_with_attributes); }
 
 private:
-    static float    to_svg_coord(float x) throw() { return unscale<float>(x) * 10.f; }
-    static float    to_svg_x(float x) throw() { return to_svg_coord(x); }
-    float           to_svg_y(float x) const throw() { return flipY ? this->height - to_svg_coord(x) : to_svg_coord(x); }
+    static float to_svg_coord(float x) throw();
+    static float to_svg_x(float x) throw() { return to_svg_coord(x); }
+           float to_svg_y(float x) const throw() { return flipY ? this->height - to_svg_coord(x) : to_svg_coord(x); }
 };
 
 }

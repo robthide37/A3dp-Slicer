@@ -2,13 +2,13 @@
 #define slic3r_GCode_FanMover_hpp_
 
 
-#include "../libslic3r.h"
-#include "../PrintConfig.hpp"
-#include "../ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/GCodeReader.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/libslic3r.h"
 
-#include "../Point.hpp"
-#include "../GCodeReader.hpp"
-#include "../GCodeWriter.hpp"
 #include <regex>
 
 namespace Slic3r {
@@ -45,7 +45,7 @@ private:
     const GCodeWriter& m_writer;
 
     //current value (at the back of the buffer), when parsing a new line
-    ExtrusionRole current_role = ExtrusionRole::erCustom;
+    GCodeExtrusionRole current_role = GCodeExtrusionRole::Custom;
     // in unit/second
     double m_current_speed = 1000 / 60.0;
     bool m_is_custom_gcode = false;

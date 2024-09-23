@@ -16,16 +16,19 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: build deps & slicer
-      run: ./BuildMacOS.sh
-    - name: copy zstd
-      run: cp /usr/local/opt/zstd/lib/libzstd.1.dylib ./build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app/Contents/MacOS/libzstd.1.dylib
-    - name: relink zstd
-      run: install_name_tool -change /usr/local/opt/zstd/lib/libzstd.1.dylib  @executable_path/libzstd.1.dylib ./build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app/Contents/MacOS/${{ github.event.repository.name }}
-    - name: create the dmg
+    - name: check autoconf version
+      run: autoconf --version
+    - name: update automake for mpfr
       run: |
-        hdiutil create -ov -fs HFS+ -volname ${{ github.event.repository.name }} -srcfolder "build/pack/${{ github.event.repository.name }}" temp.dmg
-        hdiutil convert temp.dmg -format UDZO -o ${{ github.event.repository.name }}.dmg
+        curl -O -L http://ftpmirror.gnu.org/automake/automake-1.16.5.tar.gz
+        tar -xzf automake-1.16.5.tar.gz
+        cd automake-*
+        ./configure
+        make
+        sudo make install
+        automake --version
+    - name: build deps & slicer
+      run: ./BuildMacOS.sh -dsi
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:

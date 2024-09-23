@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2016 - 2021 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 // Optimize the extrusion simulator to the bones.
 //#pragma GCC optimize ("O3")
 //#undef SLIC3R_DEBUG
@@ -695,13 +699,16 @@ void gcode_spread_points(
 			}
 		}
 		*/
-		float area_total     = 0;
-		float volume_total   = 0;
-		float volume_excess  = 0;
-		float volume_deficit = 0;
-		size_t n_cells = 0;
-		float area_circle_total = 0; 
+
+		float area_total   = 0;
+		float volume_total = 0;
+		size_t n_cells     = 0;
+
 #if 0
+        float volume_excess     = 0;
+        float volume_deficit    = 0;
+        float area_circle_total = 0;
+
 		// The intermediate lines.
 		for (int j = row_first; j < row_last; ++ j) {
 			const std::pair<float, float> &span1 = spans[j];
@@ -755,7 +762,11 @@ void gcode_spread_points(
 				cell.volume  = acc[j][i];
 				cell.area    = mask[j][i];
 				assert(cell.area >= 0.f && cell.area <= 1.000001f);
-				area_circle_total += area;
+
+#if 0
+                area_circle_total += area;
+#endif
+
 				if (cell.area < area)
 					cell.area = area;
 				cell.fraction_covered = std::clamp((cell.area > 0) ? (area / cell.area) : 0, 0.f, 1.f);
@@ -765,10 +776,15 @@ void gcode_spread_points(
 				}
 				float cell_height = cell.volume / cell.area;
 				cell.excess_height = cell_height - height_target;
+
+#if 0
+                area_circle_total += area;
 				if (cell.excess_height > 0.f)
 					volume_excess  += cell.excess_height * cell.area * cell.fraction_covered;
 				else
 					volume_deficit -= cell.excess_height * cell.area * cell.fraction_covered;
+#endif
+
 				volume_total += cell.volume * cell.fraction_covered;
 				area_total   += cell.area * cell.fraction_covered;
 			}
@@ -949,6 +965,7 @@ void ExtrusionSimulator::reset_accumulator()
 	// printf("Reset accumulator, done.\n");
 }
 
+//not used
 void ExtrusionSimulator::extrude_to_accumulator(const ExtrusionPath &path, const Point &shift, ExtrusionSimulationType simulationType)
 {
 	// printf("Extruding a path. Nr points: %d, width: %f, height: %f\r\n", path.polyline.points.size(), path.width, path.height);
@@ -957,15 +974,16 @@ void ExtrusionSimulator::extrude_to_accumulator(const ExtrusionPath &path, const
 	polyline.reserve(path.polyline.size());
 	float scalex  = float(viewport.size().x()) / float(bbox.size().x());
 	float scaley  = float(viewport.size().y()) / float(bbox.size().y());
-	float w = scale_(path.width) * scalex;
+	float w = scale_(path.width()) * scalex;
 	//float h = scale_(path.height) * scalex;
-	w = scale_(path.mm3_per_mm / path.height) * scalex;
+	w = scale_(path.mm3_per_mm() / path.height()) * scalex;
 	// printf("scalex: %f, scaley: %f\n", scalex, scaley);
 	// printf("bbox: %d,%d %d,%d\n", bbox.min.x(), bbox.min.y, bbox.max.x(), bbox.max.y);
-	for (Points::const_iterator it = path.polyline.get_points().begin(); it != path.polyline.get_points().end(); ++ it) {
+	//for (Points::const_iterator it = path.polyline.get_points().begin(); it != path.polyline.get_points().end(); ++ it) {
+	for (Point &p : path.polyline.to_polyline()) {
 		// printf("point %d,%d\n", it->x+shift.x(), it->y+shift.y);
 		ExtrusionPoint ept;
-		ept.center = V2f(float((*it)(0)+shift.x()-bbox.min.x()) * scalex, float((*it)(1)+shift.y()-bbox.min.y()) * scaley);
+		ept.center = V2f(float(p.x()+shift.x()-bbox.min.x()) * scalex, float(p.y()+shift.y()-bbox.min.y()) * scaley);
 		ept.radius = w/2.f;
 		ept.height = 0.5f;
 		polyline.push_back(ept.center);

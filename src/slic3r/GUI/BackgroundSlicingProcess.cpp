@@ -1,8 +1,15 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Lukáš Matěna @lukasmatena, Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros, Roman Beránek @zavorka, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2022 ole00 @ole00
+///|/ Copyright (c) 2021 Ilya @xorza
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "BackgroundSlicingProcess.hpp"
 #include "GUI_App.hpp"
 #include "GUI.hpp"
 #include "MainFrame.hpp"
 #include "format.hpp"
+#include "libslic3r/GCode/Thumbnails.hpp"
 
 #include <wx/app.h>
 #include <wx/panel.h>
@@ -20,7 +27,6 @@
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
-#include "libslic3r/Format/Format.hpp"
 #include "libslic3r/Format/SL1.hpp"
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/libslic3r.h"
@@ -81,11 +87,11 @@ std::pair<std::string, bool> SlicingProcessCompletedEvent::format_error_message(
 	bool        monospace = false;
 	try {
 		this->rethrow_exception();
-    } catch (const std::bad_alloc& ex) {
-        std::string errmsg = GUI::format(_u8L("%1% has encountered an error. It was likely caused by running out of memory. "
+    } catch (const std::bad_alloc &ex) {
+		error = GUI::format(_L("%1% has encountered an error. It was likely caused by running out of memory. "
                               "If you are sure you have enough RAM on your system, this may also be a bug and we would "
                               "be glad if you reported it."), SLIC3R_APP_NAME);
-        error = errmsg + "\n\n" + std::string(ex.what());
+        error += "\n\n" + std::string(ex.what());
 #ifdef WIN32
         error += " \nPlease join the 'crash_log.txt' file (if it exists) content to your report.";
 #endif
@@ -158,7 +164,7 @@ std::string BackgroundSlicingProcess::output_filepath_for_project(const boost::f
 void BackgroundSlicingProcess::process_fff()
 {
 	assert(m_print == m_fff_print);
-    m_print->process();
+	m_print->process();
 	wxCommandEvent evt(m_event_slicing_completed_id);
 	// Post the Slicing Finished message for the G-code viewer to update.
 	// Passing the timestamp 
@@ -173,23 +179,12 @@ void BackgroundSlicingProcess::process_fff()
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
 			prepare_upload();
 	    } else {
-			// m_print->set_status(60, _utf8(L("Slicing complete")));
+			//m_print->set_status(100, _u8L("Slicing complete"));
 	    }
 		this->set_step_done(bspsGCodeFinalize);
 	}
 	evt.SetInt((int)(m_fff_print->step_state_with_timestamp(PrintStep::psGCodeExport).timestamp));
 	wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
-}
-
-static void write_thumbnail(Zipper& zipper, const ThumbnailData& data)
-{
-    size_t png_size = 0;
-    void* png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)data.pixels.data(), data.width, data.height, 4, &png_size, MZ_DEFAULT_LEVEL, 1);
-    if (png_data != nullptr)
-    {
-        zipper.add_entry("thumbnail/thumbnail" + std::to_string(data.width) + "x" + std::to_string(data.height) + ".png", (const std::uint8_t*)png_data, png_size);
-        mz_free(png_data);
-    }
 }
 
 void BackgroundSlicingProcess::process_sla()
@@ -207,20 +202,13 @@ void BackgroundSlicingProcess::process_sla()
 
             ThumbnailsList thumbnails = this->render_thumbnails(
                 ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->get_values(), true, true, true, true});
+			m_sla_print->export_print(export_path, thumbnails);
 
-            Zipper zipper(export_path);
-            m_sla_archive->export_print(zipper, *m_sla_print);
-                for (const ThumbnailData& data : thumbnails)
-                    if (data.is_valid())
-                        write_thumbnail(zipper, data);
-            zipper.finalize();
-
-            m_print->set_status(100, (boost::format(_utf8(L("Masked SLA file exported to %1%"))) % export_path).str());
         } else if (! m_upload_job.empty()) {
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
             prepare_upload();
         } else {
-			m_print->set_status(100, _utf8(L("Slicing complete")));
+			m_print->set_status(100, _u8L("Slicing complete"));
         }
         this->set_step_done(bspsGCodeFinalize);
     }
@@ -230,6 +218,12 @@ void BackgroundSlicingProcess::thread_proc()
 {
     set_current_thread_name("slic3r_BgSlcPcs");
     name_tbb_thread_pool_threads_set_locale();
+
+    // Set "C" locales and enforce OSX QoS level on all threads entering an arena.
+    // The cost of the callback is quite low: The callback is called once per thread
+    // entering a parallel loop and the callback is guarded with a thread local
+    // variable to be executed just once.
+	TBBLocalesSetter setter;
 
 	assert(m_print != nullptr);
 	assert(m_print == m_fff_print || m_print == m_sla_print);
@@ -265,6 +259,9 @@ void BackgroundSlicingProcess::thread_proc()
 				(m_state == STATE_CANCELED) ? SlicingProcessCompletedEvent::Cancelled :
 				exception ? SlicingProcessCompletedEvent::Error : SlicingProcessCompletedEvent::Finished, exception);
         	wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
+        	// Cancelled by the user, not internally, thus cleanup() was not called yet.
+        	// Otherwise cleanup() is called from Print::apply()
+        	m_print->cleanup();
         }
 	    m_print->restart();
 		lck.unlock();
@@ -600,10 +597,10 @@ bool BackgroundSlicingProcess::empty() const
 	return m_print->empty();
 }
 
-std::pair<PrintBase::PrintValidationError, std::string> BackgroundSlicingProcess::validate(std::string* warning)
+std::pair<PrintBase::PrintValidationError, std::string> BackgroundSlicingProcess::validate(std::vector<std::string>* warnings)
 {
 	assert(m_print != nullptr);
-    return m_print->validate(warning);
+    return m_print->validate(warnings);
 }
 
 // Apply config over the print. Returns false, if the new config values caused any of the already
@@ -630,10 +627,6 @@ Print::ApplyStatus BackgroundSlicingProcess::apply(const Model &model, const Dyn
 		// In addition, this early memory deallocation reduces memory footprint.
 		if (m_gcode_result != nullptr)
 			m_gcode_result->reset();
-	}
-	if (invalidated && m_print->technology() == ptSLA) {
-			m_sla_archive = Slic3r::get_output_format(config);
-			m_sla_print->set_printer(m_sla_archive);
 	}
 	return invalidated;
 }
@@ -721,7 +714,7 @@ bool BackgroundSlicingProcess::invalidate_all_steps()
 // Copy the final G-code to target location (possibly a SD card, if it is a removable media, then verify that the file was written without an error).
 void BackgroundSlicingProcess::finalize_gcode()
 {
-	m_print->set_status(95, _utf8(L("Running post-processing scripts")));
+	m_print->set_status(95, _u8L("Running post-processing scripts"));
 
 	// Perform the final post-processing of the export path by applying the print statistics over the file name.
 	std::string export_path = m_fff_print->print_statistics().finalize_output_path(m_export_path);
@@ -754,32 +747,32 @@ void BackgroundSlicingProcess::finalize_gcode()
 	catch (...)
 	{
 		remove_post_processed_temp_file();
-		throw Slic3r::ExportError(_utf8(L("Unknown error occured during exporting G-code.")));
+		throw Slic3r::ExportError(_u8L("Unknown error occured during exporting G-code."));
 	}
 	switch (copy_ret_val) {
 	case CopyFileResult::SUCCESS: break; // no error
 	case CopyFileResult::FAIL_COPY_FILE:
-		throw Slic3r::ExportError((boost::format(_utf8(L("Copying of the temporary G-code to the output G-code failed. Maybe the SD card is write locked?\nError message: %1%"))) % error_message).str());
+		throw Slic3r::ExportError(GUI::format(_L("Copying of the temporary G-code to the output G-code failed. Maybe the SD card is write locked?\nError message: %1%"), error_message));
 		break;
 	case CopyFileResult::FAIL_FILES_DIFFERENT:
-		throw Slic3r::ExportError((boost::format(_utf8(L("Copying of the temporary G-code to the output G-code failed. There might be problem with target device, please try exporting again or using different device. The corrupted output G-code is at %1%.tmp."))) % export_path).str());
+		throw Slic3r::ExportError(GUI::format(_L("Copying of the temporary G-code to the output G-code failed. There might be problem with target device, please try exporting again or using different device. The corrupted output G-code is at %1%.tmp."), export_path));
 		break;
 	case CopyFileResult::FAIL_RENAMING:
-		throw Slic3r::ExportError((boost::format(_utf8(L("Renaming of the G-code after copying to the selected destination folder has failed. Current path is %1%.tmp. Please try exporting again."))) % export_path).str());
+		throw Slic3r::ExportError(GUI::format(_L("Renaming of the G-code after copying to the selected destination folder has failed. Current path is %1%.tmp. Please try exporting again."), export_path));
 		break;
 	case CopyFileResult::FAIL_CHECK_ORIGIN_NOT_OPENED:
-		throw Slic3r::ExportError((boost::format(_utf8(L("Copying of the temporary G-code has finished but the original code at %1% couldn't be opened during copy check. The output G-code is at %2%.tmp."))) % output_path % export_path).str());
+		throw Slic3r::ExportError(GUI::format(_L("Copying of the temporary G-code has finished but the original code at %1% couldn't be opened during copy check. The output G-code is at %2%.tmp."), output_path, export_path));
 		break;
 	case CopyFileResult::FAIL_CHECK_TARGET_NOT_OPENED:
-		throw Slic3r::ExportError((boost::format(_utf8(L("Copying of the temporary G-code has finished but the exported code couldn't be opened during copy check. The output G-code is at %1%.tmp."))) % export_path).str());
+		throw Slic3r::ExportError(GUI::format(_L("Copying of the temporary G-code has finished but the exported code couldn't be opened during copy check. The output G-code is at %1%.tmp."), export_path));
 		break;
 	default:
-		throw Slic3r::ExportError(_utf8(L("Unknown error occured during exporting G-code.")));
+		throw Slic3r::ExportError(_u8L("Unknown error occured during exporting G-code."));
 		BOOST_LOG_TRIVIAL(error) << "Unexpected fail code(" << (int)copy_ret_val << ") durring copy_file() to " << export_path << ".";
 		break;
 	}
 
-	m_print->set_status(100, (boost::format(_utf8(L("G-code file exported to %1%"))) % export_path).str());
+	m_print->set_status(100, GUI::format(_L("G-code file exported to %1%"), export_path));
 }
 
 // A print host upload job has been scheduled, enqueue it to the printhost job queue
@@ -790,10 +783,10 @@ void BackgroundSlicingProcess::prepare_upload()
 		/ boost::filesystem::unique_path("." SLIC3R_APP_KEY ".upload.%%%%-%%%%-%%%%-%%%%");
 
 	if (m_print == m_fff_print) {
-		m_print->set_status(90, _utf8(L("Running post-processing scripts")));
+		m_print->set_status(90, _u8L("Running post-processing scripts"));
 		std::string error_message;
 		if (copy_file(m_temp_output_path, source_path.string(), error_message) != SUCCESS)
-			throw Slic3r::RuntimeError(_utf8(L("Copying of the temporary G-code to the output G-code failed")));
+			throw Slic3r::RuntimeError("Copying of the temporary G-code to the output G-code failed");
 		m_upload_job.upload_data.upload_path = m_fff_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
         // Make a copy of the source path, as run_post_process_scripts() is allowed to change it when making a copy of the source file
         // (not here, but when the final target is a file). 
@@ -803,19 +796,12 @@ void BackgroundSlicingProcess::prepare_upload()
 			m_upload_job.upload_data.upload_path = output_name_str;
     } else if (m_print == m_sla_print) {
 		m_upload_job.upload_data.upload_path = m_sla_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
-        
-        ThumbnailsList thumbnails = this->render_thumbnails(
-        	ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->get_values(), true, true, true, true});
-																												 // true, false, true, true); // renders also supports and pad
-        Zipper zipper{source_path.string()};
-        m_sla_archive->export_print(zipper, *m_sla_print, m_upload_job.upload_data.upload_path.string());
-            for (const ThumbnailData& data : thumbnails)
-                if (data.is_valid())
-                    write_thumbnail(zipper, data);
-        zipper.finalize();
+        Vec2ds sizes = current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->get_values();
+        ThumbnailsList thumbnails = this->render_thumbnails(ThumbnailsParams{ sizes, true, true, true, true });
+        m_sla_print->export_print(source_path.string(),thumbnails, m_upload_job.upload_data.upload_path.filename().string());
     }
 
-	m_print->set_status(100, (boost::format(_utf8(L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"))) % m_upload_job.printhost->get_host()).str());
+    m_print->set_status(100, GUI::format(_L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"), m_upload_job.printhost->get_host()));
 
 	m_upload_job.upload_data.source_path = std::move(source_path);
 

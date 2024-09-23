@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Enrico Turri @enricoturri1966, David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GLToolbar_hpp_
 #define slic3r_GLToolbar_hpp_
 
@@ -153,7 +157,8 @@ public:
     // returns true if the state changes
     bool update_enabled_state();
 
-    void render(unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const;
+    void render(const GLCanvas3D& parent, unsigned int tex_id, float left, float right, float bottom, float top, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const;
+
 private:
     void set_visible(bool visible) { m_data.visible = visible; }
 
@@ -246,7 +251,7 @@ private:
     GLTexture m_icons_texture;
     bool m_icons_texture_dirty;
     BackgroundTexture m_background_texture;
-    BackgroundTexture m_arrow_texture;
+    GLTexture m_arrow_texture;
     Layout m_layout;
 
     ItemsList m_items;
@@ -273,7 +278,7 @@ public:
 
     bool init(const BackgroundTexture::Metadata& background_texture);
 
-    bool init_arrow(const BackgroundTexture::Metadata& arrow_texture);
+    bool init_arrow(const std::string& filename);
 
     Layout::EType get_layout_type() const;
     void set_layout_type(Layout::EType type);
@@ -344,7 +349,7 @@ private:
     int contains_mouse_horizontal(const Vec2d& mouse_pos, const GLCanvas3D& parent) const;
     int contains_mouse_vertical(const Vec2d& mouse_pos, const GLCanvas3D& parent) const;
 
-    void render_background(float left, float top, float right, float bottom, float border) const;
+    void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
     void render_horizontal(const GLCanvas3D& parent);
     void render_vertical(const GLCanvas3D& parent);
 

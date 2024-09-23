@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv, Filip Sykala @Jony01, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Exception.hpp"
 #include "MeshBoolean.hpp"
 #include "libslic3r/TriangleMesh.hpp"
@@ -137,7 +141,8 @@ inline Vec3f to_vec3f(const _EpecMesh::Point& v)
     return { float(iv.x()), float(iv.y()), float(iv.z()) };
 }
 
-template<class _Mesh> TriangleMesh cgal_to_triangle_mesh(const _Mesh &cgalmesh)
+template<class _Mesh>
+indexed_triangle_set cgal_to_indexed_triangle_set(const _Mesh &cgalmesh)
 {
     indexed_triangle_set its;
     its.vertices.reserve(cgalmesh.num_vertices());
@@ -147,12 +152,12 @@ template<class _Mesh> TriangleMesh cgal_to_triangle_mesh(const _Mesh &cgalmesh)
     const auto &vertices = cgalmesh.vertices();
     int vsize = int(vertices.size());
 
-    for (auto &vi : vertices) {
+    for (const auto &vi : vertices) {
         auto &v = cgalmesh.point(vi); // Don't ask...
         its.vertices.emplace_back(to_vec3f(v));
     }
 
-    for (auto &face : faces) {
+    for (const auto &face : faces) {
         auto vtc = cgalmesh.vertices_around_face(cgalmesh.halfedge(face));
 
         int i = 0;
@@ -167,7 +172,7 @@ template<class _Mesh> TriangleMesh cgal_to_triangle_mesh(const _Mesh &cgalmesh)
             its.indices.emplace_back(facet);
     }
     
-    return TriangleMesh(std::move(its));
+    return its;
 }
 
 std::unique_ptr<CGALMesh, CGALMeshDeleter>
@@ -181,7 +186,12 @@ triangle_mesh_to_cgal(const std::vector<stl_vertex> &V,
 
 TriangleMesh cgal_to_triangle_mesh(const CGALMesh &cgalmesh)
 {
-    return cgal_to_triangle_mesh(cgalmesh.m);
+    return TriangleMesh{cgal_to_indexed_triangle_set(cgalmesh.m)};
+}
+
+indexed_triangle_set cgal_to_indexed_triangle_set(const CGALMesh &cgalmesh)
+{
+    return cgal_to_indexed_triangle_set(cgalmesh.m);
 }
 
 // /////////////////////////////////////////////////////////////////////////////
@@ -236,16 +246,28 @@ bool does_self_intersect(const CGALMesh &mesh) { return CGALProc::does_self_inte
 // Now the public functions for TriangleMesh input:
 // /////////////////////////////////////////////////////////////////////////////
 
+template<class Op> void _mesh_boolean_do(Op &&op, indexed_triangle_set &A, const indexed_triangle_set &B)
+{
+    CGALMesh meshA;
+    CGALMesh meshB;
+    triangle_mesh_to_cgal(A.vertices, A.indices, meshA.m);
+    triangle_mesh_to_cgal(B.vertices, B.indices, meshB.m);
+    
+    _cgal_do(op, meshA, meshB);
+    
+    A = cgal_to_indexed_triangle_set(meshA.m);
+}
+
 template<class Op> void _mesh_boolean_do(Op &&op, TriangleMesh &A, const TriangleMesh &B)
 {
     CGALMesh meshA;
     CGALMesh meshB;
     triangle_mesh_to_cgal(A.its.vertices, A.its.indices, meshA.m);
     triangle_mesh_to_cgal(B.its.vertices, B.its.indices, meshB.m);
-    
+
     _cgal_do(op, meshA, meshB);
-    
-    A = cgal_to_triangle_mesh(meshA.m);
+
+    A = cgal_to_triangle_mesh(meshA);
 }
 
 void minus(TriangleMesh &A, const TriangleMesh &B)
@@ -263,6 +285,21 @@ void intersect(TriangleMesh &A, const TriangleMesh &B)
     _mesh_boolean_do(_cgal_intersection, A, B);
 }
 
+void minus(indexed_triangle_set &A, const indexed_triangle_set &B)
+{
+    _mesh_boolean_do(_cgal_diff, A, B);
+}
+
+void plus(indexed_triangle_set &A, const indexed_triangle_set &B)
+{
+    _mesh_boolean_do(_cgal_union, A, B);
+}
+
+void intersect(indexed_triangle_set &A, const indexed_triangle_set &B)
+{
+    _mesh_boolean_do(_cgal_intersection, A, B);
+}
+
 bool does_self_intersect(const TriangleMesh &mesh)
 {
     CGALMesh cgalm;
@@ -274,12 +311,17 @@ void CGALMeshDeleter::operator()(CGALMesh *ptr) { delete ptr; }
 
 bool does_bound_a_volume(const CGALMesh &mesh)
 {
-    return CGALProc::does_bound_a_volume(mesh.m);
+    return CGAL::is_closed(mesh.m) && CGALProc::does_bound_a_volume(mesh.m);
 }
 
 bool empty(const CGALMesh &mesh)
 {
     return mesh.m.is_empty();
+}
+
+CGALMeshPtr clone(const CGALMesh &m)
+{
+    return CGALMeshPtr{new CGALMesh{m}};
 }
 
 } // namespace cgal

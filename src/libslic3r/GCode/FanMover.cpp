@@ -267,7 +267,6 @@ void FanMover::_process_T(const std::string_view command)
 void FanMover::_process_ACTIVATE_EXTRUDER(const std::string_view cmd)
 {
     if (size_t cmd_end = cmd.find("ACTIVATE_EXTRUDER"); cmd_end != std::string::npos) {
-        bool   error              = false;
         size_t extruder_pos_start = cmd.find("EXTRUDER", cmd_end + std::string_view("ACTIVATE_EXTRUDER").size()) + std::string_view("EXTRUDER").size();
         assert(cmd[extruder_pos_start - 1] == 'R');
         if (extruder_pos_start != std::string::npos) {
@@ -360,7 +359,7 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
                             //this fan speed will be printed, to make and end to the kickstart
                         }
                     } else {
-                        if (nb_seconds_delay > 0 && (!only_overhangs || current_role == ExtrusionRole::erOverhangPerimeter)) {
+                        if (nb_seconds_delay > 0 && (!only_overhangs || current_role == GCodeExtrusionRole::OverhangPerimeter)) {
                             //don't put this command in the queue
                             time = -1;
                             // this M106 need to go in the past
@@ -469,14 +468,17 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
             if (line.raw().size() > 10 && line.raw().rfind(";TYPE:", 0) == 0) {
                 // get the type of the next extrusions
                 std::string extrusion_string = line.raw().substr(6, line.raw().size() - 6);
-                current_role = ExtrusionEntity::string_to_role(extrusion_string);
+                current_role                 = string_to_gcode_extrusion_role(extrusion_string);
+                assert(current_role != GCodeExtrusionRole::None);
             }
             if (line.raw().size() > 16) {
-                if (line.raw().rfind("; custom gcode", 0) != std::string::npos)
-                    if (line.raw().rfind("; custom gcode end", 0) != std::string::npos)
+                if (line.raw().rfind("; custom gcode", 0) != std::string::npos) {
+                    if (line.raw().rfind("; custom gcode end", 0) != std::string::npos) {
                         m_is_custom_gcode = false;
-                    else
+                    } else {
                         m_is_custom_gcode = true;
+                    }
+                }
             }
         }
     }
@@ -545,7 +547,8 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
     // puts the line back into the gcode
     //if buffer too big, flush it.
     if (time >= 0) {
-        while (!m_buffer.empty() && (need_flush || m_buffer_time_size - m_buffer.front().time > nb_seconds_delay - EPSILON) ){
+        // Add EPSILON to allow to have a buffer even with 0 m_buffer_time_size, so multiple consecutive M106 can be culled.
+        while (!m_buffer.empty() && (need_flush || m_buffer_time_size - m_buffer.front().time > nb_seconds_delay + EPSILON) ){
             write_buffer_data();
         }
     }

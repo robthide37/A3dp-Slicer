@@ -97,7 +97,7 @@ is currently unsupported because some of the dependencies don't support this, mo
 Please note that the `CMAKE_OSX_DEPLOYMENT_TARGET` and `CMAKE_OSX_SYSROOT` options need to be set the same
 on both the dependencies bundle as well as Slic3r itself.
 
-Official Mac Slic3r builds are currently built against SDK 10.9 to ensure compatibility with older Macs.
+Official macOS Slic3r builds are currently (as of Slic3r 2.5) built against SDK 10.12 to ensure compatibility with older Macs.
 
 _Warning:_ XCode may be set such that it rejects SDKs bellow some version (silently, more or less).
 This is set in the property list file
@@ -106,6 +106,27 @@ This is set in the property list file
 
 To remove the limitation, simply delete the key `MinimumSDKVersion` from that file.
 
+## Troubleshooting
+
+### `CMath::CMath` target not found
+
+At the moment (20.2.2024) PrusaSlicer cannot be built with CMake 3.28+. Use [CMake 3.27](https://github.com/Kitware/CMake/releases/tag/v3.27.9) instead. 
+If you install the CMake application from [universal DMG](https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-macos-universal.dmg), you can invoke the CMake like this:
+
+```
+/Applications/CMake.app/Contents/bin/cmake
+```
+
+### Running `cmake -GXCode` fails with `No CMAKE_CXX_COMPILER could be found.` 
+
+- If XCode command line tools wasn't already installed, run:
+    ```
+     sudo xcode-select --install
+    ```
+- If XCode command line tools are already installed, run:
+    ```
+    sudo xcode-select --reset
+    ```
 
 # TL; DR
 

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Tomáš Mészáros @tamasmeszaros, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_LocalesUtils_hpp_
 #define slic3r_LocalesUtils_hpp_
 
@@ -46,6 +50,7 @@ void remove_not_ascii(std::string &tomodify);
 std::string float_to_string_decimal_point(double value, int precision = -1);
 //std::string float_to_string_decimal_point(float value,  int precision = -1);
 double string_to_double_decimal_point(const std::string_view str, size_t* pos = nullptr);
+float  string_to_float_decimal_point (const std::string_view str, size_t* pos = nullptr);
 
 // Set locales to "C".
 inline void set_c_locales()

@@ -2,10 +2,11 @@
 
 #include <memory>
 
-#include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
 
 using namespace Slic3r;
 
+//note: erased by prusa, maybe it's wrong now?
 SCENARIO("lift() is not ignored after unlift() at normal values of Z", "[GCodeWriter]") {
     GIVEN("A config from a file and a single extruder.") {
         GCodeWriter writer;

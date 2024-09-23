@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Pavel Mikuš @Godrak, Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Filip Sykala @Jony01, David Kocík @kocikdav, Roman Beránek @zavorka, Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2021 Justin Schuh @jschuh
+///|/ Copyright (c) Slic3r 2013 - 2015 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Utils.hpp"
 #include "I18N.hpp"
 
@@ -9,6 +15,7 @@
 
 #include "Platform.hpp"
 #include "Time.hpp"
+#include "format.hpp"
 #include "libslic3r.h"
 
 #ifdef WIN32
@@ -132,33 +139,22 @@ unsigned get_logging_level()
 }
 
 // Force set_logging_level(<=error) after loading of the DLL.
-// This is currently only needed if libslic3r is loaded as a shared library into Perl interpreter
-// to perform unit and integration tests.
+// This is used ot disable logging for unit and integration tests.
 static struct RunOnInit {
-    RunOnInit() { 
+    RunOnInit() {
         set_logging_level(1);
     }
 } g_RunOnInit;
 
-void trace(unsigned int level, const std::string& message)
+void enforce_thread_count(const std::size_t count)
 {
-	trace(level, message.c_str());
-}
-void trace(unsigned int level, const char *message)
-{
-    boost::log::trivial::severity_level severity = level_to_boost(level);
-
-    BOOST_LOG_STREAM_WITH_PARAMS(::boost::log::trivial::logger::get(),\
-        (::boost::log::keywords::severity = severity)) << message;
-}
-
-void disable_multi_threading()
-{
-    // Disable parallelization so the Shiny profiler works
+    // Disable parallelization to simplify debugging.
 #ifdef TBB_HAS_GLOBAL_CONTROL
-    tbb::global_control(tbb::global_control::max_allowed_parallelism, 1);
+	{
+		static tbb::global_control gc(tbb::global_control::max_allowed_parallelism, count);
+	}
 #else // TBB_HAS_GLOBAL_CONTROL
-    static tbb::task_scheduler_init *tbb_init = new tbb::task_scheduler_init(1);
+    static tbb::task_scheduler_init *tbb_init = new tbb::task_scheduler_init(count);
     UNUSED(tbb_init);
 #endif // TBB_HAS_GLOBAL_CONTROL
 }
@@ -217,6 +213,18 @@ const std::string& sys_shapes_dir()
 	return g_sys_shapes_dir;
 }
 
+static std::string g_custom_gcodes_dir;
+
+void set_custom_gcodes_dir(const std::string &dir)
+{
+    g_custom_gcodes_dir = dir;
+}
+
+const std::string& custom_gcodes_dir()
+{
+    return g_custom_gcodes_dir;
+}
+
 // Translate function callback, to call wxWidgets translate function to convert non-localized UTF8 string to a localized one.
 Slic3r::I18N::translate_fn_type Slic3r::I18N::translate_fn = nullptr;
 
@@ -224,9 +232,9 @@ static std::string g_data_dir;
 
 void set_data_dir(const std::string &dir)
 {
-	// make sure the path is well formed for the os.
-	boost::filesystem::path fixpath(dir);
-	g_data_dir = fixpath.make_preferred().string();
+    // make sure the path is well formed for the os.
+    boost::filesystem::path fixpath(dir);
+    g_data_dir = fixpath.make_preferred().string();
 }
 
 const std::string& data_dir()
@@ -928,7 +936,8 @@ bool is_idx_file(const boost::filesystem::directory_entry &dir_entry)
 bool is_gcode_file(const std::string &path)
 {
 	return boost::iends_with(path, ".gcode") || boost::iends_with(path, ".gco") ||
-		   boost::iends_with(path, ".g")     || boost::iends_with(path, ".ngc");
+					 boost::iends_with(path, ".g") || boost::iends_with(path, ".ngc") ||
+					 boost::iends_with(path, ".bgcode") || boost::iends_with(path, ".bgc");
 }
 
 bool is_img_file(const std::string &path)
@@ -1075,18 +1084,6 @@ size_t get_utf8_sequence_length(const char *seq, size_t size)
 	return length;
 }
 
-namespace PerlUtils {
-    // Get a file name including the extension.
-    std::string path_to_filename(const char *src)       { return boost::filesystem::path(src).filename().string(); }
-    // Get a file name without the extension.
-    std::string path_to_stem(const char *src)           { return boost::filesystem::path(src).stem().string(); }
-    // Get just the extension.
-    std::string path_to_extension(const char *src)      { return boost::filesystem::path(src).extension().string(); }
-    // Get a directory without the trailing slash.
-    std::string path_to_parent_path(const char *src)    { return boost::filesystem::path(src).parent_path().string(); }
-};
-
-
 std::string string_printf(const char *format, ...)
 {
     va_list args1;
@@ -1103,9 +1100,11 @@ std::string string_printf(const char *format, ...)
         buffer.resize(size_t(bufflen) + 1);
         ::vsnprintf(buffer.data(), buffer.size(), format, args2);
     }
+
+    va_end(args1);
+    va_end(args2);
     
     buffer.resize(bufflen);
-    
     return buffer;
 }
 
@@ -1114,23 +1113,23 @@ bool config_file_header_with_date = true;
 
 void set_header_generate_with_date(bool with_date)
 {
-	config_file_header_with_date = with_date;
+    config_file_header_with_date = with_date;
 }
 
 std::string header_slic3r_generated()
 {
-	if (config_file_header_with_date)
-		return std::string("generated by " SLIC3R_APP_KEY " " SLIC3R_VERSION_FULL " on ") + Utils::utc_timestamp();
-	else
-		return std::string("generated by " SLIC3R_APP_KEY " " SLIC3R_VERSION " on");
+    if (config_file_header_with_date)
+        return std::string("generated by " SLIC3R_APP_KEY " " SLIC3R_VERSION_FULL " on ") + Utils::utc_timestamp();
+    else
+        return std::string("generated by " SLIC3R_APP_KEY " " SLIC3R_VERSION " on");
 }
 
 std::string header_gcodeviewer_generated()
 {
-	if (config_file_header_with_date)
-		return std::string("generated by " GCODEVIEWER_APP_KEY " " SLIC3R_VERSION_FULL " on ") + Utils::utc_timestamp();
-	else
-		return std::string("generated by " GCODEVIEWER_APP_KEY " " SLIC3R_VERSION " on");
+    if (config_file_header_with_date)
+        return std::string("generated by " GCODEVIEWER_APP_KEY " " SLIC3R_VERSION_FULL " on ") + Utils::utc_timestamp();
+    else
+        return std::string("generated by " GCODEVIEWER_APP_KEY " " SLIC3R_VERSION " on");
 }
 
 unsigned get_current_pid()
@@ -1159,7 +1158,7 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
         case '\'': replacement = "&apos;"; break;
         case '&':  replacement = "&amp;";  break;
         case '<':  replacement = is_marked ? "<" :"&lt;"; break;
-        case '>':  replacement = is_marked ? ">" :"&gt;"; break;
+        case '>': replacement = is_marked ? ">" : "&gt;"; break;
         default: break;
         }
 
@@ -1168,6 +1167,89 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
     }
 
     return text;
+}
+
+// Definition of escape symbols https://www.w3.org/TR/REC-xml/#AVNormalize
+// During the read of xml attribute normalization of white spaces is applied
+// Soo for not lose white space character it is escaped before store
+std::string xml_escape_double_quotes_attribute_value(std::string text)
+{
+    std::string::size_type pos = 0;
+    for (;;) {
+        pos = text.find_first_of("\"&<\r\n\t", pos);
+        if (pos == std::string::npos) break;
+
+        std::string replacement;
+        switch (text[pos]) {
+        case '\"': replacement = "&quot;"; break;
+        case '&': replacement = "&amp;"; break;
+        case '<': replacement = "&lt;"; break;
+        case '\r': replacement = "&#xD;"; break;
+        case '\n': replacement = "&#xA;"; break;
+        case '\t': replacement = "&#x9;"; break;
+        default: break;
+        }
+
+        text.replace(pos, 1, replacement);
+        pos += replacement.size();
+    }
+
+    return text;
+}
+
+std::string short_time(const std::string &time, bool force_localization /*= false*/)
+{
+	// Parse the dhms time format.
+	int days = 0;
+	int hours = 0;
+	int minutes = 0;
+	int seconds = 0;
+	if (time.find('d') != std::string::npos)
+		::sscanf(time.c_str(), "%dd %dh %dm %ds", &days, &hours, &minutes, &seconds);
+	else if (time.find('h') != std::string::npos)
+		::sscanf(time.c_str(), "%dh %dm %ds", &hours, &minutes, &seconds);
+	else if (time.find('m') != std::string::npos)
+		::sscanf(time.c_str(), "%dm %ds", &minutes, &seconds);
+	else if (time.find('s') != std::string::npos)
+		::sscanf(time.c_str(), "%ds", &seconds);
+	// Round to full minutes.
+	if (days + hours + minutes > 0 && seconds >= 30) {
+		if (++minutes == 60) {
+			minutes = 0;
+			if (++hours == 24) {
+				hours = 0;
+				++days;
+			}
+		}
+	}
+
+	// Format the dhm time
+
+	if (force_localization) {
+		auto get_d = [days]() { return format(_u8L("%1%d"), days); };
+		auto get_h = [hours]() { return format(_u8L("%1%h"), hours); };
+		// TRN "m" means "minutes"
+		auto get_m = [minutes]() { return format(_u8L("%1%m"), minutes); };
+
+		if (days > 0)
+			return get_d() + get_h() + get_m();
+		if (hours > 0)
+			return get_h() + get_m();
+		if (minutes > 0)
+			return get_m();
+		return format(_u8L("%1%s"), seconds);
+	}
+
+	char buffer[64];
+	if (days > 0)
+		::sprintf(buffer, "%dd%dh%dm", days, hours, minutes);
+	else if (hours > 0)
+		::sprintf(buffer, "%dh%dm", hours, minutes);
+	else if (minutes > 0)
+		::sprintf(buffer, "%dm", minutes);
+	else
+		::sprintf(buffer, "%ds", seconds);
+    return buffer;
 }
 
 std::string format_memsize_MB(size_t n) 

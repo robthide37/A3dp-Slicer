@@ -38,6 +38,7 @@ TEST_CASE("Skirt height is honored", "[Skirt]") {
     	{ "support_material_speed", 99 },
 		// avoid altering speeds unexpectedly
     	{ "cooling", 				false },
+        // avoid altering speeds unexpectedly
     	{ "first_layer_speed", 		"100%" }
     });
 

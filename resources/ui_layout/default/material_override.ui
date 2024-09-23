@@ -1,0 +1,26 @@
+page:Material Overrides:wrench
+group:Support head
+	line:Pinhead front diameter
+		setting:id$0:material_ow_support_head_front_diameter
+		setting:id$0:material_ow_branchingsupport_head_front_diameter
+	end_line
+	line:Head penetration
+		setting:id$0:material_ow_support_head_penetration
+		setting:id$0:material_ow_branchingsupport_head_penetration
+	end_line
+	line:Pinhead width
+		setting:id$0:material_ow_support_head_width
+		setting:id$0:material_ow_branchingsupport_head_width
+	end_line
+group:Support pillar
+	line:Pillar diameter
+		setting:id$0:material_ow_support_pillar_diameter
+		setting:id$0:material_ow_branchingsupport_pillar_diameter
+	end_line
+group:Automatic generation
+	setting:id$0:material_ow_support_points_density_relative
+group:Corrections
+	setting:id$0:material_ow_relative_correction_x
+	setting:id$0:material_ow_relative_correction_y
+	setting:id$0:material_ow_relative_correction_z
+	setting:id$0:material_ow_first_layer_size_compensation

@@ -15,15 +15,7 @@ jobs:
       with:
         ref: 'debug_macos'
     - name: build deps & slicer
-      run: ./BuildMacOS.sh -b
-    - name: copy zstd
-      run: cp /usr/local/opt/zstd/lib/libzstd.1.dylib ./build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app/Contents/MacOS/libzstd.1.dylib
-    - name: relink zstd
-      run: install_name_tool -change /usr/local/opt/zstd/lib/libzstd.1.dylib  @executable_path/libzstd.1.dylib ./build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app/Contents/MacOS/${{ github.event.repository.name }}
-    - name: create the dmg
-      run: |
-        hdiutil create -ov -fs HFS+ -volname ${{ github.event.repository.name }} -srcfolder build/pack/${{ github.event.repository.name }} temp.dmg
-        hdiutil convert temp.dmg -format UDZO -o ${{ github.event.repository.name }}.dmg
+      run: ./BuildMacOS.sh -bdsi
     - name: tar the pack
       working-directory: ./build
       run: ls

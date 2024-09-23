@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, Lukáš Matěna @lukasmatena
+///|/ Copyright (c) 2017 Eyal Soha
+///|/
+///|/ ported from lib/Slic3r/Fill/PlanePath.pm:
+///|/ Copyright (c) Prusa Research 2016 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -421,7 +430,7 @@ public:
 //        bool sticks_removed = 
         remove_sticks(polygons_src);
         //        if (sticks_removed) BOOST_LOG_TRIVIAL(error) << "Sticks removed!";
-        polygons_outer = aoffset1 == 0 ? polygons_src : offset(polygons_src, float(aoffset1), ClipperLib::jtMiter, miterLimit);
+        polygons_outer = aoffset1 == 0 ? to_polygons(polygons_src) : offset(polygons_src, float(aoffset1), ClipperLib::jtMiter, miterLimit);
         if (aoffset2 < 0)
             polygons_inner = shrink(polygons_outer, float(aoffset1 - aoffset2), ClipperLib::jtMiter, miterLimit);
         // Filter out contours with zero area or small area, contours with 2 points only.
@@ -2575,7 +2584,7 @@ static std::vector<MonotonicRegionLink> chain_monotonic_regions(
 
     // Probability (unnormalized) of traversing a link between two monotonic regions.
 	auto path_probability = [
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__clang__)
         // clang complains when capturing constexpr constants.
         pheromone_alpha, pheromone_beta
 #endif // __APPLE__
@@ -2919,6 +2928,8 @@ static void polylines_from_paths(const std::vector<MonotonicRegionLink>& path, c
 
 bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillParams &params, float angleBase, float pattern_shift, Polylines &polylines_out) const
 {
+    surface->expolygon.assert_valid();
+
     // At the end, only the new polylines will be rotated back.
     size_t n_polylines_out_initial = polylines_out.size();
 
@@ -3068,15 +3079,20 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
 #endif /* SLIC3R_DEBUG */
 
     // paths must be rotated back
-    for (Polylines::iterator it = polylines_out.begin() + n_polylines_out_initial; it != polylines_out.end(); ++ it) {
+    for (Polylines::iterator it = polylines_out.begin() + n_polylines_out_initial; it != polylines_out.end();) {
         // No need to translate, the absolute position is irrelevant.
         // it->translate(- rotate_vector.second(0), - rotate_vector.second(1));
-        //assert(! it->has_duplicate_points());
+        // assert(! it->has_duplicate_points());
         it->remove_duplicate_points();
         it->rotate(rotate_vector.first);
-        //FIXME rather simplify the paths to avoid very short edges?
-        //assert(! it->has_duplicate_points());
-        it->remove_duplicate_points();
+        // simplify the paths to avoid very short edges
+        it->douglas_peucker(params.fill_resolution);
+        if (it->length() <= params.fill_resolution) {
+            it = polylines_out.erase(it);
+        } else {
+            it->assert_valid();
+            ++it;
+        }
     }
 
 #ifdef SLIC3R_DEBUG
@@ -3157,6 +3173,9 @@ bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillPar
             params);
     }
 
+    assert_valid(fill_lines); // totest, remove if triggered, else remove this & ensure_valid
+    ensure_valid(fill_lines, params.fill_resolution);
+
     if (params.dont_connect() || fill_lines.size() <= 1) {
         if (fill_lines.size() > 1)
             fill_lines = chain_polylines(std::move(fill_lines));
@@ -3164,6 +3183,8 @@ bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillPar
     } else
         connect_infill(std::move(fill_lines), surface->expolygon, poly_with_offset_base.polygons_outer, polylines_out, scale_t(this->get_spacing()), params);
 
+    ensure_valid(polylines_out, params.fill_resolution);
+    assert_valid(polylines_out);
     return true;
 }
 
@@ -3181,7 +3202,18 @@ Polylines FillMonotonic::fill_surface(const Surface *surface, const FillParams &
     params2.monotonic = true;
     Polylines polylines_out;
     if (!fill_surface_by_lines(surface, params2, 0.f, 0.f, polylines_out))
-        BOOST_LOG_TRIVIAL(error) << "FillMonotonous::fill_surface() failed to fill a region.";
+        BOOST_LOG_TRIVIAL(error) << "FillMonotonic::fill_surface() failed to fill a region.";
+    return polylines_out;
+}
+
+Polylines FillMonotonicLines::fill_surface(const Surface *surface, const FillParams &params) const
+{
+    FillParams params2 = params;
+    params2.monotonic = true;
+    params2.anchor_length_max = 0.0f;
+    Polylines polylines_out;
+    if (! fill_surface_by_lines(surface, params2, 0.f, 0.f, polylines_out))
+        BOOST_LOG_TRIVIAL(error) << "FillMonotonicLines::fill_surface() failed to fill a region.";
     return polylines_out;
 }
 
@@ -3242,6 +3274,7 @@ Polylines FillSupportBase::fill_surface(const Surface *surface, const FillParams
         coord_t line_spacing = _line_spacing_for_density(params);
         // Create infill lines, keep them vertical.
         make_fill_lines(poly_with_offset, rotate_vector.second.rotated(- rotate_vector.first), 0, 0, line_spacing, 0, fill_lines, params);
+        assert_valid(fill_lines);
 
         // Both the poly_with_offset and polylines_out are rotated, so the infill lines are strictly vertical.
         connect_base_support(std::move(fill_lines), poly_with_offset.polygons_outer, poly_with_offset.bounding_box_outer(), polylines_out,  _line_spacing_for_density(params), params);
@@ -3252,6 +3285,7 @@ Polylines FillSupportBase::fill_surface(const Surface *surface, const FillParams
             for (Point &pt : pl.points)
                 pt.rotate(cos_a, sin_a);
     }
+    ensure_valid(polylines_out, params.fill_resolution);
     return polylines_out;
 }
 
@@ -3342,7 +3376,10 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
             if (!poly.is_valid()) continue;
 
             ExtrusionMultiPath3D *extrusions = new ExtrusionMultiPath3D();
-            extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() * params.flow_mult, params.flow.width() * params.flow_mult, params.flow.height(), false));
+            extrusions->paths.push_back(ExtrusionPath3D(ExtrusionAttributes{good_role,
+                                                                            {params.flow.mm3_per_mm() * params.flow_mult,
+                                                                             params.flow.width() * params.flow_mult, params.flow.height()}},
+                                                        false));
             ExtrusionPath3D *current_extrusion = &(extrusions->paths.back());
             const Points &pts = poly.points;
             coord_t next_zhop = tooth_spacing_min + (coord_t)abs((rand() / (float)RAND_MAX) * (tooth_spacing_max - tooth_spacing_min));
@@ -3384,13 +3421,20 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                     }
 
                     //add new extrusion that go up with nozzle_flow
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.nozzle_diameter() * params.flow.nozzle_diameter() * PI / 4, params.flow.nozzle_diameter(), params.flow.nozzle_diameter(), false));
+                    extrusions->paths.push_back(
+                        ExtrusionPath3D(ExtrusionAttributes{good_role,
+                                                            {params.flow.nozzle_diameter() * params.flow.nozzle_diameter() * PI / 4,
+                                                             params.flow.nozzle_diameter(), params.flow.nozzle_diameter()}},
+                                        false));
                     current_extrusion = &(extrusions->paths.back());
                     current_extrusion->push_back(last, 0);
                     current_extrusion->push_back(last, tooth_zhop);
 
                     //add new extrusion that move a bit to let the place for the nozzle tip
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, 0, params.flow.nozzle_diameter() / 10, params.flow.nozzle_diameter() / 10, false));
+                    extrusions->paths.push_back(
+                        ExtrusionPath3D(ExtrusionAttributes{good_role,
+                                                            {0, params.flow.nozzle_diameter() / 10, params.flow.nozzle_diameter() / 10}},
+                                        false));
                     current_extrusion = &(extrusions->paths.back());
                     //add first point
                     current_extrusion->push_back(last, tooth_zhop);
@@ -3400,7 +3444,11 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                     current_extrusion->push_back(last, tooth_zhop);
 
                     // add new extrusion that go down with no nozzle_flow / sqrt(2)
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() / std::sqrt(2), float(params.flow.width() / std::sqrt(2)), params.flow.height(), false));
+                    extrusions->paths.push_back(
+                        ExtrusionPath3D(ExtrusionAttributes{good_role,
+                                                            {params.flow.mm3_per_mm() / std::sqrt(2),
+                                                             float(params.flow.width() / std::sqrt(2)), params.flow.height()}},
+                                        false));
                     current_extrusion = &(extrusions->paths.back());
                     current_extrusion->push_back(last, tooth_zhop);
                     //add next point at scaled_nozzle_diam distance
@@ -3409,7 +3457,11 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                     current_extrusion->push_back(last, 0);
 
                     // now go back to normal flow
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() * params.flow_mult, params.flow.width() * params.flow_mult, params.flow.height(), false));
+                    extrusions->paths.push_back(
+                        ExtrusionPath3D(ExtrusionAttributes{good_role,
+                                                            {params.flow.mm3_per_mm() * params.flow_mult,
+                                                             params.flow.width() * params.flow_mult, params.flow.height()}},
+                                        false));
                     current_extrusion = &(extrusions->paths.back());
                     //add first point
                     current_extrusion->push_back(last, 0);
@@ -3451,8 +3503,10 @@ FillRectilinearWGapFill::split_polygon_gap_fill(const Surface &surface, const Fi
     ExPolygons rectilinear_areas2 = offset2_ex(ExPolygons{ surface.expolygon }, -params.flow.scaled_spacing() * factor2, params.flow.scaled_spacing() * factor2);
     //choose the best one
     rectilinear = rectilinear_areas1.size() <= rectilinear_areas2.size() + 1 || rectilinear_areas2.empty() ? rectilinear_areas1 : rectilinear_areas2;
+    ensure_valid(rectilinear);
     //get gapfill
     gapfill = diff_ex(ExPolygons{ surface.expolygon }, rectilinear);
+    ensure_valid(gapfill);
 }
 
 void
@@ -3485,7 +3539,7 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
     FillParams params_monotonic = params;
     params_monotonic.monotonic = is_monotonic();
     for (const ExPolygon &rectilinear_area : rectilinear_areas) {
-        rectilinear_surface.expolygon = rectilinear_area, 0 - 0.5 * params.flow.scaled_spacing();
+        rectilinear_surface.expolygon = rectilinear_area;
         if (!fill_surface_by_lines(&rectilinear_surface, params_monotonic, 0.f, 0.f, polylines_rectilinear)) {
             printf("FillRectilinear2::fill_surface() failed to fill a region.\n");
         }
@@ -3503,16 +3557,15 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
             eec->set_can_sort_reverse(!this->no_sort(), !this->no_sort());
 
         extrusion_entities_append_paths(
-            *eec, polylines_rectilinear,
-            good_role,
-            params.flow.mm3_per_mm() * params.flow_mult,
-            params.flow.width() * params.flow_mult,
-            params.flow.height(),
-            !is_monotonic());
+            *eec, std::move(polylines_rectilinear),
+                    ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult,
+                                                                 params.flow.width() * params.flow_mult,
+                                                                 params.flow.height()}},
+                    true);
 
         coll_nosort->append(ExtrusionEntitiesPtr{ eec });
 
-        unextruded_areas = diff_ex(rectilinear_areas, union_safety_offset_ex(eec->polygons_covered_by_spacing(params.flow.spacing_ratio(), 10)));
+        unextruded_areas = ensure_valid(params.fill_resolution, diff_ex(rectilinear_areas, union_safety_offset_ex(eec->polygons_covered_by_spacing(params.flow.spacing_ratio(), 10))));
     }
     else
         unextruded_areas = rectilinear_areas;
@@ -3520,6 +3573,8 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
     //gapfill
     gapfill_areas.insert(gapfill_areas.end(), unextruded_areas.begin(), unextruded_areas.end());
     gapfill_areas = union_safety_offset_ex(gapfill_areas);
+    ensure_valid(gapfill_areas, params.fill_resolution);
+    assert_valid(gapfill_areas);
     if (gapfill_areas.size() > 0) {
         const double minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
         for (int i = 0; i < gapfill_areas.size(); i++) {

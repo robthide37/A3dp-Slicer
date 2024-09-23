@@ -1,23 +1,53 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef OPENVDBUTILS_HPP
 #define OPENVDBUTILS_HPP
 
 #include <libslic3r/TriangleMesh.hpp>
 
-#ifdef _MSC_VER
-// Suppress warning C4146 in include/gmp.h(2177,31): unary minus operator applied to unsigned type, result still unsigned 
-#pragma warning(push)
-#pragma warning(disable : 4146)
-#endif // _MSC_VER
-#include <openvdb/openvdb.h>
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif // _MSC_VER
-
 namespace Slic3r {
 
-inline Vec3f to_vec3f(const openvdb::Vec3s &v) { return Vec3f{v.x(), v.y(), v.z()}; }
-inline Vec3d to_vec3d(const openvdb::Vec3s &v) { return to_vec3f(v).cast<double>(); }
-inline Vec3i32 to_vec3i32(const openvdb::Vec3I &v) { return Vec3i32{int(v[0]), int(v[1]), int(v[2])}; }
+struct VoxelGrid;
+struct VoxelGridDeleter { void operator()(VoxelGrid *ptr); };
+using VoxelGridPtr = std::unique_ptr<VoxelGrid, VoxelGridDeleter>;
+
+// This is like std::make_unique for a voxelgrid
+template<class... Args> VoxelGridPtr make_voxelgrid(Args &&...args);
+
+// Default constructed voxelgrid can be obtained this way.
+extern template VoxelGridPtr make_voxelgrid<>();
+
+void reset_accessor(const VoxelGrid &vgrid);
+
+double get_distance_raw(const Vec3f &p, const VoxelGrid &interior);
+
+float get_voxel_scale(const VoxelGrid &grid);
+
+VoxelGridPtr clone(const VoxelGrid &grid);
+
+class MeshToGridParams {
+    Transform3f        m_tr                = Transform3f::Identity();
+    float              m_voxel_scale       = 1.f;
+    float              m_exteriorBandWidth = 3.0f;
+    float              m_interiorBandWidth = 3.0f;
+
+    std::function<bool(int)> m_statusfn;
+
+public:
+    MeshToGridParams & trafo(const Transform3f &v) { m_tr = v; return *this; }
+    MeshToGridParams & voxel_scale(float v) { m_voxel_scale = v; return *this; }
+    MeshToGridParams & exterior_bandwidth(float v) { m_exteriorBandWidth = v; return *this; }
+    MeshToGridParams & interior_bandwidth(float v) { m_interiorBandWidth = v; return *this; }
+    MeshToGridParams & statusfn(std::function<bool(int)> fn) { m_statusfn = fn; return *this; }
+
+    const Transform3f& trafo() const noexcept { return m_tr; }
+    float voxel_scale() const noexcept { return m_voxel_scale; }
+    float exterior_bandwidth() const noexcept { return m_exteriorBandWidth; }
+    float interior_bandwidth() const noexcept { return m_interiorBandWidth; }
+    const std::function<bool(int)>& statusfn() const noexcept { return m_statusfn; }
+};
 
 // Here voxel_scale defines the scaling of voxels which affects the voxel count.
 // 1.0 value means a voxel for every unit cube. 2 means the model is scaled to
@@ -26,24 +56,32 @@ inline Vec3i32 to_vec3i32(const openvdb::Vec3I &v) { return Vec3i32{int(v[0]), i
 // achievable through the Transform parameter. (TODO: or is it?)
 // The resulting grid will contain the voxel_scale in its metadata under the
 // "voxel_scale" key to be used in grid_to_mesh function.
-openvdb::FloatGrid::Ptr mesh_to_grid(const indexed_triangle_set &    mesh,
-                                     const openvdb::math::Transform &tr = {},
-                                     float voxel_scale                  = 1.f,
-                                     float exteriorBandWidth = 3.0f,
-                                     float interiorBandWidth = 3.0f);
+VoxelGridPtr mesh_to_grid(const indexed_triangle_set &mesh,
+                          const MeshToGridParams &params = {});
 
-indexed_triangle_set grid_to_mesh(const openvdb::FloatGrid &grid,
-                                  double                    isovalue   = 0.0,
-                                  double                    adaptivity = 0.0,
+indexed_triangle_set grid_to_mesh(const VoxelGrid &grid,
+                                  double           isovalue      = 0.0,
+                                  double           adaptivity    = 0.0,
                                   bool relaxDisorientedTriangles = true);
 
-openvdb::FloatGrid::Ptr redistance_grid(const openvdb::FloatGrid &grid,
-                                        double                    iso);
+VoxelGridPtr dilate_grid(const VoxelGrid &grid,
+                         float            exteriorBandWidth = 3.0f,
+                         float            interiorBandWidth = 3.0f);
 
-openvdb::FloatGrid::Ptr redistance_grid(const openvdb::FloatGrid &grid,
-                                        double                    iso,
-                                        double ext_range,
-                                        double int_range);
+VoxelGridPtr redistance_grid(const VoxelGrid &grid, float iso);
+
+VoxelGridPtr redistance_grid(const VoxelGrid &grid,
+                             float            iso,
+                             float            ext_range,
+                             float            int_range);
+
+void rescale_grid(VoxelGrid &grid, float scale);
+
+void grid_union(VoxelGrid &grid, VoxelGrid &arg);
+void grid_difference(VoxelGrid &grid, VoxelGrid &arg);
+void grid_intersection(VoxelGrid &grid, VoxelGrid &arg);
+
+bool is_grid_empty(const VoxelGrid &grid);
 
 } // namespace Slic3r
 

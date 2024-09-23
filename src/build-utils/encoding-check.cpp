@@ -1,6 +1,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <cstdlib>
 
 
@@ -80,9 +81,7 @@ int main(int argc, char const *argv[])
     const char* filename = argv[2];
 
     const auto error_exit = [=](const char* error) {
-        std::cerr << "\n\tError: " << error << ": " << filename << "\n"
-            << "\tTarget: " << target << "\n"
-            << std::endl;
+        std::cerr << "Target: " << target << " @"<< filename << "\n\tError: " << error << std::endl;
         std::exit(-2);
     };
 
@@ -100,8 +99,16 @@ int main(int argc, char const *argv[])
         buffer.push_back('\0');
 
         // Check UTF-8 validity
-        if (utf8_check(reinterpret_cast<unsigned char*>(buffer.data())) != nullptr) {
-            error_exit("Source file does not contain (valid) UTF-8");
+        unsigned char* start = reinterpret_cast<unsigned char*>(buffer.data());
+        unsigned char* problem = utf8_check(start);
+        if (problem != nullptr) {
+            std::string msg = "Source file does not contain (valid) UTF-8 @pos:";
+            msg += std::to_string(size_t(problem) - size_t(start));
+            msg += " with these characters before: '";
+            for(unsigned char* c=std::max(start, problem-10); c<problem; ++c)
+                msg+= *c;
+            msg += "'";
+            error_exit(msg.c_str());
         }
 
         // Check against a BOM mark

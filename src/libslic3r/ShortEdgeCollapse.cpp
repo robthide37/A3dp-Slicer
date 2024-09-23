@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2022 - 2023 Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ShortEdgeCollapse.hpp"
 #include "libslic3r/NormalUtils.hpp"
 
@@ -5,6 +9,8 @@
 #include <unordered_set>
 #include <random>
 #include <algorithm>
+
+#include <ankerl/unordered_dense.h>
 
 namespace Slic3r {
 
@@ -97,7 +103,8 @@ void its_short_edge_collpase(indexed_triangle_set &mesh, size_t target_triangle_
 
         //shuffle the faces and traverse in random order, this MASSIVELY improves the quality of the result
         std::shuffle(face_indices.begin(), face_indices.end(), generator);
-
+        
+        int allowed_face_removals = int(face_indices.size()) - int(target_triangle_count);
         for (const size_t &face_idx : face_indices) {
             if (face_removal_flags[face_idx]) {
                 // if face already removed from previous collapses, skip (each collapse removes two triangles [at least] )
@@ -130,10 +137,13 @@ void its_short_edge_collpase(indexed_triangle_set &mesh, size_t target_triangle_
                 // remove faces
                 remove_face(face_idx, neighbor_to_remove_face_idx);
                 remove_face(neighbor_to_remove_face_idx, face_idx);
+                allowed_face_removals-=2;
 
                 // break. this triangle is done
                 break;
             }
+
+            if (allowed_face_removals <= 0) { break; }
         }
 
         // filter face_indices, remove those that have been collapsed
@@ -151,7 +161,7 @@ void its_short_edge_collpase(indexed_triangle_set &mesh, size_t target_triangle_
     }
 
     //Extract the result mesh
-    std::unordered_map<size_t, size_t> final_vertices_mapping;
+    ankerl::unordered_dense::map<size_t, size_t> final_vertices_mapping;
     std::vector<Vec3f> final_vertices;
     std::vector<Vec3i32> final_indices;
     final_indices.reserve(face_indices.size());

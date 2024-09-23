@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2018 Martin Loidl @LoidlM
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_PrintHostSendDialog_hpp_
 #define slic3r_PrintHostSendDialog_hpp_
 
@@ -28,17 +33,21 @@ namespace GUI {
 class PrintHostSendDialog : public GUI::MsgDialog
 {
 public:
-    PrintHostSendDialog(const boost::filesystem::path &path, PrintHostPostUploadActions post_actions, const wxArrayString& groups);
+    PrintHostSendDialog(const boost::filesystem::path &path, PrintHostPostUploadActions post_actions, const wxArrayString& groups, const wxArrayString& storage_paths, const wxArrayString& storage_names);
     boost::filesystem::path filename() const;
     PrintHostPostUploadAction post_action() const;
     std::string group() const;
+    std::string storage() const;
 
     virtual void EndModal(int ret) override;
 private:
     wxTextCtrl *txt_filename;
     wxComboBox *combo_groups;
+    wxComboBox* combo_storage;
     PrintHostPostUploadAction post_upload_action;
     wxString    m_valid_suffix;
+    wxString    m_preselected_storage;
+    wxArrayString m_paths;
 };
 
 
@@ -50,11 +59,13 @@ public:
     public:
         size_t job_id;
         int progress = 0;    // in percent
-        wxString error;
+        wxString tag;
+        wxString status;
 
         Event(wxEventType eventType, int winid, size_t job_id);
         Event(wxEventType eventType, int winid, size_t job_id, int progress);
         Event(wxEventType eventType, int winid, size_t job_id, wxString error);
+        Event(wxEventType eventType, int winid, size_t job_id, wxString tag, wxString status);
 
         virtual wxEvent *Clone() const;
     };
@@ -110,6 +121,7 @@ private:
     EventGuard on_progress_evt;
     EventGuard on_error_evt;
     EventGuard on_cancel_evt;
+    EventGuard on_info_evt;
 
     JobState get_state(int idx);
     void set_state(int idx, JobState);
@@ -117,6 +129,7 @@ private:
     void on_progress(Event&);
     void on_error(Event&);
     void on_cancel(Event&);
+    void on_info(Event&);
     // This vector keep adress and filename of uploads. It is used when checking for running uploads during exit.
     std::vector<std::pair<std::string, std::string>> upload_names;
     void save_user_data(int);
@@ -126,7 +139,7 @@ private:
 wxDECLARE_EVENT(EVT_PRINTHOST_PROGRESS, PrintHostQueueDialog::Event);
 wxDECLARE_EVENT(EVT_PRINTHOST_ERROR, PrintHostQueueDialog::Event);
 wxDECLARE_EVENT(EVT_PRINTHOST_CANCEL, PrintHostQueueDialog::Event);
-
+wxDECLARE_EVENT(EVT_PRINTHOST_INFO, PrintHostQueueDialog::Event);
 }}
 
 #endif

@@ -3,7 +3,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
-#include "Jobs/ArrangeJob.hpp"
+//#include "Jobs/ArrangeJob2.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI.hpp"
 #include "GUI_ObjectList.hpp"
@@ -169,6 +169,8 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
         if (z_step == 0)
             z_step = 0.1;
         double max_height = full_print_config.get_computed_value("max_layer_height",0);
+        if (max_height < EPSILON || !full_print_config.option("max_layer_height")->is_enabled())
+            max_height = 0.75 * nozzle_diameter;
         if (max_height > first_layer_height + z_step)
             for (size_t i = 0; i < nb_items; i++)
                 model.objects[objs_idx[i]]->config.set_key_value("first_layer_height", new ConfigOptionFloatOrPercent(first_layer_height + z_step, false));
@@ -192,11 +194,21 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        arranger.prepare_all();
-        arranger.process();
-        arranger.finalize();
+        plat->arrange();
+        //std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
+        //arr2::Scene arrscene{build_scene(*plat, ArrangeSelectionMode::Full)};
+        //ArrangeJob2::Callbacks cbs;
+        //ArrangeJob2 arranger(std::move(arrscene), cbs);
+        //auto m_task = arr2::ArrangeTask<arr2::ArrangeItem>::create(arrscene);
+        //int count = m_task->item_count_to_process();
+        //if (count > 0) {
+        //    m_result = m_task->process_native(taskctl);
+        //    arranger.process();
+        //    ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
+        //    arranger.prepare_all();
+        //    arranger.process();
+        //    arranger.finalize();
+        //}
     }
 
     plat->reslice();

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "../ClipperUtils.hpp"
 #include "../ExPolygon.hpp"
 #include "../Surface.hpp"
@@ -316,9 +320,9 @@ std::pair<double, double> adaptive_fill_line_spacing(const PrintObject &print_ob
         for (const Layer *layer : print_object.layers())
             for (size_t region_id = 0; region_id < layer->regions().size(); ++ region_id) {
                 RegionFillData &rd = region_fill_data[region_id];
-                if (rd.has_adaptive_infill == Tristate::Maybe && ! layer->regions()[region_id]->fill_surfaces.empty())
+                if (rd.has_adaptive_infill == Tristate::Maybe && ! layer->regions()[region_id]->fill_surfaces().empty())
                     rd.has_adaptive_infill = Tristate::Yes;
-                if (rd.has_support_infill == Tristate::Maybe && ! layer->regions()[region_id]->fill_surfaces.empty())
+                if (rd.has_support_infill == Tristate::Maybe && ! layer->regions()[region_id]->fill_surfaces().empty())
                     rd.has_support_infill = Tristate::Yes;
             }
 

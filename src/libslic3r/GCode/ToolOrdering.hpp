@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2017 - 2023 Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 // Ordering of the tools to minimize tool switches.
 
 #ifndef slic3r_ToolOrdering_hpp_
@@ -6,6 +10,7 @@
 #include "../libslic3r.h"
 
 #include <utility>
+#include <cstddef>
 
 #include <boost/container/small_vector.hpp>
 
@@ -14,6 +19,7 @@ namespace Slic3r {
 class Print;
 class PrintObject;
 class LayerTools;
+class ToolOrdering;
 namespace CustomGCode { struct Item; }
 class PrintRegion;
 
@@ -24,54 +30,51 @@ class WipingExtrusions
 {
 public:
     bool is_anything_overridden() const {   // if there are no overrides, all the agenda can be skipped - this function can tell us if that's the case
-        return something_overridden;
+        return m_something_overridden;
     }
 
     // When allocating extruder overrides of an object's ExtrusionEntity, overrides for maximum 3 copies are allocated in place.
-    typedef boost::container::small_vector<int32_t, 3> ExtruderPerCopy;
+    using ExtruderPerCopy =
+#ifdef NDEBUG
+        boost::container::small_vector<int32_t, 3>;
+#else // NDEBUG
+        std::vector<int32_t>;
+#endif // NDEBUG
 
-    // This is called from GCode::process_layer - see implementation for further comments:
-    const ExtruderPerCopy* get_extruder_overrides(const ExtrusionEntity* entity, int correct_extruder_id, size_t num_of_copies);
+    // This is called from GCode::process_layer_single_object()
+    // Returns positive number if the extruder is overridden.
+    // Returns -1 if not.
+    int get_extruder_override(const ExtrusionEntity* entity, uint32_t instance_id) const {
+        auto entity_map_it = m_entity_map.find(entity);
+        return entity_map_it == m_entity_map.end() ? -1 : entity_map_it->second[instance_id];
+    }
 
     // This function goes through all infill entities(), decides which ones will be used for wiping and
     // marks them by the extruder id. Returns volume that remains to be wiped on the wipe tower:
-    float mark_wiping_extrusions(const Print& print, uint16_t old_extruder, uint16_t new_extruder, float volume_to_wipe);
+    float mark_wiping_extrusions(const Print& print, const LayerTools& lt, uint16_t old_extruder, uint16_t new_extruder, float volume_to_wipe);
 
-    void ensure_perimeters_infills_order(const Print& print);
+    void ensure_perimeters_infills_order(const Print& print, const LayerTools& lt);
 
-    bool is_overriddable(const ExtrusionEntityCollection& ee, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region) const;
-    bool is_overriddable_and_mark(const ExtrusionEntityCollection& ee, const PrintConfig& print_config, const PrintObject& object, const PrintRegion& region) {
-    	bool out = this->is_overriddable(ee, print_config, object, region);
-    	this->something_overridable |= out;
-    	return out;
-    }
-
-    void set_layer_tools_ptr(const LayerTools* lt) { m_layer_tools = lt; }
+    void set_something_overridable() { m_something_overridable = true; }
 
 private:
-    int first_nonsoluble_extruder_on_layer(const PrintConfig& print_config) const;
-    int last_nonsoluble_extruder_on_layer(const PrintConfig& print_config) const;
-
     // This function is called from mark_wiping_extrusions and sets extruder that it should be printed with (-1 .. as usual)
     void set_extruder_override(const ExtrusionEntity* entity, size_t copy_id, int extruder, size_t num_of_copies);
 
     // Returns true in case that entity is not printed with its usual extruder for a given copy:
     bool is_entity_overridden(const ExtrusionEntity* entity, size_t copy_id) const {
-        auto it = entity_map.find(entity);
-        return it == entity_map.end() ? false : it->second[copy_id] != -1;
+        auto it = m_entity_map.find(entity);
+        return it == m_entity_map.end() ? false : it->second[copy_id] != -1;
     }
 
-    std::map<const ExtrusionEntity*, ExtruderPerCopy> entity_map;  // to keep track of who prints what
-    bool something_overridable = false;
-    bool something_overridden = false;
-    const LayerTools* m_layer_tools = nullptr;    // so we know which LayerTools object this belongs to
+    std::map<const ExtrusionEntity*, ExtruderPerCopy> m_entity_map;  // to keep track of who prints what
+    bool m_something_overridable = false;
+    bool m_something_overridden = false;
 };
 
 class LayerTools
 {
 public:
-    LayerTools(const coordf_t z) : print_z(z) {}
-
     // Changing these operators to epsilon version can make a problem in cases where support and object layers get close to each other.
     // In case someone tries to do it, make sure you know what you're doing and test it properly (slice multiple objects at once with supports).
     bool operator< (const LayerTools &rhs) const { return print_z < rhs.print_z; }
@@ -94,7 +97,10 @@ public:
     std::vector<uint16_t> 	    extruders;
     // If per layer extruder switches are inserted by the G-code preview slider, this value contains the new (1 based) extruder, with which the whole object layer is being printed with.
     // If not overriden, it is set to 0.
-    uint16_t 				    extruder_override = 0;
+    uint16_t                    extruder_override = 0;
+    // For multi-extruder printers, when there is a color change, this contains an extruder (1 based) on which the color change will be performed.
+    // Otherwise, it is set to 0.
+    unsigned int                extruder_needed_for_color_changer = 0;
     // Should a skirt be printed at this layer?
     // Layers are marked for infinite skirt aka draft shield. Not all the layers have to be printed.
     bool                        has_skirt = false;
@@ -109,12 +115,14 @@ public:
     // Custom G-code (color change, extruder switch, pause) to be performed before this layer starts to print.
     const CustomGCode::Item    *custom_gcode = nullptr;
 
-    WipingExtrusions& wiping_extrusions() {
-        m_wiping_extrusions.set_layer_tools_ptr(this);
-        return m_wiping_extrusions;
-    }
+    WipingExtrusions&       wiping_extrusions_nonconst() { return m_wiping_extrusions; }
+    const WipingExtrusions& wiping_extrusions() const    { return m_wiping_extrusions; }
 
 private:
+    // to access LayerTools private constructor
+    friend class ToolOrdering;
+    LayerTools(const coordf_t z) : print_z(z) {}
+
     // This object holds list of extrusion that will be used for extruder wiping
     WipingExtrusions m_wiping_extrusions;
 };
@@ -160,12 +168,14 @@ public:
     bool 				empty()       const { return m_layer_tools.empty(); }
     std::vector<LayerTools>& layer_tools() { return m_layer_tools; }
     bool 				has_wipe_tower() const { return ! m_layer_tools.empty() && m_first_printing_extruder != (uint16_t)-1 && m_layer_tools.front().wipe_tower_partitions > 0; }
+    int                 toolchanges_count() const;
 
 private:
     void				initialize_layers(std::vector<coordf_t> &zs);
-    void 				collect_extruders(const PrintObject &object, const std::vector<std::pair<double, uint16_t>> &per_layer_extruder_switches);
+    void 				collect_extruders(const PrintObject &object, const std::vector<std::pair<double, uint16_t>> &per_layer_extruder_switches, const std::vector<std::pair<double, uint16_t>> &per_layer_color_changes);
     void				reorder_extruders(uint16_t last_extruder_id);
     void 				fill_wipe_tower_partitions(const PrintConfig &config, coordf_t object_bottom_z, coordf_t max_layer_height);
+    bool                insert_wipe_tower_extruder();
     void                mark_skirt_layers(const PrintConfig &config, coordf_t max_layer_height);
     void 				collect_extruder_statistics(bool prime_multi_material);
 

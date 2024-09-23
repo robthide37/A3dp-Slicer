@@ -39,6 +39,9 @@ group:Exposure
 	setting:min_initial_exposure_time
 	setting:max_initial_exposure_time
 group:Output
+	setting:sla_archive_format
+	setting:sla_output_precision
+group:Output
     setting:output_format
     setting:sla_output_precision
 group:Thumbnails
@@ -58,10 +61,10 @@ group:Thumbnails
 group:Print Host upload
 	build_printhost
 
-page:Notes:note.png
+page:Notes:note
 group:no_title:Notes
 		setting:full_width:height$25:printer_notes
 
-page:Dependencies:wrench.png
+page:Dependencies:wrench
 	group:Profile dependencies
 		parent_preset_description

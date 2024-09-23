@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2019 John Drake @foxox
+///|/
+///|/ ported from lib/Slic3r/GUI/MainFrame.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2019 Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Enrico Turri @enricoturri1966
+///|/ Copyright (c) Slic3r 2014 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2014 Mark Hindess
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_MainFrame_hpp_
 #define slic3r_MainFrame_hpp_
 
@@ -32,6 +42,8 @@ class Tab;
 class PrintHostQueueDialog;
 class Plater;
 class MainFrame;
+class PreferencesDialog;
+class GalleryDialog;
 
 enum QuickSlice
 {
@@ -107,6 +119,7 @@ class MainFrame : public DPIFrame
     bool can_delete() const;
     bool can_delete_all() const;
     bool can_reslice() const;
+    void bind_diff_dialog();
 
     // MenuBar items changeable in respect to printer technology 
     enum MenuItems
@@ -138,7 +151,7 @@ public:
 
     enum class ETabType : uint8_t
     {
-        Plater3D,
+        Plater3D = 0,
         PlaterPreview,
         PlaterGcode,
         LastPlater,
@@ -158,16 +171,17 @@ protected:
     virtual void on_sys_color_changed() override;
 
 public:
-
-    MainFrame();
+    MainFrame(const int font_point_size);
     ~MainFrame() = default;
 
     void update_layout();
+    void update_mode_markers();
 
 	// Called when closing the application and when switching the application language.
 	void 		shutdown();
 
     Plater*     plater() { return m_plater; }
+    GalleryDialog* gallery_dialog();
 
     void        update_title();
 
@@ -192,7 +206,6 @@ public:
     bool        is_last_input_file() const  { return !m_qs_last_input_file.IsEmpty(); }
     ESettingsLayout get_layout() const { return m_layout; }
 
-//    void        quick_slice(const int qs = qsUndef);
     void        reslice_now();
     void        repair_stl();
     void        export_config(bool to_prusa = false);
@@ -231,8 +244,10 @@ public:
     DiffPresetDialog      diff_dialog;
     wxWindow*             m_plater_page{ nullptr };
 //    wxProgressDialog*     m_progress_dialog { nullptr };
+    PreferencesDialog*    preferences_dialog { nullptr };
     PrintHostQueueDialog* m_printhost_queue_dlg;
 //    std::shared_ptr<ProgressStatusBar>  m_statusbar;
+    GalleryDialog*        m_gallery_dialog{ nullptr };
 
 #ifdef __APPLE__
     std::unique_ptr<wxTaskBarIcon> m_taskbar_icon;

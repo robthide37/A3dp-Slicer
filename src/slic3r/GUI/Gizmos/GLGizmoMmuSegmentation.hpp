@@ -1,7 +1,13 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GLGizmoMmuSegmentation_hpp_
 #define slic3r_GLGizmoMmuSegmentation_hpp_
 
 #include "GLGizmoPainterBase.hpp"
+
+#include "slic3r/GUI/I18N.hpp"
 
 namespace Slic3r::GUI {
 
@@ -55,26 +61,29 @@ public:
 
     // IDs of the Vertex Array Objects, into which the geometry has been loaded.
     // Zero if the VBOs are not sent to GPU yet.
-    unsigned int              vertices_VBO_id{0};
+#if ENABLE_GL_CORE_PROFILE
+    unsigned int              vertices_VAO_id{ 0 };
+#endif // ENABLE_GL_CORE_PROFILE
+    unsigned int              vertices_VBO_id{ 0 };
     std::vector<unsigned int> triangle_indices_VBO_ids;
 };
 
 class TriangleSelectorMmGui : public TriangleSelectorGUI {
 public:
+    TriangleSelectorMmGui() = delete;
     // Plus 1 in the initialization of m_gizmo_scene is because the first position is allocated for non-painted triangles, and the indices above colors.size() are allocated for seed fill.
-    explicit TriangleSelectorMmGui(const TriangleMesh &mesh, const std::vector<std::array<float, 4>> &colors, const std::array<float, 4> &default_volume_color)
+    explicit TriangleSelectorMmGui(const TriangleMesh& mesh, const std::vector<ColorRGBA>& colors, const ColorRGBA& default_volume_color)
         : TriangleSelectorGUI(mesh), m_colors(colors), m_default_volume_color(default_volume_color), m_gizmo_scene(2 * (colors.size() + 1)) {}
+
     ~TriangleSelectorMmGui() override = default;
 
-    // Render current selection. Transformation matrices are supposed
-    // to be already set.
-    void render(ImGuiWrapper* imgui) override;
+    void render(ImGuiWrapper* imgui, const Transform3d& matrix) override;
 
 private:
     void update_render_data();
 
-    const std::vector<std::array<float, 4>> &m_colors;
-    const std::array<float, 4>               m_default_volume_color;
+    const std::vector<ColorRGBA>&            m_colors;
+    const ColorRGBA                          m_default_volume_color;
     GLMmSegmentationGizmo3DScene             m_gizmo_scene;
 };
 
@@ -85,9 +94,9 @@ public:
         : GLGizmoPainterBase(parent, icon_filename, sprite_id) {}
     ~GLGizmoMmuSegmentation() override = default;
 
-    void render_painter_gizmo() const override;
+    void render_painter_gizmo() override;
 
-    void set_painter_gizmo_data(const Selection& selection) override;
+    void data_changed(bool is_serializing) override;
 
     void render_triangles(const Selection& selection) const override;
 
@@ -100,8 +109,8 @@ public:
     const float get_cursor_radius_min() const override { return CursorRadiusMin; }
 
 protected:
-    std::array<float, 4> get_cursor_sphere_left_button_color() const override;
-    std::array<float, 4> get_cursor_sphere_right_button_color() const override;
+    ColorRGBA get_cursor_sphere_left_button_color() const override;
+    ColorRGBA get_cursor_sphere_right_button_color() const override;
 
     EnforcerBlockerType get_left_button_state_type() const override { return EnforcerBlockerType(m_first_selected_extruder_idx + 1); }
     EnforcerBlockerType get_right_button_state_type() const override { return EnforcerBlockerType(m_second_selected_extruder_idx + 1); }
@@ -116,13 +125,13 @@ protected:
 
     std::string get_gizmo_entering_text() const override { return _u8L("Entering Multimaterial painting"); }
     std::string get_gizmo_leaving_text() const override { return _u8L("Leaving Multimaterial painting"); }
-    std::string get_action_snapshot_name() override { return _u8L("Multimaterial painting editing"); }
+    std::string get_action_snapshot_name() const override { return _u8L("Multimaterial painting editing"); }
 
     size_t                            m_first_selected_extruder_idx  = 0;
     size_t                            m_second_selected_extruder_idx = 1;
     std::vector<std::string>          m_original_extruders_names;
-    std::vector<std::array<float, 4>> m_original_extruders_colors;
-    std::vector<std::array<float, 4>> m_modified_extruders_colors;
+    std::vector<ColorRGBA>            m_original_extruders_colors;
+    std::vector<ColorRGBA>            m_modified_extruders_colors;
     std::vector<int>                  m_original_volumes_extruder_idxs;
 
     static const constexpr float      CursorRadiusMin = 0.1f; // cannot be zero
@@ -144,6 +153,16 @@ private:
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.
     std::map<std::string, wxString> m_desc;
 };
+
+std::vector<ColorRGBA> get_extruders_colors();
+
+inline size_t get_extruder_color_idx(const ModelVolume &model_volume, const int extruders_count)
+{
+    if (const int extruder_id = model_volume.extruder_id(); extruder_id <= 0 || extruder_id > extruders_count)
+        return 0;
+    else
+        return extruder_id - 1;
+}
 
 } // namespace Slic3r
 
