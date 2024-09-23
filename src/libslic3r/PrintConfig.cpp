@@ -3807,7 +3807,7 @@ void PrintConfigDef::init_fff_params()
         "\nSet zero to disable.");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(1500));
+    def->set_default_value(new ConfigOptionFloat(0/*1500*/));
 
     def = this->add("max_fan_speed", coInts);
     def->label = L("Max");
@@ -4831,7 +4831,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->precision = 6;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(0.02, false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(0/*0.02*/, false));
     def->aliases = {"min_length"};
 
     def = this->add("gcode_min_resolution", coFloatOrPercent);
