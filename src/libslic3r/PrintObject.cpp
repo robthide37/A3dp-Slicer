@@ -2699,9 +2699,10 @@ void PrintObject::discover_vertical_shells()
                     // Assign resulting internal surfaces to layer.
                     layerm->m_fill_surfaces.keep_types({ stPosTop | stDensSolid, stPosBottom | stDensSolid, stPosBottom | stDensSolid | stModBridge });
                     //layerm->m_fill_surfaces.keep_types_flag(stPosTop | stPosBottom);
-                    assert_valid(new_internal);
-                    assert_valid(new_internal_void);
-                    assert_valid(new_internal_solid);
+                    coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(print()->config().resolution.value));
+                    ensure_valid(new_internal, scaled_resolution);
+                    ensure_valid(new_internal_void, scaled_resolution);
+                    ensure_valid(new_internal_solid, scaled_resolution);
                     layerm->m_fill_surfaces.append(new_internal, stPosInternal | stDensSparse);
                     layerm->m_fill_surfaces.append(new_internal_void, stPosInternal | stDensVoid);
                     layerm->m_fill_surfaces.append(new_internal_solid, stPosInternal | stDensSolid);
@@ -3966,6 +3967,8 @@ void PrintObject::discover_horizontal_shells()
 } // void PrintObject::discover_horizontal_shells()
 
 void merge_surfaces(LayerRegion* lregion) {
+    coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(lregion->layer()->object()->print()->config().resolution.value));
+
     //merge regions with same type (other things are all the same anyway)
     std::map< SurfaceType, std::vector<const Surface*>> type2srfs;
     for (const Surface& surface : lregion->fill_surfaces().surfaces) {
@@ -3975,7 +3978,7 @@ void merge_surfaces(LayerRegion* lregion) {
     std::map< SurfaceType, ExPolygons> type2newpolys;
     for (auto& entry : type2srfs) {
         if (entry.second.size() > 2) {
-            ExPolygons merged = union_safety_offset_ex(to_expolygons(entry.second));
+            ExPolygons merged = ensure_valid(union_safety_offset_ex(to_expolygons(entry.second)), scaled_resolution);
             if (merged.size() < entry.second.size()) {
                 changed = true;
                 type2newpolys[entry.first] = std::move(merged);

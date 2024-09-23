@@ -454,6 +454,12 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
         const_cast<SurfaceFillParams&>(params).idx = surface_fills.size();
         surface_fills.emplace_back(params);
     }
+    for (size_t region_id = 0; region_id < layer.regions().size(); ++region_id) {
+        const LayerRegion &layerm = *layer.regions()[region_id];
+        for (const Surface &surface : layerm.fill_surfaces()) {
+            surface.expolygon.assert_valid();
+        }
+    }
 
     for (size_t region_id = 0; region_id < layer.regions().size(); ++ region_id) {
         const LayerRegion &layerm = *layer.regions()[region_id];

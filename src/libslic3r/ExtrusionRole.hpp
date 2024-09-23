@@ -246,7 +246,7 @@ public:
     static constexpr const ExtrusionRoleModifier Travel{ExtrusionRoleModifier::ERM_Travel};
     
     bool is_perimeter() const { return (m & ExtrusionRoleModifier::ERM_Perimeter); }
-    bool is_external_perimeter() const { return this->is_perimeter() && this->is_external(); }
+    bool is_external_perimeter() const { return this->is_perimeter() && this->is_external(); } // includes external overhang
     bool is_overhang() const { return (m & (ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Bridge)) == (ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Bridge); }
     bool is_infill() const { return (m & ExtrusionRoleModifier::ERM_Infill); }
     bool is_solid_infill() const { return this->is_infill() && (m & ExtrusionRoleModifier::ERM_Solid); }

@@ -55,6 +55,7 @@ FillConcentric::_fill_surface_single(
     // generate paths from the outermost to the innermost, to avoid
     // adhesion problems of the first central tiny loops
     loops = union_pt_chained_outside_in(loops);
+    ensure_valid(loops, params.fill_resolution);
 
     // split paths using a nearest neighbor search
     size_t iPathFirst = polylines_out.size();
@@ -80,6 +81,7 @@ FillConcentric::_fill_surface_single(
     //TODO: return ExtrusionLoop objects to get better chained paths,
     // otherwise the outermost loop starts at the closest point to (0, 0).
     // We want the loops to be split inside the G-code generator to get optimum path planning.
+    assert_valid(polylines_out);
 }
 
 void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRole& good_role, const FillParams& params, Polygon& polygon) {
