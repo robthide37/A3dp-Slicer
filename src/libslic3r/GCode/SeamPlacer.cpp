@@ -446,7 +446,6 @@ struct GlobalModelInfo {
 #endif
 }
 ;
-UNOPTIMIZE
 //Extract perimeter polylines of the given layer
 PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosition configured_seam_preference,
         std::vector<const LayerRegion*> &corresponding_regions_out, PerimeterGeneratorType perimeter_type) {
