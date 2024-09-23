@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - Nigthly
-      - nightly_dev
+      - 2.5.60
       - nightly_master
       - supermerill-Main
 
