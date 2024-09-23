@@ -712,21 +712,24 @@ struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
     LoopAssertVisitor(bool check_length) : m_check_length(check_length) {}
     virtual void default_use(const ExtrusionEntity& entity) override {};
     virtual void use(const ExtrusionPath &path) override {
+        if (!m_check_length)
+            return;
         release_assert(path.length() > SCALED_EPSILON);
         for (size_t idx = 1; idx < path.size(); ++idx)
             release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
     }
     virtual void use(const ExtrusionLoop& loop) override {
-        for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
-            release_assert(std::prev(it)->polyline.back() == it->polyline.front());
+        for (size_t idx_path = 1; idx_path < loop.paths.size(); ++idx_path) {
+            release_assert(loop.paths[idx_path-1].polyline.back() == loop.paths[idx_path].polyline.front());
         }
         Point last_pt = loop.last_point();
         for (const ExtrusionPath &path : loop.paths) {
             release_assert(path.polyline.size() >= 2);
             release_assert(!m_check_length || path.length() > SCALED_EPSILON);
             release_assert(path.first_point() == last_pt);
-            for (size_t idx = 1; idx < path.size(); ++idx)
-                release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+            if(m_check_length)
+                for (size_t idx = 1; idx < path.size(); ++idx)
+                    release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
             last_pt = path.last_point();
         }
         release_assert(loop.paths.front().first_point() == loop.paths.back().last_point());

@@ -2226,8 +2226,6 @@ ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int ind
 {
     if (extra_perims.empty()) return {};
 
-    for(const ExtrusionPath &path : extra_perims) path.visit(LoopAssertVisitor());
-
     std::vector<std::unordered_set<size_t>> dependencies(extra_perims.size());
     for (size_t path_idx = 0; path_idx < extra_perims.size(); path_idx++) {
         for (size_t prev_path_idx = 0; prev_path_idx < path_idx; prev_path_idx++) {
@@ -2364,8 +2362,6 @@ ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int ind
         }
     }
 
-    for(const ExtrusionPath &path : reconnected) path.visit(LoopAssertVisitor());
-
     ExtrusionPaths filtered;
     filtered.reserve(reconnected.size());
     for (ExtrusionPath &p : reconnected) {
@@ -2373,8 +2369,6 @@ ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int ind
             filtered.push_back(p);
         }
     }
-    
-    for(const ExtrusionPath &path : filtered) path.visit(LoopAssertVisitor());
 
     return filtered;
 }
@@ -2538,8 +2532,6 @@ std::tuple<std::vector<ExtrusionPaths>, ExPolygons> generate_extra_perimeters_ov
                                                  [](const ExtrusionPath &p) { return p.empty(); }),
                                   overhang_region.end());
 
-            for(ExtrusionPath &path : overhang_region) path.visit(LoopAssertVisitor());
-
             if (!overhang_region.empty()) {
                 Polyline discrete_polyline = overhang_region.front().polyline.to_polyline();
                 discrete_polyline.assert_valid();
@@ -2581,7 +2573,6 @@ std::tuple<std::vector<ExtrusionPaths>, ExPolygons> generate_extra_perimeters_ov
                         overhang_region.front().polyline = ArcPolyline(discrete_polyline);
                     }
                 }
-                for(ExtrusionPath &path : overhang_region) path.visit(LoopAssertVisitor());
                 auto first_unanchored          = std::stable_partition(overhang_region.begin(), overhang_region.end(), is_anchored);
                 int  index_of_first_unanchored = first_unanchored - overhang_region.begin();
                 overhang_region = sort_extra_perimeters(overhang_region, index_of_first_unanchored, overhang_flow.scaled_spacing());
