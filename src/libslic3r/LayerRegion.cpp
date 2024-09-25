@@ -239,7 +239,8 @@ Surfaces expand_bridges_detect_orientations(
     const Algorithm::RegionExpansionParameters  &expansion_params_into_solid_infill,
     ExPolygons                                  &sparse,
     const Algorithm::RegionExpansionParameters  &expansion_params_into_sparse_infill,
-    const float                                 closing_radius)
+    const float                                 closing_radius,
+    const coord_t                               scaled_resolution)
 {
     using namespace Slic3r::Algorithm;
 
@@ -405,6 +406,7 @@ Surfaces expand_bridges_detect_orientations(
                     out.emplace_back(templ, std::move(ex));
             }
     }
+    ensure_valid(out, scaled_resolution);
 
     // Clip by the expanded bridges.
     if (expanded_into_shells)
@@ -516,8 +518,10 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         const auto   expansion_params_into_solid_infill  = RegionExpansionParameters::build(expansion_bottom_bridge, expansion_step, max_nr_expansion_steps);
         if (this->region().config().bridge_angle.is_enabled()) {
             bridges.surfaces = expand_merge_surfaces(m_fill_surfaces.surfaces, stPosBottom | stDensSolid | stModBridge, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius, scaled_resolution, Geometry::deg2rad(custom_angle));
+            for(auto&srf : bridges.surfaces) srf.expolygon.assert_valid();
         } else {
-            bridges.surfaces = expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius);
+            bridges.surfaces = expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, expansion_params_into_solid_infill, sparse, expansion_params_into_sparse_infill, closing_radius, scaled_resolution);
+            for(auto&srf : bridges.surfaces) srf.expolygon.assert_valid();
         }
         BOOST_LOG_TRIVIAL(trace) << "Processing external surface, detecting bridges - done";
 #if 0

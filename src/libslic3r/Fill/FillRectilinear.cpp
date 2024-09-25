@@ -3110,6 +3110,7 @@ void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offse
     // Don't produce infill lines, which fully overlap with the infill perimeter.
     coord_t     x_min = bounding_box.min.x() + x_margin;
     coord_t     x_max = bounding_box.max.x() - x_margin;
+    coord_t     min_dist = std::max(SCALED_EPSILON, line_spacing / 2);
     // extend bounding box so that our pattern will be aligned with other layers
     // align_to_grid will not work correctly with positive pattern_shift.
     coord_t pattern_shift_scaled = pattern_shift % line_spacing;
@@ -3133,10 +3134,14 @@ void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offse
                 auto it_high = it;
                 assert(it_high->type == SegmentIntersection::OUTER_HIGH);
                 if (it_high->type == SegmentIntersection::OUTER_HIGH) {
-                    if (angle == 0.)
-                        fill_lines.emplace_back(Point(vline.pos, it_low->pos()), Point(vline.pos, it_high->pos()));
-                    else
-                        fill_lines.emplace_back(Point(vline.pos, it_low->pos()).rotated(cos_a, sin_a), Point(vline.pos, it_high->pos()).rotated(cos_a, sin_a));
+                    if (std::abs(it_low->pos() - it_high->pos()) >= min_dist) {
+                        if (angle == 0.) {
+                            fill_lines.emplace_back(Point(vline.pos, it_low->pos()), Point(vline.pos, it_high->pos()));
+                        } else {
+                            fill_lines.emplace_back(Point(vline.pos, it_low->pos()).rotated(cos_a, sin_a),
+                                                    Point(vline.pos, it_high->pos()).rotated(cos_a, sin_a));
+                        }
+                    }
                     ++ it;
                 }
             }
