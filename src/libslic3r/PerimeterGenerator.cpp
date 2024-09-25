@@ -239,6 +239,7 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
                 {
                     coordf_t r = coordf_t(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
                     out.emplace_back(p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+                    assert(out.size() > 1 && !out.back().coincides_with_epsilon(out[out.size()-2]));
                 }
                 dist_next_point = p0pa_dist - p0p1_size;
                 p0 = p1;
@@ -257,16 +258,21 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
                 // if the flow is too different to merge with next path, don't change the path (but the first point)
                 assert(path.size() > 1);
                 path.polyline.set_front(*previous_point);
+                for (size_t i = 1; i < path.polyline.size(); i++)
+                    assert(!path.polyline.get_point(i - 1).coincides_with_epsilon(path.polyline.get_point(i)));
             } else if (paths.size() - 1 > idx_path) {
                 // too small, merge with next path
                 path.polyline.clear();
                 paths.erase(paths.begin() + idx_path);
                 paths[idx_path].polyline.append_before(p0);
+                assert(!paths[idx_path].polyline.get_point(0).coincides_with_epsilon(paths[idx_path].polyline.get_point(1)));
                 idx_path--;
             } else {
                 // nothing after, just finish at the same point
                 assert(path.size() > 1);
                 path.polyline.set_front(*previous_point);
+                for (size_t i = 1; i < path.polyline.size(); i++)
+                    assert(!path.polyline.get_point(i - 1).coincides_with_epsilon(path.polyline.get_point(i)));
             }
         } else {
             p0 = path.polyline.back();
@@ -290,7 +296,11 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
         assert(paths.front().polyline.front() == paths.back().polyline.back());
     } else {
         //line -> ensure you end with the same last point
-        paths.back().polyline.append(last_point);
+        if (!paths.back().polyline.back().coincides_with_epsilon(last_point)) {
+            paths.back().polyline.append(last_point);
+        } else {
+            paths.back().polyline.set_back(last_point);
+        }
     }
 #ifdef _DEBUG
     if (is_loop) assert(paths.back().last_point() == paths.front().first_point());
