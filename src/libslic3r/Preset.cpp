@@ -825,8 +825,8 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_dip_insertion_speed",
         "filament_dip_extraction_speed",  //skinnydip params end
         // pressure advance        
-        "filament_bridge_pa", //pa
         "filament_bridge_internal_pa",
+        "filament_bridge_pa",
         "filament_brim_pa",
         "filament_default_pa",
         "filament_external_perimeter_pa",
