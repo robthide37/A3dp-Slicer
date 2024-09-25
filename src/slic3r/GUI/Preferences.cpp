@@ -335,7 +335,7 @@ void PreferencesDialog::append_int_option( std::shared_ptr<ConfigOptionsGroup> o
 	def.mode = mode;
 	def.min = double(min);
 	def.max = double(max);
-	def.set_default_value(new ConfigOptionInt{ def_val });
+	def.set_default_value(new ConfigOptionInt(def_val));
 	Option option(def, opt_key);
 	option.opt.width = option_width;
 	optgroup->append_single_option_line(option);
@@ -886,8 +886,7 @@ void PreferencesDialog::build()
 			L("Add the layer area (the number just below the layer id) next to a widget of the layer double-scrollbar."),
 			app_config->get_bool("show_layer_area_doubleslider"));
 	}
-	
-	
+
 	append_int_option(m_tabid_2_optgroups.back().back(), "gcodeviewer_decimals",
 		L("Decimals for gcode viewer colors"),
 		L("On the gcode viewer window, how many decimals are used to separate colors?"
