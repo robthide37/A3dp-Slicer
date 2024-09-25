@@ -713,7 +713,7 @@ static size_t avoid_perimeters_inner(const AvoidCrossingPerimeters::Boundary &bo
                 const EdgeGrid::Contour& pts_start = boundary.grid.contours()[pt_closest_start.contour_idx];
                 Point new_start = pts_start.segment_start(pt_closest_start.start_point_idx).interpolate(pt_closest_start.t, pts_start.segment_end(pt_closest_start.start_point_idx));
                 const EdgeGrid::Contour& pts_end = boundary.grid.contours()[pt_closest_end.contour_idx];
-                Point new_end = pts_start.segment_start(pt_closest_end.start_point_idx).interpolate(pt_closest_end.t, pts_start.segment_end(pt_closest_end.start_point_idx));
+                Point new_end = pts_end.segment_start(pt_closest_end.start_point_idx).interpolate(pt_closest_end.t, pts_end.segment_end(pt_closest_end.start_point_idx));
                 // check if travel top
                 AnyIntersectionsVisitor visitor(boundary.to_avoid_grid, Polyline{start, new_start, new_end, end});
                 if(boundary.to_avoid_grid.bbox().contains(start) && boundary.to_avoid_grid.bbox().contains(new_start))
@@ -1219,6 +1219,13 @@ static std::vector<std::pair<ExPolygon, ExPolygon>> inner_offset(const ExPolygon
     for (const ExPolygon &expo : ex_polygons) {
         ex_poly_result.emplace_back(expo, expo);
         resample_expolygon(ex_poly_result.back().second, offset / 2, scaled<double>(0.5));
+        ExPolygons ensure_resample_dont_grow = diff_ex(ex_poly_result.back().second, ex_poly_result.back().first);
+        if (ensure_resample_dont_grow.size() != 1) {
+            // fail, use the unsimplified one.
+            ex_poly_result.back().second = ex_poly_result.back().first;
+        } else {
+            ex_poly_result.back().second = ensure_resample_dont_grow.front();
+        }
     }
 
     for (std::pair<ExPolygon,ExPolygon> &old_2_new : ex_poly_result) {
