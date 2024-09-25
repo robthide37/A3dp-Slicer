@@ -879,6 +879,10 @@ static inline std::vector<std::vector<ExPolygons>> mm_segmentation_top_and_botto
         const PrintRegionConfig &config = print_object.printing_region(i).config();
         max_top_layers    = std::max(max_top_layers, config.top_solid_layers.value);
         max_bottom_layers = std::max(max_bottom_layers, config.bottom_solid_layers.value);
+        if (config.solid_infill_every_layers == 1) {
+            max_top_layers = 100000;
+            max_bottom_layers = 100000;
+        }
         granularity       = std::max(granularity, std::max(config.top_solid_layers.value, config.bottom_solid_layers.value) - 1);
     }
 
@@ -1012,6 +1016,10 @@ static inline std::vector<std::vector<ExPolygons>> mm_segmentation_top_and_botto
                 out.extrusion_width     = std::max<double>(out.extrusion_width, perimeter_extrusion_width);
                 out.top_solid_layers    = std::max<int>(out.top_solid_layers, config.top_solid_layers);
                 out.bottom_solid_layers = std::max<int>(out.bottom_solid_layers, config.bottom_solid_layers);
+                if (config.solid_infill_every_layers.value == 1) {
+                    out.top_solid_layers = 100000;
+                    out.bottom_solid_layers = 100000;
+                }
                 out.small_region_threshold = config.gap_fill_enabled.value ?
                                              // Gap fill enabled. Enable a single line of 1/2 extrusion width.
                                              0.5f * (perimeter_extrusion_width) :

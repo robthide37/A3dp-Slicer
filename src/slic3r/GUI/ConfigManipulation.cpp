@@ -89,6 +89,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         && config->opt_bool("extra_perimeters_odd_layers") == false
         && config->opt_bool("overhangs_reverse") == false
         && config->opt_bool("gap_fill_last") == false
+        && config->opt_bool("solid_infill_every_layers") == false
         && config->opt_int("solid_over_perimeters") == 0
         && config->option("seam_notch_all")->get_float() == 0
         && config->option("seam_notch_inner")->get_float() == 0
@@ -104,6 +105,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             "- unchecked 'dense infill'\n"
             "- unchecked 'extra perimeters'"
             "- unchecked 'gap fill after last perimeter'"
+            "- unchecked 'solid infill every layers'"
             "- disabled  'no solid fill over X perimeters'"
             "- disabled 'seam notch'"));
         if (is_global_config)
@@ -140,6 +142,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("gap_fill_last"))
                 new_conf.set_key_value("gap_fill_last", new ConfigOptionBool(false));
+            else if (this->local_config->get().optptr("solid_infill_every_layers"))
+                new_conf.set_key_value("solid_infill_every_layers", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("solid_over_perimeters"))
                 new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
             else if (this->local_config->get().optptr("seam_notch_all"))
@@ -162,6 +166,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("extra_perimeters_odd_layers", new ConfigOptionBool(false));
             new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
             new_conf.set_key_value("gap_fill_last", new ConfigOptionBool(false));
+            new_conf.set_key_value("solid_infill_every_layers", new ConfigOptionBool(false));
             new_conf.set_key_value("solid_over_perimeters", new ConfigOptionInt(0));
             new_conf.set_key_value("seam_notch_all", new ConfigOptionFloatOrPercent(0, false));
             new_conf.set_key_value("seam_notch_inner", new ConfigOptionFloatOrPercent(0, false));
@@ -427,8 +432,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         for (auto el : { "infill_every_layers", "infill_only_where_needed" })
             toggle_field(el, !have_infill_dense);
 
-    bool has_top_solid_infill 	 = config->opt_int("top_solid_layers") > 0 || has_spiral_vase;
-    bool has_bottom_solid_infill = config->opt_int("bottom_solid_layers") > 0;
+    bool has_top_solid_infill 	 = config->opt_int("top_solid_layers") > 0 || has_spiral_vase || config->opt_int("solid_infill_every_layers") == 1;
+    bool has_bottom_solid_infill = config->opt_int("bottom_solid_layers") > 0 || config->opt_int("solid_infill_every_layers") == 1;
     bool has_solid_infill 		 = has_top_solid_infill || has_bottom_solid_infill || (have_infill && (config->opt_int("solid_infill_every_layers") > 0 || config->opt_float("solid_infill_below_area") > 0));
     // solid_infill_extruder uses the same logic as in Print::extruders()
     for (auto el : { "top_fill_pattern", "bottom_fill_pattern", "solid_fill_pattern", "enforce_full_fill_volume", "external_infill_margin", "bridged_infill_margin",
