@@ -204,14 +204,17 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
 
     const Point last_point = paths.back().last_point();
     //not always a loop, with arachne
-    bool is_loop = paths.front().first_point() == last_point;
+    const bool is_loop = paths.front().first_point() == last_point;
 #ifdef _DEBUG
+    const Point first_point = paths.front().first_point();
+    const bool is_debug_loop = (last_point == last_point);
+    ExtrusionPaths saved_paths = paths;
     if (is_loop) assert(paths.back().last_point() == paths.front().first_point());
     for (int i = 1; i < paths.size(); i++) {
         assert(paths[i - 1].last_point() == paths[i].first_point());
     }
 #endif
-    Point p0 = is_loop ? last_point : paths.front().first_point();
+    Point p0 = /*is_loop ? last_point : */paths.front().first_point();
     const Point* previous_point = is_loop ? &last_point : &paths.front().first_point();
     for (size_t idx_path = 0; idx_path < paths.size(); idx_path++) {
         ExtrusionPath& path = paths[idx_path];
@@ -236,6 +239,7 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
                 {
                     coordf_t r = coordf_t(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
                     out.emplace_back(p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+                    assert(out.size() > 1 && !out.back().coincides_with_epsilon(out[out.size()-2]));
                 }
                 dist_next_point = p0pa_dist - p0p1_size;
                 p0 = p1;
@@ -244,10 +248,32 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
             }
         }
         if (out.size() <= 1) {
-            //too small, erase
-            path.polyline.clear();
-            paths.erase(paths.begin() + idx_path);
-            idx_path--;
+            double mm3_diff_with_next = 0.;
+            if (paths.size() - 1 > idx_path) {
+                double curr_mm3 = path.mm3_per_mm();
+                double next_mm3 = paths[idx_path + 1].mm3_per_mm();
+                mm3_diff_with_next = curr_mm3 < next_mm3 ? curr_mm3 / next_mm3 : next_mm3 / curr_mm3;
+            }
+            if (out.size() == 1 && path.polyline.length() > SCALED_EPSILON && mm3_diff_with_next < 0.9) {
+                // if the flow is too different to merge with next path, don't change the path (but the first point)
+                assert(path.size() > 1);
+                path.polyline.set_front(*previous_point);
+                for (size_t i = 1; i < path.polyline.size(); i++)
+                    assert(!path.polyline.get_point(i - 1).coincides_with_epsilon(path.polyline.get_point(i)));
+            } else if (paths.size() - 1 > idx_path) {
+                // too small, merge with next path
+                path.polyline.clear();
+                paths.erase(paths.begin() + idx_path);
+                paths[idx_path].polyline.append_before(p0);
+                assert(!paths[idx_path].polyline.get_point(0).coincides_with_epsilon(paths[idx_path].polyline.get_point(1)));
+                idx_path--;
+            } else {
+                // nothing after, just finish at the same point
+                assert(path.size() > 1);
+                path.polyline.set_front(*previous_point);
+                for (size_t i = 1; i < path.polyline.size(); i++)
+                    assert(!path.polyline.get_point(i - 1).coincides_with_epsilon(path.polyline.get_point(i)));
+            }
         } else {
             p0 = path.polyline.back();
             path.polyline = ArcPolyline(out);
@@ -256,7 +282,10 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
     }
     assert(!paths.empty());
     if (is_loop) {
-        assert(paths.front().polyline.front() != paths.back().polyline.back());
+        
+        assert(paths.front().polyline.front() != paths.back().polyline.back() ||
+            // or the last one is skipped are skipped
+               (paths.back().size() == 2 && paths.back().length() < min_dist_between_points * 2));
         //the first point is the old one. remove it and try to make another point if needed.
         if (paths.front().size() > 2 && fuzzy_skin_point_dist * 2 > paths.back().last_point().distance_to(paths.front().polyline.get_point(1))) {
             //distance small enough and enough points to delete the first, just erase
@@ -267,7 +296,11 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
         assert(paths.front().polyline.front() == paths.back().polyline.back());
     } else {
         //line -> ensure you end with the same last point
-        paths.back().polyline.append(last_point);
+        if (!paths.back().polyline.back().coincides_with_epsilon(last_point)) {
+            paths.back().polyline.append(last_point);
+        } else {
+            paths.back().polyline.set_back(last_point);
+        }
     }
 #ifdef _DEBUG
     if (is_loop) assert(paths.back().last_point() == paths.front().first_point());
@@ -1391,7 +1424,12 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
                 extrusion_path_bbox.merge(Point{ej.p.x(), ej.p.y()});
             }
             extrusion_path_bbox.offset(SCALED_EPSILON);
-            if(extrusion->is_closed) assert((extrusion_path.front() - extrusion_path.back()).norm() < SCALED_EPSILON);
+            if (extrusion->is_closed) {
+                assert((extrusion_path.front() - extrusion_path.back()).norm() <= SCALED_EPSILON);
+                assert(Point(extrusion_path.front().x(),extrusion_path.front().y()).coincides_with_epsilon(Point(extrusion_path.back().x(), extrusion_path.back().y())));
+            } else if ((extrusion_path.front() - extrusion_path.back()).norm() <= SCALED_EPSILON) {
+                extrusion->is_closed = true; // fix error (yes, this happen and sohould be fixed beforehand)
+            }
             paths = this->create_overhangs_arachne(params, extrusion_path, extrusion_path_bbox, role, is_external);
             
             // Reapply the nearest point search for starting point.
@@ -1431,7 +1469,11 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
 
                 chain_and_reorder_extrusion_paths(paths, &start_point);
                 for(size_t i = 1; i< paths.size(); ++i) assert(paths[i-1].last_point().coincides_with_epsilon(paths[i].first_point()));
-                if(extrusion->is_closed) assert(paths.back().last_point().coincides_with_epsilon(paths.front().first_point()));
+                if (extrusion->is_closed) {
+                    assert(paths.back().last_point().coincides_with_epsilon(paths.front().first_point()));
+                } else {
+                    assert(!paths.back().last_point().coincides_with_epsilon(paths.front().first_point()));
+                }
             }
         } else {
             append(paths, Geometry::unsafe_variable_width(Arachne::to_thick_polyline(*extrusion),
@@ -1439,6 +1481,18 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
                 is_external ? params.ext_perimeter_flow : params.perimeter_flow,
                 std::max(params.ext_perimeter_flow.scaled_width() / 4, scale_t(params.print_config.resolution)),
                 (is_external ? params.ext_perimeter_flow : params.perimeter_flow).scaled_width() / 10));
+        }
+
+        // test check
+        if (!paths.empty()) {
+            for (size_t idx_path = 0; idx_path < paths.size(); ++idx_path) {
+                if (idx_path > 0) {
+                    assert(paths[idx_path - 1].last_point().coincides_with_epsilon(paths[idx_path].first_point()));
+                }
+                for (size_t idx_pt = 1; idx_pt < paths[idx_path].size(); ++idx_pt) {
+                    assert(!paths[idx_path].polyline.get_point(idx_pt - 1).coincides_with_epsilon(paths[idx_path].polyline.get_point(idx_pt)));
+                }
+            }
         }
 
         // Apply fuzzify
@@ -1451,6 +1505,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
 
         // Append paths to collection.
         if (!paths.empty()) {
+            // test check
             for (size_t idx_path = 0; idx_path < paths.size(); ++idx_path) {
                 if (idx_path > 0) {
                     assert(paths[idx_path - 1].last_point().coincides_with_epsilon(paths[idx_path].first_point()));
@@ -1483,6 +1538,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(const Paramet
 
                 extrusion_coll.append(std::move(extrusion_loop));
             } else {
+                assert(!paths.back().last_point().coincides_with_epsilon(paths.front().first_point()));
 
                 // Because we are processing one ExtrusionLine all ExtrusionPaths should form one connected path.
                 // But there is possibility that due to numerical issue there is poss
@@ -1810,6 +1866,8 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     idx_lh_size++;
     if (!dynamic_speed.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : dynamic_speed) {
+            if (extrusion_path.size() <= 1)
+                continue;
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
                     role | ExtrusionRole::Bridge,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
@@ -1835,6 +1893,8 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     }
     if (!small_speed.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : small_speed) {
+            if(extrusion_path.size() <= 1)
+                continue;
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
                     role | ExtrusionRole::Bridge,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
@@ -1860,6 +1920,8 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     idx_lh_size++;
     if (!big_speed.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : big_speed) {
+            if(extrusion_path.size() <= 1)
+                continue;
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
                     role | ExtrusionRole::Bridge,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
@@ -1885,6 +1947,8 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
     idx_lh_size++;
     if (!small_flow.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : small_flow) {
+            if(extrusion_path.size() <= 1)
+                continue;
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
                     role | ExtrusionRole::Bridge,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
@@ -1919,6 +1983,8 @@ ExtrusionPaths PerimeterGenerator::create_overhangs_arachne(const Parameters &  
         assert(small_flow.empty());
     if (!big_flow.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : big_flow) {
+            if(extrusion_path.size() <= 1)
+                continue;
             ExtrusionPaths thickpaths = Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
                     is_external ? ExtrusionRole::OverhangExternalPerimeter : ExtrusionRole::OverhangPerimeter,
                     is_external ? params.ext_perimeter_flow : params.perimeter_flow,
@@ -3231,6 +3297,35 @@ void PerimeterGenerator::process(// Input:
         }
         this->throw_if_canceled();
 
+        // test for loops
+        class ExtrusionTransformPathIntoLoop : public ExtrusionVisitorRecursive {
+            std::vector<ExtrusionEntity*> current_entity;
+            using ExtrusionVisitorRecursive::use;
+            void use(ExtrusionPath &path) override {
+                if (path.first_point().coincides_with_epsilon(path.last_point())) {
+                    assert(false);
+                    assert(&path == current_entity.back());
+                    current_entity.back() = new ExtrusionLoop(ExtrusionPaths{path}, ExtrusionLoopRole::elrDefault);
+                }
+            }
+            void use(ExtrusionLoop &loop) override {}
+            void use(ExtrusionMultiPath &loop) override {}
+            void use(ExtrusionPath3D &path3D) override { assert(false); /* not used by arachne */ }
+            void use(ExtrusionEntityCollection &coll) override {
+                for (auto it = coll.set_entities().begin(); it != coll.set_entities().end(); ++it) {
+                    current_entity.push_back(*it);
+                    (*it)->visit(*this);
+                    if (*it != current_entity.back()) {
+                        //changed! need to update
+                        delete *it;
+                        *it  = current_entity.back();
+                    }
+                    current_entity.pop_back();
+                }
+            }
+        } transformer;
+        loops->visit(transformer);
+
         // create one more offset to be used as boundary for fill
         // we offset by half the perimeter spacing (to get to the actual infill boundary)
         // and then we offset back and forth by half the infill spacing to only consider the
@@ -3294,8 +3389,16 @@ void PerimeterGenerator::process(// Input:
                 //put these new overhangs into their own unsortable collection.
                 ExtrusionEntityCollection *this_islands_perimeters = new ExtrusionEntityCollection(false, false);
                 // put extra perimeter as first printed
-                for (ExtrusionPaths &paths : extra_perimeters)
-                    this_islands_perimeters->append(std::move(paths));
+                for (ExtrusionPaths &paths : extra_perimeters) {
+                    for (ExtrusionPath &path : paths) {
+                        if (path.first_point().coincides_with_epsilon(path.last_point())) {
+                            //it's a loop!
+                            this_islands_perimeters->append(ExtrusionLoop(path, ExtrusionLoopRole::elrDefault));
+                        } else {
+                            this_islands_perimeters->append(std::move(path));
+                        }
+                    }
+                }
                 assert(loops->entities().size() >= first_loop_coll_index);
                 // dangerous insert! be extra careful: here we delegate the ownership of the pointer to the loops collection.
                 loops->set_entities().insert(loops->set_entities().begin() + first_loop_coll_index, this_islands_perimeters);
