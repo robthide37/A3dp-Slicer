@@ -713,7 +713,7 @@ static size_t avoid_perimeters_inner(const AvoidCrossingPerimeters::Boundary &bo
                 const EdgeGrid::Contour& pts_start = boundary.grid.contours()[pt_closest_start.contour_idx];
                 Point new_start = pts_start.segment_start(pt_closest_start.start_point_idx).interpolate(pt_closest_start.t, pts_start.segment_end(pt_closest_start.start_point_idx));
                 const EdgeGrid::Contour& pts_end = boundary.grid.contours()[pt_closest_end.contour_idx];
-                Point new_end = pts_start.segment_start(pt_closest_end.start_point_idx).interpolate(pt_closest_end.t, pts_start.segment_end(pt_closest_end.start_point_idx));
+                Point new_end = pts_end.segment_start(pt_closest_end.start_point_idx).interpolate(pt_closest_end.t, pts_end.segment_end(pt_closest_end.start_point_idx));
                 // check if travel top
                 AnyIntersectionsVisitor visitor(boundary.to_avoid_grid, Polyline{start, new_start, new_end, end});
                 if(boundary.to_avoid_grid.bbox().contains(start) && boundary.to_avoid_grid.bbox().contains(new_start))
