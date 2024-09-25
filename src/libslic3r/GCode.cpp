@@ -1353,19 +1353,19 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     if (print.config().complete_objects.value) {
         // Add each of the object's layers separately.
         for (auto object : print.objects()) {
-            std::vector<coordf_t> zs;
-            std::vector<coordf_t> zs_with_supp;
+            std::vector<coord_t> zs;
+            std::vector<coord_t> zs_with_supp;
             zs.reserve(object->layers().size());
             zs_with_supp.reserve(object->layers().size() + object->support_layers().size());
             for (auto layer : object->layers()) {
                 if (layer->has_extrusions()) {
-                zs.push_back(layer->print_z);
-                zs_with_supp.push_back(layer->print_z);
-            }
+                    zs.push_back(scale_t(layer->print_z + SCALING_FACTOR * 5));
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 5));
+                }
             }
             for (auto layer : object->support_layers()) {
                 if (layer->has_extrusions()) {
-                zs_with_supp.push_back(layer->print_z);
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 5));
                 }
             }
             std::sort(zs.begin(), zs.end());
@@ -1383,13 +1383,13 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             zs_with_supp.reserve(zs.size() + object->layers().size() + object->support_layers().size());
             for (auto layer : object->layers()) {
                 if (layer->has_extrusions()) {
-                    zs.push_back(scale_t(layer->print_z));
-                    zs_with_supp.push_back(scale_t(layer->print_z));
+                    zs.push_back(scale_t(layer->print_z + SCALING_FACTOR * 5));
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 5));
+                }
             }
-        }
             for (auto layer : object->support_layers()) {
                 if (layer->has_extrusions()) {
-                    zs_with_supp.push_back(scale_t(layer->print_z));
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 5));
                 }
             }
         }
