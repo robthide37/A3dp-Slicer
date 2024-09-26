@@ -22,6 +22,42 @@ void s_brim_set(bool new_val)
 	}
 }
 
+// quick settings fill_density
+
+float last_solid_every = -1;
+
+float s_fill_density_get()
+{
+	float density = 100 * get_float("fill_density");
+	int solid_every = get_int("solid_infill_every_layers");
+	if (solid_every  == 1) {
+		density = 100;
+	}
+	return density;
+}
+
+void s_fill_density_set(float new_density)
+{
+	int solid_every = get_int("solid_infill_every_layers");
+	if (new_density > 99) {
+		if (solid_every != 1) {
+			last_solid_every = solid_every;
+		}
+		set_int("solid_infill_every_layers", 1);
+	} else {
+		set_float("fill_density", new_density * 0.01);
+		if (last_solid_every > -1) {
+			set_float("solid_infill_every_layers", last_solid_every);
+			last_solid_every = -1;
+		} else {
+			if (solid_every == 1) {
+				set_int("solid_infill_every_layers", 0);
+			}
+		}
+	}
+}
+
+
 // quick settings support
 
 int s_support_fff_get(string &out get_val)

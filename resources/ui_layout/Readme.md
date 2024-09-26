@@ -87,9 +87,11 @@ each parameter is separated by ':'
 		* `percents`: Array. Tell the sotfware it's a percentage (float return value)
 		* `floats_or_percents: mandatory`: Array. Tell the sotfware it's a numeric that can acept a % value (boolean return value)
 		* `strings`: Array. Tell mandatory for a filament or an extruder value. The sotfware it's a numeric an entry field where you can enter a text(string return value)
-		* `enum$STR$STR[$STR$STR]*`: tell the sotfware it's a combobox (string return value). It has to be followed by $name$label for each option you want to show.
+		* `enum$STR$STR[$STR$STR]*`: tell the software it's a combobox (string return value). It has to be followed by $name$label for each option you want to show.
+		* if you're using an int/float/percent field, you can also make it appear like a combobox (still editable) by using: `hints$VAL$STR[$VAL$STR]*` like for the enum type: VAL is the value that has to be parseable into the int/float, and the second one is the label.
 	* Also, script may depends on normal fields. When a setting it depends is modified, the scripted widget will appear modified. And resetting a widget will reset all depending fields.
 		* `depends$STR[$STR]*`: add the setting fields this scripted widget depends on. Each one has to be suffixed by a '$'
+		
 
 There is also special commands:
 * `height:INT`: change the default height of settings. Don't works with every type of setting (mostly multilne text). Set to 0 or -1 to disable.
@@ -183,7 +185,7 @@ These functions can be called everywhere.
  * int   **get_int**(string &in key)
     Can be used by type int and enum (return the index)
  * float **get_float**(string &in key)
-    Can be used by type float, percent and flaot_or_percent
+    Can be used by type float, percent (1.0 = 100%) and float_or_percent
  * float **get_computed_float**(string &in key)
     Get the float computed value of the field. Useful if it's a floatOrPercent that is computable.
  * bool  **is_percent**(string &in key)
