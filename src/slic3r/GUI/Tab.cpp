@@ -2390,6 +2390,29 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         ConfigOption* default_opt = option.opt.create_default_option();
                         default_opt->set_enum_int(0); // should be generic_enum, set to first.
                         option.opt.set_default_value(default_opt);
+                    } else if (boost::starts_with(params[i], "hints")) {
+                        std::vector<std::string> enum_strs;
+                        boost::split(enum_strs, params[i], boost::is_any_of("$"));
+                        if (enum_strs.size() < 3 || enum_strs.size() % 2 == 0) {
+                            BOOST_LOG_TRIVIAL(error) << "Error: hints '"<< setting_id << "' doesn't have an even number of key-label values:"<<(enum_strs.size()-1)<<".";
+                            if (logs) Slic3r::slic3r_log->info("settings gui") << "Error: odd number of hints values: should be a key/value list ("<< option.opt.opt_key <<")";
+                            continue;
+                        }
+                        std::vector<std::pair<std::string,std::string>> values_2_labels;
+                        for (size_t idx = 1; idx < enum_strs.size(); idx += 2) {
+                            values_2_labels.emplace_back(enum_strs[idx], enum_strs[idx + 1]);
+                        }
+                        // create enum_def in option.opt
+                        //option.opt.set_enum_as_closed_for_scripted_enum(values_2_labels); // fake closed
+                        if (option.opt.type == coInt || option.opt.type == coInts) {
+                            option.opt.set_enum_values(ConfigOptionDef::GUIType::i_enum_open, values_2_labels);
+                        } else if (option.opt.type == coFloat || option.opt.type == coFloats ||
+                                       option.opt.type == coPercent || option.opt.type == coPercents) {
+                            option.opt.set_enum_values(ConfigOptionDef::GUIType::f_enum_open, values_2_labels);
+                        } else {
+                            if (logs) Slic3r::slic3r_log->info("settings gui") << "Error: hints can only apply to int, int, flaot, flaot, percent, percents ("<< option.opt.opt_key <<")";
+                        }
+                        //defautl already/will be set by the type
                     } else if (boost::starts_with(params[i], "depends")) {
                         std::vector<std::string> depends_str;
                         boost::split(depends_str, params[i], boost::is_any_of("$"));
