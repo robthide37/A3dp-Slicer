@@ -23,7 +23,7 @@ jobs:
         cmake .. -G "Visual Studio 16 2019" -A x64
         msbuild /m ALL_BUILD.vcxproj
     - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+      uses: actions/upload-artifact@v2.0.0
       with:
         name: deps_win
         path: ./deps/build/destdir/
@@ -117,7 +117,7 @@ jobs:
 #      shell: cmd
 #      run: '"C:/Program Files/7-Zip/7z.exe" a -tzip nightly.zip *'
     - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+      uses: actions/upload-artifact@v2.0.0
       with:
         name: nightly_win64
         path: build/package/
