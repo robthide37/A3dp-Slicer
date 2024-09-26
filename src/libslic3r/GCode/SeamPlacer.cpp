@@ -581,7 +581,7 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
                     visitor.also_overhangs = false;
                     if (polylines.empty()) {
                         // shouldn't happen
-                        assert(ex_entity->role() == ExtrusionRole::ThinWall || layer_region->config.perimeter_type == PerimeterGeneratorType::Arachne); // no loops
+                        assert(ex_entity->role() == ExtrusionRole::ThinWall || layer_region->region().config().perimeter_generator == PerimeterGeneratorType::Arachne); // no loops
                         //ex_entity->visit(visitor);
                         // what to do in this case?
                         Points pts;

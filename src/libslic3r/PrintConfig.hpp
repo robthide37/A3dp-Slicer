@@ -748,6 +748,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       first_layer_height))
     ((ConfigOptionFloatOrPercent,       first_layer_extrusion_width))
     ((ConfigOptionFloatOrPercent,       first_layer_extrusion_spacing))
+    ((ConfigOptionFloatOrPercent,       first_layer_infill_extrusion_width))
+    ((ConfigOptionFloatOrPercent,       first_layer_infill_extrusion_spacing))
     ((ConfigOptionFloatOrPercent,       first_layer_infill_speed))
     ((ConfigOptionFloat,                first_layer_min_speed))
     ((ConfigOptionFloat,                first_layer_size_compensation))  /* elefant_foot_compensation */
