@@ -2230,6 +2230,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "draft_shield",
         "extruder_clearance_radius",
         "first_layer_extrusion_width",
+        "first_layer_infill_extrusion_width",
         "init_z_rotate", 
         "max_print_height",
         "perimeter_extrusion_width",

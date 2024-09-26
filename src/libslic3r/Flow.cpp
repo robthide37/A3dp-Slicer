@@ -49,14 +49,16 @@ float Flow::auto_extrusion_width(FlowRole role, float nozzle_diameter)
 static inline FlowRole opt_key_to_flow_role(const std::string &opt_key)
 {
  	if (opt_key == "perimeter_extrusion_width" || 
- 		// or all the defaults:
+ 		// or almost all the defaults:
  		opt_key == "extrusion_width" || opt_key == "first_layer_extrusion_width")
         return frPerimeter;
     else if (opt_key == "external_perimeter_extrusion_width")
         return frExternalPerimeter;
     else if (opt_key == "infill_extrusion_width")
         return frInfill;
-    else if (opt_key == "solid_infill_extrusion_width")
+    else if (opt_key == "solid_infill_extrusion_width"
+ 		// or the first layer infill:
+        || opt_key == "first_layer_infill_extrusion_width")
         return frSolidInfill;
 	else if (opt_key == "top_infill_extrusion_width")
 		return frTopSolidInfill;
@@ -319,9 +321,16 @@ Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, flo
     } else {
         throw Slic3r::InvalidArgument("Unknown role");
     }
-    if (first_layer && print_config.get_abs_value("first_layer_extrusion_width", 1) > 0) {
-        config_width = print_config.opt<ConfigOptionFloatOrPercent>("first_layer_extrusion_width");
-        config_spacing = print_config.opt<ConfigOptionFloatOrPercent>("first_layer_extrusion_spacing");
+    if (first_layer) {
+        auto opt_fl_width = print_config.opt<ConfigOptionFloatOrPercent>("first_layer_extrusion_width");
+        auto opt_fli_width = print_config.opt<ConfigOptionFloatOrPercent>("first_layer_infill_extrusion_width");
+        if ((role == frInfill || role == frSolidInfill || role == frTopSolidInfill) && opt_fli_width->is_enabled()) {
+            config_width = opt_fli_width;
+            config_spacing = print_config.opt<ConfigOptionFloatOrPercent>("first_layer_infill_extrusion_spacing");
+        } else if (opt_fl_width->is_enabled()) {
+            config_width = opt_fl_width;
+            config_spacing = print_config.opt<ConfigOptionFloatOrPercent>("first_layer_extrusion_spacing");
+        }
     }
 
     if (config_width.value == 0) {
@@ -616,8 +625,8 @@ Flow support_material_1st_layer_flow(const PrintObject *object, float layer_heig
 {
 
     const PrintConfig &print_config = object->print()->config();
-    const auto& width = (object->config().first_layer_extrusion_width.value > 0) ? object->config().first_layer_extrusion_width : object->config().support_material_extrusion_width;
-    const auto& spacing = (object->config().first_layer_extrusion_spacing.value > 0) ? object->config().first_layer_extrusion_spacing : object->config().support_material_extrusion_width;
+    const auto& width = object->config().first_layer_extrusion_width.is_enabled() ? object->config().first_layer_extrusion_width : object->config().support_material_extrusion_width;
+    const auto& spacing = object->config().first_layer_extrusion_width.is_enabled() ? object->config().first_layer_extrusion_spacing : object->config().support_material_extrusion_width;
     float slice_height = layer_height;
     if (layer_height <= 0.f && !object->print()->config().nozzle_diameter.empty()){
         slice_height = (float)object->get_first_layer_height();
@@ -634,7 +643,7 @@ Flow support_material_1st_layer_flow(const PrintObject *object, float layer_heig
         frSupportMaterial,
         // The width parameter accepted by new_from_config_width is of type ConfigOptionFloatOrPercent, the Flow class takes care of the percent to value substitution.
         (width.value > 0) ? width : object->config().extrusion_width,
-        spacing, // can be used if first_layer_extrusion_width is phony
+        (spacing.value > 0) ? spacing : object->config().extrusion_spacing, // can be used if first_layer_extrusion_width is phony
         float(print_config.nozzle_diameter.get_at(extruder_id)),
         slice_height,
         extruder_id < 0 ? 1 : object->config().get_computed_value("filament_max_overlap", extruder_id), //if can get an extruder, then use its param, or use full overlap if we don't know the extruder id.

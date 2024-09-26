@@ -1472,8 +1472,10 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                 file.write_format("; support material extrusion width = %.2fmm\n", support_material_flow(first_object).width());
                 file.write_format("; support material interface extrusion width = %.2fmm\n", support_material_interface_flow(first_object).width());
             }
-            if (first_object->config().first_layer_extrusion_width.value > 0)
+            if (first_object->config().first_layer_extrusion_width.is_enabled())
                 file.write_format("; first layer extrusion width = %.2fmm\n",   region.flow(*first_object, frPerimeter, first_layer_height, 0).width());
+            if (first_object->config().first_layer_infill_extrusion_width.is_enabled())
+                file.write_format("; first layer infill extrusion width = %.2fmm\n",   region.flow(*first_object, frSolidInfill, first_layer_height, 0).width());
             file.write_format("\n");
         }
     }

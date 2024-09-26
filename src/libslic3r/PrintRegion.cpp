@@ -85,9 +85,16 @@ Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_he
     } else {
         throw Slic3r::InvalidArgument("Unknown role");
     }
-    if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
-        config_width = object.config().first_layer_extrusion_width;
-        config_spacing = object.config().first_layer_extrusion_spacing;
+    if (first_layer) {
+        if ((role == frInfill || role == frSolidInfill || role == frTopSolidInfill)
+                && object.config().first_layer_infill_extrusion_width.is_enabled()
+                ) {
+            config_width = object.config().first_layer_infill_extrusion_width;
+            config_spacing = object.config().first_layer_infill_extrusion_spacing;
+        } else if (object.config().first_layer_extrusion_width.is_enabled()) {
+            config_width = object.config().first_layer_extrusion_width;
+            config_spacing = object.config().first_layer_extrusion_spacing;
+        }
     }
 
     if (config_width.value == 0) {
@@ -112,8 +119,16 @@ float  PrintRegion::width(FlowRole role, bool first_layer, const PrintObject& ob
     const ConfigOptionFloatOrPercent* config_width = nullptr;
     // otherwise, get extrusion width from configuration
     // (might be an absolute value, or a percent value, or zero for auto)
-    if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
-        config_width = &object.config().first_layer_extrusion_width;
+    if (first_layer) {
+        if ((role == frInfill || role == frSolidInfill || role == frTopSolidInfill)
+                && object.config().first_layer_infill_extrusion_width.is_enabled()
+                ) {
+            config_width = &object.config().first_layer_infill_extrusion_width;
+        } else if (object.config().first_layer_extrusion_width.is_enabled()) {
+            config_width = &object.config().first_layer_extrusion_width;
+        }
+    }
+    if(!config_width){
     } else if (role == frExternalPerimeter) {
         config_width = &m_config.external_perimeter_extrusion_width;
     } else if (role == frPerimeter) {
