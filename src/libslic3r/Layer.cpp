@@ -711,6 +711,7 @@ void Layer::make_perimeters()
                             && config.perimeter_acceleration    == other_config.perimeter_acceleration
                             && config.perimeter_direction       == other_config.perimeter_direction
                             && config.perimeter_extrusion_width == other_config.perimeter_extrusion_width
+                            && config.perimeter_generator       == other_config.perimeter_generator
                             && config.perimeter_loop            == other_config.perimeter_loop
                             && config.perimeter_loop_seam       == other_config.perimeter_loop_seam
                             && config.perimeter_overlap         == other_config.perimeter_overlap
@@ -732,9 +733,18 @@ void Layer::make_perimeters()
                             && config.fuzzy_skin_thickness      == other_config.fuzzy_skin_thickness
                             && config.fuzzy_skin_point_dist     == other_config.fuzzy_skin_point_dist)
                         {
-                            layer_region_reset_perimeters(*other_layerm);
-                            layer_region_ids.push_back(it - m_regions.begin());
-                            done[it - m_regions.begin()] = true;
+                            if (config.perimeter_generator != PerimeterGeneratorType::Arachne || (
+                                   config.min_bead_width                    == other_config.min_bead_width
+                                && config.min_feature_size                  == other_config.min_feature_size
+                                && config.wall_distribution_count           == other_config.wall_distribution_count
+                                && config.wall_transition_angle             == other_config.wall_transition_angle
+                                && config.wall_transition_filter_deviation  == other_config.wall_transition_filter_deviation
+                                && config.wall_transition_length            == other_config.wall_transition_length
+                              )) {
+                                layer_region_reset_perimeters(*other_layerm);
+                                layer_region_ids.push_back(it - m_regions.begin());
+                                done[it - m_regions.begin()] = true;
+                            }
                         }
                     }
 

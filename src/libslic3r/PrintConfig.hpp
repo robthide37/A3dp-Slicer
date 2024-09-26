@@ -760,13 +760,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     // Force the generation of solid shells between adjacent materials/volumes.
     ((ConfigOptionBool,                 interface_shells))
     ((ConfigOptionFloat,                layer_height))
-    ((ConfigOptionFloatOrPercent,       min_bead_width))
-    ((ConfigOptionFloatOrPercent,       min_feature_size))
     ((ConfigOptionFloat,                mmu_segmented_region_max_width))
     ((ConfigOptionFloat,                mmu_segmented_region_interlocking_depth))
     ((ConfigOptionFloat,                model_precision))
     ((ConfigOptionPercent,              perimeter_bonding))
-    ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
     ((ConfigOptionFloat,                raft_contact_distance))
     ((ConfigOptionFloat,                raft_expansion))
     ((ConfigOptionPercent,              raft_first_layer_density))
@@ -788,10 +785,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<SlicingMode>,    slicing_mode))
     ((ConfigOptionBool,                 staggered_inner_seams))
     ((ConfigOptionBool,                 support_material))
-    ((ConfigOptionFloatOrPercent,       wall_transition_length))
-    ((ConfigOptionFloatOrPercent,       wall_transition_filter_deviation))
-    ((ConfigOptionFloat,                wall_transition_angle))
-    ((ConfigOptionInt,                  wall_distribution_count))
     // Automatic supports (generated based fdm support point generator).
     ((ConfigOptionBool,                 support_material_auto))
     // Direction of the support pattern (in XY plane).
@@ -949,6 +942,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       milling_extra_size))
     ((ConfigOptionBool,                 milling_post_process))
     ((ConfigOptionFloat,                milling_speed))
+    ((ConfigOptionFloatOrPercent,       min_bead_width))
+    ((ConfigOptionFloatOrPercent,       min_feature_size))
     ((ConfigOptionFloatOrPercent,       min_width_top_surface))
     // Detect bridging perimeters
     ((ConfigOptionFloatOrPercent,       overhangs_acceleration))
@@ -969,6 +964,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       perimeter_extrusion_width))
     ((ConfigOptionFloatOrPercent,       perimeter_extrusion_spacing))
     ((ConfigOptionFloatOrPercent,       perimeter_extrusion_change_odd_layers))
+    ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
     ((ConfigOptionBool,                 perimeter_loop))
     ((ConfigOptionEnum<SeamPosition>,   perimeter_loop_seam))
     ((ConfigOptionPercent,              perimeter_overlap))
@@ -1019,6 +1015,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       top_solid_infill_speed))
     ((ConfigOptionFloatOrPercent,       travel_acceleration))
     ((ConfigOptionBool,                 travel_deceleration_use_target))
+    ((ConfigOptionInt,                  wall_distribution_count))
+    ((ConfigOptionFloatOrPercent,       wall_transition_length))
+    ((ConfigOptionFloatOrPercent,       wall_transition_filter_deviation))
+    ((ConfigOptionFloat,                wall_transition_angle))
     ((ConfigOptionBool,                 wipe_into_infill))
 )
 
