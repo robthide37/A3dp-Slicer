@@ -37,7 +37,7 @@ public:
         coord_t bead_width_0,
         coord_t bead_spacing_x,
         coord_t bead_width_x,
-        size_t inset_count, coord_t wall_0_inset, coordf_t layer_height, const PrintObjectConfig &print_object_config, const PrintConfig &print_config);
+        size_t inset_count, coord_t wall_0_inset, coordf_t layer_height, const PrintRegionConfig &print_region_config, const PrintConfig &print_config);
 
     /*!
      * Generates the Toolpaths
@@ -130,7 +130,7 @@ private:
     bool toolpaths_generated; //<! Are the toolpaths generated
     std::vector<VariableWidthLines> toolpaths; //<! The generated toolpaths
     Polygons inner_contour;  //<! The inner contour of the generated toolpaths
-    const PrintObjectConfig &print_object_config;
+    const PrintRegionConfig &print_region_config;
 };
 
 } // namespace Slic3r::Arachne
