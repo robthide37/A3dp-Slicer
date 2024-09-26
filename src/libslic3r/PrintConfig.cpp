@@ -5944,7 +5944,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Maximum layer height for the support interface."
         "\nCan be a % of the nozzle diameter"
         "\nIf set to 0, the extruder maximum height will be used.");
-    def->sidetext = L("mm");
+    def->sidetext = L("mm or %");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->mode = comAdvancedE | comSuSi;
@@ -6029,7 +6029,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Maximum layer height for the support, after the first layer that uses the first layer height, and before the interface layers."
         "\nCan be a % of the nozzle diameter"
         "\nIf set to 0, the extruder maximum height will be used.");
-    def->sidetext = L("mm");
+    def->sidetext = L("mm or %");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->mode = comAdvancedE | comSuSi;
