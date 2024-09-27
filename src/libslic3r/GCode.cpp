@@ -2232,11 +2232,14 @@ void GCodeGenerator::process_layers(
             } else {
                 const std::pair<coordf_t, ObjectsLayerToPrint> &layer = layers_to_print[layer_to_print_idx];
                 CNumericLocalesSetter locales_setter;
-                const LayerTools& layer_tools = tool_ordering.tools_for_layer(layer.first);
-                if (m_wipe_tower && layer_tools.has_wipe_tower)
+                const LayerTools *layer_tools = tool_ordering.tools_for_layer(layer.first);
+                assert(layer_tools);
+                if (!layer_tools)
+                    return LayerResult::make_nop_layer_result();
+                if (m_wipe_tower && layer_tools->has_wipe_tower)
                     m_wipe_tower->next_layer();
                  this->m_throw_if_canceled();
-                LayerResult result = this->process_layer(print, status_monitor, layer.second, layer_tools,
+                LayerResult result = this->process_layer(print, status_monitor, layer.second, *layer_tools,
                                                          &layer == &layers_to_print.back(),
                                                          &print_object_instances_ordering, size_t(-1));
                 result.gcode = preamble + result.gcode;
@@ -2383,10 +2386,13 @@ void GCodeGenerator::process_layers(
                 CNumericLocalesSetter locales_setter;
                 ObjectLayerToPrint &layer = layers_to_print[layer_to_print_idx];
                 print.throw_if_canceled();
-                LayerResult result = this->process_layer(print, status_monitor, {std::move(layer)},
-                                                         tool_ordering.tools_for_layer(layer.print_z()),
-                                                         &layer == &layers_to_print.back(), nullptr,
-                                                         single_object_idx);
+                const LayerTools *layer_tool_ptr = tool_ordering.tools_for_layer(layer.print_z());
+                assert(layer_tool_ptr);
+                if(!layer_tool_ptr)
+                    return LayerResult::make_nop_layer_result();
+                LayerResult result = this->process_layer(print, status_monitor, {std::move(layer)}, *layer_tool_ptr,
+                                                         &layer == &layers_to_print.back(),
+                                                         nullptr, single_object_idx);
                 result.gcode = preamble + result.gcode;
                 preamble.clear();
                 return result;
@@ -3614,7 +3620,6 @@ void GCodeGenerator::process_layer_single_object(
         this->set_origin(offset);
     }
 
-    ExtrusionEntitiesPtr temp_fill_extrusions;
     if (const Layer *layer = layer_to_print.object_layer; layer) {
         for (size_t idx : layer->lslice_indices_sorted_by_print_order) {
             const LayerSlice &lslice = layer->lslices_ex[idx];
@@ -7528,7 +7533,7 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
     ensure_end_object_change_labels(gcode);
 
     //just for testing
-    assert(this->writer().get_position().z() - m_config.z_offset.value == print_z);
+    assert(is_approx(this->writer().get_position().z() - m_config.z_offset.value, print_z, EPSILON));
 
     // if we are running a single-extruder setup, just set the extruder and return nothing
     if (!m_writer.multiple_extruders) {
