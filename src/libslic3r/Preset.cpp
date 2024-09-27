@@ -830,6 +830,7 @@ static std::vector<std::string> s_Preset_filament_options {
         "temperature",
         // pressure advance        "filament_bridge_pa", //pa
         "filament_bridge_internal_pa",
+        "filament_bridge_pa",
         "filament_brim_pa",
         "filament_default_pa",
         "filament_external_perimeter_pa",

@@ -9511,6 +9511,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_wipe_advanced_pigment",
 //pa
 "filament_bridge_internal_pa",
+"filament_bridge_pa",
 "filament_brim_pa",
 "filament_default_pa",
 "filament_external_perimeter_pa",
@@ -9598,6 +9599,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "laser_activate_gcode",
 "laser_diameter",
 "laser_disable_gcode",
+"laser_enable_gcode",
 "laser_energy",
 "laser_head",
 "laser_support_interface_pp",
@@ -9748,7 +9750,6 @@ std::unordered_set<std::string> prusa_export_to_change_keys =
 
 std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf) {
     std::map<std::string, std::string> new_entries;
-
     //looks if it's to be removed, or have to be transformed
     if (prusa_export_to_remove_keys.find(opt_key) != prusa_export_to_remove_keys.end()) {
         assert((all_conf.def()->get(opt_key)->mode & comPrusa) == 0);
