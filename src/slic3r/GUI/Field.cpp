@@ -461,9 +461,9 @@ bool Field::is_matched(const std::string &string, const std::string &pattern)
 wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, const int opt_idx)
 {
     wxString text_value;
-    auto deserialize = [&text_value, &value, &opt](ConfigOptionVectorBase &&writer, bool check_nil = true) {
-        //TODO: test (this codepath isn't used yet)
-        writer.set_any(value, 0); // serialize one value into this empty vector, so first item
+    auto deserialize_vector = [&text_value, &value, &opt](ConfigOptionVectorBase &&writer, bool check_nil = true) {
+        // value is a vector<THING>
+        writer.set_any(value); // we can't set the indice as we set the whole vector.
         text_value = writer.serialize();
         //replace ',' by ';'
         text_value.Replace(",", ";");
@@ -477,13 +477,13 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     switch (opt.type) {
     case coFloats: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionFloats{});
+            deserialize_vector(ConfigOptionFloats{});
             break;
         }
     }
     case coPercents: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionPercents{});
+            deserialize_vector(ConfigOptionPercents{});
             break;
         }
     }
@@ -524,7 +524,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coFloatsOrPercents: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionFloatsOrPercents{});
+            deserialize_vector(ConfigOptionFloatsOrPercents{});
             break;
         }
     }
@@ -537,7 +537,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coBools: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionBools{});
+            deserialize_vector(ConfigOptionBools{});
         } else {
             text_value = boost::any_cast<uint8_t>(value) != 0 ? "true" : "false";
         }
@@ -551,7 +551,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coInts: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionInts{});
+            deserialize_vector(ConfigOptionInts{});
             break;
         }
     }
@@ -561,7 +561,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coPoints:
         if (opt_idx < 0) {
-            deserialize(ConfigOptionPoints{});
+            deserialize_vector(ConfigOptionPoints{});
             assert(text_value == get_points_string(boost::any_cast<std::vector<Vec2d>>(value)));
             break;
         }
