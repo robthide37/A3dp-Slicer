@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - rc
-      - debug_macos
 
 jobs:
   build:
@@ -12,16 +11,23 @@ jobs:
     runs-on: macos-12
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
+      with:
+        ref: 'rc'
     - name: build deps & slicer
       run: ./BuildMacOS.sh -dsi
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
+    - name: Upload dmg
+      uses: actions/upload-artifact@v4
+      with:
+        name: rc_macos.dmg
+        path: build/${{ github.event.repository.name }}.dmg
+    - name: Upload tar
+      uses: actions/upload-artifact@v4
+      with:
+        name: rc_macos.tar
+        path: build/${{ github.event.repository.name }}.tar
+    - name: Upload app
+      uses: actions/upload-artifact@v4
       with:
         name: rc_macos.app
         path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: rc_macos.dmg
-        path: ${{ github.event.repository.name }}.dmg

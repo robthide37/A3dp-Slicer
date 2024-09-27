@@ -29,12 +29,12 @@ jobs:
     - name: build deps & slicer, tar & appimage
       run: ./BuildLinux.sh -dgsi
     - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: rc_linux_gtk2.tar
         path: build/${{ github.event.repository.name }}.tar
     - name: Upload appimage
-      uses: actions/upload-artifact@v1.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: rc-${{ github.event.repository.name }}-gtk2.AppImage
         path: build/${{ github.event.repository.name }}_ubu64.AppImage
