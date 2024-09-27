@@ -372,7 +372,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("no_perimeter_unsupported_algo", have_perimeters);
     toggle_field("only_one_perimeter_top", have_perimeters);
     toggle_field("only_one_perimeter_first_layer", config->opt_int("perimeters") > 1);
-    toggle_field("overhangs_width", config->option("overhangs_width_speed")->is_enabled());
     bool have_overhangs_reverse = have_perimeters && !have_arachne && !config->opt_bool("perimeter_reverse");
     toggle_field("overhangs_reverse", have_overhangs_reverse);
     toggle_field("overhangs_reverse_threshold", have_overhangs_reverse && config->opt_bool("overhangs_reverse"));
