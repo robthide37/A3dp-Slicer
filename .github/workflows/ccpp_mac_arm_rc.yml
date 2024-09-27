@@ -16,13 +16,18 @@ jobs:
         ref: 'rc'
     - name: build deps & slicer
       run: ./BuildMacOS.sh -adsi
-    - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+    - name: Upload dmg
+      uses: actions/upload-artifact@v4
       with:
         name: rc_arm_macos.dmg
         path: build/${{ github.event.repository.name }}.dmg
-    - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+    - name: Upload tar
+      uses: actions/upload-artifact@v4
       with:
         name: rc_arm_macos.tar
         path: build/${{ github.event.repository.name }}.tar
+    - name: Upload app
+      uses: actions/upload-artifact@v4
+      with:
+        name: rc_macos.app
+        path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
