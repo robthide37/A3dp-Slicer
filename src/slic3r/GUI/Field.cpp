@@ -524,7 +524,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coFloatsOrPercents: {
         if (opt_idx < 0) {
-            deserialize(ConfigOptionFloatsOrPercents({FloatOrPercent(0.,false)}));
+            deserialize(ConfigOptionFloatsOrPercents(FloatOrPercent{0., false}));
             break;
         }
     }
@@ -561,7 +561,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coPoints:
         if (opt_idx < 0) {
-            deserialize(ConfigOptionPoints({Point(0,0)}));
+            deserialize(ConfigOptionPoints({Vec2d(0,0)}));
             assert(text_value == get_points_string(boost::any_cast<std::vector<Vec2d>>(value)));
             break;
         }
