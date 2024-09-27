@@ -5,7 +5,7 @@ on:
     branches:
       - nightly
       - nightly_dev
-      - nightly_master
+      - 2.5.60
       - supermerill-Main
       - 2.7.61
 
