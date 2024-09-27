@@ -189,7 +189,9 @@ void LayerRegion::make_perimeters(
                 // mask for "no overlap" area
             m_fill_no_overlap_expolygons
         );
-    
+
+        for(auto *peri : this->m_perimeters.entities()) assert(!peri->empty());
+
         perimeter_and_gapfill_ranges.emplace_back(
             ExtrusionRange{ uint32_t(perimeters_begin), uint32_t(m_perimeters.size()) }, 
             ExtrusionRange{ uint32_t(gap_fills_begin),  uint32_t(m_thin_fills.size()) });

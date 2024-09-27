@@ -4217,9 +4217,11 @@ void PrintConfigDef::init_fff_params()
     def->label = L("'As bridge' speed threshold");
     def->full_label = L("Overhang bridge speed threshold");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Minimum unsupported width for an extrusion to apply the bridge fan & overhang speed to this overhang."
-        " Can be in mm or in a % of the nozzle diameter."
-        " If dynamic speed is used, then the dynamic speed will be used between 0% threshold and this setting threshold.");
+    def->tooltip = L("Minimum unsupported width for an extrusion to apply the bridge fan & overhang speed to it."
+        "\nCan be in mm or in a % of the nozzle diameter."
+        "\nCan be overriden by the overhang flow threshold if its value lower than this threshold."
+        "\nIf dynamic speed is used, then the dynamic speed will be computed between 0% and this threshold.");
+    def->sidetext = L("mm or %");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->can_be_disabled = true;
@@ -4230,9 +4232,12 @@ void PrintConfigDef::init_fff_params()
     def->label = L("'As bridge' flow threshold");
     def->full_label = L("Overhang bridge flow threshold");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Minimum unsupported width for an extrusion to apply the bridge flow to this overhang."
-        " Can be in mm or in a % of the nozzle diameter."
-        " It uses the threshold for overhangs speed if this one as a higher value as this one.");
+    def->tooltip = L("Minimum unsupported width for an extrusion to apply the overhang bridge flow to it."
+        "\nCan be in mm or in a % of the nozzle diameter."
+        "\nIf lower than the threshold for overhangs speed, then this threshold is used for both."
+        "\nIf dynamic speed is used, and the overhangs speed threshold isn't enabled or is higher than this one,"
+        " then the dynamic speed will be computed between 0% and this threshold.");
+    def->sidetext = L("mm or %");
     def->ratio_over = "nozzle_diameter";
     def->min = 0;
     def->max_literal = { 10, true };
@@ -8582,27 +8587,31 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
             opt_key = "";
         }
     }
-    if (config.has("bridge_angle") && config.get_float("bridge_angle") == 0 && config.is_enabled("bridge_angle")) {
-        bool old = true;
-        if (config.has("print_version")) {
-            std::string str_version = config.option<ConfigOptionString>("print_version")->value;
-            old = str_version.size() < 4+1+7;
-            old = old || str_version.substr(0,4) != "SUSI";
-            assert(old || str_version[4] == '_');
-            if (!old) {
-                std::optional<Semver> version = Semver::parse(str_version.substr(5));
-                if (version) {
-                    if (version->maj() <= 2 && version->min() <= 6) {
-                        old = true;
-                    }
-                } else {
+    bool old = true;
+    if (config.has("print_version")) {
+        std::string str_version = config.option<ConfigOptionString>("print_version")->value;
+        old = str_version.size() < 4+1+7;
+        old = old || str_version.substr(0,4) != "SUSI";
+        assert(old || str_version[4] == '_');
+        if (!old) {
+            std::optional<Semver> version = Semver::parse(str_version.substr(5));
+            if (version) {
+                if (version->maj() <= 2 && version->min() <= 6) {
                     old = true;
                 }
+            } else {
+                old = true;
             }
         }
-        if (old) {
-            config.option("bridge_angle")->set_enabled(false);
-        }
+    }
+    if (old && config.has("bridge_angle") && config.get_float("bridge_angle") == 0 && config.is_enabled("bridge_angle")) {
+        config.option("bridge_angle")->set_enabled(false);
+    }
+    if (old && config.has("overhangs_width_speed") && config.get_float("overhangs_width_speed") == 0 && config.is_enabled("overhangs_width_speed")) {
+        config.option("overhangs_width_speed")->set_enabled(false);
+    }
+    if (old && config.has("overhangs_width") && config.get_float("overhangs_width") == 0 && config.is_enabled("overhangs_width")) {
+        config.option("overhangs_width")->set_enabled(false);
     }
     if (useful_items.find("enable_dynamic_overhang_speeds") != useful_items.end()) {
         ConfigOptionBool enable_dynamic_overhang_speeds;
