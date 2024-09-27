@@ -1,0 +1,117 @@
+name: C/C++ Nightly Windows x64
+
+on:
+  push:
+    branches:
+      - nightly
+      - nightly_dev
+      - nightly_master
+      - supermerill-Main
+      - 2.7.61
+
+jobs:
+  build_dep:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Create build directory
+        run: mkdir deps/build
+      - name: Configure and build dependencies
+        working-directory: ./deps/build
+        run: |
+          cmake .. -G "Visual Studio 16 2019" -A x64
+          msbuild /m ALL_BUILD.vcxproj
+      - name: Upload dependencies artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deps_win
+          path: ./deps/build/destdir/
+
+  build:
+    runs-on: windows-2019
+    needs: build_dep
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Update submodule profiles
+        working-directory: ./resources/profiles
+        run: git submodule update --init
+      - name: Update version date
+        shell: powershell
+        run: (Get-Content version.inc) | ForEach-Object {$_ -replace "\+UNKNOWN", ("_" + [datetime]::Today.ToString("yyyy-MM-dd"))} | Set-Content version.inc
+      - name: Create destination directory
+        run: mkdir deps/destdir
+      - name: Download dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: deps_win
+          path: deps/destdir
+      - name: List deps directory
+        run: dir deps
+      - name: List deps destination directory
+        run: dir deps/destdir
+      - name: Create msgfmt_bin directory
+        run: mkdir msgfmt_bin
+      - name: Download gettext
+        working-directory: ./msgfmt_bin
+        shell: powershell
+        run: '(new-object System.Net.WebClient).DownloadFile("https://github.com/supermerill/SuperSlicer_deps/releases/download/gettext/gettext-tools-static-0.18.1.1.zip", "gettext.zip")'
+      - name: Unzip gettext
+        working-directory: ./msgfmt_bin
+        shell: cmd
+        run: '"C:/Program Files/7-Zip/7z.exe" x gettext.zip'
+      - name: Add msgfmt to PATH
+        shell: powershell
+        working-directory: msgfmt_bin
+        run: echo "$pwd;" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Create build directory
+        run: mkdir build
+      - name: Configure project
+        working-directory: ./build
+        run: cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="d:\a\${{ github.event.repository.name }}\${{ github.event.repository.name }}\deps\destdir\usr\local"
+      - name: Build project
+        working-directory: ./build
+        run: msbuild /m /P:Configuration=RelWithDebInfo INSTALL.vcxproj
+      - name: Build .mo files
+        working-directory: ./build
+        run: msbuild /m /P:Configuration=RelWithDebInfo gettext_po_to_mo.vcxproj
+      - name: Build .pot files
+        working-directory: ./build
+        run: msbuild /m /P:Configuration=RelWithDebInfo gettext_make_pot.vcxproj
+      - name: Create package directory
+        working-directory: ./build
+        shell: powershell
+        run: mkdir package
+      - name: Download release
+        working-directory: ./build
+        shell: powershell
+        run: '(new-object System.Net.WebClient).DownloadFile("https://github.com/supermerill/SuperSlicer_deps/releases/download/1.75/Slic3r_win_build.zip", "Slic3r_win_build.zip")'
+      - name: Unzip release
+        working-directory: ./build
+        shell: cmd
+        run: '"C:/Program Files/7-Zip/7z.exe" x Slic3r_win_build.zip'
+      - name: Copy missing DLLs from old release
+        working-directory: ./build
+        shell: cmd
+        run: |
+          xcopy /RCYIE Slic3r_win_build\*.dll package\
+          xcopy /RCYIE Slic3r_win_build\local-settings.bat package\${{ github.event.repository.name }}_local-settings.bat
+          xcopy /RCYIE Slic3r_win_build\mesa package\
+      - name: Copy new resources
+        working-directory: ./build
+        shell: cmd
+        run: xcopy /RCYIE ..\resources package\resources
+      - name: Copy DLLs and EXEs
+        working-directory: ./build
+        shell: cmd
+        run: |
+          xcopy /RCYIE src\RelWithDebInfo\*.dll package\
+          xcopy /RCYIE src\RelWithDebInfo\*.exe package\
+          xcopy /RCYIE c:\windows\system32\VCRUNTIME140* package\
+          del package\opengl32.dll
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly_win64
+          path: build/package/
