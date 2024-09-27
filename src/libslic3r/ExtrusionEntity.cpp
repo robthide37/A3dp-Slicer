@@ -103,7 +103,7 @@ void ExtrusionPath::polygons_covered_by_spacing(Polygons &out, const float spaci
     // TODO: check BRIDGE_FLOW here
     auto flow = bridge ? Flow::bridging_flow(m_attributes.width, 0.f) :
                          Flow::new_from_width(m_attributes.width, 0.f, m_attributes.height, spacing_ratio);
-    polygons_append(out, offset(this->polyline.to_polyline(), 0.5f * float(flow.scaled_spacing()) + scaled_epsilon));
+    polygons_append(out, offset(this->polyline.to_polyline(), 0.5f * float(flow.scaled_spacing()) + scaled_epsilon, Slic3r::ClipperLib::jtMiter, 10));
 }
 
 //note: don't suppport arc

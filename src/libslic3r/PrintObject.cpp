@@ -894,7 +894,17 @@ void PrintObject::calculate_overhanging_perimeters()
                         size_t prev_layer_id = l->lower_layer ? l->lower_layer->id() : size_t(-1);
                         assert(layer_region->region().config().overhangs_width_speed.is_enabled());
                         const double nozzle_diameter_overhangs = layer_region->bridging_flow(frPerimeter).nozzle_diameter();
-                        const double max_width = layer_region->region().config().overhangs_width_speed.get_abs_value(nozzle_diameter_overhangs);
+                        double max_width = -1;
+                        if (layer_region->region().config().overhangs_width_speed.is_enabled()) {
+                            max_width = layer_region->region().config().overhangs_width_speed.get_abs_value(nozzle_diameter_overhangs);
+                        }
+                        if (layer_region->region().config().overhangs_width.is_enabled() && (max_width < 0 ||
+                            max_width > layer_region->region().config().overhangs_width.get_abs_value(nozzle_diameter_overhangs))) {
+                            max_width = layer_region->region().config().overhangs_width.get_abs_value(nozzle_diameter_overhangs);
+                        }
+                        if (max_width < 0) {
+                            max_width = nozzle_diameter_overhangs;
+                        }
                         layer_region->m_perimeters =
                             ExtrusionProcessor::calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
                                                                                            unscaled_polygons_lines[prev_layer_id],
