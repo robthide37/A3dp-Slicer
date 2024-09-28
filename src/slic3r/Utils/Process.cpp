@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 David Kocík @kocikdav, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Process.hpp"
 
 #include <libslic3r/AppConfig.hpp>
@@ -34,7 +38,7 @@ enum class NewSlicerInstanceType {
 
 // Start a new Slicer process instance either in a Slicer mode or in a G-code mode.
 // Optionally load a 3MF, STL or a G-code on start.
-static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance_type, const std::vector<wxString> paths_to_open, bool single_instance)
+static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance_type, const std::vector<wxString> paths_to_open, bool single_instance, bool delete_after_load)
 {
 #ifdef _WIN32
 	wxString path;
@@ -66,6 +70,8 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 	}
     if (instance_type == NewSlicerInstanceType::Slicer && single_instance)
         args.push_back(L"--single-instance");
+	if(delete_after_load && !paths_to_open.empty())
+		args.emplace_back(L"--delete-after-load=1");
     args.push_back(L"--datadir");
 	std::wstring wide_datadir = boost::nowide::widen((Slic3r::data_dir()).c_str());
 	args.push_back(wide_datadir.c_str());
@@ -97,6 +103,8 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 			}
 			if (instance_type == NewSlicerInstanceType::Slicer && single_instance)
 				args.emplace_back("--single-instance");
+			if (delete_after_load && !paths_to_open.empty())
+				args.emplace_back("--delete-after-load=1");
 			args.push_back("--datadir");
 			args.push_back((Slic3r::data_dir()));
 			boost::process::spawn(bin_path, args);
@@ -143,6 +151,8 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 		}
 		if (instance_type == NewSlicerInstanceType::Slicer && single_instance)
 			args.emplace_back("--single-instance");
+		if (delete_after_load && !paths_to_open.empty())
+			args.emplace_back("--delete-after-load=1");
 		args.push_back("--datadir");
 		std::string datadir_path = (Slic3r::data_dir());
 		args.push_back(datadir_path.c_str());
@@ -154,26 +164,26 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 #endif // Linux or Unix
 #endif // Win32
 }
-static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance_type, const wxString* path_to_open, bool single_instance)
+static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance_type, const wxString* path_to_open, bool single_instance, bool delete_after_load)
 {
 	std::vector<wxString> paths;
 	if (path_to_open != nullptr)
 		paths.emplace_back(path_to_open->wc_str());
-	start_new_slicer_or_gcodeviewer(instance_type, paths, single_instance);
+	start_new_slicer_or_gcodeviewer(instance_type, paths, single_instance, delete_after_load);
 }
 
-void start_new_slicer(const wxString *path_to_open, bool single_instance)
+void start_new_slicer(const wxString *path_to_open, bool single_instance/*=false*/, bool delete_after_load/*=false*/)
 {
-	start_new_slicer_or_gcodeviewer(NewSlicerInstanceType::Slicer, path_to_open, single_instance);
+	start_new_slicer_or_gcodeviewer(NewSlicerInstanceType::Slicer, path_to_open, single_instance, delete_after_load);
 }
-void start_new_slicer(const std::vector<wxString>& files, bool single_instance)
+void start_new_slicer(const std::vector<wxString>& files, bool single_instance/*=false*/, bool delete_after_load/*=false*/)
 {
-	start_new_slicer_or_gcodeviewer(NewSlicerInstanceType::Slicer, files, single_instance);
+	start_new_slicer_or_gcodeviewer(NewSlicerInstanceType::Slicer, files, single_instance, delete_after_load);
 }
 
 void start_new_gcodeviewer(const wxString *path_to_open)
 {
-	start_new_slicer_or_gcodeviewer(NewSlicerInstanceType::GCodeViewer, path_to_open, false);
+	start_new_slicer_or_gcodeviewer(NewSlicerInstanceType::GCodeViewer, path_to_open, false, false);
 }
 
 void start_new_gcodeviewer_open_file(wxWindow *parent)

@@ -1,4 +1,4 @@
-
+Releases are available here https://github.com/robthide37/A3dp-Slicer/tags
 
 ### So, what's this A3dp-Slicer?
 

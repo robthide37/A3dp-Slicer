@@ -1,16 +1,23 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Lukáš Hejl @hejllukas
+///|/
+///|/ Copyright (c) SuperSlicer 2020 - 2024 Durand Remi @supermerill
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
+
+#include "BridgeDetector.hpp"
+#include "ClipperUtils.hpp"
 #include "ElephantFootCompensation.hpp"
 #include "I18N.hpp"
 #include "Layer.hpp"
 #include "MultiMaterialSegmentation.hpp"
 #include "Print.hpp"
-#include "ClipperUtils.hpp"
+#include "ShortestPath.hpp"
+#include "Thread.hpp"
 
 #include <boost/log/trivial.hpp>
 
 #include <tbb/parallel_for.h>
 
-//! macro used to mark string used at localization, return same string
-#define L(s) Slic3r::I18N::translate(s)
 
 namespace Slic3r {
 
@@ -247,9 +254,6 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
     const PrintObjectRegions                                 &print_object_regions,
     const std::vector<float>                                 &zs,
     std::vector<VolumeSlices>                               &&volume_slices,
-    // If clipping is disabled, then ExPolygons produced by different volumes will never be merged, thus they will be allowed to overlap.
-    // It is up to the model designer to handle these overlaps.
-    const bool                                                clip_multipart_objects,
     const std::function<void()>                              &throw_on_cancel_callback)
 {
     model_volumes_sort_by_id(model_volumes);
@@ -318,7 +322,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
         }
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, zs_complex.size()),
-            [&slices_by_region, &print_object_regions, &zs_complex, &layer_ranges_regions_to_slices, clip_multipart_objects, &throw_on_cancel_callback]
+            [&slices_by_region, &print_object_regions, &zs_complex, &layer_ranges_regions_to_slices, &throw_on_cancel_callback]
                 (const tbb::blocked_range<size_t> &range) {
                 float z              = zs_complex[range.begin()].second;
                 auto  it_layer_range = layer_range_first(print_object_regions.layer_ranges, z);
@@ -369,7 +373,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                                 if (next_region_same_modifier)
                                     // To be used in the following iteration.
                                     temp_slices[idx_region + 1].expolygons = std::move(source);
-                            } else if ((region.model_volume->is_model_part() && clip_multipart_objects) || region.model_volume->is_negative_volume()) {
+                            } else if (region.model_volume->is_model_part() || region.model_volume->is_negative_volume()) {
                                 // Clip every non-zero region preceding it.
                                 for (int idx_region2 = 0; idx_region2 < idx_region; ++ idx_region2)
                                     if (! temp_slices[idx_region2].expolygons.empty()) {
@@ -398,10 +402,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                                     merged = true;
                                 }
                             }
-                        // Don't unite the regions if ! clip_multipart_objects. In that case it is user's responsibility
-                        // to handle region overlaps. Indeed, one may intentionally let the regions overlap to produce crossing perimeters 
-                        // for example.
-                        if (merged && clip_multipart_objects)
+                        if (merged)
                             expolygons = closing_ex(expolygons, float(scale_(EPSILON)));
                         slices_by_region[temp_slices[i].region_id][z_idx] = std::move(expolygons);
                         i = j;
@@ -429,6 +430,10 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
     return slices_by_region;
 }
 
+// Layer::slicing_errors is no more set since 1.41.1 or possibly earlier, thus this code
+// was not really functional for a long day and nobody missed it.
+// Could we reuse this fixing code one day?
+/*
 std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &throw_if_canceled)
 {
     // Collect layers with slicing errors.
@@ -499,7 +504,7 @@ std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &t
     BOOST_LOG_TRIVIAL(debug) << "Slicing objects - fixing slicing errors in parallel - end";
 
     // remove empty layers from bottom
-    while (! layers.empty() && (layers.front()->lslices.empty() || layers.front()->empty())) {
+    while (! layers.empty() && (layers.front()->lslices().empty() || layers.front()->empty())) {
         delete layers.front();
         layers.erase(layers.begin());
         if(!layers.empty())
@@ -512,6 +517,7 @@ std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &t
         "The model has overlapping or self-intersecting facets. I tried to repair it, "
         "however you might want to check the results or repair the input file and retry.\n";
 }
+*/
 
 // Called by make_perimeters()
 // 1) Decides Z positions of the layers,
@@ -534,28 +540,45 @@ void PrintObject::slice()
     m_layers = new_layers(this, generate_object_layers(*m_slicing_params, layer_height_profile));
     this->slice_volumes();
     m_print->throw_if_canceled();
+#if 0
+    // Layer::slicing_errors is no more set since 1.41.1 or possibly earlier, thus this code
+    // was not really functional for a long day and nobody missed it.
+    // Could we reuse this fixing code one day?
+
     // Fix the model.
     //FIXME is this the right place to do? It is done repeateadly at the UI and now here at the backend.
     std::string warning = fix_slicing_errors(m_layers, [this](){ m_print->throw_if_canceled(); });
     m_print->throw_if_canceled();
     if (! warning.empty())
         BOOST_LOG_TRIVIAL(info) << warning;
+#endif
 
     //create polyholes
     this->_transform_hole_to_polyholes();
 
+    this->_min_overhang_threshold();
+
     // Update bounding boxes, back up raw slices of complex models.
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, m_layers.size()),
-        [this](const tbb::blocked_range<size_t>& range) {
+        [this](const tbb::blocked_range<size_t> &range) {
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                 m_print->throw_if_canceled();
                 Layer &layer = *m_layers[layer_idx];
-                layer.lslices_bboxes.clear();
-                layer.lslices_bboxes.reserve(layer.lslices.size());
-                for (const ExPolygon &expoly : layer.lslices)
-                	layer.lslices_bboxes.emplace_back(get_extents(expoly));
+                layer.lslices_ex.clear();
+                layer.lslices_ex.reserve(layer.lslices().size());
+                for (const ExPolygon &expoly : layer.lslices())
+                	layer.lslices_ex.push_back({ get_extents(expoly) });
                 layer.backup_untyped_slices();
+            }
+        });
+    // Interlink the lslices into a Z graph.
+    tbb::parallel_for(
+        tbb::blocked_range<size_t>(1, m_layers.size()),
+        [this](const tbb::blocked_range<size_t> &range) {
+            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
+                m_print->throw_if_canceled();
+                Layer::build_up_down_graph(*m_layers[layer_idx - 1], *m_layers[layer_idx]);
             }
         });
     if (m_layers.empty())
@@ -563,8 +586,401 @@ void PrintObject::slice()
     this->set_done(posSlice);
 }
 
+// modify the polygon so it doesn't have any concave angle spiker than 90°
+// used by _min_overhang_threshold
+void only_convex_90(Polygon &poly) {
+    const bool ccw = poly.is_counter_clockwise();
+    std::vector<size_t> concave = ccw ? poly.concave_points_idx( PI/2 - EPSILON) : poly.convex_points_idx(PI/2 - EPSILON);
+    while (!concave.empty()) {
+        assert(std::is_sorted(concave.begin(), concave.end()));
+        Points new_pts;
+        bool previous_modified = false;
+        for (size_t idx = 0; idx < poly.points.size(); ++idx) {
+            if (previous_modified || std::find(concave.begin(), concave.end(), idx) == concave.end()) {
+                // convex: keep
+                new_pts.push_back(poly.points[idx]);
+                previous_modified = false;
+            } else {
+                previous_modified = true;
+                // concave: create new points to have a 90° angle
+                // get smallest side
+                Point small_side_point = idx == 0 ? poly.back() : poly[idx - 1];
+                Point big_side_point   = idx == poly.size() - 1 ? poly.front() : poly[idx + 1];
+                if (poly[idx].distance_to_square(small_side_point) > poly[idx].distance_to_square(big_side_point)) {
+                    big_side_point   = idx == 0 ? poly.back() : poly[idx - 1];
+                    small_side_point = idx == poly.size() - 1 ? poly.front() : poly[idx + 1];
+                }
+                // then get the distance to move in the big side
+                Point previous_point = ccw? (idx == 0 ? poly.back() : poly[idx - 1]) : (idx == poly.size() - 1 ? poly.front() : poly[idx + 1]);
+                Point next_point = ccw? (idx == poly.size() - 1 ? poly.front() : poly[idx + 1]) : (idx == 0 ? poly.back() : poly[idx - 1]);
+                assert(is_approx(ccw_angle_old_test(poly[idx], previous_point, next_point), abs_angle(angle_ccw(previous_point - poly[idx], next_point - poly[idx])), 0.00000001));
+                double angle = abs_angle(angle_ccw(previous_point - poly[idx], next_point - poly[idx]));
+                assert(angle <= PI/2 && angle >= 0);
+                coordf_t dist_to_move = std::cos(angle) * poly[idx].distance_to(small_side_point) + SCALED_EPSILON / 2;
+                // if distance to move too big, just deleted point (don't add it)
+                if (dist_to_move < poly[idx].distance_to(big_side_point)) {
+                    Line l(poly[idx], big_side_point);
+                    l.extend_start(-dist_to_move);
+                    new_pts.push_back(l.a);
+                    double angle_new = abs_angle(angle_ccw(previous_point - l.a, next_point - l.a));
+                    assert(angle_new != angle);
+                }
+            }
+        }
+        poly.points = new_pts;
+        concave = ccw ? poly.concave_points_idx( 3 * PI/2 + EPSILON) : poly.convex_points_idx(PI/2 - EPSILON);
+    }
+
+}
+
+void PrintObject::_min_overhang_threshold() {
+    bool has_enlargment = false;
+
+    coord_t max_nz_diam = 0;
+    for (int16_t extr_id : this->object_extruders()) {
+        max_nz_diam = std::max(max_nz_diam, scale_t(print()->config().nozzle_diameter.get_at(extr_id)));
+    }
+    if (max_nz_diam == 0)
+        max_nz_diam = scale_t(0.4);
+    
+    for (size_t region_idx = 0; region_idx < this->num_printing_regions(); ++region_idx) {
+        coord_t enlargement = scale_t(this->printing_region(region_idx).config().overhangs_max_slope.get_abs_value(unscaled(max_nz_diam)));
+        if (enlargement > 0) {
+            has_enlargment = true;
+            break;
+        }
+    }
+    if (!has_enlargment)
+        return;
+
+    coord_t resolution = std::max(scale_t(m_print->config().resolution), SCALED_EPSILON);
+    
+    for (size_t layer_idx = 1; layer_idx < this->layers().size(); layer_idx++) {
+        // get supported area
+        Layer* my_layer = this->get_layer(layer_idx);
+        Layer* lower_layer = this->get_layer(layer_idx - 1);
+        assert(lower_layer == my_layer->lower_layer);
+        ExPolygons supported_area = intersection_ex(my_layer->lslices(), lower_layer->lslices());
+        ensure_valid(supported_area, resolution);
+        ExPolygons bridged_area;
+        ExPolygons bridged_other_layers_area;
+
+        for (ExPolygon &poly : supported_area) poly.assert_valid();
+
+        // get bridgeable area
+        for (size_t region_idx = 0; region_idx < my_layer->m_regions.size(); ++region_idx) {
+            LayerRegion* lregion = my_layer->get_region(region_idx);
+            Flow bridge_flow = lregion->bridging_flow(FlowRole::frSolidInfill);
+            if (lregion->region().config().overhangs_bridge_threshold.value != 0 ||
+                    !lregion->region().config().overhangs_bridge_threshold.is_enabled()) {
+                const Surfaces & my_surfaces = lregion->m_slices.surfaces;
+                ExPolygons unsupported = to_expolygons(my_surfaces);
+                unsupported            = diff_ex(unsupported, lower_layer->lslices(), ApplySafetyOffset::Yes);
+
+                if (!unsupported.empty()) {
+                    ExPolygons unsupported_filtered;
+                    // remove small overhangs (but also good bridges to a cylinder)
+                    unsupported_filtered = offset2_ex(unsupported, double(-max_nz_diam/2), double(max_nz_diam), Slic3r::ClipperLib::jtMiter, 5);
+                    unsupported_filtered = intersection_ex(unsupported, unsupported_filtered);
+                    for (const ExPolygon &to_bridge : unsupported_filtered) {
+                        BridgeDetector detector(to_bridge,
+                                                lower_layer->lslices(),
+                                                bridge_flow.scaled_spacing(),
+                                                scale_t(this->print()->config().bridge_precision.get_abs_value(bridge_flow.spacing())),
+                                                layer_idx);
+                        if (lregion->region().config().overhangs_bridge_threshold.is_enabled()) {
+                            detector.max_bridge_length = scale_d(std::max(0., lregion->region().config().overhangs_bridge_threshold.value));
+                        } else {
+                            detector.max_bridge_length = -1;
+                        }
+                        if (detector.detect_angle()) {
+                            append(bridged_area, union_ex(detector.coverage()));
+                        }
+                    }
+                    // then, check other layers
+                    size_t max_layer_idx = lregion->region().config().overhangs_bridge_upper_layers.value;
+                    if (!lregion->region().config().overhangs_bridge_upper_layers.is_enabled()) // disabled -> all layers
+                        max_layer_idx = this->layers().size();
+                    if (max_layer_idx > 0) { // 0 -> don't check other layers
+                        max_layer_idx += layer_idx;
+                        max_layer_idx = std::min(max_layer_idx, this->layers().size());
+                        // compute the area still unsupported
+                        ExPolygons still_unsupported = diff_ex(unsupported, bridged_area);
+                        still_unsupported = intersection_ex(still_unsupported, offset2_ex(still_unsupported, double(-bridge_flow.scaled_spacing()/2), double(bridge_flow.scaled_spacing()),  Slic3r::ClipperLib::jtMiter, 5));
+                        // compute the support (without the enlarged part,as we don't know yet where it will be) 
+                        ExPolygons previous_supported = supported_area;
+                        append(previous_supported, bridged_area);
+                        previous_supported = union_safety_offset_ex(previous_supported);
+                        for (size_t other_layer_bridge_idx = layer_idx + 1; other_layer_bridge_idx < max_layer_idx; other_layer_bridge_idx++) {
+                            // remove new voids
+                            still_unsupported = intersection_ex(still_unsupported, this->get_layer(other_layer_bridge_idx)->lslices());
+                            //compute bridges
+                            ExPolygons new_bridged_area;
+                            for (size_t other_region_idx = 0; other_region_idx < my_layer->m_regions.size(); ++other_region_idx) {
+                                LayerRegion *other_lregion = my_layer->get_region(other_region_idx);
+                                if ( (other_lregion->region().config().overhangs_bridge_threshold.value != 0 ||
+                                        !lregion->region().config().overhangs_bridge_threshold.is_enabled())
+                                    && other_lregion->region().config().overhangs_max_slope > 0) {
+                                    coord_t enlargement = scale_t(my_layer->get_region(region_idx)->region().config().overhangs_max_slope.get_abs_value(unscaled(max_nz_diam)));
+                                    enlargement = std::max(enlargement, max_nz_diam);
+                                    const Surfaces &my_surfaces = other_lregion->m_slices.surfaces;
+                                    for (const ExPolygon &to_bridge : intersection_ex(still_unsupported, to_expolygons(my_surfaces))) {
+                                        //collapse too small area
+                                        if(offset(to_bridge, -enlargement).empty())
+                                            continue;
+
+                                        BridgeDetector detector(to_bridge, previous_supported, bridge_flow.scaled_spacing(),
+                                                     scale_t(this->print()->config().bridge_precision.get_abs_value(bridge_flow.spacing())),
+                                                     other_layer_bridge_idx);
+                                        detector.layer_id = other_layer_bridge_idx;
+                                        if (lregion->region().config().overhangs_bridge_threshold.is_enabled()) {
+                                            detector.max_bridge_length = scale_d(std::max(0., other_lregion->region().config().overhangs_bridge_threshold.value));
+                                        } else {
+                                            detector.max_bridge_length = -1;
+                                        }
+                                        if (detector.detect_angle()) {
+                                            append(new_bridged_area, union_ex(detector.coverage()));
+                                        }
+                                    }
+                                }
+                                // FIXME: if overhangs_bridge_upper_layers goes from 2+ to 0, detect that you can't go higher inside the region.
+                            }
+                            if (!new_bridged_area.empty()) {
+                                append(bridged_other_layers_area, new_bridged_area);
+                                // update the area still unsupported
+                                still_unsupported = diff_ex(still_unsupported, new_bridged_area);
+                                still_unsupported = offset2_ex(still_unsupported, 
+                                    double(-bridge_flow.scaled_spacing()/2), double(bridge_flow.scaled_spacing()/2));
+                            }
+                            // update support area from this layer
+                            if (other_layer_bridge_idx + 1 < max_layer_idx) {
+                                previous_supported = diff_ex(this->get_layer(other_layer_bridge_idx)->lslices(), still_unsupported);
+                            }
+                        }
+                    }
+                }
+            }
+                
+            // enlarge supported area & intersect it with full area
+            //also modify region surfaces
+            ExPolygons modified;
+            //std::map<coord_t, ExPolygons> enlargement_2_support_area;
+            for (size_t region_idx = 0; region_idx < my_layer->m_regions.size(); ++region_idx) {
+                // TODO: fuse region with same enlargement
+                coord_t enlargement = scale_t(my_layer->get_region(region_idx)->region().config().overhangs_max_slope.get_abs_value(unscaled(max_nz_diam)));
+                if (enlargement > 0) {
+                    ExPolygons enlarged_support = offset_ex(supported_area, double(enlargement));
+                    enlarged_support = diff_ex(enlarged_support, bridged_other_layers_area);
+                    append(enlarged_support, supported_area);
+                    // put bridgeable into supported area (bridges are not enlarged)
+                    append(enlarged_support, bridged_area);
+                    ExPolygons new_enlarged_support = union_safety_offset_ex(enlarged_support);
+                    // if possible, be sure to not have concave points in unsupported area
+                    for (ExPolygon &expoly : new_enlarged_support) {
+                        only_convex_90(expoly.contour);
+                        //same with holes (convex as they are in reverse order)
+                        for (Polygon &hole : expoly.holes) {
+                            only_convex_90(hole);
+                        }
+                    }
+                    enlarged_support = intersection_ex(new_enlarged_support, enlarged_support);
+                    // modify geometry
+                    Surfaces to_add;
+                    Surfaces &my_surfaces = my_layer->m_regions[region_idx]->m_slices.surfaces;
+                    for (size_t surf_idx = 0; surf_idx < my_surfaces.size(); surf_idx++) {
+                        ExPolygons polys = intersection_ex({my_surfaces[surf_idx].expolygon}, enlarged_support);
+                        // if bridge, smooth enlargment so ther ewon't be spikes near bridges.
+                        if (!bridged_other_layers_area.empty()) {
+                            polys = offset2_ex(polys, double(-enlargement / 2), double(enlargement / 2));
+                        }
+                        if (polys.empty()) {
+                            my_surfaces.erase(my_surfaces.begin() + surf_idx);
+                            surf_idx--;
+                        } else {
+                            my_surfaces[surf_idx].expolygon = polys[0];
+                            for (size_t i = 1; i < polys.size(); i++) {
+                                to_add.emplace_back(my_surfaces[surf_idx], polys[i]);
+                            }
+                        }
+                    }
+                    for(auto &srf : to_add) srf.expolygon.assert_valid();
+                    append(my_surfaces, std::move(to_add));
+                    ensure_valid(my_surfaces, resolution);
+                    for(auto &srf : my_surfaces) srf.expolygon.assert_valid();
+                    append(modified, union_ex(enlarged_support));
+                    ensure_valid(modified, resolution);
+                    assert_valid(modified);
+                }
+            }
+            //also lslices
+            ExPolygons new_lslices = intersection_ex(my_layer->lslices(), union_ex(modified), ApplySafetyOffset::Yes);
+            ensure_valid(new_lslices, resolution);
+            assert_valid(new_lslices);
+            my_layer->set_lslices() = std::move(new_lslices);
+        }
+    }
+}
+
+Polygons create_polyholes(const Point center, const coord_t radius, const coord_t nozzle_diameter, bool multiple)
+{
+    // n = max(round(2 * d), 3); // for 0.4mm nozzle
+    size_t nb_edges = (int)std::max(3, (int)std::round(4.0 * unscaled(radius) * 0.4 / unscaled(nozzle_diameter)));
+    // cylinder(h = h, r = d / cos (180 / n), $fn = n);
+    //create x polyholes by rotation if multiple
+    int nb_polyhole = 1;
+    float rotation = 0;
+    if (multiple) {
+        nb_polyhole = 5;
+        rotation = 2 * float(PI) / (nb_edges * nb_polyhole);
+    }
+    Polygons list;
+    for (int i_poly = 0; i_poly < nb_polyhole; i_poly++)
+        list.emplace_back();
+    for (int i_poly = 0; i_poly < nb_polyhole; i_poly++) {
+        Polygon& pts = (((i_poly % 2) == 0) ? list[i_poly / 2] : list[(nb_polyhole + 1) / 2 + i_poly / 2]);
+        const float new_radius = radius / float(std::cos(PI / nb_edges));
+        for (size_t i_edge = 0; i_edge < nb_edges; ++i_edge) {
+            float angle = rotation * i_poly + (float(PI) * 2 * (float)i_edge) / nb_edges;
+            pts.points.emplace_back(center.x() + new_radius * cos(angle), center.y() + new_radius * sin(angle));
+        }
+        pts.make_clockwise();
+    }
+    //alternate
+    return list;
+}
+
+void PrintObject::_transform_hole_to_polyholes()
+{
+    struct LayerData
+    {
+        Point center;
+        double max_diameter;
+        int16_t extruder_id;
+        coord_t max_deviation;
+        bool is_twist;
+
+        bool operator<(const LayerData &other) {
+            return this->is_twist != other.is_twist ? this->is_twist < other.is_twist :
+                this->extruder_id != other.extruder_id ? this->extruder_id < other.extruder_id :
+                !this->center.coincides_with_epsilon(other.center) ? this->center < other.center :
+                this->max_diameter < max_diameter;
+        }
+    };
+    // get all circular holes for each layer
+    // the id is center-diameter-extruderid
+    //the tuple is Point center; float diameter_max; int extruder_id; coord_t max_variation; bool twist;
+    std::vector<std::vector<std::pair<LayerData, Polygon*>>> layerid2center;
+    for (size_t i = 0; i < this->m_layers.size(); i++) layerid2center.emplace_back();
+    tbb::parallel_for(
+        tbb::blocked_range<size_t>(0, m_layers.size()),
+        [this, &layerid2center](const tbb::blocked_range<size_t>& range) {
+        for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+            m_print->throw_if_canceled();
+            Layer* layer = m_layers[layer_idx];
+            for (size_t region_idx = 0; region_idx < layer->m_regions.size(); ++region_idx)
+            {
+                if (layer->m_regions[region_idx]->region().config().hole_to_polyhole) {
+                    for (Surface& surf : layer->m_regions[region_idx]->m_slices.surfaces) {
+                        for (Polygon& hole : surf.expolygon.holes) {
+                            //test if convex (as it's clockwise bc it's a hole, we have to do the opposite)
+                            if (hole.convex_points().empty() && hole.points.size() > 8) {
+                                // Computing circle center
+                                Point center = hole.centroid();
+                                double diameter_min = std::numeric_limits<float>::max(), diameter_max = 0;
+                                double diameter_sum = 0;
+                                for (int i = 0; i < hole.points.size(); ++i) {
+                                    double dist = hole.points[i].distance_to(center);
+                                    diameter_min = std::min(diameter_min, dist);
+                                    diameter_max = std::max(diameter_max, dist);
+                                    diameter_sum += dist;
+                                }
+                                //also use center of lines to check it's not a rectangle
+                                double diameter_line_min = std::numeric_limits<float>::max(), diameter_line_max = 0;
+                                Lines hole_lines = hole.lines();
+                                for (Line l : hole_lines) {
+                                    Point midline = (l.a + l.b) / 2;
+                                    double dist = center.distance_to(midline);
+                                    diameter_line_min = std::min(diameter_line_min, dist);
+                                    diameter_line_max = std::max(diameter_line_max, dist);
+                                }
+
+
+                                // SCALED_EPSILON was a bit too harsh. Now using a config, as some may want some harsh setting and some don't.
+                                coord_t max_variation = std::max(SCALED_EPSILON, scale_(this->m_layers[layer_idx]->m_regions[region_idx]->region().config().hole_to_polyhole_threshold.get_abs_value(unscaled(diameter_sum / hole.points.size()))));
+                                bool twist = this->m_layers[layer_idx]->m_regions[region_idx]->region().config().hole_to_polyhole_twisted.value;
+                                if (diameter_max - diameter_min < max_variation * 2 && diameter_line_max - diameter_line_min < max_variation * 2) {
+                                    layerid2center[layer_idx].emplace_back(
+                                        LayerData{center, diameter_max, int16_t(layer->m_regions[region_idx]->region().config().perimeter_extruder.value - 1), max_variation, twist}, &hole);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // for layer->slices, it will be also replaced later.
+        }
+    });
+    //sort holes per center-diameter
+    std::vector<std::pair<LayerData, std::vector<std::pair<Polygon*, int>>>> id2layers2hole;
+
+    //search & find hole that span at least X layers
+    const size_t min_nb_layers = 2;
+    for (size_t layer_idx = 0; layer_idx < this->m_layers.size(); ++layer_idx) {
+        for (size_t hole_idx = 0; hole_idx < layerid2center[layer_idx].size(); ++hole_idx) {
+            //get all other same polygons
+            const LayerData& id = layerid2center[layer_idx][hole_idx].first;
+            float max_z = layers()[layer_idx]->print_z;
+            std::vector<std::pair<Polygon*, int>> holes;
+            holes.emplace_back(layerid2center[layer_idx][hole_idx].second, layer_idx);
+            for (size_t search_layer_idx = layer_idx + 1; search_layer_idx < this->m_layers.size(); ++search_layer_idx) {
+                if (layers()[search_layer_idx]->print_z - layers()[search_layer_idx]->height - max_z > EPSILON) break;
+                //search an other polygon with same id
+                for (size_t search_hole_idx = 0; search_hole_idx < layerid2center[search_layer_idx].size(); ++search_hole_idx) {
+                    const LayerData& search_id = layerid2center[search_layer_idx][search_hole_idx].first;
+                    if (id.extruder_id == search_id.extruder_id
+                        && id.center.distance_to(search_id.center) < id.max_deviation
+                        && std::abs(id.max_diameter - search_id.max_diameter) < id.max_deviation
+                        ) {
+                        max_z = layers()[search_layer_idx]->print_z;
+                        holes.emplace_back(layerid2center[search_layer_idx][search_hole_idx].second, search_layer_idx);
+                        layerid2center[search_layer_idx].erase(layerid2center[search_layer_idx].begin() + search_hole_idx);
+                        search_hole_idx--;
+                        break;
+                    }
+                }
+            }
+            //check if strait hole or first layer hole (cause of first layer compensation)
+            if (holes.size() >= min_nb_layers || (holes.size() == 1 && holes[0].second == 0)) {
+                id2layers2hole.emplace_back(std::move(id),std::move(holes));
+            }
+        }
+    }
+    //create a polyhole per id and replace holes points by it.
+    for (auto &entry : id2layers2hole) {
+        Polygons polyholes = create_polyholes(entry.first.center, entry.first.max_diameter, scale_t(print()->config().nozzle_diameter.get_at(entry.first.extruder_id)), entry.first.is_twist);
+        for (auto& poly_to_replace : entry.second) {
+            Polygon polyhole = polyholes[poly_to_replace.second % polyholes.size()];
+            //search the clone in layers->slices
+            for (ExPolygon& explo_slice : m_layers[poly_to_replace.second]->set_lslices()) {
+                for (Polygon& poly_slice : explo_slice.holes) {
+                    if (poly_slice.points == poly_to_replace.first->points) {
+                        poly_slice.points = polyhole.points;
+                        poly_slice.assert_valid();
+                    }
+                }
+            }
+            // copy
+            poly_to_replace.first->points = polyhole.points;
+        }
+    }
+    for(auto *layer : m_layers)
+        for(auto &region : layer->regions())
+            for(auto &srf : region->m_slices)
+                srf.expolygon.assert_valid();
+}
+
 template<typename ThrowOnCancel>
-static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel)
+void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel)
 {
     // Returns MMU segmentation based on painting in MMU segmentation gizmo
     std::vector<std::vector<ExPolygons>> segmentation = multi_material_segmentation_by_painting(print_object, throw_on_cancel);
@@ -609,7 +1025,7 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                 // layer_range.painted_regions are sorted by extruder ID and parent PrintObject region ID.
                 auto it_painted_region = layer_range.painted_regions.begin();
                 for (int region_id = 0; region_id < int(layer->region_count()); ++ region_id)
-                    if (LayerRegion &layerm = *layer->get_region(region_id); ! layerm.slices().surfaces.empty()) {
+                    if (LayerRegion &layerm = *layer->get_region(region_id); ! layerm.slices().empty()) {
                         assert(layerm.region().print_object_region_id() == region_id);
                         const BoundingBox bbox = get_extents(layerm.slices().surfaces);
                         assert(it_painted_region < layer_range.painted_regions.end());
@@ -652,6 +1068,7 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                             }
                         if (! self_trimmed) {
                             // Trim slices of this LayerRegion with all the MMU regions.
+                            // prusa has a move() here. I find that dangerous, I'm not sure i won't reuse it afterwards. It's a well hidden silent deletion. That's why i copy here.
                             Polygons mine = to_polygons(layerm.slices().surfaces);
                             for (auto &segmented : by_extruder)
                                 if (&segmented - by_extruder.data() + 1 != self_extruder_id && segmented.bbox.defined && bbox.overlap(segmented.bbox)) {
@@ -683,7 +1100,9 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                     if (src.needs_merge)
                         // Multiple regions were merged into one.
                         src.expolygons = closing_ex(src.expolygons, float(scale_(10 * EPSILON)));
+                    assert_valid(src.expolygons);
                     layer->get_region(region_id)->m_slices.set(std::move(src.expolygons), stPosInternal | stDensSparse);
+                    for(auto &srf : layer->get_region(region_id)->m_slices) srf.expolygon.assert_valid();
                 }
             }
         });
@@ -703,16 +1122,24 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
             // check whether first point forms a convex angle
             //note: we allow a deviation of 5.7° (0.01rad = 0.57°)
             bool ok = true;
-            ok = (hole.points.front().ccw_angle(hole.points.back(), *(hole.points.begin() + 1)) <= PI + 0.1);
+            //ok = (hole.points.front().ccw_angle(hole.points.back(), *(hole.points.begin() + 1)) <= PI + 0.1);
+            assert(is_approx(ccw_angle_old_test(hole.points.front(), hole.points.back(), *(hole.points.begin() + 1)), 
+                abs_angle(angle_ccw( hole.points.back() - hole.points.front(),*(hole.points.begin() + 1) - hole.points.front())), 0.000000001));
+            ok = (abs_angle(angle_ccw( hole.points.back() - hole.points.front(),*(hole.points.begin() + 1) - hole.points.front())) <= PI + 0.1);
             // check whether points 1..(n-1) form convex angles
             if (ok)
                 for (Points::const_iterator p = hole.points.begin() + 1; p != hole.points.end() - 1; ++p) {
-                    ok = (p->ccw_angle(*(p - 1), *(p + 1)) <= PI + 0.1);
+                    //ok = (p->ccw_angle(*(p - 1), *(p + 1)) <= PI + 0.1);
+                    assert(is_approx(ccw_angle_old_test(*p, *(p - 1), *(p + 1)), abs_angle(angle_ccw((*(p - 1)) - *p, (*(p + 1)) - *p)), 0.000000001));
+                    ok = (abs_angle(angle_ccw((*(p - 1)) - *p, (*(p + 1)) - *p)) <= PI + 0.1);
                     if (!ok) break;
                 }
 
             // check whether last point forms a convex angle
-            ok &= (hole.points.back().ccw_angle(*(hole.points.end() - 2), hole.points.front()) <= PI + 0.1);
+            //ok &= (hole.points.back().ccw_angle(*(hole.points.end() - 2), hole.points.front()) <= PI + 0.1);
+            assert(is_approx(ccw_angle_old_test(hole.points.back(), *(hole.points.end() - 2), hole.points.front()),
+                abs_angle(angle_ccw(*(hole.points.end() - 2) - hole.points.back(), hole.points.front() - hole.points.back())), 0.000000001));
+            ok &= (abs_angle(angle_ccw(*(hole.points.end() - 2) - hole.points.back(), hole.points.front() - hole.points.back())) <= PI + 0.1);
 
             if (ok && not_convex_delta != convex_delta) {
                 if (convex_delta != 0) {
@@ -729,7 +1156,7 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
                     if (convex_delta_adapted != 0) {
                         Polygon hole_as_contour = hole;
                         hole_as_contour.make_counter_clockwise();
-                        for (ExPolygon& newHole : offset_ex(ExPolygon{ hole_as_contour }, convex_delta_adapted)) {
+                        for (ExPolygon& newHole : offset_ex(ExPolygon{ hole_as_contour }, -convex_delta_adapted)) {
                             holes.push_back(std::move(newHole));
                         }
                     } else {
@@ -744,7 +1171,7 @@ ExPolygons PrintObject::_shrink_contour_holes(double contour_delta, double not_c
                 if (not_convex_delta != 0) {
                     Polygon hole_as_contour = hole;
                     hole_as_contour.make_counter_clockwise();
-                    for (ExPolygon& newHole : offset_ex(ExPolygon{ hole_as_contour }, not_convex_delta)) {
+                    for (ExPolygon& newHole : offset_ex(ExPolygon{ hole_as_contour }, -not_convex_delta)) {
                         holes.push_back(std::move(newHole));
                     }
                 } else {
@@ -781,13 +1208,17 @@ Polygon _smooth_curve(Polygon& p, double max_angle, double min_angle_convex, dou
         //put first point
         pout.points.push_back(p[idx]);
         //get angles
-        double angle1 = p[idx].ccw_angle(p.points[idx - 1], p.points[idx + 1]);
+        //double angle1 = p[idx].ccw_angle(p.points[idx - 1], p.points[idx + 1]);
+        assert(ccw_angle_old_test(p[idx], p.points[idx - 1], p.points[idx + 1]) == abs_angle(angle_ccw( p.points[idx - 1] - p[idx],p.points[idx + 1] - p[idx])));
+        double angle1 = abs_angle(angle_ccw( p.points[idx - 1] - p[idx],p.points[idx + 1] - p[idx]));
         bool angle1_concave = true;
         if (angle1 > PI) {
             angle1 = 2 * PI - angle1;
             angle1_concave = false;
         }
-        double angle2 = p[idx + 1].ccw_angle(p.points[idx], p.points[idx + 2]);
+        //double angle2 = p[idx + 1].ccw_angle(p.points[idx], p.points[idx + 2]);
+        assert(ccw_angle_old_test(p[idx + 1], p.points[idx], p.points[idx + 2]) == abs_angle(angle_ccw( p.points[idx] - p[idx + 1],p.points[idx + 2] - p[idx + 1])));
+        double angle2 = abs_angle(angle_ccw( p.points[idx] - p[idx + 1],p.points[idx + 2] - p[idx + 1]));
         bool angle2_concave = true;
         if (angle2 > PI) {
             angle2 = 2 * PI - angle2;
@@ -916,15 +1347,18 @@ void PrintObject::slice_volumes()
         *m_shared_regions, 
         slice_zs,
         std::move(volume_slices),
-        m_config.clip_multipart_objects,
         throw_on_cancel_callback);
 
 
 
     for (size_t region_id = 0; region_id < region_slices.size(); ++ region_id) {
         std::vector<ExPolygons> &by_layer = region_slices[region_id];
-        for (size_t layer_id = 0; layer_id < by_layer.size(); ++ layer_id)
+        for (size_t layer_id = 0; layer_id < by_layer.size(); ++ layer_id) {
+            ensure_valid(by_layer[layer_id], std::max(scale_t(m_print->config().resolution), SCALED_EPSILON));
+            assert_valid(by_layer[layer_id]);
             m_layers[layer_id]->regions()[region_id]->m_slices.append(std::move(by_layer[layer_id]), stPosInternal | stDensSparse);
+            for(auto &srf : m_layers[layer_id]->regions()[region_id]->m_slices) srf.expolygon.assert_valid();
+        }
     }
     region_slices.clear();
     
@@ -943,16 +1377,16 @@ void PrintObject::slice_volumes()
     // Is any ModelVolume MMU painted?
     if (const auto& volumes = this->model_object()->volumes;
         m_print->config().nozzle_diameter.size() > 1 &&
-        std::find_if(volumes.begin(), volumes.end(), [](const ModelVolume* v) { return !v->mmu_segmentation_facets.empty(); }) != volumes.end()) {
+        std::find_if(volumes.begin(), volumes.end(), [](const ModelVolume* v) { return !v->mm_segmentation_facets.empty(); }) != volumes.end()) {
 
         // If XY Size compensation is also enabled, notify the user that XY Size compensation
         // would not be used because the object is multi-material painted.
         if (m_config.xy_size_compensation.value != 0.f || m_config.xy_inner_size_compensation.value != 0.f || m_config.hole_size_compensation.value != 0.f) {
             this->active_step_add_warning(
                 PrintStateBase::WarningLevel::CRITICAL,
-                L("An object has enabled XY Size compensation which will not be used because it is also multi-material painted.\nXY Size "
+                _u8L("An object has enabled XY Size compensation which will not be used because it is also multi-material painted.\nXY Size "
                   "compensation cannot be combined with multi-material painting.") +
-                    "\n" + (L("Object name")) + ": " + this->model_object()->name);
+                    "\n" + (_u8L("Object name")) + ": " + this->model_object()->name);
         }
 
         BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - MMU segmentation";
@@ -971,10 +1405,8 @@ void PrintObject::slice_volumes()
         ////	0.f;
         // Uncompensated slices for the first layer in case the Elephant foot compensation is applied.
 	    //ExPolygons  lslices_1st_layer;
-	    tbb::parallel_for(
-	        tbb::blocked_range<size_t>(0, m_layers.size()),
-			[this](const tbb::blocked_range<size_t>& range) {
-	            for (size_t layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
+        Slic3r::parallel_for(size_t(0), m_layers.size(),
+            [this](const size_t layer_id) {
 	                m_print->throw_if_canceled();
 	                Layer *layer = m_layers[layer_id];
 	                // Apply size compensation and perform clipping of multi-part objects.
@@ -1024,6 +1456,7 @@ void PrintObject::slice_volumes()
 	                    // Optimized version for a single region layer.
 	                    // Single region, growing or shrinking.
                         LayerRegion* layerm = layer->regions().front();
+                        // we can move here because we'll fill it again below.
                         ExPolygons expolygons = to_expolygons(std::move(layerm->m_slices.surfaces));
                         // Apply all three main XY compensation.
                         if (hole_delta > 0 || inner_delta > 0 || outter_delta > 0) {
@@ -1042,12 +1475,13 @@ void PrintObject::slice_volumes()
                             //smoothing
                             expolygons = _smooth_curves(expolygons, layer->regions().front()->region().config());
                         }
+                        ensure_valid(expolygons, std::max(scale_t(m_print->config().resolution), SCALED_EPSILON));
+                        assert_valid(expolygons);
                         layerm->m_slices.set(std::move(expolygons), stPosInternal | stDensSparse);
                     } else {
 
                         float max_growth = std::max(hole_delta, std::max(inner_delta, outter_delta));
                         float min_growth = std::min(hole_delta, std::min(inner_delta, outter_delta));
-                        bool clip = m_config.clip_multipart_objects.value;
                         ExPolygons merged_poly_for_holes_growing;
                         if (max_growth > 0) {
                             //merge polygons because region can cut "holes".
@@ -1060,8 +1494,8 @@ void PrintObject::slice_volumes()
                             LayerRegion* layerm = layer->regions()[region_id];
                             has_curve_smoothing = layerm->region().config().curve_smoothing_precision > 0.f;
                         }
-                        //note: ps has removed that step...
-                        if (clip || max_growth > 0 || has_curve_smoothing) {
+                        //note: ps has removed that step... (because no more clips?)
+                        if (max_growth > 0 || has_curve_smoothing) {
                             // Multiple regions, growing or just clipping one region by the other.
                             // When clipping the regions, priority is given to the first regions.
                             Polygons processed;
@@ -1077,12 +1511,7 @@ void PrintObject::slice_volumes()
                                 //smoothing
                                 if (layerm->region().config().curve_smoothing_precision > 0.f)
                                     slices = _smooth_curves(slices, layerm->region().config());
-                                // Trim by the slices of already processed regions.
-                                if (region_id > 0 && clip)
-                                    slices = diff_ex(to_polygons(std::move(slices)), processed);
-                                if (clip && (region_id + 1 < layer->regions().size()))
-                                    // Collect the already processed regions to trim the to be processed regions.
-                                    polygons_append(processed, slices);
+                                assert_valid(slices);
                                 layerm->m_slices.set(std::move(slices), stPosInternal | stDensSparse);
                             }
                         }
@@ -1105,20 +1534,22 @@ void PrintObject::slice_volumes()
                             }
                         }
                     }
-	                // Merge all regions' slices to get islands, chain them by a shortest path.
+	                // Merge all regions' slices to get islands, sorted topologically, chain them by a shortest path in separate index list
 	                layer->make_slices();
                     //FIXME: can't make it work in multi-region object, it seems useful to avoid bridge on top of first layer compensation
                     //so it's disable, if you want an offset, use the offset field.
                     //if (layer->regions().size() == 1 && ! m_layers.empty() && layer_id == 0 && first_layer_compensation < 0 && m_config.raft_layers == 0) {
-                    //    // The Elephant foot has been compensated, therefore the 1st layer's lslices are shrank with the Elephant foot compensation value.
+                    //    // The Elephant foot has been compensated, therefore the 1st layer's lslices() are shrank with the Elephant foot compensation value.
                     //    // Store the uncompensated value there.
                     //    assert(! m_layers.empty());
                     //    assert(m_layers.front()->id() == 0);
-                    //    m_layers.front()->lslices = offset_ex(std::move(m_layers.front()->lslices), -first_layer_compensation);
+                    //    m_layers.front()->set_lslices() = offset_ex(std::move(m_layers.front()->lslices()), -first_layer_compensation);
+                    //    m_layers.front()->lslice_indices_sorted_by_print_order = chain_expolygons(layer.lslices());
                     //}
-	            }
-	        });
-	}
+                    for(auto &layerm : layer->regions()) for(auto &srf : layerm->slices().surfaces) srf.expolygon.assert_valid();
+                }
+            );
+    }
 
     m_print->throw_if_canceled();
     BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - make_slices in parallel - end";
@@ -1163,13 +1594,13 @@ std::vector<Polygons> PrintObject::slice_support_volumes(const ModelVolumeType m
         if (merge) {
             std::vector<Polygons*> to_merge;
             to_merge.reserve(zs.size());
-            for (size_t i = 0; i < zs.size(); ++ i)
-                if (merge_layers[i])
+            for (size_t i = 0; i < zs.size(); ++ i) {
+                if (merge_layers[i]) {
                     to_merge.emplace_back(&slices[i]);
-            tbb::parallel_for(
-                tbb::blocked_range<size_t>(0, to_merge.size()),
-                [&to_merge](const tbb::blocked_range<size_t> &range) {
-                    for (size_t i = range.begin(); i < range.end(); ++ i)
+                }
+            }
+            Slic3r::parallel_for(size_t(0), to_merge.size(),
+                [&to_merge](const size_t i) {
                         *to_merge[i] = union_(*to_merge[i]);
             });
         }

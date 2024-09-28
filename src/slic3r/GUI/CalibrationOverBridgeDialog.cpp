@@ -3,7 +3,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
-#include "Jobs/ArrangeJob.hpp"
+// #include "Jobs/ArrangeJob2.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI.hpp"
 #include "GUI_ObjectList.hpp"
@@ -27,8 +27,8 @@ namespace Slic3r {
 namespace GUI {
 
 void CalibrationOverBridgeDialog::create_buttons(wxStdDialogButtonSizer* buttons){
-    wxButton* bt1 = new wxButton(this, wxID_FILE1, _L("Over-Bridge calibration"));
-    wxButton* bt2 = new wxButton(this, wxID_FILE1, _L("Top flow calibration"));
+    wxButton* bt1 = new wxButton(this, wxID_FILE1, _L("'Above the Bridges' flow calibration"));
+    wxButton* bt2 = new wxButton(this, wxID_FILE1, _L("'Top Fill' flow calibration"));
     bt1->Bind(wxEVT_BUTTON, &CalibrationOverBridgeDialog::create_geometry1, this);
     bt2->Bind(wxEVT_BUTTON, &CalibrationOverBridgeDialog::create_geometry2, this);
     buttons->Add(bt1);
@@ -36,16 +36,20 @@ void CalibrationOverBridgeDialog::create_buttons(wxStdDialogButtonSizer* buttons
 }
 
 void CalibrationOverBridgeDialog::create_geometry1(wxCommandEvent& event_args) {
+    Plater* plat = this->main_frame->plater();
+    if (!plat->new_project(L("'Above the Bridges flow calibration")))
+        return;
     create_geometry(true);
 }
 void CalibrationOverBridgeDialog::create_geometry2(wxCommandEvent& event_args) {
+    Plater* plat = this->main_frame->plater();
+    if (!plat->new_project(L("Top Fill flow calibration")))
+        return;
     create_geometry(false);
 }
 void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     Plater* plat = this->main_frame->plater();
     Model& model = plat->model();
-    if (!plat->new_project(L("Over-bridge calibration")))
-        return;
 
     //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
@@ -69,8 +73,8 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     /// --- scale ---
     // model is created for a 0.4 nozzle, scale xy with nozzle size.
     const ConfigOptionFloats* nozzle_diameter_config = printer_config->option<ConfigOptionFloats>("nozzle_diameter");
-    assert(nozzle_diameter_config->values.size() > 0);
-    float nozzle_diameter = nozzle_diameter_config->values[0];
+    assert(nozzle_diameter_config->size() > 0);
+    float nozzle_diameter = nozzle_diameter_config->get_at(0);
     float xyz_scale = (0.2 + nozzle_diameter) / 0.6;
     //do scaling
     if (xyz_scale < 0.9 || 1.2 < xyz_scale) {
@@ -79,6 +83,16 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     }
     for (size_t i = 0; i < 6; i++)
         model.objects[objs_idx[i]]->scale(xyz_scale * 1.5f, xyz_scale * 1.5f, xyz_scale);
+    
+    // it's rotated but not around the good origin: correct that
+    double init_z_rotate_angle = Geometry::deg2rad(plat->config()->opt_float("init_z_rotate"));
+    Matrix3d rot_matrix = Eigen::Quaterniond(Eigen::AngleAxisd(init_z_rotate_angle, Vec3d{0,0,1})).toRotationMatrix();
+    auto     translate_from_rotation = [&rot_matrix, &model, &objs_idx](int idx, Vec3d &&translation) {
+            ModelVolume *vol = model.objects[objs_idx[idx]]->volumes[model.objects[objs_idx[idx]]->volumes.size()-1];
+            Geometry::Transformation trsf = vol->get_transformation();
+            trsf.set_offset(rot_matrix * translation - translation + trsf.get_offset());
+            vol->set_transformation(trsf);
+        };
 
     //add sub-part after scale
     const ConfigOptionFloatOrPercent* first_layer_height = print_config->option<ConfigOptionFloatOrPercent>("first_layer_height");
@@ -86,17 +100,18 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     float zshift =  0.8 * (1 - xyz_scale);
     for (size_t i = 0; i < 6; i++) {
         model.objects[objs_idx[i]]->rotate(PI / 2, { 0,0,1 });
-        ModelObject* obj = add_part(model.objects[objs_idx[i]], (boost::filesystem::path(Slic3r::resources_dir()) /"calibration" / "bridge_flow" / ("f"+std::to_string(100 + i * 5)+".amf")).string(), Vec3d{ 0, 10 * xyz_scale ,zshift }, Vec3d{ 1, 1, patch_zscale });
+        add_part(model.objects[objs_idx[i]], (boost::filesystem::path(Slic3r::resources_dir()) /"calibration" / "bridge_flow" / ("f"+std::to_string(100 + i * 5)+".amf")).string(), Vec3d{ 0, 10 * xyz_scale ,zshift }, Vec3d{ 1, 1, patch_zscale });
+            translate_from_rotation(i, Vec3d{ 0, 10 * xyz_scale ,zshift });
     }
 
     /// --- translate ---;
-    bool has_to_arrange = false;
+    bool has_to_arrange = init_z_rotate_angle != 0;
     const ConfigOptionFloat* extruder_clearance_radius = print_config->option<ConfigOptionFloat>("extruder_clearance_radius");
     const ConfigOptionPoints* bed_shape = printer_config->option<ConfigOptionPoints>("bed_shape");
-    const float brim_width = print_config->option<ConfigOptionFloat>("brim_width")->getFloat();
-    const float skirt_width = print_config->option("skirts")->getInt() == 0 ? 0 : print_config->option("skirt_distance")->getFloat() + print_config->option("skirts")->getInt() * nozzle_diameter * 2;
-    Vec2d bed_size = BoundingBoxf(bed_shape->values).size();
-    Vec2d bed_min = BoundingBoxf(bed_shape->values).min;
+    const float brim_width = print_config->option<ConfigOptionFloat>("brim_width")->get_float();
+    const float skirt_width = print_config->option("skirts")->get_int() == 0 ? 0 : print_config->option("skirt_distance")->get_float() + print_config->option("skirts")->get_int() * nozzle_diameter * 2;
+    Vec2d bed_size = BoundingBoxf(bed_shape->get_values()).size();
+    Vec2d bed_min = BoundingBoxf(bed_shape->get_values()).min;
     float offsetx = 3 + 30 * xyz_scale + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
     float offsety = 3 + 25 * xyz_scale + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
     model.objects[objs_idx[0]]->translate({ bed_min.x() + bed_size.x() / 2 - offsetx / 2, bed_min.y() + bed_size.y() / 2 - offsety, (nozzle_diameter / 0.4) });
@@ -114,7 +129,7 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     DynamicPrintConfig new_print_config = *print_config; //make a copy
     new_print_config.set_key_value("complete_objects", new ConfigOptionBool(true));
     //if skirt, use only one
-    if (print_config->option<ConfigOptionInt>("skirts")->getInt() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->getInt() > 0) {
+    if (print_config->option<ConfigOptionInt>("skirts")->get_int() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->get_int() > 0) {
         new_print_config.set_key_value("complete_objects_one_skirt", new ConfigOptionBool(true));
     }
 
@@ -152,11 +167,12 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        arranger.prepare_all();
-        arranger.process();
-        arranger.finalize();
+        plat->arrange();
+        // std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
+        // ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
+        // arranger.prepare_all();
+        // arranger.process();
+        // arranger.finalize();
     }
 
     plat->reslice();

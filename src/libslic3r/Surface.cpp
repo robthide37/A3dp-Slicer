@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2016 - 2019 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2014 Petr Ledvina @ledvinap
+///|/
+///|/ ported from lib/Slic3r/Surface.pm:
+///|/ Copyright (c) Prusa Research 2022 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "BoundingBox.hpp"
 #include "Surface.hpp"
 #include "SVG.hpp"
@@ -70,7 +80,7 @@ BoundingBox get_extents(const Surfaces &surfaces)
     return bbox;
 }
 
-BoundingBox get_extents(const SurfacesPtr &surfaces)
+BoundingBox get_extents(const SurfacesConstPtr &surfaces)
 {
     BoundingBox bbox;
     if (! surfaces.empty()) {
@@ -79,6 +89,24 @@ BoundingBox get_extents(const SurfacesPtr &surfaces)
             bbox.merge(get_extents(*surfaces[i]));
     }
     return bbox;
+}
+
+void ensure_valid(Surfaces &surfaces, coord_t resolution /*= SCALED_EPSILON*/)
+{
+    for (size_t i = 0; i < surfaces.size(); ++i) {
+        surfaces[i].expolygon.douglas_peucker(resolution);
+        if (surfaces[i].expolygon.contour.size() < 3) {
+            surfaces.erase(surfaces.begin() + i);
+            --i;
+        } else {
+            for (size_t i_hole = 0; i_hole < surfaces[i].expolygon.holes.size(); ++i_hole) {
+                if (surfaces[i].expolygon.holes[i_hole].size() < 3) {
+                    surfaces[i].expolygon.holes.erase(surfaces[i].expolygon.holes.begin() + i_hole);
+                    --i_hole;
+                }
+            }
+        }
+    }
 }
 
 const char* surface_type_to_color_name(const SurfaceType surface_type)

@@ -1,12 +1,21 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Pavel Mikuš @Godrak
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "SeamPlacer.hpp"
 
+#include "Color.hpp"
+#include "Polygon.hpp"
+#include "PrintConfig.hpp"
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "tbb/parallel_reduce.h"
 #include <boost/log/trivial.hpp>
-#include <random>
 #include <algorithm>
 #include <queue>
+#include <random>
+#include <tuple>
 
 #include "libslic3r/AABBTreeLines.hpp"
 #include "libslic3r/KDTreeIndirect.hpp"
@@ -22,6 +31,9 @@
 
 #include "libslic3r/Utils.hpp"
 
+
+#include <atomic>
+
 //#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
@@ -32,24 +44,6 @@
 namespace Slic3r {
 
 namespace SeamPlacerImpl {
-
-// ************  FOR BACKPORT COMPATIBILITY ONLY ***************
-// Color mapping of a value into RGB false colors.
-inline Vec3f value_to_rgbf(float minimum, float maximum, float value)
-        {
-    float ratio = 2.0f * (value - minimum) / (maximum - minimum);
-    float b = std::max(0.0f, (1.0f - ratio));
-    float r = std::max(0.0f, (ratio - 1.0f));
-    float g = 1.0f - b - r;
-    return Vec3f { r, g, b };
-}
-
-// Color mapping of a value into RGB false colors.
-inline Vec3i32 value_to_rgbi(float minimum, float maximum, float value)
-        {
-    return (value_to_rgbf(minimum, maximum, value) * 255).cast<int>();
-}
-// ***************************
 
 template<typename T> int sgn(T val) {
     return int(T(0) < val) - int(val < T(0));
@@ -141,10 +135,12 @@ Vec3f sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
     return Vec3f(cos(term1) * term3, sin(term1) * term3, term2);
 }
 
+// raycast evrything and store the weight, or set everything to 1 if 'deactivate'
 std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
         const indexed_triangle_set &triangles,
         const TriangleSetSamples &samples,
-        size_t negative_volumes_start_index) {
+        size_t negative_volumes_start_index,
+        bool deactivate) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: raycast visibility of " << samples.positions.size() << " samples over " << triangles.indices.size()
             << " triangles: end";
@@ -167,11 +163,14 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
     std::vector<float> result(samples.positions.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, result.size()),
             [&triangles, &precomputed_sample_directions, model_contains_negative_parts, negative_volumes_start_index,
-                    &raycasting_tree, &result, &samples](tbb::blocked_range<size_t> r) {
+                    &raycasting_tree, &result, &samples, deactivate](tbb::blocked_range<size_t> r) {
                 // Maintaining hits memory outside of the loop, so it does not have to be reallocated for each query.
                 std::vector<igl::Hit> hits;
                 for (size_t s_idx = r.begin(); s_idx < r.end(); ++s_idx) {
                     result[s_idx] = 1.0f;
+                    if (deactivate) {
+                        continue;
+                    }
                     constexpr float decrease_step = 1.0f
                             / (SeamPlacer::sqr_rays_per_sample_point * SeamPlacer::sqr_rays_per_sample_point);
 
@@ -236,51 +235,85 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
     return result;
 }
 
-std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, const std::vector<float> &lengths,
+std::vector<float> calculate_polyline_angles_at_vertices(const PolylineWithEnd &polyline, const std::vector<float> &lengths,
         float min_arm_length) {
-    std::vector<float> result(polygon.size());
+    std::vector<float> result(polyline.size());
+    assert(polyline.size() - 1 == lengths.size());
 
-    if (polygon.size() == 1) {
+    if (polyline.size() == 1) {
         result[0] = 0.0f;
     }
 
     size_t idx_prev = 0;
     size_t idx_curr = 0;
     size_t idx_next = 0;
+    size_t idx_start = 0;
+    size_t idx_end = 0;
 
     float distance_to_prev = 0;
     float distance_to_next = 0;
 
-    //push idx_prev far enough back as initialization
-    while (distance_to_prev < min_arm_length) {
-        idx_prev = Slic3r::prev_idx_modulo(idx_prev, polygon.size());
-        distance_to_prev += lengths[idx_prev];
+    bool is_polygon = polyline.front() == polyline.back();
+
+    //if polygon : start at 0
+    if (is_polygon) {
+        idx_start = 0;
+        idx_end = polyline.size() -1; // last point is same as first, don't bother.
+        // push idx_prev far enough back as initialization
+        while (distance_to_prev < min_arm_length) {
+            idx_prev = Slic3r::prev_idx_modulo(idx_prev, lengths.size());
+            distance_to_prev += lengths[idx_prev];
+        }
+    } else {
+        //line, start & end are hardcoded
+        idx_start = 1;
+        idx_end = polyline.size() -1;
+        result.front() = polyline.endpoints.first ? -PI / 2 : 0;
+        result.back()  = polyline.endpoints.second ? -PI / 2 : 0;
     }
 
-    for (size_t _i = 0; _i < polygon.size(); ++_i) {
+    for (size_t _i = idx_start; _i < idx_end; ++_i) {
         // pull idx_prev to current as much as possible, while respecting the min_arm_length
-        while (distance_to_prev - lengths[idx_prev] > min_arm_length) {
+        while (distance_to_prev - lengths[idx_prev] > min_arm_length && idx_prev < lengths.size()) {
             distance_to_prev -= lengths[idx_prev];
-            idx_prev = Slic3r::next_idx_modulo(idx_prev, polygon.size());
+            // if polygon, circle, if line, then stop at the end.
+            if (is_polygon) {
+                idx_prev = Slic3r::next_idx_modulo(idx_prev, lengths.size());
+            } else {
+                idx_prev++;
+            }
         }
 
         //push idx_next forward as far as needed
-        while (distance_to_next < min_arm_length) {
+        while (distance_to_next < min_arm_length && idx_next < lengths.size()) {
             distance_to_next += lengths[idx_next];
-            idx_next = Slic3r::next_idx_modulo(idx_next, polygon.size());
+            // if polygon, circle, if line, then stop at the end.
+            if (is_polygon) {
+                idx_next = Slic3r::next_idx_modulo(idx_next, lengths.size());
+            } else {
+                idx_next++;
+            }
         }
 
         // Calculate angle between idx_prev, idx_curr, idx_next.
-        const Point &p0 = polygon.points[idx_prev];
-        const Point &p1 = polygon.points[idx_curr];
-        const Point &p2 = polygon.points[idx_next];
-        result[idx_curr] = float(angle(p1 - p0, p2 - p1));
+        const Point &p0 = polyline.points[idx_prev];
+        const Point &p1 = polyline.points[idx_curr];
+        const Point &p2 = polyline.points[idx_next];
+        result[idx_curr] = float(angle_ccw(p1 - p0, p2 - p1));
+        if (!is_polygon && polyline.direction == PolylineWithEnd::PolyDir::BOTH) {
+            result[idx_curr] = std::abs(result[idx_curr]);
+        }
 
         // increase idx_curr by one
         float curr_distance = lengths[idx_curr];
         idx_curr++;
         distance_to_prev += curr_distance;
         distance_to_next -= curr_distance;
+    }
+    
+    // polygon: repeat angle
+    if (is_polygon) {
+        result.back() = result.front();
     }
 
     return result;
@@ -312,6 +345,8 @@ struct GlobalModelInfo {
     indexed_triangle_set blockers;
     AABBTreeIndirect::Tree<3, float> enforcers_tree;
     AABBTreeIndirect::Tree<3, float> blockers_tree;
+
+    bool has_custom_seam_modifier{ false };
 
     bool is_enforced(const Vec3f &position, float radius) const {
         if (enforcers.empty()) {
@@ -411,37 +446,107 @@ struct GlobalModelInfo {
 #endif
 }
 ;
-
-//Extract perimeter polygons of the given layer
-Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition configured_seam_preference,
-        std::vector<const LayerRegion*> &corresponding_regions_out) {
+//Extract perimeter polylines of the given layer
+PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosition configured_seam_preference,
+        std::vector<const LayerRegion*> &corresponding_regions_out, PerimeterGeneratorType perimeter_type) {
     
 
-    Polygons polygons;
+    PolylineWithEnds polylines;
     class PerimeterCopy : public ExtrusionVisitorConst {
-        Polygons* polygons;
-        std::vector<const LayerRegion*>* corresponding_regions_out;
-        LayerRegion* current_layer_region;
+        PolylineWithEnds* polylines;
+        std::vector<const LayerRegion*>& m_corresponding_regions_out;
+        const LayerRegion* current_layer_region;
         SeamPosition configured_seam_preference;
+        PerimeterGeneratorType perimeter_type;
     public:
-        PerimeterCopy(std::vector<const LayerRegion*>* regions_out, Polygons* polys, SeamPosition configured_seam)
-            : corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polygons(polys) {
+        bool also_overhangs = false;
+        bool also_thin_walls = false;
+        PerimeterCopy(std::vector<const LayerRegion*>& regions_out, PolylineWithEnds* polys, SeamPosition configured_seam, PerimeterGeneratorType perimeter_type)
+            : m_corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polylines(polys), perimeter_type(perimeter_type) {
         }
-        virtual void default_use(const ExtrusionEntity& entity) { };
+        virtual void default_use(const ExtrusionEntity& entity) {};
+        virtual void use(const ExtrusionPath &path) override {
+            if (perimeter_type == PerimeterGeneratorType::Arachne && path.role() != ExtrusionRole::ThinWall) {
+                //path.polygons_covered_by_width(*polygons, SCALED_EPSILON);
+                assert(m_corresponding_regions_out.size() == polylines->size());
+                polylines->emplace_back(path.polyline.to_polyline().points, true, true, PolylineWithEnd::PolyDir::BOTH); // TODO: more point for arcs
+                assert(path.polyline.front() != path.polyline.back());
+                assert(path.polyline.size() > 1);
+                //while (m_corresponding_regions_out->size() < polylines->size()) {
+                    m_corresponding_regions_out.push_back(current_layer_region);
+                //}
+            }
+        }
         virtual void use(const ExtrusionLoop& loop) override {
-            ExtrusionRole role = loop.role();
-            for (const ExtrusionPath& path : loop.paths) {
-                if (path.role() == ExtrusionRole::erExternalPerimeter) {
-                    role = ExtrusionRole::erExternalPerimeter;
+            bool is_ccw = loop.polygon().is_counter_clockwise();
+            if ((configured_seam_preference == spAllRandom && !loop.paths.empty() && loop.paths.front().role().is_perimeter())
+                    || (also_thin_walls && loop.role() == ExtrusionRole::ThinWall)) {
+                Points pts;
+                loop.collect_points(pts);
+                pts.push_back(pts.front()); //polygon
+                assert(m_corresponding_regions_out.size() == polylines->size());
+                assert(pts.size() > 1);
+                polylines->emplace_back(std::move(pts), true, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
+                m_corresponding_regions_out.push_back(current_layer_region);
+                return;
+            }else {
+                PolylineWithEnds polys;
+                size_t count_paths_collected = 0;
+                bool previous_collected = false;
+                bool current_collected = false;
+                for (const ExtrusionPath &path : loop.paths) {
+                    current_collected = false;
+                    if (path.role() == ExtrusionRole::ExternalPerimeter) {
+                        if(!previous_collected)
+                            polys.emplace_back(false, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
+                        path.collect_points(polys.back().points);
+                        assert(polys.back().size() > 1);
+                        count_paths_collected++;
+                        current_collected = true;
+                    }
+                    if ( path.role().is_overhang() &&
+                        also_overhangs) { // TODO find a way to search for external overhangs only
+                        if(!previous_collected)
+                            polys.emplace_back(false, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
+                        path.collect_points(polys.back().points);
+                        assert(polys.back().size() > 1);
+                        count_paths_collected++;
+                        current_collected = true;
+                    }
+                    //if (path.role() == ExtrusionRole::erThinWall && also_thin_walls) {
+                    //    path.collect_points(p); // TODO: 2.7: reactivate when it's possible to distinguish between thinwalltravel & thinextrusions
+                    // // currently, only looking for thinwall-only loop
+                    //}
+                    previous_collected = current_collected;
+                }
+
+                if (!polys.empty()) { // for random seam alignment, extract all perimeters
+                    if (count_paths_collected == loop.paths.size()) {
+                        assert(polys.size() == 1);
+                        assert(polys.front().first_point() ==  polys.front().last_point());
+                    }
+                    assert(m_corresponding_regions_out.size() == polylines->size());
+                    append(*polylines, std::move(polys));
+                    while (m_corresponding_regions_out.size() < polylines->size()) {
+                        m_corresponding_regions_out.push_back(current_layer_region);
+                    }
                 }
             }
-
-            if (role == ExtrusionRole::erExternalPerimeter
-                || (is_perimeter(role) && (configured_seam_preference == spRandom || configured_seam_preference == spAllRandom))) { //for random seam alignment, extract all perimeters
-                Points p;
-                loop.collect_points(p);
-                polygons->emplace_back(std::move(p));
-                corresponding_regions_out->push_back(current_layer_region);
+        }
+        virtual void use(const ExtrusionMultiPath& collection) override {
+            
+            if (perimeter_type == PerimeterGeneratorType::Arachne) {
+                for (size_t idx = 0; idx < collection.size(); idx++) {
+                    const ExtrusionPath &path = collection.paths[idx];
+                    assert(m_corresponding_regions_out.size() == polylines->size());
+                    polylines->emplace_back(path.polyline.to_polyline().points,
+                                            idx == 0 ? true : false,
+                                            idx + 1 < collection.size() ? false : true,
+                                            PolylineWithEnd::PolyDir::BOTH); // TODO: more points for arcs
+                    assert(path.polyline.front() != path.polyline.back());
+                    assert(path.polyline.size() > 1);
+                    m_corresponding_regions_out.push_back(current_layer_region);
+                }
             }
         }
         virtual void use(const ExtrusionEntityCollection& collection) override {
@@ -449,91 +554,90 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
                 entity->visit(*this);
             }
         }
-    } visitor(&corresponding_regions_out, &polygons, configured_seam_preference);
+        void set_current_layer_region(const LayerRegion *set) { current_layer_region = set; }
+    } visitor(corresponding_regions_out, &polylines, configured_seam_preference, perimeter_type);
 
     for (const LayerRegion *layer_region : layer->regions()) {
-        for (const ExtrusionEntity *ex_entity : layer_region->perimeters.entities()) {
-            if (ex_entity->is_collection()) { //collection of inner, outer, and overhang perimeters
-                //ex_entity->visit(visitor);
-                for (const ExtrusionEntity *perimeter : static_cast<const ExtrusionEntityCollection*>(ex_entity)->entities()) {
-                    ExtrusionRole role = perimeter->role();
-                    if (perimeter->is_loop()) {
-                        for (const ExtrusionPath &path : static_cast<const ExtrusionLoop*>(perimeter)->paths) {
-                            if (path.role() == ExtrusionRole::erExternalPerimeter) {
-                                role = ExtrusionRole::erExternalPerimeter;
-                            }
-                        }
-                    }
-
-                    if (role == ExtrusionRole::erExternalPerimeter
-                            || (is_perimeter(role)
-                                    && (configured_seam_preference == spRandom || configured_seam_preference == spAllRandom ) )) { //for random seam alignment, extract all perimeters
-                        Points p;
-                        perimeter->collect_points(p);
-                        polygons.emplace_back(std::move(p));
+        for (const ExtrusionEntity *ex_entity : layer_region->perimeters()) {
+            visitor.set_current_layer_region(layer_region);
+            assert(!ex_entity->empty());
+            if (ex_entity->empty()) continue;
+            assert(ex_entity->is_collection()); //collection of inner, outer, and overhang perimeters
+            ex_entity->visit(visitor);
+            if (polylines.empty()) {
+                // maybe only thin walls?
+                visitor.also_thin_walls = true;
+                ex_entity->visit(visitor);
+                if (polylines.empty()) {
+                    // can happen if the external is fully an overhang
+                    visitor.also_overhangs = true;
+                    ex_entity->visit(visitor);
+                    visitor.also_overhangs = false;
+                    if (polylines.empty()) {
+                        // shouldn't happen
+                        assert(ex_entity->role() == ExtrusionRole::ThinWall || perimeter_type == PerimeterGeneratorType::Arachne); // no loops
+                        //ex_entity->visit(visitor);
+                        // what to do in this case?
+                        Points pts;
+                        ex_entity->collect_points(pts);
+                        assert(!pts.empty());
+                        bool is_loop = pts.front() == pts.back();
+                        assert(!is_loop);
+                        polylines.emplace_back(std::move(pts), true, !is_loop, PolylineWithEnd::PolyDir::BOTH);
                         corresponding_regions_out.push_back(layer_region);
                     }
                 }
-                if (polygons.empty()) {
-                    Points p;
-                    ex_entity->collect_points(p);
-                    polygons.emplace_back(std::move(p));
-                    corresponding_regions_out.push_back(layer_region);
-                }
-            } else {
-                Points p;
-                ex_entity->collect_points(p);
-                polygons.emplace_back(std::move(p));
-                corresponding_regions_out.push_back(layer_region);
+                visitor.also_thin_walls = false;
             }
         }
     }
-
-    if (polygons.empty()) { // If there are no perimeter polygons for whatever reason (disabled perimeters .. ) insert dummy point
+    if (polylines.empty()) { // If there are no perimeter polylines/polygons for whatever reason (disabled perimeters .. ) insert dummy point
         // it is easier than checking everywhere if the layer is not emtpy, no seam will be placed to this layer anyway
-        polygons.emplace_back(std::vector { Point { 0, 0 } });
+        polylines.emplace_back(Points{ /*Point { 0, 0 }*/ }, true, true, PolylineWithEnd::PolyDir::BOTH);
         corresponding_regions_out.push_back(nullptr);
     }
-
-    return polygons;
+    assert(corresponding_regions_out.size() == polylines.size());
+    return polylines;
 }
 
-// Insert SeamCandidates created from perimeter polygons in to the result vector.
+// Insert SeamCandidates created from perimeter polygons/polylines in to the result vector.
 // Compute its type (Enfrocer,Blocker), angle, and position
-//each SeamCandidate also contains pointer to shared Perimeter structure representing the polygon
-// if Custom Seam modifiers are present, oversamples the polygon if necessary to better fit user intentions
-void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const LayerRegion *region,
+//each SeamCandidate also contains pointer to shared Perimeter structure representing the polyline
+// if Custom Seam modifiers are present, oversamples the polyline if necessary to better fit user intentions
+void process_perimeter_polylines(const PolylineWithEnd &orig_polyline, float z_coord, const LayerRegion *region,
         const GlobalModelInfo &global_model_info, PrintObjectSeamData::LayerSeams &result) {
-    if (orig_polygon.size() == 0) {
+    if (orig_polyline.size() <= 1) {
         return;
     }
-    Polygon polygon = orig_polygon;
-    bool was_clockwise = polygon.make_counter_clockwise();
+    PolylineWithEnd polyline = orig_polyline;
+    bool is_polygon = polyline.first_point() == polyline.last_point();
+    assert(!is_polygon || polyline.direction != PolylineWithEnd::PolyDir::BOTH);
+    if (is_polygon && polyline.direction == PolylineWithEnd::PolyDir::CW) {
+        polyline.reverse();
+        assert(polyline.direction == PolylineWithEnd::PolyDir::CCW);
+    }
     float angle_arm_len = region != nullptr ? region->flow(FlowRole::frExternalPerimeter).nozzle_diameter() : 0.5f;
 
     std::vector<float> lengths { };
-    for (size_t point_idx = 0; point_idx < polygon.size() - 1; ++point_idx) {
-        lengths.push_back((unscale(polygon[point_idx]) - unscale(polygon[point_idx + 1])).norm());
+    for (size_t point_idx = 0; point_idx < polyline.size() - 1; ++point_idx) {
+        lengths.push_back((unscale(polyline.points[point_idx]) - unscale(polyline.points[point_idx + 1])).norm());
     }
-    lengths.push_back(std::max((unscale(polygon[0]) - unscale(polygon[polygon.size() - 1])).norm(), 0.1));
-    std::vector<float> polygon_angles = calculate_polygon_angles_at_vertices(polygon, lengths,
-            angle_arm_len);
+    std::vector<float> polyline_angles = calculate_polyline_angles_at_vertices(polyline, lengths, angle_arm_len);
 
     result.perimeters.push_back( { });
     Perimeter &perimeter = result.perimeters.back();
 
-    std::queue<Vec3f> orig_polygon_points { };
-    for (size_t index = 0; index < polygon.size(); ++index) {
-        Vec2f unscaled_p = unscale(polygon[index]).cast<float>();
-        orig_polygon_points.emplace(unscaled_p.x(), unscaled_p.y(), z_coord);
+    std::queue<Vec3f> orig_polyline_points { };
+    for (size_t index = 0; index < polyline.size(); ++index) {
+        Vec2f unscaled_p = unscale(polyline.points[index]).cast<float>();
+        orig_polyline_points.emplace(unscaled_p.x(), unscaled_p.y(), z_coord);
     }
-    Vec3f first = orig_polygon_points.front();
     std::queue<Vec3f> oversampled_points { };
     size_t orig_angle_index = 0;
     perimeter.start_index = result.points.size();
     perimeter.flow_width = region != nullptr ? region->flow(FlowRole::frExternalPerimeter).width() : 0.0f;
     bool some_point_enforced = false;
-    while (!orig_polygon_points.empty() || !oversampled_points.empty()) {
+    while (!orig_polyline_points.empty() || !oversampled_points.empty()) {
         EnforcedBlockedSeamPoint type = EnforcedBlockedSeamPoint::Neutral;
         Vec3f position;
         float local_ccw_angle = 0;
@@ -542,9 +646,16 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             position = oversampled_points.front();
             oversampled_points.pop();
         } else {
-            position = orig_polygon_points.front();
-            orig_polygon_points.pop();
-            local_ccw_angle = was_clockwise ? -polygon_angles[orig_angle_index] : polygon_angles[orig_angle_index];
+            position = orig_polyline_points.front();
+            orig_polyline_points.pop();
+            if (orig_polyline.direction == PolylineWithEnd::PolyDir::BOTH) {
+                local_ccw_angle = polyline_angles[orig_angle_index];
+            } else if (orig_polyline.direction == PolylineWithEnd::PolyDir::CW) {
+                local_ccw_angle = -polyline_angles[orig_angle_index];
+            } else {
+                assert(orig_polyline.direction == PolylineWithEnd::PolyDir::CCW);
+                local_ccw_angle = polyline_angles[orig_angle_index];
+            }
             orig_angle_index++;
             orig_point = true;
         }
@@ -558,10 +669,11 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
         }
         some_point_enforced = some_point_enforced || type == EnforcedBlockedSeamPoint::Enforced;
 
-        if (orig_point) {
-            Vec3f pos_of_next = orig_polygon_points.empty() ? first : orig_polygon_points.front();
+        if (orig_point && !orig_polyline_points.empty()) {
+            Vec3f pos_of_next = orig_polyline_points.front();
+            Line  line(scaled(Vec2f(position.head<2>())), scaled(Vec2f(pos_of_next.head<2>())));
             float distance_to_next = (position - pos_of_next).norm();
-            if (global_model_info.is_enforced(position, distance_to_next)) {
+            if (global_model_info.is_enforced( (position + pos_of_next) / 2, distance_to_next / 2)) {
                 Vec3f vec_to_next = (pos_of_next - position).normalized();
                 float step_size = SeamPlacer::enforcer_oversampling_distance;
                 float step = step_size;
@@ -576,6 +688,7 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
     }
 
     perimeter.end_index = result.points.size();
+    assert(!is_polygon || result.points[perimeter.end_index-1].position == result.points[perimeter.start_index].position);
 
     if (some_point_enforced) {
         // We will patches of enforced points (patch: continuous section of enforced points), choose
@@ -586,18 +699,26 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             return perimeter.start_index + Slic3r::next_idx_modulo(idx - perimeter.start_index, perimeter_size);
         };
 
+        assert(perimeter.start_index + 2 <= perimeter.end_index); // at least 2 elt
         std::vector<size_t> patches_starts_ends;
-        for (size_t i = perimeter.start_index; i < perimeter.end_index; ++i) {
+        for (size_t i = perimeter.start_index; i < perimeter.end_index - 1; ++i) {
             if (result.points[i].type != EnforcedBlockedSeamPoint::Enforced &&
-                    result.points[next_index(i)].type == EnforcedBlockedSeamPoint::Enforced) {
-                patches_starts_ends.push_back(next_index(i));
+                    result.points[i+1].type == EnforcedBlockedSeamPoint::Enforced) {
+                patches_starts_ends.push_back(i+1);
             }
             if (result.points[i].type == EnforcedBlockedSeamPoint::Enforced &&
-                    result.points[next_index(i)].type != EnforcedBlockedSeamPoint::Enforced) {
-                patches_starts_ends.push_back(next_index(i));
+                    result.points[i+1].type != EnforcedBlockedSeamPoint::Enforced) {
+                patches_starts_ends.push_back(i+1);
             }
         }
-        //if patches_starts_ends are empty, it means that the whole perimeter is enforced.. don't do anything in that case
+        // also add start & end that can't be found for polyline
+        if (!is_polygon && result.points[perimeter.start_index].type == EnforcedBlockedSeamPoint::Enforced) {
+            patches_starts_ends.insert(patches_starts_ends.begin(), perimeter.start_index);
+        }
+        if (!is_polygon && result.points[perimeter.end_index - 1].type == EnforcedBlockedSeamPoint::Enforced) {
+            patches_starts_ends.push_back(perimeter.end_index);
+        }
+        // If patches_starts_ends are empty, it means that the whole perimeter is enforced.. don't do anything in that case, as there is no center of a circumference
         if (!patches_starts_ends.empty()) {
             //if the first point in the patches is not enforced, it marks a patch end. in that case, put it to the end and start on next
             // to simplify the processing
@@ -625,8 +746,13 @@ void process_perimeter_polygon(const Polygon &orig_polygon, float z_coord, const
             }
             std::vector<size_t> viable_points_indices;
             std::vector<size_t> large_angle_points_indices;
-            for (size_t point_idx = longest_patch.first; point_idx != longest_patch.second;
-                    point_idx = next_index(point_idx)) {
+            assert(longest_patch.first >= perimeter.start_index && longest_patch.first <= perimeter.end_index);
+            assert(longest_patch.second >= perimeter.start_index && longest_patch.second <= perimeter.end_index);
+            assert(is_polygon || longest_patch.first <= longest_patch.second);
+            for (size_t point_idx = longest_patch.first;
+                 point_idx       != longest_patch.second;
+                 point_idx        = is_polygon ? next_index(point_idx) : (1 + point_idx)) {
+                size_t viable_points_indices_count = viable_points_indices.size();
                 viable_points_indices.push_back(point_idx);
                 if (std::abs(result.points[point_idx].local_ccw_angle)
                         > SeamPlacer::sharp_angle_snapping_threshold) {
@@ -699,8 +825,8 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
 
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: decimate: start";
-    its_short_edge_collpase(triangle_set, 25000);
-    its_short_edge_collpase(negative_volumes_set, 25000);
+    its_short_edge_collpase(triangle_set, SeamPlacer::fast_decimation_triangle_count_target);
+    its_short_edge_collpase(negative_volumes_set, SeamPlacer::fast_decimation_triangle_count_target);
 
     size_t negative_volumes_start_index = triangle_set.indices.size();
     its_merge(triangle_set, negative_volumes_set);
@@ -746,8 +872,9 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
     throw_if_canceled();
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB tree: end";
+    bool has_seam_visibility = po->config().seam_visibility.value && po->config().seam_position.value == SeamPosition::spCost;
     result.mesh_samples_visibility = raycast_visibility(raycasting_tree, triangle_set, result.mesh_samples,
-            negative_volumes_start_index);
+            negative_volumes_start_index, !has_seam_visibility);
     throw_if_canceled();
 #ifdef DEBUG_FILES
     result.debug_export(triangle_set);
@@ -785,25 +912,34 @@ void gather_enforcers_blockers(GlobalModelInfo &result, const PrintObject *po) {
 
 struct SeamComparator {
     SeamPosition setup;
-    float angle_importance;
+    float angle_importance = 1.f;
+    float travel_importance = 1.f;
+    float visibility_importance = 1.f;
     Point seam_mod_pos;
     explicit SeamComparator(SeamPosition setup, const PrintObject& po) :
             setup(setup) {
-        //angle_importance =
-        //        setup == spNearest ? SeamPlacer::angle_importance_nearest : SeamPlacer::angle_importance_aligned;
         if (setup == spCustom)
             setup = spCost;
-        if (setup == spNearest)
-            setup = spCost;
-        float travel_cost = (float)po.config().seam_travel_cost.get_abs_value(1.f);
-        angle_importance = (float)po.config().seam_angle_cost.get_abs_value(1.f) / travel_cost;
+        if (setup == spNearest) {
+            //setup = spCost;
+            angle_importance = SeamPlacer::angle_importance_nearest;
+        } else if (setup == spAligned || setup == spExtremlyAligned) {
+            angle_importance = SeamPlacer::angle_importance_aligned;
+        } else {
+            travel_importance = (float)po.config().seam_travel_cost.get_abs_value(1.f);
+            angle_importance = (float)po.config().seam_angle_cost.get_abs_value(1.f);
+        }
+        visibility_importance = (po.config().seam_visibility.value &&
+                                 po.config().seam_position.value == SeamPosition::spCost) ?
+                                    1.f :
+                                    0.f;
     }
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
     // should return if a is better seamCandidate than b
-    bool is_first_better(const SeamCandidate &a, const SeamCandidate &b, const Vec2f &preffered_location = Vec2f { 0.0f,
-            0.0f }) const {
-        if (setup == SeamPosition::spAligned && a.central_enforcer != b.central_enforcer) {
+    bool is_first_better(const SeamCandidate &a, const SeamCandidate &b, const Vec2f &preffered_location = Vec2f { 0.0f, 0.0f}) const
+    {
+        if ((setup == SeamPosition::spAligned || setup == SeamPosition::spExtremlyAligned) && a.central_enforcer != b.central_enforcer) {
             return a.central_enforcer;
         }
 
@@ -813,7 +949,8 @@ struct SeamComparator {
         }
 
         //avoid overhangs
-        if (a.overhang > 0.0f || b.overhang > 0.0f) {
+        if ((a.overhang > a.perimeter.flow_width / 4 && b.overhang == 0.0f) ||
+            (b.overhang > b.perimeter.flow_width / 4 && a.overhang == 0.0f)) {
             return a.overhang < b.overhang;
         }
 
@@ -837,12 +974,14 @@ struct SeamComparator {
         }
 
         // the penalites are kept close to range [0-1.x] however, it should not be relied upon
-        float penalty_a = a.overhang + a.visibility +
-                angle_importance * compute_angle_penalty(a.local_ccw_angle)
-                + distance_penalty_a;
-        float penalty_b = b.overhang + b.visibility +
-                angle_importance * compute_angle_penalty(b.local_ccw_angle)
-                + distance_penalty_b;
+        float penalty_a = 2 * a.overhang / a.perimeter.flow_width
+                + visibility_importance * a.visibility
+                + angle_importance * compute_angle_penalty(a.local_ccw_angle)
+                + travel_importance * distance_penalty_a;
+        float penalty_b = 2 * b.overhang / b.perimeter.flow_width
+                + visibility_importance * b.visibility
+                + angle_importance * compute_angle_penalty(b.local_ccw_angle)
+                + travel_importance * distance_penalty_b;
 
         return penalty_a < penalty_b;
     }
@@ -852,7 +991,7 @@ struct SeamComparator {
     // Also used by the random seam generator.
     bool is_first_not_much_worse(const SeamCandidate &a, const SeamCandidate &b) const {
         // Blockers/Enforcers discrimination, top priority
-        if (setup == SeamPosition::spAligned && a.central_enforcer != b.central_enforcer) {
+        if ( (setup == SeamPosition::spAligned || setup == SeamPosition::spExtremlyAligned) && a.central_enforcer != b.central_enforcer) {
             // Prefer centers of enforcers.
             return a.central_enforcer;
         }
@@ -883,7 +1022,7 @@ struct SeamComparator {
             return false;
         }
 
-        if (setup == SeamPosition::spRandom) {
+        if (setup == SeamPosition::spRandom || setup == SeamPosition::spAllRandom) {
             return true;
         }
 
@@ -918,7 +1057,7 @@ void debug_export_points(const std::vector<PrintObjectSeamData::LayerSeams> &lay
         float max_weight = min_weight;
 
         for (const SeamCandidate &point : layers[layer_idx].points) {
-            Vec3i color = value_to_rgbi(-PI, PI, point.local_ccw_angle);
+            Vec3i32 color = value_to_rgbi(-PI, PI, point.local_ccw_angle);
             std::string fill = "rgb(" + std::to_string(color.x()) + "," + std::to_string(color.y()) + ","
                     + std::to_string(color.z()) + ")";
             angles_svg.draw(scaled(Vec2f(point.position.head<2>())), fill);
@@ -981,7 +1120,7 @@ void pick_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t start_
 size_t pick_nearest_seam_point_index(const std::vector<SeamCandidate> &perimeter_points, size_t start_index,
         const Vec2f &preffered_location, const PrintObject& po) {
     size_t end_index = perimeter_points[start_index].perimeter.end_index;
-    SeamComparator comparator { spNearest, po };
+    SeamComparator comparator { po.config().seam_position.value/*spNearest*/, po };
 
     size_t seam_index = start_index;
     for (size_t index = start_index; index < end_index; ++index) {
@@ -1057,72 +1196,31 @@ void pick_random_seam_point(const std::vector<SeamCandidate> &perimeter_points, 
     perimeter.finalized = true;
 }
 
-class PerimeterDistancer {
-    std::vector<Linef> lines;
-    AABBTreeIndirect::Tree<2, double> tree;
-
-public:
-    PerimeterDistancer(const Layer *layer) {
-        ExPolygons layer_outline = layer->lslices;
-        for (const ExPolygon &island : layer_outline) {
-            assert(island.contour.is_counter_clockwise());
-            for (const auto &line : island.contour.lines()) {
-                lines.emplace_back(unscale(line.a), unscale(line.b));
-            }
-            for (const Polygon &hole : island.holes) {
-                assert(hole.is_clockwise());
-                for (const auto &line : hole.lines()) {
-                    lines.emplace_back(unscale(line.a), unscale(line.b));
-                }
-            }
-        }
-        tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
-    }
-
-    float distance_from_perimeter(const Vec2f &point) const {
-        Vec2d p = point.cast<double>();
-        size_t hit_idx_out { };
-        Vec2d hit_point_out = Vec2d::Zero();
-        auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, hit_idx_out, hit_point_out);
-        if (distance < 0) {
-            return std::numeric_limits<float>::max();
-        }
-
-        distance = sqrt(distance);
-        const Linef &line = lines[hit_idx_out];
-        Vec2d v1 = line.b - line.a;
-        Vec2d v2 = p - line.a;
-        if ((v1.x() * v2.y()) - (v1.y() * v2.x()) > 0.0) {
-            distance *= -1;
-        }
-        return distance;
-    }
-}
-;
-
 } // namespace SeamPlacerImpl
 
 // Parallel process and extract each perimeter polygon of the given print object.
 // Gather SeamCandidates of each layer into vector and build KDtree over them
 // Store results in the SeamPlacer variables m_seam_per_object
-void SeamPlacer::gather_seam_candidates(const PrintObject *po,
-        const SeamPlacerImpl::GlobalModelInfo &global_model_info, const SeamPosition configured_seam_preference) {
+void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info, SeamPosition configured_seam_preference) {
     using namespace SeamPlacerImpl;
     PrintObjectSeamData &seam_data = m_seam_per_object.emplace(po, PrintObjectSeamData { }).first->second;
     seam_data.layers.resize(po->layer_count());
-
+    
+    // use an antomic idx instead of the range, to avoid a thread being very late because it's on the difficult layers.
+    std::atomic_size_t next_layer_idx(0);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, po->layers().size()),
-            [po, configured_seam_preference, &global_model_info, &seam_data]
+            [po, &global_model_info, &seam_data, configured_seam_preference, &next_layer_idx]
             (tbb::blocked_range<size_t> r) {
-                for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                //for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
+                for (size_t layer_idx = next_layer_idx++; layer_idx < po->layers().size(); layer_idx = next_layer_idx++) {
                     PrintObjectSeamData::LayerSeams &layer_seams = seam_data.layers[layer_idx];
                     const Layer *layer = po->get_layer(layer_idx);
                     auto unscaled_z = layer->slice_z;
                     std::vector<const LayerRegion*> regions;
                     //NOTE corresponding region ptr may be null, if the layer has zero perimeters
-                    Polygons polygons = extract_perimeter_polygons(layer, configured_seam_preference, regions);
-                    for (size_t poly_index = 0; poly_index < polygons.size(); ++poly_index) {
-                        process_perimeter_polygon(polygons[poly_index], unscaled_z,
+                    PolylineWithEnds polygons_and_lines = extract_perimeter_polylines(layer, configured_seam_preference, regions, po->config().perimeter_generator.value);
+                    for (size_t poly_index = 0; poly_index < polygons_and_lines.size(); ++poly_index) {
+                        process_perimeter_polylines(polygons_and_lines[poly_index], unscaled_z,
                                 regions[poly_index], global_model_info, layer_seams);
                     }
                     auto functor = SeamCandidateCoordinateFunctor { layer_seams.points };
@@ -1152,38 +1250,41 @@ void SeamPlacer::calculate_candidates_visibility(const PrintObject *po,
 
 void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) {
     using namespace SeamPlacerImpl;
+    using PerimeterDistancer = AABBTreeLines::LinesDistancer<Linef>;
 
     std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object[po].layers;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, layers.size()),
             [po, &layers](tbb::blocked_range<size_t> r) {
                 std::unique_ptr<PerimeterDistancer> prev_layer_distancer;
                 if (r.begin() > 0) { // previous layer exists
-                    prev_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[r.begin() - 1]);
+                    prev_layer_distancer = std::make_unique<PerimeterDistancer>(to_unscaled_linesf(po->layers()[r.begin() - 1]->lslices()));
                 }
 
                 for (size_t layer_idx = r.begin(); layer_idx < r.end(); ++layer_idx) {
                     size_t regions_with_perimeter = 0;
                     for (const LayerRegion *region : po->layers()[layer_idx]->regions()) {
-                        if (region->perimeters.entities().size() > 0) {
+                        if (region->perimeters().size() > 0) {
                             regions_with_perimeter++;
                         }
                     };
                     bool should_compute_layer_embedding = regions_with_perimeter > 1;
-                    std::unique_ptr<PerimeterDistancer> current_layer_distancer = std::make_unique<PerimeterDistancer>(po->layers()[layer_idx]);
+                    std::unique_ptr<PerimeterDistancer> current_layer_distancer        = std::make_unique<PerimeterDistancer>(
+                        to_unscaled_linesf(po->layers()[layer_idx]->lslices()));
 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
                         Vec2f point = Vec2f { perimeter_point.position.head<2>() };
                         if (prev_layer_distancer.get() != nullptr) {
-                            perimeter_point.overhang = prev_layer_distancer->distance_from_perimeter(point)
-                                    + 0.6f * perimeter_point.perimeter.flow_width
-                                    - tan(SeamPlacer::overhang_angle_threshold)
-                                            * po->layers()[layer_idx]->height;
+                            perimeter_point.overhang = prev_layer_distancer->distance_from_lines<true>(point.cast<double>());
+                                    // Seams: overhangs: don't remove overhang_angle_threshold, it seems to create artifacts. supermerill/SuperSlicer#4217
+                                    // + 0.6f * perimeter_point.perimeter.flow_width
+                                    // - tan(SeamPlacer::overhang_angle_threshold)
+                                    //         * po->layers()[layer_idx]->height;
                             perimeter_point.overhang =
                                     perimeter_point.overhang < 0.0f ? 0.0f : perimeter_point.overhang;
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
-                            perimeter_point.embedded_distance = current_layer_distancer->distance_from_perimeter(point)
+                            perimeter_point.embedded_distance = current_layer_distancer->distance_from_lines<true>(point.cast<double>())
                                     + 0.6f * perimeter_point.perimeter.flow_width;
                         }
                     }
@@ -1265,6 +1366,7 @@ std::optional<std::pair<size_t, size_t>> SeamPlacer::find_next_seam_in_layer(
     return {};
 }
 
+// get the nearests points from layers above & below. stop when the seam_align_tolerable_dist_factor don't allow to jump to a point, 
 std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintObject *po,
         std::pair<size_t, size_t> start_seam, const SeamPlacerImpl::SeamComparator &comparator) const {
     const std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object.find(po)->second.layers;
@@ -1289,7 +1391,11 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
                 break;
             }
         }
-        float max_distance = SeamPlacer::seam_align_tolerable_dist_factor *
+        float max_nozzle_diam = 0;
+        for (size_t region_id = 0; region_id < po->num_printing_regions(); ++region_id) {
+            max_nozzle_diam = std::max(max_nozzle_diam, (float)po->print()->config().nozzle_diameter.get_at(po->printing_region(region_id).config().perimeter_extruder.value - 1));
+        }
+        float max_distance = SeamPlacer::seam_align_tolerable_dist_factor * max_nozzle_diam *
                 layers[start_seam.first].points[start_seam.second].perimeter.flow_width;
         Vec3f prev_position = layers[prev_point_index.first].points[prev_point_index.second].position;
         Vec3f projected_position = prev_position;
@@ -1359,13 +1465,94 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
     }
 
     //sort them before alignment. Alignment is sensitive to initializaion, this gives it better chance to choose something nice
-    std::stable_sort(seams.begin(), seams.end(),
-            [&comparator, &layers](const std::pair<size_t, size_t> &left,
-                    const std::pair<size_t, size_t> &right) {
-                return comparator.is_first_better(layers[left.first].points[left.second],
+    if (comparator.setup != spExtremlyAligned) {
+        std::stable_sort(seams.begin(), seams.end(),
+            [&comparator, &layers](const std::pair<size_t, size_t>& left,
+                const std::pair<size_t, size_t>& right) {
+                    return comparator.is_first_better(layers[left.first].points[left.second],
                         layers[right.first].points[right.second]);
             }
-    );
+        );
+    }
+
+    // spExtremlyAligned: don't move unless it's an enforcer / Sphere
+    if (comparator.setup == spExtremlyAligned && seams.size() > 1) {
+        std::vector<std::vector<Perimeter*>> layer2seams;
+        size_t seam_idx = 0;
+        size_t current_layer_idx = 0;
+        // fisrt layer: keep that.
+        layer2seams.emplace_back();
+        while (seams[seam_idx].first == 0 && seam_idx < seams.size()) {
+            layer2seams.back().push_back(&layers[0].points[seams[seam_idx].second].perimeter);
+            layer2seams.back().back()->finalized = true;
+            //iterate
+            seam_idx++;
+        }
+        //next layer: get the nearest point form previous layer, and project it onto the current perimeter.
+        for (; seam_idx < seams.size(); seam_idx++) {
+            while (current_layer_idx < seams[seam_idx].first) {
+                layer2seams.emplace_back();
+                current_layer_idx++;
+            }
+            const std::vector<SeamPlacerImpl::SeamCandidate>& points = layers[seams[seam_idx].first].points;
+            const SeamCandidate& current = points[seams[seam_idx].second];
+            Perimeter& perimeter = points[seams[seam_idx].second].perimeter;
+            layer2seams.back().push_back(&perimeter);
+            if (current.type == EnforcedBlockedSeamPoint::Enforced) {
+                //// TODO: align as much as possible inside the enforcement
+                perimeter.seam_index = seams[seam_idx].second;
+                perimeter.final_seam_position = current.position;
+                perimeter.finalized = true;
+            } else if (current.type == EnforcedBlockedSeamPoint::Sphere) {
+                //keep as-is
+            } else if (current_layer_idx > 0 && !layer2seams[current_layer_idx - 1].empty()) {
+                //TODO: remove seam blocker
+                Point nearest_point;
+                Vec3f nearest_old_point;
+                size_t nearest_pt_idx;
+                size_t next_pt_idx;
+                double nearest_sqr_dist = std::numeric_limits<double>::max();
+                for (const Perimeter* lower_peri : layer2seams[current_layer_idx - 1]) {
+                    //old point
+                    Point lower_pt{ scale_t(lower_peri->final_seam_position.x()), scale_t(lower_peri->final_seam_position.y()) };
+                    //for each segment
+                    for (int i = perimeter.start_index; i < perimeter.end_index-1; i++) {
+                        Point pt = lower_pt.projection_onto(Point{scale_t(points[i].position.x()), scale_t(points[i].position.y())},
+                                                            Point{scale_t(points[i + 1].position.x()), scale_t(points[i + 1].position.y())});
+                        double dist_sqr = pt.distance_to_square(lower_pt);
+                        if (dist_sqr < nearest_sqr_dist) {
+                            nearest_sqr_dist = dist_sqr;
+                            nearest_point = pt;
+                            nearest_pt_idx = i;
+                            next_pt_idx = i + 1;
+                            nearest_old_point = lower_peri->final_seam_position;
+                        }
+                    }
+                    //test last segment
+                    {
+                        Point pt = lower_pt.projection_onto(Point{scale_t(points[perimeter.end_index - 1].position.x()), scale_t(points[perimeter.end_index - 1].position.y())},
+                                                            Point{scale_t(points[perimeter.start_index].position.x()), scale_t(points[perimeter.start_index].position.y())} );
+                        double dist_sqr = pt.distance_to_square(lower_pt);
+                        if (dist_sqr < nearest_sqr_dist) {
+                            nearest_sqr_dist = dist_sqr;
+                            nearest_point = pt;
+                            nearest_pt_idx = perimeter.end_index - 1;
+                            next_pt_idx = perimeter.start_index;
+                            nearest_old_point = lower_peri->final_seam_position;
+                        }
+                    }
+                }
+
+                if (nearest_sqr_dist < std::numeric_limits<double>::max()) {
+                    perimeter.seam_index = nearest_pt_idx;
+                    perimeter.final_seam_position.x() = unscaled(nearest_point.x());
+                    perimeter.final_seam_position.y() = unscaled(nearest_point.y());
+                    perimeter.finalized = true;
+                } 
+            }
+        }
+        return;
+    }
 
     //align the seam points - start with the best, and check if they are aligned, if yes, skip, else start alignment
     // Keeping the vectors outside, so with a bit of luck they will not get reallocated after couple of for loop iterations.
@@ -1390,9 +1577,9 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             for (size_t alternative_start = 0; alternative_start < seam_string.size(); alternative_start += step_size) {
                 size_t start_layer_idx = seam_string[alternative_start].first;
                 size_t seam_idx =
-                        layers[start_layer_idx].points[seam_string[alternative_start].second].perimeter.seam_index;
+                    layers[start_layer_idx].points[seam_string[alternative_start].second].perimeter.seam_index;
                 alternative_seam_string = this->find_seam_string(po,
-                        std::pair<size_t, size_t>(start_layer_idx, seam_idx), comparator);
+                    std::pair<size_t, size_t>(start_layer_idx, seam_idx), comparator);
                 if (alternative_seam_string.size() > seam_string.size()) {
                     seam_string = std::move(alternative_seam_string);
                 }
@@ -1442,13 +1629,17 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
                 observations[index] = current.position.head<2>();
                 observation_points[index] = current.position.z();
                 weights[index] = angle_weight(current.local_ccw_angle);
-                float sign = layer_angle > 2.0 * std::abs(current.local_ccw_angle) ? -0.8f : 1.0f;
+                float curling_influence = layer_angle > 2.0 * std::abs(current.local_ccw_angle) ? -0.8f : 1.0f;
                 if (current.type == EnforcedBlockedSeamPoint::Enforced) {
-                    sign = 1.0f;
+                    curling_influence = 1.0f;
                     weights[index] += 3.0f;
                 }
-                total_length += sign * (last_point_pos - current.position).norm();
+                total_length += curling_influence * (last_point_pos - current.position).norm();
                 last_point_pos = current.position;
+            }
+
+            if (comparator.setup == spRear) {
+                total_length *= 0.3f;
             }
 
             // Curve Fitting
@@ -1513,8 +1704,14 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
 void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_canceled_func) {
     using namespace SeamPlacerImpl;
     m_seam_per_object.clear();
+    this->external_perimeters_first = print.default_region_config().external_perimeters_first;
 
-    for (const PrintObject *po : print.objects()) {
+    for (size_t obj_idx = 0; obj_idx < print.objects().size(); ++ obj_idx) {
+        const PrintObject *po = print.objects()[obj_idx];
+        print.set_status(int((obj_idx * 100) / print.objects().size()),
+                         ("Computing seam visibility areas: object %s / %s"),
+                         {std::to_string(obj_idx + 1), std::to_string(print.objects().size())},
+                         PrintBase::SlicingStatus::SECONDARY_STATE);
         throw_if_canceled_func();
         SeamPosition configured_seam_preference = po->config().seam_position.value;
         SeamComparator comparator { configured_seam_preference, *po };
@@ -1523,7 +1720,8 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
             GlobalModelInfo global_model_info { };
             gather_enforcers_blockers(global_model_info, po);
             throw_if_canceled_func();
-            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned || configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
+            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned ||
+                configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
                 compute_global_occlusion(global_model_info, po, throw_if_canceled_func);
             }
             throw_if_canceled_func();
@@ -1533,7 +1731,8 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
             BOOST_LOG_TRIVIAL(debug)
             << "SeamPlacer: gather_seam_candidates: end";
             throw_if_canceled_func();
-            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned || configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
+            if (configured_seam_preference == spAligned || configured_seam_preference == spExtremlyAligned ||
+                configured_seam_preference == spNearest || configured_seam_preference == spCost || configured_seam_preference == spCustom) {
                 BOOST_LOG_TRIVIAL(debug)
                 << "SeamPlacer: calculate_candidates_visibility : start";
                 calculate_candidates_visibility(po, global_model_info);
@@ -1559,7 +1758,7 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
                             std::vector<SeamCandidate> &layer_perimeter_points = layers[layer_idx].points;
                             for (size_t current = 0; current < layer_perimeter_points.size();
                                     current = layer_perimeter_points[current].perimeter.end_index)
-                                if (configured_seam_preference == spRandom)
+                                if (configured_seam_preference == spRandom || configured_seam_preference == SeamPosition::spAllRandom)
                                     pick_random_seam_point(layer_perimeter_points, current, *po);
                                 else
                                     pick_seam_point(layer_perimeter_points, current, comparator);
@@ -1581,10 +1780,76 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
         debug_export_points(m_seam_per_object[po].layers, po->bounding_box(), comparator);
 #endif
     }
-    this->external_perimeters_first = print.default_region_config().external_perimeters_first;
 }
 
-void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first,
+static constexpr float MINIMAL_POLYGON_SIDE = scaled<float>(0.2f);
+std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer, const ExtrusionLoop& loop, const uint16_t print_object_instance_idx, const Point& last_po, const PrintObject* po) {
+
+    bool has_custom_seam_modifier = false;
+    if (print_object_instance_idx < po->instances().size()) {
+        for (ModelVolume* v : po->model_object()->volumes) {
+            if (v->is_seam_position()) {
+                has_custom_seam_modifier = true;
+                break;
+            }
+        }
+    }
+    if (has_custom_seam_modifier) {
+        Polygon polygon = loop.polygon();
+        polygon.densify(MINIMAL_POLYGON_SIDE);
+        bool was_clockwise = polygon.make_counter_clockwise();
+        // Look for all lambda-seam-modifiers below current z, choose the highest one
+        ModelVolume* v_lambda_seam = nullptr;
+        Vec3d lambda_pos;
+        double lambda_z = 0;
+        double lambda_dist = 0;
+        double lambda_radius = 0;
+        double max_lambda_radius = 0;
+        //get model_instance (like from po->model_object()->instances, but we don't have the index for that array)
+        const ModelInstance* model_instance = po->instances()[print_object_instance_idx].model_instance;
+        for (ModelVolume* v : po->model_object()->volumes) {
+            if (v->is_seam_position()) {
+                //xy in object coordinates, z in plater coordinates
+                // created/moved shpere have offset in their transformation, and loaded ones have their loaded transformation in the source transformation.
+                Vec3d test_lambda_pos = model_instance->transform_vector((v->get_transformation() * v->source.transform).get_offset(), false);
+                // remove shift, as we used the transform_vector(.., FALSE). that way, we have a correct z vs the layer height, and same for the x and y vs polygon.
+                test_lambda_pos.x() -= unscaled(po->instances()[print_object_instance_idx].shift.x());
+                test_lambda_pos.y() -= unscaled(po->instances()[print_object_instance_idx].shift.y());
+
+                double test_lambda_z = std::abs(layer.print_z - test_lambda_pos.z());
+                Point xy_lambda(scale_(test_lambda_pos.x()), scale_(test_lambda_pos.y()));
+                Point nearest = polygon.point_projection(xy_lambda).first;
+                Vec3d polygon_3dpoint{ unscaled(nearest.x()), unscaled(nearest.y()), (double)layer.print_z };
+                double test_lambda_dist = (polygon_3dpoint - test_lambda_pos).norm();
+                double sphere_radius = po->model_object()->instance_bounding_box(0, true).size().x() / 2;
+                max_lambda_radius = std::max(max_lambda_radius, sphere_radius);
+
+                //use this one if the first or nearer (in z, or in xy if same z)
+                if (v_lambda_seam == nullptr
+                    || (lambda_z > test_lambda_z)
+                    || (lambda_z == test_lambda_z && lambda_dist > test_lambda_dist)) {
+                    v_lambda_seam = v;
+                    lambda_pos = test_lambda_pos;
+                    lambda_radius = sphere_radius;
+                    lambda_dist = test_lambda_dist;
+                    lambda_z = test_lambda_z;
+                }
+            }
+        }
+
+        if (v_lambda_seam != nullptr) {
+            // Found, get the center point and apply rotation and scaling of Model instance. Continues to spAligned if not found or Weight set to Zero.
+            // Weight is set by user and stored in the radius of the sphere
+            float seam_mod_weight = 1.f + 100 * (lambda_radius / max_lambda_radius);
+            if (seam_mod_weight > 0.0) {
+                return std::tuple<bool, std::optional<Vec3f>>{ true, std::optional{ Vec3f{(float)lambda_pos.x(), (float)lambda_pos.y(), (float)layer.slice_z} } };
+            }
+        }
+    }
+    return std::tuple<bool, std::optional<Vec3f>>{ false, std::nullopt };
+}
+
+Point SeamPlacer::place_seam(const Layer *layer, const ExtrusionLoop &loop, const uint16_t print_object_instance_idx,
         const Point &last_pos) const {
     using namespace SeamPlacerImpl;
     const PrintObject *po = layer->object();
@@ -1595,13 +1860,14 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
     const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
     const double unscaled_z = layer->slice_z;
 
+    //FIXME?: not working on arcs
     auto get_next_loop_point = [&loop](ExtrusionLoop::ClosestPathPoint current) {
         current.segment_idx += 1;
-        if (current.segment_idx >= loop.paths[current.path_idx].polyline.points.size()) {
+        if (current.segment_idx >= loop.paths[current.path_idx].polyline.size()) {
             current.path_idx = next_idx_modulo(current.path_idx, loop.paths.size());
             current.segment_idx = 0;
         }
-        current.foot_pt = loop.paths[current.path_idx].polyline.points[current.segment_idx];
+        current.foot_pt = loop.paths[current.path_idx].polyline.get_point(current.segment_idx);
         return current;
     };
 
@@ -1614,11 +1880,11 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
     size_t closest_perimeter_point_index = 0;
     { // local space for the closest_perimeter_point_index
         Perimeter *closest_perimeter = nullptr;
-        ExtrusionLoop::ClosestPathPoint closest_point{0,0,loop.paths[0].polyline.points[0]};
+        ExtrusionLoop::ClosestPathPoint closest_point{0,0,loop.paths[0].polyline.front()};
         size_t points_count = std::accumulate(loop.paths.begin(), loop.paths.end(), 0, [](size_t acc,const ExtrusionPath& p) {
-           return acc + p.polyline.points.size();
+           return acc + p.polyline.size();
         });
-        for (size_t _ = 0; _ < points_count; ++_) {
+        for (size_t i = 0; i < points_count; ++i) {
             Vec2f unscaled_p = unscaled<float>(closest_point.foot_pt);
             closest_perimeter_point_index = find_closest_point(*layer_perimeters.points_tree.get(),
                     to_3d(unscaled_p, float(unscaled_z)));
@@ -1648,44 +1914,78 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
 
     Point seam_point = Point::new_scale(seam_position.x(), seam_position.y());
 
-    if (const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
-    (po->config().seam_position.value == spNearest || po->config().seam_position.value == spAligned || po->config().seam_position.value == spExtremlyAligned || po->config().seam_position.value == spCost || po->config().seam_position.value == spCustom) &&
-            loop.role() == ExtrusionRole::erPerimeter && //Hopefully internal perimeter
-            (seam_position - perimeter_point.position).squaredNorm() < 4.0f && // seam is on perimeter point
-            perimeter_point.local_ccw_angle < -EPSILON // In concave angles
-                    ) { // In this case, we are at internal perimeter, where the external perimeter has seam in concave angle. We want to align
-            // the internal seam into the concave corner, and not on the perpendicular projection on the closest edge (which is what the split_at function does)
-        size_t index_of_prev =
+    auto [has_seam_mod, seam_mod_pos] = get_seam_from_modifier(*layer, loop, print_object_instance_idx, last_pos, po);
+    if (has_seam_mod && seam_mod_pos.has_value()) {
+        seam_point = Point::new_scale(seam_mod_pos->x(), seam_mod_pos->y());
+    } else {
+
+        if (loop.role() == ExtrusionRole::Perimeter) { //Hopefully inner perimeter
+            const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
+            ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, false);
+            // determine depth of the seam point.
+            float depth = (float) unscale(Point(seam_point - projected_point.foot_pt)).norm();
+            float beta_angle = cos(perimeter_point.local_ccw_angle / 2.0f);
+            size_t index_of_prev =
                 seam_index == perimeter_point.perimeter.start_index ?
-                                                                      perimeter_point.perimeter.end_index - 1 :
-                                                                      seam_index - 1;
-        size_t index_of_next =
+                    perimeter_point.perimeter.end_index - 1 :
+                    seam_index - 1;
+            size_t index_of_next =
                 seam_index == perimeter_point.perimeter.end_index - 1 ?
-                                                                        perimeter_point.perimeter.start_index :
-                                                                        seam_index + 1;
+                    perimeter_point.perimeter.start_index :
+                    seam_index + 1;
 
-        Vec2f dir_to_middle =
-                ((perimeter_point.position - layer_perimeters.points[index_of_prev].position).head<2>().normalized()
-                        + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
-                        * 0.5;
+            if ((seam_position - perimeter_point.position).squaredNorm() < depth && // seam is on perimeter point
+                    perimeter_point.local_ccw_angle < -EPSILON // In concave angles
+                            ) { // In this case, we are at internal perimeter, where the external perimeter has seam in concave angle. We want to align
+                    // the internal seam into the concave corner, and not on the perpendicular projection on the closest edge (which is what the split_at function does)
+                Vec2f dir_to_middle =
+                        ((perimeter_point.position - layer_perimeters.points[index_of_prev].position).head<2>().normalized()
+                                + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
+                                * 0.5;
+                depth = 1.4142 * depth / beta_angle;
+                // There are some nice geometric identities in determination of the correct depth of new seam point.
+                //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
+                Vec2f final_pos = perimeter_point.position.head<2>() + depth * dir_to_middle;
+                projected_point = loop.get_closest_path_and_point(Point::new_scale(final_pos.x(), final_pos.y()), false);
+            } else { // not concave angle, in that case the nearest point is the good candidate
+                // but for staggering, we also need to recompute depth of the inner perimter, because in convex corners, the distance is larger than layer width
+                // we want the perpendicular depth, not distance to nearest point
+                depth = depth * beta_angle / 1.4142;
+            }
 
-        ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, true);
-        //get closest projected point, determine depth of the seam point.
-        float depth = (float) unscale(Point(seam_point - projected_point.foot_pt)).norm();
-        float angle_factor = cos(-perimeter_point.local_ccw_angle / 2.0f); // There are some nice geometric identities in determination of the correct depth of new seam point.
-        //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
-        Vec2f final_pos = perimeter_point.position.head<2>() + (1.4142 * depth / angle_factor) * dir_to_middle;
-        seam_point = Point::new_scale(final_pos.x(), final_pos.y());
+            seam_point = projected_point.foot_pt;
+            //lastly, for internal perimeters, do the staggering if requested
+            if (po->config().staggered_inner_seams && loop.length() > 0.0) {
+                //fix depth, it is sometimes strongly underestimated
+                depth = std::max(loop.paths[projected_point.path_idx].width(), depth);
+
+                while (depth > 0.0f) {
+                    auto next_point = get_next_loop_point(projected_point);
+                    Vec2f a = unscale(projected_point.foot_pt).cast<float>();
+                    Vec2f b = unscale(next_point.foot_pt).cast<float>();
+                    float dist = (a - b).norm();
+                    if (dist > depth) {
+                        Vec2f final_pos = a + (b - a) * depth / dist;
+                        next_point.foot_pt = Point::new_scale(final_pos.x(), final_pos.y());
+                    }
+                    depth -= dist;
+                    projected_point = next_point;
+                }
+                seam_point = projected_point.foot_pt;
+            }
+            /*{
+                static int isaqsdsdfsdfqzfn = 0;
+                std::stringstream stri;
+                stri << layer->id() << "_split_seam_" << isaqsdsdfsdfqzfn++ << ".svg";
+                SVG svg(stri.str());
+                for(auto& path : loop.paths)
+                    svg.draw(path.polyline, "blue");
+                svg.draw(seam_point, "red");
+                svg.Close();
+            }*/
+        }
     }
-
-    // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
-    // thus empty path segments will not be produced by G-code export.
-    if (!loop.split_at_vertex(seam_point, scaled<double>(0.0015))) {
-        // The point is not in the original loop.
-        // Insert it.
-        loop.split_at(seam_point, true);
-    }
-
+    return seam_point;
 }
 
 } // namespace Slic3r

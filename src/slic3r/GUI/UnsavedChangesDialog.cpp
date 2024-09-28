@@ -1,16 +1,22 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, David Kocík @kocikdav
+///|/ Copyright (c) 2021 Pascal de Bruijn @pmjdebruijn
+///|/ Copyright (c) 2021 Sebastian Hammerl
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "UnsavedChangesDialog.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 #include <boost/algorithm/string.hpp>
-#include <boost/optional.hpp>
-#include <boost/nowide/convert.hpp>
 
 #include <wx/tokenzr.h>
 
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Color.hpp"
 #include "format.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
@@ -21,13 +27,9 @@
 #include "MainFrame.hpp"
 #include "MsgDialog.hpp"
 
-//#define FTS_FUZZY_MATCH_IMPLEMENTATION
-//#include "fts_fuzzy_match.h"
-
-#include "BitmapCache.hpp"
 #include "PresetComboBoxes.hpp"
 
-using boost::optional;
+using std::optional;
 
 #ifdef __linux__
 #define wxLinux true
@@ -39,14 +41,18 @@ namespace Slic3r {
 
 namespace GUI {
 
+wxDEFINE_EVENT(EVT_DIFF_DIALOG_TRANSFER,        SimpleEvent);
+wxDEFINE_EVENT(EVT_DIFF_DIALOG_UPDATE_PRESETS,  SimpleEvent);
+
+
 // ----------------------------------------------------------------------------
 //                  ModelNode: a node inside DiffModel
 // ----------------------------------------------------------------------------
 
 static const std::map<Preset::Type, std::string> type_icon_names = {
-    {Preset::TYPE_FFF_PRINT,        "cog"           },
+    {Preset::TYPE_FFF_PRINT,    "cog"           },
     {Preset::TYPE_SLA_PRINT,    "cog"           },
-    {Preset::TYPE_FFF_FILAMENT,     "spool"         },
+    {Preset::TYPE_FFF_FILAMENT, "spool"         },
     {Preset::TYPE_SLA_MATERIAL, "resin"         },
     {Preset::TYPE_PRINTER,      "printer"       },
 };
@@ -58,8 +64,7 @@ static std::string get_icon_name(Preset::Type type, PrinterTechnology pt) {
 static std::string def_text_color()
 {
     wxColour def_colour = wxGetApp().get_label_clr_default();
-    auto clr_str = wxString::Format(wxT("#%02X%02X%02X"), def_colour.Red(), def_colour.Green(), def_colour.Blue());
-    return clr_str.ToStdString();
+    return encode_color(ColorRGB(def_colour.Red(), def_colour.Green(), def_colour.Blue()));
 }
 static std::string grey     = "#808080";
 static std::string orange   = "#ed6b21";
@@ -79,12 +84,13 @@ static void make_string_bold(wxString& str)
 }
 
 // preset(root) node
-ModelNode::ModelNode(Preset::Type preset_type, wxWindow* parent_win, const wxString& text, const std::string& icon_name) :
+ModelNode::ModelNode(Preset::Type preset_type, wxWindow* parent_win, const wxString& text, const std::string& icon_name, const wxString& new_val_column_text) :
     m_parent_win(parent_win),
     m_parent(nullptr),
     m_preset_type(preset_type),
     m_icon_name(icon_name),
-    m_text(text)
+    m_text(text),
+    m_new_value(new_val_column_text)
 {
     UpdateIcons();
 }
@@ -103,8 +109,8 @@ ModelNode::ModelNode(ModelNode* parent, const wxString& text, const std::string&
 ModelNode::ModelNode(ModelNode* parent, const wxString& text) :
     m_parent_win(parent->m_parent_win),
     m_parent(parent),
-    m_text(text),
-    m_icon_name("dot_small")
+    m_icon_name("dot_small"),
+    m_text(text)
 {
     UpdateIcons();
 }
@@ -115,41 +121,35 @@ wxIcon ModelNode::get_bitmap(const wxString& color)
 wxBitmap ModelNode::get_bitmap(const wxString& color)
 #endif // __linux__
 {
-    /* It's supposed that standard size of an icon is 48px*16px for 100% scaled display.
-     * So set sizes for solid_colored icons used for filament preset
-     * and scale them in respect to em_unit value
-     */
-    const double em = em_unit(m_parent_win);
-    const int icon_width    = lround(6.4 * em);
-    const int icon_height   = lround(1.6 * em);
-
-    BitmapCache bmp_cache;
-    unsigned char rgb[3];
-    BitmapCache::parse_color(into_u8(color), rgb);
-    // there is no need to scale created solid bitmap
+    wxBitmap bmp = get_solid_bmp_bundle(64, 16, into_u8(color))->GetBitmapFor(m_parent_win);
+    if (!m_toggle)
+        bmp = bmp.ConvertToDisabled();
 #ifndef __linux__
-    return bmp_cache.mksolid(icon_width, icon_height, rgb, true);
+    return bmp;
 #else
     wxIcon icon;
-    icon.CopyFromBitmap(bmp_cache.mksolid(icon_width, icon_height, rgb, true));
+    icon.CopyFromBitmap(bmp);
     return icon;
 #endif // __linux__
 }
 
 // option node
-ModelNode::ModelNode(ModelNode* parent, const wxString& text, const wxString& old_value, const wxString& new_value) :
+ModelNode::ModelNode(ModelNode* parent, const wxString& text, const wxString& old_value, const wxString& mod_value, const wxString& new_value) :
+    m_parent_win(parent->m_parent_win),
     m_parent(parent),
     m_old_color(old_value.StartsWith("#") ? old_value : ""),
+    m_mod_color(mod_value.StartsWith("#") ? mod_value : ""),
     m_new_color(new_value.StartsWith("#") ? new_value : ""),
-    m_container(false),
-    m_text(text),
     m_icon_name("empty"),
+    m_text(text),
     m_old_value(old_value),
-    m_new_value(new_value)
+    m_mod_value(mod_value),
+    m_new_value(new_value),
+    m_container(false)
 {
     // check if old/new_value is color
     if (m_old_color.IsEmpty()) {
-        if (!m_new_color.IsEmpty())
+        if (!m_mod_color.IsEmpty())
             m_old_value = _L("Undef");
     }
     else {
@@ -157,8 +157,17 @@ ModelNode::ModelNode(ModelNode* parent, const wxString& text, const wxString& ol
         m_old_value.Clear();
     }
 
-    if (m_new_color.IsEmpty()) {
+    if (m_mod_color.IsEmpty()) {
         if (!m_old_color.IsEmpty())
+            m_mod_value = _L("Undef");
+    }
+    else {
+        m_mod_color_bmp = get_bitmap(m_mod_color);
+        m_mod_value.Clear();
+    }
+
+    if (m_new_color.IsEmpty()) {
+        if (!m_old_color.IsEmpty() || !m_mod_color.IsEmpty())
             m_new_value = _L("Undef");
     }
     else {
@@ -168,7 +177,8 @@ ModelNode::ModelNode(ModelNode* parent, const wxString& text, const wxString& ol
 
     // "color" strings
     color_string(m_old_value, def_text_color());
-    color_string(m_new_value, orange);
+    color_string(m_mod_value, orange);
+    color_string(m_new_value, def_text_color());
 
     UpdateIcons();
 }
@@ -187,12 +197,14 @@ void ModelNode::UpdateEnabling()
     if (!m_toggle) {
         change_text_color(m_text,      def_text_color(), grey);
         change_text_color(m_old_value, def_text_color(), grey);
-        change_text_color(m_new_value, orange,grey);
+        change_text_color(m_mod_value, orange,grey);
+        change_text_color(m_new_value, def_text_color(), grey);
     }
     else {
         change_text_color(m_text,      grey, def_text_color());
         change_text_color(m_old_value, grey, def_text_color());
-        change_text_color(m_new_value, grey, orange);
+        change_text_color(m_mod_value, grey, orange);
+        change_text_color(m_new_value, grey, def_text_color());
     }
     // update icons for the colors
     UpdateIcons();
@@ -202,18 +214,24 @@ void ModelNode::UpdateIcons()
 {
     // update icons for the colors, if any exists
     if (!m_old_color.IsEmpty())
-        m_old_color_bmp = get_bitmap(m_toggle ? m_old_color : wxString::FromUTF8(grey.c_str()));
+        m_old_color_bmp = get_bitmap(m_old_color);
+    if (!m_mod_color.IsEmpty())
+        m_mod_color_bmp = get_bitmap(m_mod_color);
     if (!m_new_color.IsEmpty())
-        m_new_color_bmp = get_bitmap(m_toggle ? m_new_color : wxString::FromUTF8(grey.c_str()));
+        m_new_color_bmp = get_bitmap(m_new_color);
 
     // update main icon, if any exists
     if (m_icon_name.empty())
         return;
 
+    wxBitmap bmp = get_bmp_bundle(m_icon_name)->GetBitmapFor(m_parent_win);
+    if (!m_toggle)
+        bmp = bmp.ConvertToDisabled();
+
 #ifdef __linux__
-    m_icon.CopyFromBitmap(create_scaled_bitmap(m_icon_name, m_parent_win, 16, !m_toggle));
+    m_icon.CopyFromBitmap(bmp);
 #else
-    m_icon = create_scaled_bitmap(m_icon_name, m_parent_win, 16, !m_toggle);
+    m_icon = bmp;
 #endif //__linux__
 }
 
@@ -227,13 +245,14 @@ DiffModel::DiffModel(wxWindow* parent) :
 {
 }
 
-wxDataViewItem DiffModel::AddPreset(Preset::Type type, wxString preset_name, PrinterTechnology pt)
+wxDataViewItem DiffModel::AddPreset(Preset::Type type, wxString preset_name, PrinterTechnology pt, wxString new_preset_name/* = wxString()*/)
 {
     // "color" strings
     color_string(preset_name, def_text_color());
     make_string_bold(preset_name);
+    make_string_bold(new_preset_name);
 
-    auto preset = new ModelNode(type, m_parent_win, preset_name, get_icon_name(type, pt));
+    auto preset = new ModelNode(type, m_parent_win, preset_name, get_icon_name(type, pt), new_preset_name);
     m_preset_nodes.emplace_back(preset);
 
     wxDataViewItem child((void*)preset);
@@ -243,9 +262,9 @@ wxDataViewItem DiffModel::AddPreset(Preset::Type type, wxString preset_name, Pri
     return child;
 }
 
-ModelNode* DiffModel::AddOption(ModelNode* group_node, wxString option_name, wxString old_value, wxString new_value)
+ModelNode* DiffModel::AddOption(ModelNode* group_node, wxString option_name, wxString old_value, wxString mod_value, wxString new_value)
 {
-    group_node->Append(std::make_unique<ModelNode>(group_node, option_name, old_value, new_value));
+    group_node->Append(std::make_unique<ModelNode>(group_node, option_name, old_value, mod_value, new_value));
     ModelNode* option = group_node->GetChildren().back().get();
     wxDataViewItem group_item = wxDataViewItem((void*)group_node);
     ItemAdded(group_item, wxDataViewItem((void*)option));
@@ -254,27 +273,27 @@ ModelNode* DiffModel::AddOption(ModelNode* group_node, wxString option_name, wxS
     return option;
 }
 
-ModelNode* DiffModel::AddOptionWithGroup(ModelNode* category_node, wxString group_name, wxString option_name, wxString old_value, wxString new_value)
+ModelNode* DiffModel::AddOptionWithGroup(ModelNode* category_node, wxString group_name, wxString option_name, wxString old_value, wxString mod_value, wxString new_value)
 {
     category_node->Append(std::make_unique<ModelNode>(category_node, group_name));
     ModelNode* group_node = category_node->GetChildren().back().get();
     ItemAdded(wxDataViewItem((void*)category_node), wxDataViewItem((void*)group_node));
 
-    return AddOption(group_node, option_name, old_value, new_value);
+    return AddOption(group_node, option_name, old_value, mod_value, new_value);
 }
 
 ModelNode* DiffModel::AddOptionWithGroupAndCategory(ModelNode* preset_node, wxString category_name, wxString group_name, 
-                                            wxString option_name, wxString old_value, wxString new_value, const std::string category_icon_name)
+                                            wxString option_name, wxString old_value, wxString mod_value, wxString new_value, const std::string category_icon_name)
 {
     preset_node->Append(std::make_unique<ModelNode>(preset_node, category_name, category_icon_name));
     ModelNode* category_node = preset_node->GetChildren().back().get();
     ItemAdded(wxDataViewItem((void*)preset_node), wxDataViewItem((void*)category_node));
 
-    return AddOptionWithGroup(category_node, group_name, option_name, old_value, new_value);
+    return AddOptionWithGroup(category_node, group_name, option_name, old_value, mod_value, new_value);
 }
 
 wxDataViewItem DiffModel::AddOption(Preset::Type type, wxString category_name, wxString group_name, wxString option_name,
-                                              wxString old_value, wxString new_value, const std::string category_icon_name)
+                                              wxString old_value, wxString mod_value, wxString new_value, const std::string category_icon_name)
 {
     // "color" strings
     color_string(category_name, def_text_color());
@@ -294,12 +313,12 @@ wxDataViewItem DiffModel::AddOption(Preset::Type type, wxString category_name, w
                 {
                     for (std::unique_ptr<ModelNode> &group : category->GetChildren())
                         if (group->text() == group_name)
-                            return wxDataViewItem((void*)AddOption(group.get(), option_name, old_value, new_value));
+                            return wxDataViewItem((void*)AddOption(group.get(), option_name, old_value, mod_value, new_value));
                     
-                    return wxDataViewItem((void*)AddOptionWithGroup(category.get(), group_name, option_name, old_value, new_value));
+                    return wxDataViewItem((void*)AddOptionWithGroup(category.get(), group_name, option_name, old_value, mod_value, new_value));
                 }
 
-            return wxDataViewItem((void*)AddOptionWithGroupAndCategory(preset.get(), category_name, group_name, option_name, old_value, new_value, category_icon_name));
+            return wxDataViewItem((void*)AddOptionWithGroupAndCategory(preset.get(), category_name, group_name, option_name, old_value, mod_value, new_value, category_icon_name));
         }
 
     return wxDataViewItem(nullptr);    
@@ -368,6 +387,9 @@ void DiffModel::GetValue(wxVariant& variant, const wxDataViewItem& item, unsigne
     case colOldValue:
         variant << wxDataViewIconText(node->m_old_value, node->m_old_color_bmp);
         break;
+    case colModValue:
+        variant << wxDataViewIconText(node->m_mod_value, node->m_mod_color_bmp);
+        break;
     case colNewValue:
         variant << wxDataViewIconText(node->m_new_value, node->m_new_color_bmp);
         break;
@@ -377,6 +399,9 @@ void DiffModel::GetValue(wxVariant& variant, const wxDataViewItem& item, unsigne
         break;
     case colOldValue:
         variant << DataViewBitmapText(node->m_old_value, node->m_old_color_bmp);
+        break;
+    case colModValue:
+        variant << DataViewBitmapText(node->m_mod_value, node->m_mod_color_bmp);
         break;
     case colNewValue:
         variant << DataViewBitmapText(node->m_new_value, node->m_new_color_bmp);
@@ -485,7 +510,7 @@ unsigned int DiffModel::GetChildren(const wxDataViewItem& parent, wxDataViewItem
     for (const std::unique_ptr<ModelNode>& child : children)
         array.Add(wxDataViewItem((void*)child.get()));
 
-    return array.size();
+    return array.Count();
 }
 
 
@@ -571,7 +596,7 @@ void DiffModel::Clear()
 
 static std::string get_pure_opt_key(std::string opt_key)
 {
-    int pos = opt_key.find("#");
+    const int pos = opt_key.find("#");
     if (pos > 0)
         boost::erase_tail(opt_key, opt_key.size() - pos);
     return opt_key;
@@ -639,16 +664,17 @@ void DiffViewCtrl::Rescale(int em /*= 0*/)
 
 void DiffViewCtrl::Append(  const std::string& opt_key, Preset::Type type, 
                             wxString category_name, wxString group_name, wxString option_name,
-                            wxString old_value, wxString new_value, const std::string category_icon_name)
+                            wxString old_value, wxString mod_value, wxString new_value, const std::string category_icon_name)
 {
-    ItemData item_data = { opt_key, option_name, old_value, new_value, type };
+    ItemData item_data = { opt_key, option_name, old_value, mod_value, new_value, type };
 
     wxString old_val = get_short_string(item_data.old_val);
+    wxString mod_val = get_short_string(item_data.mod_val);
     wxString new_val = get_short_string(item_data.new_val);
-    if (old_val != item_data.old_val || new_val != item_data.new_val)
+    if (old_val != item_data.old_val || mod_val != item_data.mod_val || new_val != item_data.new_val)
         item_data.is_long = true;
 
-    m_items_map.emplace(model->AddOption(type, category_name, group_name, option_name, old_val, new_val, category_icon_name), item_data);
+    m_items_map.emplace(model->AddOption(type, category_name, group_name, option_name, old_val, mod_val, new_val, category_icon_name), item_data);
 
 }
 
@@ -698,11 +724,11 @@ void DiffViewCtrl::context_menu(wxDataViewEvent& event)
     if (it == m_items_map.end() || !it->second.is_long)
         return;
 
-    size_t column_cnt = this->GetColumnCount();
-    const wxString old_value_header = this->GetColumn(column_cnt - 2)->GetTitle();
-    const wxString new_value_header = this->GetColumn(column_cnt - 1)->GetTitle();
-    FullCompareDialog(it->second.opt_name, it->second.old_val, it->second.new_val,
-                      old_value_header, new_value_header).ShowModal();
+    const wxString old_value_header = this->GetColumn(DiffModel::colOldValue)->GetTitle();
+    const wxString mod_value_header = this->GetColumn(DiffModel::colModValue)->GetTitle();
+    const wxString new_value_header = has_new_value_column() ? this->GetColumn(DiffModel::colNewValue)->GetTitle() : "";
+    FullCompareDialog(it->second.opt_name, it->second.old_val, it->second.mod_val, it->second.new_val,
+                      old_value_header, mod_value_header, new_value_header).ShowModal();
 
 #ifdef __WXOSX__
     wxWindow* parent = this->GetParent();
@@ -769,7 +795,7 @@ static std::string none{"none"};
 
 UnsavedChangesDialog::UnsavedChangesDialog(const wxString& caption, const wxString& header, 
                                            const std::string& app_config_key, int act_buttons)
-    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, caption + ": " + _L("Unsaved Changes"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, caption + ": " + _L("Unsaved Changes"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "unsavedchanges"),
     m_app_config_key(app_config_key),
     m_buttons(act_buttons)
 {
@@ -787,7 +813,7 @@ UnsavedChangesDialog::UnsavedChangesDialog(const wxString& caption, const wxStri
 }
 
 UnsavedChangesDialog::UnsavedChangesDialog(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset)
-    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, _L("Switching Presets: Unsaved Changes"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, _L("Switching Presets: Unsaved Changes"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "unsavedcahnges2")
 {
     m_app_config_key = "default_action_on_select_preset";
 
@@ -813,24 +839,28 @@ UnsavedChangesDialog::UnsavedChangesDialog(Preset::Type type, PresetCollection* 
 
 void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset, const wxString& header)
 {
-#if defined(__WXMSW__)
-    // ys_FIXME! temporary workaround for correct font scaling
-    // Because of from wxWidgets 3.1.3 auto rescaling is implemented for the Fonts,
-    // From the very beginning set dialog font to the wxSYS_DEFAULT_GUI_FONT
-    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
-#endif // __WXMSW__
+    this->SetFont(wxGetApp().normal_font());
 
     int border = 10;
     int em = em_unit();
 
-    m_action_line = new wxStaticText(this, wxID_ANY, "");
-    m_action_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+    bool add_new_value_column = !new_selected_preset.empty() && dependent_presets && dependent_presets->get_edited_preset().type == type &&
+                                new_selected_preset != dependent_presets->get_edited_preset().name;
+    if (add_new_value_column && dependent_presets->get_edited_preset().type == Preset::TYPE_PRINTER &&
+        dependent_presets->get_edited_preset().printer_technology() != dependent_presets->find_preset(new_selected_preset)->printer_technology())
+        add_new_value_column = false;
 
-    m_tree = new DiffViewCtrl(this, wxSize(em * 60, em * 30));
+    m_action_line = new wxStaticText(this, wxID_ANY, "");
+//    m_action_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+    m_action_line->SetFont(wxGetApp().bold_font());
+
+    m_tree = new DiffViewCtrl(this, wxSize(em * (add_new_value_column ? 80 : 60), em * 30));
     m_tree->AppendToggleColumn_(L"\u2714"      , DiffModel::colToggle, wxLinux ? 9 : 6);
     m_tree->AppendBmpTextColumn(""             , DiffModel::colIconText, 28);
-    m_tree->AppendBmpTextColumn(_L("Old Value"), DiffModel::colOldValue, 12);
-    m_tree->AppendBmpTextColumn(_L("New Value"), DiffModel::colNewValue, 12);
+    m_tree->AppendBmpTextColumn(_L("Original value"), DiffModel::colOldValue, 12);
+    m_tree->AppendBmpTextColumn(_L("Modified value"), DiffModel::colModValue, 12);
+    if (add_new_value_column)
+        m_tree->AppendBmpTextColumn(_L("New value"), DiffModel::colNewValue, 12);
 
     // Add Buttons 
     wxFont      btn_font = this->GetFont().Scaled(1.4f);
@@ -838,7 +868,7 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
 
     auto add_btn = [this, buttons, btn_font, dependent_presets](ScalableButton** btn, int& btn_id, const std::string& icon_name, Action close_act, const wxString& label, bool process_enable = true)
     {
-        *btn = new ScalableButton(this, btn_id = NewControlId(), icon_name, label, wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
+        *btn = new ScalableButton(this, btn_id = NewControlId(), icon_name, label, wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
 
         buttons->Add(*btn, 1, wxLEFT, 5);
         (*btn)->SetFont(btn_font);
@@ -869,6 +899,7 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     }
     if (!m_transfer_btn && (ActionButtons::KEEP & m_buttons))
         add_btn(&m_transfer_btn, m_move_btn_id, "paste_menu", Action::Transfer, _L("Keep"));
+
     { // "Don't save" / "Discard" button
         std::string btn_icon    = (ActionButtons::DONT_SAVE & m_buttons) ? "" : (dependent_presets || (ActionButtons::KEEP & m_buttons)) ? "switch_presets" : "exit";
         wxString    btn_label   = (ActionButtons::DONT_SAVE & m_buttons) ? _L("Don't save") : _L("Discard");
@@ -880,16 +911,17 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
         add_btn(&m_save_btn, m_save_btn_id, "save", Action::Save, _L("Save"));
 
 #ifdef __WXGTK__
-    ScalableButton* cancel_btn = new ScalableButton(this, wxID_ANY, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
+    ScalableButton* cancel_btn = new ScalableButton(this, wxID_ANY, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
 #else
-    ScalableButton* cancel_btn = new ScalableButton(this, wxID_CANCEL, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, true, 24);
+    ScalableButton* cancel_btn = new ScalableButton(this, wxID_CANCEL, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
 #endif
     buttons->Add(cancel_btn, 1, wxLEFT|wxRIGHT, 5);
     cancel_btn->SetFont(btn_font);
     cancel_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) { this->EndModal(wxID_CANCEL); });
 
     m_info_line = new wxStaticText(this, wxID_ANY, "");
-    m_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+//    m_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+    m_info_line->SetFont(wxGetApp().bold_font());
     m_info_line->Hide();
 
     if (!m_app_config_key.empty()) {
@@ -991,7 +1023,7 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
 
         // for system/default/external presets we should take an edited name
         if (preset.is_system || preset.is_default || preset.is_external) {
-            SavePresetDialog save_dlg(this, preset.type);
+            SavePresetDialog save_dlg(this, { preset.type });
             if (save_dlg.ShowModal() != wxID_OK) {
                 m_exit_action = Action::Discard;
                 return false;
@@ -1009,7 +1041,7 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
         PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
         for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty()) {
+            if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty()) {
                 const Preset& preset = tab->get_presets()->get_edited_preset();
                 if (preset.is_system || preset.is_default || preset.is_external)
                     types_for_save.emplace_back(preset.type);
@@ -1035,24 +1067,6 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
     return true;
 }
 
-wxString get_string_from_enum(const std::string& opt_key, const DynamicPrintConfig& config)
-{
-    const ConfigOptionDef& def = config.def()->options.at(opt_key);
-    const std::vector<std::string>& names = def.enum_labels.empty() ? def.enum_values : def.enum_labels;
-    int val = config.option(opt_key)->getInt();
-
-    // if it doesn't use all list declared in PrintConfig.hpp.
-    // So we should "convert" val to the correct one
-    for (auto key_val : *def.enum_keys_map)
-        if (int(key_val.second) == val) {
-            auto it = std::find(def.enum_values.begin(), def.enum_values.end(), key_val.first);
-            if (it == def.enum_values.end())
-                return "";
-            return from_u8(_utf8(names[it - def.enum_values.begin()]));
-        }
-    return _L("Undef");
-}
-
 static size_t get_id_from_opt_key(std::string opt_key)
 {
     int pos = opt_key.find("#");
@@ -1060,18 +1074,28 @@ static size_t get_id_from_opt_key(std::string opt_key)
         boost::erase_head(opt_key, pos + 1);
         return static_cast<size_t>(atoi(opt_key.c_str()));
     }
-    return 0;
+    return size_t(-1);
 }
 
 static wxString get_full_label(std::string opt_key, const DynamicPrintConfig& config)
 {
     opt_key = get_pure_opt_key(opt_key);
 
-    if (config.option(opt_key)->is_nil())
-        return _L("N/A");
-
     const ConfigOptionDef* opt = config.def()->get(opt_key);
     return opt->full_label.empty() ? opt->label : opt->full_label;
+}
+
+wxString graph_to_string(const GraphData &graph)
+{
+    wxString str = "";
+    switch (graph.type) {
+    case GraphData::GraphType::SQUARE: str = _L("Square") + ":"; break;
+    case GraphData::GraphType::LINEAR: str = _L("Linear") + ":"; break;
+    case GraphData::GraphType::SPLINE: str = _L("Spline") + ":"; break;
+    default: assert(false);
+    }
+    for (const Vec2d &pt : graph.data()) { str += format_wxstr(" %1%,%2%", pt.x(), pt.y()); }
+    return str;
 }
 
 static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& config)
@@ -1079,141 +1103,195 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     size_t opt_idx = get_id_from_opt_key(opt_key);
     opt_key = get_pure_opt_key(opt_key);
 
-    if (config.option(opt_key)->is_nil())
-        return _L("N/A");
+    wxString serialized_str = _L("Undef");
 
-    wxString out;
-
-    const ConfigOptionDef* opt = config.def()->get(opt_key);
-    bool is_nullable = opt->nullable;
-
-    switch (opt->type) {
+    const ConfigOptionDef* opt_def = config.def()->get(opt_key);
+    bool is_optional = opt_def->is_optional;
+    bool can_be_disable = opt_def->can_be_disabled;
+    
+    
+    const ConfigOption* option = config.option(opt_key);
+    bool full_serialize = option->size() > 1 && (opt_idx < 0 || opt_idx >= option->size());
+    if (!full_serialize && !option->is_scalar()) {
+        opt_idx = 0;
+    }
+    switch (opt_def->type) {
     case coInt:
-        return from_u8((boost::format("%1%") % config.opt_int(opt_key)).str());
+        serialized_str = from_u8(option->serialize());
+        break;
     case coInts: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionIntsNullable>(opt_key);
-            if (opt_idx < values->size())
-                return from_u8((boost::format("%1%") % values->get_at(opt_idx)).str());
-        }
-        else {
-            auto values = config.opt<ConfigOptionInts>(opt_key);
-            if (opt_idx < values->size())
-                return from_u8((boost::format("%1%") % values->get_at(opt_idx)).str());
-        }
-        return _L("Undef");
-    }
-    case coBool:
-        return config.opt_bool(opt_key) ? "true" : "false";
-    case coBools: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionBoolsNullable>(opt_key);
-            if (opt_idx < values->size())
-                return values->get_at(opt_idx) ? "true" : "false";
-        }
-        else {
-            auto values = config.opt<ConfigOptionBools>(opt_key);
-            if (opt_idx < values->size())
-                return values->get_at(opt_idx) ? "true" : "false";
-        }
-        return _L("Undef");
-    }
-    case coPercent:
-        return from_u8((boost::format("%1%%%") % int(config.optptr(opt_key)->getFloat())).str());
-    case coPercents: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionPercentsNullable>(opt_key);
-            if (opt_idx < values->size())
-                return from_u8((boost::format("%1%%%") % values->get_at(opt_idx)).str());
-        }
-        else {
-            auto values = config.opt<ConfigOptionPercents>(opt_key);
-            if (opt_idx < values->size())
-                return from_u8((boost::format("%1%%%") % values->get_at(opt_idx)).str());
-        }
-        return _L("Undef");
-    }
-    case coFloat:
-        return double_to_string(config.opt_float(opt_key), opt->precision);
-    case coFloats: {
-        if (is_nullable) {
-            auto values = config.opt<ConfigOptionFloatsNullable>(opt_key);
-            if (opt_idx < values->size())
-                return double_to_string(values->get_at(opt_idx), opt->precision);
-        }
-        else {
-            auto values = config.opt<ConfigOptionFloats>(opt_key);
-            if (opt_idx < values->size())
-                return double_to_string(values->get_at(opt_idx), opt->precision);
-        }
-        return _L("Undef");
-    }
-    case coString: {
-        //character '<' '>' create strange problems for wxWidget, so remove them (only for the display)
-        std::string str = config.opt_string(opt_key);
-        boost::erase_all(str, "<");
-        boost::erase_all(str, ">");
-        return from_u8(str);
-    }
-
-    case coStrings: {
-        const ConfigOptionStrings* strings = config.opt<ConfigOptionStrings>(opt_key);
-        if (strings) {
-            if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
-                if (strings->empty())
-                    return _L("All"); 
-                for (size_t id = 0; id < strings->size(); id++)
-                    out += from_u8(strings->get_at(id)) + "\n";
-                out.RemoveLast(1);
-                return out;
-            }
-            if (opt_key == "gcode_substitutions") {
-                if (!strings->empty())
-                    for (size_t id = 0; id < strings->size(); id += 4)
-                        out +=  from_u8(strings->get_at(id))     + ";\t" + 
-                                from_u8(strings->get_at(id + 1)) + ";\t" + 
-                                from_u8(strings->get_at(id + 2)) + ";\t" +
-                                from_u8(strings->get_at(id + 3)) + ";\n";
-                return out;
-            }
-            if (!strings->empty() && opt_idx < strings->values.size())
-                return from_u8(strings->get_at(opt_idx));
+        if (!full_serialize) {
+            serialized_str = from_u8(config.option<ConfigOptionInts>(opt_key)->serialize_at(opt_idx));
+        } else {
+            serialized_str = from_u8(option->serialize());
         }
         break;
+    }
+    case coBool:
+        serialized_str = from_u8(option->serialize());
+        serialized_str.Replace("0", "false");
+        serialized_str.Replace("1", "false");
+        serialized_str.Replace("!", "Disabled:");
+        break;
+    case coBools: {
+        if (!full_serialize) {
+            serialized_str = from_u8(config.option<ConfigOptionBools>(opt_key)->serialize_at(opt_idx));
+        } else {
+            serialized_str = from_u8(option->serialize());
         }
+        serialized_str.Replace("0", "false");
+        serialized_str.Replace("1", "false");
+        serialized_str.Replace("!", "Disabled:");
+        break;
+    }
+    case coPercent:
+    case coPercents: {
+        if (!full_serialize) {
+            serialized_str = option->is_enabled(opt_idx) ? "" : "Disabled:";
+            serialized_str += from_u8((boost::format("%1%%%") % int(option->get_float(opt_idx))).str());
+        } else {
+            serialized_str = from_u8(option->serialize());
+            serialized_str.Replace("!", "Disabled:");
+        }
+        break;
+    }
+    case coFloat:
+    case coFloats: {
+        if (!full_serialize) {
+            serialized_str = option->is_enabled(opt_idx) ? "" : "Disabled:";
+            serialized_str += double_to_string(option->get_float(opt_idx), opt_def->precision);
+        } else {
+            serialized_str = from_u8(option->serialize());
+            serialized_str.Replace("!", "Disabled:");
+        }
+        break;
+    }
+    case coString: {
+        const ConfigOptionString* option_str = config.option<ConfigOptionString>(opt_key);
+        assert(option_str);
+        //character '<' '>' create strange problems for wxWidget, so remove them (only for the display)
+        std::string str = option->is_enabled() ? "" : "Disabled:";
+        str += option_str->value;
+        boost::erase_all(str, "<");
+        boost::erase_all(str, ">");
+        serialized_str = from_u8(str);
+        break;
+    }
+    case coStrings: {
+        const ConfigOptionStrings* strings = config.option<ConfigOptionStrings>(opt_key);
+        assert(strings);
+        if (opt_key == "compatible_printers" || opt_key == "compatible_prints") {
+            if (strings->empty()) {
+                serialized_str = _L("All");
+                break;
+            }
+            for (size_t id = 0; id < strings->size(); id++) {
+                serialized_str += from_u8(strings->get_at(id)) + "\n";
+            }
+            serialized_str.RemoveLast(1);
+            break;
+        }
+        if (opt_key == "gcode_substitutions") {
+            if (!strings->empty()) {
+                for (size_t id = 0; id < strings->size(); id += 4) {
+                    serialized_str +=   from_u8(strings->get_at(id))     + ";\t" + 
+                                        from_u8(strings->get_at(id + 1)) + ";\t" + 
+                                        from_u8(strings->get_at(id + 2)) + ";\t" +
+                                        from_u8(strings->get_at(id + 3)) + ";\n";
+                }
+            }
+            break;
+        }
+        if (!strings->empty()) {
+            if (opt_idx < strings->size()) {
+                serialized_str = option->is_enabled(opt_idx) ? "" : "Disabled:";
+                serialized_str += from_u8(strings->get_at(opt_idx));
+            } else {
+                serialized_str = "";
+                for (size_t i = 0; i < option->size(); ++i) {
+                    serialized_str += i==0 ? "\"" : "\",\"";
+                    serialized_str += option->is_enabled(i) ? "" : "Disabled:";
+                    serialized_str += from_u8(strings->get_at(i));
+                }
+                serialized_str += "\"";
+            }
+        }
+        break;
+    }
     case coFloatOrPercent: {
-        const ConfigOptionFloatOrPercent* float_percent = config.opt<ConfigOptionFloatOrPercent>(opt_key);
-        if (float_percent)
-            out = double_to_string(float_percent->value, opt->precision) + (float_percent->percent ? "%" : "");
-        return out;
+        const ConfigOptionFloatOrPercent* float_percent = config.option<ConfigOptionFloatOrPercent>(opt_key);
+        assert(float_percent);
+        serialized_str = (float_percent->is_enabled() ? "" : "Disabled:");
+        serialized_str += double_to_string(float_percent->value, opt_def->precision);
+        serialized_str += (float_percent->percent ? "%" : "");
+        break;
     }
     case coFloatsOrPercents: {
-        const ConfigOptionFloatsOrPercents* floats_percents = config.opt<ConfigOptionFloatsOrPercents>(opt_key);
-        if (floats_percents)
-            out = double_to_string(floats_percents->get_at(opt_idx).value, opt->precision) + (floats_percents->get_at(opt_idx).percent ? "%" : "");
-        return out;
+        const ConfigOptionFloatsOrPercents* floats_or_percents = config.option<ConfigOptionFloatsOrPercents>(opt_key);
+        assert(floats_or_percents);
+        if (!full_serialize) {
+            const FloatOrPercent f_o_p = floats_or_percents->get_at(opt_idx);
+            serialized_str = (floats_or_percents->is_enabled(opt_idx) ? "" : "Disabled:");
+            serialized_str += double_to_string(f_o_p.value, opt_def->precision);
+            serialized_str += (f_o_p.percent ? "%" : "");
+        } else {
+            serialized_str = from_u8(floats_or_percents->serialize());
+            serialized_str.Replace("!", "Disabled:");
+        }
+        break;
     }
     case coEnum: {
-        return get_string_from_enum(opt_key, config);
+        auto optional_str = config.option_def(opt_key)->enum_def->enum_to_label(config.option(opt_key)->get_int());
+        serialized_str = (option->is_enabled() ? "" : "Disabled:");
+        serialized_str += optional_str.has_value() ? _(from_u8(*optional_str)) : _L("Undef");
         break;
     }
     case coPoint: {
-        Vec2d val = config.opt<ConfigOptionPoint>(opt_key)->value;
-        return from_u8((boost::format("[%1%]") % ConfigOptionPoint(val).serialize()).str());
+        Vec2d pointd = config.opt<ConfigOptionPoint>(opt_key)->value;
+        serialized_str = (option->is_enabled() ? "" : "Disabled:");
+        serialized_str += from_u8((boost::format("[%1%]") % ConfigOptionPoint(pointd).serialize()).str());
+        break;
     }
     case coPoints: {
+        const ConfigOptionPoints* opt_pts = config.opt<ConfigOptionPoints>(opt_key);
         if (opt_key == "bed_shape") {
-            BedShape shape(*config.option<ConfigOptionPoints>(opt_key));
-            return shape.get_full_name_with_params();
+            BedShape shape(*opt_pts);
+            serialized_str = shape.get_full_name_with_params();
+            break;
         }
-
-        Vec2d val = config.opt<ConfigOptionPoints>(opt_key)->get_at(opt_idx);
-        return from_u8((boost::format("[%1%]") % ConfigOptionPoint(val).serialize()).str());
+        if (!opt_pts->empty()) {
+            if (!full_serialize) {
+                serialized_str = (option->is_enabled(opt_idx) ? "" : "Disabled:");
+                serialized_str += from_u8((boost::format("[%1%]") % opt_pts->serialize_at(opt_idx)).str());
+            } else {
+                serialized_str = from_u8(opt_pts->serialize());
+                serialized_str.Replace("!", "Disabled:");
+            }
+        }
+        break;
+    }
+    case coGraph: {
+        serialized_str = (option->is_enabled() ? "" : "Disabled:");
+        serialized_str += graph_to_string(config.option<ConfigOptionGraph>(opt_key)->value);
+        break;
+    }
+    case coGraphs: {
+        const ConfigOptionGraphs* opt_graphs = config.opt<ConfigOptionGraphs>(opt_key);
+        if (!opt_graphs->empty()) {
+            if (!full_serialize) {
+                serialized_str = (option->is_enabled(opt_idx) ? "" : "Disabled:");
+                serialized_str += graph_to_string(opt_graphs->get_at(opt_idx));
+            } else {
+                serialized_str = from_u8(opt_graphs->serialize());
+                serialized_str.Replace("!", "Disabled:");
+            }
+        }
+        break;
     }
     default:
         break;
     }
-    return out;
+    return serialized_str;
 }
 
 void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset, const wxString& header)
@@ -1234,7 +1312,7 @@ void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent
         PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
         int presets_cnt = 0;
         for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+            if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty())
                 presets_cnt++;
         m_action_line->SetLabel((header.IsEmpty() ? "" : header + "\n\n") + 
                                 _L_PLURAL("The following preset was modified",
@@ -1242,7 +1320,7 @@ void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent
     }
     else {
         wxString action_msg;
-        if (type == dependent_presets->type()) {
+        if (dependent_presets && type == dependent_presets->type()) {
             action_msg = format_wxstr(_L("Preset \"%1%\" has the following unsaved changes:"), presets->get_edited_preset().name);
         }
         else {
@@ -1254,15 +1332,15 @@ void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent
         m_action_line->SetLabel(action_msg);
     }
 
-    update_tree(type, presets);
+    update_tree(type, presets, new_selected_preset);
 }
 
-void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* presets_)
+void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* presets_, const std::string& new_selected_preset)
 {
     // update searcher befofre update of tree
     wxGetApp().sidebar().check_and_update_searcher();
     Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
-    searcher.sort_options_by_key();
+    assert(searcher.is_sorted());
 
     // list of the presets with unsaved changes
     std::vector<PresetCollection*> presets_list;
@@ -1271,7 +1349,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
         PrinterTechnology printer_technology = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
         for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+            if (tab->supports_printer_technology(printer_technology) && tab->completed() && tab->current_preset_is_dirty())
                 presets_list.emplace_back(tab->get_presets());
     }
     else
@@ -1282,56 +1360,72 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
     {
         const DynamicPrintConfig& old_config = presets->get_selected_preset().config;
         const PrinterTechnology&  old_pt     = presets->get_selected_preset().printer_technology();
-        const DynamicPrintConfig& new_config = presets->get_edited_preset().config;
+        const DynamicPrintConfig& mod_config = presets->get_edited_preset().config;
+        const DynamicPrintConfig& new_config = m_tree->has_new_value_column() ? presets->find_preset(new_selected_preset, false, false)->config : mod_config;
         type = presets->type();
 
         const std::map<wxString, std::string>& category_icon_map = wxGetApp().get_tab(type)->get_category_icon_map();
 
-        m_tree->model->AddPreset(type, from_u8(presets->get_edited_preset().name), old_pt);
+        m_tree->model->AddPreset(type, from_u8(presets->get_edited_preset().name), old_pt, from_u8(new_selected_preset));
 
         // Collect dirty options.
-        const bool deep_compare = (type == Preset::TYPE_PRINTER || type == Preset::TYPE_SLA_MATERIAL);
+        const bool deep_compare = type != Preset::TYPE_FFF_FILAMENT && type != Preset::TYPE_SLA_MATERIAL;
         auto dirty_options = presets->current_dirty_options(deep_compare);
 
         // process changes of extruders count
         if (type == Preset::TYPE_PRINTER && old_pt == ptFFF &&
-            old_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() != new_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()) {
+            old_config.opt<ConfigOptionStrings>("extruder_colour")->size() != mod_config.opt<ConfigOptionStrings>("extruder_colour")->size()) {
             wxString local_label = _L("Extruders count");
-            wxString old_val = from_u8((boost::format("%1%") % old_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
-            wxString new_val = from_u8((boost::format("%1%") % new_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
+            wxString old_val = from_u8((boost::format("%1%") % old_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
+            wxString mod_val = from_u8((boost::format("%1%") % mod_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
+            wxString new_val = !m_tree->has_new_value_column() ? "" : from_u8((boost::format("%1%") % new_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
 
             assert(category_icon_map.find(wxGetApp().get_tab(type)->get_page(0)->title()) != category_icon_map.end());
             if(wxGetApp().get_tab(type)->get_page_count() > 0)
-                m_tree->Append("extruders_count", type, wxGetApp().get_tab(type)->get_page(0)->title()/*_L("General")*/, _L("Capabilities"), local_label, old_val, new_val, 
+                m_tree->Append("extruders_count", type, wxGetApp().get_tab(type)->get_page(0)->title()/*_L("General")*/, _L("Capabilities"), local_label, old_val, mod_val, new_val, 
                     category_icon_map.find(wxGetApp().get_tab(type)->get_page(0)->title()) != category_icon_map.end() ? category_icon_map.at(wxGetApp().get_tab(type)->get_page(0)->title()) : "wrench"/*category_icon_map.at("General")*/);
         }
         //TODO same for milling head?
+        //TODO same for laser head?
 
         for (const std::string& opt_key : dirty_options) {
-            const Search::Option& option = searcher.get_option(opt_key, type);
+            const Search::Option& option = searcher.get_option(opt_key, type); //FIXME serach for current mode.
             if (option.opt_key_with_idx() != opt_key) {
                 // When founded option isn't the correct one.
                 // It can be for dirty_options: "default_print_profile", "printer_model", "printer_settings_id",
                 // because of they don't exist in searcher
+                if ((std::set<std::string>{"default_print_profile", "printer_model", "printer_settings_id",
+                                           "filament_settings_id", "print_settings_id", "inherits"})
+                        .count(opt_key) > 0)
                 continue;
+
+                // may be a setting that isn't in the gui, but is still in the system (like seam_position when we use s_seam_position instead of it)
+                // TODO find a way to show the script widget. maybe the script widget must register itself for all dependencies (for the mode).
+                m_tree->Append(opt_key, type, "hidden", "hidden", opt_key,
+                    get_string_value(opt_key, old_config), get_string_value(opt_key, mod_config), get_string_value(opt_key, new_config), "wrench");
+                continue;
+
             }
 
             m_tree->Append(opt_key, type, option.category_local, option.group_local, option.label_local,
-                get_string_value(opt_key, old_config), get_string_value(opt_key, new_config), category_icon_map.find(option.category) != category_icon_map.end() ? category_icon_map.at(option.category) : "wrench");
+                get_string_value(opt_key, old_config), get_string_value(opt_key, mod_config),
+                     m_tree->has_new_value_column() ? get_string_value(opt_key, new_config) : "",
+                     category_icon_map.find(option.category) != category_icon_map.end() ? category_icon_map.at(option.category) : "wrench");
         }
     }
+}
 
-    // Revert sort of searcher back
-    searcher.sort_options_by_label();
+wxString UnsavedChangesDialog::msg_success_saved_modifications(size_t saved_presets_cnt)
+{
+    return _L_PLURAL("The preset modifications are successfully saved",
+                     "The presets modifications are successfully saved", static_cast<unsigned int>(saved_presets_cnt));
 }
 
 void UnsavedChangesDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     int em = em_unit();
 
-    msw_buttons_rescale(this, em, { wxID_CANCEL, m_save_btn_id, m_move_btn_id, m_continue_btn_id });
-    for (auto btn : { m_save_btn, m_transfer_btn, m_discard_btn } )
-        if (btn) btn->msw_rescale();
+    msw_buttons_rescale(this, em, { wxID_CANCEL, m_save_btn_id, m_move_btn_id, m_continue_btn_id }, 1.5);
 
     const wxSize& size = wxSize(70 * em, 30 * em);
     SetMinSize(size);
@@ -1345,7 +1439,7 @@ void UnsavedChangesDialog::on_dpi_changed(const wxRect& suggested_rect)
 void UnsavedChangesDialog::on_sys_color_changed()
 {
     for (auto btn : { m_save_btn, m_transfer_btn, m_discard_btn } )
-        btn->msw_rescale();
+        btn->sys_color_changed();
     // msw_rescale updates just icons, so use it
     m_tree->Rescale();
 
@@ -1357,20 +1451,22 @@ void UnsavedChangesDialog::on_sys_color_changed()
 //          FullCompareDialog
 //------------------------------------------
 
-FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString& old_value, const wxString& new_value,
-                                     const wxString& old_value_header, const wxString& new_value_header)
+FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString& old_value, const wxString& mod_value, const wxString& new_value,
+                                     const wxString& old_value_header, const wxString& mod_value_header, const wxString& new_value_header)
     : wxDialog(nullptr, wxID_ANY, option_name, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     wxGetApp().UpdateDarkUI(this);
+    this->SetFont(wxGetApp().normal_font());
 
     int border = 10;
+    bool has_new_value_column = !new_value_header.IsEmpty();
 
     wxStaticBoxSizer* sizer = new wxStaticBoxSizer(wxVERTICAL, this);
 
-    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(2, 2, 1, 0);
+    wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(2, has_new_value_column ? 3 : 2, 1, 0);
     grid_sizer->SetFlexibleDirection(wxBOTH);
-    grid_sizer->AddGrowableCol(0,1);
-    grid_sizer->AddGrowableCol(1,1);
+    for (int col = 0 ; col < grid_sizer->GetCols(); col++)
+        grid_sizer->AddGrowableCol(col, 1);
     grid_sizer->AddGrowableRow(1,1);
 
     auto add_header = [grid_sizer, border, this](wxString label) {
@@ -1380,7 +1476,9 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
     };
 
     add_header(old_value_header);
-    add_header(new_value_header);
+    add_header(mod_value_header);
+    if (has_new_value_column)
+        add_header(new_value_header);
 
     auto get_set_from_val = [](wxString str) {
         if (str.Find("\n") == wxNOT_FOUND)
@@ -1396,11 +1494,14 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
     };
 
     std::set<wxString> old_set = get_set_from_val(old_value);
+    std::set<wxString> mod_set = get_set_from_val(mod_value);
     std::set<wxString> new_set = get_set_from_val(new_value);
-    std::set<wxString> old_new_diff_set;
+    std::set<wxString> old_mod_diff_set;
+    std::set<wxString> mod_old_diff_set;
     std::set<wxString> new_old_diff_set;
 
-    std::set_difference(old_set.begin(), old_set.end(), new_set.begin(), new_set.end(), std::inserter(old_new_diff_set, old_new_diff_set.begin()));
+    std::set_difference(old_set.begin(), old_set.end(), mod_set.begin(), mod_set.end(), std::inserter(old_mod_diff_set, old_mod_diff_set.begin()));
+    std::set_difference(mod_set.begin(), mod_set.end(), old_set.begin(), old_set.end(), std::inserter(mod_old_diff_set, mod_old_diff_set.begin()));
     std::set_difference(new_set.begin(), new_set.end(), old_set.begin(), old_set.end(), std::inserter(new_old_diff_set, new_old_diff_set.begin()));
 
     auto add_value = [grid_sizer, border, this](wxString label, const std::set<wxString>& diff_set, bool is_colored = false) {
@@ -1417,8 +1518,10 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
 
         grid_sizer->Add(text, 1, wxALL | wxEXPAND, border);
     };
-    add_value(old_value, old_new_diff_set);
-    add_value(new_value, new_old_diff_set, true);
+    add_value(old_value, old_mod_diff_set);
+    add_value(mod_value, mod_old_diff_set, true);
+    if (has_new_value_column)
+        add_value(new_value, new_old_diff_set);
 
     sizer->Add(grid_sizer, 1, wxEXPAND);
 
@@ -1437,7 +1540,7 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
 
 static PresetCollection* get_preset_collection(Preset::Type type, PresetBundle* preset_bundle = nullptr) {
     if (!preset_bundle)
-        preset_bundle = wxGetApp().preset_bundle;
+        preset_bundle = wxGetApp().preset_bundle.get();
     return  type == Preset::Type::TYPE_FFF_PRINT        ? &preset_bundle->fff_prints :
             type == Preset::Type::TYPE_SLA_PRINT        ? &preset_bundle->sla_prints :
             type == Preset::Type::TYPE_FFF_FILAMENT     ? &preset_bundle->filaments :
@@ -1454,34 +1557,11 @@ static std::string get_selection(PresetComboBox* preset_combo)
     return into_u8(preset_combo->GetString(preset_combo->GetSelection()));
 }
 
-DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
-    : DPIDialog(mainframe, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
-    m_pr_technology(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology())
-{    
-#if defined(__WXMSW__)
-    // ys_FIXME! temporary workaround for correct font scaling
-    // Because of from wxWidgets 3.1.3 auto rescaling is implemented for the Fonts,
-    // From the very beginning set dialog font to the wxSYS_DEFAULT_GUI_FONT
-    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
-#endif // __WXMSW__
+void DiffPresetDialog::create_presets_sizer()
+{
+    m_presets_sizer = new wxBoxSizer(wxVERTICAL);
 
-    int border = 10;
-    int em = em_unit();
-
-    assert(wxGetApp().preset_bundle);
-
-    m_preset_bundle_left  = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
-    m_preset_bundle_right = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
-
-    m_top_info_line = new wxStaticText(this, wxID_ANY, _L("Select presets to compare"));
-    m_top_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
-
-    m_bottom_info_line = new wxStaticText(this, wxID_ANY, "");
-    m_bottom_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
-
-    wxBoxSizer* presets_sizer = new wxBoxSizer(wxVERTICAL);
-    
-    for (Preset::Type new_type : { Preset::TYPE_FFF_PRINT, Preset::TYPE_FFF_FILAMENT, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL, Preset::TYPE_PRINTER })
+    for (Preset::Type new_type : { Preset::TYPE_FFF_PRINT, Preset::TYPE_SLA_PRINT, Preset::TYPE_FFF_FILAMENT, Preset::TYPE_SLA_MATERIAL, Preset::TYPE_PRINTER })
     {
         const PresetCollection* collection = get_preset_collection(new_type);
         wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -1489,14 +1569,17 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
         PresetComboBox* presets_right;
         ScalableButton* equal_bmp = new ScalableButton(this, wxID_ANY, "equal");
 
-        auto add_preset_combobox = [collection, sizer, new_type, em, this](PresetComboBox** cb_, PresetBundle* preset_bundle) {
-            *cb_ = new PresetComboBox(this, new_type, wxSize(em * 35, -1), preset_bundle);
-            PresetComboBox* cb = (*cb_);
+        auto add_preset_combobox = [collection, sizer, new_type, this](PresetComboBox** cb_, PresetBundle* preset_bundle) {
+            *cb_ = new PresetComboBox(this, new_type, wxSize(em_unit() * 35, -1), preset_bundle);
+            PresetComboBox*cb = (*cb_);
+            cb->SetFont(this->GetFont());
+            cb->show_modif_preset_separately();
             cb->set_selection_changed_function([this, new_type, preset_bundle, cb](int selection) {
-                if (m_view_type == Preset::TYPE_INVALID) {
-                    std::string preset_name = cb->GetString(selection).ToUTF8().data();
-                    update_compatibility(Preset::remove_suffix_modified(preset_name), new_type, preset_bundle);
-                }
+                std::string preset_name = Preset::remove_suffix_modified(cb->GetString(selection).ToUTF8().data());
+                if (m_view_type == Preset::TYPE_INVALID)
+                    update_compatibility(preset_name, new_type, preset_bundle);
+                // update selection inside of related presets
+                preset_bundle->get_presets(new_type).select_preset_by_name(preset_name, true);
                 update_tree(); 
             });
             if (collection->get_selected_idx() != (size_t)-1)
@@ -1508,7 +1591,7 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
         add_preset_combobox(&presets_left, m_preset_bundle_left.get());
         sizer->Add(equal_bmp, 0, wxRIGHT | wxLEFT | wxALIGN_CENTER_VERTICAL, 5);
         add_preset_combobox(&presets_right, m_preset_bundle_right.get());
-        presets_sizer->Add(sizer, 1, wxTOP, 5);
+        m_presets_sizer->Add(sizer, 1, wxTOP, 5);
         equal_bmp->Show(new_type == Preset::TYPE_PRINTER);
 
         m_preset_combos.push_back({ presets_left, equal_bmp, presets_right });
@@ -1517,11 +1600,14 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
             std::string preset_name = get_selection(presets_left);
             presets_right->update(preset_name); 
             if (m_view_type == Preset::TYPE_INVALID)
-                update_compatibility(Preset::remove_suffix_modified(preset_name), presets_right->get_type(), m_preset_bundle_right.get());
+                update_compatibility(preset_name, presets_right->get_type(), m_preset_bundle_right.get());
             update_tree();
         });
     }
+}
 
+void DiffPresetDialog::create_show_all_presets_chb()
+{
     m_show_all_presets = new wxCheckBox(this, wxID_ANY, _L("Show all presets (including incompatible)"));
     m_show_all_presets->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
         bool show_all = m_show_all_presets->GetValue();
@@ -1534,24 +1620,168 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
         if (m_view_type == Preset::TYPE_INVALID)
             update_tree();
     });
+}
 
-    m_tree = new DiffViewCtrl(this, wxSize(em * 65, em * 40));
+void DiffPresetDialog::create_info_lines()
+{
+//    const wxFont font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold();
+    const wxFont font = GetFont().Bold();
+
+    m_top_info_line = new wxStaticText(this, wxID_ANY, _L("Select presets to compare"));
+    m_top_info_line->SetFont(font);
+
+    m_bottom_info_line = new wxStaticText(this, wxID_ANY, "");
+    m_bottom_info_line->SetFont(font);
+}
+
+void DiffPresetDialog::create_tree()
+{
+    m_tree = new DiffViewCtrl(this, wxSize(em_unit() * 65, em_unit() * 40));
+    m_tree->SetFont(this->GetFont());
+    m_tree->AppendToggleColumn_(L"\u2714", DiffModel::colToggle, wxLinux ? 9 : 6);
     m_tree->AppendBmpTextColumn("",                      DiffModel::colIconText, 35);
     m_tree->AppendBmpTextColumn(_L("Left Preset Value"), DiffModel::colOldValue, 15);
-    m_tree->AppendBmpTextColumn(_L("Right Preset Value"),DiffModel::colNewValue, 15);
+    m_tree->AppendBmpTextColumn(_L("Right Preset Value"),DiffModel::colModValue, 15);
     m_tree->Hide();
+    m_tree->GetColumn(DiffModel::colToggle)->SetHidden(true);
+}
 
-    wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
+std::array<Preset::Type, 3> DiffPresetDialog::types_list() const
+{
+    return PresetBundle::types_list(m_pr_technology);
+}
 
-    topSizer->Add(m_top_info_line, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, 2 * border);
-    topSizer->Add(presets_sizer, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
-    topSizer->Add(m_show_all_presets, 0, wxEXPAND | wxALL, border);
-    topSizer->Add(m_tree, 1, wxEXPAND | wxALL, border);
-    topSizer->Add(m_bottom_info_line, 0, wxEXPAND | wxALL, 2 * border);
+void DiffPresetDialog::create_buttons()
+{
+    wxFont font = this->GetFont().Scaled(1.4f);
+    m_buttons   = new wxBoxSizer(wxHORIZONTAL);
 
-    this->SetMinSize(wxSize(80 * em, 30 * em));
+    auto show_in_bottom_info = [this](const wxString& ext_line, wxMouseEvent& e) {
+        m_bottom_info_line->SetLabel(ext_line);
+        m_bottom_info_line->Show(true);
+        Layout();
+        e.Skip();
+    };
+
+    // Transfer 
+    m_transfer_btn = new ScalableButton(this, wxID_ANY, "paste_menu", _L("Transfer"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
+    m_transfer_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) { button_event(Action::Transfer);});
+
+
+    auto enable_transfer = [this](const Preset::Type& type) {
+        const Preset& main_edited_preset = get_preset_collection(type, wxGetApp().preset_bundle.get())->get_edited_preset();
+        if (main_edited_preset.is_dirty)
+            return main_edited_preset.name == get_right_preset_name(type);
+        return true;
+    };
+    m_transfer_btn->Bind(wxEVT_UPDATE_UI, [this, enable_transfer](wxUpdateUIEvent& evt) {
+        bool enable = m_tree->has_selection();
+        if (enable) {
+            if (m_view_type == Preset::TYPE_INVALID) {
+                for (const Preset::Type& type : types_list())
+                    if (!enable_transfer(type)) {
+                        enable = false;
+                        break;
+                    }
+            }
+            else
+                enable = enable_transfer(m_view_type);
+        }
+        evt.Enable(enable);
+    });
+    m_transfer_btn->Bind(wxEVT_ENTER_WINDOW, [show_in_bottom_info](wxMouseEvent& e) {
+        show_in_bottom_info(_L("Transfer the selected options from left preset to the right.\n"
+                            "Note: New modified presets will be selected in settings tabs after close this dialog."), e); });
+
+    // Save
+    m_save_btn = new ScalableButton(this, wxID_ANY, "save", _L("Save"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
+    m_save_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) { button_event(Action::Save); });
+    m_save_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(m_tree->has_selection()); });
+    m_save_btn->Bind(wxEVT_ENTER_WINDOW, [show_in_bottom_info](wxMouseEvent& e) {
+        show_in_bottom_info(_L("Save the selected options from left preset to the right."), e); });
+
+    // Cancel
+    m_cancel_btn = new ScalableButton(this, wxID_CANCEL, "cross", _L("Cancel"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
+    m_cancel_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) { button_event(Action::Discard);});
+
+    for (ScalableButton* btn : { m_transfer_btn, m_save_btn, m_cancel_btn }) {
+        btn->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { update_bottom_info(); Layout(); e.Skip(); });
+        m_buttons->Add(btn, 1, wxLEFT, 5);
+        btn->SetFont(font);
+    }
+
+    m_buttons->Show(false);
+}
+
+void DiffPresetDialog::create_edit_sizer()
+{
+    // Add check box for the edit mode
+    m_use_for_transfer = new wxCheckBox(this, wxID_ANY, _L("Transfer values from left to right"));
+    m_use_for_transfer->SetToolTip(_L("If checked, this dialog can be used for transferring selected values from the preset on the left to the preset on the right."));
+    m_use_for_transfer->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+        bool use = m_use_for_transfer->GetValue();
+        m_tree->GetColumn(DiffModel::colToggle)->SetHidden(!use);
+        if (m_tree->IsShown()) {
+            m_buttons->Show(use);
+            Fit();
+            Refresh();
+        }
+        else
+            this->Layout();
+    });
+
+    // Add Buttons 
+    create_buttons();
+
+    // Create and fill edit sizer
+    m_edit_sizer = new wxBoxSizer(wxHORIZONTAL);
+    m_edit_sizer->Add(m_use_for_transfer, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 5);
+    m_edit_sizer->AddSpacer(em_unit() * 10);
+    m_edit_sizer->Add(m_buttons, 1, wxLEFT, 5);
+    m_edit_sizer->Show(false);
+}
+
+void DiffPresetDialog::complete_dialog_creation()
+{
+    wxBoxSizer*topSizer = new wxBoxSizer(wxVERTICAL);
+
+    int border = 10;
+    topSizer->Add(m_top_info_line,      0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, 2 * border);
+    topSizer->Add(m_presets_sizer,      0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
+    topSizer->Add(m_show_all_presets,   0, wxEXPAND | wxALL, border);
+    topSizer->Add(m_tree,               1, wxEXPAND | wxALL, border);
+    topSizer->Add(m_bottom_info_line,   0, wxEXPAND | wxALL, 2 * border);
+    topSizer->Add(m_edit_sizer,         0, wxEXPAND | wxLEFT | wxBOTTOM | wxRIGHT, 2 * border);
+
+    this->SetMinSize(wxSize(80 * em_unit(), 30 * em_unit()));
     this->SetSizer(topSizer);
     topSizer->SetSizeHints(this);
+}
+
+DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
+    : DPIDialog(mainframe, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "diff_presets_dialog", mainframe->normal_font().GetPointSize()),
+    m_pr_technology(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology())
+{    
+    // Init bundles
+
+    assert(wxGetApp().preset_bundle);
+
+    m_preset_bundle_left  = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
+    m_preset_bundle_right = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
+
+    // Create UI items
+
+    create_info_lines();
+
+    create_presets_sizer();
+
+    create_show_all_presets_chb();
+
+    create_tree();
+
+    create_edit_sizer();
+
+    complete_dialog_creation();
 }
 
 void DiffPresetDialog::update_controls_visibility(Preset::Type type /* = Preset::TYPE_INVALID*/)
@@ -1579,6 +1809,8 @@ void DiffPresetDialog::update_bundles_from_app()
 {
     *m_preset_bundle_left  = *wxGetApp().preset_bundle;
     *m_preset_bundle_right = *wxGetApp().preset_bundle;
+
+    m_pr_technology = m_preset_bundle_left.get()->printers.get_edited_preset().printer_technology();
 }
 
 void DiffPresetDialog::show(Preset::Type type /* = Preset::TYPE_INVALID*/)
@@ -1599,11 +1831,10 @@ void DiffPresetDialog::show(Preset::Type type /* = Preset::TYPE_INVALID*/)
     Show();
 }
 
-void DiffPresetDialog::update_presets(Preset::Type type)
+void DiffPresetDialog::update_presets(Preset::Type type, bool update_preset_bundles_from_app/* = true */)
 {
-    m_pr_technology = m_preset_bundle_left.get()->printers.get_edited_preset().printer_technology();
-
-    update_bundles_from_app();
+    if (update_preset_bundles_from_app)
+        update_bundles_from_app();
     update_controls_visibility(type);
 
     if (type == Preset::TYPE_INVALID)
@@ -1626,12 +1857,23 @@ void DiffPresetDialog::update_presets(Preset::Type type)
     update_tree();
 }
 
+void DiffPresetDialog::update_bottom_info(wxString bottom_info)
+{
+    if (m_tree->has_long_strings())
+        bottom_info = _L("Some fields are too long to fit. Right mouse click reveals the full text.");
+
+    const bool show_bottom_info = !m_tree->IsShown() || m_tree->has_long_strings();
+    if (show_bottom_info)
+        m_bottom_info_line->SetLabel(bottom_info);
+    m_bottom_info_line->Show(show_bottom_info);
+}
+
 void DiffPresetDialog::update_tree()
 {
-    // update searcher befofre update of tree
+    // update searcher before update of tree
     wxGetApp().sidebar().check_and_update_searcher(); 
     Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
-    searcher.sort_options_by_key();
+    assert(searcher.is_sorted());
 
     m_tree->Clear();
     wxString bottom_info = "";
@@ -1644,8 +1886,14 @@ void DiffPresetDialog::update_tree()
         Preset::Type type = preset_combos.presets_left->get_type();
 
         const PresetCollection* presets = get_preset_collection(type);
-        const Preset* left_preset  = presets->find_preset(get_selection(preset_combos.presets_left));
-        const Preset* right_preset = presets->find_preset(get_selection(preset_combos.presets_right));
+
+        std::string preset_name_full = get_selection(preset_combos.presets_left);
+        std::string preset_name = Preset::remove_suffix_modified(preset_name_full);
+        const Preset* left_preset  = presets->find_preset(preset_name, false, preset_name_full.length() != preset_name.length());
+        preset_name_full = get_selection(preset_combos.presets_right);
+        preset_name = Preset::remove_suffix_modified(preset_name_full);
+        const Preset* right_preset = presets->find_preset(preset_name, false, preset_name_full.length() != preset_name.length());
+
         if (!left_preset || !right_preset) {
             bottom_info = _L("One of the presets doesn't found");
             preset_combos.equal_bmp->SetBitmap_(ScalableBitmap(this, "question"));
@@ -1665,9 +1913,9 @@ void DiffPresetDialog::update_tree()
         }
 
         // Collect dirty options.
-        const bool deep_compare = (type == Preset::TYPE_PRINTER || type == Preset::TYPE_SLA_MATERIAL);
+        const bool deep_compare = type != Preset::TYPE_FFF_FILAMENT;
         auto dirty_options = type == Preset::TYPE_PRINTER && left_pt == ptFFF &&
-                             left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() < right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size() ?
+                             left_config.opt<ConfigOptionStrings>("extruder_colour")->size() < right_congig.opt<ConfigOptionStrings>("extruder_colour")->size() ?
                              presets->dirty_options(right_preset, left_preset, deep_compare) :
                              presets->dirty_options(left_preset, right_preset, deep_compare);
 
@@ -1689,12 +1937,12 @@ void DiffPresetDialog::update_tree()
 
         // process changes of extruders count
         if (type == Preset::TYPE_PRINTER && left_pt == ptFFF &&
-            left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() != right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size()) {
+            left_config.opt<ConfigOptionStrings>("extruder_colour")->size() != right_congig.opt<ConfigOptionStrings>("extruder_colour")->size()) {
             wxString local_label = _L("Extruders count");
-            wxString left_val = from_u8((boost::format("%1%") % left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
-            wxString right_val = from_u8((boost::format("%1%") % right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
+            wxString left_val = from_u8((boost::format("%1%") % left_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
+            wxString right_val = from_u8((boost::format("%1%") % right_congig.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
 
-            m_tree->Append("extruders_count", type, _L("General"), _L("Capabilities"), local_label, left_val, right_val, category_icon_map.at("General"));
+            m_tree->Append("extruders_count", type, _L("General"), _L("Capabilities"), local_label, left_val, right_val, "", category_icon_map.at("General"));
         }
 
         for (const std::string& opt_key : dirty_options) {
@@ -1704,27 +1952,25 @@ void DiffPresetDialog::update_tree()
             Search::Option option = searcher.get_option_names(opt_key/*, get_full_label(opt_key, left_config)*/, type);
             if (option.opt_key_with_idx() != opt_key) {
                 // temporary solution, just for testing
-                m_tree->Append(opt_key, type, _L("Undef category"), _L("Undef group"), opt_key, left_val, right_val, "question");
+                m_tree->Append(opt_key, type, _L("Undef category"), _L("Undef group"), opt_key, left_val, right_val, "", "question");
                 // When founded option isn't the correct one.
                 // It can be for dirty_options: "default_print_profile", "printer_model", "printer_settings_id",
                 // because of they don't exist in searcher
                 continue;
             }
             m_tree->Append(opt_key, type, option.category_local, option.group_local, option.label_local,
-                left_val, right_val, category_icon_map.at(option.category));
+                left_val, right_val, "", category_icon_map.at(option.category));
         }
     }
-    
-    if (m_tree->has_long_strings())
-        bottom_info = _L("Some fields are too long to fit. Right mouse click reveals the full text.");
 
     bool tree_was_shown = m_tree->IsShown();
     m_tree->Show(show_tree);
 
-    bool show_bottom_info = !show_tree || m_tree->has_long_strings();
-    if (show_bottom_info)
-        m_bottom_info_line->SetLabel(bottom_info);
-    m_bottom_info_line->Show(show_bottom_info);
+    bool can_transfer_options = m_view_type == Preset::TYPE_INVALID || get_left_preset_name(m_view_type) != get_right_preset_name(m_view_type);
+    m_edit_sizer->Show(show_tree && can_transfer_options);
+    m_buttons->Show(m_edit_sizer->IsShown(size_t(0)) && m_use_for_transfer->GetValue());
+   
+    update_bottom_info(bottom_info);
 
     if (tree_was_shown == m_tree->IsShown())
         Layout();
@@ -1733,8 +1979,6 @@ void DiffPresetDialog::update_tree()
         Refresh();
     }
 
-    // Revert sort of searcher back
-    searcher.sort_options_by_label();
 }
 
 void DiffPresetDialog::on_dpi_changed(const wxRect&)
@@ -1746,10 +1990,16 @@ void DiffPresetDialog::on_dpi_changed(const wxRect&)
     const wxSize& size = wxSize(80 * em, 30 * em);
     SetMinSize(size);
 
+    auto rescale = [em](PresetComboBox* pcb) {
+        pcb->msw_rescale();
+        wxSize sz = wxSize(35 * em, -1);
+        pcb->SetMinSize(sz);
+        pcb->SetSize(sz);
+    };
+
     for (auto preset_combos : m_preset_combos) {
-        preset_combos.presets_left->msw_rescale();
-        preset_combos.equal_bmp->msw_rescale();
-        preset_combos.presets_right->msw_rescale();
+        rescale(preset_combos.presets_left);
+        rescale(preset_combos.presets_right);
     }
 
     m_tree->Rescale(em);
@@ -1767,10 +2017,14 @@ void DiffPresetDialog::on_sys_color_changed()
 #endif
 
     for (auto preset_combos : m_preset_combos) {
-        preset_combos.presets_left->msw_rescale();
-        preset_combos.equal_bmp->msw_rescale();
-        preset_combos.presets_right->msw_rescale();
+        preset_combos.presets_left->sys_color_changed();
+        preset_combos.equal_bmp->sys_color_changed();
+        preset_combos.presets_right->sys_color_changed();
     }
+
+    for (ScalableButton* btn : { m_transfer_btn, m_save_btn, m_cancel_btn })
+        btn->sys_color_changed();
+
     // msw_rescale updates just icons, so use it
     m_tree->Rescale();
     Refresh();
@@ -1832,6 +2086,98 @@ void DiffPresetDialog::update_compatibility(const std::string& preset_name, Pres
         m_pr_technology = m_preset_bundle_left.get()->printers.get_edited_preset().printer_technology();
         update_controls_visibility();
     }
+}
+
+bool DiffPresetDialog::is_save_confirmed()
+{
+    presets_to_save.clear();
+
+    std::vector<Preset::Type> types_for_save;
+
+    for (const Preset::Type& type : types_list()) {
+        if (!m_tree->options(type, true).empty()) {
+            types_for_save.emplace_back(type);
+            presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });
+        }
+    }
+
+    if (!types_for_save.empty()) {
+        SavePresetDialog save_dlg(this, types_for_save, _u8L("Modified"), m_preset_bundle_right.get());
+        if (save_dlg.ShowModal() != wxID_OK)
+            return false;
+
+        for (auto& preset : presets_to_save) {
+            const std::string& name = save_dlg.get_name(preset.type);
+            if (!name.empty())
+                preset.new_name = name;
+        }
+    }
+    return true;
+}
+
+std::vector<std::string> DiffPresetDialog::get_options_to_save(Preset::Type type)
+{
+    auto options = m_tree->options(type, true);
+
+    // erase "inherits" option from the list if it exists there
+    if (const auto it = std::find(options.begin(), options.end(), "inherits"); it != options.end())
+        options.erase(it);
+
+    if (type == Preset::TYPE_PRINTER) {
+        // erase "extruders_count" option from the list if it exists there
+        if (const auto it = std::find(options.begin(), options.end(), "extruders_count"); it != options.end())
+            options.erase(it);
+    }
+    return options;
+}
+
+void DiffPresetDialog::button_event(Action act)
+{
+    if (act == Action::Save) {
+        if (is_save_confirmed()) {
+            size_t saved_cnt = 0;
+            for (const auto& preset : presets_to_save)
+                if (wxGetApp().preset_bundle->transfer_and_save(preset.type, preset.from_name, preset.to_name, preset.new_name, get_options_to_save(preset.type)))
+                    saved_cnt++;
+
+            if (saved_cnt > 0) {
+                MessageDialog(this, UnsavedChangesDialog::msg_success_saved_modifications(saved_cnt)).ShowModal();
+                update_bundles_from_app();
+                for (const auto& preset : presets_to_save) {
+                    m_preset_bundle_left->get_presets(preset.type).select_preset_by_name(preset.from_name, true);
+                    m_preset_bundle_right->get_presets(preset.type).select_preset_by_name(preset.new_name, true);
+                }
+                update_presets(m_view_type, false);
+            }
+        }
+    }
+    else {
+        Hide();
+        if (act == Action::Transfer)
+            wxPostEvent(this, SimpleEvent(EVT_DIFF_DIALOG_TRANSFER));
+        else if (!presets_to_save.empty())
+            wxPostEvent(this, SimpleEvent(EVT_DIFF_DIALOG_UPDATE_PRESETS));
+    }
+}
+
+std::string DiffPresetDialog::get_left_preset_name(Preset::Type type)
+{
+    for (auto preset_combos : m_preset_combos) {
+        if (preset_combos.presets_left->get_type() == type) {
+            return Preset::remove_suffix_modified(get_selection(preset_combos.presets_left));
+        }
+    }
+    return "";
+}
+
+std::string DiffPresetDialog::get_right_preset_name(Preset::Type type)
+{
+    for (auto preset_combos : m_preset_combos) {
+        if (preset_combos.presets_right->get_type() == type) {
+            return Preset::remove_suffix_modified(get_selection(preset_combos.presets_right));
+        }
+    }
+    return "";
 }
 
 }

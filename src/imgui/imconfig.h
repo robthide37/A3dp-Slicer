@@ -140,6 +140,7 @@ namespace ImGui
     const wchar_t CancelButton             = 0x14;
     const wchar_t CancelHoverButton        = 0x15;
 //    const wchar_t VarLayerHeightMarker     = 0x16;
+    const wchar_t RevertButton             = 0x16;
 
     const wchar_t RightArrowButton         = 0x18;
     const wchar_t RightArrowHoverButton    = 0x19;
@@ -149,13 +150,43 @@ namespace ImGui
 //    const wchar_t CustomSupportsMarker     = 0x1D;
 //    const wchar_t CustomSeamMarker         = 0x1E;
 //    const wchar_t MmuSegmentationMarker    = 0x1F;
+    const wchar_t PlugMarker               = 0x1C;
+    const wchar_t DowelMarker              = 0x1D;
+    const wchar_t SnapMarker               = 0x1E;
     // Do not forget use following letters only in wstring
     const wchar_t DocumentationButton      = 0x2600;
     const wchar_t DocumentationHoverButton = 0x2601;
     const wchar_t ClippyMarker             = 0x2602;
     const wchar_t InfoMarker               = 0x2603;
     const wchar_t SliderFloatEditBtnIcon   = 0x2604;
+    const wchar_t SliderFloatEditBtnPressedIcon = 0x2605;
+    const wchar_t ClipboardBtnIcon         = 0x2606;
+    const wchar_t PlayButton               = 0x2618;
+    const wchar_t PlayHoverButton          = 0x2619;
+    const wchar_t PauseButton              = 0x261A;
+    const wchar_t PauseHoverButton         = 0x261B;
+    const wchar_t OpenButton               = 0x261C;
+    const wchar_t OpenHoverButton          = 0x261D;
+    const wchar_t SlaViewOriginal          = 0x261E;
+    const wchar_t SlaViewProcessed         = 0x261F;
 
-//    void MyFunction(const char* name, const MyMatrix44& v);
+    const wchar_t LegendTravel             = 0x2701;
+    const wchar_t LegendWipe               = 0x2702;
+    const wchar_t LegendRetract            = 0x2703;
+    const wchar_t LegendDeretract          = 0x2704;
+    const wchar_t LegendSeams              = 0x2705;
+    const wchar_t LegendToolChanges        = 0x2706;
+    const wchar_t LegendColorChanges       = 0x2707;
+    const wchar_t LegendPausePrints        = 0x2708;
+    const wchar_t LegendCustomGCodes       = 0x2709;
+    const wchar_t LegendCOG                = 0x2710;
+    const wchar_t LegendShells             = 0x2711;
+    const wchar_t LegendToolMarker         = 0x2712;
+    const wchar_t WarningMarkerSmall       = 0x2713;
+    const wchar_t ExpandBtn                = 0x2714;
+    const wchar_t InfoMarkerSmall          = 0x2716;
+    const wchar_t CollapseBtn              = 0x2715;
+
+    //    void MyFunction(const char* name, const MyMatrix44& v);
 }
 

@@ -3,7 +3,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
-#include "Jobs/ArrangeJob.hpp"
+// #include "Jobs/ArrangeJob2.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI.hpp"
 #include "GUI_ObjectList.hpp"
@@ -35,12 +35,25 @@ void CalibrationFlowDialog::create_buttons(wxStdDialogButtonSizer* buttons){
     buttons->Add(bt);
 }
 
+void CalibrationFlowDialog::create_geometry_10(wxCommandEvent &event_args)
+{
+    Plater *plat = this->main_frame->plater();
+    if (!plat->new_project(L("Flow 10 percent calibration")))
+        return;
+    create_geometry(80.f, 10.f);
+}
+
+void CalibrationFlowDialog::create_geometry_2_5(wxCommandEvent &event_args)
+{
+    Plater *plat = this->main_frame->plater();
+    if (!plat->new_project(L("Flow 2 percent calibration")))
+        return;
+    create_geometry(92.f, 2.F);
+}
 
 void CalibrationFlowDialog::create_geometry(float start, float delta) {
     Plater* plat = this->main_frame->plater();
     Model& model = plat->model();
-    if (!plat->new_project(L("Flow calibration")))
-        return;
 
     //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
@@ -64,8 +77,8 @@ void CalibrationFlowDialog::create_geometry(float start, float delta) {
     /// --- scale ---
     // model is created for a 0.4 nozzle, scale xy with nozzle size.
     const ConfigOptionFloats* nozzle_diameter_config = printerConfig->option<ConfigOptionFloats>("nozzle_diameter");
-    assert(nozzle_diameter_config->values.size() > 0);
-    float nozzle_diameter = nozzle_diameter_config->values[0];
+    assert(nozzle_diameter_config->size() > 0);
+    float nozzle_diameter = nozzle_diameter_config->get_at(0);
     float xyScale = nozzle_diameter / 0.4;
     //scale z to have 6 layers
     const ConfigOptionFloatOrPercent* first_layer_height_setting = print_config->option<ConfigOptionFloatOrPercent>("first_layer_height");
@@ -92,6 +105,17 @@ void CalibrationFlowDialog::create_geometry(float start, float delta) {
     The 0.3 constant is the same as the delta calculated in add_part below, this should probably be calculated per the model object
     */
     float zshift = -(zscale / 2) + ((first_layer_height + layer_height) / 2) + 0.3;
+    
+    // it's rotated but not around the good origin: correct that
+    double init_z_rotate_angle = Geometry::deg2rad(plat->config()->opt_float("init_z_rotate"));
+    Matrix3d rot_matrix = Eigen::Quaterniond(Eigen::AngleAxisd(init_z_rotate_angle, Vec3d{0,0,1})).toRotationMatrix();
+    auto     translate_from_rotation = [&rot_matrix, &model, &objs_idx](int idx, Vec3d &&translation) {
+            ModelVolume *vol = model.objects[objs_idx[idx]]->volumes[model.objects[objs_idx[idx]]->volumes.size()-1];
+            Geometry::Transformation trsf = vol->get_transformation();
+            trsf.set_offset(rot_matrix * translation - translation + trsf.get_offset());
+            vol->set_transformation(trsf);
+        };
+    
     if (delta == 10.f && start == 80.f) {
         add_part(model.objects[objs_idx[0]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_flow" / "m20.amf").string(), Vec3d{ 10 * xyScale,0,zshift }, Vec3d{ xyScale , xyScale, zscale_number});
         add_part(model.objects[objs_idx[1]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_flow" / "m10.amf").string(), Vec3d{ 10 * xyScale,0,zshift }, Vec3d{ xyScale , xyScale, zscale_number });
@@ -106,16 +130,18 @@ void CalibrationFlowDialog::create_geometry(float start, float delta) {
         add_part(model.objects[objs_idx[4]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_flow" / "_0.amf").string(), Vec3d{ 10 * xyScale,0,zshift }, Vec3d{ xyScale , xyScale, zscale_number});
     }
     for (size_t i = 0; i < 5; i++) {
+        translate_from_rotation(i, Vec3d{ 10 * xyScale,0,zshift });
         add_part(model.objects[objs_idx[i]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_flow" / "O.amf").string(), Vec3d{ 0,0,zscale/2.f + 0.5 }, Vec3d{xyScale , xyScale, layer_height / 0.2}); // base: 0.2mm height
     }
 
+    
     /// --- translate ---;
-    bool has_to_arrange = false;
+    bool has_to_arrange = init_z_rotate_angle != 0;
     const ConfigOptionFloat* extruder_clearance_radius = print_config->option<ConfigOptionFloat>("extruder_clearance_radius");
     const ConfigOptionPoints* bed_shape = printerConfig->option<ConfigOptionPoints>("bed_shape");
     const double brim_width = nozzle_diameter * 3.5;
-    Vec2d bed_size = BoundingBoxf(bed_shape->values).size();
-    Vec2d bed_min = BoundingBoxf(bed_shape->values).min;
+    Vec2d bed_size = BoundingBoxf(bed_shape->get_values()).size();
+    Vec2d bed_min = BoundingBoxf(bed_shape->get_values()).min;
     float offsetx = 3 + 20 * xyScale + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
     float offsety = 3 + 20 * xyScale + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
     model.objects[objs_idx[0]]->translate({ bed_min.x() + bed_size.x() / 2 - offsetx / 2, bed_min.y() + bed_size.y() / 2 - offsety, zscale / 2 });
@@ -132,7 +158,7 @@ void CalibrationFlowDialog::create_geometry(float start, float delta) {
     DynamicPrintConfig new_print_config = *print_config; //make a copy
     new_print_config.set_key_value("complete_objects", new ConfigOptionBool(true));
     //if skirt, use only one
-    if (print_config->option<ConfigOptionInt>("skirts")->getInt() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->getInt() > 0) {
+    if (print_config->option<ConfigOptionInt>("skirts")->get_int() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->get_int() > 0) {
         new_print_config.set_key_value("complete_objects_one_skirt", new ConfigOptionBool(true));
     }
 
@@ -177,11 +203,12 @@ void CalibrationFlowDialog::create_geometry(float start, float delta) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        arranger.prepare_all();
-        arranger.process();
-        arranger.finalize();
+        plat->arrange();
+        // std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
+        // ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
+        // arranger.prepare_all();
+        // arranger.process();
+        // arranger.finalize();
     }
 
     plat->reslice();

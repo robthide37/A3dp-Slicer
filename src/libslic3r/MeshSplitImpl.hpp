@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef MESHSPLITIMPL_HPP
 #define MESHSPLITIMPL_HPP
 
@@ -108,6 +112,21 @@ template<class IndexT> struct ItsNeighborsWrapper
     const auto& get_index() const noexcept { return index_ref; }
 };
 
+// Can be used as the second argument to its_split to apply a functor on each
+// part, instead of collecting them into a container.
+template<class Fn>
+struct SplitOutputFn {
+
+    Fn fn;
+
+    SplitOutputFn(Fn f): fn{std::move(f)} {}
+
+    SplitOutputFn &operator *() { return *this; }
+    void           operator=(indexed_triangle_set &&its) { fn(std::move(its)); }
+    void           operator=(indexed_triangle_set &its) { fn(its); }
+    SplitOutputFn& operator++() { return *this; };
+};
+
 // Splits a mesh into multiple meshes when possible.
 template<class Its, class OutputIt>
 void its_split(const Its &m, OutputIt out_it)
@@ -155,7 +174,8 @@ void its_split(const Its &m, OutputIt out_it)
             mesh.indices.emplace_back(new_face);
         }
 
-        out_it = std::move(mesh);
+        *out_it = std::move(mesh);
+        ++out_it;
     }
 }
 

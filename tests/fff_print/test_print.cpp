@@ -32,11 +32,11 @@ SCENARIO("PrintObject: Perimeter generation", "[PrintObject]") {
             }
             THEN("Every layer in region 0 has 1 island of perimeters") {
                 for (const Layer *layer : object.layers())
-                    REQUIRE(layer->regions().front()->perimeters.entities.size() == 1);
+                    REQUIRE(layer->regions().front()->perimeters().size() == 1);
             }
             THEN("Every layer in region 0 has 3 paths in its perimeters list.") {
                 for (const Layer *layer : object.layers())
-                    REQUIRE(layer->regions().front()->perimeters.items_count() == 3);
+                    REQUIRE(layer->regions().front()->perimeters().items_count() == 3);
             }
         }
     }
@@ -74,11 +74,11 @@ SCENARIO("Print: Changing number of solid surfaces does not cause all surfaces t
         // Precondition: Ensure that the model has 2 solid top layers (39, 38)
         // and one solid bottom layer (0).
 		auto test_is_solid_infill = [&print](size_t obj_id, size_t layer_id) {
-		    const Layer &layer = *(print.objects().at(obj_id)->get_layer((int)layer_id));
+		    const Layer &layer = *print.objects()[obj_id]->get_layer((int)layer_id);
 		    // iterate over all of the regions in the layer
 		    for (const LayerRegion *region : layer.regions()) {
 		        // for each region, iterate over the fill surfaces
-		        for (const Surface &surface : region->fill_surfaces.surfaces)
+		        for (const Surface &surface : region->fill_surfaces())
 		            CHECK(surface.has_fill_solid());
 		    }
 		};
@@ -134,6 +134,65 @@ SCENARIO("Print: Brim generation", "[Print]") {
 			print.process();
             THEN("Brim Extrusion collection has 12 loops in it") {
                 REQUIRE(print.brim().items_count() == 14);
+            }
+        }
+    }
+}
+
+SCENARIO("Ported from Perl", "[Print]") {
+    GIVEN("20mm cube") {
+        WHEN("Print center is set to 100x100 (test framework default)")  {
+            auto config = Slic3r::DynamicPrintConfig::full_print_config();
+            std::string gcode = Slic3r::Test::slice({ TestMesh::cube_20x20x20 }, config);
+            GCodeReader parser;
+            Points      extrusion_points;
+            parser.parse_buffer(gcode, [&extrusion_points](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+            {
+                if (line.cmd_is("G1") && line.extruding(self) && line.dist_XY(self) > 0)
+                    extrusion_points.emplace_back(line.new_XY_scaled(self));
+            });
+            Vec2d center = unscaled<double>(BoundingBox(extrusion_points).center());
+            THEN("print is centered around print_center") {
+                REQUIRE(is_approx(center.x(), 100.));
+                REQUIRE(is_approx(center.y(), 100.));
+            }
+        }
+    }
+    GIVEN("Model with multiple objects") {
+        auto config = Slic3r::DynamicPrintConfig::full_print_config_with({
+            { "nozzle_diameter", { 0.4, 0.4, 0.4, 0.4 } }
+        });
+        Print print;
+        Model model;
+        Slic3r::Test::init_print({ TestMesh::cube_20x20x20 }, print, model, config);
+        
+        // User sets a per-region option, also testing a deep copy of Model.
+        Model model2(model);
+        model2.objects.front()->config.set_deserialize_strict("fill_density", "100%");
+        WHEN("fill_density overridden") {
+            print.apply(model2, config);
+            THEN("region config inherits model object config") {
+                REQUIRE(print.get_print_region(0).config().fill_density == 100);
+            }
+        }
+
+        model2.objects.front()->config.erase("fill_density");
+        WHEN("fill_density resetted") {
+            print.apply(model2, config);
+            THEN("region config is resetted") {
+                REQUIRE(print.get_print_region(0).config().fill_density == 20);
+            }
+        }
+
+        WHEN("extruder is assigned") {
+            model2.objects.front()->config.set("extruder", 3);
+            model2.objects.front()->config.set("perimeter_extruder", 2);
+            print.apply(model2, config);
+            THEN("extruder setting is correctly expanded") {
+                REQUIRE(print.get_print_region(0).config().infill_extruder == 3);
+            }
+            THEN("extruder setting does not override explicitely specified extruders") {
+                REQUIRE(print.get_print_region(0).config().perimeter_extruder == 2);
             }
         }
     }

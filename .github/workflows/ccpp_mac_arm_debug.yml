@@ -8,14 +8,14 @@ on:
 jobs:
   build:
 
-    runs-on: macos-11
+    runs-on: macos-14
 
     steps:
     - uses: actions/checkout@v2
       with:
         ref: 'debug_macos'
     - name: build deps & slicer
-      run: ./BuildMacOS.sh -bia
+      run: ./BuildMacOS.sh -badsi
     - name: ls build
       working-directory: ./build
       run: ls

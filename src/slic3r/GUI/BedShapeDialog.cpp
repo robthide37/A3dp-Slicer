@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Filip Sykala @Jony01, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ ported from lib/Slic3r/GUI/BedShapeDialog.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Král @vojtechkral, Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2017 Joseph Lenox @lordofhyphens
+///|/ Copyright (c) 2017 Ahmed Samir Abdelreheem @Samir55
+///|/ Copyright (c) Slic3r 2014 - 2016 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "BedShapeDialog.hpp"
 #include "GUI_App.hpp"
 #include "OptionsGroup.hpp"
@@ -23,8 +33,8 @@ namespace GUI {
 
 BedShape::BedShape(const ConfigOptionPoints& points)
 {
-    m_build_volume = { points.values, 0. };
-            }
+    m_build_volume = { points.get_values(), 0. };
+}
 
 static std::string get_option_label(BedShape::Parameter param)
 {
@@ -42,7 +52,7 @@ void BedShape::append_option_line(ConfigOptionsGroupShp optgroup, Parameter para
     t_config_option_key key;
     switch (param) {
     case Parameter::RectSize:
-        def.type = coPoints;
+        def.type = coPoint;
         def.set_default_value(new ConfigOptionPoints{ Vec2d(200, 200) });
         def.min = 0;
         def.max = 100000;
@@ -51,7 +61,7 @@ void BedShape::append_option_line(ConfigOptionsGroupShp optgroup, Parameter para
         key = "rect_size";
         break;
     case Parameter::RectOrigin:
-        def.type = coPoints;
+        def.type = coPoint;
         def.set_default_value(new ConfigOptionPoints{ Vec2d(0, 0) });
         def.min = -100000;
         def.max = 100000;
@@ -72,7 +82,7 @@ void BedShape::append_option_line(ConfigOptionsGroupShp optgroup, Parameter para
     }
 
     optgroup->append_single_option_line({ def, std::move(key) });
-    }
+}
 
 wxString BedShape::get_name(PageType type)
 {
@@ -94,7 +104,7 @@ BedShape::PageType BedShape::get_page_type()
     case BuildVolume::Type::Circle:     return PageType::Circle;
     case BuildVolume::Type::Convex:
     case BuildVolume::Type::Custom:     return PageType::Custom;
-}
+    }
     // make visual studio happy
     assert(false);
     return PageType::Rectangle;
@@ -120,14 +130,21 @@ void BedShape::apply_optgroup_values(ConfigOptionsGroupShp optgroup)
 {
     switch (m_build_volume.type()) {
     case BuildVolume::Type::Circle:
-        optgroup->set_value("diameter", double_to_string(2. * unscaled<double>(m_build_volume.circle().radius)));
+        optgroup->set_value("diameter", 2. * unscaled<double>(m_build_volume.circle().radius), true, false);
         break;
     default:
         // rectangle, convex, concave...
-        optgroup->set_value("rect_size"     , new ConfigOptionPoints{ to_2d(m_build_volume.bounding_volume().size()) });
-        optgroup->set_value("rect_origin"   , new ConfigOptionPoints{ - to_2d(m_build_volume.bounding_volume().min) });
+        optgroup->set_value("rect_size", Vec2d(m_build_volume.bounding_volume().size().x(),
+                                               m_build_volume.bounding_volume().size().y()),
+                                               true, false);
+        optgroup->set_value("rect_origin", Vec2d(-m_build_volume.bounding_volume().min.x(),
+                                                 -m_build_volume.bounding_volume().min.y()),
+                                                  true, false);
     }
 }
+
+BedShapeDialog::BedShapeDialog(wxWindow* parent) : DPIDialog(parent, wxID_ANY, _(L("Bed Shape")),
+        wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "bedshape") {}
 
 void BedShapeDialog::build_dialog(const ConfigOptionPoints& default_pt, const ConfigOptionString& custom_texture, const ConfigOptionString& custom_model)
 {
@@ -138,7 +155,10 @@ void BedShapeDialog::build_dialog(const ConfigOptionPoints& default_pt, const Co
 
 	auto main_sizer = new wxBoxSizer(wxVERTICAL);
 	main_sizer->Add(m_panel, 1, wxEXPAND);
-	main_sizer->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 10);
+    wxStdDialogButtonSizer* buttons = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
+    wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
+	main_sizer->Add(buttons, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 10);
 
     wxGetApp().UpdateDlgDarkUI(this, true);
 
@@ -173,7 +193,7 @@ const std::string BedShapePanel::EMPTY_STRING = "";
 void BedShapePanel::build_panel(const ConfigOptionPoints& default_pt, const ConfigOptionString& custom_texture, const ConfigOptionString& custom_model)
 {
     wxGetApp().UpdateDarkUI(this);
-    m_shape = default_pt.values;
+    m_shape = default_pt.get_values();
     m_custom_texture = custom_texture.value.empty() ? NONE : custom_texture.value;
     m_custom_model = custom_model.value.empty() ? NONE : custom_model.value;
 
@@ -202,6 +222,7 @@ void BedShapePanel::build_panel(const ConfigOptionPoints& default_pt, const Conf
 	line.full_width = 1;
 	line.widget = [this](wxWindow* parent) {
         wxButton* shape_btn = new wxButton(parent, wxID_ANY, _L("Load shape from STL..."));
+        wxGetApp().SetWindowVariantForButton(shape_btn);
         wxSizer* shape_sizer = new wxBoxSizer(wxHORIZONTAL);
         shape_sizer->Add(shape_btn, 1, wxEXPAND);
 
@@ -250,7 +271,8 @@ ConfigOptionsGroupShp BedShapePanel::init_shape_options_page(const wxString& tit
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Settings"));
 
     optgroup->title_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
         update_shape();
     };
 	
@@ -274,7 +296,8 @@ wxPanel* BedShapePanel::init_texture_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Texture"));
 
     optgroup->title_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
         update_shape();
     };
 
@@ -282,6 +305,7 @@ wxPanel* BedShapePanel::init_texture_panel()
     line.full_width = 1;
     line.widget = [this](wxWindow* parent) {
         wxButton* load_btn = new wxButton(parent, wxID_ANY, _L("Load..."));
+        wxGetApp().SetWindowVariantForButton(load_btn);
         wxSizer* load_sizer = new wxBoxSizer(wxHORIZONTAL);
         load_sizer->Add(load_btn, 1, wxEXPAND);
 
@@ -291,6 +315,7 @@ wxPanel* BedShapePanel::init_texture_panel()
         filename_sizer->Add(filename_lbl, 1, wxEXPAND);
 
         wxButton* remove_btn = new wxButton(parent, wxID_ANY, _L("Remove"));
+        wxGetApp().SetWindowVariantForButton(remove_btn);
         wxSizer* remove_sizer = new wxBoxSizer(wxHORIZONTAL);
         remove_sizer->Add(remove_btn, 1, wxEXPAND);
 
@@ -353,7 +378,8 @@ wxPanel* BedShapePanel::init_model_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Model"));
 
     optgroup->title_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+        assert(enabled);
         update_shape();
     };
 
@@ -362,13 +388,16 @@ wxPanel* BedShapePanel::init_model_panel()
     line.widget = [this](wxWindow* parent) {
         wxButton* load_btn = new wxButton(parent, wxID_ANY, _L("Load..."));
         load_btn->SetToolTip(_L("The position of the model origin (point with coordinates x:0, y:0, z:0) needs to be in the middle of the print bed area. If you load a custom model and it appears misaligned, the origin is not set properly."));
+        wxGetApp().SetWindowVariantForButton(load_btn);
         wxSizer* load_sizer = new wxBoxSizer(wxHORIZONTAL);
         load_sizer->Add(load_btn, 1, wxEXPAND);
 
         wxStaticText* filename_lbl = new wxStaticText(parent, wxID_ANY, _(NONE));
         wxSizer* filename_sizer = new wxBoxSizer(wxHORIZONTAL);
         filename_sizer->Add(filename_lbl, 1, wxEXPAND);
+
         wxButton* remove_btn = new wxButton(parent, wxID_ANY, _L("Remove"));
+        wxGetApp().SetWindowVariantForButton(remove_btn);
         wxSizer* remove_sizer = new wxBoxSizer(wxHORIZONTAL);
         remove_sizer->Add(remove_btn, 1, wxEXPAND);
 
@@ -438,11 +467,9 @@ void BedShapePanel::set_shape(const ConfigOptionPoints& points)
 
     // Copy the polygon to the canvas, make a copy of the array, if custom shape is selected
     if (shape.is_custom())
-        m_loaded_shape = points.values;
+        m_loaded_shape = points.get_values();
 
     update_shape();
-
-    return;
 }
 
 void BedShapePanel::update_preview()
@@ -460,7 +487,7 @@ void BedShapePanel::update_shape()
     switch (static_cast<BedShape::PageType>(page_idx)) {
     case BedShape::PageType::Rectangle:
     {
-		Vec2d rect_size(Vec2d::Zero());
+        Vec2d rect_size(Vec2d::Zero());
 		Vec2d rect_origin(Vec2d::Zero());
 
 		try { rect_size = boost::any_cast<Vec2d>(opt_group->get_value("rect_size")); }
@@ -493,7 +520,7 @@ void BedShapePanel::update_shape()
     }
     case BedShape::PageType::Circle:
     {
-		double diameter;
+        double diameter;
 		try { diameter = boost::any_cast<double>(opt_group->get_value("diameter")); }
 		catch (const std::exception & /* e */) { return; } 
 

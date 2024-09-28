@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2021 Lukáš Matěna @lukasmatena, Roman Beránek @zavorka, Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, David Kocík @kocikdav, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Mouse3DController_hpp_
 #define slic3r_Mouse3DController_hpp_
 
@@ -61,6 +65,13 @@ class Mouse3DController
         size_t 					 input_queue_max_size { 15 };
         // Whether to swap Y/Z axes or not.
         bool 					 swap_yz{ false };
+        // Invert varius axes...
+        bool                                     invert_x{ false };
+        bool                                     invert_y{ false };
+        bool                                     invert_z{ false };
+        bool                                     invert_yaw{ false };
+        bool                                     invert_pitch{ false };
+        bool                                     invert_roll{ false };
     };
 
 	// Queue of the 3DConnexion input events (translations, rotations, button presses).

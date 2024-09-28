@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Lukáš Matěna @lukasmatena, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Geometry_Circle_hpp_
 #define slic3r_Geometry_Circle_hpp_
 
@@ -9,10 +13,17 @@ namespace Slic3r { namespace Geometry {
 
 // https://en.wikipedia.org/wiki/Circumscribed_circle
 // Circumcenter coordinates, Cartesian coordinates
-template<typename Vector>
-Vector circle_center(const Vector &a, const Vector &bsrc, const Vector &csrc, typename Vector::Scalar epsilon)
+// In case the three points are collinear, returns their centroid.
+template<typename Derived, typename Derived2, typename Derived3>
+Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> circle_center(const Derived &a, const Derived2 &bsrc, const Derived3 &csrc, typename Derived::Scalar epsilon)
 {
-    using Scalar = typename Vector::Scalar;
+    static_assert(Derived ::IsVectorAtCompileTime && int(Derived ::SizeAtCompileTime) == 2, "circle_center(): 1st point is not a 2D vector");
+    static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "circle_center(): 2nd point is not a 2D vector");
+    static_assert(Derived3::IsVectorAtCompileTime && int(Derived3::SizeAtCompileTime) == 2, "circle_center(): 3rd point is not a 2D vector");
+    static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value && std::is_same<typename Derived::Scalar, typename Derived3::Scalar>::value, 
+        "circle_center(): All three points must be of the same type.");
+    using Scalar = typename Derived::Scalar;
+    using Vector = Eigen::Matrix<Scalar, 2, 1, Eigen::DontAlign>;
     Vector b  = bsrc - a;
     Vector c  = csrc - a;
 	Scalar lb = b.squaredNorm();
@@ -27,6 +38,32 @@ Vector circle_center(const Vector &a, const Vector &bsrc, const Vector &csrc, ty
     } else {
         Vector v = lc * b - lb * c;
         return a + Vector(- v.y(), v.x()) / (2 * d);
+    }
+}
+
+// https://en.wikipedia.org/wiki/Circumscribed_circle
+// Circumcenter coordinates, Cartesian coordinates
+// Returns no value if the three points are collinear.
+template<typename Derived, typename Derived2, typename Derived3>
+std::optional<Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign>> try_circle_center(const Derived &a, const Derived2 &bsrc, const Derived3 &csrc, typename Derived::Scalar epsilon)
+{
+    static_assert(Derived ::IsVectorAtCompileTime && int(Derived ::SizeAtCompileTime) == 2, "try_circle_center(): 1st point is not a 2D vector");
+    static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "try_circle_center(): 2nd point is not a 2D vector");
+    static_assert(Derived3::IsVectorAtCompileTime && int(Derived3::SizeAtCompileTime) == 2, "try_circle_center(): 3rd point is not a 2D vector");
+    static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value && std::is_same<typename Derived::Scalar, typename Derived3::Scalar>::value, 
+        "try_circle_center(): All three points must be of the same type.");
+    using Scalar = typename Derived::Scalar;
+    using Vector = Eigen::Matrix<Scalar, 2, 1, Eigen::DontAlign>;
+    Vector b  = bsrc - a;
+    Vector c  = csrc - a;
+    Scalar lb = b.squaredNorm();
+    Scalar lc = c.squaredNorm();
+    if (Scalar d = b.x() * c.y() - b.y() * c.x(); std::abs(d) < epsilon) {
+        // The three points are collinear.
+        return {};
+    } else {
+        Vector v = lc * b - lb * c;
+        return std::make_optional<Vector>(a + Vector(- v.y(), v.x()) / (2 * d));
     }
 }
 
@@ -65,7 +102,7 @@ struct Circle {
     Vector center;
     Scalar radius;
 
-    Circle() {}
+    Circle() = default;
     Circle(const Vector &center, const Scalar radius) : center(center), radius(radius) {}
     Circle(const Vector &a, const Vector &b) : center(Scalar(0.5) * (a + b)) { radius = (a - center).norm(); }
     Circle(const Vector &a, const Vector &b, const Vector &c, const Scalar epsilon) { *this = CircleSq(a, b, c, epsilon); }
@@ -102,7 +139,19 @@ inline Vec2d circle_center_taubin_newton(const Vec2ds& input, size_t cycles = 20
 Circled circle_taubin_newton(const Vec2ds& input, size_t cycles = 20);
 
 // Find circle using RANSAC randomized algorithm.
-Circled circle_ransac(const Vec2ds& input, size_t iterations = 20);
+Circled circle_ransac(const Vec2ds& input, size_t iterations = 20, double* min_error = nullptr);
+
+// Linear Least squares fitting.
+// Be careful! The linear least squares fitting is strongly biased towards small circles,
+// thus the method is only recommended for circles or arches with large arc angle.
+// Also it is strongly recommended to center the input at an expected circle (or arc) center
+// to minimize the small circle bias!
+    // Linear Least squares fitting with SVD. Most accurate, but slowest.
+    Circled circle_linear_least_squares_svd(const Vec2ds &input);
+    // Linear Least squares fitting with QR decomposition. Medium accuracy, medium speed.
+    Circled circle_linear_least_squares_qr(const Vec2ds &input);
+    // Linear Least squares fitting solving normal equations. Low accuracy, high speed.
+    Circled circle_linear_least_squares_normal(const Vec2ds &input);
 
 // Randomized algorithm by Emo Welzl, working with squared radii for efficiency. The returned circle radius is inflated by epsilon.
 template<typename Vector, typename Points>
@@ -181,6 +230,134 @@ int ray_circle_intersections(T r, T a, T b, T c, std::pair<Eigen::Matrix<T, 2, 1
     }
     return ray_circle_intersections_r2_lv2_c2(r * r, a, b, a * a + b * b, c, out);
 }
+
+
+enum class ArcDirection : unsigned char {
+    Arc_Dir_unknow,
+    Arc_Dir_CCW,
+    Arc_Dir_CW,
+    Count
+};
+
+//// arc fitting ////
+
+//constexpr double ZERO_TOLERANCE = EPSILON / 20;//0.000005;
+#define ZERO_TOLERANCE EPSILON/20
+
+class ArcCircle {
+public:
+    ArcCircle() {
+        center = Point(0, 0);
+        radius = 0;
+    }
+    ArcCircle(Point& p, double r) {
+        center = p;
+        radius = r;
+    }
+    Point center;
+    double radius;
+
+    Point get_closest_point(const Point& input) {
+        Vec2d v = (input - center).cast<double>().normalized();
+        return (center + (v * radius).cast<coord_t>());
+    }
+
+    static bool try_create_circle(const Point& p1, const Point& p2, const Point& p3, const double max_radius, ArcCircle& new_circle);
+    static bool try_create_circle(const Points& points, const double max_radius, const double tolerance, ArcCircle& new_circle);
+    double get_polar_radians(const Point& p1) const;
+    bool is_over_deviation(const Points& points, const double tolerance);
+    bool get_deviation_sum_squared(const Points& points, const double tolerance, double& sum_deviation);
+
+    //BBS: only support calculate on X-Y plane, Z is useless
+    static Vec3f calc_tangential_vector(const Vec3f& pos, const Vec3f& center_pos, const bool is_ccw);
+    static bool get_closest_perpendicular_point(const Point& p1, const Point& p2, const Point& c, Point& out);
+    static bool is_equal(double x, double y, double tolerance = ZERO_TOLERANCE) {
+        double abs_difference = std::fabs(x - y);
+        return abs_difference < tolerance;
+    };
+    static bool greater_than(double x, double y, double tolerance = ZERO_TOLERANCE) {
+        return x > y && !ArcCircle::is_equal(x, y, tolerance);
+    };
+    static bool greater_than_or_equal(double x, double y, double tolerance = ZERO_TOLERANCE) {
+        return x > y || ArcCircle::is_equal(x, y, tolerance);
+    };
+    static bool less_than(double x, double y, double tolerance = ZERO_TOLERANCE) {
+        return x < y && !ArcCircle::is_equal(x, y, tolerance);
+    };
+    static bool less_than_or_equal(double x, double y, double tolerance = ZERO_TOLERANCE) {
+        return x < y || ArcCircle::is_equal(x, y, tolerance);
+    };
+
+};
+
+#define DEFAULT_SCALED_MAX_RADIUS scale_(2000)        // 2000mm
+#define DEFAULT_SCALED_RESOLUTION scale_(0.05)        // 0.05mm
+#define DEFAULT_ARC_LENGTH_PERCENT_TOLERANCE  0.05    // 5 percent
+
+class ArcSegment : public ArcCircle {
+public:
+    ArcSegment() : ArcCircle() {}
+    ArcSegment(Point center, double radius, Point start, Point end, ArcDirection dir) :
+        ArcCircle(center, radius),
+        start_point(start),
+        end_point(end),
+        direction(dir) {
+        if (radius == 0.0 ||
+            start_point == center ||
+            end_point == center ||
+            start_point == end_point) {
+            is_arc = false;
+            return;
+        }
+        update_angle_and_length();
+        is_arc = true;
+    }
+
+    bool is_arc = false;
+    double length = 0;
+    double angle_radians = 0;
+    double polar_start_theta = 0;
+    double polar_end_theta = 0;
+    Point start_point{ Point(0,0) };
+    Point end_point{ Point(0,0) };
+    ArcDirection direction = ArcDirection::Arc_Dir_unknow;
+
+    bool is_valid() const { return is_arc; }
+    bool clip_start(const Point& point);
+    bool clip_end(const Point& point);
+    bool reverse();
+    bool split_at(const Point& point, ArcSegment& p1, ArcSegment& p2);
+    bool is_point_inside(const Point& point) const;
+
+private:
+    void update_angle_and_length();
+
+public:
+    static bool try_create_arc(
+        const Points& points,
+        ArcSegment& target_arc,
+        double approximate_length,
+        double max_radius = DEFAULT_SCALED_MAX_RADIUS,
+        double tolerance = DEFAULT_SCALED_RESOLUTION,
+        double path_tolerance_percent = DEFAULT_ARC_LENGTH_PERCENT_TOLERANCE);
+
+    static bool are_points_within_slice(const ArcSegment& test_arc, const Points& points);
+    // BBS: this function is used to detect whether a ray cross the segment
+    static bool ray_intersects_segment(const Point& rayOrigin, const Vec2d& rayDirection, const Line& segment);
+    // BBS: these three functions are used to calculate related arguments of arc in unscale_field.
+    static float calc_arc_radian(Vec3f start_pos, Vec3f end_pos, Vec3f center_pos, bool is_ccw);
+    static float calc_arc_radius(Vec3f start_pos, Vec3f center_pos);
+    static float calc_arc_length(Vec3f start_pos, Vec3f end_pos, Vec3f center_pos, bool is_ccw);
+private:
+    static bool try_create_arc(
+        const ArcCircle& c,
+        const Point& start_point,
+        const Point& mid_point,
+        const Point& end_point,
+        ArcSegment& target_arc,
+        double approximate_length,
+        double path_tolerance_percent = DEFAULT_ARC_LENGTH_PERCENT_TOLERANCE);
+};
 
 } } // namespace Slic3r::Geometry
 

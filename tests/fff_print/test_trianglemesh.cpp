@@ -270,10 +270,16 @@ SCENARIO( "make_xxx functions produce meshes.") {
     GIVEN("make_sphere() function") {
         WHEN("make_sphere() is called with arguments 10, PI / 3") {
             TriangleMesh sph = make_sphere(10, PI / 243.0);
-            THEN("Resulting mesh has one point at 0,0,-10 and one at 0,0,10") {
-				const std::vector<stl_vertex> &verts = sph.its.vertices;
-                REQUIRE(std::count_if(verts.begin(), verts.end(), [](const Vec3f& t) { return is_approx(t, Vec3f(0.f, 0.f, 10.f)); } ) == 1);
-				REQUIRE(std::count_if(verts.begin(), verts.end(), [](const Vec3f& t) { return is_approx(t, Vec3f(0.f, 0.f, -10.f)); } ) == 1);
+            THEN( "Edge length is smaller than limit but not smaller than half of it") {
+                double len = (sph.its.vertices[sph.its.indices[0][0]] - sph.its.vertices[sph.its.indices[0][1]]).norm();
+                double limit = 10*PI/243.;
+                REQUIRE(len <= limit);
+                REQUIRE(len >= limit/2.);
+            }
+            THEN( "Vertices are about the correct distance from the origin") {
+                bool all_vertices_ok = std::all_of(sph.its.vertices.begin(), sph.its.vertices.end(),
+                    [](const stl_vertex& pt) { return is_approx(pt.squaredNorm(), 100.f); });
+                REQUIRE(all_vertices_ok);
             }
             THEN( "The mesh volume is approximately 4/3 * pi * 10^3") {
                 REQUIRE(abs(sph.volume() - (4.0/3.0 * M_PI * std::pow(10,3))) < 1); // 1% tolerance?

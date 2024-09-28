@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, Lukáš Matěna @lukasmatena
+///|/ Copyright (c) Slic3r 2016 Alessandro Ranellucci @alranel
+///|/
+///|/ ported from lib/Slic3r/Fill/Concentric.pm:
+///|/ Copyright (c) Prusa Research 2016 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2012 Mark Hindess
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_FillRectilinear_hpp_
 #define slic3r_FillRectilinear_hpp_
 
@@ -7,6 +17,7 @@
 
 namespace Slic3r {
 
+class PrintRegionConfig;
 class Surface;
 struct SegmentedIntersectionLine;
 struct ExPolygonWithOffset;
@@ -50,7 +61,22 @@ class FillMonotonic : public FillRectilinear
 public:
     Fill* clone() const override { return new FillMonotonic(*this); }
     ~FillMonotonic() override = default;
+    //apply monotonic
+    void fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const override {
+        FillParams monotonic_params = params;
+        monotonic_params.monotonic = true;
+        FillRectilinear::fill_surface_extrusion(surface, monotonic_params, out);
+    }
     Polylines fill_surface(const Surface* surface, const FillParams& params) const override;
+    bool no_sort() const override { return true; }
+};
+
+class FillMonotonicLines : public FillRectilinear
+{
+public:
+    Fill* clone() const override { return new FillMonotonicLines(*this); }
+    ~FillMonotonicLines() override = default;
+    Polylines fill_surface(const Surface *surface, const FillParams &params) const override;
     bool no_sort() const override { return true; }
 };
 
@@ -123,7 +149,7 @@ public:
 protected:
     float _layer_angle(size_t idx) const override;
     std::vector<SegmentedIntersectionLine> _vert_lines_for_polygon(const ExPolygonWithOffset& poly_with_offset, const BoundingBox& bounding_box, const FillParams& params, coord_t line_spacing) const override;
-    coord_t _line_spacing_for_density(float density) const override;
+    coord_t _line_spacing_for_density(const FillParams& params) const override;
 };
 
 class FillRectilinearSawtooth : public FillRectilinear {

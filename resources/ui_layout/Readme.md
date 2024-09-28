@@ -61,6 +61,7 @@ each parameter is separated by ':'
 	* `label_left`: Draw the label aligned to the left instead of the right.
 	* `full_label$STR`: to override the full_label by this new one (full_label is used on modifiers).
 	* `full_label`: to override the label by the "full one".
+	* `tooltip$STR`: to override the tooltip. Note that you can write '\t' for a tabulation, '\n' for a new line, '\.' for a ':' and '\£' for a '$'.
 	* `full_width`: to tell to create a field that span the full width.
 	* `sidetext$STR`: the suffix at the right of the widget (like 'mm').
 	* `sidetext_width$INT`: the suffix label length (override the group one). -1 for auto.
@@ -205,6 +206,10 @@ These functions can only be called in a `set` or `reset` function. If you need t
 ### others
   * void **ask_for_refresh**()
     ask for a OPTNAME_set() after the current OPTNAME_get(), to be able to set settings.
+  * bool **is_enabled**(string setting_key, int idx)
+    Ask if this setting is currently enabled. `idx` is the index of the value if the settigns is a vector, it's ignored if it's a scalar.
+  * bool **is_widget_enabled**(string setting_key)
+    Experimental. Ask if a widget for this setting is currently enabled. Dangerous, as it will be true if it's not constructed. 
 
 ### to get/set the value of a custom variable
 The first argument is the index of the tab setting: 0 for print settings, 1 for filament settings and 2 for printer settings.

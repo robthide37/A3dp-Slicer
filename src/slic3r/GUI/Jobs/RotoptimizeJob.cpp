@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "RotoptimizeJob.hpp"
 
 #include "libslic3r/MTUtils.hpp"
@@ -11,6 +15,8 @@
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "libslic3r/AppConfig.hpp"
+
+#include <slic3r/GUI/I18N.hpp>
 
 namespace Slic3r { namespace GUI {
 
@@ -45,20 +51,23 @@ void RotoptimizeJob::prepare()
     }
 }
 
-void RotoptimizeJob::process()
+void RotoptimizeJob::process(Ctl &ctl)
 {
     int prev_status = 0;
+    auto statustxt = _u8L("Searching for optimal orientation");
+    ctl.update_status(0, statustxt);
+
     auto params =
         sla::RotOptimizeParams{}
             .accuracy(m_accuracy)
             .print_config(&m_default_print_cfg)
-            .statucb([this, &prev_status](int s)
+            .statucb([this, &prev_status, &ctl, &statustxt](int s)
         {
             if (s > 0 && s < 100)
-                update_status(prev_status + s / m_selected_object_ids.size(),
-                              _(L("Searching for optimal orientation")));
+                ctl.update_status(prev_status + s / m_selected_object_ids.size(),
+                                  statustxt);
 
-            return !was_canceled();
+            return !ctl.was_canceled();
         });
 
 
@@ -71,16 +80,20 @@ void RotoptimizeJob::process()
 
         prev_status += 100 / m_selected_object_ids.size();
 
-        if (was_canceled()) break;
+        if (ctl.was_canceled()) break;
     }
 
-    update_status(100, was_canceled() ? _(L("Orientation search canceled.")) :
-                                        _(L("Orientation found.")));
+    ctl.update_status(100, ctl.was_canceled() ?
+                               _u8L("Orientation search canceled.") :
+                               _u8L("Orientation found."));
 }
 
-void RotoptimizeJob::finalize()
+RotoptimizeJob::RotoptimizeJob() : m_plater{wxGetApp().plater()} { prepare(); }
+
+void RotoptimizeJob::finalize(bool canceled, std::exception_ptr &eptr)
 {
-    if (was_canceled()) return;
+    if (canceled || eptr)
+        return;
 
     for (const ObjRot &objrot : m_selected_object_ids) {
         ModelObject *o = m_plater->model().objects[size_t(objrot.idx)];
@@ -109,14 +122,20 @@ void RotoptimizeJob::finalize()
         // Correct the z offset of the object which was corrupted be
         // the rotation
         o->ensure_on_bed();
-
-//        m_plater->find_new_position(o->instances);
     }
 
-    if (!was_canceled())
+    if (!canceled)
         m_plater->update();
-    
-    Job::finalize();
+}
+
+std::string RotoptimizeJob::get_method_name(size_t i)
+{
+    return into_u8(_(Methods[i].name));
+}
+
+std::string RotoptimizeJob::get_method_description(size_t i)
+{
+    return into_u8(_(Methods[i].descr));
 }
 
 }}

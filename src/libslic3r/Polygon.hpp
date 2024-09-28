@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/
+///|/ ported from lib/Slic3r/Polygon.pm:
+///|/ Copyright (c) Prusa Research 2017 - 2022 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2012 Mark Hindess
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Polygon_hpp_
 #define slic3r_Polygon_hpp_
 
@@ -5,26 +15,51 @@
 #include <vector>
 #include <string>
 #include "Line.hpp"
+#include "Point.hpp"
 #include "MultiPoint.hpp"
 #include "Polyline.hpp"
 
 namespace Slic3r {
 
 class Polygon;
-using Polygons          = std::vector<Polygon>;
-using PolygonPtrs       = std::vector<Polygon*>;
-using ConstPolygonPtrs  = std::vector<const Polygon*>;
+using Polygons          = std::vector<Polygon, PointsAllocator<Polygon>>;
+using PolygonPtrs       = std::vector<Polygon*, PointsAllocator<Polygon*>>;
+using ConstPolygonPtrs  = std::vector<const Polygon*, PointsAllocator<const Polygon*>>;
+
+// Returns true if inside. Returns border_result if on boundary.
+bool contains(const Polygon& polygon, const Point& p, bool border_result = true);
+bool contains(const Polygons& polygons, const Point& p, bool border_result = true);
 
 class Polygon : public MultiPoint
 {
 public:
     Polygon() = default;
-    virtual ~Polygon() = default;
-    explicit Polygon(const Points &points) : MultiPoint(points) {}
-	Polygon(std::initializer_list<Point> points) : MultiPoint(points) {}
-    Polygon(const Polygon &other) : MultiPoint(other.points) {}
-    Polygon(Polygon &&other) : MultiPoint(std::move(other.points)) {}
-	static Polygon new_scale(const std::vector<Vec2d> &points) { 
+    explicit Polygon(const Points &points) : MultiPoint(points) {
+        assert(points.size() != 1);
+        if (points.size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    explicit Polygon(Points &&points) : MultiPoint(points) {
+        assert(points.size() != 1);
+        if (points.size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    Polygon(std::initializer_list<Point> points) : MultiPoint(points) {
+        assert(this->size() != 1);
+        assert(this->empty() || !this->front().coincides_with(this->back()));
+        if (this->size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    Polygon(const Polygon &other) : MultiPoint(other.points) {
+        assert(this->empty() || !this->front().coincides_with(this->back()));
+    }
+    Polygon(Polygon &&other) : MultiPoint(std::move(other.points)) {
+        assert(this->size() != 1);
+        assert(this->empty() || !this->front().coincides_with(this->back()));
+        if (this->size() > 1 && this->front().coincides_with_epsilon(this->back()))
+            this->points.pop_back();
+    }
+    static Polygon new_scale(const std::vector<Vec2d> &points) {
         Polygon pgn;
         pgn.points.reserve(points.size());
         for (const Vec2d &pt : points)
@@ -38,16 +73,19 @@ public:
     const Point& operator[](Points::size_type idx) const { return this->points[idx]; }
 
     // last point == first point for polygons
-    const Point& last_point() const override { return this->points.front(); }
+    //please don't use that, prefer 'is_loop', front() and back().
+    const Point& last_point() const { return this->points.front(); }
+    virtual bool is_loop() const { return true; }
 
-    Lines lines() const override;
+    double length() const;
+    Lines lines() const;
     Polyline split_at_vertex(const Point &point) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_index(size_t index) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_first_point() const { return this->split_at_index(0); }
     Points   equally_spaced_points(double distance) const { return this->split_at_first_point().equally_spaced_points(distance); }
-    
+
     static double area(const Points &pts);
     double area() const;
     bool is_counter_clockwise() const;
@@ -55,25 +93,49 @@ public:
     bool make_counter_clockwise();
     bool make_clockwise();
     bool is_valid() const { return this->points.size() >= 3; }
-    void douglas_peucker(double tolerance);
+    void douglas_peucker(coord_t tolerance) override;
 
     // Does an unoriented polygon contain a point?
-    // Tested by counting intersections along a horizontal line.
-    bool contains(const Point &point) const;
+    bool contains(const Point &point) const { return Slic3r::contains(*this, point, true); }
+    // Approximate on boundary test.
+    bool on_boundary(const Point &point, double eps) const
+        { return (this->point_projection(point).first - point).cast<double>().squaredNorm() < eps * eps; }
+
+    // Works on CCW polygons only, CW contour will be reoriented to CCW by Clipper's simplify_polygons()!
     Polygons simplify(double tolerance) const;
-    void simplify(double tolerance, Polygons &polygons) const;
     void densify(float min_length, std::vector<float>* lengths = nullptr);
     void triangulate_convex(Polygons* polygons) const;
     Point centroid() const;
-    Points concave_points(double angle = PI) const;
-    Points convex_points(double angle = PI) const;
+
+    bool intersection(const Line& line, Point* intersection) const;
+    bool first_intersection(const Line& line, Point* intersection) const;
+    bool intersections(const Line &line, Points *intersections) const;
+
+    // Considering CCW orientation of this polygon, find all convex resp. concave points
+    // with the angle at the vertex larger than a threshold.
+    // Zero angle_threshold means to accept all convex resp. concave points.
+    Points convex_points(double angle_threshold = 0.) const;
+    Points concave_points(double angle_threshold = 0.) const;
+    std::vector<size_t> concave_points_idx(double angle = PI) const;
+    std::vector<size_t> convex_points_idx(double angle = PI) const;
     // Projection of a point onto the polygon.
-    Point point_projection(const Point &point) const;
+    std::pair<Point, size_t> point_projection(const Point &point) const override;
     std::vector<float> parameter_by_length() const;
     /// remove points that are (almost) on an existing line from previous & next point.
     /// return number of point removed
     size_t remove_collinear(coord_t max_offset);
     size_t remove_collinear_angle(double angle);
+
+#ifdef _DEBUGINFO
+    void assert_valid() const override {
+        assert(size() > 2);
+        for (size_t i_pt = 1; i_pt < size(); ++i_pt)
+            release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
+        release_assert(!points.front().coincides_with_epsilon(points.back()));
+    }
+#else
+    void assert_valid() const {}
+#endif
 
     using iterator = Points::iterator;
     using const_iterator = Points::const_iterator;
@@ -96,6 +158,19 @@ inline bool polygon_is_convex(const Polygon &poly) { return polygon_is_convex(po
 inline bool has_duplicate_points(Polygon &&poly)      { return has_duplicate_points(std::move(poly.points)); }
 inline bool has_duplicate_points(const Polygon &poly) { return has_duplicate_points(poly.points); }
 bool        has_duplicate_points(const Polygons &polys);
+
+// Return True when erase some otherwise False.
+bool remove_same_neighbor(Polygon &polygon);
+bool remove_same_neighbor(Polygons &polygons);
+// remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polygons that are too small to be valid
+void ensure_valid(Polygons &polygons, coord_t resolution = SCALED_EPSILON);
+Polygons ensure_valid(Polygons &&polygons, coord_t resolution = SCALED_EPSILON);
+Polygons ensure_valid(coord_t resolution, Polygons &&polygons);
+#ifdef _DEBUGINFO
+void assert_valid(const Polygons &polygons);
+#else
+inline void assert_valid(const Polygons &polygons) {}
+#endif
 
 inline double total_length(const Polygons &polylines) {
     double total = 0;
@@ -137,14 +212,8 @@ inline void polygons_append(Polygons &dst, Polygons &&src)
     }
 }
 
-inline Polygons polygons_simplify(const Polygons &polys, double tolerance)
-{
-	Polygons out;
-	out.reserve(polys.size());
-	for (const Polygon &p : polys)
-		polygons_append(out, p.simplify(tolerance));
-	return out;
-}
+Polygons polygons_simplify(Polygons &&polys, double tolerance, bool strictly_simple = true);
+Polygons polygons_simplify(const Polygons &polys, double tolerance, bool strictly_simple = true);
 
 inline void polygons_rotate(Polygons &polys, double angle)
 {
@@ -165,13 +234,16 @@ inline Points to_points(const Polygon &poly)
     return poly.points;
 }
 
+inline size_t count_points(const Polygons &polys) {
+    size_t n_points = 0;
+    for (const auto &poly: polys) n_points += poly.points.size();
+    return n_points;
+}
+
 inline Points to_points(const Polygons &polys) 
 {
-    size_t n_points = 0;
-    for (size_t i = 0; i < polys.size(); ++ i)
-        n_points += polys[i].points.size();
     Points points;
-    points.reserve(n_points);
+    points.reserve(count_points(polys));
     for (const Polygon &poly : polys)
         append(points, poly.points);
     return points;
@@ -191,11 +263,8 @@ inline Lines to_lines(const Polygon &poly)
 
 inline Lines to_lines(const Polygons &polys) 
 {
-    size_t n_lines = 0;
-    for (size_t i = 0; i < polys.size(); ++ i)
-        n_lines += polys[i].points.size();
     Lines lines;
-    lines.reserve(n_lines);
+    lines.reserve(count_points(polys));
     for (size_t i = 0; i < polys.size(); ++ i) {
         const Polygon &poly = polys[i];
         for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
@@ -205,18 +274,22 @@ inline Lines to_lines(const Polygons &polys)
     return lines;
 }
 
-inline Polylines to_polylines(const Polygons &polys)
+inline Polyline to_polyline(const Polygon &polygon)
 {
-    Polylines polylines;
-    polylines.assign(polys.size(), Polyline());
-    size_t idx = 0;
-    for (Polygons::const_iterator it = polys.begin(); it != polys.end(); ++ it) {
-        Polyline &pl = polylines[idx ++];
-        pl.points = it->points;
-        pl.points.push_back(it->points.front());
-    }
-    assert(idx == polylines.size());
-    return polylines;
+    Polyline out;
+    out.points.reserve(polygon.size() + 1);
+    out.points.assign(polygon.points.begin(), polygon.points.end());
+    out.points.push_back(polygon.points.front());
+    return out;
+}
+
+inline Polylines to_polylines(const Polygons &polygons)
+{
+    Polylines out;
+    out.reserve(polygons.size());
+    for (const Polygon &polygon : polygons)
+        out.emplace_back(to_polyline(polygon));
+    return out;
 }
 
 inline Polylines to_polylines(Polygons &&polys)
@@ -224,16 +297,28 @@ inline Polylines to_polylines(Polygons &&polys)
     Polylines polylines;
     polylines.assign(polys.size(), Polyline());
     size_t idx = 0;
-    for (Polygons::const_iterator it = polys.begin(); it != polys.end(); ++ it) {
+    for (auto it = polys.begin(); it != polys.end(); ++ it) {
         Polyline &pl = polylines[idx ++];
         pl.points = std::move(it->points);
-        pl.points.push_back(it->points.front());
+        pl.points.push_back(pl.points.front());
     }
     assert(idx == polylines.size());
     return polylines;
 }
 
-inline Polygons to_polygons(const std::vector<Points> &paths)
+// close polyline to polygon (connect first and last point in polyline)
+inline Polygons to_polygons(const Polylines &polylines)
+{
+    Polygons out;
+    out.reserve(polylines.size());
+    for (const Polyline &polyline : polylines) {
+        if (polyline.size())
+        out.emplace_back(polyline.points);
+    }
+    return out;
+}
+
+inline Polygons to_polygons(const VecOfPoints &paths)
 {
     Polygons out;
     out.reserve(paths.size());
@@ -242,13 +327,41 @@ inline Polygons to_polygons(const std::vector<Points> &paths)
     return out;
 }
 
-inline Polygons to_polygons(std::vector<Points> &&paths)
+inline Polygons to_polygons(VecOfPoints &&paths)
 {
     Polygons out;
     out.reserve(paths.size());
-    for (const Points &path : paths)
+    for (Points &path : paths)
         out.emplace_back(std::move(path));
     return out;
+}
+
+// Do polygons match? If they match, they must have the same topology,
+// however their contours may be rotated.
+bool polygons_match(const Polygon &l, const Polygon &r);
+
+Polygon make_circle(double radius, double error);
+Polygon make_circle_num_segments(double radius, size_t num_segments);
+
+/// <summary>
+/// Define point laying on polygon
+/// keep index of polygon line and point coordinate
+/// </summary>
+struct PolygonPoint
+{
+    // index of line inside of polygon
+    // 0 .. from point polygon[0] to polygon[1]
+    size_t index;
+
+    // Point, which lay on line defined by index
+    Point point;
+};
+using PolygonPoints = std::vector<PolygonPoint>;
+
+// To replace reserve_vector where it's used for Polygons
+template<class I> IntegerOnly<I, Polygons> reserve_polygons(I cap)
+{
+    return reserve_vector<Polygon, I, typename Polygons::allocator_type>(cap);
 }
 
 } // Slic3r

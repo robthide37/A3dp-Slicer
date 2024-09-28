@@ -1,59 +1,66 @@
 #include "sla_test_utils.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/SLA/AGGRaster.hpp"
+#include "libslic3r/SLA/DefaultSupportTree.hpp"
+#include "libslic3r/SLA/BranchingTreeSLA.hpp"
 
 #include <iomanip>
 
-void test_support_model_collision(const std::string          &obj_filename,
-                                  const sla::SupportTreeConfig   &input_supportcfg,
-                                  const sla::HollowingConfig &hollowingcfg,
-                                  const sla::DrainHoles      &drainholes)
+void test_support_model_collision(
+    const std::string            &obj_filename,
+    const sla::SupportTreeConfig &input_supportcfg,
+    const sla::HollowingConfig   &hollowingcfg,
+    const sla::DrainHoles        &drainholes)
 {
     SupportByproducts byproducts;
-    
+
     sla::SupportTreeConfig supportcfg = input_supportcfg;
-    
+
     // Set head penetration to a small negative value which should ensure that
     // the supports will not touch the model body.
-    supportcfg.head_penetration_mm = -0.15;
-    
+    supportcfg.head_penetration_mm = -0.2;
+
     test_supports(obj_filename, supportcfg, hollowingcfg, drainholes, byproducts);
-    
+
     // Slice the support mesh given the slice grid of the model.
     std::vector<ExPolygons> support_slices =
-            byproducts.supporttree.slice(byproducts.slicegrid, CLOSING_RADIUS);
-    
+        sla::slice(byproducts.suptree_builder.retrieve_mesh(sla::MeshType::Support),
+              byproducts.suptree_builder.retrieve_mesh(sla::MeshType::Pad),
+              byproducts.slicegrid, CLOSING_RADIUS, {});
+
     // The slices originate from the same slice grid so the numbers must match
-    
+
     bool support_mesh_is_empty =
-            byproducts.supporttree.retrieve_mesh(sla::MeshType::Pad).empty() &&
-            byproducts.supporttree.retrieve_mesh(sla::MeshType::Support).empty();
-    
+            byproducts.suptree_builder.retrieve_mesh(sla::MeshType::Pad).empty() &&
+            byproducts.suptree_builder.retrieve_mesh(sla::MeshType::Support).empty();
+
     if (support_mesh_is_empty)
         REQUIRE(support_slices.empty());
     else
         REQUIRE(support_slices.size() == byproducts.model_slices.size());
-    
+
     bool notouch = true;
     for (size_t n = 0; notouch && n < support_slices.size(); ++n) {
         const ExPolygons &sup_slice = support_slices[n];
         const ExPolygons &mod_slice = byproducts.model_slices[n];
-        
+
         Polygons intersections = intersection(sup_slice, mod_slice);
-        
+
         double pinhead_r  = scaled(input_supportcfg.head_front_radius_mm);
 
         // TODO:: make it strict without a threshold of PI * pihead_radius ^ 2
         notouch = notouch && area(intersections) < PI * pinhead_r * pinhead_r;
     }
-    
-    /*if (!notouch) */export_failed_case(support_slices, byproducts);
-    
+
+    if (!notouch)
+        export_failed_case(support_slices, byproducts);
+
     REQUIRE(notouch);
 }
 
 void export_failed_case(const std::vector<ExPolygons> &support_slices, const SupportByproducts &byproducts)
 {
+    bool do_export_stl = false;
     for (size_t n = 0; n < support_slices.size(); ++n) {
         const ExPolygons &sup_slice = support_slices[n];
         const ExPolygons &mod_slice = byproducts.model_slices[n];
@@ -68,14 +75,18 @@ void export_failed_case(const std::vector<ExPolygons> &support_slices, const Sup
             svg.draw(intersections, "red");
             svg.Close();
         }
+
+        do_export_stl = do_export_stl || !intersections.empty();
     }
 
-    indexed_triangle_set its;
-    byproducts.supporttree.retrieve_full_mesh(its);
-    TriangleMesh m{its};
-    m.merge(byproducts.input_mesh);
-    m.WriteOBJFile((Catch::getResultCapture().getCurrentTestName() + "_" +
-                    byproducts.obj_fname).c_str());
+    if (do_export_stl) {
+        indexed_triangle_set its;
+        byproducts.suptree_builder.retrieve_full_mesh(its);
+        TriangleMesh m{its};
+        m.merge(byproducts.input_mesh);
+        m.WriteOBJFile((Catch::getResultCapture().getCurrentTestName() + "_" +
+                        byproducts.obj_fname).c_str());
+    }
 }
 
 void test_supports(const std::string          &obj_filename,
@@ -86,94 +97,116 @@ void test_supports(const std::string          &obj_filename,
 {
     using namespace Slic3r;
     TriangleMesh mesh = load_model(obj_filename);
-    
+
     REQUIRE_FALSE(mesh.empty());
-    
+
     if (hollowingcfg.enabled) {
-        sla::InteriorPtr interior = sla::generate_interior(mesh, hollowingcfg);
+        sla::InteriorPtr interior = sla::generate_interior(mesh.its, hollowingcfg);
         REQUIRE(interior);
         mesh.merge(TriangleMesh{sla::get_mesh(*interior)});
     }
-    
+
     auto   bb      = mesh.bounding_box();
     double zmin    = bb.min.z();
     double zmax    = bb.max.z();
     double gnd     = zmin - supportcfg.object_elevation_mm;
     auto   layer_h = 0.05f;
-    
+
     out.slicegrid = grid(float(gnd), float(zmax), layer_h);
     out.model_slices = slice_mesh_ex(mesh.its, out.slicegrid, CLOSING_RADIUS);
     sla::cut_drainholes(out.model_slices, out.slicegrid, CLOSING_RADIUS, drainholes, []{});
-    
+
     // Create the special index-triangle mesh with spatial indexing which
     // is the input of the support point and support mesh generators
-    sla::IndexedMesh emesh{mesh};
+    sla::SupportableMesh  sm{mesh.its, {}, supportcfg};
 
-#ifdef SLIC3R_HOLE_RAYCASTER
-    if (hollowingcfg.enabled) 
+    #ifdef SLIC3R_HOLE_RAYCASTER
+    if (hollowingcfg.enabled)
         emesh.load_holes(drainholes);
-#endif
+    #endif
 
     // TODO: do the cgal hole cutting...
-    
+
     // Create the support point generator
     sla::SupportPointGenerator::Config autogencfg;
     autogencfg.head_diameter = float(2 * supportcfg.head_front_radius_mm);
-    sla::SupportPointGenerator point_gen{emesh, autogencfg, [] {}, [](int) {}};
-    
+    sla::SupportPointGenerator point_gen{sm.emesh, autogencfg, [] {}, [](int) {}};
+
     point_gen.seed(0); // Make the test repeatable
     point_gen.execute(out.model_slices, out.slicegrid);
-    
+
     // Get the calculated support points.
-    std::vector<sla::SupportPoint> support_points = point_gen.output();
-    
+    sm.pts = point_gen.output();
+
     int validityflags = ASSUME_NO_REPAIR;
-    
+
     // If there is no elevation, support points shall be removed from the
     // bottom of the object.
     if (std::abs(supportcfg.object_elevation_mm) < EPSILON) {
-        sla::remove_bottom_points(support_points, zmin + supportcfg.base_height_mm);
+        sla::remove_bottom_points(sm.pts, zmin + supportcfg.base_height_mm);
     } else {
         // Should be support points at least on the bottom of the model
-        REQUIRE_FALSE(support_points.empty());
-        
+        REQUIRE_FALSE(sm.pts.empty());
+
         // Also the support mesh should not be empty.
         validityflags |= ASSUME_NO_EMPTY;
     }
-    
+
     // Generate the actual support tree
     sla::SupportTreeBuilder treebuilder;
-    sla::SupportableMesh    sm{emesh, support_points, supportcfg};
-    sla::SupportTreeBuildsteps::execute(treebuilder, sm);
-    
-    check_support_tree_integrity(treebuilder, supportcfg);
-    
+
+    switch (sm.cfg.tree_type) {
+    case sla::SupportTreeType::Default: {
+        sla::DefaultSupportTree::execute(treebuilder, sm);
+        check_support_tree_integrity(treebuilder, supportcfg, sla::ground_level(sm));
+        break;
+    }
+    case sla::SupportTreeType::Branching: {
+        create_branching_tree(treebuilder, sm);
+        // TODO: check_support_tree_integrity(treebuilder, supportcfg);
+        break;
+    }
+    default:;
+    }
+
     TriangleMesh output_mesh{treebuilder.retrieve_mesh(sla::MeshType::Support)};
-    
+
     check_validity(output_mesh, validityflags);
-    
+
     // Quick check if the dimensions and placement of supports are correct
     auto obb = output_mesh.bounding_box();
-    
+
     double allowed_zmin = zmin - supportcfg.object_elevation_mm;
-    
+
     if (std::abs(supportcfg.object_elevation_mm) < EPSILON)
         allowed_zmin = zmin - 2 * supportcfg.head_back_radius_mm;
-    
+
+#ifndef NDEBUG
+    if (!(obb.min.z() >= Approx(allowed_zmin)) || !(obb.max.z() <= Approx(zmax)))
+    {
+        indexed_triangle_set its;
+        treebuilder.retrieve_full_mesh(its);
+        TriangleMesh m{its};
+        m.merge(mesh);
+        m.WriteOBJFile((Catch::getResultCapture().getCurrentTestName() + "_" +
+                        obj_filename).c_str());
+    }
+#endif
+
     REQUIRE(obb.min.z() >= Approx(allowed_zmin));
     REQUIRE(obb.max.z() <= Approx(zmax));
-    
+
     // Move out the support tree into the byproducts, we can examine it further
     // in various tests.
-    out.obj_fname   = std::move(obj_filename);
-    out.supporttree = std::move(treebuilder);
-    out.input_mesh  = std::move(mesh);
+    out.obj_fname       = std::move(obj_filename);
+    out.suptree_builder = std::move(treebuilder);
+    out.input_mesh      = std::move(mesh);
 }
 
 void check_support_tree_integrity(const sla::SupportTreeBuilder &stree, 
-                                  const sla::SupportTreeConfig &cfg)
+                                  const sla::SupportTreeConfig &cfg,
+                                  double gnd)
 {
-    double gnd  = stree.ground_level;
     double H1   = cfg.max_solo_pillar_height_mm;
     double H2   = cfg.max_dual_pillar_height_mm;
     
@@ -260,8 +293,22 @@ static void _test_concave_hull(const Polygons &hull, const ExPolygons &polys)
     
     REQUIRE(cchull_holes == 0);
     
-    Polygons intr = diff(to_polygons(polys), hull);
-    REQUIRE(intr.empty());
+    Polygons diff_poly = diff(to_polygons(polys), hull);
+
+    if (!diff_poly.empty()) {
+        BOOST_LOG_TRIVIAL(warning)
+            << "Concave hull diff with original shape is not completely empty."
+            << "See pad_chull.svg for details.";
+
+        SVG svg("pad_chull.svg");
+        svg.draw(polys, "green");
+        svg.draw(hull, "red");
+        svg.draw(diff_poly, "blue");
+    }
+
+    double diff_area = area(diff_poly);
+
+    REQUIRE(std::abs(diff_area) < std::pow(scaled(2 * EPSILON), 2));
 }
 
 void test_concave_hull(const ExPolygons &polys) {
@@ -307,8 +354,8 @@ void check_validity(const TriangleMesh &input_mesh, int flags)
 void check_raster_transformations(sla::RasterBase::Orientation o, sla::RasterBase::TMirroring mirroring)
 {
     double disp_w = 120., disp_h = 68.;
-    sla::RasterBase::Resolution res{2560, 1440};
-    sla::RasterBase::PixelDim pixdim{disp_w / res.width_px, disp_h / res.height_px};
+    sla::Resolution res{2560, 1440};
+    sla::PixelDim pixdim{disp_w / res.width_px, disp_h / res.height_px};
     
     auto bb = BoundingBox({0, 0}, {scaled(disp_w), scaled(disp_h)});
     sla::RasterBase::Trafo trafo{o, mirroring};
@@ -386,7 +433,7 @@ long raster_pxsum(const sla::RasterGrayscaleAA &raster)
 
 double raster_white_area(const sla::RasterGrayscaleAA &raster)
 {
-    if (raster.resolution().pixels() == 0) return std::nan("");
+    if (raster.resolution().pixels() == 0) return NaNd;
     
     auto res = raster.resolution();
     double a = 0;
@@ -400,7 +447,7 @@ double raster_white_area(const sla::RasterGrayscaleAA &raster)
     return a;
 }
 
-double predict_error(const ExPolygon &p, const sla::RasterBase::PixelDim &pd)
+double predict_error(const ExPolygon &p, const sla::PixelDim &pd)
 {
     auto lines = p.lines();
     double pix_err = pixel_area(FullWhite, pd)  / 2.;
@@ -426,7 +473,7 @@ sla::SupportPoints calc_support_pts(
     std::vector<ExPolygons> slices  = slice_mesh_ex(mesh.its, heights, CLOSING_RADIUS);
 
     // Prepare the support point calculator
-    sla::IndexedMesh emesh{mesh};
+    AABBMesh emesh{mesh};
     sla::SupportPointGenerator spgen{emesh, cfg, []{}, [](int){}};
 
     // Calculate the support points

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Pavel Mikuš @Godrak, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef libslic3r_SeamPlacer_hpp_
 #define libslic3r_SeamPlacer_hpp_
 
@@ -28,32 +32,44 @@ class Grid;
 namespace SeamPlacerImpl {
 
 
-// ************  FOR BACKPORT COMPATIBILITY ONLY ***************
-// Angle from v1 to v2, returning double atan2(y, x) normalized to <-PI, PI>.
-template<typename Derived, typename Derived2>
-inline double angle(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBase<Derived2> &v2) {
-    static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "angle(): first parameter is not a 2D vector");
-    static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "angle(): second parameter is not a 2D vector");
-    auto v1d = v1.template cast<double>();
-    auto v2d = v2.template cast<double>();
-    return atan2(cross2(v1d, v2d), v1d.dot(v2d));
-}
-// ***************************
-
-
 struct GlobalModelInfo;
 struct SeamComparator;
+
+class PolylineWithEnd : public Polyline {
+public:
+    enum PolyDir {
+        CCW,
+        CW,
+        BOTH
+    };
+    /// if true => it's an endpoint, if false it join somthign that can't be used for a seam, so don't use this endpoint.
+    std::pair<bool, bool> endpoints;
+    PolyDir direction;
+
+    PolylineWithEnd() : endpoints(false, false), direction(PolyDir::BOTH) {}
+    PolylineWithEnd(bool stopstart, bool stopend, PolyDir is_ccw) : endpoints(stopstart, stopend), direction(is_ccw) {}
+    PolylineWithEnd(const Points &pts, bool stopstart, bool stopend, PolyDir is_ccw) : Polyline(pts), endpoints(stopstart, stopend), direction(is_ccw) {}
+    PolylineWithEnd(Points &&pts,  bool stopstart, bool stopend, PolyDir is_ccw) : Polyline(pts), endpoints(stopstart, stopend), direction(is_ccw) {}
+    void reverse() {
+        Polyline::reverse();
+        std::swap(this->endpoints.first, this->endpoints.second);
+        if (direction != PolyDir::BOTH)
+            direction = (direction == PolyDir::CCW) ? PolyDir::CW : PolyDir::CCW;
+    }
+};
+typedef std::vector<PolylineWithEnd> PolylineWithEnds;
 
 enum class EnforcedBlockedSeamPoint {
     Blocked = 0,
     Neutral = 1,
     Enforced = 2,
+    Sphere = 3,
 };
 
 // struct representing single perimeter loop
 struct Perimeter {
     size_t start_index{};
-    size_t end_index{}; //inclusive!
+    size_t end_index{}; //exclusive
     size_t seam_index{};
     float flow_width{};
 
@@ -124,6 +140,7 @@ class SeamPlacer {
 public:
     // Number of samples generated on the mesh. There are sqr_rays_per_sample_point*sqr_rays_per_sample_point rays casted from each samples
     static constexpr size_t raycasting_visibility_samples_count = 30000;
+    static constexpr size_t fast_decimation_triangle_count_target = 16000;
     //square of number of rays per sample point
     static constexpr size_t sqr_rays_per_sample_point = 5;
 
@@ -142,39 +159,38 @@ public:
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
     static constexpr float seam_align_score_tolerance = 0.3f;
-    // seam_align_tolerable_dist_factor - how far to search for seam from current position, final dist is seam_align_tolerable_dist_factor * flow_width
-    static constexpr float seam_align_tolerable_dist_factor = 4.0f;
+    // seam_align_tolerable_dist_factor - how far to search for seam from current position, final dist is seam_align_tolerable_dist_factor * nozzle_size * flow_width
+    static constexpr float seam_align_tolerable_dist_factor = 10.0f;
     // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
+    static constexpr size_t seam_extremly_align_minimum_string_seams = 3;
     // millimeters covered by spline; determines number of splines for the given string
     static constexpr size_t seam_align_mm_per_segment = 4.0f;
 
     //The following data structures hold all perimeter points for all PrintObject.
     std::unordered_map<const PrintObject*, PrintObjectSeamData> m_seam_per_object;
 
-    // if it's expected, we need to randomized at the external periemter.
+    // if it's expected, we need to randomized at the external perimeter.
     bool external_perimeters_first = false;
 
     void init(const Print &print, std::function<void(void)> throw_if_canceled_func);
 
-    void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
+    Point place_seam(const Layer *layer, const ExtrusionLoop &loop, const uint16_t print_object_instance_idx, const Point &last_pos) const;
 
 private:
-    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info,
-            //const uint16_t object_instance_idx,
-            const SeamPosition configured_seam_preference);
+    void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info, SeamPosition configured_seam_preference);
     void calculate_candidates_visibility(const PrintObject *po,
             const SeamPlacerImpl::GlobalModelInfo &global_model_info);
     void calculate_overhangs_and_layer_embedding(const PrintObject *po);
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
     std::vector<std::pair<size_t, size_t>> find_seam_string(const PrintObject *po,
-            std::pair<size_t, size_t> start_seam,
-            const SeamPlacerImpl::SeamComparator &comparator) const;
+    std::pair<size_t, size_t> start_seam,
+    const SeamPlacerImpl::SeamComparator &comparator) const;
     std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
-            const std::vector<PrintObjectSeamData::LayerSeams> &layers,
-            const Vec3f& projected_position,
-            const size_t layer_idx, const float max_distance,
-            const SeamPlacerImpl::SeamComparator &comparator) const;
+    const std::vector<PrintObjectSeamData::LayerSeams> &layers,
+    const Vec3f& projected_position,
+    const size_t layer_idx, const float max_distance,
+    const SeamPlacerImpl::SeamComparator &comparator) const;
 };
 
 } // namespace Slic3r

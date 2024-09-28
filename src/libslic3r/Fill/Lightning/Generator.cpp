@@ -29,7 +29,7 @@ Generator::Generator(const PrintObject &print_object, const coordf_t fill_densit
     const PrintConfig         &print_config         = print_object.print()->config();
     const PrintObjectConfig   &object_config        = print_object.config();
     const PrintRegionConfig   &region_config        = print_object.shared_regions()->all_regions.front()->config();
-    const std::vector<double> &nozzle_diameters     = print_config.nozzle_diameter.values;
+    const std::vector<double> &nozzle_diameters     = print_config.nozzle_diameter.get_values();
     double                     max_nozzle_diameter  = *std::max_element(nozzle_diameters.begin(), nozzle_diameters.end());
 //    const int                  infill_extruder      = region_config.infill_extruder.value;
     const double               default_infill_extrusion_width = Flow::auto_extrusion_width(FlowRole::frInfill, float(max_nozzle_diameter));
@@ -62,7 +62,7 @@ void Generator::generateInitialInternalOverhangs(const PrintObject &print_object
         throw_on_cancel_callback();
         Polygons infill_area_here;
         for (const LayerRegion* layerm : print_object.get_layer(layer_nr)->regions())
-            for (const Surface& surface : layerm->fill_surfaces.surfaces)
+            for (const Surface& surface : layerm->fill_surfaces())
                 if (surface.surface_type == (stPosInternal | stDensSparse) || surface.surface_type == (stPosInternal | stDensVoid))
                     append(infill_area_here, to_polygons(surface.expolygon));
 
@@ -93,7 +93,7 @@ void Generator::generateTrees(const PrintObject &print_object, const std::functi
     for (int layer_id = int(print_object.layers().size()) - 1; layer_id >= 0; layer_id--) {
         throw_on_cancel_callback();
         for (const LayerRegion *layerm : print_object.get_layer(layer_id)->regions())
-            for (const Surface &surface : layerm->fill_surfaces.surfaces)
+            for (const Surface &surface : layerm->fill_surfaces())
                 if (surface.surface_type == (stPosInternal | stDensSparse) || surface.surface_type == (stPosInternal | stDensVoid))
                     append(infill_outlines[layer_id], to_polygons(surface.expolygon));
 

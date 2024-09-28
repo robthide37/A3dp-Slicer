@@ -1,4 +1,3 @@
-#include <unordered_set>
 #include <unordered_map>
 #include <random>
 #include <numeric>
@@ -8,7 +7,7 @@
 
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
-#include <libslic3r/SLA/Concurrency.hpp>
+#include <libslic3r/BranchingTree/PointCloud.hpp>
 
 namespace {
 
@@ -32,18 +31,11 @@ const char *const SUPPORT_TEST_MODELS[] = {
 
 } // namespace
 
-TEST_CASE("Pillar pairhash should be unique", "[SLASupportGeneration]") {
-    test_pairhash<int, int>();
-    test_pairhash<int, long>();
-    test_pairhash<unsigned, unsigned>();
-    test_pairhash<unsigned, unsigned long>();
-}
-
 TEST_CASE("Support point generator should be deterministic if seeded", 
           "[SLASupportGeneration], [SLAPointGen]") {
     TriangleMesh mesh = load_model("A_upsidedown.obj");
     
-    sla::IndexedMesh emesh{mesh};
+    AABBMesh emesh{mesh};
     
     sla::SupportTreeConfig supportcfg;
     sla::SupportPointGenerator::Config autogencfg;
@@ -126,29 +118,29 @@ TEST_CASE("WingedPadAroundObjectIsValid", "[SLASupportGeneration]") {
     for (auto &fname : AROUND_PAD_TEST_OBJECTS) test_pad(fname, padcfg);
 }
 
-TEST_CASE("ElevatedSupportGeometryIsValid", "[SLASupportGeneration]") {
+TEST_CASE("DefaultSupports::ElevatedSupportGeometryIsValid", "[SLASupportGeneration]") {
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 10.;
     
     for (auto fname : SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 }
 
-TEST_CASE("FloorSupportGeometryIsValid", "[SLASupportGeneration]") {
+TEST_CASE("DefaultSupports::FloorSupportGeometryIsValid", "[SLASupportGeneration]") {
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 0;
     
     for (auto &fname: SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
 }
 
-TEST_CASE("ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration]") {
-    
+TEST_CASE("DefaultSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration]") {
     sla::SupportTreeConfig supportcfg;
-    
+    supportcfg.object_elevation_mm = 10.;
+
     for (auto fname : SUPPORT_TEST_MODELS)
         test_support_model_collision(fname, supportcfg);
 }
 
-TEST_CASE("FloorSupportsDoNotPierceModel", "[SLASupportGeneration]") {
+TEST_CASE("DefaultSupports::FloorSupportsDoNotPierceModel", "[SLASupportGeneration]") {
     
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 0;
@@ -157,10 +149,47 @@ TEST_CASE("FloorSupportsDoNotPierceModel", "[SLASupportGeneration]") {
         test_support_model_collision(fname, supportcfg);
 }
 
+//TEST_CASE("BranchingSupports::ElevatedSupportGeometryIsValid", "[SLASupportGeneration][Branching]") {
+//    sla::SupportTreeConfig supportcfg;
+//    supportcfg.object_elevation_mm = 10.;
+//    supportcfg.tree_type = sla::SupportTreeType::Branching;
+
+//    for (auto fname : SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
+//}
+
+//TEST_CASE("BranchingSupports::FloorSupportGeometryIsValid", "[SLASupportGeneration][Branching]") {
+//    sla::SupportTreeConfig supportcfg;
+//    supportcfg.object_elevation_mm = 0;
+//    supportcfg.tree_type = sla::SupportTreeType::Branching;
+
+//    for (auto &fname: SUPPORT_TEST_MODELS) test_supports(fname, supportcfg);
+//}
+
+
+TEST_CASE("BranchingSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {
+
+    sla::SupportTreeConfig supportcfg;
+    supportcfg.object_elevation_mm = 10.;
+    supportcfg.tree_type = sla::SupportTreeType::Branching;
+
+    for (auto fname : SUPPORT_TEST_MODELS)
+        test_support_model_collision(fname, supportcfg);
+}
+
+TEST_CASE("BranchingSupports::FloorSupportsDoNotPierceModel", "[SLASupportGeneration][Branching]") {
+
+    sla::SupportTreeConfig supportcfg;
+    supportcfg.object_elevation_mm = 0;
+    supportcfg.tree_type = sla::SupportTreeType::Branching;
+
+    for (auto fname : SUPPORT_TEST_MODELS)
+        test_support_model_collision(fname, supportcfg);
+}
+
 TEST_CASE("InitializedRasterShouldBeNONEmpty", "[SLARasterOutput]") {
     // Default Prusa SL1 display parameters
-    sla::RasterBase::Resolution res{2560, 1440};
-    sla::RasterBase::PixelDim   pixdim{120. / res.width_px, 68. / res.height_px};
+    sla::Resolution res{2560, 1440};
+    sla::PixelDim   pixdim{120. / res.width_px, 68. / res.height_px};
     
     sla::RasterGrayscaleAAGammaPower raster(res, pixdim, {}, 1.);
     REQUIRE(raster.resolution().width_px == res.width_px);
@@ -186,8 +215,8 @@ TEST_CASE("MirroringShouldBeCorrect", "[SLARasterOutput]") {
 
 TEST_CASE("RasterizedPolygonAreaShouldMatch", "[SLARasterOutput]") {
     double disp_w = 120., disp_h = 68.;
-    sla::RasterBase::Resolution res{2560, 1440};
-    sla::RasterBase::PixelDim pixdim{disp_w / res.width_px, disp_h / res.height_px};
+    sla::Resolution res{2560, 1440};
+    sla::PixelDim pixdim{disp_w / res.width_px, disp_h / res.height_px};
     
     double gamma = 1.;
     sla::RasterGrayscaleAAGammaPower raster(res, pixdim, {}, gamma);

@@ -1,3 +1,14 @@
+///|/ Copyright (c) Prusa Research 2017 - 2023 Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Lukáš Hejl @hejllukas, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ ported from lib/Slic3r/GUI/OptionsGroup.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) Slic3r 2011 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2013 Scott Penrose
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2011 Richard Goodwin
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_OptionsGroup_hpp_
 #define slic3r_OptionsGroup_hpp_
 
@@ -18,6 +29,11 @@
     #define wxOSX true
 #else
     #define wxOSX false
+#endif 
+#ifdef __WXGTK3__
+    #define wxGTK3 true
+#else
+    #define wxGTK3 false
 #endif
 
 #define BORDER(a, b) ((wxOSX ? a : b))
@@ -31,7 +47,9 @@ class OG_CustomCtrl;
 /// Widget type describes a function object that returns a wxWindow (our widget) and accepts a wxWidget (parent window).
 using widget_t = std::function<wxSizer*(wxWindow*)>;//!std::function<wxWindow*(wxWindow*)>;
 
-class ScriptContainer;
+namespace script {
+	class ScriptContainer;
+}
 /// Wraps a ConfigOptionDef and adds function object for creating a side_widget.
 struct Option {
 	ConfigOptionDef			opt { ConfigOptionDef() };
@@ -39,20 +57,20 @@ struct Option {
     widget_t				side_widget {nullptr};
     bool					readonly {false};
     //for fake config
-	ScriptContainer* script = nullptr;
+	script::ScriptContainer* script = nullptr;
 	//std::vector<std::string> depends_on; // moved to configoptiondef
 
 	bool operator==(const Option& rhs) const {
 		return  (rhs.opt_id == this->opt_id);
 	}
 
-	Option(const ConfigOptionDef& _opt, t_config_option_key id) :
-		opt(_opt), opt_id(id) {}
+	Option(const ConfigOptionDef& _opt, t_config_option_key id);
 };
 using t_option = std::unique_ptr<Option>;	//!
 
 /// Represents option lines
-class Line {
+class Line : public UndoValueUIManager
+{
 	bool		m_is_separator{ false };
 public:
     wxString	label;
@@ -60,13 +78,14 @@ public:
 	std::string	label_path;
 
     size_t		full_width {0}; 
-	wxColour*	full_Label_color {nullptr};
-	bool		blink	{false};
     widget_t	widget {nullptr};
     std::function<wxWindow*(wxWindow*)>	near_label_widget{ nullptr };
 	wxWindow*	near_label_widget_win {nullptr};
     wxSizer*	widget_sizer {nullptr};
     wxSizer*	extra_widget_sizer {nullptr};
+     // mode for the whole line visibility. Useful when it's a widget. If none, then it's not overriding anything
+     // note: not used yet (in custom og), as the comments are out of the visibility loop
+    ConfigOptionMode tags_override{comNone};
 
     void append_option(const Option& option) {
         m_options.push_back(option);
@@ -81,12 +100,19 @@ public:
 		label(_(label)), label_tooltip(_(tooltip)) {}
 	Line() : m_is_separator(true) {}
 
+	Line(const std::string& opt_key, const wxString& label, const wxString& tooltip) :
+		label(_(label)), label_tooltip(_(tooltip))
+	{
+		m_options.push_back(Option({ opt_key, coNone }, opt_key));
+	}
+
 	bool is_separator() const { return m_is_separator; }
+	bool has_only_option(const std::string& opt_key) const { return m_options.size() == 1 && m_options[0].opt_id == opt_key; }
+	void clear();
 
     const std::vector<widget_t>&	get_extra_widgets() const {return m_extra_widgets;}
 	const std::vector<Option>&		get_options() const { return m_options; }
 	std::vector<Option>&			get_options() { return m_options; }
-	bool*							get_blink_ptr() { return &blink; }
 
 private:
 	std::vector<Option>		m_options;//! {std::vector<Option>()};
@@ -102,7 +128,7 @@ class OptionsGroup {
 protected:
 	wxStaticBox*	stb {nullptr};
 public:
-    const bool		staticbox {true};
+    const bool		staticbox {true}; // false if title is empty.
     const wxString	title;
     int             title_width = 20;// {200};
     bool            no_title = false;
@@ -120,17 +146,19 @@ public:
 
     std::function<void(wxWindow* win)> rescale_extra_column_item { nullptr };
     std::function<void(wxWindow* win)> rescale_near_label_widget { nullptr };
+
+    std::function<void(const t_config_option_key& opt_key)> edit_custom_gcode { nullptr };
     
     wxFont			sidetext_font {wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT) };
     wxFont			label_font {wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT) };
     int             sidetext_width{ -1 };
     int             label_width{ -1 };
-	int				sublabel_width{ -1 };
+	//int				sublabel_width{ -1 }; //never set
 
     /// Returns a copy of the pointer of the parent wxWindow.
     /// Accessor function is because users are not allowed to change the parent
     /// but defining it as const means a lot of const_casts to deal with wx functions.
-	inline wxWindow* parent() const { return m_parent; }
+	inline wxWindow* parent() const { assert(m_parent); return m_parent; }
 
     wxWindow*   ctrl_parent() const;
 
@@ -155,10 +183,21 @@ public:
 							if (m_fields.find(id) == m_fields.end()) return nullptr;
 							return m_fields.at(id).get();
     }
-	bool			set_value(const t_config_option_key& id, const boost::any& value, bool change_event = false) {
-							if (m_fields.find(id) == m_fields.end()) return false;
-							m_fields.at(id)->set_value(value, change_event);
-							return true;
+
+    inline Line*	get_line(const t_config_option_key& id) {
+		for (Line& line : m_lines)
+			if (line.has_only_option(id))
+				return &line;
+		return nullptr;
+    }
+
+	bool			set_value(const t_config_option_key &id, const boost::any &value, bool enabled, bool change_event /*= false*/) {
+        if (auto it = m_fields.find(id); it != m_fields.end()) {
+            it->second->set_enable_bitmap_checked(enabled);
+            it->second->set_any_value(value, change_event);
+            return true;
+        }
+        return false;
     }
 	boost::any		get_value(const t_config_option_key& id) {
 							boost::any out; 
@@ -171,12 +210,11 @@ public:
 	void			show_field(const t_config_option_key& opt_key, bool show = true);
 	void			hide_field(const t_config_option_key& opt_key) {  show_field(opt_key, false);  }
 
-	void			set_name(const wxString& new_name) {
-							stb->SetLabel(new_name);
-    }
+	void			set_name(const wxString& new_name) { stb->SetLabel(new_name); }
+	wxString		get_name() const { return stb->GetLabel(); }
 
-	inline void		enable() { for (auto& field : m_fields) field.second->enable(); }
-    inline void		disable() { for (auto& field : m_fields) field.second->disable(); }
+	inline void		enable() { for (auto& field : m_fields) field.second->widget_enable(); }
+    inline void		disable() { for (auto& field : m_fields) field.second->widget_disable(); }
 	void			set_grid_vgap(int gap) { m_grid_sizer->SetVGap(gap); }
 
     void            clear_fields_except_of(const std::vector<std::string> left_fields);
@@ -185,15 +223,18 @@ public:
 
 	OptionsGroup(	wxWindow* _parent, const wxString& title, bool is_tab_opt = false, 
                     column_t extra_clmn = nullptr);
-	~OptionsGroup() { clear(true); }
+	virtual ~OptionsGroup() { clear(true); }
 
     wxGridSizer*        get_grid_sizer() { return m_grid_sizer; }
 	const std::vector<Line>& get_lines() const { return m_lines; }
 	std::vector<Line>&  set_lines() { return m_lines; }
+	Line*				get_last_line()  { return m_lines.empty() ? nullptr : &m_lines[m_lines.size()-1]; }
 	bool				is_legend_line();
 	// if we have to set the same control alignment for different option groups, 
     // we have to set same max contrtol width to all of them
 	void				set_max_win_width(int max_win_width);
+	void				set_use_custom_ctrl(bool use_custom_ctrl) { m_use_custom_ctrl = use_custom_ctrl; }
+	const std::map<t_config_option_key, Option>& get_optioms_map() { return m_options; }
 
 	bool				is_activated() { return sizer != nullptr; }
 
@@ -235,7 +276,7 @@ protected:
 	const t_field&		build_field(const Option& opt);
 
     virtual void		on_kill_focus(const std::string& opt_key) {};
-	virtual void		on_change_OG(const t_config_option_key& opt_id, const boost::any& value);
+	virtual void		on_change_OG(const t_config_option_key& opt_id, bool enable, const boost::any& value);
 	virtual void		back_to_initial_value(const std::string& opt_key) {}
 	virtual void		back_to_sys_value(const std::string& opt_key) {}
 
@@ -247,14 +288,15 @@ public:
 
 class ConfigOptionsGroup: public OptionsGroup {
 public:
-	ConfigOptionsGroup(	wxWindow* parent, const wxString& title, DynamicConfig* config = nullptr,
+	ConfigOptionsGroup(	wxWindow* parent, const wxString& title, ConfigBase* config = nullptr,
 						bool is_tab_opt = false, column_t extra_clmn = nullptr) :
-		OptionsGroup(parent, title, is_tab_opt, extra_clmn), m_config(config) {}
+		OptionsGroup(parent, title, is_tab_opt, extra_clmn), m_config(config), m_modelconfig(nullptr), m_config_mutable(config) {}
 	ConfigOptionsGroup(	wxWindow* parent, const wxString& title, ModelConfig* config, 
 						bool is_tab_opt = false, column_t extra_clmn = nullptr) :
-		OptionsGroup(parent, title, is_tab_opt, extra_clmn), m_config(&config->get()), m_modelconfig(config) {}
-	ConfigOptionsGroup(	wxWindow* parent) :
-		OptionsGroup(parent, wxEmptyString, true, nullptr) {}
+		OptionsGroup(parent, title, is_tab_opt, extra_clmn), m_config(&config->get()), m_modelconfig(config), m_config_mutable(nullptr) {}
+	ConfigOptionsGroup(	wxWindow* parent, const wxString& title, bool is_tab_opt) :
+		OptionsGroup(parent, title, is_tab_opt, nullptr) {}
+    ~ConfigOptionsGroup() override = default;
 
 	const wxString& config_category() const throw() { return m_config_category; }
 	int config_type() const throw() { return m_config_type; }
@@ -262,15 +304,19 @@ public:
 	void		copy_for_freq_settings(const ConfigOptionsGroup& origin) { this->m_opt_map = origin.m_opt_map; }
 
 	void 		set_config_category_and_type(const wxString &category, int type) { m_config_category = category; m_config_type = type; }
-	void        set_config(DynamicPrintConfig* config) { 
-		m_config = config; m_modelconfig = nullptr; 
+	void        set_config(ConfigBase* config) { 
+		m_config = config; m_modelconfig = nullptr; m_config_mutable = config;
 	}
-	bool		has_option(const std::string& opt_key, int opt_index = -1);
-	// more like "create option from def"
-	Option		get_option(const std::string& opt_key, int opt_index = -1);
+
+    bool has_option_def(const std::string &opt_key);
+    const Option* get_option_def(const std::string &opt_key);
+	//these 'has' and 'get' are about m_opt_map and not m_options. it's the option + id
+    bool has_option(const std::string &opt_key, int opt_index = -1);
+	// more like "create option from def" (old "get_option")
+	Option		create_option_from_def(const std::string& opt_key, int opt_index = -1);
 	void		register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index, bool reset);
 	Option		get_option_and_register(const std::string& opt_key, int opt_index = -1) {
-		Option opt = get_option(opt_key, opt_index);
+        Option opt = create_option_from_def(opt_key, opt_index);
 		if(m_use_custom_ctrl) // fill group and category values just for options from Settings Tab
 			register_to_search(opt_key, opt.opt, opt_index, true);
 		return opt;
@@ -291,7 +337,7 @@ public:
 		append_single_option_line(option, path);
 	}
 
-	void		on_change_OG(const t_config_option_key& opt_id, const boost::any& value) override;
+	void		on_change_OG(const t_config_option_key& opt_id, bool enable, const boost::any& value) override;
 	void		back_to_initial_value(const std::string& opt_key) override;
 	void		back_to_sys_value(const std::string& opt_key) override;
 	void		back_to_config_value(const DynamicPrintConfig& config, const std::string& opt_key);
@@ -305,9 +351,6 @@ public:
     void        msw_rescale();
     void        sys_color_changed();
     void        refresh();
-	boost::any	config_value(const std::string& opt_key, int opt_index, bool deserialize);
-	// return option value from config 
-	boost::any	get_config_value(const DynamicConfig& config, const std::string& opt_key, int opt_index = -1);
 	Field*		get_fieldc(const t_config_option_key& opt_key, int opt_index);
 	std::pair<OG_CustomCtrl*, bool*>	get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index/* = -1*/);
 
@@ -315,7 +358,10 @@ private:
     // Reference to libslic3r config or ModelConfig::get(), non-owning pointer.
     // The reference is const, so that the spots which modify m_config are clearly
     // demarcated by const_cast and m_config_changed_callback is called afterwards.
-    const DynamicConfig*		m_config {nullptr};
+    //const DynamicConfig*		m_config {nullptr};
+    const ConfigBase*		m_config {nullptr};
+	// if nom_modelconfig, we can set.
+    ConfigBase*				m_config_mutable {nullptr};
     // If the config is modelconfig, then ModelConfig::touch() has to be called after value change.
     ModelConfig*				m_modelconfig { nullptr };
 	t_opt_map					m_opt_map;
@@ -323,7 +369,7 @@ private:
     int                         m_config_type;
 
     // Change an option on m_config, possibly call ModelConfig::touch().
-	void 	change_opt_value(const t_config_option_key& opt_key, const boost::any& value, int opt_index = 0);
+	void 	change_opt_value(const t_config_option_key& opt_key, bool enable, const boost::any& value, int opt_index = 0);
 };
 
 //  Static text shown among the options.

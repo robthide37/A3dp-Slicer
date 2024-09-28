@@ -1,9 +1,14 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GCode_PressureEqualizer_hpp_
 #define slic3r_GCode_PressureEqualizer_hpp_
 
 #include "../libslic3r.h"
 #include "../PrintConfig.hpp"
-#include "../ExtrusionEntity.hpp"
+#include "../ExtrusionRole.hpp"
 
 #include <queue>
 
@@ -65,7 +70,7 @@ private:
         float positive;
         float negative;
     };
-    ExtrusionRateSlope              m_max_volumetric_extrusion_rate_slopes[erCount];
+    ExtrusionRateSlope              m_max_volumetric_extrusion_rate_slopes[size_t(GCodeExtrusionRole::Count)];
     float                           m_max_volumetric_extrusion_rate_slope_positive;
     float                           m_max_volumetric_extrusion_rate_slope_negative;
 
@@ -77,7 +82,8 @@ private:
     // X,Y,Z,E,F
     float                           m_current_pos[5];
     size_t                          m_current_extruder;
-    ExtrusionRole                   m_current_extrusion_role;
+    std::vector<std::string>        m_extruder_names;
+    GCodeExtrusionRole              m_current_extrusion_role;
     bool                            m_retracted;
     bool                            m_use_relative_e_distances;
     int                             m_gcode_precision_xyz = 3;
@@ -151,7 +157,7 @@ private:
         // Index of the active extruder.
         size_t      extruder_id;
         // Extrusion role of this segment.
-        ExtrusionRole extrusion_role;
+        GCodeExtrusionRole extrusion_role;
 
         // Current volumetric extrusion rate.
         float       volumetric_extrusion_rate;
@@ -183,6 +189,7 @@ private:
 
     bool process_line(const char *line, const char *line_end, GCodeLine &buf);
     void output_gcode_line(size_t line_idx);
+    void parse_activate_extruder(const std::string&);
 
     // Go back from the current circular_buffer_pos and lower the feedtrate to decrease the slope of the extrusion rate changes.
     // Then go forward and adjust the feedrate to decrease the slope of the extrusion rate changes.

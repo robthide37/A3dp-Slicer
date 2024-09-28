@@ -1,8 +1,14 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2015 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_SurfaceCollection_hpp_
 #define slic3r_SurfaceCollection_hpp_
 
 #include "libslic3r.h"
 #include "Surface.hpp"
+#include <initializer_list>
 #include <vector>
 
 namespace Slic3r {
@@ -17,18 +23,19 @@ public:
     SurfaceCollection(Surfaces &&surfaces) : surfaces(std::move(surfaces)) {};
 
     void simplify(double tolerance);
-    void group(std::vector<SurfacesPtr> *retval);
+    void group(std::vector<SurfacesPtr> *retval) const;
     // get all surfaces that have this exact SurfaceType
     SurfacesConstPtr filter_by_type(const SurfaceType type) const;
     // get all surfaces that have this SurfaceType flag in their SurfaceType
     SurfacesConstPtr filter_by_type_flag(const SurfaceType allowed, const SurfaceType not_allowed = stNone) const;
-    SurfacesConstPtr filter_by_types(const SurfaceType *types, int ntypes) const;
+    SurfacesConstPtr filter_by_types(std::initializer_list<SurfaceType> types) const;
     void keep_type(const SurfaceType type);
     void keep_type_flag(const SurfaceType flags_needed, const SurfaceType flags_to_remove = stNone);
-    void keep_types(const SurfaceType *types, int ntypes);
+    void keep_types(std::initializer_list<SurfaceType> types);
     void keep_types_flag(const SurfaceType flags_to_keep, const SurfaceType flags_to_remove = stNone);
     void remove_type(const SurfaceType type);
-    void remove_types(const SurfaceType *types, int ntypes);
+    void remove_type(const SurfaceType type, ExPolygons *polygons);
+    void remove_types(std::initializer_list<SurfaceType> types);
     void filter_by_type(const SurfaceType type, Polygons* polygons) const;
     void filter_by_type_flag(Polygons* polygons, const SurfaceType flags_needed, const SurfaceType flags_not_allowed = stNone) const;
     void set_type(SurfaceType type) {
@@ -44,6 +51,13 @@ public:
             if (surface.surface_type == type) return true;
         return false;
     }
+
+    Surfaces::const_iterator    cbegin() const { return this->surfaces.cbegin(); }
+    Surfaces::const_iterator    cend()   const { return this->surfaces.cend(); }
+    Surfaces::const_iterator    begin()  const { return this->surfaces.cbegin(); }
+    Surfaces::const_iterator    end()    const { return this->surfaces.cend(); }
+    Surfaces::iterator          begin()        { return this->surfaces.begin(); }
+    Surfaces::iterator          end()          { return this->surfaces.end(); }
 
     void set(const SurfaceCollection &coll) { surfaces = coll.surfaces; }
     void set(SurfaceCollection &&coll) { surfaces = std::move(coll.surfaces); }
@@ -62,13 +76,6 @@ public:
     void append(ExPolygons &&src, SurfaceType surfaceType) { surfaces_append(this->surfaces, std::move(src), surfaceType); }
     void append(ExPolygons &&src, const Surface &surfaceTempl) { surfaces_append(this->surfaces, std::move(src), surfaceTempl); }
     void append(Surfaces &&src) { surfaces_append(this->surfaces, std::move(src)); }
-
-    Surfaces::iterator begin() { return this->surfaces.begin();}
-    Surfaces::iterator end() { return this->surfaces.end();}
-    Surfaces::const_iterator cbegin() const { return this->surfaces.cbegin();}
-    Surfaces::const_iterator cend() const { return this->surfaces.cend();}
-    Surfaces::const_iterator begin() const { return this->surfaces.cbegin();}
-    Surfaces::const_iterator end() const { return this->surfaces.cend();}
 
     // For debugging purposes:
     void export_to_svg(const char *path, bool show_labels);

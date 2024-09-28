@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "../Print.hpp"
 #include "../ShortestPath.hpp"
 
@@ -19,7 +23,7 @@ void Filler::_fill_surface_single(
     if (params.dont_connect() || fill_lines.size() <= 1) {
         append(polylines_out, chain_polylines(std::move(fill_lines)));
     } else
-        connect_infill(std::move(fill_lines), expolygon, polylines_out, this->get_spacing(), params);
+        connect_infill(std::move(fill_lines), expolygon, polylines_out, scale_t(this->get_spacing()), params);
 }
 
 void GeneratorDeleter::operator()(Generator *p) {

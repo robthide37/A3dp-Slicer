@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2016 - 2021 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) SuperSlicer 2019 Remi Durand @supermerill
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "../ClipperUtils.hpp"
 #include "../ShortestPath.hpp"
 #include "../Surface.hpp"
@@ -143,7 +148,7 @@ void Fill3DHoneycomb::_fill_surface_single(
 {
     // no rotation is supported for this infill pattern
     BoundingBox bb = expolygon.contour.bounding_box();
-    coord_t     distance = coord_t(scale_(this->get_spacing()) / params.density);
+    coord_t     distance = _line_spacing_for_density(params);
 
     // align bounding box to a multiple of our honeycomb grid module
     // (a module is 2*$distance since one $distance half-module is 
@@ -170,7 +175,7 @@ void Fill3DHoneycomb::_fill_surface_single(
     if (params.connection == icNotConnected || polylines.size() <= 1)
         append(polylines_out, chain_polylines(std::move(polylines)));
     else
-        this->connect_infill(std::move(polylines), expolygon, polylines_out, this->get_spacing(), params);
+        this->connect_infill(std::move(polylines), expolygon, polylines_out, scale_t(this->get_spacing()), params);
 }
 
 } // namespace Slic3r

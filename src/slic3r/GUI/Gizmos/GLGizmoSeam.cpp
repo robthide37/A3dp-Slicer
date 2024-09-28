@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GLGizmoSeam.hpp"
 
 #include "libslic3r/Model.hpp"
@@ -54,9 +58,7 @@ std::string GLGizmoSeam::on_get_name() const
     return _u8L("Seam painting");
 }
 
-
-
-void GLGizmoSeam::render_painter_gizmo() const
+void GLGizmoSeam::render_painter_gizmo()
 {
     const Selection& selection = m_parent.get_selection();
 
@@ -97,14 +99,14 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     const float button_width = m_imgui->calc_text_size(m_desc.at("remove_all")).x + m_imgui->scaled(1.f);
     const float minimal_slider_width = m_imgui->scaled(4.f);
 
-    float caption_max = 0.f;
+    float caption_max    = 0.f;
     float total_text_max = 0.f;
-    for (const std::string& t : {"enforce", "block", "remove"}) {
+    for (const auto &t : std::array<std::string, 3>{"enforce", "block", "remove"}) {
         caption_max    = std::max(caption_max, m_imgui->calc_text_size(m_desc[t + "_caption"]).x);
         total_text_max = std::max(total_text_max, m_imgui->calc_text_size(m_desc[t]).x);
     }
     total_text_max += caption_max + m_imgui->scaled(1.f);
-    caption_max += m_imgui->scaled(1.f);
+    caption_max    += m_imgui->scaled(1.f);
 
     const float sliders_left_width = std::max(cursor_size_slider_left, clipping_slider_left);
     const float slider_icon_width  = m_imgui->get_slider_icon_size().x;
@@ -114,13 +116,12 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     window_width = std::max(window_width, cursor_type_radio_left + cursor_type_radio_sphere + cursor_type_radio_circle);
 
     auto draw_text_with_caption = [this, &caption_max](const wxString& caption, const wxString& text) {
-        // static const ImVec4 ORANGE(1.0f, 0.49f, 0.22f, 1.0f);
         m_imgui->text_colored(ImGuiWrapper::get_COL_LIGHT(), caption);
         ImGui::SameLine(caption_max);
         m_imgui->text(text);
     };
 
-    for(const std::string& t : {"enforce", "block", "remove"})
+    for (const auto &t : std::array<std::string, 3>{"enforce", "block", "remove"})
         draw_text_with_caption(m_desc.at(t + "_caption"), m_desc.at(t));
 
     ImGui::Separator();
@@ -161,7 +162,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     else {
         if (m_imgui->button(m_desc.at("reset_direction"))) {
             wxGetApp().CallAfter([this](){
-                    m_c->object_clipper()->set_position(-1., false);
+                    m_c->object_clipper()->set_position_by_ratio(-1., false);
                 });
         }
     }
@@ -170,7 +171,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::SameLine(sliders_left_width);
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, _L("Ctrl + Mouse wheel")))
-    m_c->object_clipper()->set_position(clp_dist, true);
+        m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
     ImGui::Separator();
     if (m_imgui->button(m_desc.at("remove_all"))) {
@@ -182,7 +183,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
                 ++idx;
                 m_triangle_selectors[idx]->reset();
                 m_triangle_selectors[idx]->request_update_render_data();
-    }
+            }
 
         update_model_object();
         m_parent.set_as_dirty();
@@ -210,7 +211,7 @@ void GLGizmoSeam::update_model_object() const
         wxGetApp().obj_list()->update_info_items(std::find(mos.begin(), mos.end(), mo) - mos.begin());
 
         m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
-}
+    }
 }
 
 

@@ -3,10 +3,10 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <optional>
 #include <string>
 #include <wx/string.h>
 #include <wx/arrstr.h>
-#include <boost/optional.hpp>
 
 #include "OctoPrint.hpp"
 #include "libslic3r/PrintConfig.hpp"

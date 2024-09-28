@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "TriangleSelector.hpp"
 #include "Model.hpp"
 
@@ -371,7 +375,7 @@ std::pair<std::vector<Vec3i32>, std::vector<Vec3i32>> TriangleSelector::precompu
 {
     std::vector<Vec3i32> neighbors(m_triangles.size(), Vec3i32(-1, -1, -1));
     std::vector<Vec3i32> neighbors_propagated(m_triangles.size(), Vec3i32(-1, -1, -1));
-    for (int facet_idx = 0; facet_idx < this->m_orig_size_indices; ++facet_idx) {
+    for (int facet_idx = 0; facet_idx < m_orig_size_indices; ++facet_idx) {
         neighbors[facet_idx]            = m_neighbors[facet_idx];
         neighbors_propagated[facet_idx] = neighbors[facet_idx];
         assert(this->verify_triangle_neighbors(m_triangles[facet_idx], neighbors[facet_idx]));
@@ -1480,7 +1484,7 @@ void TriangleSelector::get_facets_split_by_tjoints(const Vec3i32 &vertices, cons
 
 std::vector<Vec2i32> TriangleSelector::get_seed_fill_contour() const {
     std::vector<Vec2i32> edges_out;
-    for (int facet_idx = 0; facet_idx < this->m_orig_size_indices; ++facet_idx) {
+    for (int facet_idx = 0; facet_idx < m_orig_size_indices; ++facet_idx) {
         const Vec3i32 neighbors = m_neighbors[facet_idx];
         assert(this->verify_triangle_neighbors(m_triangles[facet_idx], neighbors));
         this->get_seed_fill_contour_recursive(facet_idx, neighbors, neighbors, edges_out);

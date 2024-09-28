@@ -1,3 +1,13 @@
+#/|/ Copyright (c) Prusa Research 2017 - 2023 Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
+#/|/ Copyright (c) 2023 Ben Greiner
+#/|/ Copyright (c) 2021 D-mo @dimitry-ishenko
+#/|/ Copyright (c) 2020 Pascal de Bruijn @pmjdebruijn
+#/|/ Copyright (c) 2019 Sam Segers
+#/|/ Copyright (c) 2019 Colin Gilgenbach @hexane360
+#/|/ Copyright (c) 2018 Dan Kortschak
+#/|/
+#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+#/|/
 cmake_minimum_required(VERSION 3.13)
 project(Slic3r)
 
@@ -32,17 +42,15 @@ if(NOT WIN32)
     )
 endif()
 
-option(SLIC3R_STATIC 			"Compile Slic3r with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
-option(SLIC3R_GUI    			"Compile Slic3r with GUI components (OpenGL, wxWidgets)" 1)
+option(SLIC3R_STATIC            "Compile Slic3r with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
+option(SLIC3R_GUI               "Compile Slic3r with GUI components (OpenGL, wxWidgets)" 1)
 option(SLIC3R_FHS               "Assume Slic3r is to be installed in a FHS directory structure" 0)
-option(SLIC3R_WX_STABLE         "Build against wxWidgets stable (3.0) as oppsed to dev (3.1) on Linux" 0)
-option(SLIC3R_PROFILE 			"Compile Slic3r with an invasive Shiny profiler" 0)
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
 option(SLIC3R_MSVC_PDB          "Generate PDB files on MSVC in Release mode" 1)
-option(SLIC3R_PERL_XS           "Compile XS Perl module and enable Perl unit and integration tests" 0)
 option(SLIC3R_ASAN              "Enable ASan on Clang and GCC" 0)
-option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" 1)
+option(SLIC3R_UBSAN             "Enable UBSan on Clang and GCC" 0)
+option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" ON)
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
 CMAKE_DEPENDENT_OPTION(SLIC3R_DESKTOP_INTEGRATION "Allow perfoming desktop integration during runtime" 1 "NOT SLIC3R_FHS" 0)
 
@@ -51,6 +59,23 @@ set(OPENVDB_FIND_MODULE_PATH "" CACHE PATH "Path to OpenVDB installation's find 
 set(SLIC3R_GTK "2" CACHE STRING "GTK version to use with wxWidgets on Linux")
 
 set(IS_CROSS_COMPILE FALSE)
+
+if (SLIC3R_STATIC)
+    # Prefer config scripts over find modules. This is helpful when building with
+    # the static dependencies. Many libraries have their own export scripts
+    # while having a Find<PkgName> module in standard cmake installation.
+    # (e.g. CURL)
+    set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+endif ()
+
+# Dependency build management
+option(${PROJECT_NAME}_BUILD_DEPS "Build dependencies before the project" OFF)
+option(${PROJECT_NAME}_DEPS_OUTPUT_QUIET "Don't print build output for dependencies" OFF)
+set(${PROJECT_NAME}_DEPS_PRESET "default" CACHE STRING "Preset of the dependencies when ${PROJECT_NAME}_BUILD_DEPS is ON")
+set(${PROJECT_NAME}_DEPS_BUILD_DIR "" CACHE PATH "Binary dir of the dependencies build when ${PROJECT_NAME}_BUILD_DEPS is ON")
+if (${PROJECT_NAME}_BUILD_DEPS)
+    include(deps/autobuild.cmake)
+endif ()
 
 if (APPLE)
     set(CMAKE_FIND_FRAMEWORK LAST)
@@ -61,13 +86,11 @@ if (APPLE)
     endif ()
 endif ()
 
-# Proposal for C++ unit tests and sandboxes
 option(SLIC3R_BUILD_SANDBOXES   "Build development sandboxes" OFF)
 option(SLIC3R_BUILD_TESTS       "Build unit tests" OFF)
 
 if (IS_CROSS_COMPILE)
     message("Detected cross compilation setup. Tests and encoding checks will be forcedly disabled!")
-    set(SLIC3R_PERL_XS OFF CACHE BOOL "" FORCE)
     set(SLIC3R_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 endif ()
 
@@ -115,6 +138,8 @@ if (MSVC)
     # C4244: 'conversion' conversion from 'type1' to 'type2', possible loss of data. An integer type is converted to a smaller integer type.
     # C4267: The compiler detected a conversion from size_t to a smaller type.
     add_compile_options(/wd4244 /wd4267)
+    # Enforce strict C++ conformance, so our code that compiles on MSVC also compiles on GCC and clang.
+    add_compile_options(/permissive-)
 endif ()
 
 if (MINGW)
@@ -153,10 +178,6 @@ enable_testing ()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# To be able to link libslic3r with the Perl XS module.
-# Once we get rid of Perl and libslic3r is linked statically, we can get rid of -fPIC
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
 # WIN10SDK_PATH is used to point CMake to the WIN10 SDK installation directory.
 # We pick it from environment if it is not defined in another way
 if(WIN32)
@@ -171,41 +192,42 @@ if(WIN32)
         else()
             message("WIN10SDK_PATH is invalid: ${WIN10SDK_PATH}")
             message("${WIN10SDK_PATH}/include/winrt/windows.graphics.printing3d.h was not found")
-            message("STL fixing by the Netfabb service will not be compiled")
+            message("STL fixing by WinSDK will not be compiled")
             unset(WIN10SDK_PATH)
         endif()
     else()
         # Try to use the default Windows 10 SDK path.
         if(NOT DEFINED ENV{WindowsSdkDir})
             message("Env var 'WindowsSdkDir' not defined, trying to use location on 'C:/Program Files (x86)/Windows Kits/10' and version '${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}' for it.")
-			set(CMAKE_WINDOWS_KITS_10_DIR "C:/Program Files (x86)/Windows Kits/10")
+            set(CMAKE_WINDOWS_KITS_10_DIR "C:/Program Files (x86)/Windows Kits/10")
             set(WIN10SDK_PATH "${CMAKE_WINDOWS_KITS_10_DIR}")
-			set(WIN10SDK_INCLUDE_PATH "${CMAKE_WINDOWS_KITS_10_DIR}/Include/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
-			link_directories(${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64)
-			if (NOT EXISTS "${WIN10SDK_INCLUDE_PATH}/winrt/windows.graphics.printing3d.h")
-				message("${WIN10SDK_INCLUDE_PATH}/winrt/windows.graphics.printing3d.h was not found")
-				message("STL fixing by the Netfabb service will not be compiled")
-				unset(WIN10SDK_INCLUDE_PATH)
-			endif()
+            set(WIN10SDK_INCLUDE_PATH "${CMAKE_WINDOWS_KITS_10_DIR}/Include/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
+            link_directories(${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64)
+            if (NOT EXISTS "${WIN10SDK_INCLUDE_PATH}/winrt/windows.graphics.printing3d.h")
+                message("${WIN10SDK_INCLUDE_PATH}/winrt/windows.graphics.printing3d.h was not found")
+                message("STL fixing by the Netfabb service will not be compiled")
+                unset(WIN10SDK_INCLUDE_PATH)
+            endif()
         else()
 			set(WIN10SDK_INCLUDE_PATH "$ENV{WindowsSdkDir}/Include/$ENV{WindowsSDKVersion}")
 			if (NOT EXISTS "${WIN10SDK_INCLUDE_PATH}/winrt/windows.graphics.printing3d.h")
 				message("${WIN10SDK_INCLUDE_PATH}/winrt/windows.graphics.printing3d.h was not found")
-				message("STL fixing by the Netfabb service will not be compiled")
+                message("STL fixing by WinSDK will not be compiled")
 				unset(WIN10SDK_INCLUDE_PATH)
 			endif()
 		endif()
     endif()
     if(WIN10SDK_INCLUDE_PATH)
-        message("Building with Win10 Netfabb STL fixing service support")
+        message("Building with Win10 STL fixing service support")
         add_definitions(-DHAS_WIN10SDK)
         include_directories("${WIN10SDK_INCLUDE_PATH}")
     else()
-        message("Building without Win10 Netfabb STL fixing service support")
+        message("Building without Win10 STL fixing service support")
     endif()
 endif()
 
 if (APPLE)
+    add_compile_options(-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION)
     message("OS X SDK Path: ${CMAKE_OSX_SYSROOT}")
     if (CMAKE_OSX_DEPLOYMENT_TARGET)
         message("OS X Deployment Target: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
@@ -257,6 +279,11 @@ if (NOT MSVC AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMP
         add_compile_options(-Wno-deprecated-declarations)
     endif()
 
+    # Clang reports misleading indentation for some IF blocks because of mixing tabs with spaces.
+    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+        add_compile_options(-Wno-misleading-indentation)
+    endif()
+
     #GCC generates loads of -Wunknown-pragmas when compiling igl. The fix is not easy due to a bug in gcc, see
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66943 or
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53431
@@ -284,6 +311,32 @@ if (SLIC3R_ASAN)
     endif ()
 endif ()
 
+if (SLIC3R_UBSAN)
+    # Stacktrace for every report is enabled by default. It can be disabled by running Slic3r with "UBSAN_OPTIONS=print_stacktrace=0".
+
+    # Define macro SLIC3R_UBSAN to allow detection in the source code if this sanitizer is enabled.
+    add_compile_definitions(SLIC3R_UBSAN)
+
+    # Clang supports much more useful checks than GCC, so when Clang is detected, another checks will be enabled.
+    # List of what GCC is checking: https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
+    # List of what Clang is checking: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+        set(_ubsan_flags "-fsanitize=undefined,integer")
+    else ()
+        set(_ubsan_flags "-fsanitize=undefined")
+    endif ()
+
+    add_compile_options(${_ubsan_flags} -fno-omit-frame-pointer)
+
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${_ubsan_flags}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_ubsan_flags}")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${_ubsan_flags}")
+
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lubsan")
+    endif ()
+endif ()
+
 if (APPLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=partial-availability -Werror=unguarded-availability -Werror=unguarded-availability-new")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=partial-availability -Werror=unguarded-availability -Werror=unguarded-availability-new")
@@ -305,6 +358,7 @@ if(WIN32)
         # Force the source code encoding to UTF-8. See PrusaSlicer GH pull request #5583
         add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
         add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+        add_compile_options("$<$<CONFIG:RELWITHDEBINFO>:-D_RELWITHDEBINFO>")
     endif(MSVC)
 endif(WIN32)
 
@@ -312,25 +366,6 @@ add_definitions(-DwxUSE_UNICODE -D_UNICODE -DUNICODE -DWXINTL_NO_GETTEXT_MACRO)
 
 # Disable unsafe implicit wxString to const char* / std::string and vice versa. This implicit conversion breaks the UTF-8 encoding quite often.
 add_definitions(-DwxNO_UNSAFE_WXSTRING_CONV)
-
-if (SLIC3R_PROFILE)
-    message("Slic3r will be built with a Shiny invasive profiler")
-    add_definitions(-DSLIC3R_PROFILE)
-endif ()
-
-# Disable optimization even with debugging on.
-if (0)
-    message(STATUS "Perl compiled without optimization. Disabling optimization for the Slic3r build.")
-    message("Old CMAKE_CXX_FLAGS_RELEASE: ${CMAKE_CXX_FLAGS_RELEASE}")
-    message("Old CMAKE_CXX_FLAGS_RELWITHDEBINFO: ${CMAKE_CXX_FLAGS_RELEASE}")
-    message("Old CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS_RELEASE}")
-    set(CMAKE_CXX_FLAGS_RELEASE "/MD /Od /Zi /EHsc /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_C_FLAGS_RELEASE "/MD /Od /Zi /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/MD /Od /Zi /EHsc /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_C_FLAGS_RELWITHDEBINFO "/MD /Od /Zi /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_CXX_FLAGS "/MD /Od /Zi /EHsc /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_C_FLAGS "/MD /Od /Zi /DWIN32 /DTBB_USE_ASSERT")
-endif()
 
 # Find and configure boost
 if(SLIC3R_STATIC)
@@ -405,6 +440,7 @@ endif()
 set(TBB_DEBUG 1)
 find_package(TBB REQUIRED)
 slic3r_remap_configs(TBB::tbb RelWithDebInfo Release)
+slic3r_remap_configs(TBB::tbbmalloc RelWithDebInfo Release)
 # include_directories(${TBB_INCLUDE_DIRS})
 # add_definitions(${TBB_DEFINITIONS})
 # if(MSVC)
@@ -444,6 +480,14 @@ include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 # no matter what.
 find_package(EXPAT REQUIRED)
 
+add_library(libexpat INTERFACE)
+
+if (TARGET EXPAT::EXPAT )
+    target_link_libraries(libexpat INTERFACE EXPAT::EXPAT)
+elseif(TARGET expat::expat)
+    target_link_libraries(libexpat INTERFACE expat::expat)
+endif ()
+
 find_package(PNG REQUIRED)
 
 set(OpenGL_GL_PREFERENCE "LEGACY")
@@ -455,19 +499,16 @@ if (SLIC3R_STATIC AND NOT SLIC3R_STATIC_EXCLUDE_GLEW)
     set(GLEW_VERBOSE ON)
 endif()
 
-find_package(GLEW)
-if (NOT TARGET GLEW::GLEW)
-    message(STATUS "GLEW not found, using bundled version.")
-    add_library(glew STATIC ${LIBDIR}/glew/src/glew.c)
-    set(GLEW_FOUND TRUE)
-    set(GLEW_INCLUDE_DIRS ${LIBDIR}/glew/include/)
-    target_compile_definitions(glew PUBLIC GLEW_STATIC)
-    target_include_directories(glew PUBLIC ${GLEW_INCLUDE_DIRS})
-    add_library(GLEW::GLEW ALIAS glew)
-endif ()
+find_package(GLEW REQUIRED)
 
 # Find the Cereal serialization library
 find_package(cereal REQUIRED)
+add_library(libcereal INTERFACE)
+if (NOT TARGET cereal::cereal)
+    target_link_libraries(libcereal INTERFACE cereal)
+else()
+    target_link_libraries(libcereal INTERFACE cereal::cereal)
+endif()
 
 # l10n
 set(L10N_DIR "${SLIC3R_RESOURCES_DIR}/localization")
@@ -540,6 +581,7 @@ foreach(po_file ${L10N_PO_FILES})
 endforeach()
 
 find_package(NLopt 1.4 REQUIRED)
+slic3r_remap_configs(NLopt::nlopt RelWithDebInfo Release)
 
 if(SLIC3R_STATIC)
     set(OPENVDB_USE_STATIC_LIBS ON)
@@ -592,12 +634,12 @@ function(prusaslicer_copy_dlls target)
     
     # This has to be a separate target due to the windows command line lenght limits    
     add_custom_command(TARGET ${target} POST_BUILD 
-        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/GMP/gmp/lib/win${_bits}/libgmp-10.dll ${_out_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/+GMP/gmp/lib/win${_bits}/libgmp-10.dll ${_out_dir}
         COMMENT "Copy gmp runtime to build tree"
         VERBATIM)
     
     add_custom_command(TARGET ${target} POST_BUILD 
-        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/MPFR/mpfr/lib/win${_bits}/libmpfr-4.dll ${_out_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/+MPFR/mpfr/lib/win${_bits}/libmpfr-4.dll ${_out_dir}
         COMMENT "Copy mpfr runtime to build tree"
         VERBATIM)
 
@@ -609,13 +651,6 @@ add_subdirectory(src)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Slic3r_app_console)
 
 add_dependencies(gettext_make_pot hintsToPot)
-
-# Perl bindings, currently only used for the unit / integration tests of libslic3r.
-# Also runs the unit / integration tests.
-#FIXME Port the tests into C++ to finally get rid of the Perl!
-if (SLIC3R_PERL_XS)
-    add_subdirectory(xs)
-endif ()
 
 if(SLIC3R_BUILD_SANDBOXES)
     add_subdirectory(sandboxes)
@@ -661,8 +696,7 @@ endif ()
 
 configure_file(${LIBDIR}/platform/unix/fhs.hpp.in ${LIBDIR_BIN}/platform/unix/fhs.hpp)
 
-if (WIN32)
-else () 
+if (NOT WIN32)
     set(CPACK_GENERATOR "STGZ;TGZ;TZ")
     set(CPACK_NSIS_DISPLAY_NAME "${SLIC3R_APP_NAME} ${SLIC3R_VERSION}")
     set(CPACK_OUTPUT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/CPackConfig.cmake")
@@ -690,3 +724,4 @@ else ()
 endif()
 
 include(CPack)
+
