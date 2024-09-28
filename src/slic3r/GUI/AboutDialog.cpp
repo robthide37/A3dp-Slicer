@@ -290,16 +290,15 @@ AboutDialog::AboutDialog()
         std::array<int, 7> size = {fs,fs,fs,fs,fs,fs,fs};
         m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), size.data());
         m_html->SetBorders(2);
-        const std::string copyright_str = _utf8(L("Copyright"));
+        const std::string copyright_str = _u8L(("Copyright"));
         // TRN "Slic3r _is licensed under the_ License"
-        const std::string is_lecensed_str = _utf8(L("is licensed under the"));
-        const std::string license_str = _utf8(L("GNU Affero General Public License, version 3"));
-        const std::string based_on_str = _utf8(L("SuperSlicer is a skinned version of Slic3r, based on PrusaSlicer by Prusa and the original Slic3r by Alessandro Ranellucci & the RepRap community."));
-        const std::string contributors_str = _utf8(L("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik, Durand Rémi and numerous others."));
-        const std::string manual_str = _utf8(L("Manual by Gary Hodgson. Inspired by the RepRap community."));
-        const std::string icon_str = _utf8(L("Slic3r logo designed by Corey Daniels."));
-        const auto text = from_u8(
-            (boost::format(
+        const std::string is_lecensed_str = _u8L(("is licensed under the"));
+        const std::string license_str = _u8L(("GNU Affero General Public License, version 3"));
+        const std::string based_on_str = _u8L(("SuperSlicer is a skinned version of Slic3r, based on PrusaSlicer by Prusa and the original Slic3r by Alessandro Ranellucci & the RepRap community."));
+        const std::string contributors_str = _u8L(("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik, Durand Rémi and numerous others."));
+        const std::string manual_str = _u8L(("Manual by Gary Hodgson. Inspired by the RepRap community."));
+        const std::string icon_str = _u8L(("Slic3r logo designed by Corey Daniels."));
+        const auto text = format_wxstr(
             "<html>"
             "<body bgcolor= %1% link= %2%>"
             "<font color=%3%>"

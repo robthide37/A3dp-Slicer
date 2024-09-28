@@ -3700,7 +3700,7 @@ void GCodeGenerator::emit_milling_commands(std::string& gcode, const ObjectsLaye
             this->placeholder_parser().set("current_extruder", milling_extruder_id);
             // Append the filament start G-code.
             const std::string& start_mill_gcode = m_config.milling_toolchange_start_gcode.get_at(0);
-            //coordf_t previous_print_z = m_layer != nullptr ? m_layer->print_z : 0;
+            coordf_t previous_print_z = m_layer != nullptr ? m_layer->print_z : 0;
             if (!start_mill_gcode.empty()) {
                 DynamicConfig config;
                 config.set_key_value("previous_extruder", new ConfigOptionInt((int)current_extruder_filament));
