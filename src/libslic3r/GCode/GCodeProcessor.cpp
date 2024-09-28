@@ -2839,7 +2839,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
         if (m_wiping)
             return EMoveType::Wipe;
         else if (m_laser)
-            type = EMoveType::Extrude;
+            return EMoveType::Extrude;
         else if (delta_pos[E] < 0.0f)
             return (delta_pos[X] != 0.0f || delta_pos[Y] != 0.0f || delta_pos[Z] != 0.0f) ? EMoveType::Travel : EMoveType::Retract;
         else if (delta_pos[E] > 0.0f) {
