@@ -145,7 +145,7 @@ BundleMap BundleMap::load()
         prusa_bundle_loc = BundleLocation::IN_ARCHIVE;
     }
     if (!boost::filesystem::exists(prusa_bundle_path)) {
-        prusa_bundle_path = (rsrc_vendor_dir / PresetBundle::PRUSA_BUNDLE).replace_extension(".ini");
+        prusa_bundle_path = (rsrc_vendor_dir / ALLOW_PRUSA_FIRST).replace_extension(".ini");
         prusa_bundle_loc = BundleLocation::IN_RESOURCES;
     }
     {
@@ -220,7 +220,7 @@ BundleMap BundleMap::load()
             }
         }
       }catch (std::exception e) {
-          MessageDialog msg(nullptr, format_wxstr(_L("Can't open directory '%1%'. Config bundles from here can't be loaded.\nError: %2%"), vendor_dir.string(), e.what()), _L("Error"), wxOK);
+          MessageDialog msg(nullptr, format_wxstr(_L("Can't open directory '%1%'. Config bundles from here can't be loaded.\nError: %2%"), dir.first.string(), e.what()), _L("Error"), wxOK);
           msg.ShowModal();
       }
     }

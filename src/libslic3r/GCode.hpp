@@ -353,6 +353,7 @@ private:
         // and the object & support layer of the above.
         const ObjectLayerToPrint &layer_to_print);
     void emit_milling_commands(std::string& gcode, const ObjectsLayerToPrint& layers);
+    void emit_laser_commands(std::string& gcode, const SupportLayer *support_layer);
     
     // set the region config, and the overrides it contains.
     // if no m_region, then it will take the default region config from print_object
