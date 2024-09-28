@@ -1,3 +1,19 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Tomáš Mészáros @tamasmeszaros, Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, David Kocík @kocikdav, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Pavel Mikuš @Godrak, Filip Sykala @Jony01, Vojtěch Král @vojtechkral
+///|/
+///|/ ported from lib/Slic3r/GUI/Plater.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2019 Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros
+///|/ Copyright (c) 2018 Martin Loidl @LoidlM
+///|/ Copyright (c) 2017 Matthias Gazzari @qtux
+///|/ Copyright (c) Slic3r 2012 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2017 Joseph Lenox @lordofhyphens
+///|/ Copyright (c) 2015 Daren Schwenke
+///|/ Copyright (c) 2014 Mark Hindess
+///|/ Copyright (c) 2012 Mike Sheldrake @mesheldrake
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2012 Sam Wong
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Plater_hpp_
 #define slic3r_Plater_hpp_
 
@@ -14,6 +30,7 @@
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "Jobs/Job.hpp"
+#include "Jobs/Worker.hpp"
 #include "Search.hpp"
 #include "GUI_Preview.hpp"
 #include "ProjectDirtyStateManager.hpp"
@@ -29,13 +46,12 @@ namespace Slic3r {
 class BuildVolume;
 class Model;
 class ModelObject;
-enum class ModelObjectCutAttribute : int;
-using ModelObjectCutAttributes = enum_bitmask<ModelObjectCutAttribute>;
 class ModelInstance;
 class PrintBase;
 class Print;
 class SLAPrint;
-enum SLAPrintObjectStep : unsigned int;
+enum PrintObjectStep : uint8_t;
+enum SLAPrintObjectStep : uint8_t;
 enum class ConversionType : int;
 
 using ModelInstancePtrs = std::vector<ModelInstance*>;
@@ -87,9 +103,12 @@ public:
     void update_reslice_btn_tooltip() const;
     void msw_rescale();
     void sys_color_changed();
+    void update_mode_markers();
     void search();
     void jump_to_option(size_t selected);
     void jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category);
+    // jump to option which is represented by composite key : "opt_key;tab_name"
+    void jump_to_option(const std::string& composite_key);
 
     ObjectManipulation*     obj_manipul();
     ObjectList*             obj_list();
@@ -156,6 +175,8 @@ public:
     void render_project_state_debug_window() const;
 #endif // ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
 
+    bool is_project_temp() const;
+
     Sidebar& sidebar();
     const Model& model() const;
     Model& model();
@@ -169,11 +190,14 @@ public:
     void load_project();
     void load_project(const wxString& filename);
     void add_model(bool imperial_units = false);
+    void import_zip_archive();
     void import_sl1_archive();
     void extract_config_from_project();
     void load_gcode();
     void load_gcode(const wxString& filename);
     void reload_gcode_from_disk();
+    void convert_gcode_to_ascii();
+    void convert_gcode_to_binary();
     void refresh_print();
 
     //std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model = true, bool load_config = true, bool update_dirs = true, bool imperial_units = false);
@@ -182,13 +206,54 @@ public:
     std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model, bool load_config, bool update_dirs, bool imperial_units);
     std::vector<size_t> load_files(const std::vector<std::string>& input_files,             bool load_model, bool load_config, bool update_dirs, bool imperial_units);
     // to be called on drag and drop
-    bool load_files(const wxArrayString& filenames);
+    bool load_files(const wxArrayString& filenames, bool delete_after_load = false);
+    void notify_about_installed_presets();
+
+    bool preview_zip_archive(const boost::filesystem::path& input_file);
 
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
 
-    void update();
-    void stop_jobs();
-    bool is_any_job_running() const;
+    enum class UpdateParams {
+        FORCE_FULL_SCREEN_REFRESH = 1,
+        FORCE_BACKGROUND_PROCESSING_UPDATE = 2,
+        POSTPONE_VALIDATION_ERROR_MESSAGE = 4,
+    };
+    void update(unsigned int flags = 0);
+
+    // Get the worker handling the UI jobs (arrange, fill bed, etc...)
+    // Here is an example of starting up an ad-hoc job:
+    //    queue_job(
+    //        get_ui_job_worker(),
+    //        [](Job::Ctl &ctl) {
+    //            // Executed in the worker thread
+    //
+    //            CursorSetterRAII cursor_setter{ctl};
+    //            std::string msg = "Running";
+    //
+    //            ctl.update_status(0, msg);
+    //            for (int i = 0; i < 100; i++) {
+    //                usleep(100000);
+    //                if (ctl.was_canceled()) break;
+    //                ctl.update_status(i + 1, msg);
+    //            }
+    //            ctl.update_status(100, msg);
+    //        },
+    //        [](bool, std::exception_ptr &e) {
+    //            // Executed in UI thread after the work is done
+    //
+    //            try {
+    //                if (e) std::rethrow_exception(e);
+    //            } catch (std::exception &e) {
+    //                BOOST_LOG_TRIVIAL(error) << e.what();
+    //            }
+    //            e = nullptr;
+    //        });
+    // This would result in quick run of the progress indicator notification
+    // from 0 to 100. Use replace_job() instead of queue_job() to cancel all
+    // pending jobs.
+    Worker& get_ui_job_worker();
+    const Worker & get_ui_job_worker() const;
+
     void select_view(const std::string& direction);
     void select_view_3D(const std::string& name);
     void set_force_preview(Preview::ForceState force);
@@ -200,6 +265,9 @@ public:
 
     bool are_view3D_labels_shown() const;
     void show_view3D_labels(bool show);
+
+    bool is_legend_shown() const;
+    void show_legend(bool show);
 
     bool is_sidebar_collapsed() const;
     void collapse_sidebar(bool show);
@@ -215,23 +283,23 @@ public:
     void remove(size_t obj_idx);
     void reset();
     void reset_with_confirm();
-    void delete_object_from_model(size_t obj_idx);
+    bool delete_object_from_model(size_t obj_idx);
     void remove_selected();
-    void increase_instances(size_t num = 1);
-    void decrease_instances(size_t num = 1);
-    void set_number_of_copies(/*size_t num*/);
+    void increase_instances(size_t num = 1, int obj_idx = -1, int inst_idx = -1);
+    void decrease_instances(size_t num = 1, int obj_idx = -1);
+    void set_number_of_copies();
     void fill_bed_with_instances();
     bool is_selection_empty() const;
     void scale_selection_to_fit_print_volume();
     void convert_unit(ConversionType conv_type);
     void toggle_layers_editing(bool enable);
 
-    void cut(size_t obj_idx, size_t instance_idx, coordf_t z, ModelObjectCutAttributes attributes);
+    void apply_cut_object_to_model(size_t init_obj_idx, const ModelObjectPtrs& cut_objects);
 
     std::string get_export_path();
     void export_gcode(bool prefer_removable);
     void export_platter();
-    void export_stl(std::string path, bool extended = false, bool selection_only = false);
+    void export_stl_obj(std::string path, bool extended = false, bool selection_only = false);
     void export_amf();
     bool export_3mf(const boost::filesystem::path& output_path = boost::filesystem::path());
     void reload_from_disk();
@@ -240,13 +308,13 @@ public:
     bool has_toolpaths_to_export() const;
     void export_toolpaths_to_obj() const;
     void reslice();
-    void reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages = false);
-    void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
+    void reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
 
-    void clear_before_change_mesh(int obj_idx);
+    void clear_before_change_mesh(int obj_idx, const std::string &notification_msg);
     void changed_mesh(int obj_idx);
 
+    void changed_object(ModelObject &object);
     void changed_object(int obj_idx);
     void changed_objects(const std::vector<size_t>& object_idxs);
     void schedule_background_process(bool schedule = true);
@@ -278,14 +346,16 @@ public:
     bool update_filament_colors_in_full_config();
     void on_config_change(const DynamicConfig &config);
     void force_filament_colors_update();
+    void force_filament_cb_update();
     void force_print_bed_update();
     // On activating the parent window.
     void on_activate();
-    std::vector<std::string> get_extruder_colors_from_plater_config(const GCodeProcessorResult* const result = nullptr) const;
-    std::vector<std::string> get_colors_for_color_print(const GCodeProcessorResult* const result = nullptr) const;
+    std::vector<std::string> get_extruder_colors_from_plater_config(std::optional<std::reference_wrapper<const GCodeProcessorResult>> result = {}) const;
+    std::vector<std::string> get_colors_for_color_print(std::optional<std::reference_wrapper<const GCodeProcessorResult>> result = {}) const;
 
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;
+    void show_action_buttons() const;
 
     wxString get_project_filename(const wxString& extension = wxEmptyString) const;
     void set_project_filename(const wxString& filename);
@@ -300,7 +370,7 @@ public:
     GLCanvas3D* get_current_canvas3D();
     
     void arrange();
-    void find_new_position(const ModelInstancePtrs  &instances);
+    void arrange(Worker &w, bool selected);
 
     void set_current_canvas_as_dirty();
     void unbind_canvas_event_handlers();
@@ -316,14 +386,13 @@ public:
     void mirror(Axis axis);
     void split_object();
     void split_volume();
-    void optimize_rotation();
 
     bool can_delete() const;
     bool can_delete_all() const;
     bool can_increase_instances() const;
-    bool can_decrease_instances() const;
+    bool can_decrease_instances(int obj_idx = -1) const;
     bool can_set_instance_to_object() const;
-    bool can_fix_through_netfabb() const;
+    bool can_fix_through_winsdk() const;
     bool can_simplify() const;
     bool can_split_to_objects() const;
     bool can_split_to_volumes() const;
@@ -363,7 +432,8 @@ public:
     const GLToolbar& get_collapse_toolbar() const;
     GLToolbar& get_collapse_toolbar();
 
-    void update_preview_bottom_toolbar();
+    void set_preview_layers_slider_values_range(int bottom, int top);
+
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
 
@@ -375,6 +445,7 @@ public:
 
 	void set_bed_shape() const;
     void set_bed_shape(const Pointfs& shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false) const;
+    void set_default_bed_shape() const;
 
     NotificationManager * get_notification_manager();
     const NotificationManager * get_notification_manager() const;
@@ -429,6 +500,8 @@ public:
     void toggle_render_statistic_dialog();
     bool is_render_statistic_dialog_visible() const;
 
+    void set_keep_current_preview_type(bool value);
+
 	// Wrapper around wxWindow::PopupMenu to suppress error messages popping out while tracking the popup menu.
 	bool PopupMenu(wxMenu *menu, const wxPoint& pos = wxDefaultPosition);
     bool PopupMenu(wxMenu *menu, int x, int y) { return this->PopupMenu(menu, wxPoint(x, y)); }
@@ -436,6 +509,8 @@ public:
     // get same Plater/ObjectList menus
     wxMenu* object_menu();
     wxMenu* part_menu();
+    wxMenu* text_part_menu();
+    wxMenu* svg_part_menu();
     wxMenu* sla_object_menu();
     wxMenu* default_menu();
     wxMenu* instance_menu();
@@ -447,6 +522,8 @@ public:
     static void show_illegal_characters_warning(wxWindow* parent);
 
 private:
+    void reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages);
+
     struct priv;
     std::unique_ptr<priv> p;
 
@@ -471,6 +548,16 @@ public:
     ~SuppressBackgroundProcessingUpdate();
 private:
     bool m_was_scheduled;
+};
+
+class PlaterAfterLoadAutoArrange
+{
+    bool m_enabled{ false };
+
+public:
+    PlaterAfterLoadAutoArrange();
+    ~PlaterAfterLoadAutoArrange();
+    void disable() { m_enabled = false; }
 };
 
 } // namespace GUI

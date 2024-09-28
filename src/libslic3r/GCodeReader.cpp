@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2017 - 2023 Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, Lukáš Hejl @hejllukas, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GCodeReader.hpp"
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -10,7 +14,6 @@
 
 #include "LocalesUtils.hpp"
 
-#include <Shiny/Shiny.h>
 #include <fast_float/fast_float.h>
 
 namespace Slic3r {
@@ -37,14 +40,11 @@ void GCodeReader::apply_config(const DynamicPrintConfig &config)
 
 const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, GCodeLine &gline, std::pair<const char*, const char*> &command)
 {
-    PROFILE_FUNC();
-
     assert(is_decimal_separator_point());
     
     // command and args
     const char *c = ptr;
     {
-        PROFILE_BLOCK(command_and_args);
         // Skip the whitespaces.
         command.first = skip_whitespaces(c);
         // Skip the command.
@@ -74,7 +74,7 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
             if (axis != NUM_AXES_WITH_UNKNOWN) {
                 // Try to parse the numeric value.
                 double v;
-                c = skip_whitespaces(++c);
+                c = skip_whitespaces(++ c);
                 auto [pend, ec] = fast_float::from_chars(c, end, v);
                 if (pend != c && is_end_of_word(*pend)) {
                     // The axis value has been parsed correctly.
@@ -98,10 +98,8 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
     for (; ! is_end_of_line(*c); ++ c);
 
     // Copy the raw string including the comment, without the trailing newlines.
-    if (c > ptr) {
-        PROFILE_BLOCK(copy_raw_string);
+    if (c > ptr)
         gline.m_raw.assign(ptr, c);
-    }
 
     // Skip the trailing newlines.
 	if (*c == '\r')
@@ -117,7 +115,6 @@ const char* GCodeReader::parse_line_internal(const char *ptr, const char *end, G
 
 void GCodeReader::update_coordinates(GCodeLine &gline, std::pair<const char*, const char*> &command)
 {
-    PROFILE_FUNC();
     if (*command.first == 'G') {
         int cmd_len = int(command.second - command.first);
         if ((cmd_len == 2 && (command.first[1] == '0' || command.first[1] == '1' || command.first[1] == '2' || command.first[1] == '3')) ||
@@ -202,10 +199,11 @@ bool GCodeReader::parse_file(const std::string &file, callback_t callback)
     return this->parse_file_internal(file, callback, [](size_t){});
 }
 
-bool GCodeReader::parse_file(const std::string &file, callback_t callback, std::vector<size_t> &lines_ends)
+bool GCodeReader::parse_file(const std::string& file, callback_t callback, std::vector<std::vector<size_t>>& lines_ends)
 {
     lines_ends.clear();
-    return this->parse_file_internal(file, callback, [&lines_ends](size_t file_pos){ lines_ends.emplace_back(file_pos); });
+    lines_ends.push_back(std::vector<size_t>());
+    return this->parse_file_internal(file, callback, [&lines_ends](size_t file_pos) { lines_ends.front().emplace_back(file_pos); });
 }
 
 bool GCodeReader::parse_file_raw(const std::string &filename, raw_line_callback_t line_callback)
@@ -215,9 +213,9 @@ bool GCodeReader::parse_file_raw(const std::string &filename, raw_line_callback_
         [](size_t){});
 }
 
-bool GCodeReader::GCodeLine::has(char axis) const
+const char* GCodeReader::axis_pos(const char *raw_str, char axis)
 {
-    const char *c = m_raw.c_str();
+    const char *c = raw_str;
     // Skip the whitespaces.
     c = skip_whitespaces(c);
     // Skip the command.
@@ -230,9 +228,37 @@ bool GCodeReader::GCodeLine::has(char axis) const
             break;
         // Check the name of the axis.
         if (*c == axis)
-            return true;
+            return c;
         // Skip the rest of the word.
         c = skip_word(c);
+    }
+    return nullptr;
+}
+
+bool GCodeReader::GCodeLine::has(char axis) const
+{
+    return GCodeReader::axis_pos(this->raw().c_str(), axis);
+}
+
+std::string_view GCodeReader::GCodeLine::axis_pos(char axis) const
+{ 
+    const std::string &s = this->raw();
+    const char *c = GCodeReader::axis_pos(this->raw().c_str(), axis);
+    return c ? std::string_view{ c, s.size() - (c - s.data()) } : std::string_view();
+}
+
+bool GCodeReader::GCodeLine::has_value(std::string_view axis_pos, float &value)
+{
+    if (const char *c = axis_pos.data(); c) {
+        // Try to parse the numeric value.
+        double v = 0.;
+        const char *end = axis_pos.data() + axis_pos.size();
+        auto [pend, ec] = fast_float::from_chars(++ c, end, v);
+        if (pend != c && is_end_of_word(*pend)) {
+            // The axis value has been parsed correctly.
+            value = float(v);
+            return true;
+        }
     }
     return false;
 }
@@ -240,32 +266,27 @@ bool GCodeReader::GCodeLine::has(char axis) const
 bool GCodeReader::GCodeLine::has_value(char axis, float &value) const
 {
     assert(is_decimal_separator_point());
-    const char *c = m_raw.c_str();
-    // Skip the whitespaces.
-    c = skip_whitespaces(c);
-    // Skip the command.
-    c = skip_word(c);
-    // Up to the end of line or comment.
-    while (! is_end_of_gcode_line(*c)) {
-        // Skip whitespaces.
-        c = skip_whitespaces(c);
-        if (is_end_of_gcode_line(*c))
-            break;
-        // Check the name of the axis.
-        if (*c == axis) {
-            // Try to parse the numeric value.
-            char   *pend = nullptr;
-            double  v = strtod(++ c, &pend);
-            if (pend != nullptr && is_end_of_word(*pend)) {
-                // The axis value has been parsed correctly.
-                value = float(v);
-                return true;
-            }
+    return this->has_value(this->axis_pos(axis), value);
+}
+
+bool GCodeReader::GCodeLine::has_value(std::string_view axis_pos, int &value)
+{
+    if (const char *c = axis_pos.data(); c) {
+        // Try to parse the numeric value.
+        char   *pend = nullptr;
+        long    v = strtol(++ c, &pend, 10);
+        if (pend != nullptr && is_end_of_word(*pend)) {
+            // The axis value has been parsed correctly.
+            value = int(v);
+            return true;
         }
-        // Skip the rest of the word.
-        c = skip_word(c);
     }
     return false;
+}
+
+bool GCodeReader::GCodeLine::has_value(char axis, int &value) const
+{
+    return this->has_value(this->axis_pos(axis), value);
 }
 
 void GCodeReader::GCodeLine::set(const GCodeReader &reader, const Axis axis, const float new_value, const int decimal_digits)

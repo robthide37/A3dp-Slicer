@@ -19,24 +19,34 @@ namespace GUI {
 class ModeButton : public ScalableButton
 {
 public:
-    ModeButton(
-        wxWindow*           parent,
-        wxWindowID          id,
-        const std::string&  icon_name = "",
-        const wxString&     mode = wxEmptyString,
-        const wxSize&       size = wxDefaultSize,
-        const wxPoint&      pos = wxDefaultPosition);
+    //ModeButton(
+    //    wxWindow*           parent,
+    //    wxWindowID          id,
+    //    const std::string&  icon_name = "",
+    //    const wxString&     mode = wxEmptyString,
+    //    const wxSize&       size = wxDefaultSize,
+    //    const wxPoint&      pos = wxDefaultPosition);
 
-    ModeButton(
-        wxWindow*           parent,
-        const wxString&     mode,
-        const std::string&  icon_name,
-        int                 px_cnt);
+    //ModeButton(
+    //    wxWindow*           parent,
+    //    const wxString&     mode,
+    //    const std::string&  icon_name,
+    //    int                 px_cnt);
 
-    ModeButton(wxWindow* parent,
-        const wxString&     mode,
-        wxBitmap*           bitmap,
-        int                 px_cnt);
+    //ModeButton(wxWindow* parent,
+    //    const wxString&     mode,
+    //    wxBitmap*           bitmap,
+    //    int                 px_cnt);
+		
+     //ModeButton(
+     //    wxWindow*           parent,
+     //    uint64_t            mode_mask,/*ConfigOptionMode*/
+     //    const wxString&     mode = wxEmptyString,
+     //    int                 px_cnt = 16);
+    ModeButton(
+        wxWindow          *parent,
+        const std::string &m_mode_name,
+        int                px_cnt = 16);
 
     ~ModeButton() {}
 
@@ -47,16 +57,21 @@ public:
     void    OnLeaveBtn(wxMouseEvent& event) { focus_button(m_is_selected); event.Skip(); }
 
     void    SetState(const bool state);
+    void    update_bitmap();
     bool    is_selected() { return m_is_selected; }
+    void    sys_color_changed() override;
 
 protected:
     void    focus_button(const bool focus);
 
 private:
     bool        m_is_selected = false;
+    // uint64_t    m_mode_mask {uint64_t(-1)};
+	std::string m_mode_name;
 
     wxString    m_tt_selected;
     wxString    m_tt_focused;
+    wxBitmapBundle    m_bmp;
 };
 
 
@@ -76,13 +91,13 @@ public:
     void set_items_flag(int flag);
     void set_items_border(int border);
 
-    void msw_rescale();
+    void sys_color_changed();
+    void update_mode_markers();
     const std::vector<ModeButton*>& get_btns() { return m_mode_btns; }
 
 private:
     std::vector<ConfigOptionMode> m_bt_mode;
     std::vector<ModeButton*> m_mode_btns;
-    wxWindow*                m_parent {nullptr};
     double                   m_hgap_unscaled;
 };
 

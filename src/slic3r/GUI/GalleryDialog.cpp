@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GalleryDialog.hpp"
 
 #include <cstddef>
@@ -65,8 +69,8 @@ bool GalleryDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& f
 }
 
 
-GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) :
-    DPIDialog(parent, wxID_ANY, _L("Shape Gallery"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+GalleryDialog::GalleryDialog(wxWindow* parent) :
+    DPIDialog(parent, wxID_ANY, _L("Shape Gallery"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "gallery")
 {
 #ifndef _WIN32
     SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
@@ -94,13 +98,12 @@ GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) 
 #endif
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK | wxCLOSE);
-    wxButton* ok_btn = static_cast<wxButton*>(FindWindowById(wxID_OK, this));
-    ok_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(!m_selected_items.empty()); });
-    if (modify_gallery) {
-        ok_btn->SetLabel(_L("Add to bed"));
-        ok_btn->SetToolTip(_L("Add selected shape(s) to the bed"));
-    }
-    static_cast<wxButton*>(FindWindowById(wxID_CLOSE, this))->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
+    m_ok_btn = buttons->GetAffirmativeButton();
+    wxGetApp().SetWindowVariantForButton(m_ok_btn);
+    m_ok_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(!m_selected_items.empty()); });
+
+    buttons->GetCancelButton()->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
     this->SetEscapeId(wxID_CLOSE);
     auto add_btn = [this, buttons]( size_t pos, int& ID, wxString title, wxString tooltip,
                                     void (GalleryDialog::* method)(wxEvent&), 
@@ -108,6 +111,7 @@ GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) 
         ID = NewControlId();
         wxButton* btn = new wxButton(this, ID, title);
         btn->SetToolTip(tooltip);
+        wxGetApp().SetWindowVariantForButton(btn);
         btn->Bind(wxEVT_UPDATE_UI, [enable_fn](wxUpdateUIEvent& evt) { evt.Enable(enable_fn()); });
         buttons->Insert(pos, btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
         this->Bind(wxEVT_BUTTON, method, this, ID);
@@ -137,7 +141,20 @@ GalleryDialog::GalleryDialog(wxWindow* parent, bool modify_gallery/* = false*/) 
 }
 
 GalleryDialog::~GalleryDialog()
-{   
+{
+    // From wxWidgets docs:
+    // The method void wxListCtrl::SetImageList(wxImageList* imageList, int which)
+    // does not take ownership of the image list, you have to delete it yourself.
+    if (m_image_list)
+        delete m_image_list;
+}
+
+int GalleryDialog::show(bool show_from_menu) 
+{
+    m_ok_btn->SetLabel(  show_from_menu ? _L("Add to bed")                       : _L("OK"));
+    m_ok_btn->SetToolTip(show_from_menu ? _L("Add selected shape(s) to the bed") : "");
+
+    return this->ShowModal();
 }
 
 bool GalleryDialog::can_delete() 
@@ -157,8 +174,9 @@ bool GalleryDialog::can_change_thumbnail()
 
 void GalleryDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
-    const int& em = em_unit();
+    update();
 
+    const int& em = em_unit();
     msw_buttons_rescale(this, em, { ID_BTN_ADD_CUSTOM_SHAPE, ID_BTN_DEL_CUSTOM_SHAPE, ID_BTN_REPLACE_CUSTOM_PNG, wxID_OK, wxID_CLOSE });
 
     wxSize size = wxSize(50 * em, 35 * em);
@@ -169,13 +187,14 @@ void GalleryDialog::on_dpi_changed(const wxRect& suggested_rect)
     Refresh();
 }
 
-static void add_lock(wxImage& image) 
+static void add_lock(wxImage& image, wxWindow* parent_win) 
 {
-    int lock_sz = 22;
+    wxBitmapBundle* bmp_bndl = get_bmp_bundle("lock", 22);
 #ifdef __APPLE__
-    lock_sz /= mac_max_scaling_factor();
+    wxBitmap bmp = bmp_bndl->GetBitmap(bmp_bndl->GetDefaultSize() * mac_max_scaling_factor());
+#else
+    wxBitmap bmp = bmp_bndl->GetBitmapFor(parent_win);
 #endif
-    wxBitmap bmp = create_scaled_bitmap("lock", nullptr, lock_sz);
 
     wxImage lock_image = bmp.ConvertToImage();
     if (!lock_image.IsOk() || lock_image.GetWidth() == 0 || lock_image.GetHeight() == 0)
@@ -213,21 +232,28 @@ static void add_lock(wxImage& image)
     }
 }
 
-static void add_default_image(wxImageList* img_list, bool is_system)
+static void add_default_image(wxImageList* img_list, bool is_system, wxWindow* parent_win)
 {
-    int sz = IMG_PX_CNT;
+    wxBitmapBundle* bmp_bndl = get_bmp_bundle("cog", IMG_PX_CNT);
 #ifdef __APPLE__
-    sz /= mac_max_scaling_factor();
+    wxBitmap bmp = bmp_bndl->GetBitmap(bmp_bndl->GetDefaultSize() * mac_max_scaling_factor());
+#else
+    wxBitmap bmp = bmp_bndl->GetBitmapFor(parent_win);
 #endif
-    wxBitmap bmp = create_scaled_bitmap("cog", nullptr, sz, true);
 
+    bmp = bmp.ConvertToDisabled();
     if (is_system) {
         wxImage image = bmp.ConvertToImage();
         if (image.IsOk() && image.GetWidth() != 0 && image.GetHeight() != 0) {
-            add_lock(image);
+            add_lock(image, parent_win);
+#ifdef __APPLE__
+            bmp = wxBitmap(std::move(image), -1, mac_max_scaling_factor());
+#else
             bmp = wxBitmap(std::move(image));
+#endif
         }
     }
+
     img_list->Add(bmp);
 };
 
@@ -273,10 +299,8 @@ static void generate_thumbnail_from_model(const std::string& filename)
     model.center_instances_around_point(to_2d(wxGetApp().plater()->build_volume().bounding_volume().center()));
 
     GLVolumeCollection volumes;
-    volumes.volumes.push_back(new GLVolume());
-    GLVolume* volume = volumes.volumes[0];
-    volume->indexed_vertex_array.load_mesh(model.mesh());
-    volume->indexed_vertex_array.finalize_geometry(true);
+    GLVolume* volume = volumes.volumes.emplace_back(new GLVolume()).get();
+    volume->model.init_from(model.mesh());
     volume->set_instance_transformation(model.objects[0]->instances[0]->get_transformation());
     volume->set_volume_transformation(model.objects[0]->volumes[0]->get_transformation());
 
@@ -341,8 +365,13 @@ void GalleryDialog::load_label_icon_list()
 
     // Make an image list containing large icons
 
+#ifdef __APPLE__
+    m_image_list = new wxImageList(IMG_PX_CNT, IMG_PX_CNT);
+    int px_cnt = IMG_PX_CNT * mac_max_scaling_factor();
+#else
     int px_cnt = (int)(em_unit() * IMG_PX_CNT * 0.1f + 0.5f);
     m_image_list = new wxImageList(px_cnt, px_cnt);
+#endif
 
     for (const auto& item : list_items) {
         fs::path model_path = fs::path((item.is_system ? m_sys_dir_path : m_cust_dir_path) + item.name);
@@ -359,7 +388,7 @@ void GalleryDialog::load_label_icon_list()
             if (can_generate_thumbnail)
                 generate_thumbnail_from_model(model_name);
             else {
-                add_default_image(m_image_list, item.is_system);
+                add_default_image(m_image_list, item.is_system, this);
                 continue;
             }
         }
@@ -369,14 +398,18 @@ void GalleryDialog::load_label_icon_list()
         if (!image.CanRead(from_u8(img_name)) ||
             !image.LoadFile(from_u8(img_name), wxBITMAP_TYPE_PNG) ||
             image.GetWidth() == 0 || image.GetHeight() == 0) {
-            add_default_image(m_image_list, item.is_system);
+            add_default_image(m_image_list, item.is_system, this);
             continue;
         }
         image.Rescale(px_cnt, px_cnt, wxIMAGE_QUALITY_BILINEAR);
 
         if (item.is_system)
-            add_lock(image);
+            add_lock(image, this);
+#ifdef __APPLE__
+        wxBitmap bmp = wxBitmap(std::move(image), -1, mac_max_scaling_factor());
+#else
         wxBitmap bmp = wxBitmap(std::move(image));
+#endif
         m_image_list->Add(bmp);
     }
 
@@ -385,8 +418,7 @@ void GalleryDialog::load_label_icon_list()
     int img_cnt = m_image_list->GetImageCount();
     for (int i = 0; i < img_cnt; i++) {
         m_list_ctrl->InsertItem(i, from_u8(list_items[i].name), i);
-        if (list_items[i].is_system)
-            m_list_ctrl->SetItemFont(i, wxGetApp().bold_font());
+        m_list_ctrl->SetItemData(i, list_items[i].is_system ? 1 : 0);
     }
 }
 
@@ -473,7 +505,7 @@ void GalleryDialog::change_thumbnail()
 
         fs::path current = fs::path(into_u8(input_files.Item(0)));
 		std::string error_msg;
-        if (copy_file_inner(current, png_path, error_msg))
+        if (copy_file_inner(current, png_path, error_msg)) // TODO: fs::copy_options::overwrite_existing instead of fs::copy_option::overwrite_if_exists
             throw FileIOError(error_msg);
     }
     catch (fs::filesystem_error const& e) {
@@ -562,9 +594,9 @@ bool GalleryDialog::load_files(const wxArrayString& input_files)
         try {
             fs::path current = fs::path(input_file);
             if (!fs::exists(dest_dir / current.filename())) {
-				std::string error_msg;
-        		if (copy_file_inner(current, dest_dir / current.filename(), error_msg))
-            		throw FileIOError(error_msg);
+                std::string error_msg;
+                if (copy_file_inner(current, dest_dir / current.filename(), error_msg))
+                    throw FileIOError(error_msg);
             } else {
                 std::string filename = current.stem().string();
 
@@ -588,8 +620,8 @@ bool GalleryDialog::load_files(const wxArrayString& input_files)
                 if (file_idx > 0) {
                     filename += " (" + std::to_string(file_idx) + ")." + (is_gallery_file(input_file, ".stl") ? "stl" : "obj");
                     std::string error_msg;
-        		    if (copy_file_inner(current, dest_dir / filename, error_msg))
-            		    throw FileIOError(error_msg);
+                    if (copy_file_inner(current, dest_dir / filename, error_msg))
+                        throw FileIOError(error_msg);
                 }
             }
         }

@@ -1,5 +1,10 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include <numeric>
 #include <algorithm>
+#include <optional>
 #include <thread>
 #include <condition_variable>
 #include <stdexcept>
@@ -7,7 +12,6 @@
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/optional.hpp>
 
 #if _WIN32
 	#include <regex>
@@ -46,7 +50,7 @@
 namespace fs = boost::filesystem;
 namespace asio = boost::asio;
 using boost::system::error_code;
-using boost::optional;
+using std::optional;
 
 
 namespace Slic3r {
@@ -543,7 +547,7 @@ void FirmwareDialog::priv::prepare_mk3()
 
 void FirmwareDialog::priv::prepare_avr109(Avr109Pid usb_pid)
 {
-	port = boost::none;
+	port = std::nullopt;
 	avr109_lookup_port(usb_pid);
 	if (! port) {
 		queue_error(_(L("The %s device could not have been found")), avr109_dev_name(usb_pid));
@@ -590,7 +594,7 @@ bool FirmwareDialog::priv::get_serial_port()
 #endif
 			port = SerialPortInfo(std::move(path_u8));
 		} else {
-			port = boost::none;
+			port = std::nullopt;
 		}
 	}
 
@@ -654,7 +658,7 @@ void FirmwareDialog::priv::perform_upload()
 			}
 		})
 		.on_message([
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__clang__)
 	        // clang complains when capturing constants.
 			extra_verbose,
 #endif // __APPLE__
@@ -771,7 +775,7 @@ void FirmwareDialog::priv::ensure_joined()
 const char* FirmwareDialog::priv::avr109_dev_name(Avr109Pid usb_pid) {
 	switch (usb_pid.boot) {
 		case USB_PID_MMU_BOOT:
-			return "Original Prusa MMU 2.0 Control";
+			return "Original Prusa Multi Material 2 & 3 Upgrade (bootloader)";
 		case USB_PID_CW1_BOOT:
 			return "Original Prusa CW1";
 		case USB_PID_CW1S_BOOT:
@@ -784,7 +788,7 @@ const char* FirmwareDialog::priv::avr109_dev_name(Avr109Pid usb_pid) {
 // Public
 
 FirmwareDialog::FirmwareDialog(wxWindow *parent) :
-	GUI::DPIDialog(parent, wxID_ANY, _(L("Firmware flasher")), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
+	GUI::DPIDialog(parent, wxID_ANY, _(L("Firmware flasher")), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "firmware"),
 	p(new priv(this))
 {
 	const int em = GUI::wxGetApp().em_unit();
@@ -813,11 +817,13 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	p->hex_picker = new wxFilePickerCtrl(panel, wxID_ANY, wxEmptyString, /*wxFileSelectorPromptStr*/_L("Select a file"),
 		"Hex files (*.hex)|*.hex|All files|*.*");
 	p->hex_picker->GetPickerCtrl()->SetLabelText(_(L("Browse")));
+	GUI::wxGetApp().SetWindowVariantForButton(static_cast<wxButton*>(p->hex_picker->GetPickerCtrl()));
 
 	auto *label_port_picker = new wxStaticText(panel, wxID_ANY, _(L("Serial port:")));
 	p->port_picker = new wxComboBox(panel, wxID_ANY);
 	p->txt_port_autodetect = new wxStaticText(panel, wxID_ANY, _(L("Autodetected")));
 	p->btn_rescan = new wxButton(panel, wxID_ANY, _(L("Rescan")));
+    GUI::wxGetApp().SetWindowVariantForButton(p->btn_rescan);
 	auto *port_sizer = new wxBoxSizer(wxHORIZONTAL);
 	port_sizer->Add(p->port_picker, 1, wxEXPAND | wxRIGHT, SPACING);
 	port_sizer->Add(p->btn_rescan, 0);
@@ -841,7 +847,7 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	grid->Add(port_sizer, 0, wxEXPAND);
 
 	grid->Add(label_progress, 0, wxALIGN_CENTER_VERTICAL);
-	grid->Add(p->progressbar, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
+	grid->Add(p->progressbar, 1, wxEXPAND);
 
 	grid->Add(label_status, 0, wxALIGN_CENTER_VERTICAL);
 	grid->Add(p->txt_status, 0, wxEXPAND);
@@ -860,7 +866,9 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	vsizer->Add(p->spoiler, 1, wxEXPAND | wxBOTTOM, SPACING);
 
 	p->btn_close = new wxButton(panel, wxID_CLOSE, _(L("Close")));   // Note: The label needs to be present, otherwise we get accelerator bugs on Mac
+	GUI::wxGetApp().SetWindowVariantForButton(p->btn_close);
 	p->btn_flash = new wxButton(panel, wxID_ANY, p->btn_flash_label_ready);
+	GUI::wxGetApp().SetWindowVariantForButton(p->btn_flash);
 	p->btn_flash->Disable();
 	auto *bsizer = new wxBoxSizer(wxHORIZONTAL);
 	bsizer->Add(p->btn_close);

@@ -15,9 +15,12 @@ group:Offsets (for multi-extruder printers)
 	setting:idx:extruder_temperature_offset
 	setting:idx:extruder_fan_offset
 	setting:idx:extruder_extrusion_multiplier_speed
-group:Retraction
-	setting:idx:retract_length
+group:Travel lift
 	setting:idx:retract_lift
+	setting:idx:travel_ramping_lift
+	setting:idx:travel_max_lift
+	setting:idx:travel_slope
+	setting:idx:travel_lift_before_obstacle
 	line:Only lift Z
 		setting:idx:retract_lift_above
 		setting:idx:retract_lift_below
@@ -26,6 +29,8 @@ group:Retraction
 		setting:idx:retract_lift_first_layer
 		setting:idx:retract_lift_top
 	end_line
+group:Retraction
+	setting:idx:retract_length
 	line:Retraction Speed
 		setting:idx:retract_speed
 		setting:idx:label$Deretraction:deretract_speed

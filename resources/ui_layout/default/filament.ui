@@ -14,9 +14,10 @@ group:Temperature °C
 	end_line
 	line:Bed
 		setting:id$0:first_layer_bed_temperature
-		setting:id$0:label:Other layers:bed_temperature
+		setting:id$0:label$Other layers:bed_temperature
 	end_line
 	setting:id$0:chamber_temperature
+    setting:id$0:label$Idle:idle_temperature
 group:Filament properties
 	setting:id$0:width$7:filament_type
 	setting:id$0:filament_soluble
@@ -74,6 +75,7 @@ group:Fan speed - default
 		setting:id$0:label_width$12:label$Internal bridges:internal_bridge_fan_speed
 	line:Overhangs Perimeter fan speed
 		setting:id$0:label_width$12:label$Overhangs:overhangs_fan_speed
+        setting:id$0:overhangs_dynamic_fan_speed
 	line:Gap fill fan speed
 		setting:id$0:label_width$12:label$Gap fill:gap_fill_fan_speed
 	line:Disable fan for the first
@@ -120,23 +122,26 @@ group:Toolchange parameters with single extruder MM printers
 	setting:id$0:filament_cooling_final_speed
 	setting:id$0:filament_wipe_advanced_pigment
 	filament_ramming_parameters
-
+group:Toolchange parameters with multi extruder MM printers
+    setting:id$0:filament_multitool_ramming
+    setting:id$0:filament_multitool_ramming_volume
+    setting:id$0:filament_multitool_ramming_flow
 
 filament_overrides_page
 
 page:Custom G-code:cog
-group:no_title:validate_gcode:Start G-code
-	setting:id$0:full_width:height$35:start_filament_gcode
-group:no_title:validate_gcode:End G-code
-	setting:id$0:full_width:height$35:end_filament_gcode
+group:no_title:edit_gcode:validate_gcode:Start G-code
+	setting:is_gcode:id$0:full_width:height$35:start_filament_gcode
+group:no_title:edit_gcode:validate_gcode:End G-code
+	setting:is_gcode:id$0:full_width:height$35:end_filament_gcode
 
-page:Notes:note.png
+page:Notes:note
 group:label_width$0:Notes
 	setting:id$0:full_width:height$25:filament_notes
 group:label_width$0:Custom variables
 	setting:id$0:full_width:height$15:filament_custom_variables
 
-page:Dependencies:wrench.png
+page:Dependencies:wrench
 	group:Profile dependencies
 	setting:id$0:compatible_printers
 	setting:id$0:full_width:color:compatible_printers_condition

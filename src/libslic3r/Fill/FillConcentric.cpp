@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas
+///|/
+///|/ ported from lib/Slic3r/Fill/Concentric.pm:
+///|/ Copyright (c) Prusa Research 2016 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2012 Mark Hindess
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "../ClipperUtils.hpp"
 #include "../ExPolygon.hpp"
 #include "../Surface.hpp"
@@ -51,7 +60,7 @@ FillConcentric::_fill_surface_single(
     size_t iPathFirst = polylines_out.size();
     Point last_pos(0, 0);
     for (const Polygon &loop : loops) {
-        polylines_out.emplace_back(loop.split_at_index(last_pos.nearest_point_index(loop.points)));
+        polylines_out.emplace_back(loop.split_at_index(nearest_point_index(loop.points, last_pos)));
         last_pos = polylines_out.back().last_point();
     }
 
@@ -80,7 +89,7 @@ void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRo
     if (polygon.is_valid()) {
         //default to ccw
         polygon.make_counter_clockwise();
-        ExtrusionPath path(good_role, flow, width, height, false);
+        ExtrusionPath path(ExtrusionAttributes{good_role, ExtrusionFlow{flow, float(width), float(height)}}, false);
         path.polyline.append(std::move(polygon.points));
         path.polyline.append(path.polyline.front());
         storage.append(ExtrusionLoop{ std::move(path) });
@@ -351,7 +360,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //            //do gapfill locally
                 //            leafs[idx_leaf]->append(
                 //                Geometry::variable_width(
-                //                    poly, erGapFill, 
+                //                    poly, ExtrusionRole::GapFill, 
                 //                    params.flow, 
                 //                    scale_t(params.config->get_computed_value("resolution_internal")), 
                 //                    params.flow.scaled_width() / 10)
@@ -363,14 +372,14 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //    }
                 //    //goto_next_polyline:
                 //}
-                bool fill_bridge = is_bridge(good_role) || params.flow.bridge();
+                bool fill_bridge = good_role.is_bridge() || params.flow.bridge();
                 // allow bridged gapfill, mostly for support bottom interface.
-                assert(!is_bridge(good_role));
+                assert(!good_role.is_bridge());
                 if (!polylines.empty()) {
-                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
+                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, ExtrusionRole::GapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
                     if (!gap_fill_entities.empty()) {
                         // set role if needed
-                        if (fill_bridge || (good_role != erSolidInfill && good_role != erTopSolidInfill)) {
+                        if (fill_bridge || (good_role != ExtrusionRole::SolidInfill && good_role != ExtrusionRole::TopSolidInfill)) {
                             ExtrusionSetRole set_good_role(good_role);
                             for (ExtrusionEntity* ptr : gap_fill_entities)
                                 ptr->visit(set_good_role);
@@ -408,7 +417,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
             }
         }
         FillParams params2{ params };
-        params2.role = erGapFill;
+        params2.role = ExtrusionRole::GapFill;
 
         do_gap_fill(intersection_ex(gapfill_areas, no_overlap_expolygons), params2, out_to_check);
     }
@@ -481,19 +490,10 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
                 continue;
 
             ThickPolyline thick_polyline = Arachne::to_thick_polyline(*extrusion);
-            if (extrusion->is_closed && thick_polyline.points.front() == thick_polyline.points.back() && thick_polyline.points_width.front() == thick_polyline.points_width.back()) {
-                thick_polyline.points.pop_back();
-                thick_polyline.points_width.pop_back();
-                assert(thick_polyline.points.size() == thick_polyline.points_width.size());
-                int nearest_idx = last_pos.nearest_point_index(thick_polyline.points);
-                std::rotate(thick_polyline.points.begin(), thick_polyline.points.begin() + nearest_idx, thick_polyline.points.end());
-                std::rotate(thick_polyline.points_width.begin(), thick_polyline.points_width.begin() + nearest_idx, thick_polyline.points_width.end());
-                thick_polyline.points.emplace_back(thick_polyline.points.front());
-                thick_polyline.points_width.emplace_back(thick_polyline.points_width.front());
-                assert(thick_polyline.points.size() == thick_polyline.points_width.size());
-            }
+            if (extrusion->is_closed)
+                thick_polyline.start_at_index(nearest_point_index(thick_polyline.points, last_pos));
             thick_polylines_out.emplace_back(std::move(thick_polyline));
-            last_pos = thick_polylines_out.back().last_point();
+            last_pos = thick_polylines_out.back().back();
         }
 
         // clip the paths to prevent the extruder from getting exactly on the first point of the loop

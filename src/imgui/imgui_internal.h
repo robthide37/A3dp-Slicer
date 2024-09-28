@@ -272,7 +272,7 @@ namespace ImStb
 // - Helpers: Maths
 // - Helpers: Geometry
 // - Helper: ImVec1
-// - Helper: ImVec2ih
+// - Helper: ImVec2i32h
 // - Helper: ImRect
 // - Helper: ImBitArray
 // - Helper: ImBitVector
@@ -456,13 +456,13 @@ struct ImVec1
     ImVec1(float _x) { x = _x; }
 };
 
-// Helper: ImVec2ih (2D vector, half-size integer, for long-term packed storage)
-struct ImVec2ih
+// Helper: ImVec2i32h (2D vector, half-size integer, for long-term packed storage)
+struct ImVec2i32h
 {
     short   x, y;
-    ImVec2ih()                           { x = y = 0; }
-    ImVec2ih(short _x, short _y)         { x = _x; y = _y; }
-    explicit ImVec2ih(const ImVec2& rhs) { x = (short)rhs.x; y = (short)rhs.y; }
+    ImVec2i32h()                           { x = y = 0; }
+    ImVec2i32h(short _x, short _y)         { x = _x; y = _y; }
+    explicit ImVec2i32h(const ImVec2& rhs) { x = (short)rhs.x; y = (short)rhs.y; }
 };
 
 // Helper: ImRect (2D axis aligned bounding-box)
@@ -1260,8 +1260,8 @@ struct ImGuiViewportP : public ImGuiViewport
 struct ImGuiWindowSettings
 {
     ImGuiID     ID;
-    ImVec2ih    Pos;
-    ImVec2ih    Size;
+    ImVec2i32h    Pos;
+    ImVec2i32h    Size;
     bool        Collapsed;
     bool        WantApply;      // Set when loaded from .ini data (to enable merging/loading .ini data into an already running context)
 
@@ -1869,8 +1869,8 @@ struct IMGUI_API ImGuiWindow
     ImRect                  ParentWorkRect;                     // Backup of WorkRect before entering a container such as columns/tables. Used by e.g. SpanAllColumns functions to easily access. Stacked containers are responsible for maintaining this. // FIXME-WORKRECT: Could be a stack?
     ImRect                  ClipRect;                           // Current clipping/scissoring rectangle, evolve as we are using PushClipRect(), etc. == DrawList->clip_rect_stack.back().
     ImRect                  ContentRegionRect;                  // FIXME: This is currently confusing/misleading. It is essentially WorkRect but not handling of scrolling. We currently rely on it as right/bottom aligned sizing operation need some size to rely on.
-    ImVec2ih                HitTestHoleSize;                    // Define an optional rectangular hole where mouse will pass-through the window.
-    ImVec2ih                HitTestHoleOffset;
+    ImVec2i32h                HitTestHoleSize;                    // Define an optional rectangular hole where mouse will pass-through the window.
+    ImVec2i32h                HitTestHoleOffset;
 
     int                     LastFrameActive;                    // Last frame number the window was Active.
     float                   LastTimeActive;                     // Last timestamp the window was Active (using float as we don't need high precision there)

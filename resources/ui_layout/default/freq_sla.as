@@ -6,24 +6,35 @@ int s_support_sla_get(string &out get_val)
 	if (!supports_enable) { // None
 		return 0;
 	}
+	bool support_enforcers_only = get_bool("support_enforcers_only");
+	if (support_enforcers_only) { // Support on enforcer only
+		return 2;
+	}
 	bool support_buildplate_only = get_bool("support_buildplate_only");
 	if (support_buildplate_only) { // Support on build plate only
 		return 1;
 	}
 	// everywhere
-	return 2;
+	return 3;
 }
 
 void s_support_sla_set(string &in new_val, int idx)
 {
 	if(idx == 0) { // None
+		back_initial_value("support_enforcers_only");
 		back_initial_value("support_buildplate_only");
 		set_bool("supports_enable", false);
 	} else if(idx == 1) { // Support on build plate only
 		set_bool("support_buildplate_only", true);
+		set_bool("support_enforcers_only", false);
 		set_bool("supports_enable", true);
+	} else if(idx == 2) { // For support enforcers only
+		set_bool("support_buildplate_only", false);
+		set_bool("support_enforcers_only", true);
+		set_bool("support_material", true);
 	} else { // everywhere
 		set_bool("support_buildplate_only", false);
+		set_bool("support_enforcers_only", false);
 		set_bool("supports_enable", true);
 	}
 }

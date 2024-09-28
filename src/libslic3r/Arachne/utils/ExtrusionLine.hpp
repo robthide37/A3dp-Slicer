@@ -119,7 +119,7 @@ struct ExtrusionLine
      * Sum the total length of this path.
      */
     int64_t getLength() const;
-    bool    isZeroLength() const;
+    bool    is_zero_length() const;
     int64_t polylineLength() const { return getLength(); }
 
     /*!
@@ -186,9 +186,8 @@ struct ExtrusionLine
      * \param A Start point of the 3-point-straight line
      * \param B Intermediate point of the 3-point-straight line
      * \param C End point of the 3-point-straight line
-     * \param weighted_average_width The weighted average of the widths of the two colinear extrusion segments
      * */
-    static int64_t calculateExtrusionAreaDeviationError(ExtrusionJunction A, ExtrusionJunction B, ExtrusionJunction C, coord_t& weighted_average_width);
+    static int64_t calculateExtrusionAreaDeviationError(ExtrusionJunction A, ExtrusionJunction B, ExtrusionJunction C);
 
     bool is_contour() const;
 

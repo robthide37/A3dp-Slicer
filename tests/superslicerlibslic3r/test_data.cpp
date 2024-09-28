@@ -267,7 +267,7 @@ TriangleMesh mesh(TestMesh m) {
 
 
 void init_print(Print& print, std::initializer_list<TestMesh> meshes, Slic3r::Model& model, DynamicPrintConfig* _config, bool comments) {
-	DynamicPrintConfig &config = Slic3r::DynamicPrintConfig::full_print_config();
+	DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
     config.apply(*_config);
     
     //remove print of status
@@ -290,7 +290,7 @@ void init_print(Print& print, std::initializer_list<TestMesh> meshes, Slic3r::Mo
     }
 
     print.apply(model, config); // apply config for the arrange_objects
-    arrange_objects(model, InfiniteBed{}, ArrangeParams{ scale_t(10)});//print.config().min_object_distance()) });
+    arrange_objects(model, arr2::InfiniteBed{}, arr2::ArrangeSettings().set_distance_from_objects(10.f));//print.config().min_object_distance()) });
     model.center_instances_around_point(Slic3r::Vec2d(100,100));
     for (auto* mo : model.objects) {
         print.auto_assign_extruders(mo);
@@ -304,7 +304,7 @@ void init_print(Print& print, std::initializer_list<TestMesh> meshes, Slic3r::Mo
 }
 
 void init_print(Print& print, std::vector<TriangleMesh> meshes, Slic3r::Model& model, DynamicPrintConfig* _config, bool comments) {
-	DynamicPrintConfig &config = Slic3r::DynamicPrintConfig::full_print_config();
+	DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
     config.apply(*_config);
     
     //remove print of status
@@ -328,7 +328,7 @@ void init_print(Print& print, std::vector<TriangleMesh> meshes, Slic3r::Model& m
     }
 
     print.apply(model, config); // apply config for the arrange_objects
-    arrange_objects(model, InfiniteBed{}, ArrangeParams{scale_t(10)} );//print.config().min_object_distance())});
+    arrange_objects(model, arr2::InfiniteBed{}, arr2::ArrangeSettings().set_distance_from_objects(10.f) );//print.config().min_object_distance())});
     model.center_instances_around_point(Slic3r::Vec2d(100,100));
 	print.apply(model, config);
 	for (ModelObject* mo : model.objects) {

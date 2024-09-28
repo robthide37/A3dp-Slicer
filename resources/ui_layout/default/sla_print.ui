@@ -7,6 +7,8 @@ group:Layers
 page:Supports:support
 group:Supports
 	setting:supports_enable
+	setting:support_tree_type
+	setting:support_enforcers_only
 group:Support head
 	setting:support_head_front_diameter
 	setting:support_head_penetration
@@ -17,8 +19,8 @@ group:Support pillar
 	setting:support_max_bridges_on_pillar
 	setting:support_pillar_connection_mode
 	setting:support_buildplate_only
-# TODO: This parameter is not used at the moment.
-# setting:support_pillar_widening_factor
+	setting:support_pillar_widening_factor
+    setting:support_max_weight_on_model
 	setting:support_base_diameter
 	setting:support_base_height
 	setting:support_base_safety_distance

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2022 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_ObjectID_hpp_
 #define slic3r_ObjectID_hpp_
 
@@ -90,7 +94,9 @@ protected:
 	friend class cereal::access;
 	friend class Slic3r::UndoRedo::StackImpl;
 	template<class Archive> void serialize(Archive &ar) { ar(m_id); }
+protected: // #vbCHECKME && #ysFIXME
     ObjectBase(const ObjectID id) : m_id(id) {}
+private:
   	template<class Archive> static void load_and_construct(Archive & ar, cereal::construct<ObjectBase> &construct) { ObjectID id; ar(id); construct(id); }
 };
 
@@ -128,8 +134,6 @@ private:
 	friend class Slic3r::UndoRedo::StackImpl;
 	template<class Archive> void serialize(Archive &ar) { ar(m_timestamp); }
 };
-
-
 
 class CutObjectBase : public ObjectBase
 {

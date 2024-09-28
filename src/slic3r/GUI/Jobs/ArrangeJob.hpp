@@ -1,7 +1,13 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef ARRANGEJOB_HPP
 #define ARRANGEJOB_HPP
 
-#include "PlaterJob.hpp"
+#include <optional>
+
+#include "Job.hpp"
 #include "libslic3r/Arrange.hpp"
 #include "libslic3r/Print.hpp"
 
@@ -11,13 +17,20 @@ class ModelInstance;
 
 namespace GUI {
 
-class ArrangeJob : public PlaterJob
+class Plater;
+
+class ArrangeJob : public Job
 {
     using ArrangePolygon = arrangement::ArrangePolygon;
     using ArrangePolygons = arrangement::ArrangePolygons;
     
     ArrangePolygons m_selected, m_unselected, m_unprintable;
     std::vector<ModelInstance*> m_unarranged;
+    arrangement::ArrangeBed m_bed;
+    coord_t m_min_bed_inset = 0.;
+
+    Plater *m_plater;
+    bool m_selection_only = false;
 
     // clear m_selected and m_unselected, reserve space for next usage
     void clear_input();
@@ -29,11 +42,11 @@ class ArrangeJob : public PlaterJob
 
     ArrangePolygon get_arrange_poly_(ModelInstance *mi);
 
-protected:
+public:
 
-    void prepare() override;
+    enum Mode { Full, SelectionOnly };
 
-    void on_exception(const std::exception_ptr &) override;
+    void prepare();
 
 
 public:
@@ -42,18 +55,16 @@ public:
     void prepare_all();
 
     // for calibrations
-    void process() override;
+    void process(Ctl &ctl) override;
 
-    ArrangeJob(std::shared_ptr<ProgressIndicator> pri, Plater *plater)
-        : PlaterJob{std::move(pri), plater}
-    {}
+    ArrangeJob(Mode mode = Full);
 
-    int status_range() const override
+    int status_range() const
     {
         return int(m_selected.size() + m_unprintable.size());
     }
 
-    void finalize() override;
+    void finalize(bool canceled, std::exception_ptr &e) override;
 };
 
 std::optional<arrangement::ArrangePolygon> get_wipe_tower_arrangepoly(const Plater &);
@@ -89,7 +100,6 @@ arrangement::ArrangePolygon get_arrange_poly(T obj, const Plater *plater)
     using ArrangePolygon = arrangement::ArrangePolygon;
 
     ArrangePolygon ap = obj.get_arrange_polygon();
-    ap.bed_idx        = ap.translation.x() / bed_stride(plater);
     ap.setter         = [obj, plater](const ArrangePolygon &p) {
         if (p.is_arranged()) {
             Vec2d t = p.translation.cast<double>();
@@ -106,6 +116,12 @@ arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
                                              const Plater * plater);
 
 arrangement::ArrangeParams get_arrange_params(Plater *p);
+
+coord_t get_skirt_offset(const Plater* plater);
+
+void assign_logical_beds(std::vector<arrangement::ArrangePolygon> &items,
+                         const arrangement::ArrangeBed &bed,
+                         double stride);
 
 }} // namespace Slic3r::GUI
 

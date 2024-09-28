@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2022 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ExtruderSequenceDialog.hpp"
 
 #include <wx/wx.h>
@@ -18,13 +22,14 @@
 #include "MainFrame.hpp"
 #include "BitmapComboBox.hpp"
 
+#include "Widgets/CheckBox.hpp"
 
 namespace Slic3r {
 namespace GUI {
 
 ExtruderSequenceDialog::ExtruderSequenceDialog(const DoubleSlider::ExtrudersSequence& sequence)
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, wxString(SLIC3R_APP_NAME) + " - " + _(L("Set extruder sequence")),
-        wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
+        wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "extrudersequence"),
     m_sequence(sequence)
 {
 #ifdef _WIN32
@@ -161,7 +166,7 @@ ExtruderSequenceDialog::ExtruderSequenceDialog(const DoubleSlider::ExtrudersSequ
     intervals_box_sizer->Add(m_intervals_grid_sizer, 0, wxLEFT, em);
     option_sizer->Add(intervals_box_sizer, 0, wxEXPAND);
 
-    m_random_sequence = new wxCheckBox(this, wxID_ANY, _L("Random sequence"));
+    m_random_sequence = new ::CheckBox(this, _L("Random sequence"));
     m_random_sequence->SetValue(m_sequence.random_sequence);
     m_random_sequence->SetToolTip(_L("If enabled, random sequence of the selected extruders will be used."));
     m_random_sequence->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& e) {
@@ -169,7 +174,7 @@ ExtruderSequenceDialog::ExtruderSequenceDialog(const DoubleSlider::ExtrudersSequ
         m_color_repetition->Enable(m_sequence.random_sequence);
     });
 
-    m_color_repetition = new wxCheckBox(this, wxID_ANY, _L("Allow next color repetition"));
+    m_color_repetition = new ::CheckBox(this, _L("Allow next color repetition"));
     m_color_repetition->SetValue(m_sequence.color_repetition);
     m_color_repetition->SetToolTip(_L("If enabled, a repetition of the next random color will be allowed."));
     m_color_repetition->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& e) {m_sequence.color_repetition = e.IsChecked();  });
@@ -263,9 +268,6 @@ void ExtruderSequenceDialog::apply_extruder_sequence()
 void ExtruderSequenceDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     SetFont(wxGetApp().normal_font());
-
-    m_bmp_add.msw_rescale();
-    m_bmp_del.msw_rescale();
 
     const int em = em_unit();
 

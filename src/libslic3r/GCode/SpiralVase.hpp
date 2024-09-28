@@ -1,3 +1,11 @@
+///|/ Copyright (c) Prusa Research 2017 - 2021 Vojtěch Bubník @bubnikv
+///|/
+///|/ ported from lib/Slic3r/GCode/SpiralVase.pm:
+///|/ Copyright (c) Prusa Research 2017 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_SpiralVase_hpp_
 #define slic3r_SpiralVase_hpp_
 
@@ -5,6 +13,7 @@
 #include "../GCodeReader.hpp"
 
 namespace Slic3r {
+
 
 class SpiralVase {
 public:
@@ -22,7 +31,7 @@ public:
     std::string process_layer(const std::string& gcode);
 
     bool is_transition_layer() { return m_transition_layer; }
-    
+
 private:
     const PrintConfig  &m_config;
     GCodeReader 		m_reader;

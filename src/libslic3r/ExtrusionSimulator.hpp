@@ -1,10 +1,14 @@
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_ExtrusionSimulator_hpp_
 #define slic3r_ExtrusionSimulator_hpp_
 
 #include "libslic3r.h"
 #include "ExtrusionEntity.hpp"
 #include "BoundingBox.hpp"
-
+//note: not used anymore
 namespace Slic3r {
 
 enum ExtrusionSimulationType

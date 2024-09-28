@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_PresetUpdate_hpp_
 #define slic3r_PresetUpdate_hpp_
 
@@ -26,9 +30,11 @@ public:
 	~PresetUpdater();
 
 	// If either version check or config updating is enabled, get the appropriate data in the background and cache it.
-	void sync(PresetBundle *preset_bundle);
+	void sync(const PresetBundle *preset_bundle, wxEvtHandler* evt_handler);
+	void cancel_sync();
 
 	// If version check is enabled, check if chaced online slic3r version is newer, notify if so.
+	//FIXME doesn't called anymore, delete? (replaced by void GUI_App::app_version_check(bool from_user))
 	void slic3r_update_notify();
 
 	enum UpdateResult {
@@ -52,9 +58,11 @@ public:
 	// Providing old slic3r version upgrade profiles on upgrade of an application even in case
 	// that the config index installed from the Internet is equal to the index contained in the installation package.
 	UpdateResult config_update(const Semver &old_slic3r_version, UpdateParams params) const;
+	
+	void update_index_db();
 
-	// "Update" a list of bundles from resources (behaves like an online update).
-	bool install_bundles_rsrc(std::vector<std::string> bundles, bool snapshot = true) const;
+	// "Update" a list of bundles from resources or cache/vendor (behaves like an online update).
+	bool install_bundles_rsrc_or_cache_vendor(std::vector<std::string> bundles, bool snapshot = true) const;
 
 	void on_update_notification_confirm();
 
@@ -65,7 +73,8 @@ private:
 	std::unique_ptr<priv> p;
 };
 
-wxDECLARE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
-wxDECLARE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
+//wxDECLARE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
+//wxDECLARE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
+wxDECLARE_EVENT(EVT_CONFIG_UPDATER_SYNC_DONE, wxCommandEvent);
 }
 #endif

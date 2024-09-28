@@ -165,6 +165,7 @@ struct indexed_triangle_set
     std::vector<stl_vertex>       				vertices;
 
     bool empty() const { return indices.empty() || vertices.empty(); }
+    bool operator==(const indexed_triangle_set& other) const { return this->indices == other.indices && this->vertices == other.vertices; }
 };
 
 extern bool stl_open(stl_file *stl, const char *file);
@@ -302,6 +303,17 @@ extern void stl_generate_shared_vertices(stl_file *stl, indexed_triangle_set &it
 extern bool its_write_obj(const indexed_triangle_set &its, const char *file);
 extern bool its_write_off(const indexed_triangle_set &its, const char *file);
 extern bool its_write_vrml(const indexed_triangle_set &its, const char *file);
+
+
+typedef Eigen::Matrix<float, 3, 1, Eigen::DontAlign> obj_color; // Vec3f
+/// <summary>
+/// write idexed triangle set into obj file with color
+/// </summary>
+/// <param name="its">input model</param>
+/// <param name="color">color of stored model</param>
+/// <param name="file">define place to store</param>
+/// <returns>True on success otherwise FALSE</returns>
+extern bool its_write_obj(const indexed_triangle_set& its, const std::vector<obj_color> &color, const char* file);
 
 extern bool stl_write_dxf(stl_file *stl, const char *file, char *label);
 inline void stl_calculate_normal(stl_normal &normal, stl_facet *facet) {

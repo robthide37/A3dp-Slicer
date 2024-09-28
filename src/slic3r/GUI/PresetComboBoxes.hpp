@@ -1,7 +1,11 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_PresetComboBoxes_hpp_
 #define slic3r_PresetComboBoxes_hpp_
 
-//#include <wx/bmpcbox.h>
+#include <wx/bmpbndl.h>
 #include <wx/gdicmn.h>
 
 #include "libslic3r/Preset.hpp"
@@ -32,6 +36,7 @@ class Tab;
 class PresetComboBox : public BitmapComboBox
 {
     bool m_show_all { false };
+    bool m_show_modif_preset_separately{ false };
 public:
     PresetComboBox(wxWindow* parent, Preset::Type preset_type, const wxSize& size = wxDefaultSize, PresetBundle* preset_bundle = nullptr);
     PresetComboBox(Tab* parent, const wxSize& size = wxDefaultSize);
@@ -67,7 +72,9 @@ public:
 
     void edit_physical_printer();
     void add_physical_printer();
+    void open_physical_printer_url();
     bool del_physical_printer(const wxString& note_string = wxEmptyString);
+    void show_modif_preset_separately() { m_show_modif_preset_separately = true; }
 
     virtual wxString get_preset_name(const Preset& preset); 
     Preset::Type     get_type() { return m_type; }
@@ -91,9 +98,9 @@ protected:
     static BitmapCache& bitmap_cache();
 
     // Indicator, that the preset is compatible with the selected printer.
-    ScalableBitmap      m_bitmapCompatible;
+    wxBitmapBundle*      m_bitmapCompatible;
     // Indicator, that the preset is NOT compatible with the selected printer.
-    ScalableBitmap      m_bitmapIncompatible;
+    wxBitmapBundle*      m_bitmapIncompatible;
 
     int m_last_selected;
     int m_em_unit;
@@ -102,6 +109,7 @@ protected:
     // parameters for an icon's drawing
     int icon_height;
     int norm_icon_width;
+    int null_icon_width;
     int thin_icon_width;
     int wide_icon_width;
     int space_icon_width;
@@ -123,12 +131,14 @@ protected:
 #endif // __linux__
     static wxString    separator(const std::string& label);
 
-    wxBitmap* get_bmp(  std::string bitmap_key, bool wide_icons, const std::string& main_icon_name, 
+    wxBitmapBundle* get_bmp(  std::string bitmap_key, bool wide_icons, const std::string& main_icon_name,
                         bool is_compatible = true, bool is_system = false, bool is_single_bar = false,
                         const std::string& filament_rgb = "", const std::string& extruder_rgb = "", const std::string& material_rgb = "");
 
-    wxBitmap* get_bmp(  std::string bitmap_key, const std::string& main_icon_name, const std::string& next_icon_name,
+    wxBitmapBundle* get_bmp(  std::string bitmap_key, const std::string& main_icon_name, const std::string& next_icon_name,
                         bool is_enabled = true, bool is_compatible = true, bool is_system = false);
+
+    wxBitmapBundle NullBitmapBndl();
 
 private:
     void fill_width_height();
@@ -158,7 +168,10 @@ public:
     wxString get_preset_name(const Preset& preset) override;
     void update() override;
     void msw_rescale() override;
+    void sys_color_changed() override;
     void OnSelect(wxCommandEvent& evt) override;
+
+    std::string get_selected_ph_printer_name() const;
 
 private:
     int     m_extruder_idx = -1;
@@ -173,6 +186,8 @@ class TabPresetComboBox : public PresetComboBox
 {
     bool show_incompatible {false};
     bool m_enable_all {false};
+    // This parameter is used by FilamentSettings tab to show filament setting related to the active extruder
+    int  m_active_extruder_idx {0};
 
 public:
     TabPresetComboBox(wxWindow *parent, Preset::Type preset_type);
@@ -192,6 +207,9 @@ public:
 
     PresetCollection*   presets()   const { return m_collection; }
     Preset::Type        type()      const { return m_type; }
+
+    // used by Filaments tab to update preset list according to the particular extruder
+    void set_active_extruder(int extruder_idx) { m_active_extruder_idx = extruder_idx; }
 };
 
 } // namespace GUI

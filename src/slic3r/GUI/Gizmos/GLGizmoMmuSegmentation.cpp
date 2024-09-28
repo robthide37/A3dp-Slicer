@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Lukáš Hejl @hejllukas, David Kocík @kocikdav, Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2021 Justin Schuh @jschuh
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GLGizmoMmuSegmentation.hpp"
 
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -9,6 +14,7 @@
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
+#include "slic3r/GUI/OpenGLManager.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Model.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
@@ -48,7 +54,7 @@ std::string GLGizmoMmuSegmentation::on_get_name() const
 bool GLGizmoMmuSegmentation::on_is_selectable() const
 {
     return (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF
-            && (wxGetApp().get_mode() != comSimple || wxGetApp().app_config->get("objects_always_expert") == "1") 
+            && (wxGetApp().get_mode() != comSimple || get_app_config()->get_bool("objects_always_expert")) 
             && wxGetApp().extruders_edited_cnt() > 1);
 }
 
@@ -57,18 +63,12 @@ bool GLGizmoMmuSegmentation::on_is_activable() const
     return GLGizmoPainterBase::on_is_activable() && wxGetApp().extruders_edited_cnt() > 1;
 }
 
-static std::vector<std::array<float, 4>> get_extruders_colors()
+std::vector<ColorRGBA> get_extruders_colors()
 {
-    unsigned char                     rgb_color[3] = {};
-    std::vector<std::string>          colors       = Slic3r::GUI::wxGetApp().plater()->get_extruder_colors_from_plater_config();
-    std::vector<std::array<float, 4>> colors_out(colors.size());
-    for (const std::string &color : colors) {
-        Slic3r::GUI::BitmapCache::parse_color(color, rgb_color);
-        size_t color_idx      = &color - &colors.front();
-        colors_out[color_idx] = {float(rgb_color[0]) / 255.f, float(rgb_color[1]) / 255.f, float(rgb_color[2]) / 255.f, 1.f};
-    }
-
-    return colors_out;
+    std::vector<std::string> colors = Slic3r::GUI::wxGetApp().plater()->get_extruder_colors_from_plater_config();
+    std::vector<ColorRGBA> ret;
+    decode_colors(colors, ret);
+    return ret;
 }
 
 static std::vector<std::string> get_extruders_names()
@@ -77,7 +77,7 @@ static std::vector<std::string> get_extruders_names()
     std::vector<std::string> extruders_out;
     extruders_out.reserve(extruders_count);
     for (size_t extruder_idx = 1; extruder_idx <= extruders_count; ++extruder_idx)
-        extruders_out.emplace_back("Extruder " + std::to_string(extruder_idx));
+        extruders_out.emplace_back(_u8L("Extruder") + " " + std::to_string(extruder_idx));
 
     return extruders_out;
 }
@@ -137,7 +137,7 @@ bool GLGizmoMmuSegmentation::on_init()
     return true;
 }
 
-void GLGizmoMmuSegmentation::render_painter_gizmo() const
+void GLGizmoMmuSegmentation::render_painter_gizmo()
 {
     const Selection& selection = m_parent.get_selection();
 
@@ -153,10 +153,9 @@ void GLGizmoMmuSegmentation::render_painter_gizmo() const
     glsafe(::glDisable(GL_BLEND));
 }
 
-void GLGizmoMmuSegmentation::set_painter_gizmo_data(const Selection &selection)
+void GLGizmoMmuSegmentation::data_changed(bool is_serializing)
 {
-    GLGizmoPainterBase::set_painter_gizmo_data(selection);
-
+    GLGizmoPainterBase::data_changed(is_serializing);
     if (m_state != On || wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptFFF || wxGetApp().extruders_edited_cnt() <= 1)
         return;
 
@@ -196,34 +195,33 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 
         const Transform3d trafo_matrix = mo->instances[selection.get_instance_idx()]->get_transformation().get_matrix() * mv->get_matrix();
 
-        bool is_left_handed = trafo_matrix.matrix().determinant() < 0.;
+        const bool is_left_handed = trafo_matrix.matrix().determinant() < 0.0;
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
-        glsafe(::glPushMatrix());
-        glsafe(::glMultMatrixd(trafo_matrix.data()));
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Transform3d& view_matrix = camera.get_view_matrix();
+        shader->set_uniform("view_model_matrix", view_matrix * trafo_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * trafo_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
 
         shader->set_uniform("volume_world_matrix", trafo_matrix);
         shader->set_uniform("volume_mirrored", is_left_handed);
-        m_triangle_selectors[mesh_id]->render(m_imgui);
+        m_triangle_selectors[mesh_id]->render(m_imgui, trafo_matrix);
 
-        glsafe(::glPopMatrix());
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CCW));
     }
 }
 
-static void render_extruders_combo(const std::string                       &label,
-                                   const std::vector<std::string>          &extruders,
-                                   const std::vector<std::array<float, 4>> &extruders_colors,
-                                   size_t                                  &selection_idx)
+static void render_extruders_combo(const std::string& label,
+                                   const std::vector<std::string>& extruders,
+                                   const std::vector<ColorRGBA>& extruders_colors,
+                                   size_t& selection_idx)
 {
     assert(!extruders_colors.empty());
     assert(extruders_colors.size() == extruders_colors.size());
-
-    auto convert_to_imu32 = [](const std::array<float, 4> &color) -> ImU32 {
-        return IM_COL32(uint8_t(color[0] * 255.f), uint8_t(color[1] * 255.f), uint8_t(color[2] * 255.f), uint8_t(color[3] * 255.f));
-    };
 
     size_t selection_out = selection_idx;
     // It is necessary to use BeginGroup(). Otherwise, when using SameLine() is called, then other items will be drawn inside the combobox.
@@ -240,7 +238,7 @@ static void render_extruders_combo(const std::string                       &labe
             ImGui::SameLine();
             ImGuiStyle &style  = ImGui::GetStyle();
             float       height = ImGui::GetTextLineHeight();
-            ImGui::GetWindowDrawList()->AddRectFilled(start_position, ImVec2(start_position.x + height + height / 2, start_position.y + height), convert_to_imu32(extruders_colors[extruder_idx]));
+            ImGui::GetWindowDrawList()->AddRectFilled(start_position, ImVec2(start_position.x + height + height / 2, start_position.y + height), ImGuiWrapper::to_ImU32(extruders_colors[extruder_idx]));
             ImGui::GetWindowDrawList()->AddRect(start_position, ImVec2(start_position.x + height + height / 2, start_position.y + height), IM_COL32_BLACK);
 
             ImGui::SetCursorScreenPos(ImVec2(start_position.x + height + height / 2 + style.FramePadding.x, start_position.y));
@@ -258,7 +256,7 @@ static void render_extruders_combo(const std::string                       &labe
     ImVec2 p      = ImGui::GetCursorScreenPos();
     float  height = ImGui::GetTextLineHeight();
 
-    ImGui::GetWindowDrawList()->AddRectFilled(p, ImVec2(p.x + height + height / 2, p.y + height), convert_to_imu32(extruders_colors[selection_idx]));
+    ImGui::GetWindowDrawList()->AddRectFilled(p, ImVec2(p.x + height + height / 2, p.y + height), ImGuiWrapper::to_ImU32(extruders_colors[selection_idx]));
     ImGui::GetWindowDrawList()->AddRect(p, ImVec2(p.x + height + height / 2, p.y + height), IM_COL32_BLACK);
 
     ImGui::SetCursorScreenPos(ImVec2(p.x + height + height / 2 + style.FramePadding.x, p.y));
@@ -293,7 +291,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     const float button_width             = m_imgui->calc_text_size(m_desc.at("remove_all")).x + m_imgui->scaled(1.f);
     const float buttons_width            = m_imgui->scaled(0.5f);
     const float minimal_slider_width     = m_imgui->scaled(4.f);
-    const float color_button_width       = m_imgui->calc_text_size("").x + m_imgui->scaled(1.75f);
+    const float color_button_width       = m_imgui->scaled(1.75f);
     const float combo_label_width        = std::max(m_imgui->calc_text_size(m_desc.at("first_color")).x,
                                                     m_imgui->calc_text_size(m_desc.at("second_color")).x) + m_imgui->scaled(1.f);
 
@@ -305,7 +303,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
 
     float caption_max    = 0.f;
     float total_text_max = 0.f;
-    for (const std::string& t : {"first_color", "second_color", "remove"}) {
+    for (const auto &t : std::array<std::string, 3>{"first_color", "second_color", "remove"}) {
         caption_max    = std::max(caption_max, m_imgui->calc_text_size(m_desc[t + "_caption"]).x);
         total_text_max = std::max(total_text_max, m_imgui->calc_text_size(m_desc[t]).x);
     }
@@ -328,7 +326,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
         m_imgui->text(text);
     };
 
-    for (const std::string& t : {"first_color", "second_color", "remove"})
+    for (const auto &t : std::array<std::string, 3>{"first_color", "second_color", "remove"})
         draw_text_with_caption(m_desc.at(t + "_caption"), m_desc.at(t));
 
     ImGui::Separator();
@@ -340,10 +338,15 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     render_extruders_combo("##first_color_combo", m_original_extruders_names, m_original_extruders_colors, m_first_selected_extruder_idx);
     ImGui::SameLine();
 
-    const std::array<float, 4> &select_first_color = m_modified_extruders_colors[m_first_selected_extruder_idx];
-    ImVec4                      first_color        = ImVec4(select_first_color[0], select_first_color[1], select_first_color[2], select_first_color[3]);
-    if(ImGui::ColorEdit4("First color##color_picker", (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
-        m_modified_extruders_colors[m_first_selected_extruder_idx] = {first_color.x, first_color.y, first_color.z, first_color.w};
+    const ColorRGBA& select_first_color = m_modified_extruders_colors[m_first_selected_extruder_idx];
+    ImVec4           first_color        = ImGuiWrapper::to_ImVec4(select_first_color);
+    const std::string first_label       = into_u8(m_desc.at("first_color")) + "##color_picker";
+    if (ImGui::ColorEdit4(first_label.c_str(), (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel,
+        // TRN Means "current color"
+        _u8L("Current").c_str(),
+        // TRN Means "original color"
+        _u8L("Original").c_str()))
+        m_modified_extruders_colors[m_first_selected_extruder_idx] = ImGuiWrapper::from_ImVec4(first_color);
 
     ImGui::AlignTextToFramePadding();
     m_imgui->text(m_desc.at("second_color"));
@@ -352,10 +355,12 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     render_extruders_combo("##second_color_combo", m_original_extruders_names, m_original_extruders_colors, m_second_selected_extruder_idx);
     ImGui::SameLine();
 
-    const std::array<float, 4> &select_second_color = m_modified_extruders_colors[m_second_selected_extruder_idx];
-    ImVec4                      second_color        = ImVec4(select_second_color[0], select_second_color[1], select_second_color[2], select_second_color[3]);
-    if(ImGui::ColorEdit4("Second color##color_picker", (float*)&second_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
-        m_modified_extruders_colors[m_second_selected_extruder_idx] = {second_color.x, second_color.y, second_color.z, second_color.w};
+    const ColorRGBA& select_second_color = m_modified_extruders_colors[m_second_selected_extruder_idx];
+    ImVec4           second_color        = ImGuiWrapper::to_ImVec4(select_second_color);
+    const std::string second_label       = into_u8(m_desc.at("second_color")) + "##color_picker";
+    if (ImGui::ColorEdit4(second_label.c_str(), (float*)&second_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel,
+        _u8L("Current").c_str(), _u8L("Original").c_str()))
+        m_modified_extruders_colors[m_second_selected_extruder_idx] = ImGuiWrapper::from_ImVec4(second_color);
 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
 
@@ -474,7 +479,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
         m_imgui->text(m_desc.at("clipping_of_view"));
     } else {
         if (m_imgui->button(m_desc.at("reset_direction"))) {
-            wxGetApp().CallAfter([this]() { m_c->object_clipper()->set_position(-1., false); });
+            wxGetApp().CallAfter([this]() { m_c->object_clipper()->set_position_by_ratio(-1., false); });
         }
     }
 
@@ -482,7 +487,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImGui::SameLine(sliders_left_width);
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, _L("Ctrl + Mouse wheel")))
-        m_c->object_clipper()->set_position(clp_dist, true);
+        m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
     ImGui::Separator();
     if (m_imgui->button(m_desc.at("remove_all"))) {
@@ -513,7 +518,7 @@ void GLGizmoMmuSegmentation::update_model_object() const
         if (! mv->is_model_part())
             continue;
         ++idx;
-        updated |= mv->mmu_segmentation_facets.set(*m_triangle_selectors[idx].get());
+        updated |= mv->mm_segmentation_facets.set(*m_triangle_selectors[idx].get());
     }
 
     if (updated) {
@@ -525,7 +530,8 @@ void GLGizmoMmuSegmentation::update_model_object() const
 
 void GLGizmoMmuSegmentation::init_model_triangle_selectors()
 {
-    const ModelObject *mo = m_c->selection_info()->model_object();
+    const int          extruders_count = wxGetApp().extruders_edited_cnt();
+    const ModelObject *mo              = m_c->selection_info()->model_object();
     m_triangle_selectors.clear();
 
     // Don't continue when extruders colors are not initialized
@@ -539,10 +545,10 @@ void GLGizmoMmuSegmentation::init_model_triangle_selectors()
         // This mesh does not account for the possible Z up SLA offset.
         const TriangleMesh *mesh = &mv->mesh();
 
-        int extruder_idx = (mv->extruder_id() > 0) ? mv->extruder_id() - 1 : 0;
-        m_triangle_selectors.emplace_back(std::make_unique<TriangleSelectorMmGui>(*mesh, m_modified_extruders_colors, m_original_extruders_colors[size_t(extruder_idx)]));
+        size_t extruder_idx = get_extruder_color_idx(*mv, extruders_count);
+        m_triangle_selectors.emplace_back(std::make_unique<TriangleSelectorMmGui>(*mesh, m_modified_extruders_colors, m_original_extruders_colors[extruder_idx]));
         // Reset of TriangleSelector is done inside TriangleSelectorMmGUI's constructor, so we don't need it to perform it again in deserialize().
-        m_triangle_selectors.back()->deserialize(mv->mmu_segmentation_facets.get_data(), false);
+        m_triangle_selectors.back()->deserialize(mv->mm_segmentation_facets.get_data(), false);
         m_triangle_selectors.back()->request_update_render_data();
     }
     m_original_volumes_extruder_idxs = get_extruder_id_for_volumes(*mo);
@@ -566,19 +572,21 @@ PainterGizmoType GLGizmoMmuSegmentation::get_painter_type() const
     return PainterGizmoType::MMU_SEGMENTATION;
 }
 
-std::array<float, 4> GLGizmoMmuSegmentation::get_cursor_sphere_left_button_color() const
+ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_left_button_color() const
 {
-    const std::array<float, 4> &color = m_modified_extruders_colors[m_first_selected_extruder_idx];
-    return {color[0], color[1], color[2], 0.25f};
+    ColorRGBA color = m_modified_extruders_colors[m_first_selected_extruder_idx];
+    color.a(0.25f);
+    return color;
 }
 
-std::array<float, 4> GLGizmoMmuSegmentation::get_cursor_sphere_right_button_color() const
+ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_right_button_color() const
 {
-    const std::array<float, 4> &color = m_modified_extruders_colors[m_second_selected_extruder_idx];
-    return {color[0], color[1], color[2], 0.25f};
+    ColorRGBA color = m_modified_extruders_colors[m_second_selected_extruder_idx];
+    color.a(0.25f);
+    return color;
 }
 
-void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
+void TriangleSelectorMmGui::render(ImGuiWrapper* imgui, const Transform3d& matrix)
 {
     if (m_update_render_data)
         update_render_data();
@@ -586,9 +594,10 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
     auto *shader = wxGetApp().get_current_shader();
     if (!shader)
         return;
+
     assert(shader->get_name() == "mm_gouraud");
 
-    for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx)
+    for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx) {
         if (m_gizmo_scene.has_VBOs(color_idx)) {
             if (color_idx > m_colors.size()) // Seed fill VBO
                 shader->set_uniform("uniform_color", TriangleSelectorGUI::get_seed_fill_color(color_idx == (m_colors.size() + 1) ? m_default_volume_color : m_colors[color_idx - (m_colors.size() + 1) - 1]));
@@ -597,21 +606,9 @@ void TriangleSelectorMmGui::render(ImGuiWrapper *imgui)
 
             m_gizmo_scene.render(color_idx);
         }
-
-    if (m_paint_contour.has_VBO()) {
-        ScopeGuard guard_mm_gouraud([shader]() { shader->start_using(); });
-        shader->stop_using();
-
-        auto *contour_shader = wxGetApp().get_shader("mm_contour");
-        contour_shader->start_using();
-
-        glsafe(::glDepthFunc(GL_LEQUAL));
-        m_paint_contour.render();
-        glsafe(::glDepthFunc(GL_LESS));
-
-        contour_shader->stop_using();
     }
 
+    render_paint_contour(matrix);
     m_update_render_data = false;
 }
 
@@ -644,25 +641,7 @@ void TriangleSelectorMmGui::update_render_data()
         m_gizmo_scene.triangle_indices_sizes[color_idx] = m_gizmo_scene.triangle_indices[color_idx].size();
 
     m_gizmo_scene.finalize_triangle_indices();
-
-    m_paint_contour.release_geometry();
-    std::vector<Vec2i32> contour_edges = this->get_seed_fill_contour();
-    m_paint_contour.contour_vertices.reserve(contour_edges.size() * 6);
-    for (const Vec2i32 &edge : contour_edges) {
-        m_paint_contour.contour_vertices.emplace_back(m_vertices[edge(0)].v.x());
-        m_paint_contour.contour_vertices.emplace_back(m_vertices[edge(0)].v.y());
-        m_paint_contour.contour_vertices.emplace_back(m_vertices[edge(0)].v.z());
-
-        m_paint_contour.contour_vertices.emplace_back(m_vertices[edge(1)].v.x());
-        m_paint_contour.contour_vertices.emplace_back(m_vertices[edge(1)].v.y());
-        m_paint_contour.contour_vertices.emplace_back(m_vertices[edge(1)].v.z());
-    }
-
-    m_paint_contour.contour_indices.assign(m_paint_contour.contour_vertices.size() / 3, 0);
-    std::iota(m_paint_contour.contour_indices.begin(), m_paint_contour.contour_indices.end(), 0);
-    m_paint_contour.contour_indices_size = m_paint_contour.contour_indices.size();
-
-    m_paint_contour.finalize_geometry();
+    update_paint_contour();
 }
 
 wxString GLGizmoMmuSegmentation::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const
@@ -686,6 +665,13 @@ void GLMmSegmentationGizmo3DScene::release_geometry() {
         glsafe(::glDeleteBuffers(1, &triangle_indices_VBO_id));
         triangle_indices_VBO_id = 0;
     }
+#if ENABLE_GL_CORE_PROFILE
+    if (this->vertices_VAO_id > 0) {
+        glsafe(::glDeleteVertexArrays(1, &this->vertices_VAO_id));
+        this->vertices_VAO_id = 0;
+    }
+#endif // ENABLE_GL_CORE_PROFILE
+
     this->clear();
 }
 
@@ -693,35 +679,71 @@ void GLMmSegmentationGizmo3DScene::render(size_t triangle_indices_idx) const
 {
     assert(triangle_indices_idx < this->triangle_indices_VBO_ids.size());
     assert(this->triangle_indices_sizes.size() == this->triangle_indices_VBO_ids.size());
+#if ENABLE_GL_CORE_PROFILE
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        assert(this->vertices_VAO_id != 0);
+#endif // ENABLE_GL_CORE_PROFILE
     assert(this->vertices_VBO_id != 0);
     assert(this->triangle_indices_VBO_ids[triangle_indices_idx] != 0);
 
+    GLShaderProgram* shader = wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+
+#if ENABLE_GL_CORE_PROFILE
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(this->vertices_VAO_id));
+    // the following binding is needed to set the vertex attributes
+#endif // ENABLE_GL_CORE_PROFILE
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->vertices_VBO_id));
-    glsafe(::glVertexPointer(3, GL_FLOAT, 3 * sizeof(float), (const void*)(0 * sizeof(float))));
-
-    glsafe(::glEnableClientState(GL_VERTEX_ARRAY));
-
-    // Render using the Vertex Buffer Objects.
-    if (this->triangle_indices_sizes[triangle_indices_idx] > 0) {
-        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->triangle_indices_VBO_ids[triangle_indices_idx]));
-        glsafe(::glDrawElements(GL_TRIANGLES, GLsizei(this->triangle_indices_sizes[triangle_indices_idx]), GL_UNSIGNED_INT, nullptr));
-        glsafe(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    const GLint position_id = shader->get_attrib_location("v_position");
+    if (position_id != -1) {
+        glsafe(::glVertexAttribPointer(position_id, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (GLvoid*)0));
+        glsafe(::glEnableVertexAttribArray(position_id));
     }
 
-    glsafe(::glDisableClientState(GL_VERTEX_ARRAY));
+    // Render using the Vertex Buffer Objects.
+    if (this->triangle_indices_VBO_ids[triangle_indices_idx] != 0 &&
+        this->triangle_indices_sizes[triangle_indices_idx] > 0) {
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->triangle_indices_VBO_ids[triangle_indices_idx]));
+        glsafe(::glDrawElements(GL_TRIANGLES, GLsizei(this->triangle_indices_sizes[triangle_indices_idx]), GL_UNSIGNED_INT, nullptr));
+        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    }
+
+    if (position_id != -1)
+        glsafe(::glDisableVertexAttribArray(position_id));
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+#if ENABLE_GL_CORE_PROFILE
+    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(0));
+#endif // ENABLE_GL_CORE_PROFILE
 }
 
 void GLMmSegmentationGizmo3DScene::finalize_vertices()
 {
+#if ENABLE_GL_CORE_PROFILE
+        assert(this->vertices_VAO_id == 0);
+#endif // ENABLE_GL_CORE_PROFILE
     assert(this->vertices_VBO_id == 0);
     if (!this->vertices.empty()) {
+#if ENABLE_GL_CORE_PROFILE
+        if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0)) {
+            glsafe(::glGenVertexArrays(1, &this->vertices_VAO_id));
+            glsafe(::glBindVertexArray(this->vertices_VAO_id));
+        }
+#endif // ENABLE_GL_CORE_PROFILE
+
         glsafe(::glGenBuffers(1, &this->vertices_VBO_id));
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->vertices_VBO_id));
         glsafe(::glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(float), this->vertices.data(), GL_STATIC_DRAW));
         glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
         this->vertices.clear();
+
+#if ENABLE_GL_CORE_PROFILE
+        if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+        glsafe(::glBindVertexArray(0));
+#endif // ENABLE_GL_CORE_PROFILE
     }
 }
 

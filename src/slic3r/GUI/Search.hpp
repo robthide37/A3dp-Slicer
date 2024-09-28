@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_SearchComboBox_hpp_
 #define slic3r_SearchComboBox_hpp_
 
@@ -17,8 +21,12 @@
 
 #include "GUI_Utils.hpp"
 #include "wxExtensions.hpp"
+#include "OptionsGroup.hpp"
 #include "libslic3r/Preset.hpp"
 
+#include "Widgets/CheckBox.hpp"
+
+class CheckBox;
 
 namespace Slic3r {
 
@@ -58,9 +66,9 @@ struct Option {
 
     // Fuzzy matching works at a character level. Thus matching with wide characters is a safer bet than with short characters,
     // though for some languages (Chinese?) it may not work correctly.
-    std::wstring    key;
+    std::wstring    key; // opt_key (without the 'type;' as suffix)
     Preset::Type    type {Preset::TYPE_INVALID};
-    int16_t        idx;
+    int16_t         idx;
     ConfigOptionMode tags;
     std::wstring    label;
     std::wstring    label_local;
@@ -72,7 +80,9 @@ struct Option {
     std::wstring    tooltip_local;
     std::wstring    tooltip_lowercase;
     std::wstring    tooltip_local_lowercase;
+
     std::string     opt_key_with_idx() const;
+    std::string     opt_key() const;
 };
 
 struct FoundOption {
@@ -108,6 +118,7 @@ class OptionsSearcher
     std::vector<Option>                     options{};
     bool sorted = false;
     std::vector<Option>                     script_options{};
+    std::vector<Option>                     preferences_options {};
     std::vector<FoundOption>                found {};
     std::map<ConfigOptionMode, wxString>    tag_label_cache;
 
@@ -133,6 +144,8 @@ public:
     OptionsSearcher();
     ~OptionsSearcher();
 
+    void append_preferences_option(const GUI::Line& opt_line);
+    void append_preferences_options(const std::vector<GUI::Line>& opt_lines);
     void check_and_update(  PrinterTechnology pt_in, 
                             ConfigOptionMode tags_in, 
                             std::vector<InputInfo> input_values);
@@ -176,8 +189,8 @@ class SearchDialog : public GUI::DPIDialog
     wxTextCtrl*         search_line         { nullptr };
     wxDataViewCtrl*     search_list         { nullptr };
     SearchListModel*    search_list_model   { nullptr };
-    wxCheckBox*         check_category      { nullptr };
-    wxCheckBox*         check_english       { nullptr };
+    CheckBox*           check_category      { nullptr };
+    CheckBox*           check_english       { nullptr };
     wxCheckBox*         check_exact         { nullptr };
     wxCheckBox*         check_all_mode      { nullptr };
 
@@ -198,7 +211,7 @@ class SearchDialog : public GUI::DPIDialog
 
 public:
     SearchDialog(OptionsSearcher* searcher);
-    ~SearchDialog() {}
+    ~SearchDialog();
 
     void Popup(wxPoint position = wxDefaultPosition);
     void ProcessSelection(wxDataViewItem selection);
@@ -218,12 +231,16 @@ protected:
 class SearchListModel : public wxDataViewVirtualListModel
 {
     std::vector<std::pair<wxString, int>>   m_values;
-    ScalableBitmap                          m_icon[5];
+    ScalableBitmap                          m_icon[6];
 
 public:
     enum {
+#ifdef __WXMSW__
+        colIconMarkedText,
+#else
         colIcon,
         colMarkedText,
+#endif
         colMax
     };
 
@@ -233,7 +250,7 @@ public:
 
     void Clear();
     void Prepend(const std::string& text);
-    void msw_rescale();
+    void sys_color_changed();
 
     // implementation of base class virtuals to define model
 

@@ -15,7 +15,7 @@ jobs:
       with:
         ref: 'debug_macos'
     - name: build deps & slicer
-      run: ./BuildMacOS.sh -bia
+      run: ./BuildMacOS.sh -badsi
     - name: ls build
       working-directory: ./build
       run: ls
