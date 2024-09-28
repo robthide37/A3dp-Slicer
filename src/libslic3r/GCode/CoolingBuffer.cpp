@@ -91,7 +91,6 @@ struct CoolingLine
         TYPE_G2G3_IJ            = 1 << 23,
         // Arc interpolation, arc defined by R (arc radius, positive - smaller, negative - larger).
         TYPE_G2G3_R             = 1 << 24,
-        TYPE_UNSET_TOOL         = 1 << 22,
         // Would be TYPE_ADJUSTABLE, but the block of G-code lines has zero extrusion length, thus the block
         // cannot have its speed adjusted. This should not happen (sic!). (delete the block if no g1)
         TYPE_ADJUSTABLE_EMPTY   = 1 << 25,
