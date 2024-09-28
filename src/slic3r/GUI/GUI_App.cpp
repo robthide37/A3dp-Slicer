@@ -265,7 +265,6 @@ public:
         // draw text to the box at the left of the splashscreen.
         // this box will be 2/5 of the weight of the bitmap, and be at the left.
         int width = lround(m_main_bitmap.GetWidth() * 0.4);
-        wxCoord margin = int(m_scale * 20);
 
         // load bitmap for logo
         int logo_size = lround(width * 0.25);
