@@ -69,6 +69,7 @@ void Layer::make_slices()
     }
 
     this->lslice_indices_sorted_by_print_order = chain_expolygons(this->lslices());
+    assert(this->lslices().size() == this->lslice_indices_sorted_by_print_order.size());
 }
 
 // used by Layer::build_up_down_graph()
