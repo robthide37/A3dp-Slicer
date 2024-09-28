@@ -21,6 +21,7 @@ enum class TestMesh {
     V,
     _40x10,
     cube_20x20x20,
+    cube_2x20x10,
     sphere_50mm,
     bridge,
     bridge_with_hole,
@@ -62,11 +63,11 @@ template <typename T>
 bool _equiv(const T& a, const T& b, double epsilon) { return abs(a - b) < epsilon; }
 
 Slic3r::Model model(const std::string& model_name, TriangleMesh&& _mesh);
-void init_print(std::vector<TriangleMesh> 		  &&meshes, Slic3r::Print &print, Slic3r::Model& model, const DynamicPrintConfig &config_in, bool comments = false);
-void init_print(std::initializer_list<TestMesh> 	meshes, Slic3r::Print &print, Slic3r::Model& model, const Slic3r::DynamicPrintConfig &config_in = Slic3r::DynamicPrintConfig::full_print_config(), bool comments = false);
-void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, Slic3r::Model& model, const Slic3r::DynamicPrintConfig &config_in = Slic3r::DynamicPrintConfig::full_print_config(), bool comments = false);
-void init_print(std::initializer_list<TestMesh> 	meshes, Slic3r::Print &print, Slic3r::Model& model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
-void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, Slic3r::Model& model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
+void init_print(std::vector<TriangleMesh> 		  &&meshes, Slic3r::Print &print, Slic3r::Model& model, const DynamicPrintConfig &config_in, bool comments = false, unsigned duplicate_count = 1);
+void init_print(std::initializer_list<TestMesh> 	meshes, Slic3r::Print &print, Slic3r::Model& model, const Slic3r::DynamicPrintConfig &config_in = Slic3r::DynamicPrintConfig::full_print_config(), bool comments = false, unsigned duplicate_count = 1);
+void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, Slic3r::Model& model, const Slic3r::DynamicPrintConfig &config_in = Slic3r::DynamicPrintConfig::full_print_config(), bool comments = false, unsigned duplicate = 1);
+void init_print(std::initializer_list<TestMesh> 	meshes, Slic3r::Print &print, Slic3r::Model& model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false, unsigned duplicate = 1);
+void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, Slic3r::Model& model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false, unsigned duplicate = 1);
 
 void init_and_process_print(std::initializer_list<TestMesh> 	meshes, Slic3r::Print &print, const DynamicPrintConfig& config, bool comments = false);
 void init_and_process_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, const DynamicPrintConfig& config, bool comments = false);
@@ -79,6 +80,9 @@ std::string slice(std::initializer_list<TestMesh> meshes, const DynamicPrintConf
 std::string slice(std::initializer_list<TriangleMesh> meshes, const DynamicPrintConfig &config, bool comments = false);
 std::string slice(std::initializer_list<TestMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
 std::string slice(std::initializer_list<TriangleMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
+
+bool contains(const std::string &data, const std::string &pattern);
+bool contains_regex(const std::string &data, const std::string &pattern);
 
 } } // namespace Slic3r::Test
 

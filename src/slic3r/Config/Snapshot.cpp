@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Snapshot.hpp"
 
 #include <time.h>
@@ -130,8 +134,13 @@ void Snapshot::load_ini(const std::string &path)
             vc.name = section.first.substr(group_name_vendor.size());
             for (auto &kvp : section.second) {
             	if (kvp.first == "version" || kvp.first == "min_slic3r_version" || kvp.first == "max_slic3r_version") {
-            		// Version of the vendor specific config bundle bundled with this snapshot.            		
-                	auto semver = Semver::parse(kvp.second.data());
+            		// Version of the vendor specific config bundle bundled with this snapshot.
+                	std::optional<Slic3r::Semver> semver;
+                    if (kvp.second.data().empty()) {
+                        semver = {Semver(0,0,0,0)};
+                    }else{
+                        semver = Semver::parse(kvp.second.data());
+                    }
                 	if (! semver)
                 		throw_on_parse_error("invalid " + kvp.first + " format for " + section.first);
 					if (kvp.first == "version")

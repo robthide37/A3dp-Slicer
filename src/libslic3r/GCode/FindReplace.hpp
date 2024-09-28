@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2022 Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_FindReplace_hpp_
 #define slic3r_FindReplace_hpp_
 
@@ -9,7 +13,7 @@ namespace Slic3r {
 
 class GCodeFindReplace {
 public:
-    GCodeFindReplace(const PrintConfig &print_config) : GCodeFindReplace(print_config.gcode_substitutions.values) {}
+    GCodeFindReplace(const PrintConfig &print_config) : GCodeFindReplace(print_config.gcode_substitutions.get_values()) {}
     GCodeFindReplace(const std::vector<std::string> &gcode_substitutions);
 
 

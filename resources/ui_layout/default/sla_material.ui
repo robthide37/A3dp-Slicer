@@ -21,6 +21,8 @@ group:label_width$19:Corrections
 		setting:label$Z:width$6:material_correction_z
 	end_line
 
+material_overrides_page
+
 page:Notes:note
 group:label_width$0:no_title:Notes
     setting:full_width:height$25:material_notes

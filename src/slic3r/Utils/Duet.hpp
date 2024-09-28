@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2020 Manuel Coenen
+///|/ Copyright (c) 2018 Martin Loidl @LoidlM
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Duet_hpp_
 #define slic3r_Duet_hpp_
 
@@ -20,14 +26,14 @@ public:
 	const char* get_name() const override;
 
 	bool test(wxString &curl_msg) const override;
-	bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const override;
+	bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 	bool has_auto_discovery() const override { return false; }
 	bool can_test() const override { return true; }
     PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint | PrintHostPostUploadAction::StartSimulation; }
 	std::string get_host() const override { return host; }
    
 private:
-	enum class ConnectionType { rrf, dsf, error };
+	enum class ConnectionType { rrf, dsf, error }; // rrf = RepRapFirmware, dsf = DuetSoftwareFramework
 	std::string host;
 	std::string password;
 

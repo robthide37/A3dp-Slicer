@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Filip Sykala @Jony01, David Kocík @kocikdav, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r/libslic3r.h"
 #include "KBShortcutsDialog.hpp"
 #include "I18N.hpp"
@@ -16,7 +20,7 @@ namespace GUI {
 
 KBShortcutsDialog::KBShortcutsDialog()
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, wxString(wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME) + " - " + _L("Keyboard Shortcuts"),
-    wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+    wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "kbshortcut")
 {
     // fonts
     const wxFont& font = wxGetApp().normal_font();
@@ -46,19 +50,29 @@ KBShortcutsDialog::KBShortcutsDialog()
     }
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK);
-    wxGetApp().UpdateDarkUI(static_cast<wxButton*>(this->FindWindowById(wxID_OK, this)));
+    wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+    wxGetApp().UpdateDarkUI(buttons->GetAffirmativeButton());
     this->SetEscapeId(wxID_OK);
     main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 5);
 
     SetSizer(main_sizer);
     main_sizer->SetSizeHints(this);
     this->CenterOnParent();
+
+#ifdef __linux__
+    // workaround to correct pages layout
+    book->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [book](wxBookCtrlEvent& e) {
+        book->GetPage(e.GetSelection())->Fit();
+    });
+    const wxSize sz = this->GetBestSize();
+    this->SetSize(sz.x + 1, sz.y);
+#endif
 }
 
 void KBShortcutsDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
-    m_logo_bmp.msw_rescale();
-    m_header_bitmap->SetBitmap(m_logo_bmp.bmp());
+    //m_logo_bmp.msw_rescale();
+    //m_header_bitmap->SetBitmap(m_logo_bmp.bmp());
     msw_buttons_rescale(this, em_unit(), { wxID_OK });
 
     Layout();
@@ -154,6 +168,7 @@ void KBShortcutsDialog::fill_shortcuts()
             { "L", L("Gizmo FDM paint-on supports") },
             { "P", L("Gizmo FDM paint-on seam") },
             { "N", L("Gizmo Multi Material painting") },
+            { "T", L("Gizmo Text emboss / engrave")},
             { "Esc", L("Unselect gizmo or clear selection") },
             { "K", L("Change camera type (perspective, orthographic)") },
             { "B", L("Zoom to Bed") },
@@ -173,10 +188,6 @@ void KBShortcutsDialog::fill_shortcuts()
             { ctrl + "M", L("Show/Hide 3Dconnexion devices settings dialog") },
 #endif // __APPLE__
 #endif // _WIN32
-#if ENABLE_RENDER_PICKING_PASS
-            // Don't localize debugging texts.
-            { "P", "Toggle picking pass texture rendering on/off" },
-#endif // ENABLE_RENDER_PICKING_PASS
         };
 
         m_full_shortcuts.push_back({ { _L("Platter"), "" }, plater_shortcuts });
@@ -224,7 +235,7 @@ void KBShortcutsDialog::fill_shortcuts()
         { "A", L("Horizontal slider - Move active thumb Left") },
         { "D", L("Horizontal slider - Move active thumb Right") },
         { "X", L("On/Off one layer mode of the vertical slider") },
-        { "L", L("Show/Hide Legend and Estimated printing time") },
+        { "L", L("Show/Hide legend") },
         { "C", L("Show/Hide G-code window") },
     };
 
@@ -271,8 +282,8 @@ wxPanel* KBShortcutsDialog::create_header(wxWindow* parent, const wxFont& bold_f
     sizer->AddStretchSpacer();
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 32);
-    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, m_logo_bmp.bmp());
+    m_header_bitmap = new wxStaticBitmap(panel, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 32));
+
     sizer->Add(m_header_bitmap, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
 
     // text

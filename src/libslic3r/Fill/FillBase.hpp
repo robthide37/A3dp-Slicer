@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Pavel Mikuš @Godrak, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/ Copyright (c) SuperSlicer 2019 Remi Durand @supermerill
+///|/
+///|/ ported from lib/Slic3r/Fill/Base.pm:
+///|/ Copyright (c) Prusa Research 2016 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_FillBase_hpp_
 #define slic3r_FillBase_hpp_
 
@@ -12,6 +21,7 @@
 
 #include "../libslic3r.h"
 #include "../BoundingBox.hpp"
+#include "../Exception.hpp"
 #include "../PrintConfig.hpp"
 #include "../Exception.hpp"
 #include "../Utils.hpp"
@@ -20,7 +30,6 @@
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
 #include "../Flow.hpp"
-#include "../PrintConfig.hpp"
 
 namespace Slic3r {
 
@@ -46,7 +55,7 @@ struct FillParams
     // Fill density, fraction in <0, 1>
     float       density     { 0.f };
 
-    // bridge offset from the centerline.
+    // bridge offset from the centerline. (scaled)
     coord_t       bridge_offset = -1;
 
     // Fill extruding flow multiplier, fraction in <0, 1>. Used by "over bridge compensation"
@@ -60,8 +69,8 @@ struct FillParams
     float       anchor_length   { 1000.f };
     float       anchor_length_max   { 1000.f };
 
-    // G-code resolution.
-    coordf_t    resolution          { 0.0125 };
+    // internal resolution.
+    coord_t    fill_resolution          { scale_t(0.0125) };
 
     // Don't adjust spacing to fill the space evenly.
     bool        dont_adjust { true };
@@ -77,8 +86,8 @@ struct FillParams
     // in this case we don't try to make more continuous paths
     bool        complete    { false };
 
-    // if role == erNone or ERCustom, this method have to choose the best role itself, else it must use the argument's role.
-    ExtrusionRole role      { erNone };
+    // if role == ExtrusionRole::None or ERCustom, this method have to choose the best role itself, else it must use the argument's role.
+    ExtrusionRole role{ExtrusionRole::None};
 
     // flow to use
     Flow        flow        {};
@@ -94,8 +103,12 @@ struct FillParams
 
     // For Concentric infill, to switch between Classic and Arachne.
     bool        use_arachne     { false };
-    // Layer height for Concentric infill with Arachne.
-    coordf_t    layer_height    { 0.f };
+
+    // Layer height for Concentric infill with Arachne. (unscaled)
+    float    layer_height    { 0.f };
+
+    // sparse infill width to use to create the pattern (0 if not used) (unscaled)
+    float    max_sparse_infill_spacing  { 0.f };
 };
 static_assert(IsTriviallyCopyable<FillParams>::value, "FillParams class is not POD (and it should be - see constructor).");
 
@@ -111,6 +124,8 @@ public:
     ExPolygons  no_overlap_expolygons;
     // in radians, ccw, 0 = East
     float       angle;
+    // to allow rectilinear to rotate 90deg on odd
+    float       can_angle_cross;
     // In scaled coordinates. Maximum lenght of a perimeter segment connecting two infill lines.
     // Used by the FillRectilinear2, FillGrid2, FillTriangles, FillStars and FillCubic.
     // If left to zero, the links will not be limited.
@@ -122,9 +137,16 @@ public:
 
     // Octree builds on mesh for usage in the adaptive cubic infill
     FillAdaptive::Octree* adapt_fill_octree = nullptr;
+#if _DEBUG
+    mutable double debug_verify_flow_mult = 0;
+#endif
 protected:
     // in unscaled coordinates, please use init (after settings all others settings) as some algos want to modify the value
-    coordf_t    spacing_priv;
+    double spacing_priv = -1.;
+
+    // PrintConfig and PrintObjectConfig are used by infills that use Arachne (Concentric and FillEnsuring).
+    const PrintConfig       *print_config        = nullptr;
+    const PrintObjectConfig *print_object_config = nullptr;
 
 public:
     virtual ~Fill() {}
@@ -133,9 +155,14 @@ public:
     static Fill* new_from_type(const InfillPattern type);
     static Fill* new_from_type(const std::string &type);
 
+    void set_config(const PrintConfig *print_config, const PrintObjectConfig *print_object_config)
+    {
+        this->print_config = print_config;
+        this->print_object_config = print_object_config;
+    }
     void         set_bounding_box(const Slic3r::BoundingBox &bbox) { bounding_box = bbox; }
     virtual void init_spacing(coordf_t spacing, const FillParams &params) { this->spacing_priv = spacing;  }
-    coordf_t get_spacing() const { return spacing_priv; }
+    double get_spacing() const { return spacing_priv; }
 
     // Do not sort the fill lines to optimize the print head path?
     virtual bool no_sort() const { return false; }
@@ -156,6 +183,7 @@ protected:
         overlap(0.),
         // Initial angle is undefined.
         angle(FLT_MAX),
+        can_angle_cross(true),
         link_max_length(0),
         loop_clipping(0),
         // The initial bounding box is empty, therefore undefined.
@@ -170,6 +198,7 @@ protected:
         ExPolygon                         /* expolygon */,
         Polylines                       & /* polylines_out */) const {
         BOOST_LOG_TRIVIAL(error)<<"Error, the fill isn't implemented";
+        assert(false);
     };
 
     // Used for concentric infill to generate ThickPolylines using Arachne.
@@ -179,11 +208,12 @@ protected:
                                       ExPolygon                      expolygon,
                                       ThickPolylines                &thick_polylines_out) const {
         BOOST_LOG_TRIVIAL(error) << "Error, the arachne fill isn't implemented";
+        assert(false);
     };
 
-    virtual float _layer_angle(size_t idx) const { return (idx & 1) ? float(M_PI/2.) : 0; }
+    virtual float _layer_angle(size_t idx) const { return can_angle_cross && (idx & 1) ? float(M_PI/2.) : 0; }
 
-    virtual coord_t _line_spacing_for_density(float density) const;
+    virtual coord_t _line_spacing_for_density(const FillParams& params) const;
 
     virtual std::pair<float, Point> _infill_direction(const Surface *surface) const;
 
@@ -191,44 +221,37 @@ protected:
 
     double compute_unscaled_volume_to_fill(const Surface* surface, const FillParams& params) const;
 
-    ExtrusionRole getRoleFromSurfaceType(const FillParams &params, const Surface *surface) const {
-        if (params.role == erNone || params.role == erCustom) {
-            return params.flow.bridge() ?
-                (surface->has_pos_bottom() ? erBridgeInfill : erInternalBridgeInfill) :
-                           (surface->has_fill_solid() ?
-                           ((surface->has_pos_top()) ? erTopSolidInfill : erSolidInfill) :
-                           erInternalInfill);
-        }
-        return params.role;
-    }
+    ExtrusionRole getRoleFromSurfaceType(const FillParams &params, const Surface *surface) const;
 
 public:
-    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
+    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
     //for rectilinear
-    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, const Polygons& polygons_src, Polylines& polylines_out, const double spacing, const FillParams& params);
+    static void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, const Polygons& polygons_src, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
 
-    static void connect_base_support(Polylines &&infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params);
-    static void connect_base_support(Polylines &&infill_ordered, const Polygons &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params);
+    static void connect_base_support(Polylines &&infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const coord_t line_spacing, const FillParams &params);
+    static void connect_base_support(Polylines &&infill_ordered, const Polygons &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const coord_t line_spacing, const FillParams &params);
 
     static coord_t  _adjust_solid_spacing(const coord_t width, const coord_t distance, const double factor_max = 1.2);
 };
 
 namespace FakePerimeterConnect {
-    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
-    void connect_infill(Polylines&& infill_ordered, const Polygons& boundary, const BoundingBox& bbox, Polylines& polylines_out, const double spacing, const FillParams& params);
-    void connect_infill(Polylines&& infill_ordered, const std::vector<const Polygon*>& boundary, const BoundingBox& bbox, Polylines& polylines_out, double spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const Polygons& boundary, const BoundingBox& bbox, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const std::vector<const Polygon*>& boundary, const BoundingBox& bbox, Polylines& polylines_out, coord_t spacing, const FillParams& params);
 }
 namespace PrusaSimpleConnect {
-    void connect_infill(Polylines& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
+    void connect_infill(Polylines& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
 }
 namespace NaiveConnect {
-    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params);
+    void connect_infill(Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const coord_t spacing, const FillParams& params);
 }
 
 // composite filler
 class FillWithPerimeter : public Fill
 {
 public:
+    // bewteen 0 (0%) and 1 (100%) overlap
+    float overlap_ratio = 0;
     std::unique_ptr<Fill> infill{ nullptr };
     float ratio_fill_inside = 0.f;
     FillWithPerimeter() : Fill() {}
@@ -253,9 +276,9 @@ public:
     ExtrusionSetRole(ExtrusionRole role) : new_role(role) {}
     void use(ExtrusionPath &path) override { path.set_role(new_role); }
     void use(ExtrusionPath3D &path3D) override { path3D.set_role(new_role); }
-    void use(ExtrusionMultiPath &multipath) override { for (ExtrusionPath path : multipath.paths) path.set_role(new_role); }
-    void use(ExtrusionMultiPath3D &multipath) override { for (ExtrusionPath path : multipath.paths) path.set_role(new_role); }
-    void use(ExtrusionLoop &loop) override { for (ExtrusionPath path : loop.paths) path.set_role(new_role); }
+    void use(ExtrusionMultiPath &multipath) override { for (ExtrusionPath &path : multipath.paths) path.set_role(new_role); }
+    void use(ExtrusionMultiPath3D &multipath) override { for (ExtrusionPath &path : multipath.paths) path.set_role(new_role); }
+    void use(ExtrusionLoop &loop) override { for (ExtrusionPath &path : loop.paths) path.set_role(new_role); }
     void use(ExtrusionEntityCollection &collection) override { for (ExtrusionEntity *entity : collection.entities()) entity->visit(*this); }
 };
 

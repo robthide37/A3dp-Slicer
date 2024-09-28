@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas
+///|/
+///|/ ported from lib/Slic3r/Fill/Concentric.pm:
+///|/ Copyright (c) Prusa Research 2016 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2012 Mark Hindess
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "../ClipperUtils.hpp"
 #include "../ExPolygon.hpp"
 #include "../Surface.hpp"
@@ -15,7 +24,7 @@ FillConcentric::init_spacing(coordf_t spacing, const FillParams &params)
 {
     Fill::init_spacing(spacing, params);
     if (params.density > 0.9999f && !params.dont_adjust) {
-        this->spacing_priv = unscaled(this->_adjust_solid_spacing(bounding_box.size()(0), _line_spacing_for_density(params.density)));
+        this->spacing_priv = unscaled(this->_adjust_solid_spacing(bounding_box.size()(0), _line_spacing_for_density(params)));
     }
 }
 
@@ -30,7 +39,7 @@ FillConcentric::_fill_surface_single(
     // no rotation is supported for this infill pattern
     BoundingBox bounding_box = expolygon.contour.bounding_box();
     
-    coord_t distance = _line_spacing_for_density(params.density);
+    coord_t distance = _line_spacing_for_density(params);
     if (params.density > 0.9999f && !params.dont_adjust) {
         //it's == Slic3r::FillConcentric::_adjust_solid_spacing(bounding_box.size()(0), _line_spacing_for_density(params.density)) because of the init_spacing()
         distance = scale_t(this->get_spacing());
@@ -46,12 +55,13 @@ FillConcentric::_fill_surface_single(
     // generate paths from the outermost to the innermost, to avoid
     // adhesion problems of the first central tiny loops
     loops = union_pt_chained_outside_in(loops);
+    ensure_valid(loops, params.fill_resolution);
 
     // split paths using a nearest neighbor search
     size_t iPathFirst = polylines_out.size();
     Point last_pos(0, 0);
     for (const Polygon &loop : loops) {
-        polylines_out.emplace_back(loop.split_at_index(last_pos.nearest_point_index(loop.points)));
+        polylines_out.emplace_back(loop.split_at_index(nearest_point_index(loop.points, last_pos)));
         last_pos = polylines_out.back().last_point();
     }
 
@@ -71,6 +81,7 @@ FillConcentric::_fill_surface_single(
     //TODO: return ExtrusionLoop objects to get better chained paths,
     // otherwise the outermost loop starts at the closest point to (0, 0).
     // We want the loops to be split inside the G-code generator to get optimum path planning.
+    assert_valid(polylines_out);
 }
 
 void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRole& good_role, const FillParams& params, Polygon& polygon) {
@@ -80,7 +91,7 @@ void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRo
     if (polygon.is_valid()) {
         //default to ccw
         polygon.make_counter_clockwise();
-        ExtrusionPath path(good_role, flow, width, height, false);
+        ExtrusionPath path(ExtrusionAttributes{good_role, ExtrusionFlow{flow, float(width), float(height)}}, false);
         path.polyline.append(std::move(polygon.points));
         path.polyline.append(path.polyline.front());
         storage.append(ExtrusionLoop{ std::move(path) });
@@ -93,9 +104,11 @@ FillConcentricWGapFill::fill_surface_extrusion(
     const FillParams &params,
     ExtrusionEntitiesPtr &out) const {
 
+    ExtrusionEntitiesPtr out_to_check;
+
     double min_gapfill_area = double(params.flow.scaled_width()) * double(params.flow.scaled_width());
     if (params.config != nullptr) min_gapfill_area = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
-    // Perform offset.
+    // Perform offset. //FIXME: can miss gapfill outside of this first perimeter
     Slic3r::ExPolygons expp = offset_ex(surface->expolygon, double(scale_(0 - 0.5 * this->get_spacing())));
     // Create the infills for each of the regions.
     Polylines polylines_out;
@@ -113,13 +126,11 @@ FillConcentricWGapFill::fill_surface_extrusion(
         // no rotation is supported for this infill pattern
         BoundingBox bounding_box = expolygon.contour.bounding_box();
 
-        coord_t distance = _line_spacing_for_density(params.density);
+        coord_t distance = _line_spacing_for_density(params);
         if (params.density > 0.9999f && !params.dont_adjust) {
             distance = scale_t(this->get_spacing());
         }
-
-        ExPolygons gaps;
-        std::vector< std::vector<Polygons>> bunch_2_shell_2_loops;
+        std::vector<std::vector<Polygons>> bunch_2_shell_2_loops;
         bunch_2_shell_2_loops.emplace_back(); // create a new bunch before a gap
         bunch_2_shell_2_loops.back().push_back(to_polygons(expolygon)); // add first shell
         std::vector<ExPolygons> bunch_2_gaps; // size = bunch_2_shell_2_loops.size() (-1)
@@ -129,39 +140,62 @@ FillConcentricWGapFill::fill_surface_extrusion(
             ExPolygons next_onion = offset2_ex(last, -(distance + scale_d(this->get_spacing()) / 2), +(scale_d(this->get_spacing()) / 2));
             ExPolygons new_gaps = diff_ex(
                 offset_ex(last, -0.5f * distance),
-                offset_ex(next_onion, 0.5f * distance + 10));  // 10 = safety offset         
+                offset_ex(next_onion, 0.5f * distance + 10));  // 10 = safety offset
+            //add next shell (into the last collection)
             bunch_2_shell_2_loops.back().push_back(to_polygons(next_onion));
+            //if there is some gaps, then we need to create a new collection for the next shells, so they will be peirnted after the gaps.
             if (!new_gaps.empty()) {
-                append(gaps, new_gaps);
+                if (first && !this->no_overlap_expolygons.empty()) {
+                    new_gaps = intersection_ex(new_gaps, this->no_overlap_expolygons);
+                }
                 bunch_2_gaps.push_back(std::move(new_gaps));
                 if (!bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
                     bunch_2_shell_2_loops.back().pop_back();
                 }
-                //create a new collection for next bunch.
-                bunch_2_shell_2_loops.emplace_back();
+                //create a new collection for next bunch (if the loop don't stop here).
+                if (!next_onion.empty()) {
+                    bunch_2_shell_2_loops.emplace_back();
+                }
             }
+            // refresh before next iteration
             last = next_onion;
-            if (first && !this->no_overlap_expolygons.empty()) {
-                gaps = intersection_ex(gaps, this->no_overlap_expolygons);
-            }
             first = false;
         }
         if (!bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
             bunch_2_shell_2_loops.back().pop_back();
         }
         if (bunch_2_shell_2_loops.back().empty()) {
-            assert(bunch_2_shell_2_loops.size() > bunch_2_gaps.size());
+            assert(bunch_2_shell_2_loops.size() >= bunch_2_gaps.size());
+            if (bunch_2_shell_2_loops.size() == bunch_2_gaps.size()) {
+                assert(bunch_2_gaps.size() > 1);
+                if (bunch_2_gaps.size() > 1) {
+                    // merge last two gaps (inside the last perimeter & after the last perimeter are both extruded
+                    // after the last perimeter)
+                    append(bunch_2_gaps[bunch_2_gaps.size() - 2], bunch_2_gaps.back());
+                    bunch_2_gaps.pop_back();
+                }
+            }
             bunch_2_shell_2_loops.pop_back();
             if (!bunch_2_shell_2_loops.empty() && !bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
                 bunch_2_shell_2_loops.back().pop_back();
             }
         }
+        //check no empty shell
+        assert(!bunch_2_shell_2_loops.back().empty());
+        //check no empty gap
+        assert(std::find_if(bunch_2_gaps.begin(), bunch_2_gaps.end(), [](const auto &vec) { return vec.empty(); }) ==
+               bunch_2_gaps.end());
+        // check size there is 3 posibilities:
+        //   1) no gap: 1 shell
+        //   2) gap but not in the last to iteration: X xhells, x-1 gap
+        //   3) gap and there is some to print after the last shell: X shell, X gap
+        assert(bunch_2_shell_2_loops.size() == bunch_2_gaps.size() + 1 ||
+               bunch_2_shell_2_loops.size() == bunch_2_gaps.size());
 
         // generate paths from the outermost to the innermost, to avoid
         // adhesion problems of the first central tiny loops
         //note: useless if we don't apply no_sort flag
         //loops = union_pt_chained(loops, false);
-
 
         //get the role
         ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
@@ -237,7 +271,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
                             leaf_coll->append(ExtrusionEntityCollection{});
                             leaf_count.sortable = static_cast<ExtrusionEntityCollection*>(leaf_coll->set_entities().back());
                             ExtrusionEntityCollection new_coll_nosort{ false, false };
-                            new_coll_nosort.set_entities().push_back(elt);
+                            new_coll_nosort.append(ExtrusionEntitiesPtr{elt});
                             leaf_count.sortable->append(std::move(new_coll_nosort));
                         }
                         if (leaf_count.sortable) {
@@ -328,7 +362,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //            //do gapfill locally
                 //            leafs[idx_leaf]->append(
                 //                Geometry::variable_width(
-                //                    poly, erGapFill, 
+                //                    poly, ExtrusionRole::GapFill, 
                 //                    params.flow, 
                 //                    scale_t(params.config->get_computed_value("resolution_internal")), 
                 //                    params.flow.scaled_width() / 10)
@@ -340,11 +374,14 @@ FillConcentricWGapFill::fill_surface_extrusion(
                 //    }
                 //    //goto_next_polyline:
                 //}
-                if (!polylines.empty() && !is_bridge(good_role)) {
-                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
+                bool fill_bridge = good_role.is_bridge() || params.flow.bridge();
+                // allow bridged gapfill, mostly for support bottom interface.
+                assert(!good_role.is_bridge());
+                if (!polylines.empty()) {
+                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, ExtrusionRole::GapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
                     if (!gap_fill_entities.empty()) {
-                        //set role if needed
-                        if (good_role != erSolidInfill) {
+                        // set role if needed
+                        if (fill_bridge || (good_role != ExtrusionRole::SolidInfill && good_role != ExtrusionRole::TopSolidInfill)) {
                             ExtrusionSetRole set_good_role(good_role);
                             for (ExtrusionEntity* ptr : gap_fill_entities)
                                 ptr->visit(set_good_role);
@@ -365,14 +402,14 @@ FillConcentricWGapFill::fill_surface_extrusion(
 
 
         if (!root_collection_nosort->entities().empty())
-            out.push_back(root_collection_nosort);
+            out_to_check.push_back(root_collection_nosort);
         else delete root_collection_nosort;
     }
 
     // external gapfill
     ExPolygons gapfill_areas = diff_ex(ExPolygons{ surface->expolygon }, offset_ex(expp, double(scale_(0.5 * this->get_spacing()))));
     gapfill_areas = union_safety_offset_ex(gapfill_areas);
-    if (gapfill_areas.size() > 0) {
+    if (gapfill_areas.size() > 0 && no_overlap_expolygons.size() > 0) {
         double minarea = double(params.flow.scaled_width()) * double(params.flow.scaled_width());
         if (params.config != nullptr) minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
         for (int i = 0; i < gapfill_areas.size(); i++) {
@@ -382,11 +419,41 @@ FillConcentricWGapFill::fill_surface_extrusion(
             }
         }
         FillParams params2{ params };
-        params2.role = erGapFill;
+        params2.role = ExtrusionRole::GapFill;
 
-        do_gap_fill(intersection_ex(gapfill_areas, no_overlap_expolygons), params2, out);
+        do_gap_fill(intersection_ex(gapfill_areas, no_overlap_expolygons), params2, out_to_check);
     }
 
+    // check volume coverage
+    {
+        double flow_mult_exact_volume = 1;
+        // check if not over-extruding
+        if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
+            // compute the path of the nozzle -> extruded volume
+            double length_tot = 0;
+            int    nb_lines   = 0;
+            ExtrusionVolume get_volume;
+            for (ExtrusionEntity *ee : out_to_check) ee->visit(get_volume);
+            // compute flow to remove spacing_ratio from the equation
+            // compute real volume to fill
+            double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
+            if (get_volume.volume != 0 && polyline_volume != 0)
+                flow_mult_exact_volume = polyline_volume / get_volume.volume;
+            // failsafe, it can happen
+            if (flow_mult_exact_volume > 1.3)
+                flow_mult_exact_volume = 1.3;
+            if (flow_mult_exact_volume < 0.8)
+                flow_mult_exact_volume = 0.8;
+            BOOST_LOG_TRIVIAL(info) << "concentric Infill (with gapfil) process extrude " << get_volume.volume
+                                    << " mm3 for a volume of " << polyline_volume << " mm3 : we mult the flow by "
+                                    << flow_mult_exact_volume;
+            //apply to extrusions
+            ExtrusionModifyFlow modifier(flow_mult_exact_volume);
+            for (ExtrusionEntity *ee : out_to_check) ee->visit(modifier);
+        }
+    }
+
+    out.insert(out.end(), out_to_check.begin(), out_to_check.end());
 }
 
 void FillConcentric::_fill_surface_single(const FillParams              &params,
@@ -425,19 +492,10 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
                 continue;
 
             ThickPolyline thick_polyline = Arachne::to_thick_polyline(*extrusion);
-            if (extrusion->is_closed && thick_polyline.points.front() == thick_polyline.points.back() && thick_polyline.points_width.front() == thick_polyline.points_width.back()) {
-                thick_polyline.points.pop_back();
-                thick_polyline.points_width.pop_back();
-                assert(thick_polyline.points.size() == thick_polyline.points_width.size());
-                int nearest_idx = last_pos.nearest_point_index(thick_polyline.points);
-                std::rotate(thick_polyline.points.begin(), thick_polyline.points.begin() + nearest_idx, thick_polyline.points.end());
-                std::rotate(thick_polyline.points_width.begin(), thick_polyline.points_width.begin() + nearest_idx, thick_polyline.points_width.end());
-                thick_polyline.points.emplace_back(thick_polyline.points.front());
-                thick_polyline.points_width.emplace_back(thick_polyline.points_width.front());
-                assert(thick_polyline.points.size() == thick_polyline.points_width.size());
-            }
+            if (extrusion->is_closed)
+                thick_polyline.start_at_index(nearest_point_index(thick_polyline.points, last_pos));
             thick_polylines_out.emplace_back(std::move(thick_polyline));
-            last_pos = thick_polylines_out.back().last_point();
+            last_pos = thick_polylines_out.back().back();
         }
 
         // clip the paths to prevent the extruder from getting exactly on the first point of the loop

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Brim_hpp_
 #define slic3r_Brim_hpp_
 
@@ -12,6 +16,7 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
 #endif
 void make_brim(const Print& print, const Flow& flow, const PrintObjectPtrs& objects, ExPolygons& unbrimmable, ExtrusionEntityCollection& out);
 void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs& objects, ExPolygons& unbrimmable, ExtrusionEntityCollection& out);
+void make_brim_patch(const Print &print, const Flow &flow, const Polygons &patches, ExPolygons &unbrimmable_areas, ExtrusionEntityCollection &out);
 void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectPtrs& objects, ExPolygons& unbrimmable_areas, ExtrusionEntityCollection& out);
 
 } // Slic3r

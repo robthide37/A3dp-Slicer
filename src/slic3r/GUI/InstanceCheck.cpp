@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GUI_App.hpp"
 #include "InstanceCheck.hpp"
 #include "Plater.hpp"
@@ -374,6 +378,7 @@ bool instance_check(int argc, char** argv, bool app_config_single_instance)
 namespace GUI {
 
 wxDEFINE_EVENT(EVT_LOAD_MODEL_OTHER_INSTANCE, LoadFromOtherInstanceEvent);
+wxDEFINE_EVENT(EVT_START_DOWNLOAD_OTHER_INSTANCE, StartDownloadOtherInstanceEvent);
 wxDEFINE_EVENT(EVT_INSTANCE_GO_TO_FRONT, InstanceGoToFrontEvent);
 
 void OtherInstanceMessageHandler::init(wxEvtHandler* callback_evt_handler)
@@ -502,18 +507,30 @@ void OtherInstanceMessageHandler::handle_message(const std::string& message)
 	}
 
 	std::vector<boost::filesystem::path> paths;
+	std::vector<std::string> downloads;
 	// Skip the first argument, it is the path to the slicer executable.
 	auto it = args.begin();
 	for (++ it; it != args.end(); ++ it) {
 		boost::filesystem::path p = MessageHandlerInternal::get_path(*it);
 		if (! p.string().empty())
 			paths.emplace_back(p);
+// TODO: There is a misterious slash appearing in recieved msg on windows
+#ifdef _WIN32
+		else if (it->rfind("prusaslicer://open/?file=", 0) == 0)
+#else
+	    else if (it->rfind("prusaslicer://open?file=", 0) == 0)
+#endif
+			downloads.emplace_back(*it);
 	}
 	if (! paths.empty()) {
 		//wxEvtHandler* evt_handler = wxGetApp().plater(); //assert here?
 		//if (evt_handler) {
 			wxPostEvent(m_callback_evt_handler, LoadFromOtherInstanceEvent(GUI::EVT_LOAD_MODEL_OTHER_INSTANCE, std::vector<boost::filesystem::path>(std::move(paths))));
 		//}
+	}
+	if (!downloads.empty())
+	{
+		wxPostEvent(m_callback_evt_handler, StartDownloadOtherInstanceEvent(GUI::EVT_START_DOWNLOAD_OTHER_INSTANCE, std::vector<std::string>(std::move(downloads))));
 	}
 }
 
@@ -547,6 +564,9 @@ namespace MessageHandlerDBusInternal
 	        "     <method name=\"AnotherInstance\">"
 	        "       <arg name=\"data\" direction=\"in\" type=\"s\" />"
 	        "     </method>"
+	        "	  <method name=\"Introspect\">"
+	        "       <arg name=\"data\" direction=\"out\" type=\"s\" />"
+	        "     </method>"
 	        "   </interface>"
 	        " </node>";
 	     
@@ -555,6 +575,7 @@ namespace MessageHandlerDBusInternal
 	    dbus_connection_send(connection, reply, NULL);
 	    dbus_message_unref(reply);
 	}
+
 	//method AnotherInstance receives message from another PrusaSlicer instance 
 	static void handle_method_another_instance(DBusConnection *connection, DBusMessage *request)
 	{
@@ -589,6 +610,9 @@ namespace MessageHandlerDBusInternal
 	        return DBUS_HANDLER_RESULT_HANDLED;
 	    } else if (0 == strcmp(our_interface.c_str(), interface_name) && 0 == strcmp("AnotherInstance", member_name)) {
 	        handle_method_another_instance(connection, message);
+	        return DBUS_HANDLER_RESULT_HANDLED;
+	    } else if (0 == strcmp(our_interface.c_str(), interface_name) && 0 == strcmp("Introspect", member_name)) {
+	         respond_to_introspect(connection, message);
 	        return DBUS_HANDLER_RESULT_HANDLED;
 	    } 
 	    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;

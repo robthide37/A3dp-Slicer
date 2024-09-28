@@ -1,5 +1,10 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ButtonsDescription.hpp"
 #include <wx/sizer.h>
+#include <wx/string.h>
 #include <wx/stattext.h>
 #include <wx/statbmp.h>
 #include <wx/clrpicker.h>
@@ -7,19 +12,90 @@
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "I18N.hpp"
+#include "OptionsGroup.hpp"
 #include "wxExtensions.hpp"
+#include "BitmapCache.hpp"
 
 namespace Slic3r {
 namespace GUI {
 
-void ButtonsDescription::FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent,
+#ifdef GUI_TAG_PALETTE
+	
+//static ModePaletteComboBox::PalettesMap MODE_PALETTES =
+static std::vector<std::pair<std::string, std::vector<std::string>>> MODE_PALETTES =
+{
+	{ L("Palette 1 (default)"), { "#00B000", "#FFDC00", "#E70000" } },
+	{ L("Palette 2"), { "#FC766A", "#B0B8B4", "#184A45" } },
+	{ L("Palette 3"), { "#567572", "#964F4C", "#696667" } },
+	{ L("Palette 4"), { "#DA291C", "#56A8CB", "#53A567" } },
+	{ L("Palette 5"), { "#F65058", "#FBDE44", "#28334A" } },
+	{ L("Palette 6"), { "#FF3EA5", "#EDFF00", "#00A4CC" } },
+	{ L("Palette 7"), { "#E95C20", "#006747", "#4F2C1D" } },
+	{ L("Palette 8"), { "#D9514E", "#2A2B2D", "#2DA8D8" } }
+};
+
+ModePaletteComboBox::ModePaletteComboBox(wxWindow* parent) :
+	BitmapComboBox(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxCB_READONLY)
+{
+	for (const auto& palette : MODE_PALETTES)
+		Append(_(palette.first), *get_bmp(palette.second));
+}
+
+void ModePaletteComboBox::UpdateSelection(const std::vector<wxColour> &palette_in)
+{
+	for (size_t idx = 0; idx < MODE_PALETTES.size(); ++idx ) {
+		const auto& palette = MODE_PALETTES[idx].second;
+
+		bool is_selected = true;
+		for (size_t mode = 0; mode < palette_in.size(); mode++)
+			if (wxColour(palette[mode]) != palette_in[mode]) {
+				is_selected = false;
+				break;
+			}
+		if (is_selected) {
+			Select(int(idx));
+			return;
+		}
+	}
+
+	Select(-1);
+}
+
+BitmapCache& ModePaletteComboBox::bitmap_cache()
+{
+	static BitmapCache bmps;
+	return bmps;
+}
+
+wxBitmapBundle * ModePaletteComboBox::get_bmp(const std::vector<std::string> &palette)
+{
+	std::string bitmap_key;
+	for (const auto& color : palette)
+	    bitmap_key += color + "+";
+
+	const int icon_height = wxOSX ? 10 : 12;
+
+	wxBitmapBundle* bmp_bndl = bitmap_cache().find_bndl(bitmap_key);
+	if (bmp_bndl == nullptr) {
+		// Create the bitmap with color bars.
+		std::vector<wxBitmapBundle*> bmps;
+		for (const auto& color : palette) {
+			bmps.emplace_back(get_bmp_bundle("mode", icon_height, icon_height, color));
+			bmps.emplace_back(get_empty_bmp_bundle(wxOSX ? 5 : 6, icon_height));
+		}
+		bmp_bndl = bitmap_cache().insert_bndl(bitmap_key, bmps);
+	}
+
+	return bmp_bndl;
+}
+#endif
+namespace GUI_Descriptions {
+
+void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent,
     wxColourPickerCtrl** default_colour, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour, wxColourPickerCtrl** phony_colour)
 {
 	wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(3, 5, 5);
 	sizer->Add(grid_sizer, 0, wxEXPAND);
-
-	ScalableBitmap bmp_delete = ScalableBitmap(parent, "cross");
-	ScalableBitmap bmp_delete_focus = ScalableBitmap(parent, "cross_focus");
 
 	auto add_color = [grid_sizer, parent](wxColourPickerCtrl** color_picker, const wxColour& color, const wxColour& def_color, wxString label_text) {
 		// wrap the label_text to the max 80 characters
@@ -52,7 +128,7 @@ void ButtonsDescription::FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWi
 
 		grid_sizer->Add(*color_picker, 0, wxALIGN_CENTRE_VERTICAL);
 		grid_sizer->Add(btn, 0, wxALIGN_CENTRE_VERTICAL);
-		grid_sizer->Add(sys_label, 0, wxALIGN_CENTRE_VERTICAL | wxEXPAND);
+		grid_sizer->Add(sys_label, 0, wxALIGN_CENTRE_VERTICAL);
 	};
 
 	add_color(default_colour, wxGetApp().get_label_clr_default(), wxGetApp().get_label_default_clr_default(), _L("Value is the same as the last saved preset, but is not the system value"));
@@ -61,7 +137,82 @@ void ButtonsDescription::FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWi
 	add_color(phony_colour, wxGetApp().get_label_clr_phony(), wxGetApp().get_label_default_clr_phony(),     _L("Value isn't taken into account, it's computed over an other field."));
 }
 
-ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry> &entries) :
+void FillSizerWithModeColorDescriptions(
+	wxSizer* sizer, wxWindow* parent, 
+	std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color)
+{
+	const int margin = em_unit(parent);
+#ifdef GUI_TAG_PALETTE
+	auto palette_cb = new ModePaletteComboBox(parent);
+    palette_cb->UpdateSelection(mode_palette);
+
+	palette_cb->Bind(wxEVT_COMBOBOX, [clr_pickers, &mode_palette](wxCommandEvent& evt) {
+		const int selection = evt.GetSelection();
+		if (selection < 0)
+			return;
+		const auto& palette = MODE_PALETTES[selection];
+		for (int mode = 0; mode < 3; mode++)
+		    if  (*clr_pickers[mode]) {
+				wxColour clr = wxColour(palette.second[mode]);
+			    (*clr_pickers[mode])->SetColour(clr);
+				mode_palette[mode] = clr;
+		    }
+	});
+
+	wxBoxSizer* h_sizer = new wxBoxSizer(wxHORIZONTAL);
+	h_sizer->Add(new wxStaticText(parent, wxID_ANY, _L("Default palette for mode markers") + ": "), 0, wxALIGN_CENTER_VERTICAL);
+	h_sizer->Add(palette_cb, 1, wxEXPAND);
+
+	sizer->Add(h_sizer, 0, wxEXPAND | wxBOTTOM, margin);
+#endif
+	wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(9, 5, 5);
+	sizer->Add(grid_sizer, 0, wxEXPAND);
+
+	//const std::vector<wxString> names = { _L("Simple"), _CTX("Advanced", "Mode"), _L("Expert") };
+
+	//for (size_t mode = 0; mode < names.size(); ++mode) {
+	for(auto& gui_2_tag : clr_pickers_2_color){
+		ColorRGB rgb_color;
+		if(!decode_color(gui_2_tag.second.color_hash, rgb_color))
+			continue;
+		wxColour color(rgb2int(rgb_color));
+
+		wxColourPickerCtrl** color_picker = gui_2_tag.first;
+		*color_picker = new wxColourPickerCtrl(parent, wxID_ANY, color);
+		wxGetApp().UpdateDarkUI((*color_picker)->GetPickerCtrl(), true);
+
+		(*color_picker)->Bind(wxEVT_COLOURPICKER_CHANGED, [color_picker, &color](wxCommandEvent&) {
+			const wxColour new_color = (*color_picker)->GetColour();
+			if (new_color != color) {
+				color = new_color;
+#ifdef GUI_TAG_PALETTE
+				palette_cb->UpdateSelection(mode_palette);
+#endif
+			}
+		});
+
+		wxColour def_color = color;
+		auto btn = new ScalableButton(parent, wxID_ANY, "undo");
+		btn->SetToolTip(_L("Revert color"));
+
+		btn->Bind(wxEVT_BUTTON, [color_picker, &color, def_color](wxEvent& event) {
+			color = def_color;
+			(*color_picker)->SetColour(def_color);
+#ifdef GUI_TAG_PALETTE
+			palette_cb->UpdateSelection(mode_palette);
+#endif
+		});
+		parent->Bind(wxEVT_UPDATE_UI, [color_picker, def_color](wxUpdateUIEvent& evt) {
+			evt.Enable((*color_picker)->GetColour() != def_color);
+	    }, btn->GetId());
+
+		grid_sizer->Add(*color_picker, 0, wxALIGN_CENTRE_VERTICAL);
+		grid_sizer->Add(btn, 0, wxALIGN_CENTRE_VERTICAL);
+		grid_sizer->Add(new wxStaticText(parent, wxID_ANY, gui_2_tag.second.name), 0, wxALIGN_CENTRE_VERTICAL | wxRIGHT, 2*margin);
+	}
+}
+
+Dialog::Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries) :
 	wxDialog(parent, wxID_ANY, _(L("Buttons And Text Colors Description")), wxDefaultPosition, wxDefaultSize),
 	m_entries(entries)
 {
@@ -73,21 +224,40 @@ ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry
 	main_sizer->Add(grid_sizer, 0, wxEXPAND | wxALL, 20);
 
 	// Icon description
-	for (const Entry &entry : m_entries)
+	for (const ButtonEntry &entry : m_entries)
 	{
 		auto icon = new wxStaticBitmap(this, wxID_ANY, entry.bitmap->bmp());
 		grid_sizer->Add(icon, -1, wxALIGN_CENTRE_VERTICAL);
 		auto description = new wxStaticText(this, wxID_ANY, _(entry.symbol));
 		grid_sizer->Add(description, -1, wxALIGN_CENTRE_VERTICAL);
 		description = new wxStaticText(this, wxID_ANY, _(entry.explanation));
-		grid_sizer->Add(description, -1, wxALIGN_CENTRE_VERTICAL | wxEXPAND);
+		grid_sizer->Add(description, -1, wxALIGN_CENTRE_VERTICAL);
 	}
 
 	// Text color description
 	wxSizer* sizer = new wxBoxSizer(wxVERTICAL);
-	FillSizerWithTextColorDescriptions(sizer, this, &default_colour, &sys_colour, &mod_colour, &phony_colour);
-	main_sizer->Add(sizer, 0, wxEXPAND | wxALL, 20);	
+	GUI_Descriptions::FillSizerWithTextColorDescriptions(sizer, this, &default_colour, &sys_colour, &mod_colour, &phony_colour);
+	main_sizer->Add(sizer, 0, wxEXPAND | wxALL, 20);
+	
+#ifdef GUI_TAG_PALETTE
+	// Mode color markers description
+	mode_palette = wxGetApp().get_mode_palette();
+#endif
+	//check if we have enough colour picker
+	std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color;
+    for (AppConfig::Tag &tag : get_app_config()->tags()) {
+		//create nullptr if not present yet
+		if(tags.find(tag.tag) == tags.end())
+			tags[tag.tag] = nullptr;
+	}
+	//now tags is fixed for the end of this method
+    for (AppConfig::Tag &tag : get_app_config()->tags()) {
+		clr_pickers_2_color.emplace_back(&tags[tag.tag], tag);
+	}
 
+	wxSizer* mode_sizer = new wxBoxSizer(wxVERTICAL);
+	GUI_Descriptions::FillSizerWithModeColorDescriptions(mode_sizer, this, clr_pickers_2_color);
+	main_sizer->Add(mode_sizer, 0, wxEXPAND | wxALL, 20);
 
 	auto buttons = CreateStdDialogButtonSizer(wxOK|wxCANCEL);
 	main_sizer->Add(buttons, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 10);
@@ -98,8 +268,12 @@ ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry
 		wxGetApp().set_label_clr_modified(mod_colour->GetColour());
 		wxGetApp().set_label_clr_default(default_colour->GetColour());
 		wxGetApp().set_label_clr_phony(phony_colour->GetColour());
+#ifdef GUI_TAG_PALETTE
+		wxGetApp().set_mode_palette(mode_palette);
+#endif
+
 		EndModal(wxID_OK);
-		});
+	});
 
 	wxGetApp().UpdateDarkUI(btn);
 	wxGetApp().UpdateDarkUI(static_cast<wxButton*>(FindWindowById(wxID_CANCEL, this)));
@@ -108,6 +282,7 @@ ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry
 	main_sizer->SetSizeHints(this);
 }
 
+} // GUI_Descriptions
 } // GUI
 } // Slic3r
 

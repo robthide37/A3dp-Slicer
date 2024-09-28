@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_AvoidCrossingPerimeters_hpp_
 #define slic3r_AvoidCrossingPerimeters_hpp_
 
@@ -8,7 +12,7 @@
 namespace Slic3r {
 
 // Forward declarations.
-class GCode;
+class GCodeGenerator;
 class Layer;
 class Point;
 
@@ -26,13 +30,13 @@ public:
     void        init_layer(const Layer &layer);
     bool        is_init() { return m_init; }
 
-    Polyline    travel_to(const GCode& gcodegen, const Point& point)
+    Polyline    travel_to(const GCodeGenerator &gcodegen, const Point& point)
     {
         bool could_be_wipe_disabled;
         return this->travel_to(gcodegen, point, &could_be_wipe_disabled);
     }
 
-    Polyline    travel_to(const GCode& gcodegen, const Point& point, bool* could_be_wipe_disabled);
+    Polyline    travel_to(const GCodeGenerator &gcodegen, const Point& point, bool* could_be_wipe_disabled);
 
     struct Boundary {
         // Collection of boundaries used for detection of crossing perimeters for travels
@@ -44,13 +48,18 @@ public:
         // Used for detection of intersection between line and any polygon from boundaries
         EdgeGrid::Grid                  grid;
         //used to move the point inside the boundary
-        std::vector<std::pair<ExPolygon, ExPolygons>> boundary_growth;
+        std::vector<std::pair<ExPolygon, ExPolygon>> boundary_growth;
+        // area (top) where you don't want to travel, even more so than over voids.
+        ExPolygons to_avoid;
+        // Used for detection of intersection between line and any polygon from to_avoid
+        EdgeGrid::Grid to_avoid_grid;
 
         void clear()
         {
             boundaries.clear();
             boundaries_params.clear();
             boundary_growth.clear();
+            to_avoid.clear();
         }
     };
 
@@ -64,8 +73,11 @@ private:
 
     bool m_init{ false };
 
+    // Lslices offseted by half an external perimeter width. Used for detection if line or polyline is inside of any polygon.
+    ExPolygons               m_lslices_offset;
+    std::vector<BoundingBox> m_lslices_offset_bboxes;
     // Used for detection of line or polyline is inside of any polygon.
-    EdgeGrid::Grid m_grid_lslice;
+    EdgeGrid::Grid           m_grid_lslices_offset;
     // Store all needed data for travels inside object
     Boundary m_internal;
     // Store all needed data for travels outside object

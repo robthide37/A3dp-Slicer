@@ -1,10 +1,19 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2014 - 2015 Alessandro Ranellucci @alranel
+///|/
+///|/ ported from lib/Slic3r/Flow.pm:
+///|/ Copyright (c) Prusa Research 2022 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2012 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Flow_hpp_
 #define slic3r_Flow_hpp_
 
 #include "libslic3r.h"
 #include "Config.hpp"
 #include "Exception.hpp"
-#include "ExtrusionEntity.hpp"
+#include "ExtrusionRole.hpp"
 
 namespace Slic3r {
 
@@ -49,10 +58,14 @@ class Flow
 {
 private:
     Flow(float width, float height, float nozzle_diameter, float spacing_ratio) :
-        m_width(width), m_height(height), m_spacing(rounded_rectangle_extrusion_spacing(width, height, spacing_ratio)), m_nozzle_diameter(nozzle_diameter), m_spacing_ratio(spacing_ratio), m_bridge(false) {}
+        m_width(width), m_height(height), m_spacing(rounded_rectangle_extrusion_spacing(width, height, spacing_ratio)), m_nozzle_diameter(nozzle_diameter), m_spacing_ratio(spacing_ratio), m_bridge(false) {
+        assert(spacing_ratio >= 0 && spacing_ratio <= 1);
+    }
     //Flow(width, height, rounded_rectangle_extrusion_spacing(width, height, spacing_ratio), nozzle_diameter, spacing_ratio, false) {}
     Flow(float width, float height, float spacing, float _nd, float spacing_ratio, bool _bridge) :
-        m_width(width), m_height(height), m_spacing(spacing), m_nozzle_diameter(_nd), m_spacing_ratio(spacing_ratio), m_bridge(_bridge) {}
+        m_width(width), m_height(height), m_spacing(spacing), m_nozzle_diameter(_nd), m_spacing_ratio(spacing_ratio), m_bridge(_bridge) {
+        assert(spacing_ratio >= 0 && spacing_ratio <= 1);
+    }
 public:
     Flow() = default;
 

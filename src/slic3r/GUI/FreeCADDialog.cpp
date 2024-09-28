@@ -8,9 +8,9 @@
 #include "GUI.hpp"
 #include "GUI_Utils.hpp"
 #include "GUI_ObjectList.hpp"
-#include "../Utils/Http.hpp"
-#include "Plater.hpp"
 #include "slic3r/Utils/Http.hpp"
+#include "slic3r/Utils/MacDarkMode.hpp"
+#include "Plater.hpp"
 #include "Tab.hpp"
 
 #include "MainFrame.hpp"
@@ -36,6 +36,7 @@
 #include <boost/iostreams/tee.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/fstream.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
@@ -138,7 +139,7 @@ FreeCADDialog::~FreeCADDialog() {
 FreeCADDialog::FreeCADDialog(GUI_App* app, MainFrame* mainframe)
     : DPIDialog(NULL, wxID_ANY, wxString(SLIC3R_APP_NAME) + " - " + _L("FreePySCAD : script engine for FreeCAD"),
 //#if ENABLE_SCROLLABLE
-        wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+        wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "freecad")
 //#else
 //    wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
 //#endif // ENABLE_SCROLLABLE
@@ -218,7 +219,13 @@ FreeCADDialog::FreeCADDialog(GUI_App* app, MainFrame* mainframe)
     createSTC();
 
     wxStaticBitmap* logo = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap);
-    logo->SetBitmap(create_scaled_bitmap("freecad", this, 64));
+    wxBitmapBundle* bmp_bndl = get_bmp_bundle("freecad", 64);
+#ifdef __APPLE__
+    wxBitmap bmp = bmp_bndl->GetBitmap(bmp_bndl->GetDefaultSize() * mac_max_scaling_factor());
+#else
+    wxBitmap bmp = bmp_bndl->GetBitmapFor(this);
+#endif
+    logo->SetBitmap(*bmp_bndl);
 
     m_errors = new wxTextCtrl(this, wxID_ANY, "",
         wxDefaultPosition, wxSize(200, 100 * this->scale_factor()), wxHW_SCROLLBAR_AUTO | wxTE_MULTILINE);
@@ -322,9 +329,9 @@ bool FreeCADDialog::load_text_from_file(const boost::filesystem::path &path) {
         try {
             std::locale loc = boost::locale::generator()("en_US.UTF-8");
             // Open the stream to 'lock' the file.
-            boost::filesystem::ifstream in;
+            boost::nowide::ifstream in;
             in.imbue(loc);
-            in.open(path);
+            in.open(path.string());
             // Obtain the size of the file.
             const uintmax_t sz = boost::filesystem::file_size(path);
             // Create a buffer.
@@ -369,9 +376,9 @@ bool FreeCADDialog::write_text_in_file(const wxString &towrite, const boost::fil
         boost::filesystem::create_directories(file.parent_path());
         std::locale loc = boost::locale::generator()("en_US.UTF-8");
         // Open the stream to 'lock' the file.
-        boost::filesystem::ofstream out;
+        boost::nowide::ofstream out;
         out.imbue(loc);
-        out.open(file);
+        out.open(file.string());
         out << towrite;
         out.close();
     }
@@ -987,8 +994,8 @@ void FreeCADDialog::create_geometry(wxCommandEvent& event_args) {
     /// --- translate ---
     const DynamicPrintConfig* printerConfig = this->gui_app->get_tab(Preset::TYPE_PRINTER)->get_config();
     const ConfigOptionPoints* bed_shape = printerConfig->option<ConfigOptionPoints>("bed_shape");
-    Vec2d bed_size = BoundingBoxf(bed_shape->values).size();
-    Vec2d bed_min = BoundingBoxf(bed_shape->values).min;
+    Vec2d bed_size = BoundingBoxf(bed_shape->get_values()).size();
+    Vec2d bed_min = BoundingBoxf(bed_shape->get_values()).min;
     model.objects[objs_idx[0]]->translate({ bed_min.x() + bed_size.x() / 2, bed_min.y() + bed_size.y() / 2, 0 });
 
     //update plater

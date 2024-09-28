@@ -8,21 +8,26 @@ on:
 jobs:
   build:
 
-    runs-on: macos-latest
+    runs-on: macos-12
 
     steps:
     - uses: actions/checkout@v2
       with:
         ref: 'rc'
     - name: build deps & slicer
-      run: ./BuildMacOS.sh -i
-    - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
-      with:
-        name: rc_macos.tar
-        path: build/Slic3r.tar
-    - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+      run: ./BuildMacOS.sh -dsi
+    - name: Upload dmg
+      uses: actions/upload-artifact@v4
       with:
         name: rc_macos.dmg
-        path: build/Slic3r.dmg
+        path: build/${{ github.event.repository.name }}.dmg
+    - name: Upload tar
+      uses: actions/upload-artifact@v4
+      with:
+        name: rc_macos.tar
+        path: build/${{ github.event.repository.name }}.tar
+    - name: Upload app
+      uses: actions/upload-artifact@v4
+      with:
+        name: rc_macos.app
+        path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app

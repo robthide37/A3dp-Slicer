@@ -1,12 +1,12 @@
 #!/bin/bash
 
 export ROOT=`pwd`
-export NCORES=`nproc --all`
+export NCORES=`nproc`
 FOUND_GTK2=$(dpkg -l libgtk* | grep gtk2)
 FOUND_GTK3=$(dpkg -l libgtk* | grep gtk-3)
 
 unset name
-while getopts ":dsiuhgb" opt; do
+while getopts ":hwdrigbsyu" opt; do
   case ${opt} in
     u )
         UPDATE_LIB="1"
@@ -20,18 +20,31 @@ while getopts ":dsiuhgb" opt; do
     s )
         BUILD_SLIC3R="1"
         ;;
+    t)
+        BUILD_TESTS="1"
+        ;;
     b )
         BUILD_DEBUG="1"
         ;;
     g )
         FOUND_GTK3=""
         ;;
-    h ) echo "Usage: ./BuildLinux.sh [-i][-u][-d][-s][-b][-g]"
+    w )
+        BUILD_WIPE="1"
+        ;;
+    r )
+        BUILD_CLEANDEPEND="1"
+        ;;
+    h ) echo "Usage: ./BuildLinux.sh [-h][-w][-d][-r][-i][-g][-b][-s][-t][-u]"
+        echo "   -h: this message"
+        echo "   -w: wipe build directories before building"
+        echo "   -d: build deps (optional)"
+        echo "   -r: clean dependencies building files (reduce disk usage)"
         echo "   -i: Generate appimage (optional)"
         echo "   -g: force gtk2 build"
-        echo "   -b: build in debug mode"
-        echo "   -d: build deps (optional)"
-        echo "   -s: build slic3r (optional)"
+        echo "   -b: build with debug symbols"
+        echo "   -s: build Slic3r/SuperSlicer"
+        echo "   -t: build tests (in combination with -s)"
         echo "   -u: only update clock & dependency packets (optional and need sudo)"
         echo "For a first use, you want to 'sudo ./BuildLinux.sh -u'"
         echo "   and then './BuildLinux.sh -dsi'"
@@ -42,37 +55,45 @@ done
 
 if [ $OPTIND -eq 1 ]
 then
-    echo "Usage: ./BuildLinux.sh [-i][-u][-d][-s][-b][-g]"
+    echo "Usage: ./BuildLinux.sh [-h][-w][-d][-r][-i][-g][-b][-s][-t][-u]"
+    echo "   -h: this message"
+    echo "   -w: wipe build directories before building"
+    echo "   -d: build deps (optional)"
+    echo "   -r: clean dependencies building files (reduce disk usage)"
     echo "   -i: Generate appimage (optional)"
     echo "   -g: force gtk2 build"
-    echo "   -b: build in debug mode"
-    echo "   -d: build deps (optional)"
-    echo "   -s: build slic3r (optional)"
+    echo "   -b: build with debug symbols"
+    echo "   -s: build Slic3r/SuperSlicer"
+    echo "   -t: build tests (in combination with -s)"
     echo "   -u: only update clock & dependency packets (optional and need sudo)"
     echo "For a first use, you want to 'sudo ./BuildLinux.sh -u'"
     echo "   and then './BuildLinux.sh -dsi'"
     exit 0
 fi
 
-# mkdir build
-if [ ! -d "build" ]
+if [[ -n "$FOUND_GTK3" ]]
 then
-    mkdir build
+    echo "Found GTK3"
+else
+    if [[ -n "$FOUND_GTK2" ]]
+    then
+        echo "Found GTK2"
+    fi
 fi
-
 
 if [[ -n "$UPDATE_LIB" ]]
 then
     echo -n -e "Updating linux ...\n"
     hwclock -s
     apt update
+	apt install g++ m4
     if [[ -z "$FOUND_GTK3" ]]
     then
-        echo -e "\nInstalling: libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git
+        echo -e "\nInstalling: libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse\n"
+        apt install libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse
     else
-        echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git
+        echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse\n"
+        apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext fuse
     fi
     # for ubuntu 22.04:
     ubu_version="$(cat /etc/issue)" 
@@ -117,6 +138,12 @@ echo "[2/9] Changing date in version..."
 }
 echo "done"
 
+# mkdir build
+if [ ! -d "build" ]
+then
+    mkdir build
+fi
+
 # mkdir in deps
 if [ ! -d "deps/build" ]
 then
@@ -125,6 +152,17 @@ fi
 
 if [[ -n "$BUILD_DEPS" ]]
 then
+    if [[ -n $BUILD_WIPE ]]
+    then
+       echo -e "\n wiping deps/build directory ...\n"
+       rm -fr deps/build
+       echo -e " ... done\n"
+    fi
+    # mkdir in deps
+    if [ ! -d "deps/build" ]
+    then
+        mkdir deps/build
+    fi
     echo "[3/9] Configuring dependencies..."
     BUILD_ARGS=""
     if [[ -n "$FOUND_GTK3_DEV" ]]
@@ -157,18 +195,26 @@ then
         pushd destdir/usr/local/lib
             if [[ -z "$FOUND_GTK3_DEV" ]]
             then
-                cp libwxscintilla-3.1.a libwx_gtk2u_scintilla-3.1.a
+                cp libwxscintilla-3.2.a libwx_gtk2u_scintilla-3.2.a
             else
-                cp libwxscintilla-3.1.a libwx_gtk3u_scintilla-3.1.a
+                cp libwxscintilla-3.2.a libwx_gtk3u_scintilla-3.2.a
             fi
         popd
         echo "done"
         
-        # clean deps
-        echo "[6/9] Cleaning dependencies..."
-        rm -rf dep_*
     popd
     echo "done"
+fi
+
+# clean deps
+if [[ -n "$BUILD_CLEANDEPEND" ]]
+then
+    echo -e "[6/9] Cleaning dependencies...\n"
+    pushd deps/build
+    pwd
+    rm -fr dep_*
+    popd > /dev/null
+    echo -e "\n ... done\n"
 fi
 
 if [[ -n "$BUILD_SLIC3R" ]]
@@ -183,11 +229,20 @@ then
     then
         BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
     fi
+    if [[ -n "$BUILD_TESTS" ]]
+    then
+        BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TESTS=1"
+    else
+        BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TESTS=0"
+    fi
     
     # cmake
     pushd build
         cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local" -DSLIC3R_STATIC=1 ${BUILD_ARGS}
         echo "done"
+        
+        #make avrdude-slic3r
+        make avrdude-slic3r
         
         # make Slic3r
         echo "[8/9] Building Slic3r..."
@@ -195,7 +250,12 @@ then
 
         # make .mo
         make gettext_po_to_mo
-    
+        
+        # make OCCTWrapper.so
+        make OCCTWrapper
+        
+        # update the pot
+        make gettext_make_pot
     popd
     echo "done"
 fi

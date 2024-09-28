@@ -71,7 +71,8 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
 
     // -- get temps
     const ConfigOptionInts* temperature_config = filament_config->option<ConfigOptionInts>("temperature");
-    assert(temperature_config->values.size() >= 1);
+    const int first_layer_temperature = filament_config->option<ConfigOptionInts>("temperature")->get_at(0);
+    assert(temperature_config->size() >= 1);
     long nb_items_up = 1;
     if (!nb_up->GetValue().ToLong(&nb_items_up)) {
         nb_items_up = 2;
@@ -80,7 +81,7 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     if (!nb_down->GetValue().ToLong(&nb_items_down)) {
         nb_items_down = 2;
     }
-    int16_t temperature = 5 * (temperature_config->values[0] / 5);
+    int16_t temperature = 5 * (temperature_config->get_at(0) / 5);
     long step_temp = 1;
     if (!steps->GetValue().ToLong(&step_temp)) {
         step_temp = 10;
@@ -92,8 +93,8 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     /// --- scale ---
     //model is created for a 0.4 nozzle, scale xy with nozzle size.
     const ConfigOptionFloats* nozzle_diameter_config = printer_config->option<ConfigOptionFloats>("nozzle_diameter");
-    assert(nozzle_diameter_config->values.size() > 0);
-    float nozzle_diameter = nozzle_diameter_config->values[0];
+    assert(nozzle_diameter_config->size() > 0);
+    float nozzle_diameter = nozzle_diameter_config->get_at(0);
     float xyzScale = nozzle_diameter / 0.4;
     //do scaling
     if (xyzScale < 0.9 || 1.1 < xyzScale) {
@@ -102,23 +103,41 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
         xyzScale = 1;
         model.objects[objs_idx[0]]->scale(xyzScale, xyzScale * 0.5, xyzScale);
     }
+    
+    // it's rotated but not around the good origin: correct that
+    double init_z_rotate_angle = Geometry::deg2rad(plat->config()->opt_float("init_z_rotate"));
+    Matrix3d rot_matrix = Eigen::Quaterniond(Eigen::AngleAxisd(init_z_rotate_angle, Vec3d{0,0,1})).toRotationMatrix();
+    auto     translate_from_rotation = [&rot_matrix, &model, &objs_idx](int idx, const Vec3d &translation) {
+            ModelVolume *vol_parent = model.objects[objs_idx[idx]]->volumes[model.objects[objs_idx[idx]]->volumes.size()-2];
+            ModelVolume *vol = model.objects[objs_idx[idx]]->volumes[model.objects[objs_idx[idx]]->volumes.size()-1];
+            //Geometry::Transformation trsf = vol->get_transformation();
+            //Vec3d rotxtrans = rot_matrix * translation;
+            //Vec3d  offset_reste =  trsf.get_offset()- translation;
+            //Vec3d  tot = rot_matrix * translation + trsf.get_offset()- translation;
+            //Vec3d  tot2 =  translation + trsf.get_offset()- rot_matrix * translation;
+            //trsf.set_offset( (rot_matrix *translation) - translation + trsf.get_offset());
+            Geometry::Transformation trsf = vol->get_transformation();
+            trsf.set_offset( (rot_matrix *translation) + vol_parent->get_offset());
+            vol->set_transformation(trsf);
+        };
 
     //add 8 others
-    std::vector<ModelObject*>tower;
-    tower.push_back(model.objects[objs_idx[0]]);
     float zshift = (1 - xyzScale) / 2;
     if (temperature > 175 && temperature < 290 && temperature%5==0) {
-        tower.push_back(add_part(model.objects[objs_idx[0]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("t"+std::to_string(temperature)+".amf")).string(),
-            //Vec3d{ xyzScale * 5, - xyzScale * 2.5, zshift - xyzScale * 2.5}, Vec3d{ xyzScale, xyzScale, xyzScale * 0.43 }));
-            Vec3d{ 8 - xyzScale * 5, -xyzScale * 2.3, xyzScale * (0 * 10 - 2.45) }, Vec3d{ xyzScale, xyzScale, xyzScale * 0.43 }));
+        Vec3d translate{ 0 - xyzScale * 3.75, -xyzScale * 2.7, xyzScale * (0 * 10 - 2.45) };
+        add_part(model.objects[objs_idx[0]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("t"+std::to_string(temperature)+".amf")).string(),
+            translate, Vec3d{ xyzScale, xyzScale, xyzScale * 0.43 });
+        translate_from_rotation(0, translate);
     }
     for (int16_t i = 1; i < nb_items; i++) {
-        tower.push_back(add_part(model.objects[objs_idx[0]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("Smart_compact_temperature_calibration_item.amf")).string(),
-            Vec3d{ 0,0, i * 10 * xyzScale }, Vec3d{ xyzScale, xyzScale * 0.5, xyzScale }));
+        add_part(model.objects[objs_idx[0]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("Smart_compact_temperature_calibration_item.amf")).string(),
+            Vec3d{ 0,0, i * 10 * xyzScale }, Vec3d{ xyzScale, xyzScale * 0.5, xyzScale });
         int sub_temp = temperature - i * step_temp;
         if (sub_temp > 175 && sub_temp < 290 && sub_temp % 5 == 0) {
-            tower.push_back(add_part(model.objects[objs_idx[0]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("t" + std::to_string(sub_temp) + ".amf")).string(),
-                Vec3d{ 8 - xyzScale * 5, -xyzScale * 2.3, xyzScale * (i * 10 - 2.5) }, Vec3d{ xyzScale, xyzScale, xyzScale * 0.43 }));
+            Vec3d translate{ 0 - xyzScale * 3.75, -xyzScale * 2.7, xyzScale * (0 * 10 - 2.45) };
+            add_part(model.objects[objs_idx[0]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / ("t" + std::to_string(sub_temp) + ".amf")).string(),
+                translate, Vec3d{ xyzScale, xyzScale, xyzScale * 0.43 });
+            translate_from_rotation(0, translate);
         }
     }
 
@@ -127,8 +146,8 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
     if (!autocenter) {
         const ConfigOptionPoints* bed_shape = printer_config->option<ConfigOptionPoints>("bed_shape");
-        Vec2d bed_size = BoundingBoxf(bed_shape->values).size();
-        Vec2d bed_min = BoundingBoxf(bed_shape->values).min;
+        Vec2d bed_size = BoundingBoxf(bed_shape->get_values()).size();
+        Vec2d bed_min = BoundingBoxf(bed_shape->get_values()).min;
         model.objects[objs_idx[0]]->translate({ bed_min.x() + bed_size.x() / 2, bed_min.y() + bed_size.y() / 2, 5 * xyzScale - 5 });
     }
 
@@ -142,6 +161,7 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     double firstChangeHeight = print_config->get_abs_value("first_layer_height", nozzle_diameter);
     //model.custom_gcode_per_print_z.gcodes.emplace_back(CustomGCode::Item{ firstChangeHeight + nozzle_diameter/2, CustomGCode::Type::Custom, -1, "", "M104 S" + std::to_string(temperature) + " ; ground floor temp tower set" });
     model.objects[objs_idx[0]]->config.set_key_value("print_temperature", new ConfigOptionInt(temperature));
+    model.objects[objs_idx[0]]->config.set_key_value("print_first_layer_temperature", new ConfigOptionInt(first_layer_temperature));
     for (int16_t i = 1; i < nb_items; i++) {
         model.custom_gcode_per_print_z.gcodes.emplace_back(CustomGCode::Item{ (i * 10 * xyzScale), CustomGCode::Type::Custom , -1, "", "M104 S" + std::to_string(temperature - i * step_temp) + " ; floor " + std::to_string(i) + " of the temp tower set" });
         //str_layer_gcode += "\n{ elsif layer_z >= " + std::to_string(i * 10 * xyzScale) + " and layer_z <= " + std::to_string((1 + i * 10) * xyzScale) + " }\nM104 S" + std::to_string(temperature - (int8_t)nb_delta * 5 + i * 5);

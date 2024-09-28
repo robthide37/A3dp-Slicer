@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Pavel Mikuš @Godrak, Lukáš Hejl @hejllukas, Filip Sykala @Jony01, Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, Tomáš Mészáros @tamasmeszaros, Lukáš Matěna @lukasmatena
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2014 Petr Ledvina @ledvinap
+///|/
+///|/ ported from lib/Slic3r/Line.pm:
+///|/ Copyright (c) Prusa Research 2022 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Geometry.hpp"
 #include "Line.hpp"
 #include "Polyline.hpp"
@@ -40,7 +50,7 @@ bool Line::intersection_infinite(const Line &other, Point* point) const
     return true;
 }
 
-double Line::perp_distance_to(const Point &point) const
+coordf_t Line::perp_distance_to(const Point &point) const
 {
     const Line  &line = *this;
     const Vec2d  v  = (line.b - line.a).cast<double>();
@@ -91,28 +101,7 @@ bool Line::perpendicular_to(const Line& line) const
 
 bool Line::intersection(const Line &l2, Point *intersection) const
 {
-    const Line  &l1  = *this;
-    const Vec2d  v1  = (l1.b - l1.a).cast<double>();
-    const Vec2d  v2  = (l2.b - l2.a).cast<double>();
-    double       denom  = cross2(v1, v2);
-    if (fabs(denom) < EPSILON)
-#if 0
-        // Lines are collinear. Return true if they are coincident (overlappign).
-        return ! (fabs(nume_a) < EPSILON && fabs(nume_b) < EPSILON);
-#else
-        return false;
-#endif
-    const Vec2d v12 = (l1.a - l2.a).cast<double>();
-    double nume_a = cross2(v2, v12);
-    double nume_b = cross2(v1, v12);
-    double t1 = nume_a / denom;
-    double t2 = nume_b / denom;
-    if (t1 >= 0 && t1 <= 1.0f && t2 >= 0 && t2 <= 1.0f) {
-        // Get the intersection point.
-        (*intersection) = (l1.a.cast<double>() + t1 * v1).cast<coord_t>();
-        return true;
-    }
-    return false;  // not intersecting
+    return line_alg::intersection(*this, l2, intersection);
 }
 
 bool Line::clip_with_bbox(const BoundingBox &bbox)
@@ -126,14 +115,14 @@ bool Line::clip_with_bbox(const BoundingBox &bbox)
 	return result;
 }
 
-void Line::extend(double offset)
+void Line::extend(coordf_t offset)
 {
-    Vector offset_vector = (offset * this->vector().cast<double>().normalized()).cast<coord_t>();
+    Vector offset_vector = (offset * this->vector().cast<coordf_t>().normalized()).cast<coord_t>();
     this->a -= offset_vector;
     this->b += offset_vector;
 }
 
-Vec3d Linef3::intersect_plane(double z) const
+Vec3d Linef3::intersect_plane(coordf_t z) const
 {
     auto   v = (this->b - this->a).cast<double>();
     double t = (z - this->a(2)) / v(2);
@@ -151,9 +140,9 @@ BoundingBox get_extents(const Lines &lines)
 
 }
 
-Point Line::point_at(double distance) const {
+Point Line::point_at(coordf_t distance) const {
     Point point;
-    double len = this->length();
+    coordf_t len = this->length();
     point = this->a;
     if (this->a.x() != this->b.x())
         point.x() = (coord_t)( this->a.x() + (this->b.x() - this->a.x()) * distance / len );

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Pavel Mikuš @Godrak, Filip Sykala @Jony01, Lukáš Hejl @hejllukas, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "QuadricEdgeCollapse.hpp"
 #include <tuple>
 #include <optional>
@@ -184,7 +188,7 @@ void Slic3r::its_quadric_edge_collapse(
     throw_on_cancel();
     status_fn(status_init_size);
 
-    //its_store_triangle(its, "triangle.obj", 1182);
+    //its_store_triangle_to_obj(its, "triangle.obj", 1182);
     //store_surround("triangle_surround1.obj", 1182, 1, its, v_infos, e_infos);
 
     // convert from triangle index to mutable priority queue index
@@ -888,7 +892,7 @@ void QuadricEdgeCollapse::store_surround(const char *obj_filename,
         triangles.insert(ti);
         if (item.second == 0) continue;
 
-        const Vec3i &t = its.indices[ti];
+        const Vec3i32 &t = its.indices[ti];
         for (size_t i = 0; i < 3; ++i) {
             const auto &v_info = v_infos[t[i]];
             for (size_t d = 0; d < v_info.count; ++d) {
@@ -904,7 +908,7 @@ void QuadricEdgeCollapse::store_surround(const char *obj_filename,
     std::vector<size_t> trs;
     trs.reserve(triangles.size());
     for (size_t ti : triangles) trs.push_back(ti);
-    its_store_triangles(its, obj_filename, trs);
+    its_store_triangles_to_obj(its, obj_filename, trs);
     // its_write_obj(its,"original.obj");
 }
 

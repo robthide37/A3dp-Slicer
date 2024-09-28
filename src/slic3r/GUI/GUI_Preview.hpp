@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_Preview_hpp_
 #define slic3r_GUI_Preview_hpp_
 
@@ -95,21 +99,10 @@ class Preview : public wxTitledPanel
     wxBoxSizer* m_left_sizer { nullptr };
     wxBoxSizer* m_layers_slider_sizer { nullptr };
     wxPanel* m_bottom_toolbar_panel { nullptr };
-    wxStaticText* m_label_view_type { nullptr };
-#ifdef _WIN32
-    BitmapComboBox* m_choice_view_type { nullptr };
-#else
-    wxComboBox* m_choice_view_type { nullptr };
-#endif
-    std::map<GCodeViewer::EViewType, wxString>  m_choice_view_label;
-    wxStaticText* m_label_show { nullptr };
-    wxComboCtrl* m_combochecklist_features { nullptr };
-    size_t m_combochecklist_features_pos { 0 };
-    wxComboCtrl* m_combochecklist_options { nullptr };
 
     DynamicPrintConfig* m_config;
-    BackgroundSlicingProcess* m_process;
-    GCodeProcessorResult* m_gcode_result;
+    BackgroundSlicingProcess& m_process;
+    GCodeProcessorResult& m_gcode_result;
 
 #ifdef __linux__
     // We are getting mysterious crashes on Linux in gtk due to OpenGL context activation GH #1874 #1955.
@@ -122,7 +115,6 @@ class Preview : public wxTitledPanel
 
     unsigned int m_number_extruders { 1 };
     bool m_keep_current_preview_type{ false };
-    GCodeViewer::EViewType m_last_choice = GCodeViewer::EViewType::FeatureType;
     //fields to see what color to display
     bool m_has_switched_to_color = false;
     bool m_has_switched_to_extruders = false;
@@ -132,9 +124,6 @@ class Preview : public wxTitledPanel
     DoubleSlider::Control* m_layers_slider{ nullptr };
     DoubleSlider::Control* m_moves_slider{ nullptr };
 
-
-    enum ScreenWidth { large, medium, tiny };
-    ScreenWidth m_width_screen = ScreenWidth::large;
 public:
     enum class OptionType : unsigned int
     {
@@ -147,9 +136,9 @@ public:
         ColorChanges,
         PausePrints,
         CustomGCodes,
+        CenterOfGravity,
         Shells,
         ToolMarker,
-        Legend
     };
 
     enum class ForceState : unsigned int {
@@ -158,8 +147,8 @@ public:
         ForceGcode
     };
 
-Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
-    GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process = []() {});
+Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess& process, 
+    GCodeProcessorResult& gcode_result, std::function<void()> schedule_background_process = []() {});
     virtual ~Preview();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
@@ -171,6 +160,7 @@ Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, 
     void select_view(const std::string& direction);
     void set_drop_target(wxDropTarget* target);
 
+    void load_gcode_shells();
     void load_print(bool keep_z_range = false);
     void reload_print(bool keep_volumes = false);
     void refresh_print();
@@ -185,7 +175,6 @@ Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, 
 
     bool is_loaded() const { return m_loaded; }
 
-    void update_bottom_toolbar();
     void update_moves_slider();
     void enable_moves_slider(bool enable);
     void move_moves_slider(wxKeyEvent& evt);
@@ -194,6 +183,10 @@ Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, 
     bool can_display_gcode();
     bool can_display_volume();
     void reset_gcode_toolpaths();
+
+    void set_keep_current_preview_type(bool value) { m_keep_current_preview_type = value; }
+
+    void set_layers_slider_values_range(int bottom, int top);
 
 private:
     ForceState current_force_state = ForceState::NoForce;
@@ -204,16 +197,13 @@ private:
     void unbind_event_handlers();
 
     void on_size(wxSizeEvent& evt);
-    void on_choice_view_type(wxCommandEvent& evt);
-    void on_combochecklist_features(wxCommandEvent& evt);
-    void on_combochecklist_options(wxCommandEvent& evt);
 
     // Create/Update/Reset double slider on 3dPreview
     wxBoxSizer* create_layers_slider_sizer();
     void check_layers_slider_values(std::vector<CustomGCode::Item>& ticks_from_model,
         const std::vector<double>& layers_z);
     void reset_layers_slider();
-    void update_layers_slider(const std::vector<double>& layers_z, bool keep_z_range = false);
+    void update_layers_slider(const std::vector<double>& layers_z, bool show_gcode_data = false, bool keep_z_range = false);
     void update_layers_slider_mode();
     // update vertical DoubleSlider after keyDown in canvas
     void update_layers_slider_from_canvas(wxKeyEvent& event);
@@ -223,7 +213,6 @@ private:
 
     void on_layers_slider_scroll_changed(wxCommandEvent& event);
     void on_moves_slider_scroll_changed(wxCommandEvent& event);
-    wxString get_option_type_string(OptionType type) const;
 };
 
 } // namespace GUI

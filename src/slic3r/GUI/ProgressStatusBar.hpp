@@ -1,3 +1,11 @@
+///|/ Copyright (c) Prusa Research 2018 - 2021 David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral, Vojtěch Bubník @bubnikv
+///|/
+///|/ ported from lib/Slic3r/GUI/ProgressStatusBar.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv, Tomáš Mészáros @tamasmeszaros
+///|/ Copyright (c) Slic3r 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef PROGRESSSTATUSBAR_HPP
 #define PROGRESSSTATUSBAR_HPP
 
@@ -57,10 +65,6 @@ public:
     void        set_status_text(const char *txt) override;
     wxString    get_status_text() const;
     void        set_font(const wxFont &font);
-
-    // Temporary methods to satisfy Perl side
-    void        show_cancel_button();
-    void        hide_cancel_button();
 
     void        update_dark_ui();
 

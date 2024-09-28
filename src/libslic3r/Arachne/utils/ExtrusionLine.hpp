@@ -119,7 +119,7 @@ struct ExtrusionLine
      * Sum the total length of this path.
      */
     int64_t getLength() const;
-    bool    isZeroLength() const;
+    bool    is_zero_length() const;
     int64_t polylineLength() const { return getLength(); }
 
     /*!
@@ -129,9 +129,49 @@ struct ExtrusionLine
      */
     Polygon toPolygon() const
     {
+        assert(this->is_closed);
         Polygon ret;
-        for (const ExtrusionJunction &j : junctions)
-            ret.points.emplace_back(j.p);
+        for (const ExtrusionJunction &j : junctions) {
+            // only copy a point if it's far enough
+            if (ret.points.empty() || !j.p.coincides_with_epsilon(ret.points.back())) {
+                ret.points.emplace_back(j.p);
+            }
+        }
+        // be sure the last point is the one that is kept
+        if (ret.points.back() != junctions.back().p) {
+            ret.points.back() = junctions.back().p;
+        }
+        // a polygon doesn't repeat the last point
+        if (ret.points.back().coincides_with_epsilon(ret.points.front())) {
+            ret.points.pop_back();
+        }
+
+        return ret;
+    }
+
+    /*!
+     * Put all junction locations into a polygon object.
+     *
+     * When this path is not closed the returned Polygon should be handled as a polyline, rather than a polygon.
+     */
+    Polyline toPolyline() const
+    {
+        Polyline ret;
+        for (const ExtrusionJunction &j : junctions) {
+            // only copy a point if it's far enough
+            if (ret.points.empty() || !j.p.coincides_with_epsilon(ret.points.back())) {
+                ret.points.emplace_back(j.p);
+            }
+        }
+        // be sure the last point is the one that is kept
+        if (ret.points.back() != junctions.back().p) {
+            ret.points.back() = junctions.back().p;
+        }
+        // if loop, be sure to have the exact same point in front & back.
+        if (ret.points.back().coincides_with_epsilon(ret.points.front())) {
+            assert(this->is_closed);
+            ret.points.back() = ret.points.front();
+        }
 
         return ret;
     }
@@ -186,9 +226,8 @@ struct ExtrusionLine
      * \param A Start point of the 3-point-straight line
      * \param B Intermediate point of the 3-point-straight line
      * \param C End point of the 3-point-straight line
-     * \param weighted_average_width The weighted average of the widths of the two colinear extrusion segments
      * */
-    static int64_t calculateExtrusionAreaDeviationError(ExtrusionJunction A, ExtrusionJunction B, ExtrusionJunction C, coord_t& weighted_average_width);
+    static int64_t calculateExtrusionAreaDeviationError(ExtrusionJunction A, ExtrusionJunction B, ExtrusionJunction C);
 
     bool is_contour() const;
 
@@ -224,6 +263,17 @@ static inline Slic3r::ThickPolyline to_thick_polyline(const ClipperLib_Z::Path &
             out.points_width.emplace_back(it->z());
         }
     }
+    // Don't create 1-element polyline.
+    if(out.points.size() <2)
+        return {};
+
+    assert(out.points.back().coincides_with_epsilon(Point{ path.back().x(), path.back().y() }));
+    out.points.back() = Point{ path.back().x(), path.back().y() };
+
+    assert(out.points.front().x() == path.front().x());
+    assert(out.points.front().y() == path.front().y());
+    assert(out.points.back().x() == path.back().x());
+    assert(out.points.back().y() == path.back().y());
     return out;
 }
 

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Filip Sykala @Jony01
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "BuildVolume.hpp"
 #include "ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
@@ -238,7 +242,7 @@ BuildVolume::ObjectState object_state_templ(const indexed_triangle_set &its, con
                             const stl_vertex p2 = trafo * its.vertices[tri(iedge)];
                             assert(sign(p1) == s[iprev]);
                             assert(sign(p2) == s[iedge]);
-                            assert(p1.z() * p2.z() < 0);
+                            assert((p1.z() - world_min_z) * (p2.z() - world_min_z) < 0);
                             // Edge crosses the z plane. Calculate intersection point with the plane.
                             const float t = (world_min_z - p1.z()) / (p2.z() - p1.z());
                             (is_inside(Vec3f(p1.x() + (p2.x() - p1.x()) * t, p1.y() + (p2.y() - p1.y()) * t, world_min_z)) ? inside : outside) = true;
@@ -320,7 +324,7 @@ BuildVolume::ObjectState BuildVolume::volume_state_bbox(const BoundingBoxf3& vol
 bool BuildVolume::all_paths_inside(const GCodeProcessorResult& paths, const BoundingBoxf3& paths_bbox, bool ignore_bottom) const
 {
     auto move_valid = [](const GCodeProcessorResult::MoveVertex &move) {
-        return move.type == EMoveType::Extrude && move.extrusion_role != erCustom && move.width != 0.f && move.height != 0.f;
+        return move.type == EMoveType::Extrude && move.extrusion_role != GCodeExtrusionRole::Custom && move.width != 0.f && move.height != 0.f;
     };
     static constexpr const double epsilon = BedEpsilon;
 

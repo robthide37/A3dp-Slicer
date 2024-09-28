@@ -1,7 +1,13 @@
+///|/ Copyright (c) Prusa Research 2018 - 2020 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/ Copyright (c) SuperSlicer 2018 Remi Durand @supermerill
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_FillGyroid_hpp_
 #define slic3r_FillGyroid_hpp_
 
 #include "../libslic3r.h"
+#include "../Geometry.hpp"
 
 #include "FillBase.hpp"
 
@@ -13,18 +19,15 @@ public:
     FillGyroid() {}
     Fill* clone() const override { return new FillGyroid(*this); }
 
-    // Correction applied to regular infill angle to maximize printing
-    // speed in default configuration (degrees)
-    static constexpr float CorrectionAngle = -45.;
-
     // Density adjustment to have a good %of weight.
-    static constexpr double DensityAdjust = 2.44;
-
-    // Gyroid upper resolution tolerance (mm^-2)
-    static constexpr double PatternTolerance = 0.2;
+    static constexpr double DENSITY_ADJUST = 2.44;
 
 
 protected:
+    // Correction applied to regular infill angle to maximize printing
+    // speed in default configuration (45 degrees)
+    float _layer_angle(size_t idx) const override { return this->can_angle_cross ? float(Geometry::deg2rad(-45.)) : 0.f; }
+
     void _fill_surface_single(
         const FillParams                &params, 
         unsigned int                     thickness_layers,

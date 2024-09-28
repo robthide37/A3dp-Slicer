@@ -207,6 +207,31 @@ bool its_write_obj(const indexed_triangle_set &its, const char *file)
   	return true;
 }
 
+bool its_write_obj(const indexed_triangle_set& its, const std::vector<obj_color> &color, const char* file)
+{
+    Slic3r::CNumericLocalesSetter locales_setter;
+    FILE* fp = boost::nowide::fopen(file, "w");
+    if (fp == nullptr) {
+        BOOST_LOG_TRIVIAL(error) << "stl_write_obj: Couldn't open " << file << " for writing";
+        return false;
+    }
+
+    for (size_t i = 0; i < its.vertices.size(); ++i)
+        fprintf(fp, "v %f %f %f %f %f %f\n", 
+            its.vertices[i](0), 
+			its.vertices[i](1), 
+			its.vertices[i](2),
+            color[i](0), 
+			color[i](1), 
+			color[i](2));
+    for (size_t i = 0; i < its.indices.size(); ++i)
+        fprintf(fp, "f %d %d %d\n", 
+			its.indices[i][0] + 1, 
+			its.indices[i][1] + 1, 
+			its.indices[i][2] + 1);
+    fclose(fp);
+    return true;
+}
 
 // Check validity of the mesh, assert on error.
 bool stl_validate(const stl_file *stl, const indexed_triangle_set &its)

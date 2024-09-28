@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka, Filip Sykala @Jony01, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Vojtěch Král @vojtechkral
+///|/ Copyright (c) BambuStudio 2023 manch1n @manch1n
+///|/ Copyright (c) 2019 BeldrothTheGold @BeldrothTheGold
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef _prusaslicer_technologies_h_
 #define _prusaslicer_technologies_h_
 
@@ -12,8 +18,6 @@
 #define ENABLE_RENDER_SELECTION_CENTER 0
 // Shows an imgui dialog with camera related data
 #define ENABLE_CAMERA_STATISTICS 0
-//  Render the picking pass instead of the main scene (use [T] key to toggle between regular rendering and picking pass only rendering)
-#define ENABLE_RENDER_PICKING_PASS 0
 // Enable extracting thumbnails from selected gcode and save them as png files
 #define ENABLE_THUMBNAIL_GENERATOR_DEBUG 0
 // Disable synchronization of unselected instances
@@ -26,6 +30,20 @@
 #define ENABLE_GCODE_VIEWER_DATA_CHECKING 0
 // Enable project dirty state manager debug window
 #define ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW 0
+// Disable using instanced models to render options in gcode preview
+#define DISABLE_GCODEVIEWER_INSTANCED_MODELS 1
+// Enable Measure Gizmo debug window
+#define ENABLE_MEASURE_GIZMO_DEBUG 0
+// Enable scene raycast picking debug window
+#define ENABLE_RAYCAST_PICKING_DEBUG 0
+// Shows an imgui dialog with GLModel statistics data
+#define ENABLE_GLMODEL_STATISTICS 0
+// Shows an imgui dialog containing the matrices of the selected volumes
+#define ENABLE_MATRICES_DEBUG 0
+// Shows an imgui dialog containing data from class ObjectManipulation
+#define ENABLE_OBJECT_MANIPULATION_DEBUG 0
+// Shows an imgui dialog containing data for class GLCanvas3D::SLAView
+#define ENABLE_SLA_VIEW_DEBUG_WINDOW 0
 
 //#define DEBUG_EXTRUSION_OUTPUT 0
 
@@ -33,19 +51,14 @@
 #define ENABLE_ENVIRONMENT_MAP 0
 // Enable smoothing of objects normals
 #define ENABLE_SMOOTH_NORMALS 0
-// Enable rendering markers for options in preview as fixed screen size points
-#define ENABLE_FIXED_SCREEN_SIZE_POINT_MARKERS 1
 
+// Enable OpenGL ES
+#define ENABLE_OPENGL_ES 0
+// Enable OpenGL core profile context (tested against Mesa 20.1.8 on Windows)
+#define ENABLE_GL_CORE_PROFILE (1 && !ENABLE_OPENGL_ES)
 
-//================
-// 2.4.1.rc techs
-//================
-#define ENABLE_2_4_1_RC 1
-
-// Enable detection of layers for spiral vase prints
-#define ENABLE_SPIRAL_VASE_LAYERS (1 && ENABLE_2_4_1_RC)
-// Enable correction of toolpaths when z offset is set
-#define ENABLE_Z_OFFSET_CORRECTION (1 && ENABLE_2_4_1_RC)
+// Enable imgui dialog which allows to set the parameters used to export binarized gcode
+#define ENABLE_BINARIZED_GCODE_DEBUG_WINDOW 0
 
 
 #endif // _prusaslicer_technologies_h_

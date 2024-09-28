@@ -3,7 +3,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
-#include "Jobs/ArrangeJob.hpp"
+//#include "Jobs/ArrangeJob2.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI.hpp"
 #include "GUI_ObjectList.hpp"
@@ -91,8 +91,8 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
     /// --- scale ---
     // model is created for a 0.4 nozzle, scale xy with nozzle size.
     const ConfigOptionFloats* nozzle_diameter_config = printer_config->option<ConfigOptionFloats>("nozzle_diameter");
-    assert(nozzle_diameter_config->values.size() > 0);
-    float nozzle_diameter = nozzle_diameter_config->values[0];
+    assert(nozzle_diameter_config->size() > 0);
+    float nozzle_diameter = nozzle_diameter_config->get_at(0);
     float z_scale = nozzle_diameter / 0.4;
     //do scaling
     if (z_scale < 0.9 || 1.2 < z_scale) {
@@ -101,6 +101,16 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
     } else {
         z_scale = 1;
     }
+    
+    // it's rotated but not around the good origin: correct that
+    double init_z_rotate_angle = Geometry::deg2rad(plat->config()->opt_float("init_z_rotate"));
+    Matrix3d rot_matrix = Eigen::Quaterniond(Eigen::AngleAxisd(init_z_rotate_angle, Vec3d{0,0,1})).toRotationMatrix();
+    auto     translate_from_rotation = [&rot_matrix, &model, &objs_idx](int idx, Vec3d &&translation) {
+            ModelVolume *vol = model.objects[objs_idx[idx]]->volumes[model.objects[objs_idx[idx]]->volumes.size()-1];
+            Geometry::Transformation trsf = vol->get_transformation();
+            trsf.set_offset(rot_matrix * translation - translation + trsf.get_offset());
+            vol->set_transformation(trsf);
+        };
 
     //add sub-part after scale
     const ConfigOptionPercent* bridge_flow_ratio = print_config->option<ConfigOptionPercent>(setting_to_test);
@@ -109,16 +119,17 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
     for (size_t i = 0; i < nb_items; i++) {
         int step_num = (start + (add ? 1 : -1) * i * step);
         if (step_num < 180 && step_num > 20 && step_num%5 == 0) {
-            add_part(model.objects[objs_idx[i]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bridge_flow" / ("f" + std::to_string(step_num) + ".amf")).string(), Vec3d{ -10,0, zshift + 4.6 * z_scale }, Vec3d{ 1,1,z_scale });
+            add_part(model.objects[objs_idx[i]], (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bridge_flow" / ("f" + std::to_string(step_num) + ".amf")).string(), Vec3d{ -10, 0, zshift + 4.6 * z_scale }, Vec3d{ 1,1,z_scale });
+            translate_from_rotation(i, Vec3d{ -10, 0, zshift + 4.6 * z_scale });
         }
     }
     /// --- translate ---;
-    bool has_to_arrange = false;
+    bool has_to_arrange = init_z_rotate_angle != 0;
     const float brim_width = std::max(print_config->option<ConfigOptionFloat>("brim_width")->value, nozzle_diameter * 5.);
     const ConfigOptionFloat* extruder_clearance_radius = print_config->option<ConfigOptionFloat>("extruder_clearance_radius");
     const ConfigOptionPoints* bed_shape = printer_config->option<ConfigOptionPoints>("bed_shape");
-    Vec2d bed_size = BoundingBoxf(bed_shape->values).size();
-    Vec2d bed_min = BoundingBoxf(bed_shape->values).min;
+    Vec2d bed_size = BoundingBoxf(bed_shape->get_values()).size();
+    Vec2d bed_min = BoundingBoxf(bed_shape->get_values()).min;
     float offsety = 2 + 10 * 1 + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
     model.objects[objs_idx[0]]->translate({ bed_min.x() + bed_size.x() / 2, bed_min.y() + bed_size.y() / 2, 2.5 * z_scale });
     for (int i = 1; i < nb_items; i++) {
@@ -133,7 +144,7 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
     DynamicPrintConfig new_print_config = *print_config; //make a copy
     new_print_config.set_key_value("complete_objects", new ConfigOptionBool(true));
     //if skirt, use only one
-    if (print_config->option<ConfigOptionInt>("skirts")->getInt() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->getInt() > 0) {
+    if (print_config->option<ConfigOptionInt>("skirts")->get_int() > 0 && print_config->option<ConfigOptionInt>("skirt_height")->get_int() > 0) {
         new_print_config.set_key_value("complete_objects_one_skirt", new ConfigOptionBool(true));
     }
 
@@ -158,6 +169,8 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
         if (z_step == 0)
             z_step = 0.1;
         double max_height = full_print_config.get_computed_value("max_layer_height",0);
+        if (max_height < EPSILON || !full_print_config.option("max_layer_height")->is_enabled())
+            max_height = 0.75 * nozzle_diameter;
         if (max_height > first_layer_height + z_step)
             for (size_t i = 0; i < nb_items; i++)
                 model.objects[objs_idx[i]]->config.set_key_value("first_layer_height", new ConfigOptionFloatOrPercent(first_layer_height + z_step, false));
@@ -181,11 +194,21 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        arranger.prepare_all();
-        arranger.process();
-        arranger.finalize();
+        plat->arrange();
+        //std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
+        //arr2::Scene arrscene{build_scene(*plat, ArrangeSelectionMode::Full)};
+        //ArrangeJob2::Callbacks cbs;
+        //ArrangeJob2 arranger(std::move(arrscene), cbs);
+        //auto m_task = arr2::ArrangeTask<arr2::ArrangeItem>::create(arrscene);
+        //int count = m_task->item_count_to_process();
+        //if (count > 0) {
+        //    m_result = m_task->process_native(taskctl);
+        //    arranger.process();
+        //    ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
+        //    arranger.prepare_all();
+        //    arranger.process();
+        //    arranger.finalize();
+        //}
     }
 
     plat->reslice();
