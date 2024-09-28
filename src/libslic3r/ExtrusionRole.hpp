@@ -180,7 +180,7 @@ struct ExtrusionRole
 {
 private:
     ExtrusionRoleModifier m;
-    static constexpr const ExtrusionRoleModifier BaseType{ERM_Perimeter | ERM_Infill | ERM_Support | ERM_Skirt | ERM_Wipe | ERM_Mill | ERM_Travel | ERM_Mixed};
+    static constexpr const ExtrusionRoleModifier BaseType{ERM_Perimeter | ERM_Infill | ERM_Support | ERM_Skirt | ERM_Wipe | ERM_Mill | ERM_Laser | ERM_Travel | ERM_Mixed};
 public:
     ExtrusionRole() = delete;
     ExtrusionRole(ExtrusionRoleModifier mods) : m(mods) {

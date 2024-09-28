@@ -7588,21 +7588,12 @@ void PrintConfigDef::init_laser_params()
     // laser Printer settings
 
     def = this->add("laser_head", coInt);
-    def->gui_type = ConfigOptionDef::GUIType::i_enum_open;
     def->label = L("laser cutter");
     def->category = OptionCategory::general;
     def->tooltip = L("The laser head to use (unless more specific tool settings are specified). ");
     def->min = 0;  // 0 = inherit defaults
-    def->enum_labels.push_back("default");  // override label for item 0
-    def->enum_labels.push_back("1");
-    def->enum_labels.push_back("2");
-    def->enum_labels.push_back("3");
-    def->enum_labels.push_back("4");
-    def->enum_labels.push_back("5");
-    def->enum_labels.push_back("6");
-    def->enum_labels.push_back("7");
-    def->enum_labels.push_back("8");
-    def->enum_labels.push_back("9");
+    def->set_enum_labels(ConfigOptionDef::GUIType::i_enum_open, 
+        { L("default"), "1", "2", "3", "4", "5", "6", "7", "8", "9" }); // override label for item 0
 
     //def = this->add("laser_diameter", coFloats);
     //def->label = L("laser diameter");
