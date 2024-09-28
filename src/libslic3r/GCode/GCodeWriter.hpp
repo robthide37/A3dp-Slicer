@@ -81,6 +81,7 @@ public:
     std::string travel_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const bool is_ccw, const double speed, const std::string_view comment);
     std::string travel_to_xyz(const Vec3d &point, const double speed = 0.0, const std::string_view comment = {});
     std::string travel_to_z(double z, const std::string_view comment = {});
+    // low-level method to force a z travel, disregarding the lift and other thigns. Prefer using "travel_to_z" "lift" and "unlift".
     std::string get_travel_to_z_gcode(double z, const std::string_view comment = {});
     bool        will_move_z(double z) const;
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
