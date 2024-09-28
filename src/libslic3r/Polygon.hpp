@@ -36,7 +36,7 @@ public:
     Polygon() = default;
     explicit Polygon(const Points &points) : MultiPoint(points) {
         assert(points.size() != 1);
-        if (points.size() > 1 && this->front().coincides_with_epsilon(this->back()))
+        if (points.size() > 1 && this->front().coincides_with(this->back()))
             this->points.pop_back();
     }
     explicit Polygon(Points &&points) : MultiPoint(points) {
@@ -92,7 +92,7 @@ public:
     bool is_clockwise() const;
     bool make_counter_clockwise();
     bool make_clockwise();
-    bool is_valid() const { return this->points.size() >= 3; }
+    bool is_valid() const { return this->points.size() >= 3; assert_valid(); }
     void douglas_peucker(coord_t tolerance) override;
 
     // Does an unoriented polygon contain a point?

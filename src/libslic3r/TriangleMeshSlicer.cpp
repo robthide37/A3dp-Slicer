@@ -1043,7 +1043,17 @@ static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polyg
                     (first_line->a_id      != -1 && first_line->a_id      == last_line->b_id)) {
                     // The current loop is complete. Add it to the output.
                     assert(first_line->a == last_line->b);
-                    loops.emplace_back(std::move(loop_pts));
+                    Points loop_pts_init = loop_pts;
+                    if (loop_pts.front().coincides_with(loop_pts.back())) {
+                        if (loop_pts.size() > 3) {
+                            loop_pts.pop_back();
+                            assert(!loop_pts.front().coincides_with(loop_pts.back()));
+                            loops.emplace_back(std::move(loop_pts));
+                        }
+                    } else {
+                        assert(!loop_pts.front().coincides_with(loop_pts.back()));
+                        loops.emplace_back(std::move(loop_pts));
+                    }
                     #ifdef SLIC3R_TRIANGLEMESH_DEBUG
                     printf("  Discovered %s polygon of %d points\n", (p.is_counter_clockwise() ? "ccw" : "cw"), (int)p.points.size());
                     #endif
@@ -2066,7 +2076,7 @@ void slice_mesh_slabs(
         const Vec3f   fa = vertices_transformed[tri(0)];
         const Vec3f   fb = vertices_transformed[tri(1)];
         const Vec3f   fc = vertices_transformed[tri(2)];
-        assert(fa != fb && fa != fc && fb != fc);
+        //assert(fa != fb && fa != fc && fb != fc);
         const Point   a = to_2d(fa).cast<coord_t>();
         const Point   b = to_2d(fb).cast<coord_t>();
         const Point   c = to_2d(fc).cast<coord_t>();

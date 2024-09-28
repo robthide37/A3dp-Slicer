@@ -144,29 +144,25 @@ class MainFrame;
 class SplashScreen : public wxSplashScreen
 {
 public:
-    SplashScreen(const wxBitmap& bitmap, long splashStyle, int milliseconds, wxPoint pos = wxDefaultPosition, wxString author = "")
+    SplashScreen(const wxBitmap& bitmap, double scaling, long splashStyle, int milliseconds, wxPoint pos = wxDefaultPosition, wxString author = "")
         : wxSplashScreen(bitmap, splashStyle, milliseconds, static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, wxDefaultPosition, wxDefaultSize,
 #ifdef __APPLE__
             wxSIMPLE_BORDER | wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP
 #else
             wxSIMPLE_BORDER | wxFRAME_NO_TASKBAR
 #endif // !__APPLE__
-        ), m_author(author)
+        ), m_author(author), m_scale(scaling)
     {
         wxASSERT(bitmap.IsOk());
 
-//        int init_dpi = get_dpi_for_window(this);
         this->SetPosition(pos);
         // The size of the SplashScreen can be hanged after its moving to another display
         // So, update it from a bitmap size
         this->SetClientSize(bitmap.GetWidth(), bitmap.GetHeight());
         this->CenterOnScreen();
-//        int new_dpi = get_dpi_for_window(this);
 
-//        m_scale         = (float)(new_dpi) / (float)(init_dpi);
+        // set background image
         m_main_bitmap   = bitmap;
-
-//        scale_bitmap(m_main_bitmap, m_scale);
 
         // init constant texts and scale fonts
         init_constant_text();
@@ -191,7 +187,7 @@ public:
 ///            memDC.SetTextForeground(wxColour(237, 107, 33)); // ed6b21
             uint32_t color = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
             memDC.SetTextForeground(wxColour(color & 0xFF, (color & 0xFF00) >> 8, (color & 0xFF0000) >> 16));
-            memDC.DrawText(text, int(m_scale * 60), m_action_line_y_position);
+            memDC.DrawText(text, int(get_margin() * 2), m_action_line_y_position);
 
             memDC.SelectObject(wxNullBitmap);
             set_bitmap(bitmap);
@@ -202,7 +198,7 @@ public:
         }
     }
 
-    static wxBitmap MakeBitmap(wxBitmap bmp)
+    static wxBitmap MakeBitmap(wxBitmap bmp, double &scaling)
     {
         if (!bmp.IsOk())
             return wxNullBitmap;
@@ -211,6 +207,35 @@ public:
         // It will be 5/3 of the weight of the bitmap
         int width = lround((double)5 / 3 * bmp.GetWidth());
         int height = bmp.GetHeight();
+
+        wxDisplay main_display;
+        wxRect display_size = main_display.GetClientArea();
+        //display_size.width = 1920;
+        // the scaling factor is for text, not pictures.
+        //double scaling = main_display.GetScaleFactor();
+        
+        //check if the spashscreen fit
+        scaling = std::min(
+            (display_size.width - display_size.x) * 0.8 / width,
+            (display_size.height - display_size.y) * 0.8 / height);
+        // if screen very small, use all the space avaialble
+        if (scaling < 0.5) {
+            scaling = std::min(
+                (display_size.width - display_size.x) / width,
+                (display_size.height - display_size.y) / height);
+        }
+        if (scaling > 1) {
+            // don't grow with fractional scaling
+            if (scaling > 1.8) {
+                scaling = 2 * int(scaling * 0.56);
+            } else {
+                scaling = 1.;
+            }
+        } else {
+            scaling = int(scaling * 10) / 10.;
+        }
+        width *= scaling;
+        height *= scaling;
 
         wxImage image(width, height);
         unsigned char* imgdata_ = image.GetData();
@@ -224,7 +249,10 @@ public:
 
         wxMemoryDC memDC;
         memDC.SelectObject(new_bmp);
-        memDC.DrawBitmap(bmp, width - bmp.GetWidth(), 0, true);
+        double xscale,yscale;
+        memDC.GetUserScale(&xscale, &yscale);
+        memDC.SetUserScale(xscale * scaling, yscale * scaling);
+        memDC.DrawBitmap(bmp, (width / scaling) - (bmp.GetWidth()), 0, true);
 
         return new_bmp;
     }
@@ -241,19 +269,20 @@ public:
 
         // load bitmap for logo
         int logo_size = lround(width * 0.25);
-        //BitmapCache bmp_cache;
-        //wxBitmap* logo_bmp_ptr = bmp_cache.load_svg(wxGetApp().logo_name(), logo_size, logo_size);
-        wxBitmapBundle *logo_bmp_ptr = get_bmp_bundle("A3dp-Slicer_blue_logo"/*wxGetApp().logo_name()*/, logo_size, logo_size);
+        wxBitmapBundle *logo_bmp_ptr = get_bmp_bundle("A3dp-Slicer_blue_logo"/*wxGetApp().logo_name()*/, 0, logo_size);
         if (logo_bmp_ptr == nullptr)
             return;
         
-#ifdef __APPLE__
-        wxBitmap logo_bmp = logo_bmp_ptr->GetBitmap(logo_bmp_ptr->GetDefaultSize() * mac_max_scaling_factor());
-#else
-        wxBitmap logo_bmp = logo_bmp_ptr->GetBitmapFor(this);
-#endif
+//#ifdef __APPLE__
+//        wxBitmap logo_bmp = logo_bmp_ptr->GetBitmap(logo_bmp_ptr->GetDefaultSize() * mac_max_scaling_factor());
+//#else
+//        wxBitmap logo_bmp = logo_bmp_ptr->GetBitmapFor(this);
+//#endif
+        wxBitmap logo_bmp = logo_bmp_ptr->GetBitmap(logo_bmp_ptr->GetDefaultSize());
 
-        wxRect banner_rect(wxPoint(0, logo_size), wxPoint(width, m_main_bitmap.GetHeight()));
+        wxCoord margin = get_margin();
+
+        wxRect banner_rect(wxPoint(0, logo_bmp.GetSize().y), wxPoint(width, m_main_bitmap.GetHeight()));
         banner_rect.Deflate(margin, 2 * margin);
 
         // use a memory DC to draw directly onto the bitmap
@@ -266,7 +295,7 @@ public:
         memDc.SetTextForeground(wxColour(180, 180, 180));
 
         memDc.SetFont(m_constant_text.title_font);
-        //memDc.DrawLabel(m_constant_text.title,   banner_rect, wxALIGN_TOP | wxALIGN_LEFT);
+        //memDc.DrawLabel(m_constant_text.title, banner_rect, wxALIGN_TOP | wxALIGN_LEFT);
 
         int title_height = memDc.GetTextExtent(m_constant_text.title).GetY();
         banner_rect.SetTop(banner_rect.GetTop() + title_height);
@@ -284,6 +313,12 @@ public:
         //print from bottom
         memDc.DrawLabel(credit_and_author, banner_rect, wxALIGN_BOTTOM | wxALIGN_LEFT);
 
+        //memDc.SetBrush(wxBrush(wxColour(255, 0, 0)));
+        //memDc.DrawLine(wxPoint(banner_rect.x, banner_rect.y), wxPoint(banner_rect.x + banner_rect.width, banner_rect.y));
+        //memDc.DrawLine(wxPoint(banner_rect.x, banner_rect.y), wxPoint(banner_rect.x, banner_rect.y + credits_height));
+        //memDc.DrawLine(wxPoint(banner_rect.x + banner_rect.width, banner_rect.y + credits_height), wxPoint(banner_rect.x + banner_rect.width, banner_rect.y));
+        //memDc.DrawLine(wxPoint(banner_rect.x + banner_rect.width, banner_rect.y + credits_height), wxPoint(banner_rect.x, banner_rect.y + credits_height));
+
         int text_height    = memDc.GetTextExtent("text").GetY();
 
         // calculate position for the dynamic text
@@ -295,8 +330,13 @@ private:
     wxBitmap    m_main_bitmap;
     wxFont      m_action_font;
     int         m_action_line_y_position;
-    float       m_scale {1.0};
+    const double m_scale;
     wxString    m_author;
+
+    int get_margin() {
+        // 1% margin (20 px for 2000 width)
+        return int(m_main_bitmap.GetWidth() * 0.01f);
+    }
 
     struct ConstantText
     {
@@ -335,13 +375,24 @@ private:
         // As default we use a system font for current display.
         // Scale fonts in respect to banner width
 
-        int text_banner_width = lround(0.4 * m_main_bitmap.GetWidth()) - roundl(m_scale * 50); // banner_width - margins
+        int text_banner_width = lround(0.4 * m_main_bitmap.GetWidth()) - roundl(get_margin()); // banner_width - margins
 
-        float title_font_scale = (float)text_banner_width / GetTextExtent(m_constant_text.title).GetX();
-        scale_font(m_constant_text.title_font, title_font_scale > 3.5f ? 3.5f : title_font_scale);
+        int default_width_title = GetTextExtent(m_constant_text.title).GetX();
+        float title_font_scale = (float)text_banner_width / default_width_title;
+        if (title_font_scale > 2.f) {
+            title_font_scale = std::max(2.f, (float)(text_banner_width * 0.5f) / default_width_title);
+        }
+        scale_font(m_constant_text.title_font, title_font_scale);
 
         float version_font_scale = (float)text_banner_width / GetTextExtent(m_constant_text.version).GetX();
-        scale_font(m_constant_text.version_font, version_font_scale > 2.f ? 2.f : version_font_scale);
+        if (version_font_scale > 1.f && version_font_scale > title_font_scale * 0.6f) {
+            if (title_font_scale > 1.6f) {
+                version_font_scale = title_font_scale * 0.6f;
+            } else {
+                version_font_scale = std::min(1.f, title_font_scale * 0.9f);
+            }
+        }
+        scale_font(m_constant_text.version_font, version_font_scale);
 
         // The width of the credits information string doesn't respect to the banner width some times.
         // So, scale credits_font in the respect to the longest string width
@@ -390,11 +441,11 @@ private:
 #endif //__WXMSW__
     }
 
-    // wrap a string for the strings no longer then 55 symbols
+    // wrap a string for the strings no longer then line_len symbols
     // return extent of the longest string
     int word_wrap_string(wxString& input)
     {
-        size_t line_len = 55;// count of symbols in one line
+        size_t line_len = 56;// count of symbols in one line
         int idx = -1;
         size_t cur_len = 0;
 
@@ -1300,6 +1351,7 @@ bool GUI_App::on_init_inner()
     }
 
     SplashScreen* scrn = nullptr;
+    double        scrn_scaling = 1.;
     if (app_config->get_bool("show_splash_screen")) {
         wxBitmap bmp;
         std::string file_name = app_config->splashscreen(is_editor());
@@ -1308,23 +1360,27 @@ bool GUI_App::on_init_inner()
             boost::filesystem::path splash_screen_path = (boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name);
             if (boost::filesystem::exists(splash_screen_path)) {
                 wxString path_str = wxString::FromUTF8((splash_screen_path).string().c_str());
-        // make a bitmap with dark grey banner on the left side
-                bmp = SplashScreen::MakeBitmap(wxBitmap(path_str, wxBITMAP_TYPE_JPEG));
+                // make a bitmap with dark grey banner on the left side
+                bmp = SplashScreen::MakeBitmap(wxBitmap(path_str, wxBITMAP_TYPE_JPEG), scrn_scaling);
 
                 //get the artist name from metadata
-            int result;
-            void** ifdArray = nullptr;
-            ExifTagNodeInfo* tag;
+                int result;
+                void** ifdArray = nullptr;
+                ExifTagNodeInfo* tag;
                 ifdArray = exif_createIfdTableArray(path_str.c_str(), &result);
-            if (result > 0 && ifdArray) {
-                tag = exif_getTagInfo(ifdArray, IFD_0TH, TAG_Artist);
-                if (tag) {
-                    if (!tag->error) {
-                        artist = (_L("Artwork model by") + " " + wxString::FromUTF8((char*)tag->byteData));
+                if (result > 0 && ifdArray) {
+                    tag = exif_getTagInfo(ifdArray, IFD_0TH, TAG_Artist);
+                    if (tag) {
+                        if (!tag->error) {
+                            wxString artist_name = wxString::FromUTF8((char*)tag->byteData);
+                            artist_name = artist_name.Trim();
+                            if (!artist_name.empty()) {
+                                artist = (_L("Artwork model by") + " " + artist_name);
+                            }
+                        }
                     }
                 }
             }
-        }
         }
 
         // Detect position (display) to show the splash screen
@@ -1345,8 +1401,10 @@ bool GUI_App::on_init_inner()
         }
 
         // make a bitmap with dark grey banner on the left side
-        scrn = new SplashScreen(bmp.IsOk() ? bmp : SplashScreen::MakeBitmap(get_bmp_bundle(SLIC3R_APP_KEY, 600)->GetPreferredBitmapSizeAtScale(1.0)),
-                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
+        if (!bmp.IsOk()) {
+            bmp = SplashScreen::MakeBitmap(get_bmp_bundle(SLIC3R_APP_KEY, 600)->GetPreferredBitmapSizeAtScale(1.0), scrn_scaling);
+        }
+        scrn = new SplashScreen(bmp, scrn_scaling, wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
 
         if (!default_splashscreen_pos)
             // revert "restore_win_position" value if application wasn't crashed

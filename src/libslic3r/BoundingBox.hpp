@@ -216,6 +216,7 @@ public:
     BoundingBox(const Points &points) : BoundingBoxBase<Point, Points>(points) {}
 
     BoundingBox inflated(coordf_t delta) const throw() { BoundingBox out(*this); out.offset(delta); return out; }
+    Point nearest_point(const Point &outside_pt) const;
 
     friend BoundingBox get_extents_rotated(const Points &points, double angle);
 };

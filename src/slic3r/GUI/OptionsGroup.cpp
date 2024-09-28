@@ -432,12 +432,15 @@ void OptionsGroup::activate_line(Line& line)
             ConfigOptionDef option = opt.opt;
             // add label if any
             if ((option_set.size() > 1 || line.label.IsEmpty()) && !option.label.empty()) {
-                const std::string opt_label = (option.label.empty() || option.label.back() != '_') ? option.label : option.label.substr(0, option.label.size() - 1);
+                const std::string opt_label = (option.label == "_") ? "" :
+                    (option.label.empty() || option.label.back() != '_') ?
+                                                                      option.label :
+                                                                      option.label.substr(0, option.label.size() - 1);
                 // those two parameter names require localization with context
                 const wxString str_label = _(opt_label);
                 bool no_dots = str_label.empty() || option.label.back() == '_';
                 label = new wxStaticText(this->ctrl_parent(), wxID_ANY,
-                   (no_dots ? "" : (str_label + ":")), wxDefaultPosition, //wxDefaultSize);
+                   (no_dots ? str_label : (str_label + ": ")), wxDefaultPosition, //wxDefaultSize);
                    (option.label_width >= 0) ? ((option.label_width != 0) ? wxSize(option.label_width*wxGetApp().em_unit(), -1) : wxDefaultSize) :
 					((label_width > 0) ? wxSize(label_width * wxGetApp().em_unit(), -1) : (wxDefaultSize))
 				, wxALIGN_RIGHT);

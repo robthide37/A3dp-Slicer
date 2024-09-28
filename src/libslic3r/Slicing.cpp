@@ -59,7 +59,7 @@ inline coordf_t max_layer_height_from_nozzle(const PrintConfig &print_config, ui
     coordf_t min_layer_height = min_layer_height_from_nozzle(print_config, idx_nozzle);
     coordf_t nozzle_dmr = print_config.nozzle_diameter.get_at(idx_nozzle);
     coordf_t max_layer_height = print_config.max_layer_height.get_abs_value(idx_nozzle, nozzle_dmr);
-    return check_z_step(std::max(min_layer_height, (max_layer_height == 0.) ? (0.75 * nozzle_dmr) : max_layer_height), print_config.z_step);
+    return check_z_step(std::max(min_layer_height, (max_layer_height == 0. || !print_config.max_layer_height.is_enabled()) ? (0.75 * nozzle_dmr) : max_layer_height), print_config.z_step);
 }
 
 // Minimum layer height for the variable layer height algorithm.

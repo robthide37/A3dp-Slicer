@@ -802,7 +802,7 @@ void Preview::update_moves_slider()
     alternate_values.reserve(view.endpoints.last - view.endpoints.first + 1);
     unsigned int last_gcode_id = view.gcode_ids[view.endpoints.first];
     for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
-        assert(view.gcode_ids.size() > i);
+        //assert(view.gcode_ids.size() > i); //can happen in 0th layer (before first layer)
         if (view.gcode_ids.size() > i) {
             if (i > view.endpoints.first) {
                 // skip consecutive moves with same gcode id (resulting from processing G2 and G3 lines)

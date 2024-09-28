@@ -115,8 +115,7 @@ ExPolygons ifp_convex(const arr2::RectangleBed &obed, const Polygon &convexpoly)
     Polygon innerNfp{ Point{bedMinx + leftOffset, bedMaxy + topOffset},
                       Point{bedMaxx + rightOffset, bedMaxy + topOffset},
                       Point{bedMaxx + rightOffset, bedMiny + bottomOffset},
-                      Point{bedMinx + leftOffset, bedMiny + bottomOffset},
-                      Point{bedMinx + leftOffset, bedMaxy + topOffset} };
+                      Point{bedMinx + leftOffset, bedMiny + bottomOffset} };
 
     if (sheight <= boxHeight && swidth <= boxWidth)
         ret.contour = std::move(innerNfp);
@@ -347,6 +346,9 @@ static void buildPolygon(const std::vector<Line>& edgelist,
 
         tmp = std::next(tmp);
     }
+    // a Polygon doesn't have fron()==back(), it's only for a Polyline that loop.
+    assert(rsh.front() == rsh.back());
+    rsh.pop_back();
 }
 
 Polygon nfp_convex_convex_legacy(const Polygon &fixed, const Polygon &movable)

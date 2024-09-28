@@ -1450,9 +1450,10 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
     }
 
     // update phony fields
-    assert(m_config);
+    assert(m_config_base);
     std::set<const DynamicPrintConfig*> changed;
-    assert( m_config == &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config
+    assert( dynamic_cast<TabFrequent*>(this)
+        || m_config == &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config
         || m_config == &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config
         || m_config == &wxGetApp().preset_bundle->printers.get_edited_preset().config);
     std::vector<const DynamicPrintConfig*> all_const_configs = {&wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
@@ -1468,7 +1469,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
             changed.insert(config_updated);
         }
     }
-    if (changed.find(m_config) != changed.end()) {
+    if (m_config && changed.find(m_config) != changed.end()) {
         update_dirty();
         //# Initialize UI components with the config values.
         reload_config();
@@ -1501,7 +1502,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         return;
     }
     
-    if ("fill_density" == opt_key && m_config->get_float("fill_density") >= 100 && m_config->get_int("solid_infill_every_layers") != 1)
+    if ("fill_density" == opt_key && m_config_base->get_float("fill_density") >= 100 && m_config_base->get_int("solid_infill_every_layers") != 1)
     {
         const wxString msg_text = _(L("You set the sparse infill to have 100% fill density. If you want to have only solid infill, you should set 'solid_infill_every_layers' to 1."
             "\n\nIf not, then the sparse infill will still be considered as 'sparse' even at 100% density."
@@ -1511,7 +1512,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         int res = dialog.ShowModal();
         if (res == wxID_YES) {
             boost::any val = int32_t(1);
-            m_config->opt_int("solid_infill_every_layers") = 1;
+            m_config_base->opt_int("solid_infill_every_layers") = 1;
             //m_config->set_key_value("solid_infill_every_layers", new ConfigOptionInt(1));
             this->on_value_change("solid_infill_every_layers", val);
         }
@@ -2408,6 +2409,29 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         ConfigOption* default_opt = option.opt.create_default_option();
                         default_opt->set_enum_int(0); // should be generic_enum, set to first.
                         option.opt.set_default_value(default_opt);
+                    } else if (boost::starts_with(params[i], "hints")) {
+                        std::vector<std::string> enum_strs;
+                        boost::split(enum_strs, params[i], boost::is_any_of("$"));
+                        if (enum_strs.size() < 3 || enum_strs.size() % 2 == 0) {
+                            BOOST_LOG_TRIVIAL(error) << "Error: hints '"<< setting_id << "' doesn't have an even number of key-label values:"<<(enum_strs.size()-1)<<".";
+                            if (logs) Slic3r::slic3r_log->info("settings gui") << "Error: odd number of hints values: should be a key/value list ("<< option.opt.opt_key <<")";
+                            continue;
+                        }
+                        std::vector<std::pair<std::string,std::string>> values_2_labels;
+                        for (size_t idx = 1; idx < enum_strs.size(); idx += 2) {
+                            values_2_labels.emplace_back(enum_strs[idx], enum_strs[idx + 1]);
+                        }
+                        // create enum_def in option.opt
+                        //option.opt.set_enum_as_closed_for_scripted_enum(values_2_labels); // fake closed
+                        if (option.opt.type == coInt || option.opt.type == coInts) {
+                            option.opt.set_enum_values(ConfigOptionDef::GUIType::i_enum_open, values_2_labels);
+                        } else if (option.opt.type == coFloat || option.opt.type == coFloats ||
+                                       option.opt.type == coPercent || option.opt.type == coPercents) {
+                            option.opt.set_enum_values(ConfigOptionDef::GUIType::f_enum_open, values_2_labels);
+                        } else {
+                            if (logs) Slic3r::slic3r_log->info("settings gui") << "Error: hints can only apply to int, int, flaot, flaot, percent, percents ("<< option.opt.opt_key <<")";
+                        }
+                        //defautl already/will be set by the type
                     } else if (boost::starts_with(params[i], "depends")) {
                         std::vector<std::string> depends_str;
                         boost::split(depends_str, params[i], boost::is_any_of("$"));

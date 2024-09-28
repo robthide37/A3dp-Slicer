@@ -1418,14 +1418,34 @@ namespace client
         // Return a boolean value, true if the scalar variable referenced by "opt" or "opt[index]" is enabled.
         static void is_enabled_test(const MyContext *ctx, OptWithPos &opt, expr &output)
         {
-            output.set_b(opt.opt->is_enabled(opt.index));
+            if (ctx->skipping()) {
+            } else if (opt.opt->is_vector()) {
+                if (! opt.has_index())
+                    ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
+                if (opt.opt->size() == 0)
+                    ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
+                output.set_b(opt.opt->is_enabled(opt.index));
+            } else {
+                assert(opt.opt->is_scalar());
+                output.set_b(opt.opt->is_enabled());
+            }
             output.it_range = opt.it_range;
         }
         // Return a boolean value, true if an element of a variable referenced by "opt" or "opt[index]" is disabled.
         static void is_nil_test(const MyContext *ctx, OptWithPos &opt, expr &output)
         {
             BOOST_LOG_TRIVIAL(warning) << "Warning: The macro 'is_nil' is deprecated. Please use '!is_enabled' instead.";
-            output.set_b(!opt.opt->is_enabled(opt.index));
+            if (ctx->skipping()) {
+            } else if (opt.opt->is_vector()) {
+                if (! opt.has_index())
+                    ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
+                if (opt.opt->size() == 0)
+                    ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
+                output.set_b(!opt.opt->is_enabled(opt.index));
+            } else {
+                assert(opt.opt->is_scalar());
+                output.set_b(!opt.opt->is_enabled());
+            }
             output.it_range = opt.it_range;
         }
 

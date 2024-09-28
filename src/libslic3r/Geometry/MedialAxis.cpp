@@ -2107,18 +2107,24 @@ MedialAxis::build(ThickPolylines& polylines_out)
             if (fixer.size() == 1) {
                 ExPolygon fixPoly = fixer[0];
                 ThickPolylines pp_stopgap;
-                this->polyline_from_voronoi(fixPoly, &pp_stopgap);
-                double fix_area = 0;
-                for (ThickPolyline& tp : pp_stopgap) {
-                    for (int i = 1; i < tp.points.size(); i++) {
-                        fix_area += (tp.points_width[i - 1] + tp.points_width[i]) * tp.points[i - 1].distance_to(tp.points[i]) / 2;
+                try {
+                    this->polyline_from_voronoi(fixPoly, &pp_stopgap);
+                    double fix_area = 0;
+                    for (ThickPolyline &tp : pp_stopgap) {
+                        for (int i = 1; i < tp.points.size(); i++) {
+                            fix_area += (tp.points_width[i - 1] + tp.points_width[i]) *
+                                tp.points[i - 1].distance_to(tp.points[i]) / 2;
+                        }
                     }
-                }
-                double fix_ratio_area = fix_area / area;
-                if (fix_ratio_area < 1) fix_ratio_area = 1 / fix_ratio_area;
-                //if it's less off, then use it.
-                if (fix_ratio_area < ratio_area) {
-                    pp = pp_stopgap;
+                    double fix_ratio_area = fix_area / area;
+                    if (fix_ratio_area < 1)
+                        fix_ratio_area = 1 / fix_ratio_area;
+                    // if it's less off, then use it.
+                    if (fix_ratio_area < ratio_area) {
+                        pp = pp_stopgap;
+                    }
+                } catch (std::exception) {
+                    //if error (like Slic3r::InvalidArgument("Voronoi cell doesn't contain a source point!")), then don't consider it.
                 }
             }
         }

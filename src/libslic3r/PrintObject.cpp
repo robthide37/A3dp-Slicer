@@ -894,7 +894,17 @@ void PrintObject::calculate_overhanging_perimeters()
                         size_t prev_layer_id = l->lower_layer ? l->lower_layer->id() : size_t(-1);
                         assert(layer_region->region().config().overhangs_width_speed.is_enabled());
                         const double nozzle_diameter_overhangs = layer_region->bridging_flow(frPerimeter).nozzle_diameter();
-                        const double max_width = layer_region->region().config().overhangs_width_speed.get_abs_value(nozzle_diameter_overhangs);
+                        double max_width = -1;
+                        if (layer_region->region().config().overhangs_width_speed.is_enabled()) {
+                            max_width = layer_region->region().config().overhangs_width_speed.get_abs_value(nozzle_diameter_overhangs);
+                        }
+                        if (layer_region->region().config().overhangs_width.is_enabled() && (max_width < 0 ||
+                            max_width > layer_region->region().config().overhangs_width.get_abs_value(nozzle_diameter_overhangs))) {
+                            max_width = layer_region->region().config().overhangs_width.get_abs_value(nozzle_diameter_overhangs);
+                        }
+                        if (max_width < 0) {
+                            max_width = nozzle_diameter_overhangs;
+                        }
                         layer_region->m_perimeters =
                             ExtrusionProcessor::calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
                                                                                            unscaled_polygons_lines[prev_layer_id],
@@ -1040,7 +1050,6 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "external_perimeter_extrusion_spacing"
             || opt_key == "external_perimeter_extrusion_width"
             || opt_key == "external_perimeters_vase"
-            || opt_key == "first_layer_extrusion_width"
             || opt_key == "gap_fill_extension"
             || opt_key == "gap_fill_last"
             || opt_key == "gap_fill_max_width"
@@ -1223,6 +1232,8 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "fill_top_flow_ratio"
             || opt_key == "fill_smooth_width"
             || opt_key == "fill_smooth_distribution"
+            || opt_key == "first_layer_infill_extrusion_spacing"
+            || opt_key == "first_layer_infill_extrusion_width"
             || opt_key == "infill_anchor"
             || opt_key == "infill_anchor_max"
             || opt_key == "infill_connection"
@@ -2699,9 +2710,10 @@ void PrintObject::discover_vertical_shells()
                     // Assign resulting internal surfaces to layer.
                     layerm->m_fill_surfaces.keep_types({ stPosTop | stDensSolid, stPosBottom | stDensSolid, stPosBottom | stDensSolid | stModBridge });
                     //layerm->m_fill_surfaces.keep_types_flag(stPosTop | stPosBottom);
-                    assert_valid(new_internal);
-                    assert_valid(new_internal_void);
-                    assert_valid(new_internal_solid);
+                    coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(print()->config().resolution.value));
+                    ensure_valid(new_internal, scaled_resolution);
+                    ensure_valid(new_internal_void, scaled_resolution);
+                    ensure_valid(new_internal_solid, scaled_resolution);
                     layerm->m_fill_surfaces.append(new_internal, stPosInternal | stDensSparse);
                     layerm->m_fill_surfaces.append(new_internal_void, stPosInternal | stDensVoid);
                     layerm->m_fill_surfaces.append(new_internal_solid, stPosInternal | stDensSolid);
@@ -3966,6 +3978,8 @@ void PrintObject::discover_horizontal_shells()
 } // void PrintObject::discover_horizontal_shells()
 
 void merge_surfaces(LayerRegion* lregion) {
+    coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(lregion->layer()->object()->print()->config().resolution.value));
+
     //merge regions with same type (other things are all the same anyway)
     std::map< SurfaceType, std::vector<const Surface*>> type2srfs;
     for (const Surface& surface : lregion->fill_surfaces().surfaces) {
@@ -3975,7 +3989,7 @@ void merge_surfaces(LayerRegion* lregion) {
     std::map< SurfaceType, ExPolygons> type2newpolys;
     for (auto& entry : type2srfs) {
         if (entry.second.size() > 2) {
-            ExPolygons merged = union_safety_offset_ex(to_expolygons(entry.second));
+            ExPolygons merged = ensure_valid(union_safety_offset_ex(to_expolygons(entry.second)), scaled_resolution);
             if (merged.size() < entry.second.size()) {
                 changed = true;
                 type2newpolys[entry.first] = std::move(merged);

@@ -55,6 +55,7 @@ FillConcentric::_fill_surface_single(
     // generate paths from the outermost to the innermost, to avoid
     // adhesion problems of the first central tiny loops
     loops = union_pt_chained_outside_in(loops);
+    ensure_valid(loops, params.fill_resolution);
 
     // split paths using a nearest neighbor search
     size_t iPathFirst = polylines_out.size();
@@ -80,6 +81,7 @@ FillConcentric::_fill_surface_single(
     //TODO: return ExtrusionLoop objects to get better chained paths,
     // otherwise the outermost loop starts at the closest point to (0, 0).
     // We want the loops to be split inside the G-code generator to get optimum path planning.
+    assert_valid(polylines_out);
 }
 
 void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRole& good_role, const FillParams& params, Polygon& polygon) {
@@ -471,7 +473,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
     if (params.density > 0.9999f && !params.dont_adjust) {
         coord_t                loops_count = std::max(bbox_size.x(), bbox_size.y()) / min_spacing + 1;
         Polygons               polygons    = offset(expolygon, float(min_spacing) / 2.f);
-        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_width, min_spacing, min_width, loops_count, 0, params.layer_height, *this->print_object_config, *this->print_config);
+        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_width, min_spacing, min_width, loops_count, 0, params.layer_height, *params.config, *this->print_config);
 
         std::vector<Arachne::VariableWidthLines>    loops = wallToolPaths.getToolPaths();
         std::vector<const Arachne::ExtrusionLine *> all_extrusions;

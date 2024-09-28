@@ -954,13 +954,13 @@ bool ArcPolyline::split_at_index(const size_t index, ArcPolyline &p1, ArcPolylin
 Point ArcPolyline::get_point_from_begin(coord_t distance) const {
     size_t idx = 1;
     while (distance > 0 && idx < m_path.size()) {
-        const Geometry::ArcWelder::Segment last = m_path[idx];
-        const Geometry::ArcWelder::Segment current = m_path[idx - 1];
+        const Geometry::ArcWelder::Segment last = m_path[idx - 1];
+        const Geometry::ArcWelder::Segment current = m_path[idx];
         if (last.linear()) {
             // Linear segment
             Vec2d  v    = (current.point - last.point).cast<double>();
             double lsqr = v.squaredNorm();
-            if (lsqr > sqr(distance)) {
+            if (lsqr >= sqr(distance)) {
                 // Length to go is zero.
                 return last.point + (v * (distance / sqrt(lsqr))).cast<coord_t>();
             }
@@ -969,7 +969,7 @@ Point ArcPolyline::get_point_from_begin(coord_t distance) const {
             // Circular segment
             double angle = Geometry::ArcWelder::arc_angle(current.point.cast<double>(), last.point.cast<double>(), last.radius);
             double len   = std::abs(last.radius) * angle;
-            if (len > distance) {
+            if (len >= distance) {
                 // Rotate the segment end point in reverse towards the start point.
                 if (last.ccw())
                     angle *= -1.;
@@ -983,7 +983,7 @@ Point ArcPolyline::get_point_from_begin(coord_t distance) const {
 
     // Return remaining distance to go.
     assert(distance >= 0);
-    return m_path.front().point;
+    return m_path[idx - 1].point;
 }
 
 Point ArcPolyline::get_point_from_end(coord_t distance) const {
@@ -995,7 +995,7 @@ Point ArcPolyline::get_point_from_end(coord_t distance) const {
             // Linear segment
             Vec2d  v    = (current.point - last.point).cast<double>();
             double lsqr = v.squaredNorm();
-            if (lsqr > sqr(distance)) {
+            if (lsqr >= sqr(distance)) {
                 // Length to go is zero.
                 return last.point + (v * (distance / sqrt(lsqr))).cast<coord_t>();
             }
@@ -1004,7 +1004,7 @@ Point ArcPolyline::get_point_from_end(coord_t distance) const {
             // Circular segment
             double angle = Geometry::ArcWelder::arc_angle(current.point.cast<double>(), last.point.cast<double>(), last.radius);
             double len   = std::abs(last.radius) * angle;
-            if (len > distance) {
+            if (len >= distance) {
                 // Rotate the segment end point in reverse towards the start point.
                 if (last.ccw())
                     angle *= -1.;
@@ -1018,7 +1018,7 @@ Point ArcPolyline::get_point_from_end(coord_t distance) const {
 
     // Return remaining distance to go.
     assert(distance >= 0);
-    return m_path.front().point;
+    return m_path[idx].point;
 }
 
 void ArcPolyline::set_front(const Point &p) {

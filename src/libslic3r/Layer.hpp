@@ -197,7 +197,12 @@ protected:
     friend class Layer;
     friend class PrintObject;
 
-    LayerRegion(Layer *layer, const PrintRegion *region) : m_layer(layer), m_region(region) {}
+    LayerRegion(Layer *layer, const PrintRegion *region) : m_layer(layer), m_region(region) {
+        //these are sorted in the island by idx, so they shoul never change.
+        m_perimeters.set_can_sort_reverse(false, false);
+        m_fills.set_can_sort_reverse(false, false);
+        m_ironings.set_can_sort_reverse(false, false);
+    }
     ~LayerRegion() = default;
 
 private:
