@@ -477,13 +477,13 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     switch (opt.type) {
     case coFloats: {
         if (opt_idx < 0) {
-            deserialize_vector(ConfigOptionFloats{});
+            deserialize_vector(ConfigOptionFloats());
             break;
         }
     }
     case coPercents: {
         if (opt_idx < 0) {
-            deserialize_vector(ConfigOptionPercents{});
+            deserialize_vector(ConfigOptionPercents());
             break;
         }
     }
@@ -524,7 +524,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coFloatsOrPercents: {
         if (opt_idx < 0) {
-            deserialize_vector(ConfigOptionFloatsOrPercents{});
+            deserialize_vector(ConfigOptionFloatsOrPercents());
             break;
         }
     }
@@ -537,7 +537,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coBools: {
         if (opt_idx < 0) {
-            deserialize_vector(ConfigOptionBools{});
+            deserialize_vector(ConfigOptionBools());
         } else {
             text_value = boost::any_cast<uint8_t>(value) != 0 ? "true" : "false";
         }
@@ -551,7 +551,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coInts: {
         if (opt_idx < 0) {
-            deserialize_vector(ConfigOptionInts{});
+            deserialize_vector(ConfigOptionInts());
             break;
         }
     }
@@ -561,7 +561,7 @@ wxString any_to_wxstring(const boost::any &value, const ConfigOptionDef &opt, co
     }
     case coPoints:
         if (opt_idx < 0) {
-            deserialize_vector(ConfigOptionPoints{});
+            deserialize_vector(ConfigOptionPoints());
             assert(text_value == get_points_string(boost::any_cast<std::vector<Vec2d>>(value)));
             break;
         }
