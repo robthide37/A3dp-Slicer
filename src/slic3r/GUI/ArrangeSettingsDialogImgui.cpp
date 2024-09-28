@@ -140,6 +140,8 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
 
 void ArrangeSettingsDialogImgui::set_arrange_settings(const DynamicPrintConfig &conf, PrinterTechnology tech)
 {
+    assert(conf.option("duplicate_distance") && conf.option("complete_objects") && conf.option("nozzle_diameter"));
+
     const ConfigOptionFloat *dd_opt = conf.option<ConfigOptionFloat>("duplicate_distance");
 
     if (dd_opt && dd_opt->value != 0) {
@@ -147,6 +149,7 @@ void ArrangeSettingsDialogImgui::set_arrange_settings(const DynamicPrintConfig &
         if (tech == ptSLA) {
             dist = dd_opt->value;
         } else if (tech == ptFFF) {
+    assert(conf.option("duplicate_distance") && conf.option("complete_objects") && conf.option("nozzle_diameter"));
             const ConfigOptionBool *co_opt = conf.option<ConfigOptionBool>("complete_objects");
             if (co_opt && co_opt->value) {
                 dist = float(min_object_distance(&conf, 0.) * 2);
