@@ -4804,17 +4804,18 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
     add_wipe_points(wipe_paths);
 
     //wipe for External Perimeter (and not vase)
+    //TODO: move that into a wipe object's new method. (like wipe_hide_seam did for PS)
     if (wipe_paths.back().role() == ExtrusionRole::ExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 0 && wipe_paths.front().size() >= 2 && wipe_paths.back().polyline.size() >= 2
         && (m_enable_loop_clipping && m_writer.tool_is_extruder()) ) {
         double dist_wipe_extra_perimeter = EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0);
 
         //safeguard : if not possible to wipe, abord.
         if (wipe_paths.size() == 1 && wipe_paths.front().size() <= 2) {
-            return gcode;
+            goto stop_print_loop;
         }
         //TODO: abord if the wipe is too big for a mini loop (in a better way)
         if (wipe_paths.size() == 1 && unscaled(wipe_paths.front().length()) < EXTRUDER_CONFIG_WITH_DEFAULT(wipe_extra_perimeter, 0) + nozzle_diam) {
-            return gcode;
+            goto stop_print_loop;
         }
         //get dist for wipe point
         coordf_t dist_point = wipe_paths.back().width();
@@ -5142,6 +5143,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
             gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
         }
     }
+stop_print_loop:
 
     assert(!this->visitor_flipped);
     this->visitor_flipped = save_flipped;
