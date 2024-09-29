@@ -74,14 +74,8 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
         gcode += gcodegen.retract_and_wipe();
         gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
         const std::string comment{"Travel to a Wipe Tower"};
-        if (gcodegen.last_pos_defined()) {
-            Polyline travel_path = gcodegen.travel_to(gcode, xy_point, ExtrusionRole::Mixed);
-            gcodegen.write_travel_to(gcode, travel_path, comment);
-        } else {
-            // TODO: check if the z is already set
-            gcode += gcodegen.writer().travel_to_xy(gcodegen.point_to_gcode(xy_point), 0.0, comment);
-            gcode += gcodegen.writer().get_travel_to_z_gcode(z, comment + " (travel z from wipetower)");
-        }
+        Polyline travel_path = gcodegen.travel_to(gcode, xy_point, ExtrusionRole::Mixed);
+        gcodegen.write_travel_to(gcode, travel_path, comment);
         need_unretract = true;
     } else {
         // When this is multiextruder printer without any ramming, we can just change
