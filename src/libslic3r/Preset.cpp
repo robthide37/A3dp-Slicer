@@ -852,7 +852,7 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_retract_restart_extra_toolchange",
         "filament_seam_gap",
         "filament_travel_lift_before_obstacle",
-        "filament_travel_max_lift",
+        // "filament_travel_max_lift",
         "filament_travel_ramping_lift",
         "filament_travel_slope",
         "filament_wipe", "filament_wipe_only_crossing", "filament_wipe_extra_perimeter", "filament_wipe_speed",

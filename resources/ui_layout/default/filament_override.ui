@@ -2,7 +2,6 @@ page:Filament Overrides:wrench
 group:Travel lift
 	setting:id$0:filament_retract_lift
 	setting:id$0:filament_travel_ramping_lift
-	setting:id$0:filament_travel_max_lift
 	setting:id$0:filament_travel_slope
 	setting:id$0:filament_travel_lift_before_obstacle
 	setting:id$0:filament_retract_lift_above

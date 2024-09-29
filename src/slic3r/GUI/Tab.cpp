@@ -3202,10 +3202,10 @@ void TabFilament::update_filament_overrides_page()
     );
 
     const bool is_lifting =  (
-       ! m_config->option("filament_travel_max_lift")->is_enabled(0)
-        || m_config->opt_float("filament_travel_max_lift", extruder_idx) > 0
-        || !m_config->option("filament_retract_lift")->is_enabled(0)
-        || m_config->opt_float("filament_retract_lift", extruder_idx) > 0
+       // !m_config->option("filament_travel_max_lift")->is_enabled(0) ||
+       //  m_config->opt_float("filament_travel_max_lift", extruder_idx) > 0 ||
+       !m_config->option("filament_retract_lift")->is_enabled(0) ||
+        m_config->opt_float("filament_retract_lift", extruder_idx) > 0
     );
 
     for (const std::string& opt_key : print_config_def.filament_override_option_keys()) {

@@ -4905,7 +4905,10 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("travel_slope", coFloats);
     def->label = L("Ramping slope angle");
-    def->tooltip = L("Slope of the ramp in the initial phase of the travel.");
+    def->tooltip = L("Minimum slope of the ramp in the initial phase of the travel."
+                    " If the travel isn't long enough, the angle will be increased."
+                    "\n90° means a direct lift, like if there was no ramp."
+                    "\n0° means that the lift will always be hit at the end of the travel.");
     def->sidetext = L("°");
     def->min = 0;
     def->max = 90;
@@ -4917,21 +4920,23 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Use ramping lift");
     def->tooltip = L("Generates a ramping lift instead of lifting the extruder directly upwards. "
                      "The travel is split into two phases: the ramp and the standard horizontal travel. "
-                     "This option helps reduce stringing.");
+                     "This option helps reduce stringing."
+                     "\nAlso works for the z move when a layer change occurs.");
     def->mode = comAdvancedE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ false });
 
-    def = this->add("travel_max_lift", coFloats);
-    def->label = L("Maximum ramping lift");
-    def->tooltip = L("Maximum lift height of the ramping lift. It may not be reached if the next position "
-                     "is close to the old one.");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->max_literal = {1000, false};
-    def->mode = comAdvancedE | comPrusa;
-    def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionFloats{0.0});
+    // why not reuse rretract_lift ? because it's a max? My current impl enforced the lift, so it's okay for me to remove it.
+    // def = this->add("travel_max_lift", coFloats);
+    // def->label = L("Maximum ramping lift");
+    // def->tooltip = L("Maximum lift height of the ramping lift. It may not be reached if the next position "
+                     // "is close to the old one.");
+    // def->sidetext = L("mm");
+    // def->min = 0;
+    // def->max_literal = {1000, false};
+    // def->mode = comAdvancedE | comPrusa;
+    // def->is_vector_extruder = true;
+    // def->set_default_value(new ConfigOptionFloats{0.0});
 
     def = this->add("travel_lift_before_obstacle", coBools);
     def->label = L("Steeper ramp before obstacles");
@@ -7178,7 +7183,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap_external",
         "tool_name",
         "travel_lift_before_obstacle",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_ramping_lift",
         "travel_slope",
         "wipe",
@@ -7210,7 +7215,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap",
         "seam_gap_external",
         "travel_lift_before_obstacle",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_ramping_lift",
         "travel_slope",
         "wipe",
@@ -7238,7 +7243,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_speed",
         "seam_gap",
         "travel_lift_before_obstacle",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_ramping_lift",
         "travel_slope",
         "wipe",
@@ -8252,6 +8257,7 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "gcode_resolution", // now in printer config.
     "enable_dynamic_fan_speeds", "overhang_fan_speed_0","overhang_fan_speed_1","overhang_fan_speed_2","overhang_fan_speed_3", // converted in composite_legacy
     "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3", // converted in composite_legacy
+    "travel_max_lift", "filament_travel_max_lift" // removed, using retract_lift also for rampping lift instead.
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value, bool remove_unkown_keys)
@@ -9644,6 +9650,11 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
         if (!value.empty() && value.front() == '!') {
             value = std::to_string(all_conf.option("fan_printer_min_speed")->get_float());
         }
+    }
+    if ("travel_ramping_lift" == opt_key && "1" == value) {
+        // also add travel_max_lift from retract_lift & same from filament
+        new_entries["travel_ramping_lift"] = all_conf.option("retract_lift")->serialize();
+        new_entries["filament_travel_ramping_lift"] = all_conf.option("filament_retract_lift")->serialize();
     }
 
     // compute max & min height from % to flat value

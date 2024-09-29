@@ -559,7 +559,7 @@ std::string GCodeWriter::travel_arc_to_xy(const Vec2d& point, const Vec2d& cente
     return write_acceleration() + w.string();
 }
 
-std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const double speed, const std::string_view comment)
+std::string GCodeWriter::travel_to_xyz(const Vec3d &point, bool is_lift, const double speed, const std::string_view comment)
 {
     assert(std::abs(point.x()) < 120000.);
     assert(std::abs(point.y()) < 120000.);
@@ -568,7 +568,7 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const double speed, c
         don't perform the Z move but we only move in the XY plane and
         adjust the nominal Z by reducing the lift amount that will be 
         used for unlift. */
-    if (!this->will_move_z(point.z())) {
+    if (!is_lift && !this->will_move_z(point.z())) {
         double nominal_z = m_pos.z() - m_lifted;
         m_lifted -= (point.z() - nominal_z);
         // In case that retract_lift == layer_height we could end up with almost zero in_m_lifted
@@ -595,10 +595,13 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const double speed, c
     // check if speed from caller won't limit the speed
     if ((speed > 0) & (speed < travel_speed))
         travel_speed = speed;
-
-    /*  In all the other cases, we perform an actual XYZ move and cancel
-        the lift. */
-    m_lifted = 0;
+    
+    if (is_lift) {
+        m_lifted += point.z() - m_pos.z();
+    } else {
+        //  In all the other cases, we perform an actual XYZ move and cancel the lift.
+        m_lifted = 0;
+    }
 
     m_pos = point;
     
@@ -874,11 +877,11 @@ void GCodeWriter::update_position(const Vec3d &new_pos)
     m_pos = new_pos;
 }
 
-/*  If this method is called more than once before calling unlift(),
-    it will not perform subsequent lifts, even if Z was raised manually
-    (i.e. with travel_to_z()) and thus _lifted was reduced. */
-std::string GCodeWriter::lift(int layer_id)
-{
+/*
+* Compute the lift z diff with current position.
+* 
+**/
+double GCodeWriter::will_lift(int layer_id) const{
     // check whether the above/below conditions are met
     double target_lift = 0;
     if(this->tool_is_extruder()){
@@ -901,11 +904,28 @@ std::string GCodeWriter::lift(int layer_id)
     }
 
     // one-time extra lift (often for dangerous travels)
-    if (this->m_extra_lift > 0) {
-        target_lift += this->m_extra_lift;
-        this->m_extra_lift = 0;
-    }
+    target_lift += this->m_extra_lift;
 
+    // compare against epsilon to be sure
+    if (std::abs(target_lift) < EPSILON) {
+        return 0;
+    }
+    if (std::abs(target_lift - m_lifted) < EPSILON) {
+        return m_lifted;
+    }
+    return target_lift;
+}
+
+/*  If this method is called more than once before calling unlift(),
+    it will not perform subsequent lifts, even if Z was raised manually
+    (i.e. with travel_to_z()) and thus _lifted was reduced. */
+std::string GCodeWriter::lift(int layer_id)
+{
+    // get our lift move
+    double target_lift = will_lift(layer_id);
+    // extra_lift is already integrated in will_lift, set it to 0 to ensure it's only used once.
+    this->m_extra_lift = 0;
+    
     // compare against epsilon because travel_to_z() does math on it
     // and subtracting layer_height from retract_lift might not give
     // exactly zero

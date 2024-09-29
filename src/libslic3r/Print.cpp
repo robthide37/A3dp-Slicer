@@ -186,7 +186,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "travel_ramping_lift",
         "travel_initial_part_length",
         "travel_slope",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_lift_before_obstacle",
         "retract_before_travel",
         "retract_before_wipe",

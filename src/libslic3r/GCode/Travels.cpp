@@ -292,44 +292,45 @@ Points3 generate_flat_travel(tcb::span<const Point> xy_path, const float elevati
     return result;
 }
 
-Vec2d place_at_segment(
-    const Vec2d &current_point, const Vec2d &previous_point, const double distance
-) {
-    Vec2d direction = (current_point - previous_point).normalized();
-    return previous_point + direction * distance;
-}
-
-std::vector<DistancedPoint> slice_xy_path(
-    tcb::span<const Point> xy_path, tcb::span<const double> sorted_distances
-) {
+std::vector<DistancedPoint> slice_xy_path(tcb::span<const Point> xy_path,
+                                          tcb::span<const double> sorted_distances,
+                                          coordf_t min_distance) {
     assert(xy_path.size() >= 2);
     std::vector<DistancedPoint> result;
     result.reserve(xy_path.size() + sorted_distances.size());
-    double total_distance{0};
+    coordf_t total_distance{0};
     result.emplace_back(DistancedPoint{xy_path.front(), 0});
-    Point previous_point = result.front().point;
-    std::size_t offset{0};
+    std::size_t dist_idx{0};
     for (const Point &point : xy_path.subspan(1)) {
-        Vec2d unscaled_point{unscaled(point)};
-        Vec2d unscaled_previous_point{unscaled(previous_point)};
-        const double current_segment_length = (unscaled_point - unscaled_previous_point).norm();
-        for (const double distance_to_add : sorted_distances.subspan(offset)) {
-            if (distance_to_add <= total_distance + current_segment_length) {
-                Point to_place = scaled(place_at_segment(
-                    unscaled_point, unscaled_previous_point, distance_to_add - total_distance
-                ));
-                if (to_place != previous_point && to_place != point) {
-                    result.emplace_back(DistancedPoint{to_place, distance_to_add});
+        const double current_segment_end = total_distance + point.distance_to(result.back().point);
+        for (const double distance_to_add : sorted_distances.subspan(dist_idx)) {
+            coordf_t dist_target = scale_d(distance_to_add);
+            if (dist_target < current_segment_end + min_distance) {
+                if (dist_target + min_distance > current_segment_end) {
+                    total_distance = current_segment_end;
+                    result.emplace_back(DistancedPoint{point, total_distance});
+                } else {
+                    //don't bother if it's at less than epsilon from the last point
+                    if (dist_target > total_distance + min_distance) {
+                        total_distance = dist_target;
+                        result.emplace_back(
+                            DistancedPoint{Line(result.back().point, point).point_at(dist_target), total_distance});
+                    }
                 }
-                ++offset;
+                ++dist_idx;
             } else {
                 break;
             }
         }
-        total_distance += current_segment_length;
-        result.emplace_back(DistancedPoint{point, total_distance});
-        previous_point = point;
+        if (total_distance < current_segment_end) {
+            assert(point.distance_to(result.back().point) > SCALED_EPSILON);
+            total_distance = current_segment_end;
+            result.emplace_back(DistancedPoint{point, total_distance});
+        } else {
+            assert(result.back().point == point);
+        }
     }
+    assert(result.back().point == xy_path.back());
     return result;
 }
 
@@ -347,7 +348,7 @@ Points3 generate_elevated_travel(
     for (const DistancedPoint &point : extended_xy_path) {
         result.emplace_back(
             point.point.x(), point.point.y(),
-            scaled(initial_elevation + elevation(point.distance_from_start))
+            scaled(initial_elevation + elevation(unscaled(point.dist_from_start)))
         );
     }
 
@@ -495,7 +496,8 @@ ElevatedTravelParams get_elevated_traval_params(
     const FullPrintConfig &config,
     GCodeWriter writer,
     const GCode::TravelObstacleTracker &obstacle_tracker,
-    size_t layer_id
+    size_t layer_id,
+    double desired_z_lift
 ) {
     ElevatedTravelParams elevation_params{};
     assert(writer.tool());
@@ -509,7 +511,7 @@ ElevatedTravelParams get_elevated_traval_params(
         elevation_params.blend_width = 0;
         return elevation_params;
     }
-    elevation_params.lift_height = config.travel_max_lift.get_at(extruder_id);
+    elevation_params.lift_height = desired_z_lift;
 
     const double slope_deg = config.travel_slope.get_at(extruder_id);
 

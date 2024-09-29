@@ -112,7 +112,7 @@ namespace Slic3r::GCode::Impl::Travels {
 struct DistancedPoint
 {
     Point point;
-    double distance_from_start;
+    coordf_t dist_from_start;
 };
 
 struct ElevatedTravelParams
@@ -172,9 +172,9 @@ private:
  * // notice that 1.5 is omitted
  * @endcode
  */
-std::vector<DistancedPoint> slice_xy_path(
-    tcb::span<const Point> xy_path, tcb::span<const double> sorted_distances
-);
+std::vector<DistancedPoint> slice_xy_path(tcb::span<const Point> xy_path,
+                                          tcb::span<const double> sorted_distances,
+                                          coordf_t min_distance = SCALED_EPSILON * 2);
 
 /**
  * @brief Generate regulary spaced points on 1 axis. Includes both from and to.
@@ -188,7 +188,8 @@ ElevatedTravelParams get_elevated_traval_params(
     const FullPrintConfig &config,
     GCodeWriter writer,
     const GCode::TravelObstacleTracker &obstacle_tracker,
-    size_t layer_id
+    size_t layer_id,
+    double desired_z_lift
 );
 
 /**

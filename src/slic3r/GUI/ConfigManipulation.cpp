@@ -751,9 +751,9 @@ void ConfigManipulation::toggle_printer_fff_options(DynamicPrintConfig *config, 
         //const bool lifts_z = (ramping_lift && config->get_float("travel_max_lift", i) > 0)
         //                  || (! ramping_lift && config->get_float("retract_lift", i) > 0);
 
-        toggle_field("travel_max_lift", ramping_lift, i);
+        //toggle_field("travel_max_lift", ramping_lift, i);
         toggle_field("travel_slope", ramping_lift, i);
-        toggle_field("retract_lift", ! ramping_lift, i); // now possible outside retraction
+        // toggle_field("retract_lift", ! ramping_lift, i);
 
         // when using firmware retraction, firmware decides retraction length
         bool use_firmware_retraction = config->opt_bool("use_firmware_retraction");
