@@ -110,7 +110,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             if (! wiped) {
                 wiped = true;
                 gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
-                gcode += gcodegen.writer().set_speed(wipe_speed.first * 60, gcodegen.config().gcode_comments ? wipe_speed.second? "wipe_speed"sv : "travel_speed * 0.8"sv : ""sv , gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv);
+                gcode += gcodegen.writer().set_speed_mm_s(wipe_speed.first, gcodegen.config().gcode_comments ? wipe_speed.second? "wipe_speed"sv : "travel_speed * 0.8"sv : ""sv , gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv);
             }
         };
         const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer(), extruder.id());

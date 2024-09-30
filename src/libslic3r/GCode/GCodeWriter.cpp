@@ -495,8 +495,8 @@ std::string GCodeWriter::toolchange(uint16_t tool_id)
     return gcode.str();
 }
 
-// !! be careful, prusa pass the F here (mm/min) as parameter, not the speed (mm/s)
-std::string GCodeWriter::set_speed(const double speed, const std::string_view comment, const std::string_view cooling_marker)
+// !! be careful, prusa pass the F in set_speed(mm/min) as parameter, not the speed (mm/s)
+std::string GCodeWriter::set_speed_mm_s(const double speed, const std::string_view comment, const std::string_view cooling_marker)
 {
     const double F = speed * 60;
     m_current_speed = speed;
@@ -509,7 +509,7 @@ std::string GCodeWriter::set_speed(const double speed, const std::string_view co
     return w.string();
 }
 
-double GCodeWriter::get_speed() const
+double GCodeWriter::get_speed_mm_s() const
 {
     return m_current_speed;
 }

@@ -74,9 +74,9 @@ public:
     std::string toolchange_prefix() const;
     std::string toolchange(uint16_t tool_id);
     // in mm/s
-    std::string set_speed(const double speed, const std::string_view comment = {}, const std::string_view cooling_marker = {});
+    std::string set_speed_mm_s(const double speed, const std::string_view comment = {}, const std::string_view cooling_marker = {});
     // in mm/s
-    double      get_speed() const;
+    double      get_speed_mm_s() const;
     std::string travel_to_xy(const Vec2d &point, const double speed = 0.0, const std::string_view comment = {});
     std::string travel_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const bool is_ccw, const double speed, const std::string_view comment);
     std::string travel_to_xyz(const Vec3d &point, bool is_lift, const double speed = 0.0, const std::string_view comment = {});
