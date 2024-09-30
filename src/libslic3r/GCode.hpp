@@ -153,7 +153,7 @@ public:
             return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
                 - m_writer.current_tool_offset();
         } else {
-            assert(false);
+            // assert(false); // called by wipe tower via 'generate_travel_gcode'
             const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
             return to_3d(gcode_point_xy, unscaled(point.z()));
         }
@@ -563,7 +563,7 @@ private:
 
     std::function<void()> m_throw_if_canceled = [](){};
 
-    double                    _compute_e_per_mm(double path_mm3_per_mm);
+    double                    _compute_e_per_mm(const ExtrusionPath &path);
     std::string               _extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);
     void                      _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, ExtrusionRole role);
     void                      _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, Point& last_pos, const double path_width);

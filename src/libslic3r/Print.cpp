@@ -133,6 +133,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "filament_custom_variables",
         "filament_diameter",
         "filament_density",
+        "filament_fill_top_flow_ratio",
+        "filament_first_layer_flow_ratio",
         "filament_load_time",
         "filament_notes",
         "filament_cost",

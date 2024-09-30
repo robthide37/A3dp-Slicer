@@ -3,10 +3,13 @@ page:Filament:spool
 group:filament_spool_weight_event:Filament
 	setting:id$0:filament_colour
 	setting:id$0:filament_diameter
-	setting:id$0:extrusion_multiplier
 	setting:id$0:filament_density
 	setting:id$0:filament_cost
 	setting:id$0:filament_spool_weight
+group:Flow
+	setting:id$0:extrusion_multiplier
+	setting:id$0:filament_fill_top_flow_ratio
+	setting:id$0:filament_first_layer_flow_ratio
 group:Temperature °C
 	line:Extruder
 		setting:id$0:first_layer_temperature

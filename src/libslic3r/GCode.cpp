@@ -4020,7 +4020,7 @@ std::string GCodeGenerator::extrude_loop_vase(const ExtrusionLoop &original_loop
             }
 
             // calculate extrusion length per distance unit
-            double e_per_mm_per_height = _compute_e_per_mm(path->mm3_per_mm());
+            double e_per_mm_per_height = _compute_e_per_mm(*path);
             //extrude
             {
                 std::string_view comment = config().gcode_comments ? description : ""sv;
@@ -5221,7 +5221,7 @@ std::string GCodeGenerator::extrude_multi_path3D(const ExtrusionMultiPath3D &mul
             gcode += this->_before_extrude(path, description, speed);
 
             // calculate extrusion length per distance unit
-            double e_per_mm = _compute_e_per_mm(path.mm3_per_mm());
+            double e_per_mm = _compute_e_per_mm(path);
             double path_length = 0.;
             {
                 std::string_view comment = m_writer.gcode_config().gcode_comments ? description : ""sv;
@@ -5387,7 +5387,7 @@ std::string GCodeGenerator::extrude_path_3D(const ExtrusionPath3D &path, const s
     std::string gcode = this->_before_extrude(simplifed_path, description, speed);
 
     // calculate extrusion length per distance unit
-    double e_per_mm = _compute_e_per_mm(simplifed_path.mm3_per_mm());
+    double e_per_mm = _compute_e_per_mm(simplifed_path);
     double path_length = 0.;
     {
         std::string_view comment = m_config.gcode_comments ? description : ""sv;
@@ -5861,7 +5861,8 @@ void GCodeGenerator::_extrude_line_cut_corner(std::string& gcode_str, const Line
     }
 }
 
-double GCodeGenerator::_compute_e_per_mm(double path_mm3_per_mm) {
+double GCodeGenerator::_compute_e_per_mm(const ExtrusionPath &path) {
+    const double path_mm3_per_mm = path.mm3_per_mm(); 
     // no e if no extrusion axis
     if (m_writer.extrusion_axis().empty() || path_mm3_per_mm <= 0)
         return 0;
@@ -5881,9 +5882,15 @@ double GCodeGenerator::_compute_e_per_mm(double path_mm3_per_mm) {
             assert(e_per_mm > 0);
         }
     }
+    // filament_fill_top_flow_ratio
+    if (path.role() == ExtrusionRole::TopSolidInfill) {
+        e_per_mm *= EXTRUDER_CONFIG_WITH_DEFAULT(filament_fill_top_flow_ratio, 100) * 0.01;
+    }
     // first layer mult
-    if (this->m_layer->bottom_z() < EPSILON)
+    if (this->m_layer->bottom_z() < EPSILON) {
         e_per_mm *= this->config().first_layer_flow_ratio.get_abs_value(1);
+        e_per_mm *= EXTRUDER_CONFIG_WITH_DEFAULT(filament_first_layer_flow_ratio, 100) * 0.01;
+    }
     return e_per_mm;
 }
 
@@ -5901,7 +5908,7 @@ std::string GCodeGenerator::_extrude(const ExtrusionPath &path, const std::strin
     };
 
     // calculate extrusion length per distance unit
-    double e_per_mm = _compute_e_per_mm(path.mm3_per_mm());
+    double e_per_mm = _compute_e_per_mm(path);
     ArcPolyline polyline = path.as_polyline();
     if (polyline.size() > 1) {
         std::string comment = m_config.gcode_comments ? descr : "";

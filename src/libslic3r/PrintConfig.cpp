@@ -1935,6 +1935,30 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionStrings{ "" });
 
+    def = this->add("filament_fill_top_flow_ratio", coPercents);
+    def->label = L("Top fill");
+    def->full_label = L("Top fill flow ratio");
+    def->sidetext = L("%");
+    def->category = OptionCategory::width;
+    def->tooltip = L("You can increase this to over-extrude on the top layer if there is not enough plastic to make a good fill."
+                    "\nThis setting multiply the percentage available in the print setting."
+                    " You should only add the little percentage difference that this filament has versus your main one.");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionPercents{100});
+
+    def = this->add("filament_first_layer_flow_ratio", coPercents);
+    def->label = L("First layer");
+    def->full_label = L("First layer flow ratio");
+    def->sidetext = L("%");
+    def->category = OptionCategory::width;
+    def->tooltip = L("You can increase this to over/under-extrude on the first layer if there is not enough / too many plastic because your bed isn't levelled / flat."
+                    "\nThis setting multiply the percentage available in the print setting."
+                    " You should only add the little percentage difference that this filament has versus your main one.");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionPercents{100});
+
     def = this->add("filament_notes", coStrings);
     def->label = L("Filament notes");
     def->category = OptionCategory::notes;
@@ -9234,6 +9258,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_dip_insertion_speed",
 "filament_enable_toolchange_part_fan",
 "filament_enable_toolchange_temp",
+"filament_fill_top_flow_ratio",
+"filament_first_layer_flow_ratio",
 "filament_max_speed",
 "filament_max_wipe_tower_speed",
 "filament_melt_zone_pause",
