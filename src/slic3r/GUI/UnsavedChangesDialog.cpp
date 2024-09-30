@@ -1438,7 +1438,8 @@ void UnsavedChangesDialog::on_dpi_changed(const wxRect& suggested_rect)
 void UnsavedChangesDialog::on_sys_color_changed()
 {
     for (auto btn : { m_save_btn, m_transfer_btn, m_discard_btn } )
-        btn->sys_color_changed();
+        if (btn) // m_transfer_btn can benullptr
+            btn->sys_color_changed();
     // msw_rescale updates just icons, so use it
     m_tree->Rescale();
 
@@ -2022,7 +2023,8 @@ void DiffPresetDialog::on_sys_color_changed()
     }
 
     for (ScalableButton* btn : { m_transfer_btn, m_save_btn, m_cancel_btn })
-        btn->sys_color_changed();
+        if(btn)
+            btn->sys_color_changed();
 
     // msw_rescale updates just icons, so use it
     m_tree->Rescale();
