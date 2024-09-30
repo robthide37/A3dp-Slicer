@@ -660,18 +660,7 @@ void ConfigManipulation::update_printer_fff_config(DynamicPrintConfig *config,
             is_msg_dlg_already_exist = false;
             max_lh = config->get_computed_value("max_layer_height", extruder_idx);
         }
-        if (max_lh > nozzle_sizes[extruder_idx]) {
-            const wxString msg_text = _(
-                L("Maximum layer height is not valid, it can't be higher than the nozzle diameter.\n\nThe maximum layer height will be set to 100% of the nozzle diameter."));
-            MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Maximum layer height")), wxICON_WARNING | wxOK);
-            DynamicPrintConfig new_conf = *config;
-            is_msg_dlg_already_exist    = true;
-            dialog.ShowModal();
-            new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->set_at(FloatOrPercent{100., true}, extruder_idx);
-            apply(config, &new_conf);
-            max_lh = config->get_computed_value("max_layer_height", extruder_idx);
-            is_msg_dlg_already_exist = false;
-        }
+        // now max_lh > nozzle_size is allowed, but a warning is sent when changed
         if (min_lh >= max_lh) {
             const wxString msg_text = _(
                 L("Minimum layer height is not valid, it can't be higher or equal to the maximum layer height.\n\nThe minimum layer height will be set to 0."));
