@@ -4290,8 +4290,6 @@ void Tab::load_current_preset()
         }
         else {
             on_presets_changed();
-            if ((type() & Preset::TYPE_PRINT1) != 0)
-                update_frequently_changed_parameters();
 
             //update width/spacing links
             if (type() == Preset::TYPE_FFF_PRINT) {
@@ -4307,6 +4305,7 @@ void Tab::load_current_preset()
                 }
             }
         }
+        update_frequently_changed_parameters();
 
         m_opt_status_value = (m_presets->get_selected_preset_parent() ? osSystemValue : 0) | osInitValue;
         init_options_list();
