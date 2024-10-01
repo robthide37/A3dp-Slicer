@@ -2806,7 +2806,7 @@ void PrintObject::replaceSurfaceType(SurfaceType st_to_replace, SurfaceType st_r
                     }
                 }
 
-                for (ExPolygon& ex : union_ex(poly_to_replace)) {
+                for (ExPolygon& ex : ensure_valid(union_ex(poly_to_replace), scaled_resolution)) {
                     ex.assert_valid();
                     new_surfaces.push_back(Surface(st_replacement, ex));
                 }
