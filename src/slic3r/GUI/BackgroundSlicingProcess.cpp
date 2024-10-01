@@ -142,6 +142,8 @@ bool BackgroundSlicingProcess::select_technology(PrinterTechnology tech)
 		}
 		changed = true;
 	}
+	if (tech == ptFFF)
+		m_print = m_fff_print;
 	assert(m_print != nullptr);
 	return changed;
 }

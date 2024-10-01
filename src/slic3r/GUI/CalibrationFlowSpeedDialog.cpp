@@ -444,7 +444,7 @@ void CalibrationFlowSpeedDialog::create_geometry(
     if (true) { //has_to_arrange) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
-            plat->fff_print().apply(plat->model(), *plat->config());
+            plat->active_fff_print().apply(plat->model(), *plat->config());
         Worker &ui_job_worker = plat->get_ui_job_worker();
         plat->arrange(ui_job_worker, false);
         ui_job_worker.wait_for_current_job(20000);

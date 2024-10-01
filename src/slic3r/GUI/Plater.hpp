@@ -180,11 +180,13 @@ public:
     Sidebar& sidebar();
     const Model& model() const;
     Model& model();
-    const Print& fff_print() const;
-    Print& fff_print();
-    const SLAPrint& sla_print() const;
-    SLAPrint& sla_print();
-    const PrintBase* current_print() const;
+    //const Print& fff_print() const;
+    //Print& fff_print();
+    //const SLAPrint& sla_print() const;
+    //SLAPrint& sla_print();
+    
+    Print& active_fff_print();
+    SLAPrint& active_sla_print();
 
     bool new_project(std::string project_name = "");
     void load_project();
