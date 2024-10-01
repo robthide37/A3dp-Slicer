@@ -6424,7 +6424,7 @@ void PrintConfigDef::init_fff_params()
         "expected to take care of the toolchange yourself - Slic3r will not output any other G-code to "
         "change the filament. You can use placeholder variables for all Slic3r settings as well as {toolchange_z}, {layer_z}, {layer_num}, {max_layer_z}, {previous_extruder} "
         "and {next_extruder}, so e.g. the standard toolchange command can be scripted as T{next_extruder}."
-        "!! Warning !!: if any character is written here, Slic3r won't output any toochange command by itself.");
+        "!! Warning !!: if any character is written here, Slic3r won't output any toolchange command by itself.");
     def->multiline = true;
     def->full_width = true;
     def->height = 5;
@@ -8822,7 +8822,7 @@ bool PrintConfigDef::is_defined(t_config_option_key &opt_key) { return print_con
 std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf) {
     std::map<std::string, std::string> output;
     if ("toolchange_gcode" == opt_key) {
-        if (!value.empty() && value.find("T{next_extruder}") == std::string::npos && value.find("T[next_extruder]") == std::string::npos) {
+        if (!value.empty() && value.find("T") == std::string::npos) {
             value = "T{next_extruder}\n" + value;
         }
     }
