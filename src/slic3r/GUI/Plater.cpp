@@ -4243,11 +4243,17 @@ void Plater::priv::set_current_panel(wxTitledPanel* panel)
     bool force_render = (current_panel != nullptr);
 #endif // __WXMAC__
 
-    if (current_panel == panel)
-        return;
+    if (current_panel == panel) {
+        if (!s_reload_preview_after_switching_beds)
+            return;
+        else
+            s_reload_preview_after_switching_beds = false;
+    }
 
     wxTitledPanel* old_panel = current_panel;
     current_panel = panel;
+
+    
     // to reduce flickering when changing view, first set as visible the new current panel
     for (wxPanel* p : panels) {
         if (p == current_panel) {
