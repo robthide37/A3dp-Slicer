@@ -968,6 +968,9 @@ struct OpenPolyline {
 // Only connects segments crossing triangles of the same orientation.
 static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polygons &loops, std::vector<OpenPolyline> &open_polylines)
 {
+    for(auto &loop : loops)
+        assert(!loop.points.front().coincides_with(loop.points.back()));
+
     // Build a map of lines by edge_a_id and a_id.
     std::vector<IntersectionLine*> by_edge_a_id;
     std::vector<IntersectionLine*> by_a_id;
@@ -1048,10 +1051,13 @@ static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polyg
                         if (loop_pts.size() > 3) {
                             loop_pts.pop_back();
                             assert(!loop_pts.front().coincides_with(loop_pts.back()));
+    for(auto &loop : loops)
+        assert(!loop.points.front().coincides_with(loop.points.back()));
                             loops.emplace_back(std::move(loop_pts));
                         }
                     } else {
-                        assert(!loop_pts.front().coincides_with(loop_pts.back()));
+    for(auto &loop : loops)
+        assert(!loop.points.front().coincides_with(loop.points.back()));
                         loops.emplace_back(std::move(loop_pts));
                     }
                     #ifdef SLIC3R_TRIANGLEMESH_DEBUG
@@ -1654,7 +1660,7 @@ static ExPolygons make_expolygons_simple(IntersectionLines &lines)
     return slices;
 }
 
-static void make_expolygons(const Polygons &loops, const coord_t closing_radius, const coord_t model_precision, const coord_t extra_offset, ClipperLib::PolyFillType fill_type, ExPolygons* slices)
+static void make_expolygons(const Polygons &loops, const coord_t closing_radius, const coord_t model_precision, const coord_t extra_offset, ClipperLib::PolyFillType fill_type, ExPolygons* slices, int layer_id)
 {
     /*
         Input loops are not suitable for evenodd nor nonzero fill types, as we might get
