@@ -78,6 +78,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/miniz_extension.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 
 // For stl export
 #include "libslic3r/CSGMesh/ModelToCSGMesh.hpp"
@@ -3526,9 +3527,16 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
     background_process_timer.Stop();
     // Update the "out of print bed" state of ModelInstances.
     update_print_volume_state();
+
+    // Move all instances according to their active bed:
+    s_multiple_beds.move_active_to_first_bed(q->model(), q->build_volume(), true);
+
     // Apply new config to the possibly running background task.
     bool               was_running = background_process.running();
     Print::ApplyStatus invalidated = background_process.apply(q->model(), full_config, wxGetApp().preset_bundle->physical_printers.get_selected_printer_config());
+
+    // Move all instances back to their respective beds.
+    s_multiple_beds.move_active_to_first_bed(q->model(), q->build_volume(), false);
 
     // Just redraw the 3D canvas without reloading the scene to consume the update of the layer height profile.
     if (view3D->is_layers_editing_enabled())
