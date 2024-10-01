@@ -6214,10 +6214,12 @@ double_t GCodeGenerator::_compute_speed_mm_per_sec(const ExtrusionPath& path, co
         if(comment) *comment = "max_print_speed";
     }
     // Apply small perimeter 'modifier
-    //  don't modify bridge speed
-    if (factor < 1 && !path.role().is_bridge()) {
+    // Don't modify bridge speed
+    // modify overhang if it means slow down.
+    if (factor < 1 && (!path.role().is_bridge() || path.role().is_overhang())) {
         float small_speed = (float)m_config.small_perimeter_speed.get_abs_value(m_config.get_computed_value("perimeter_speed"));
-        if (small_speed > 0) {
+        // modify overhang if it means slow down.
+        if (small_speed > 0 && (!path.role().is_overhang() || small_speed < speed)) {
             // apply factor between feature speed and small speed
             speed = (speed * factor) + double((1.f - factor) * small_speed);
             if(comment) *comment += ", reduced by small_perimeter_speed";
