@@ -322,7 +322,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
         }
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, zs_complex.size()),
-            [&slices_by_region, &print_object_regions, &zs_complex, &layer_ranges_regions_to_slices, &throw_on_cancel_callback]
+            [&slices_by_region, &print_object_regions, &zs_complex, &layer_ranges_regions_to_slices, &print_config, &print_object, &throw_on_cancel_callback]
                 (const tbb::blocked_range<size_t> &range) {
                 float z              = zs_complex[range.begin()].second;
                 auto  it_layer_range = layer_range_first(print_object_regions.layer_ranges, z);
@@ -355,7 +355,11 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                             temp_slices.push_back({ std::move(slices->slices[z_idx]), volume_region.region ? volume_region.region->print_object_region_id() : -1, volume_region.model_volume->id() });
                         }
                     }
-                    for (int idx_region = 0; idx_region < int(layer_range.volume_regions.size()); ++ idx_region)
+
+                    double max_slice_closing_radius = print_object.config().slice_closing_radius; //0;
+                    // get slice for each region
+                    for (int idx_region = 0; idx_region < int(layer_range.volume_regions.size()); ++ idx_region) {
+                        //max_slice_closing_radius = std::max(max_slice_closing_radius, print_object_regions.all_regions[idx_region]->config().slice_closing_radius.value; //for when slice_closing_radius will be in region
                         if (! temp_slices[idx_region].expolygons.empty()) {
                             const PrintObjectRegions::VolumeRegion &region = layer_range.volume_regions[idx_region];
                             if (region.model_volume->is_modifier()) {
@@ -363,7 +367,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                                 bool next_region_same_modifier = idx_region + 1 < int(temp_slices.size()) && layer_range.volume_regions[idx_region + 1].model_volume == region.model_volume;
                                 RegionSlice &parent_slice = temp_slices[region.parent];
                                 RegionSlice &this_slice   = temp_slices[idx_region];
-                                ExPolygons   source       = std::move(this_slice.expolygons);
+                                ExPolygons   source       = this_slice.expolygons;
                                 if (parent_slice.expolygons.empty()) {
                                     this_slice  .expolygons.clear();
                                 } else {
@@ -375,14 +379,66 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                                     temp_slices[idx_region + 1].expolygons = std::move(source);
                             } else if (region.model_volume->is_model_part() || region.model_volume->is_negative_volume()) {
                                 // Clip every non-zero region preceding it.
-                                for (int idx_region2 = 0; idx_region2 < idx_region; ++ idx_region2)
+                                for (int idx_region2 = 0; idx_region2 < idx_region; ++ idx_region2) {
                                     if (! temp_slices[idx_region2].expolygons.empty()) {
                                         if (const PrintObjectRegions::VolumeRegion &region2 = layer_range.volume_regions[idx_region2];
                                             ! region2.model_volume->is_negative_volume() && overlap_in_xy(*region.bbox, *region2.bbox))
                                             temp_slices[idx_region2].expolygons = diff_ex(temp_slices[idx_region2].expolygons, temp_slices[idx_region].expolygons);
                                     }
+                                }
                             }
                         }
+                    }
+                    //gap closing: also between volumes
+                    // note: it needs to already have good clipped expolygons for each region, so nobody 'steal' area from another.
+                    if (layer_range.volume_regions.size() > 1 && max_slice_closing_radius > 0) {
+                        // if slice gap closing raduis & multiple region, then we need a clipping master
+                        ExPolygons clip_master;
+                        for (size_t idx_region = 0; idx_region < layer_range.volume_regions.size(); ++idx_region) {
+                            append(clip_master, temp_slices[idx_region].expolygons);
+                        }
+                        clip_master = union_ex(clip_master);
+                        // do the gap closing for the master (it's a simple one, use the max_slice_closing_radius
+                        // instead of doing it separatly for each region, as this would be very complicated).
+                        clip_master = offset2_ex(clip_master, scale_d(max_slice_closing_radius), -scale_d(max_slice_closing_radius));
+                        ensure_valid(clip_master, std::max(scale_t(print_config.resolution.value), SCALED_EPSILON));
+
+                        // // for when slice_closing_radius will be in region
+                        // // can redo the grow to allow a region to go into its neighbor without the neighbor growing.
+                        //ExPolygons unclip_master = clip_master;
+                        //int iter = 0;
+                        //while (!unclip_master.empty() && iter < 2) {
+                            // now grow & clip the polygons of each region (the biggest region id has the priority, so
+                            // we began by it)
+                            for (size_t idx_region = layer_range.volume_regions.size() - 1; idx_region < layer_range.volume_regions.size(); --idx_region) {
+                                if (!temp_slices[idx_region].expolygons.empty()) {
+                                    ExPolygons &region_expolys = temp_slices[idx_region].expolygons;
+                                    //region_expolys = offset_ex(region_expolys, scale_d(print_object_regions.all_regions[idx_region]->config().slice_closing_radius.value)); // for when slice_closing_radius will be in region
+                                    region_expolys = offset_ex(region_expolys, scale_d(print_object.config().slice_closing_radius));
+                                    // now clip it by clip_master
+                                    region_expolys = intersection_ex(region_expolys, clip_master);
+                                    // now remove parts from the other regions
+                                    for (size_t idx_region2 = 0; idx_region2 < layer_range.volume_regions.size(); ++idx_region2) {
+                                        if (!temp_slices[idx_region2].expolygons.empty() && idx_region != idx_region2) {
+                                            region_expolys = diff_ex(region_expolys, temp_slices[idx_region2].expolygons);
+                                        }
+                                    }
+                                    // we now have our final poly for this region
+                                    // FIXME: this may have make it grows outside of a modifier box, but parent_slice.expolygons is already modified.
+                                    //        test if you can create the issue & then resolve it.
+                                    ensure_valid(region_expolys, std::max(scale_t(print_config.resolution.value), SCALED_EPSILON));
+                                    // // for when slice_closing_radius will be in region
+                                    // // to verify there is no holes from different max_slice_closing_radius
+                                    //unclip_master = diff_ex(unclip_master, region_expolys);
+                                }
+                            }
+                        // // for when slice_closing_radius will be in region
+                        //    // remove artifacts
+                        //    unclip_master = offset2_ex(unclip_master, -SACLED_EPSILON * 5, SCALED_EPSILON * 5);
+                        //    iter++
+                        //}
+                    }
+
                     // Sort by region_id, push empty slices to the end.
                     std::sort(temp_slices.begin(), temp_slices.end());
                     // Remove the empty slices.
