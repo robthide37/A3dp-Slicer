@@ -698,8 +698,14 @@ class ExtrusionModifyFlow : public ExtrusionVisitorRecursive {
 public:
     using ExtrusionVisitorRecursive::use;
     ExtrusionModifyFlow(double flow_mult) : _flow_mult(flow_mult) {}
-    void use(ExtrusionPath &path) override { path.attributes_mutable().mm3_per_mm *= _flow_mult; path.attributes_mutable().width *= _flow_mult; }
-    void use(ExtrusionPath3D &path3D) override { path3D.attributes_mutable().mm3_per_mm *= _flow_mult; path3D.attributes_mutable().width *= _flow_mult; }
+    void use(ExtrusionPath &path) override {
+        path.attributes_mutable().mm3_per_mm *= _flow_mult;
+        path.attributes_mutable().width *= _flow_mult;
+    }
+    void use(ExtrusionPath3D &path3D) override {
+        path3D.attributes_mutable().mm3_per_mm *= _flow_mult;
+        path3D.attributes_mutable().width *= _flow_mult;
+    }
     void set(ExtrusionEntityCollection &coll);
 };
 

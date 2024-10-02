@@ -85,8 +85,8 @@ FillConcentric::_fill_surface_single(
 }
 
 void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRole& good_role, const FillParams& params, Polygon& polygon) {
-    double flow = params.flow.mm3_per_mm() * params.flow_mult;
-    double width = params.flow.width() * params.flow_mult;
+    double flow = params.flow.mm3_per_mm();
+    double width = params.flow.width();
     double height = params.flow.height();
     if (polygon.is_valid()) {
         //default to ccw
@@ -425,8 +425,8 @@ FillConcentricWGapFill::fill_surface_extrusion(
     }
 
     // check volume coverage
-    {
-        double flow_mult_exact_volume = 1;
+    if (!out_to_check.empty()) {
+        double mult_flow = 1;
         // check if not over-extruding
         if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
             // compute the path of the nozzle -> extruded volume
@@ -438,18 +438,23 @@ FillConcentricWGapFill::fill_surface_extrusion(
             // compute real volume to fill
             double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
             if (get_volume.volume != 0 && polyline_volume != 0)
-                flow_mult_exact_volume = polyline_volume / get_volume.volume;
+                mult_flow = polyline_volume / get_volume.volume;
             // failsafe, it can happen
-            if (flow_mult_exact_volume > 1.3)
-                flow_mult_exact_volume = 1.3;
-            if (flow_mult_exact_volume < 0.8)
-                flow_mult_exact_volume = 0.8;
+            if (mult_flow > 1.3)
+                mult_flow = 1.3;
+            if (mult_flow < 0.8)
+                mult_flow = 0.8;
             BOOST_LOG_TRIVIAL(info) << "concentric Infill (with gapfil) process extrude " << get_volume.volume
                                     << " mm3 for a volume of " << polyline_volume << " mm3 : we mult the flow by "
-                                    << flow_mult_exact_volume;
-            //apply to extrusions
-            ExtrusionModifyFlow modifier(flow_mult_exact_volume);
-            for (ExtrusionEntity *ee : out_to_check) ee->visit(modifier);
+                                    << mult_flow;
+        }
+        mult_flow *= params.flow_mult;
+        if (mult_flow != 1) {
+            // apply to extrusions
+            ExtrusionModifyFlow visitor(mult_flow);
+            for (ExtrusionEntity *ee : out_to_check) {
+                ee->visit(visitor);
+            }
         }
     }
 

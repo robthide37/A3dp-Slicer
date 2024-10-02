@@ -58,7 +58,7 @@ struct FillParams
     // bridge offset from the centerline. (scaled)
     coord_t       bridge_offset = -1;
 
-    // Fill extruding flow multiplier, fraction in <0, 1>. Used by "over bridge compensation"
+    // Fill extruding flow multiplier, fraction in <0, 1>. Used by various flow ratio (top, bot, over-bridges), this is applied after the fill_exactly's flow compensation.
     float       flow_mult   { 1.0f };
 
     // Don't connect the fill lines around the inner perimeter.
