@@ -1555,7 +1555,8 @@ bool PresetCollection::delete_preset(const std::string& name)
     m_presets.erase(it);
 
     // update selected preset
-    this->select_preset_by_name(selected_preset_name, true);
+    // // supermerill: why reloading our preset? 
+    //this->select_preset_by_name(selected_preset_name, true);
 
     return true;
 }
