@@ -200,6 +200,9 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
         // Start with the current position, which may be different from the wipe path start in case of loop clipping.
         Vec2d prev = gcodegen.point_to_gcode_quantized(gcodegen.last_pos());
         auto  it   = this->path().begin();
+        if (gcodegen.last_pos().coincides_with_epsilon(it->point)) {
+            ++it;
+        }
         Vec2d p    = gcodegen.point_to_gcode(it->point + m_offset);
         ++ it;
         bool done = false;
