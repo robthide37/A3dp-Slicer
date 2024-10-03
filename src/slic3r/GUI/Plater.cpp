@@ -3467,8 +3467,8 @@ void Plater::priv::scale_selection_to_fit_print_volume()
 void Plater::priv::schedule_background_process()
 {
     delayed_error_message.clear();
-    // Trigger the timer event after 0.5s
-    this->background_process_timer.Start(500, wxTIMER_ONE_SHOT);
+    // Trigger the timer event after 0.1s
+    this->background_process_timer.Start(100, wxTIMER_ONE_SHOT);
     // Notify the Canvas3D that something has changed, so it may invalidate some of the layer editing stuff.
     this->view3D->get_canvas3d()->set_config(this->config);
 }
@@ -4790,7 +4790,8 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
         if (evt.data.second) { // right button was clicked on empty space
             if (!get_selection().is_empty()) // several objects are selected in 3DScene
                 return;
-            menu = menus.default_menu();
+            if (s_multiple_beds.get_last_hovered_bed() != -1)
+                menu = menus.default_menu();
         }
         else
             menu = menus.multi_selection_menu();
