@@ -3054,8 +3054,8 @@ public:
     template<typename ENUM>
     ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->get_int()); }
 
-    bool                opt_bool(const t_config_option_key &opt_key) const                      { return this->option<ConfigOptionBool>(opt_key)->value; }
-    bool                opt_bool(const t_config_option_key &opt_key, size_t idx) const          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx) != 0; }
+    bool                opt_bool(const t_config_option_key &opt_key) const                      { auto opt = this->option<ConfigOptionBool>(opt_key); assert(opt); return opt->value;  }
+    bool                opt_bool(const t_config_option_key &opt_key, size_t idx) const          { auto opt = this->option<ConfigOptionBools>(opt_key); assert(opt); return opt->get_at(idx) != 0; }
     //bool&               opt_bool(const t_config_option_key &opt_key)                            { return this->option<ConfigOptionBool>(opt_key)->value; }
     //uint8_t&            opt_bool(const t_config_option_key &opt_key, size_t idx)          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx); }
 

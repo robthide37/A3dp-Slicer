@@ -4090,7 +4090,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
         this->throw_if_canceled();
         // Add perimeters on overhangs : initialization
         ExPolygons overhangs_unsupported;
-        if ((/*params.config.extra_perimeters_overhangs || */(params.config.overhangs_reverse && params.layer->id() % 2 == 1))
+        if ((/*params.config.extra_perimeters_on_overhangs || */(params.config.overhangs_reverse && params.layer->id() % 2 == 1))
             && !last.empty() && this->lower_slices != NULL && !this->lower_slices->empty()) {
             //remove holes from lower layer, we only ant that for overhangs, not bridges!
             ExPolygons lower_without_holes;
@@ -4156,7 +4156,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             // We can add more perimeters if there are uncovered overhangs
             // improvement for future: find a way to add perimeters only where it's needed.
             bool has_overhang = false;
-            // if (params.config.extra_perimeters_overhangs && !last.empty() && !overhangs_unsupported.empty()) {
+            // if (params.config.extra_perimeters_on_overhangs && !last.empty() && !overhangs_unsupported.empty()) {
                 // overhangs_unsupported = intersection_ex(overhangs_unsupported, last, ApplySafetyOffset::Yes);
                 // if (overhangs_unsupported.size() > 0) {
                     // //please don't stop adding perimeter yet.

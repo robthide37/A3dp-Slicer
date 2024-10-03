@@ -1276,7 +1276,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "bridged_infill_margin"
                 || opt_key == "extra_perimeters"
                 || opt_key == "extra_perimeters_odd_layers"
-                || opt_key == "extra_perimeters_overhangs"
+                || opt_key == "extra_perimeters_on_overhangs"
                 || opt_key == "external_infill_margin"
                 || opt_key == "external_perimeter_overlap"
                 || opt_key == "gap_fill_overlap"

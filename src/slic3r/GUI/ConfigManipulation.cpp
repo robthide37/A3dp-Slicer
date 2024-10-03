@@ -85,7 +85,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         // && config->opt_bool("exact_last_layer_height") == false
         && config->opt_bool("infill_dense") == false
         && config->opt_bool("extra_perimeters") == false
-        && config->opt_bool("extra_perimeters_overhangs") == false
+        && config->opt_bool("extra_perimeters_on_overhangs") == false
         && config->opt_bool("extra_perimeters_odd_layers") == false
         && config->opt_bool("overhangs_reverse") == false
         && config->opt_bool("gap_fill_last") == false
@@ -134,8 +134,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("infill_dense", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("extra_perimeters"))
                 new_conf.set_key_value("extra_perimeters", new ConfigOptionBool(false));
-            else if (this->local_config->get().optptr("extra_perimeters_overhangs"))
-                new_conf.set_key_value("extra_perimeters_overhangs", new ConfigOptionBool(false));
+            else if (this->local_config->get().optptr("extra_perimeters_on_overhangs"))
+                new_conf.set_key_value("extra_perimeters_on_overhangs", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("extra_perimeters_odd_layers"))
                 new_conf.set_key_value("extra_perimeters_odd_layers", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("overhangs_reverse"))
@@ -162,7 +162,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             // new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
             new_conf.set_key_value("infill_dense", new ConfigOptionBool(false));
             new_conf.set_key_value("extra_perimeters", new ConfigOptionBool(false));
-            new_conf.set_key_value("extra_perimeters_overhangs", new ConfigOptionBool(false));
+            new_conf.set_key_value("extra_perimeters_on_overhangs", new ConfigOptionBool(false));
             new_conf.set_key_value("extra_perimeters_odd_layers", new ConfigOptionBool(false));
             new_conf.set_key_value("overhangs_reverse", new ConfigOptionBool(false));
             new_conf.set_key_value("gap_fill_last", new ConfigOptionBool(false));
@@ -370,7 +370,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     toggle_field("perimeter_bonding", config->opt_bool("external_perimeters_first") && !have_arachne && config->option("perimeter_overlap")->get_float() == 100.f && config->option("external_perimeter_overlap")->get_float() == 100.f);
 
-    for (auto el : {"perimeter_loop", "extra_perimeters_overhangs",
+    for (auto el : {"perimeter_loop", "extra_perimeters_on_overhangs",
         "thin_perimeters", "perimeter_round_corners"})
         toggle_field(el, have_perimeters && !have_arachne);
     
