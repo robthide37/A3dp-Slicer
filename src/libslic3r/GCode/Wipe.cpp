@@ -103,21 +103,11 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
     }
     retract_length = extruder.retract_to_go(retract_length);
     if (retract_length > 0 && this->has_path()) {
-        // Delayed emitting of a wipe start tag.
-        bool wiped = false;
-        std::pair<double, bool> wipe_speed = this->calc_wipe_speed(gcodegen.writer());
-        auto start_wipe = [&wiped, &gcode, &gcodegen, &wipe_speed](){
-            if (! wiped) {
-                wiped = true;
-                gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
-                gcode += gcodegen.writer().set_speed_mm_s(wipe_speed.first, gcodegen.config().gcode_comments ? wipe_speed.second? "wipe_speed"sv : "travel_speed * 0.8"sv : ""sv , gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv);
-            }
-        };
         const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer(), extruder.id());
         auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e, use_firmware_retract](const Vec2d &prev_quantized, Vec2d &p) {
             Vec2d  p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(p);
             if (p_quantized == prev_quantized) {
-                p = p_quantized; // keep old prev
+                p = prev_quantized; // keep old prev
                 return false;
             }
             double segment_length = (p_quantized - prev_quantized).norm();
@@ -129,7 +119,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                     precision = std::max(precision, gcodegen.config().resolution.value);
                 }
                 if (segment_length < precision) {
-                    p = p_quantized; // keep old prev
+                    p = prev_quantized; // keep old prev
                     return false;
                 }
             }
@@ -137,16 +127,28 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             double dE = gcodegen.writer().get_default_gcode_formatter().quantize_e(xy_to_e * segment_length);
             bool   done = false;
             if (dE > retract_length - EPSILON) {
-                if (dE > retract_length + EPSILON)
+                if (dE > retract_length + EPSILON) {
                     // Shorten the segment.
-                    p = gcodegen.writer().get_default_gcode_formatter().quantize(Vec2d(prev_quantized + (p - prev_quantized) * (retract_length / dE)));
-                else
-                    p = p_quantized;
+                    p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(
+                        Vec2d(prev_quantized + (p - prev_quantized) * (retract_length / dE)));
+                    // test if the shorten segment isn't too short
+                    if (p_quantized == prev_quantized) {
+                        if (!use_firmware_retract) {
+                            // add it as missing extrusion to push through as soon as possible.
+                            gcodegen.writer().add_de_delayed(retract_length);
+                        }
+                        // too small to print, finish the wipe right now.
+                        p = p_quantized;
+                        return true;
+                    }
+                }
                 dE   = retract_length;
                 done = true;
-            } else
-                p = p_quantized;
-            gcode += gcodegen.writer().extrude_to_xy(p, use_firmware_retract?0:-dE, wipe_retract_comment);
+            }
+            p = p_quantized;
+            std::cout<<"wipe to "<<p.x()<<":"<<p.y()<<", de="<<dE<<"\n";
+            assert(p.x() != gcodegen.writer().get_position().x() || p.y() != gcodegen.writer().get_position().y());
+            gcode += gcodegen.writer().extrude_to_xy(p, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
             retract_length -= dE;
             return done;
         };
@@ -154,7 +156,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             const Vec2d &prev_quantized, Vec2d &p, double radius_in, const bool ccw) {
             Vec2d  p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(p);
             if (p_quantized == prev_quantized) {
-                p = p_quantized;
+                p = prev_quantized; // keep old prev
                 return false;
             }
             // Use the exact radius for calculating the IJ values, no quantization.
@@ -175,14 +177,12 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                     angle = Geometry::ArcWelder::arc_angle(prev_quantized.cast<double>(), p.cast<double>(), double(radius));
                     segment_length = angle * std::abs(radius);
                     dE = xy_to_e * segment_length;
-                    p = gcodegen.writer().get_default_gcode_formatter().quantize(
+                    p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(
                             Vec2d(center + Eigen::Rotation2D((ccw ? angle : -angle) * (retract_length / dE)) * (prev_quantized - center)));
-                } else
-                    p = p_quantized;
+                }
                 dE   = retract_length;
                 done = true;
-            } else
-                p = p_quantized;
+            }
             assert(dE > 0);
             {
                 // Calculate quantized IJ circle center offset.
@@ -190,51 +190,52 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                 if (ij == Vec2d::Zero())
                     // Degenerated arc after quantization. Process it as if it was a line segment.
                     return wipe_linear(prev_quantized, p);
+                // use quantized version
+                p = p_quantized;
                 // The arc is valid.
-                gcode += gcodegen.writer().extrude_arc_to_xy(
-                    p, ij, ccw, use_firmware_retract?0:-dE, wipe_retract_comment);
+                gcode += gcodegen.writer().extrude_arc_to_xy(p, ij, ccw, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
             }
             retract_length -= dE;
             return done;
         };
         // Start with the current position, which may be different from the wipe path start in case of loop clipping.
         Vec2d prev = gcodegen.point_to_gcode_quantized(gcodegen.last_pos());
+#ifdef _DEBUG
+        for (size_t i = 1; i < path().size(); ++i) {
+            assert(!path()[i - 1].point.coincides_with_epsilon(path()[i].point));
+        }
+#endif
         auto  it   = this->path().begin();
-        if (gcodegen.last_pos().coincides_with_epsilon(it->point)) {
-            ++it;
-        }
-        Vec2d p    = gcodegen.point_to_gcode(it->point + m_offset);
-        ++ it;
-        bool done = false;
-        if (p != prev) {
-            start_wipe();
-            done = wipe_linear(prev, p);
-        }
-        if (! done) {
-            prev = p;
-            auto end = this->path().end();
-            for (; it != end; ++ it) {
-                p = gcodegen.point_to_gcode(it->point + m_offset);
-                if (p != prev) {
-                    start_wipe();
-                    if (it->linear() ?
-                        wipe_linear(prev, p) :
-                        wipe_arc(prev, p, unscaled<double>(it->radius), it->ccw()))
-                        break;
-                    prev = p;
-                }
+        Vec2d p;
+        auto end = this->path().end();
+        for (; it != end; ++it) {
+            p = gcodegen.point_to_gcode(it->point + m_offset);
+            // wipe_xxx check itself if prev == p (with quantization)
+            ;
+            if (it->linear() ? wipe_linear(prev, p) : wipe_arc(prev, p, unscaled<double>(it->radius), it->ccw())) {
+                break;
             }
+            // wipe has updated p into quantized-prev point for next loop
+            prev = p;
         }
-        if (wiped) {
-            // add tag for processor
-            assert(p == gcodegen.writer().get_default_gcode_formatter().quantize(p));
-            gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
-            gcodegen.set_last_pos(gcodegen.gcode_to_point(p));
-        }
+        // set new current point in gcodegen
+        auto pq = gcodegen.writer().get_default_gcode_formatter().quantize(p);
+        assert(p == gcodegen.writer().get_default_gcode_formatter().quantize(p));
+        gcodegen.set_last_pos(gcodegen.gcode_to_point(p));
     }
 
     // Prevent wiping again on the same path.
     this->reset_path();
+    if (!gcode.empty()) {
+        std::pair<double, bool> wipe_speed = this->calc_wipe_speed(gcodegen.writer());
+        // Delayed emitting of a wipe start tag.
+        gcode = std::string(";") + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + std::string("\n")
+        // Delayed emitting of a wipe speed.
+            + gcodegen.writer().set_speed_mm_s(wipe_speed.first, gcodegen.config().gcode_comments ? wipe_speed.second? "wipe_speed"sv : "travel_speed * 0.8"sv : ""sv , gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv)
+            + gcode;
+        // add tag for processor
+        gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
+    }
     return gcode;
 }
 
