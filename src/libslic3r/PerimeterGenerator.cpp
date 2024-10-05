@@ -5158,13 +5158,14 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
                 poly_after.set_front(pt_front);
             }
             // same for first_part
-            if (first_part.size() > 1 && first_part.back().coincides_with_epsilon(first_part.get_point(first_part.size() - 2))) {
+            if (first_part.size() > 2 && first_part.back().coincides_with_epsilon(first_part.get_point(first_part.size() - 2))) {
                 Point pt_back = first_part.back();
                 first_part.pop_back();
                 first_part.set_back(pt_back);
             }
             assert(first_part.size() == 2 || first_part.is_valid());
             assert(poly_after.size() == 2 || poly_after.is_valid());
+            assert(first_part.length() > SCALED_EPSILON || poly_after.length() > SCALED_EPSILON);
 
             size_t idx_path_before = searcher.search_result.idx_path;
             size_t idx_path_to_add = idx_path_before + 1;
@@ -5175,9 +5176,10 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
                 assert(first_part.size() == 2);
                 assert(searcher.search_result.loop->paths.size() > 1);
                 //not long enough, move point to first point and destroy it
+                // idx_path_before will be replaced anyway by poly_after
                 assert(!searcher.search_result.loop->paths[idx_path_before].empty());
-                point = searcher.search_result.loop->paths[idx_path_before].last_point();
-                assert(first_part.front().coincides_with_epsilon(poly_after.back()));
+                point = searcher.search_result.loop->paths[idx_path_before].first_point();
+                assert(first_part.front().coincides_with_epsilon(poly_after.front()));
                 poly_after.set_front(first_part.front());
                 first_part.clear();
                 point_moved = true;
@@ -5202,8 +5204,16 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
                 point_moved = true;
             } else {
                 assert(poly_after.length() > SCALED_EPSILON);
-                searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add, 
-                    ExtrusionPath(poly_after, path_to_split.attributes(), path_to_split.can_reverse()));
+                if (first_part.empty()) {
+                    searcher.search_result.loop->paths[idx_path_before].polyline = poly_after;
+                    idx_path_to_add--;
+                    assert(idx_path_to_add < searcher.search_result.loop->paths.size());
+                    if (idx_path_to_add >= searcher.search_result.loop->paths.size())
+                        idx_path_to_add = searcher.search_result.loop->paths.size() - 1;
+                } else {
+                    searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add, 
+                        ExtrusionPath(poly_after, path_to_split.attributes(), path_to_split.can_reverse()));
+                }
             }
             assert(idx_path_before > searcher.search_result.loop->paths.size() || searcher.search_result.loop->paths[idx_path_before].polyline.size() > 1);
             assert(poly_after.size() > 0);
@@ -5251,10 +5261,14 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
                 change_flow.first_point = &poly_after.front(); // end at the start of the next path
                 change_flow.percent_extrusion = 0.1f;
                 change_flow.use(tws); // tws_second); //does not need the deep copy if the change_flow copy the content instead of re-using it.
-                //force reverse
+                // force reverse
                 for (ExtrusionPath &path : change_flow.paths)
                     path.reverse();
                 std::reverse(change_flow.paths.begin(), change_flow.paths.end());
+                size_t idx_path_to_add_after = idx_path_to_add < searcher.search_result.loop->paths.size() ?
+                    idx_path_to_add :
+                    searcher.search_result.loop->paths.size() - 1;
+                assert(searcher.search_result.loop->paths[idx_path_to_add_after].polyline.front() == change_flow.paths.back().polyline.back());
                 //std::reverse(change_flow.paths.begin(), change_flow.paths.end());
                 searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add,
                     change_flow.paths.begin(), change_flow.paths.end()); //TODO 2.7:change role by a kind of thinwalltravel that won't be considered for seam
@@ -5267,6 +5281,10 @@ void PerimeterGenerator::_merge_thin_walls(const Parameters &params, ExtrusionEn
                 for (ExtrusionPath &path : change_flow.paths)
                     path.visit(loop_assert_visitor);
 #endif
+                size_t idx_path_to_add_before = (idx_path_to_add - 1) < searcher.search_result.loop->paths.size() ?
+                    (idx_path_to_add - 1) :
+                    searcher.search_result.loop->paths.size() - 1;
+                assert(searcher.search_result.loop->paths[idx_path_to_add_before].polyline.back() == change_flow.paths.front().polyline.front());
                 searcher.search_result.loop->paths.insert(searcher.search_result.loop->paths.begin() + idx_path_to_add,
                     change_flow.paths.begin(), change_flow.paths.end());
 #if _DEBUG
