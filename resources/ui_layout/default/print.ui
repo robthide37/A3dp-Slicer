@@ -444,10 +444,6 @@ group:Extrusion width
 		setting:sidetext_width$10:label$width:extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:extrusion_spacing
 	end_line
-	line:first layer
-		setting:sidetext_width$10:label$width:first_layer_extrusion_width
-		setting:sidetext_width$10:label_width$15:label$spacing:first_layer_extrusion_spacing
-	end_line
 	line:perimeter
 		setting:sidetext_width$10:label$width:perimeter_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:perimeter_extrusion_spacing
@@ -477,6 +473,14 @@ group:Extrusion width
 	end_line
 	line:skirt
 		setting:sidetext_width$10:label$width:skirt_extrusion_width
+	end_line
+	line:first layer
+		setting:sidetext_width$10:label$width:first_layer_extrusion_width
+		setting:sidetext_width$10:label_width$15:label$spacing:first_layer_extrusion_spacing
+	end_line
+	line:first layer Infill
+		setting:sidetext_width$10:label$width:first_layer_infill_extrusion_width
+		setting:sidetext_width$10:label_width$15:label$spacing:first_layer_infill_extrusion_spacing
 	end_line
 	recommended_extrusion_width_description
 group:Overlap

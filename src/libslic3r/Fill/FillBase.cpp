@@ -247,10 +247,9 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 all_new_paths->set_can_sort_reverse(false, false);
             thick_polylines.clear();
 
-
             // ensure it doesn't over or under-extrude
-            if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
             double mult_flow = 1;
+            if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
                 // compute real volume
                 double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
                 if (extruded_volume != 0 && polyline_volume != 0) mult_flow *= polyline_volume / extruded_volume;
@@ -258,22 +257,10 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 if (mult_flow > 1.3) mult_flow = 1.3;
                 if (mult_flow < 0.8) mult_flow = 0.8;
                 BOOST_LOG_TRIVIAL(info) << "Layer " << layer_id << ": Arachne Fill process extrude " << extruded_volume << " mm3 for a volume of " << polyline_volume << " mm3 : we mult the flow by " << mult_flow;
-                
-                //apply mult_flow
-                class ApplyFlow : public ExtrusionVisitorRecursive {
-                    double mult_flow;
-                public:
-                    ApplyFlow(double mult_flow) : mult_flow(mult_flow) {}
-                    virtual void use(ExtrusionPath& path) override {
-                        path.attributes_mutable().mm3_per_mm *= mult_flow;
-                        path.attributes_mutable().width *= mult_flow;
-                    }
-                    virtual void use(ExtrusionPath3D& path3D) override {
-                        path3D.attributes_mutable().mm3_per_mm *= mult_flow;
-                        path3D.attributes_mutable().width *= mult_flow;
-                    }
-                } flow_multiplier(mult_flow);
-                all_new_paths->visit(flow_multiplier);
+            }
+            mult_flow *= params.flow_mult;
+            if (mult_flow != 1) {
+                ExtrusionModifyFlow(mult_flow).set(*all_new_paths);
             }
 
             //save into layer
@@ -392,7 +379,10 @@ Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, Ext
         }
 #endif
 
-        ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines_gapfill, ExtrusionRole::GapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
+        ExtrusionEntitiesPtr gap_fill_entities =
+            Geometry::thin_variable_width(polylines_gapfill, ExtrusionRole::GapFill, params.flow,
+                                          scale_t(params.config->get_computed_value("resolution_internal")), true);
+
         ////set role if needed
         //if (params.role != ExtrusionRole::SolidInfill) {
         //    ExtrusionSetRole set_good_role(params.role);
@@ -3724,8 +3714,8 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
             ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
             /// push the path
             extrusion_entities_append_paths(*eec_peri, std::move(polylines_peri),
-                                            ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult,
-                                                                                         params.flow.width() * params.flow_mult,
+                                            ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm(),
+                                                                                         params.flow.width(),
                                                                                          params.flow.height()}},
                                             true);
 
@@ -3748,8 +3738,8 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
                     ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
                     /// push the path
                     extrusion_entities_append_paths(*eec_infill, std::move(polys_infill),
-                                                    ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult,
-                                                                                                 params.flow.width() * params.flow_mult,
+                                                    ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm(),
+                                                                                                 params.flow.width(),
                                                                                                  params.flow.height()}},
                                                     true);
 #ifdef _DEBUGINFO
@@ -3759,6 +3749,34 @@ FillWithPerimeter::fill_surface_extrusion(const Surface* surface, const FillPara
             }
         }
 
+    }
+    
+    // check volume coverage
+    if (!eecroot->empty()) {
+        double mult_flow = 1;
+        // check if not over-extruding
+        if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
+            // compute the path of the nozzle -> extruded volume
+            double extruded_volume = ExtrusionVolume{}.get(*eecroot);
+            // compute flow to remove spacing_ratio from the equation
+            // compute real volume to fill
+            double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
+            if (extruded_volume != 0 && polyline_volume != 0)
+                mult_flow = polyline_volume / extruded_volume;
+            // failsafe, it can happen
+            if (mult_flow > 1.3)
+                mult_flow = 1.3;
+            if (mult_flow < 0.8)
+                mult_flow = 0.8;
+            BOOST_LOG_TRIVIAL(info) << "rectilinear/monotonic Infill (with gapfil) process extrude "
+                                    << extruded_volume << " mm3 for a volume of " << polyline_volume
+                                    << " mm3 : we mult the flow by " << mult_flow;
+        }
+        mult_flow *= params.flow_mult;
+        if (mult_flow != 1) {
+            // apply to extrusions
+            ExtrusionModifyFlow{mult_flow}.set(*eecroot);
+        }
     }
 
     // === end ===

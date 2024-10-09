@@ -110,7 +110,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             if (! wiped) {
                 wiped = true;
                 gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
-                gcode += gcodegen.writer().set_speed(wipe_speed.first * 60, gcodegen.config().gcode_comments ? wipe_speed.second? "wipe_speed"sv : "travel_speed * 0.8"sv : ""sv , gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv);
+                gcode += gcodegen.writer().set_speed_mm_s(wipe_speed.first, gcodegen.config().gcode_comments ? wipe_speed.second? "wipe_speed"sv : "travel_speed * 0.8"sv : ""sv , gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv);
             }
         };
         const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer(), extruder.id());
@@ -123,13 +123,10 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             double segment_length = (p_quantized - prev_quantized).norm();
             // Compute a min dist between point, to avoid going under the precision.
             {
-                assert(gcodegen.m_last_width < SCALED_EPSILON);
-                coordf_t precision = pow(10, -gcodegen.config().gcode_precision_xyz.value) * 1.5;
-                precision = std::max(precision, coordf_t(SCALED_EPSILON * 10));
+                double precision = pow(10, -gcodegen.config().gcode_precision_xyz.value) * 1.5;
+                precision = std::max(precision, (EPSILON * 10));
                 if (gcodegen.config().resolution.value > 0) {
-                    precision = std::max(precision, scale_d(gcodegen.config().resolution.value));
-                } else {
-                    precision = std::max(precision, scale_d(gcodegen.m_last_width / 10));
+                    precision = std::max(precision, gcodegen.config().resolution.value);
                 }
                 if (segment_length < precision) {
                     p = p_quantized; // keep old prev
@@ -334,6 +331,7 @@ std::optional<Point> sample_path_point_at_distance_from_end(const ExtrusionPaths
 // Make a little move inwards before leaving loop after path was extruded,
 // thus the current extruder position is at the end of a path and the path
 // may not be closed in case the loop was clipped to hide a seam.
+// note: prusaslicer method. I don't use it as the current algorithm is quite much more complex. Also couldn't find a way to trigger it with a test project in ps 2.8.
 std::optional<Point> wipe_hide_seam(const ExtrusionPaths &paths, bool is_hole, double wipe_length)
 {
     assert(! paths.empty());

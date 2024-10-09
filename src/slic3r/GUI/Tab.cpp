@@ -1517,6 +1517,27 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
             this->on_value_change("solid_infill_every_layers", val);
         }
     }
+    if (opt_key.find("max_layer_height") != std::string::npos && m_config_base) {
+        static bool only_one_warning_per_session = true;
+        if (only_one_warning_per_session) {
+            only_one_warning_per_session= false;
+            assert(opt_key.find("#") != std::string::npos);
+            assert(opt_id.find("max_layer_height") == std::string::npos);
+            int16_t extruder_idx = atoi(opt_id.c_str());
+            const std::vector<double> &nozzle_sizes = m_config_base->option<ConfigOptionFloats>("nozzle_diameter")->get_values();
+            double max_lh = m_config_base->option("max_layer_height")->is_enabled() ?
+                m_config_base->get_computed_value("max_layer_height", extruder_idx) :
+                nozzle_sizes[extruder_idx] * 0.75f;
+            if (max_lh > nozzle_sizes[extruder_idx]) {
+                const wxString msg_text = _(
+                    L("Maximum layer height is higher than the nozzle diameter, it's dangerous!"
+                      " Be sure your extrusion width is high enough for it (it need to be equal or higher than the layer height) or use the extrusion spacing instead."
+                      "\n\nIf something wrong is detected, the slicer may try to change a value arbitrarly or emit an error.."));
+                MessageDialog dialog(m_parent, msg_text, _(L("Maximum layer height")), wxICON_WARNING | wxOK);
+                dialog.ShowModal();
+            }
+        }
+    }
 
     update();
 }
@@ -2409,6 +2430,29 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                         ConfigOption* default_opt = option.opt.create_default_option();
                         default_opt->set_enum_int(0); // should be generic_enum, set to first.
                         option.opt.set_default_value(default_opt);
+                    } else if (boost::starts_with(params[i], "hints")) {
+                        std::vector<std::string> enum_strs;
+                        boost::split(enum_strs, params[i], boost::is_any_of("$"));
+                        if (enum_strs.size() < 3 || enum_strs.size() % 2 == 0) {
+                            BOOST_LOG_TRIVIAL(error) << "Error: hints '"<< setting_id << "' doesn't have an even number of key-label values:"<<(enum_strs.size()-1)<<".";
+                            if (logs) Slic3r::slic3r_log->info("settings gui") << "Error: odd number of hints values: should be a key/value list ("<< option.opt.opt_key <<")";
+                            continue;
+                        }
+                        std::vector<std::pair<std::string,std::string>> values_2_labels;
+                        for (size_t idx = 1; idx < enum_strs.size(); idx += 2) {
+                            values_2_labels.emplace_back(enum_strs[idx], enum_strs[idx + 1]);
+                        }
+                        // create enum_def in option.opt
+                        //option.opt.set_enum_as_closed_for_scripted_enum(values_2_labels); // fake closed
+                        if (option.opt.type == coInt || option.opt.type == coInts) {
+                            option.opt.set_enum_values(ConfigOptionDef::GUIType::i_enum_open, values_2_labels);
+                        } else if (option.opt.type == coFloat || option.opt.type == coFloats ||
+                                       option.opt.type == coPercent || option.opt.type == coPercents) {
+                            option.opt.set_enum_values(ConfigOptionDef::GUIType::f_enum_open, values_2_labels);
+                        } else {
+                            if (logs) Slic3r::slic3r_log->info("settings gui") << "Error: hints can only apply to int, int, flaot, flaot, percent, percents ("<< option.opt.opt_key <<")";
+                        }
+                        //defautl already/will be set by the type
                     } else if (boost::starts_with(params[i], "depends")) {
                         std::vector<std::string> depends_str;
                         boost::split(depends_str, params[i], boost::is_any_of("$"));
@@ -3208,10 +3252,10 @@ void TabFilament::update_filament_overrides_page()
     );
 
     const bool is_lifting =  (
-       ! m_config->option("filament_travel_max_lift")->is_enabled(0)
-        || m_config->opt_float("filament_travel_max_lift", extruder_idx) > 0
-        || !m_config->option("filament_retract_lift")->is_enabled(0)
-        || m_config->opt_float("filament_retract_lift", extruder_idx) > 0
+       // !m_config->option("filament_travel_max_lift")->is_enabled(0) ||
+       //  m_config->opt_float("filament_travel_max_lift", extruder_idx) > 0 ||
+       !m_config->option("filament_retract_lift")->is_enabled(0) ||
+        m_config->opt_float("filament_retract_lift", extruder_idx) > 0
     );
 
     for (const std::string& opt_key : print_config_def.filament_override_option_keys()) {
@@ -4107,14 +4151,14 @@ void TabPrinter::toggle_options()
     //z step checks
     double z_step = m_config->opt_float("z_step");
     if(z_step > 0){
-        int64_t z_step_Mlong = (int64_t)(z_step * 1000000.);
+        coord_t z_step_Mlong = scale_t(z_step);
         DynamicPrintConfig new_conf;
         bool has_changed = false;
         const std::vector<double>& nozzle_diameters = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_values();
         const std::vector<FloatOrPercent>& min_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("min_layer_height")->get_values();
         for (int i = 0; i < min_layer_height.size(); i++) {
             if(!min_layer_height[i].percent)
-                if (min_layer_height[i].value != 0 && (int64_t)(min_layer_height[i].value * 1000000.) % z_step_Mlong != 0) {
+                if (min_layer_height[i].value != 0 && scale_t(min_layer_height[i].value) % z_step_Mlong != 0) {
                     if (!has_changed)
                         new_conf = *m_config;
                     new_conf.option<ConfigOptionFloatsOrPercents>("min_layer_height")->set_at(FloatOrPercent{std::max(z_step, Slic3r::check_z_step(min_layer_height[i].value, z_step)), false}, i);
@@ -4124,7 +4168,7 @@ void TabPrinter::toggle_options()
         std::vector<FloatOrPercent> max_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("max_layer_height")->get_values();
         for (int i = 0; i < max_layer_height.size(); i++) {
             if (!max_layer_height[i].percent)
-                if ((int64_t)(max_layer_height[i].value * 1000000.) % z_step_Mlong != 0) {
+                if (scale_t(max_layer_height[i].value) % z_step_Mlong != 0) {
                     if (!has_changed)
                         new_conf = *m_config;
                     new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->get_at(i).value = std::max(z_step, Slic3r::check_z_step(max_layer_height[i].value, z_step));

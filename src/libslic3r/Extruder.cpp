@@ -66,7 +66,7 @@ std::pair<double, double> Tool::extrude(double dE)
    value supplied will overwrite the previous one if any. */
 std::pair<double, double> Tool::retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange)
 {
-    assert(!std::isnan(retract_length()));
+    assert(!std::isnan(length));
     assert(!restart_extra || (!std::isnan(*restart_extra) && *restart_extra >= 0)); //not nan, it's optional now
     assert(!restart_extra_toolchange || (!std::isnan(*restart_extra_toolchange) && *restart_extra_toolchange >= 0)); //not nan, it's optional now
     assert(length < std::numeric_limits<int32_t>::max());
@@ -79,7 +79,7 @@ std::pair<double, double> Tool::retract(double length, std::optional<double> res
     if (m_config->use_relative_e_distances)
         m_E = 0.;
     // Quantize extruder delta to G-code resolution.
-    double to_retract = this->retract_to_go(retract_length());
+    double to_retract = this->retract_to_go(length);
     if (to_retract > 0.) {
         m_E             -= to_retract;
         m_absolute_E    -= to_retract;
@@ -91,7 +91,7 @@ std::pair<double, double> Tool::retract(double length, std::optional<double> res
         m_restart_extra_toolchange = *restart_extra_toolchange;
     return std::make_pair(to_retract, m_E);
 }
-double Tool::retract_to_go(double retract_length) const { return std::max(0., m_formatter.quantize_e(retract_length - m_retracted)); }
+double Tool::retract_to_go(double length) const { return std::max(0., m_formatter.quantize_e(length - m_retracted)); }
 
 std::pair<double, double> Tool::unretract()
 {
@@ -244,7 +244,7 @@ double Extruder::extrusion_multiplier() const
 // Return a "retract_before_wipe" percentage as a factor clamped to <0, 1>
 double Extruder::retract_before_wipe() const
 {
-    return std::min(1., std::max(0., m_config->retract_before_wipe.get_at(m_id) * 0.01));
+    return std::min(1., std::max(0., m_config->retract_before_wipe.get_abs_value(m_id,1)));
 }
 
 double Extruder::retract_length() const

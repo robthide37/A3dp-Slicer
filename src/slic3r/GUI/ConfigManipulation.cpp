@@ -545,7 +545,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_raft);
 
     //for default_extrusion_width/spacing, you need to ahve at least an extrusion_width with 0
-    bool have_default_width = config->option("first_layer_extrusion_width")->get_float() == 0 ||
+    auto opt_first_layer_width = config->option("first_layer_extrusion_width");
+    auto opt_first_layer_infill_width = config->option("first_layer_infill_extrusion_width");
+    assert(opt_first_layer_width);
+    assert(opt_first_layer_infill_width);
+    bool have_default_width = 
+        (opt_first_layer_width->is_enabled() && opt_first_layer_width->get_float() == 0) ||
+        (opt_first_layer_infill_width->is_enabled() && opt_first_layer_infill_width->get_float() == 0) ||
         (config->option("perimeter_extrusion_width")->get_float() == 0 && (have_perimeters || have_brim)) ||
         (config->option("external_perimeter_extrusion_width")->get_float() == 0 && have_perimeters) ||
         (config->option("infill_extrusion_width")->get_float() == 0 && (have_infill || has_solid_infill)) ||
@@ -555,6 +561,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         (config->option("skirt_extrusion_width")->get_float() == 0 && have_skirt);
     toggle_field("extrusion_width", have_default_width);
     toggle_field("extrusion_spacing", have_default_width);
+    
+    toggle_field("first_layer_extrusion_spacing", opt_first_layer_width->is_enabled());
+    toggle_field("first_layer_infill_extrusion_spacing", opt_first_layer_infill_width->is_enabled());
+    
 
     bool has_PP_ironing = has_top_solid_infill && config->opt_bool("ironing");
     for (auto el : { "ironing_type", "ironing_flowrate", "ironing_spacing", "ironing_angle" })
@@ -654,18 +664,7 @@ void ConfigManipulation::update_printer_fff_config(DynamicPrintConfig *config,
             is_msg_dlg_already_exist = false;
             max_lh = config->get_computed_value("max_layer_height", extruder_idx);
         }
-        if (max_lh > nozzle_sizes[extruder_idx]) {
-            const wxString msg_text = _(
-                L("Maximum layer height is not valid, it can't be higher than the nozzle diameter.\n\nThe maximum layer height will be set to 100% of the nozzle diameter."));
-            MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Maximum layer height")), wxICON_WARNING | wxOK);
-            DynamicPrintConfig new_conf = *config;
-            is_msg_dlg_already_exist    = true;
-            dialog.ShowModal();
-            new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->set_at(FloatOrPercent{100., true}, extruder_idx);
-            apply(config, &new_conf);
-            max_lh = config->get_computed_value("max_layer_height", extruder_idx);
-            is_msg_dlg_already_exist = false;
-        }
+        // now max_lh > nozzle_size is allowed, but a warning is sent when changed
         if (min_lh >= max_lh) {
             const wxString msg_text = _(
                 L("Minimum layer height is not valid, it can't be higher or equal to the maximum layer height.\n\nThe minimum layer height will be set to 0."));
@@ -745,9 +744,9 @@ void ConfigManipulation::toggle_printer_fff_options(DynamicPrintConfig *config, 
         //const bool lifts_z = (ramping_lift && config->get_float("travel_max_lift", i) > 0)
         //                  || (! ramping_lift && config->get_float("retract_lift", i) > 0);
 
-        toggle_field("travel_max_lift", ramping_lift, i);
+        //toggle_field("travel_max_lift", ramping_lift, i);
         toggle_field("travel_slope", ramping_lift, i);
-        toggle_field("retract_lift", ! ramping_lift, i); // now possible outside retraction
+        // toggle_field("retract_lift", ! ramping_lift, i);
 
         // when using firmware retraction, firmware decides retraction length
         bool use_firmware_retraction = config->opt_bool("use_firmware_retraction");

@@ -1990,6 +1990,7 @@ void PageDiameters::apply_custom_config(DynamicPrintConfig &config)
 
     config.set_key_value("extrusion_width", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("first_layer_extrusion_width", new ConfigOptionFloatOrPercent(140, true));
+    config.set_key_value("first_layer_infill_extrusion_width", (new ConfigOptionFloatOrPercent(140, true))->set_can_be_disabled(true));
     config.set_key_value("perimeter_extrusion_width", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("external_perimeter_extrusion_width", new ConfigOptionFloatOrPercent(100, true));
     config.set_key_value("infill_extrusion_width", new ConfigOptionFloatOrPercent(100, true));
@@ -2001,6 +2002,7 @@ void PageDiameters::apply_custom_config(DynamicPrintConfig &config)
     //configure spacing where needed
     config.set_key_value("extrusion_spacing", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("first_layer_extrusion_spacing", new ConfigOptionFloatOrPercent(140, true));
+    config.set_key_value("first_layer_infill_extrusion_spacing", new ConfigOptionFloatOrPercent(140, true));
     config.set_key_value("perimeter_extrusion_spacing", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("external_perimeter_extrusion_spacing", new ConfigOptionFloatOrPercent(100, true));
     config.set_key_value("infill_extrusion_spacing", new ConfigOptionFloatOrPercent(100, true));

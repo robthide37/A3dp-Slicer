@@ -694,6 +694,8 @@ static std::vector<std::string> s_Preset_print_options {
         "extrusion_width", 
         "first_layer_extrusion_spacing", 
         "first_layer_extrusion_width", 
+        "first_layer_infill_extrusion_spacing", 
+        "first_layer_infill_extrusion_width", 
         "perimeter_round_corners",
         "perimeter_extrusion_spacing",
         "perimeter_extrusion_width",
@@ -806,6 +808,8 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_multitool_ramming",
         "filament_multitool_ramming_volume",
         "filament_multitool_ramming_flow", 
+        "filament_fill_top_flow_ratio",
+        "filament_first_layer_flow_ratio",
         "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
         "filament_unloading_speed", "filament_toolchange_delay", "filament_unloading_speed_start", "filament_unload_time", "filament_cooling_moves",
         "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
@@ -880,7 +884,7 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_retract_restart_extra_toolchange",
         "filament_seam_gap",
         "filament_travel_lift_before_obstacle",
-        "filament_travel_max_lift",
+        // "filament_travel_max_lift",
         "filament_travel_ramping_lift",
         "filament_travel_slope",
         "filament_wipe", "filament_wipe_only_crossing", "filament_wipe_extra_perimeter", "filament_wipe_speed",
@@ -1583,7 +1587,8 @@ bool PresetCollection::delete_preset(const std::string& name)
     m_presets.erase(it);
 
     // update selected preset
-    this->select_preset_by_name(selected_preset_name, true);
+    // // supermerill: why reloading our preset? 
+    //this->select_preset_by_name(selected_preset_name, true);
 
     return true;
 }

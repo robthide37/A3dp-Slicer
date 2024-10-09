@@ -153,7 +153,7 @@ public:
             return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
                 - m_writer.current_tool_offset();
         } else {
-            assert(false);
+            // assert(false); // called by wipe tower via 'generate_travel_gcode'
             const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
             return to_3d(gcode_point_xy, unscaled(point.z()));
         }
@@ -380,13 +380,15 @@ private:
      );
     Polyline        travel_to(std::string& gcode, const Point &end_point, ExtrusionRole role);
     void            write_travel_to(std::string& gcode, Polyline& travel, std::string comment);
-    std::vector<coord_t> get_travel_elevation(Polyline& travel);
+    std::vector<coord_t> get_travel_elevation(Polyline& travel, double z_change);
     //std::string     travel_to_first_position(const Vec3crd& point);
     bool            can_cross_perimeter(const Polyline& travel, bool offset);
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None, coordf_t max_min_dist = 0);
 
     std::string     retract_and_wipe(bool toolchange = false, bool inhibit_lift = false);
     std::string     unretract() { return m_writer.unlift() + m_writer.unretract(); }
+    // enforce lift_min
+    void            set_extra_lift(const float previous_print_z, const int layer_id, const PrintConfig& print_config, GCodeWriter & writer, int extruder_id);
     std::string     set_extruder(uint16_t extruder_id, double print_z, bool no_toolchange = false);
     std::string     toolchange(uint16_t extruder_id, double print_z);
     bool line_distancer_is_required(const std::vector<uint16_t>& extruder_ids);
@@ -504,7 +506,11 @@ private:
     const PrintInstance*                m_last_instance {nullptr};
     std::optional<Point>                m_last_pos;
 
-    bool                                m_new_layer = false;
+    // for ramping lift: if enabled, and this is set, then you will need to move Z at the next travel.
+    // note: rampng lift and these kind of trick should eb reworked & improve when the gcode creation will be split in multiplt subsystem, these working on a chain of "command" objects. That way it should be easier to move the Z / travel accrodingly.
+    // the dangerous thing with it is when you cancel an object, then the Z move and the travel need to be dealt with correctly. currently, it's a pain to to do that.
+    std::optional<double>               m_new_z_target = {};
+    double                              m_next_lift_min{0};
 
     double                              m_current_perimeter_extrusion_width = 0.4;
     std::optional<unsigned>             m_layer_change_extruder_id;
@@ -557,7 +563,7 @@ private:
 
     std::function<void()> m_throw_if_canceled = [](){};
 
-    double                    _compute_e_per_mm(double path_mm3_per_mm);
+    double                    _compute_e_per_mm(const ExtrusionPath &path);
     std::string               _extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);
     void                      _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, ExtrusionRole role);
     void                      _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, Point& last_pos, const double path_width);
