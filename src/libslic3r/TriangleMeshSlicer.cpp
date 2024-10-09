@@ -1047,17 +1047,13 @@ static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polyg
                     // The current loop is complete. Add it to the output.
                     assert(first_line->a == last_line->b);
                     Points loop_pts_init = loop_pts;
-                    if (loop_pts.front().coincides_with(loop_pts.back())) {
-                        if (loop_pts.size() > 3) {
-                            loop_pts.pop_back();
-                            assert(!loop_pts.front().coincides_with(loop_pts.back()));
-    for(auto &loop : loops)
-        assert(!loop.points.front().coincides_with(loop.points.back()));
-                            loops.emplace_back(std::move(loop_pts));
-                        }
-                    } else {
-    for(auto &loop : loops)
-        assert(!loop.points.front().coincides_with(loop.points.back()));
+                    while (loop_pts.size() > 2 && loop_pts.front().coincides_with(loop_pts.back())) {
+                        loop_pts.pop_back();
+                    }
+                    for(auto &loop : loops)
+                        assert(!loop.points.front().coincides_with(loop.points.back()));
+                    if (loop_pts.size() > 2) {
+                        assert(!loop_pts.front().coincides_with(loop_pts.back()));
                         loops.emplace_back(std::move(loop_pts));
                     }
                     #ifdef SLIC3R_TRIANGLEMESH_DEBUG
