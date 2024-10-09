@@ -4298,7 +4298,7 @@ void Tab::load_current_preset()
 
     // apply duplicate_distance for print preset
     if (type() == Preset::TYPE_FFF_PRINT || type() == Preset::TYPE_SLA_PRINT) {
-        wxGetApp().mainframe->plater()->canvas3D()->set_arrange_settings(m_presets->get_edited_preset().config, m_presets->get_edited_preset().printer_technology());
+        //wxGetApp().mainframe->plater()->canvas3D()->set_arrange_settings(m_presets->get_edited_preset().config, m_presets->get_edited_preset().printer_technology());
     }
 
 //	m_undo_to_sys_btn->Enable(!preset.is_default);
@@ -4392,8 +4392,6 @@ void Tab::load_current_preset()
         }
         else {
             on_presets_changed();
-            if ((type() & Preset::TYPE_PRINT1) != 0)
-                update_frequently_changed_parameters();
 
             //update width/spacing links
             if (type() == Preset::TYPE_FFF_PRINT) {
@@ -4409,6 +4407,7 @@ void Tab::load_current_preset()
                 }
             }
         }
+        update_frequently_changed_parameters();
 
         m_opt_status_value = (m_presets->get_selected_preset_parent() ? osSystemValue : 0) | osInitValue;
         init_options_list();
@@ -4964,6 +4963,9 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     save_current_preset(name, detach);
+    //ensure evrything now point to the saved preset
+    select_preset_by_name(name, true);
+    
 
     // Print bed has to be updated, when printer preset is detached from the system preset
     if (detach && type() == Preset::TYPE_PRINTER) {

@@ -618,7 +618,7 @@ ExPolygons Layer::merged(float offset_scaled) const
 	for (LayerRegion *layerm : m_regions) {
 		const PrintRegionConfig &config = layerm->region().config();
 		// Our users learned to bend Slic3r to produce empty volumes to act as subtracters. Only add the region if it is non-empty.
-		if (config.bottom_solid_layers > 0 || config.top_solid_layers > 0 || config.fill_density > 0. || config.perimeters > 0 || config.solid_infill_every_layers.value > 0)
+		if (config.bottom_solid_layers > 0 || config.top_solid_layers > 0 || config.fill_density > 0. || config.perimeters > 0 || (config.solid_infill_every_layers.value > 0 && config.fill_density.value > 0))
 			append(polygons, offset(layerm->slices().surfaces, offset_scaled));
 	}
     ExPolygons out = union_ex(polygons);

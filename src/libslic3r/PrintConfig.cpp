@@ -3817,7 +3817,7 @@ void PrintConfigDef::init_fff_params()
         "\nSet zero to disable.");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(1500));
+    def->set_default_value(new ConfigOptionFloat(0/*1500*/));
 
     def = this->add("max_fan_speed", coInts);
     def->label = L("Max");
@@ -5006,7 +5006,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->precision = 6;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(0.02, false));
+    def->set_default_value(new ConfigOptionFloatOrPercent(0/*0.02*/, false));
     def->aliases = {"min_length"};
 
     def = this->add("gcode_min_resolution", coFloatOrPercent);
@@ -5850,8 +5850,7 @@ void PrintConfigDef::init_fff_params()
         " at and beyond which solid infill should no longer be added above/below. If this setting is equal or higher than "
         " the top/bottom solid layer count, it won't do anything. If this setting is set to 1, it will evict "
         " all solid fill above/below perimeters. "
-        "\nSet zero to disable."
-        "\n!! ensure_vertical_shell_thickness needs to be activated so this algorithm can work !!.");
+        "\nSet zero to disable.");
     def->min = 0;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionInt(2));
@@ -10355,7 +10354,6 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;
             // this->opt<ConfigOptionBool>("exact_last_layer_height", true)->value = false;
-            this->opt<ConfigOptionBool>("ensure_vertical_shell_thickness", true)->value = false;
             this->opt<ConfigOptionBool>("infill_dense", true)->value = false;
             this->opt<ConfigOptionBool>("extra_perimeters", true)->value = false;
             this->opt<ConfigOptionBool>("extra_perimeters_on_overhangs", true)->value = false;

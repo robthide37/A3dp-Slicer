@@ -1191,6 +1191,7 @@ int ArcPolyline::simplify_straits(coordf_t min_tolerance,
                             double absangle = std::abs(angle);
                             assert(absangle <= PI);
                             weights[i] = (absangle / PI) * (1 - deviation / min_tolerance) * (min_point_distance / length);
+                            assert(weights[i] >= 0 && weights[i] <= 1);
                         }
                     }
                     assert(weights[i]==3 || (weights[i] >= 0 && weights[i] <= 1));
