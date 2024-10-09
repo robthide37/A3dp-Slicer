@@ -1963,7 +1963,7 @@ std::vector<ExPolygons> slice_mesh_ex(
                     layers_p[layer_id], scale_t(params.closing_radius), scale_t(params.model_resolution), scale_t(params.extra_offset),
                     this_mode == MeshSlicingParams::SlicingMode::EvenOdd ? ClipperLib::pftEvenOdd : 
                     this_mode == MeshSlicingParams::SlicingMode::PositiveLargestContour ? ClipperLib::pftPositive : ClipperLib::pftNonZero,
-                    &expolygons);
+                    &expolygons, layer_id);
 
 #if 0
 //#ifndef NDEBUG
