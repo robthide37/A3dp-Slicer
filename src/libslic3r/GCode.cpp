@@ -1353,19 +1353,19 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     if (print.config().complete_objects.value) {
         // Add each of the object's layers separately.
         for (auto object : print.objects()) {
-            std::vector<coordf_t> zs;
-            std::vector<coordf_t> zs_with_supp;
+            std::vector<coord_t> zs;
+            std::vector<coord_t> zs_with_supp;
             zs.reserve(object->layers().size());
             zs_with_supp.reserve(object->layers().size() + object->support_layers().size());
             for (auto layer : object->layers()) {
                 if (layer->has_extrusions()) {
-                zs.push_back(layer->print_z);
-                zs_with_supp.push_back(layer->print_z);
-            }
+                    zs.push_back(scale_t(layer->print_z + SCALING_FACTOR * 0.5));
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 0.5));
+                }
             }
             for (auto layer : object->support_layers()) {
                 if (layer->has_extrusions()) {
-                zs_with_supp.push_back(layer->print_z);
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 0.5));
                 }
             }
             std::sort(zs.begin(), zs.end());
@@ -1383,13 +1383,13 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             zs_with_supp.reserve(zs.size() + object->layers().size() + object->support_layers().size());
             for (auto layer : object->layers()) {
                 if (layer->has_extrusions()) {
-                    zs.push_back(scale_t(layer->print_z));
-                    zs_with_supp.push_back(scale_t(layer->print_z));
+                    zs.push_back(scale_t(layer->print_z + SCALING_FACTOR * 0.5));
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 0.5));
+                }
             }
-        }
             for (auto layer : object->support_layers()) {
                 if (layer->has_extrusions()) {
-                    zs_with_supp.push_back(scale_t(layer->print_z));
+                    zs_with_supp.push_back(scale_t(layer->print_z + SCALING_FACTOR * 0.5));
                 }
             }
         }
@@ -2221,19 +2221,31 @@ void GCodeGenerator::process_layers(
 
      const auto layer_select = tbb::make_filter<void, size_t>(slic3r_tbb_filtermode::serial_in_order,
         [this, &print, &layers_to_print, &layer_to_print_idx](tbb::flow_control &fc) -> size_t {
-            if (layer_to_print_idx >= layers_to_print.size()) {
-                if (layer_to_print_idx == layers_to_print.size() + (m_pressure_equalizer ? 1 : 0)) {
-                    fc.stop();
-                    return 0;
+            while(true){
+                if (layer_to_print_idx >= layers_to_print.size()) {
+                    if (layer_to_print_idx == layers_to_print.size() + (m_pressure_equalizer ? 1 : 0)) {
+                        fc.stop();
+                        return 0;
+                    } else {
+                        // Pressure equalizer need insert empty input. Because it returns one layer back.
+                        // Insert NOP (no operation) layer;
+                        return layer_to_print_idx ++;
+                    }
                 } else {
-                    // Pressure equalizer need insert empty input. Because it returns one layer back.
-                    // Insert NOP (no operation) layer;
-                    return layer_to_print_idx ++;
+                    CNumericLocalesSetter locales_setter;
+                    print.throw_if_canceled();
+                    bool has_extrusions = false;
+                    for (const ObjectLayerToPrint &os_layer : layers_to_print[layer_to_print_idx].second) {
+                        has_extrusions = has_extrusions || (os_layer.object_layer ? os_layer.object_layer->has_extrusions() : false);
+                        has_extrusions = has_extrusions || (os_layer.support_layer ? os_layer.support_layer->has_extrusions() : false);
+                    }
+                    if (has_extrusions) {
+                        return layer_to_print_idx++;
+                    } else {
+                        // else, look to the next layer
+                        layer_to_print_idx++;
+                    }
                 }
-            } else {
-                CNumericLocalesSetter locales_setter;
-                print.throw_if_canceled();
-                return layer_to_print_idx++;
             }
         });
     const auto generator = tbb::make_filter<size_t, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
@@ -2247,8 +2259,8 @@ void GCodeGenerator::process_layers(
                 preamble.clear();
                 return result;
             } else {
-                CNumericLocalesSetter locales_setter;
                 const std::pair<coordf_t, ObjectsLayerToPrint> &layer = layers_to_print[layer_to_print_idx];
+                CNumericLocalesSetter locales_setter;
                 const LayerTools& layer_tools = tool_ordering.tools_for_layer(layer.first);
                 if (m_wipe_tower && layer_tools.has_wipe_tower)
                     m_wipe_tower->next_layer();
@@ -3533,8 +3545,8 @@ void GCodeGenerator::process_layer_single_object(
             // When starting a new object, use the external motion planner for the first travel move.
             const Point &offset = instance.shift;
             GCode::PrintObjectInstance next_instance = {&print_object, int(print_args.print_instance.instance_id)};
-            if (m_current_instance != next_instance)
-                m_avoid_crossing_perimeters.use_external_mp_once();
+            //if (m_current_instance != next_instance) // commented because now internal will be togthe nearest internal point first.
+            //    m_avoid_crossing_perimeters.use_external_mp_once();
             m_current_instance = next_instance;
             this->set_origin(unscale(offset));
             assert(m_gcode_label_objects_start.empty());
@@ -4874,8 +4886,8 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
 
     std::string gcode;
 
-    coordf_t point_dist_for_vec = scale_t(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), nozzle_diam)) / 2;
-    assert(point_dist_for_vec >= 0);
+    coordf_t point_dist_for_vec = std::max(scale_t(nozzle_diam) / 100, scale_t(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), nozzle_diam)) / 2);
+    assert(point_dist_for_vec > 0);
 
     // generate the unretracting/wipe start move (same thing than for the end, but on the other side)
     assert(!wipe_paths.empty() && wipe_paths.front().size() > 1 && !wipe_paths.back().empty());
@@ -7085,7 +7097,6 @@ Polyline GCodeGenerator::travel_to(std::string &gcode, const Point &point, Extru
             assert(travel.size() > 1);
             for (size_t i = 1; i < travel.size(); i++)
                 assert(!travel.points[i - 1].coincides_with_epsilon(travel.points[i]));
-            travel = m_avoid_crossing_perimeters.travel_to(*this, point, &could_be_wipe_disabled);
         }
     }
 

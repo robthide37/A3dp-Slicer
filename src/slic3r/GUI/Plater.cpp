@@ -798,7 +798,7 @@ Sidebar::Sidebar(Plater *parent)
 
     const int margin_5 = int(0.5 * wxGetApp().em_unit());// 5;
 
-    auto init_combo = [this, margin_5](PlaterPresetComboBox **combo, wxString label, Preset::Type preset_type, bool filament) {
+    auto init_combo = [this, margin_5](PlaterPresetComboBox **combo, wxString label, Preset::Type preset_type) {
         // do not print these labels. if you re-enabled these, don't forget to *2 the size in show_preset_comboboxes()
         //auto *text = new wxStaticText(p->presets_panel, wxID_ANY, label + " :");
         //text->SetFont(wxGetApp().small_font());
@@ -811,11 +811,10 @@ Sidebar::Sidebar(Plater *parent)
                                     int(0.3*wxGetApp().em_unit()));
 
         auto *sizer_presets = this->p->sizer_presets;
-        auto *sizer_filaments = this->p->sizer_filaments;
         // Hide controls, which will be shown/hidden in respect to the printer technology
         //text->Show(preset_type == Preset::TYPE_PRINTER);
         //sizer_presets->Add(text, 0, wxALIGN_LEFT | wxEXPAND | wxRIGHT, 4);
-        if (! filament) {
+        {
             combo_and_btn_sizer->ShowItems(preset_type == Preset::TYPE_PRINTER);
             sizer_presets->Add(combo_and_btn_sizer, 0, wxEXPAND | 
 #ifdef __WXGTK3__
@@ -824,25 +823,20 @@ Sidebar::Sidebar(Plater *parent)
                 wxBOTTOM, 1);
                 (void)margin_5; // supress unused capture warning
 #endif // __WXGTK3__
-        } else {
-            sizer_filaments->Add(combo_and_btn_sizer, 0, wxEXPAND |
-#ifdef __WXGTK3__
-                wxRIGHT, margin_5);
-#else
-                wxBOTTOM, 1);
-#endif // __WXGTK3__
-            (*combo)->set_extruder_idx(0);
-            sizer_filaments->ShowItems(false);
-            sizer_presets->Add(sizer_filaments, 1, wxEXPAND);
         }
     };
 
-    p->combos_filament.push_back(nullptr);
-    init_combo(&p->combo_print,         _L("Print settings"),     Preset::TYPE_FFF_PRINT,         false);
-    init_combo(&p->combos_filament[0],  _L("Filament"),           Preset::TYPE_FFF_FILAMENT,      true);
-    init_combo(&p->combo_sla_print,     _L("SLA print settings"), Preset::TYPE_SLA_PRINT,     false);
-    init_combo(&p->combo_sla_material,  _L("SLA material"),       Preset::TYPE_SLA_MATERIAL,  false);
-    init_combo(&p->combo_printer,       _L("Printer"),            Preset::TYPE_PRINTER,       false);
+    init_combo(&p->combo_print,         _L("Print settings"),     Preset::TYPE_FFF_PRINT);
+    //init_combo(&p->combos_filament[0],  _L("Filament"),           Preset::TYPE_FFF_FILAMENT,      true);
+    {
+        p->combos_filament.push_back(nullptr);
+        this->init_filament_combo(&p->combos_filament[0], 0);
+        this->p->sizer_filaments->ShowItems(false);
+        this->p->sizer_presets->Add(this->p->sizer_filaments, 1, wxEXPAND);
+    }
+    init_combo(&p->combo_sla_print,     _L("SLA print settings"), Preset::TYPE_SLA_PRINT);
+    init_combo(&p->combo_sla_material,  _L("SLA material"),       Preset::TYPE_SLA_MATERIAL);
+    init_combo(&p->combo_printer,       _L("Printer"),            Preset::TYPE_PRINTER);
 
     p->sizer_params = new wxBoxSizer(wxVERTICAL);
 
@@ -1005,7 +999,19 @@ void Sidebar::init_filament_combo(PlaterPresetComboBox** combo, const int extr_i
     (*combo)->set_extruder_idx(extr_idx);
 
     auto combo_and_btn_sizer = new wxBoxSizer(wxHORIZONTAL);
+    {   // tool name
+        auto opt = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionStrings>("tool_name");
+        assert(opt);
+        std::string tool_name = opt? opt->get_at(extr_idx) : nullptr;
+        if (tool_name.size() > 10) {
+            tool_name = tool_name.substr(0,7) + std::string("... ");
+        }
+        (*combo)->label = new wxStaticText(p->presets_panel, wxID_ANY, tool_name.empty() ? "" : ( tool_name + std::string(": ")));
+        (*combo)->label->SetFont(wxGetApp().small_font());
+        combo_and_btn_sizer->Add((*combo)->label, 0, wxALIGN_LEFT | wxEXPAND | wxRIGHT, 4);
+    }
     combo_and_btn_sizer->Add(*combo, 1, wxEXPAND);
+    assert((*combo)->edit_btn);
     combo_and_btn_sizer->Add((*combo)->edit_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT,
                             int(0.3*wxGetApp().em_unit()));
 
@@ -1015,6 +1021,7 @@ void Sidebar::init_filament_combo(PlaterPresetComboBox** combo, const int extr_i
 #else
         wxBOTTOM, 1);
 #endif // __WXGTK3__
+
 }
 
 void Sidebar::remove_unused_filament_combos(const size_t current_extruder_count)
@@ -1047,8 +1054,20 @@ void Sidebar::update_all_preset_comboboxes()
     // Update the filament choosers to only contain the compatible presets, update the color preview,
     // update the dirty flags.
     if (print_tech == ptFFF) {
-        for (PlaterPresetComboBox* cb : p->combos_filament)
+        for (size_t extr_idx = 0; extr_idx < p->combos_filament.size(); ++extr_idx) {
+            PlaterPresetComboBox *cb  = p->combos_filament[extr_idx];
             cb->update();
+            // update tool name
+            auto opt = preset_bundle.printers.get_edited_preset().config.option<ConfigOptionStrings>("tool_name");
+            assert(opt);
+            if (opt && cb->label) {
+                std::string tool_name = opt ? opt->get_at(extr_idx) : nullptr;
+                if (tool_name.size() > 10) {
+                    tool_name = tool_name.substr(0, 7) + std::string("... ");
+                }
+                cb->label->SetLabel(tool_name.empty() ? "" : (tool_name + std::string(": ")));
+            }
+        }
     }
 }
 

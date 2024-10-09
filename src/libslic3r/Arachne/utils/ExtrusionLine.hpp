@@ -129,9 +129,49 @@ struct ExtrusionLine
      */
     Polygon toPolygon() const
     {
+        assert(this->is_closed);
         Polygon ret;
-        for (const ExtrusionJunction &j : junctions)
-            ret.points.emplace_back(j.p);
+        for (const ExtrusionJunction &j : junctions) {
+            // only copy a point if it's far enough
+            if (ret.points.empty() || !j.p.coincides_with_epsilon(ret.points.back())) {
+                ret.points.emplace_back(j.p);
+            }
+        }
+        // be sure the last point is the one that is kept
+        if (ret.points.back() != junctions.back().p) {
+            ret.points.back() = junctions.back().p;
+        }
+        // a polygon doesn't repeat the last point
+        if (ret.points.back().coincides_with_epsilon(ret.points.front())) {
+            ret.points.pop_back();
+        }
+
+        return ret;
+    }
+
+    /*!
+     * Put all junction locations into a polygon object.
+     *
+     * When this path is not closed the returned Polygon should be handled as a polyline, rather than a polygon.
+     */
+    Polyline toPolyline() const
+    {
+        Polyline ret;
+        for (const ExtrusionJunction &j : junctions) {
+            // only copy a point if it's far enough
+            if (ret.points.empty() || !j.p.coincides_with_epsilon(ret.points.back())) {
+                ret.points.emplace_back(j.p);
+            }
+        }
+        // be sure the last point is the one that is kept
+        if (ret.points.back() != junctions.back().p) {
+            ret.points.back() = junctions.back().p;
+        }
+        // if loop, be sure to have the exact same point in front & back.
+        if (ret.points.back().coincides_with_epsilon(ret.points.front())) {
+            assert(this->is_closed);
+            ret.points.back() = ret.points.front();
+        }
 
         return ret;
     }

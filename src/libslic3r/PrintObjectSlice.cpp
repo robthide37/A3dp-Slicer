@@ -803,7 +803,6 @@ void PrintObject::_min_overhang_threshold() {
                             }
                         }
                     }
-                    for(auto &srf : to_add) srf.expolygon.assert_valid();
                     append(my_surfaces, std::move(to_add));
                     ensure_valid(my_surfaces, resolution);
                     for(auto &srf : my_surfaces) srf.expolygon.assert_valid();

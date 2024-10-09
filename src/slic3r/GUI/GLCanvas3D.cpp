@@ -5070,19 +5070,25 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
     //parse custom color from config, if we need to set a special color to objects for thumbnail.
-    ColorRGBA custom_color = { -1.0f, 0.0f, 0.0f, 1.0f };
-    if(Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER))
-        if(const DynamicPrintConfig* printer_config = tab->get_config())
-            if(const ConfigOptionBool *conf_ok = printer_config->option<ConfigOptionBool>("thumbnails_custom_color"))
-                if(conf_ok->value)
-                    if (const ConfigOptionString* conf_color = printer_config->option<ConfigOptionString>("thumbnails_color"))
-                        if(conf_color->value.length() > 6)
-                        {
+    ColorRGBA custom_color = { 0.0f, 0.0f, 1.0f, 1.0f };
+    bool use_custom_color = false;
+    if (Tab *tab = wxGetApp().get_tab(Preset::TYPE_PRINTER)) {
+        if (const DynamicPrintConfig *printer_config = tab->get_config()) {
+            if (const ConfigOptionBool *conf_ok = printer_config->option<ConfigOptionBool>("thumbnails_custom_color")) {
+                if (conf_ok->value) {
+                    if (const ConfigOptionString *conf_color = printer_config->option<ConfigOptionString>("thumbnails_color")) {
+                        if (conf_color->value.length() > 6) {
                             wxColour clr(conf_color->value);
                             custom_color.r(clr.Red() / 255.f);
                             custom_color.g(clr.Green() / 255.f);
                             custom_color.b(clr.Blue() / 255.f);
+                            use_custom_color = true;
                         }
+                    }
+                }
+            }
+        }
+    }
 
     const int extruders_count = wxGetApp().extruders_edited_cnt();
     for (GLVolume *vol : visible_volumes) {
@@ -5106,7 +5112,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         else {
             shader->set_uniform("emission_factor", 0.0f);
             vol->model.set_color((vol->printable && !vol->is_outside) 
-                ? (custom_color.r() < 0 ? vol->color : custom_color)
+                ? (use_custom_color ? custom_color : vol->color)
                 : ColorRGBA::GRAY());
         }
 
@@ -5125,7 +5131,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         if (render_as_painted) {
             const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
             const size_t extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
-            TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
+            TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, use_custom_color ? custom_color : extruders_colors[extruder_idx]);
             ts.deserialize(model_volume.mm_segmentation_facets.get_data(), true);
             ts.request_update_render_data();
 

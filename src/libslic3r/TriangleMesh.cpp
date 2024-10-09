@@ -911,12 +911,24 @@ Polygon its_convex_hull_2d_above(const indexed_triangle_set& its, const Transfor
                 iprev = iedge;
             }
         }
-        return Geometry::convex_hull(std::move(pts));
+        if (pts.size() > 2) {
+            Polygon polygon = Geometry::convex_hull(std::move(pts));
+            while (polygon.size() > 2 && polygon.points.front().coincides_with_epsilon(polygon.points.back())) {
+                polygon.points.pop_back();
+            }
+            if (polygon.size() > 2) {
+                return std::move(polygon);
+            }
+        }
+        return Polygon();
     };
 
     tbb::concurrent_vector<Polygon> chs;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, its.indices.size()), [&](const tbb::blocked_range<size_t>& range) {
-        chs.push_back(collect_mesh_projection_points_above(range));
+        Polygon poly = collect_mesh_projection_points_above(range);
+        if (!poly.empty()) {
+            chs.push_back(poly);
+        }
     });
 
     const Polygons polygons(std::make_move_iterator(chs.begin()), std::make_move_iterator(chs.end()));

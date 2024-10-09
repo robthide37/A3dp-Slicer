@@ -3110,6 +3110,7 @@ void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offse
     // Don't produce infill lines, which fully overlap with the infill perimeter.
     coord_t     x_min = bounding_box.min.x() + x_margin;
     coord_t     x_max = bounding_box.max.x() - x_margin;
+    coord_t     min_dist = std::max(SCALED_EPSILON, line_spacing / 2);
     // extend bounding box so that our pattern will be aligned with other layers
     // align_to_grid will not work correctly with positive pattern_shift.
     coord_t pattern_shift_scaled = pattern_shift % line_spacing;
@@ -3133,10 +3134,14 @@ void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offse
                 auto it_high = it;
                 assert(it_high->type == SegmentIntersection::OUTER_HIGH);
                 if (it_high->type == SegmentIntersection::OUTER_HIGH) {
-                    if (angle == 0.)
-                        fill_lines.emplace_back(Point(vline.pos, it_low->pos()), Point(vline.pos, it_high->pos()));
-                    else
-                        fill_lines.emplace_back(Point(vline.pos, it_low->pos()).rotated(cos_a, sin_a), Point(vline.pos, it_high->pos()).rotated(cos_a, sin_a));
+                    if (std::abs(it_low->pos() - it_high->pos()) >= min_dist) {
+                        if (angle == 0.) {
+                            fill_lines.emplace_back(Point(vline.pos, it_low->pos()), Point(vline.pos, it_high->pos()));
+                        } else {
+                            fill_lines.emplace_back(Point(vline.pos, it_low->pos()).rotated(cos_a, sin_a),
+                                                    Point(vline.pos, it_high->pos()).rotated(cos_a, sin_a));
+                        }
+                    }
                     ++ it;
                 }
             }
@@ -3274,6 +3279,7 @@ Polylines FillSupportBase::fill_surface(const Surface *surface, const FillParams
         coord_t line_spacing = _line_spacing_for_density(params);
         // Create infill lines, keep them vertical.
         make_fill_lines(poly_with_offset, rotate_vector.second.rotated(- rotate_vector.first), 0, 0, line_spacing, 0, fill_lines, params);
+        assert_valid(fill_lines);
 
         // Both the poly_with_offset and polylines_out are rotated, so the infill lines are strictly vertical.
         connect_base_support(std::move(fill_lines), poly_with_offset.polygons_outer, poly_with_offset.bounding_box_outer(), polylines_out,  _line_spacing_for_density(params), params);
@@ -3284,6 +3290,7 @@ Polylines FillSupportBase::fill_surface(const Surface *surface, const FillParams
             for (Point &pt : pl.points)
                 pt.rotate(cos_a, sin_a);
     }
+    ensure_valid(polylines_out, params.fill_resolution);
     return polylines_out;
 }
 

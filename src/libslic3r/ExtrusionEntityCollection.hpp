@@ -97,6 +97,7 @@ public:
     void swap (ExtrusionEntityCollection &c);
     void append(const ExtrusionEntity &entity) { this->m_entities.emplace_back(entity.clone()); }
     void append(ExtrusionEntity &&entity) { this->m_entities.emplace_back(entity.clone_move()); }
+    void append_at(ExtrusionEntity &&entity, size_t position) { assert(position <= m_entities.size()); this->m_entities.insert(this->m_entities.begin() + position, entity.clone_move()); }
     void append(const ExtrusionEntitiesPtr &entities) { 
         this->m_entities.reserve(this->m_entities.size() + entities.size());
         for (const ExtrusionEntity *ptr : entities)

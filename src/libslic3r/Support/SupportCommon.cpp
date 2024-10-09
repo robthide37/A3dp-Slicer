@@ -600,6 +600,10 @@ static inline void tree_supports_generate_paths(
     const Flow                &flow, 
     const SupportParameters   &support_params)
 {
+#ifdef _DEBUGINFO
+    for (const auto extr : dst.entities()) extr->visit(LoopAssertVisitor());
+    assert_valid(polygons);
+#endif
     // Offset expolygon inside, returns number of expolygons collected (0 or 1).
     // Vertices of output paths are marked with Z = source contour index of the expoly.
     // Vertices at the intersection of source contours are marked with Z = -1.
@@ -812,14 +816,27 @@ static inline void tree_supports_generate_paths(
         }
 
         ExtrusionEntityCollection &out = eec ? *eec : dst;
+#ifdef _DEBUGINFO
+        out.visit(LoopAssertVisitor());
+        assert_valid(polylines);
+#endif
         extrusion_entities_append_paths(out, std::move(polylines), { ExtrusionRole::SupportMaterial, flow },
             // Disable reversal of the path, always start with the anchor, always print CCW.
             false);
+#ifdef _DEBUGINFO
+        out.visit(LoopAssertVisitor());
+#endif
         if (eec) {
             std::reverse(eec->set_entities().begin(), eec->set_entities().end());
+#ifdef _DEBUGINFO
+            eec->visit(LoopAssertVisitor());
+#endif
             dst.append(ExtrusionEntitiesPtr{eec.release()});
         }
     }
+#ifdef _DEBUGINFO
+    for (const auto extr : dst.entities()) extr->visit(LoopAssertVisitor());
+#endif
 }
 // now use FillWithPerimeter
 //static inline void fill_expolygons_with_sheath_generate_paths(
@@ -915,13 +932,18 @@ struct SupportGeneratorLayerExtruded
             Slic3r::polygons_append(*m_polygons_to_extrude, other.layer->polygons);
             *m_polygons_to_extrude = union_safety_offset(*m_polygons_to_extrude);
         }
+        if (m_polygons_to_extrude) {
+            ensure_valid(*m_polygons_to_extrude, resolution);
+        }
         // 2) Merge the extrusions.
         this->extrusions.append_move_from(other.extrusions);
+#ifdef _DEBUGINFO
+        this->extrusions.visit(LoopAssertVisitor());
+#endif
         // 3) Merge the infill polygons.
         Slic3r::polygons_append(this->layer->polygons, std::move(other.layer->polygons));
         this->layer->polygons = union_safety_offset(this->layer->polygons);
         ensure_valid(this->layer->polygons, resolution);
-        assert_valid(this->layer->polygons);
         other.layer->polygons.clear();
     }
 
@@ -960,7 +982,7 @@ struct LoopInterfaceProcessor
 
     // Generate loop contacts at the top_contact_layer,
     // trim the top_contact_layer->polygons with the areas covered by the loops.
-    void generate(SupportGeneratorLayerExtruded &top_contact_layer, const Flow &interface_flow_src) const;
+    void generate(SupportGeneratorLayerExtruded &top_contact_layer, const Flow &interface_flow_src, const coord_t resolution) const;
 
     int         n_contact_loops;
     coordf_t    circle_radius;
@@ -968,7 +990,7 @@ struct LoopInterfaceProcessor
     Polygon     circle;
 };
 
-void LoopInterfaceProcessor::generate(SupportGeneratorLayerExtruded &top_contact_layer, const Flow &interface_flow_src) const
+void LoopInterfaceProcessor::generate(SupportGeneratorLayerExtruded &top_contact_layer, const Flow &interface_flow_src, const coord_t resolution) const
 {
     if (n_contact_loops == 0 || top_contact_layer.empty())
         return;
@@ -1164,13 +1186,21 @@ void LoopInterfaceProcessor::generate(SupportGeneratorLayerExtruded &top_contact
     // solution should be found to achieve both goals
     // Store the trimmed polygons into a separate polygon set, so the original infill area remains intact for
     // "modulate by layer thickness".
-    top_contact_layer.set_polygons_to_extrude(diff(top_contact_layer.layer->polygons, offset(loop_lines, double(circle_radius * 1.1))));
+    top_contact_layer.set_polygons_to_extrude(
+        ensure_valid(
+            diff(top_contact_layer.layer->polygons, offset(loop_lines, double(circle_radius * 1.1)))
+            , resolution));
+
+    ensure_valid(loop_lines, resolution);
 
     // Transform loops into ExtrusionPath objects.
     extrusion_entities_append_paths(
         top_contact_layer.extrusions,
         std::move(loop_lines),
         { ExtrusionRole::SupportMaterialInterface, flow });
+#ifdef _DEBUGINFO
+        top_contact_layer.extrusions.visit(LoopAssertVisitor());
+#endif
 }
 
 #ifdef SLIC3R_DEBUG
@@ -1868,16 +1898,22 @@ void generate_support_toolpaths(
                     }
                 }
             } else {
-                loop_interface_processor.generate(top_contact_layer, support_params.support_material_interface_flow);
+                loop_interface_processor.generate(top_contact_layer, support_params.support_material_interface_flow, support_params.resolution);
                 // If no loops are allowed, we treat the contact layer exactly as a generic interface layer.
                 // Merge interface_layer into top_contact_layer, as the top_contact_layer is not synchronized and therefore it will be used
                 // to trim other layers.
                 if (top_contact_layer.could_merge(interface_layer) && !raft_layer) {
                     if(interface_layer.layer)       assert_valid(interface_layer.polygons_to_extrude());
+#ifdef _DEBUGINFO
+                    top_contact_layer.extrusions.visit(LoopAssertVisitor());
+                    interface_layer.extrusions.visit(LoopAssertVisitor());
+                    if(top_contact_layer.layer)     assert_valid(top_contact_layer.polygons_to_extrude());
+                    if(interface_layer.layer)     assert_valid(interface_layer.polygons_to_extrude());
+#endif
                     top_contact_layer.merge(std::move(interface_layer), support_params.resolution);
                     if(top_contact_layer.layer)     assert_valid(top_contact_layer.polygons_to_extrude());
                 }
-            } 
+            }
             if ( (config.support_material_interface_layers == 0 ||
                     (config.support_material_bottom_interface_layers.is_enabled() && config.support_material_bottom_interface_layers.value == 0))
                 && support_params.can_merge_support_regions) {
@@ -1910,10 +1946,12 @@ void generate_support_toolpaths(
                 base_layer.layer->polygons = diff(base_layer.layer->polygons, islands);
             }
 #endif
-
             // Top and bottom contacts, interface layers.
             enum class InterfaceLayerType { TopContact, BottomContact, RaftContact, Interface, InterfaceAsBase };
             auto extrude_interface = [&](SupportGeneratorLayerExtruded &layer_ex, InterfaceLayerType interface_layer_type) {
+#ifdef _DEBUGINFO
+                for (const auto extr : layer_ex.extrusions.entities()) extr->visit(LoopAssertVisitor());
+#endif
                 if (! layer_ex.empty() && ! layer_ex.polygons_to_extrude().empty()) {
                     assert_valid(layer_ex.polygons_to_extrude());
                     bool interface_as_base = interface_layer_type == InterfaceLayerType::InterfaceAsBase;
