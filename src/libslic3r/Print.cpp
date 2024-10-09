@@ -1375,7 +1375,8 @@ Polygons get_brim_patch(const PrintObject &obj, ModelVolumeType brim_type, const
             }
         }
     }
-    return polys;
+    coord_t scaled_brim_resolution = std::max(SCALED_EPSILON * 10, scale_t(obj.print()->config().resolution.value));
+    return ensure_valid(union_(polys), scaled_brim_resolution);
 }
 
 bool has_brim_patch(const PrintObject &obj, ModelVolumeType brim_type)

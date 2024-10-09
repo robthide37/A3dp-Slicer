@@ -1692,7 +1692,7 @@ void GCodeProcessor::process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeL
     //check the config
     std::string raw_value = get_klipper_param(" EXTRUDER", line.raw());
     auto it = std::find(m_extruder_names.begin(), m_extruder_names.end(), raw_value);
-    if (it != m_extruder_names.end()) {
+    if ( it != m_extruder_names.end()) {
         process_toolchange(uint16_t(it - m_extruder_names.begin()));
         return;
     }
