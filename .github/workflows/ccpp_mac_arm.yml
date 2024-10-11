@@ -7,7 +7,7 @@ on:
       - Nigthly
       - nightly_dev
       - nightly_master
-      - debug_win
+      - Main
       - dev
 
 jobs:
