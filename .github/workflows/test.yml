@@ -1,0 +1,44 @@
+name: C/C++ dev arm macos
+
+on:
+  push:
+    branches:
+      - patch-1
+      - Nightly
+      - nightly_dev
+      - nightly_master
+      - Main
+      - dev
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: install autoconf
+      run: brew install autoconf
+    - name: check autoconf version
+      run: autoconf --version
+    - name: update automake for mpfr
+      run: |
+        curl -O -L http://ftpmirror.gnu.org/automake/automake-1.16.5.tar.gz
+        tar -xzf automake-1.16.5.tar.gz
+        cd automake-*
+        ./configure
+        make
+        sudo make install
+        automake --version
+    - name: build deps & slicer
+      run: ./BuildMacOS.sh -adsi
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ github.event.repository.name }}_macos_arm.app
+        path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ github.event.repository.name }}_macos_arm.dmg
+        path: build/${{ github.event.repository.name }}.dmg
