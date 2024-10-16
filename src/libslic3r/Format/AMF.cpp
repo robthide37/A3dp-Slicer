@@ -715,7 +715,7 @@ void AMFParserContext::endElement(const char * /* name */)
         CustomGCode::Type type  = static_cast<CustomGCode::Type>(atoi(m_value[3].c_str()));
         const std::string& extra= m_value[4];
 
-        m_model.custom_gcode_per_print_z.gcodes.push_back(CustomGCode::Item{print_z, type, extruder, color, extra});
+        m_model.custom_gcode_per_print_z().gcodes.push_back(CustomGCode::Item{print_z, type, extruder, color, extra});
 
         for (std::string& val: m_value)
             val.clear();
@@ -725,9 +725,9 @@ void AMFParserContext::endElement(const char * /* name */)
     case NODE_TYPE_CUSTOM_GCODE_MODE: {
         const std::string& mode = m_value[0];
 
-        m_model.custom_gcode_per_print_z.mode = mode == CustomGCode::SingleExtruderMode ? CustomGCode::Mode::SingleExtruder :
-                                                mode == CustomGCode::MultiAsSingleMode  ? CustomGCode::Mode::MultiAsSingle  :
-                                                                                          CustomGCode::Mode::MultiExtruder;
+        m_model.custom_gcode_per_print_z().mode = mode == CustomGCode::SingleExtruderMode ? CustomGCode::Mode::SingleExtruder :
+                                                    mode == CustomGCode::MultiAsSingleMode  ? CustomGCode::Mode::MultiAsSingle  :
+                                                                                              CustomGCode::Mode::MultiExtruder;
         for (std::string& val: m_value)
             val.clear();
         break;
@@ -1340,14 +1340,14 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
         stream << "  </constellation>\n";
     }
 
-    if (!model->custom_gcode_per_print_z.gcodes.empty() && options.export_modifiers)
+    if (!model->custom_gcode_per_print_z().gcodes.empty() && options.export_modifiers)
     {
         std::string out = "";
         pt::ptree tree;
 
         pt::ptree& main_tree = tree.add("custom_gcodes_per_height", "");
 
-        for (const CustomGCode::Item& code : model->custom_gcode_per_print_z.gcodes)
+        for (const CustomGCode::Item& code : model->custom_gcode_per_print_z().gcodes)
         {
             pt::ptree& code_tree = main_tree.add("code", "");
             // store custom_gcode_per_print_z gcodes information 

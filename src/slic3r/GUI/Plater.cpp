@@ -2771,8 +2771,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     }
                     if (! config_substitutions.empty())
                         show_substitutions_info(config_substitutions.get(), filename.string());
-
-                    this->model.custom_gcode_per_print_z = model.custom_gcode_per_print_z;
+                    
+                    if (load_config) {
+                        this->model.get_custom_gcode_per_print_z_vector() = model.get_custom_gcode_per_print_z_vector();
+                        //this->model.wipe_tower = model.wipe_tower;
+                    }
                 }
 
                 if (load_config) {
@@ -2803,8 +2806,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         preset_bundle->load_config_model(filename.string(), std::move(config));
                         q->notify_about_installed_presets();
 
-                        if (loaded_printer_technology == ptFFF)
-                            CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, &preset_bundle->project_config);
+                        //if (loaded_printer_technology == ptFFF)
+                        //    CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z(), &preset_bundle->project_config);
 
                         // For exporting from the amf/3mf we shouldn't check printer_presets for the containing information about "Print Host upload"
                         wxGetApp().load_current_presets(false);
@@ -3371,7 +3374,8 @@ void Plater::priv::delete_all_objects_from_model()
     // The hiding of the slicing results, if shown, is not taken care by the background process, so we do it here
     sidebar->show_sliced_info_sizer(false);
 
-    model.custom_gcode_per_print_z.gcodes.clear();
+    for (CustomGCode::Info& info : model.get_custom_gcode_per_print_z_vector())
+        info.gcodes.clear();
 }
 
 void Plater::priv::reset(std::string name)
@@ -3403,7 +3407,8 @@ void Plater::priv::reset(std::string name)
     // The hiding of the slicing results, if shown, is not taken care by the background process, so we do it here
     this->sidebar->show_sliced_info_sizer(false);
 
-    model.custom_gcode_per_print_z.gcodes.clear();
+    for (CustomGCode::Info& info : model.get_custom_gcode_per_print_z_vector())
+        info.gcodes.clear();
 }
 
 void Plater::priv::mirror(Axis axis)
@@ -8320,16 +8325,15 @@ std::vector<std::string> Plater::get_extruder_colors_from_plater_config(std::opt
 std::vector<std::string> Plater::get_colors_for_color_print(std::optional<std::reference_wrapper<const GCodeProcessorResult>> result) const
 {
     std::vector<std::string> colors = get_extruder_colors_from_plater_config(result);
-    colors.reserve(colors.size() + p->model.custom_gcode_per_print_z.gcodes.size());
-
+    colors.reserve(colors.size() + p->model.custom_gcode_per_print_z().gcodes.size());
+    
     if (wxGetApp().is_gcode_viewer() && result.has_value()) {
         for (const CustomGCode::Item& code : result->get().custom_gcode_per_print_z) {
             if (code.type == CustomGCode::ColorChange)
                 colors.emplace_back(code.color);
         }
-    }
-    else {
-        for (const CustomGCode::Item& code : p->model.custom_gcode_per_print_z.gcodes) {
+    } else {
+       for (const CustomGCode::Item &code : p->model.custom_gcode_per_print_z().gcodes) {
             if (code.type == CustomGCode::ColorChange)
                 colors.emplace_back(code.color);
         }
