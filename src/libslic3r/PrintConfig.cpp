@@ -8455,7 +8455,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         if (value == "1")
             value = "50%";
         else
-            value = "0";
+            value = "!50%";
     }
     if (opt_key == "print_machine_envelope") {
         opt_key = "machine_limits_usage";
@@ -8705,6 +8705,7 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
     if (old && config.has("bridge_angle") && config.get_float("bridge_angle") == 0 && config.is_enabled("bridge_angle")) {
         config.option("bridge_angle")->set_enabled(false);
     }
+    bool enabled = !config.has("overhangs_width_speed") || config.is_enabled("overhangs_width_speed");
     if (old && config.has("overhangs_width_speed") && config.get_float("overhangs_width_speed") == 0 && config.is_enabled("overhangs_width_speed")) {
         config.option("overhangs_width_speed")->set_enabled(false);
     }
@@ -10662,9 +10663,9 @@ std::string validate(const FullPrintConfig& cfg)
         return "Invalid value for --skirt-height";
     
     // extruder clearance
-    if (cfg.extruder_clearance_radius <= 0)
+    if (cfg.extruder_clearance_radius < 0)
         return "Invalid value for --extruder-clearance-radius";
-    if (cfg.extruder_clearance_height <= 0)
+    if (cfg.extruder_clearance_height < 0)
         return "Invalid value for --extruder-clearance-height";
 
     // --extrusion-multiplier
