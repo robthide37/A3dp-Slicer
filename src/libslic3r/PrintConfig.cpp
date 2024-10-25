@@ -2558,6 +2558,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionInt(1));
 
+    def = this->add("first_layer_size_compensation_no_collapse", coBool);
+    def->label = L("No collapse");
+    def->full_label = L("XY First layer compensation: no collapse");
+    def->category = OptionCategory::slicing;
+    def->tooltip = L("The compensations won't shrink thin areas below a threshold for the first layer(s)."
+                    "\nThe layer(s) where this is activated depends on the 'first_layer_size_compensation_layers' setting.");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("fill_smooth_width", coFloatOrPercent);
     def->label = L("Width");
     def->full_label = L("Ironing width");
@@ -9317,6 +9326,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "first_layer_infill_speed",
 "first_layer_min_speed",
 "first_layer_size_compensation_layers",
+"first_layer_size_compensation_no_collapse",
 "gcode_ascii",
 "gcode_command_buffer",
 "gcode_min_length",

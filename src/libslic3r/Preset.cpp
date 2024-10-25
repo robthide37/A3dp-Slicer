@@ -720,6 +720,7 @@ static std::vector<std::string> s_Preset_print_options {
         // compensation
         "first_layer_size_compensation",
         "first_layer_size_compensation_layers",
+        "first_layer_size_compensation_no_collapse",
         "xy_size_compensation",
         "xy_inner_size_compensation",
         "hole_size_compensation",

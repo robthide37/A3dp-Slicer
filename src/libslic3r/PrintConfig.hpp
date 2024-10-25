@@ -755,6 +755,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                first_layer_min_speed))
     ((ConfigOptionFloat,                first_layer_size_compensation))  /* elefant_foot_compensation */
     ((ConfigOptionInt,                  first_layer_size_compensation_layers))
+    ((ConfigOptionBool,                 first_layer_size_compensation_no_collapse))
     ((ConfigOptionFloatOrPercent,       first_layer_speed))
     ((ConfigOptionFloatOrPercent,       first_layer_speed_over_raft))
     ((ConfigOptionFloat,                hole_size_compensation))
