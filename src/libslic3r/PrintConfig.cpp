@@ -2448,7 +2448,7 @@ void PrintConfigDef::init_fff_params()
         ", it will choose the layer angle from the pattern as if it has started from the first layer."
         "Empty this settings to disable and recover the old behavior.");
     def->sidetext   = L("°");
-    def->min        = 0;
+    def->min        = -360;
     def->max        = 360;
     def->full_width = true;
     def->mode       = comExpert | comSuSi;
