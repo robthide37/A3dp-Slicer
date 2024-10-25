@@ -101,7 +101,7 @@ using namespace std::literals::string_view_literals;
 #endif
 
 #include <assert.h>
-
+#pragma UNOPTIMIZE
 namespace Slic3r {
 
 // Only add a newline in case the current G-code does not end with a newline.
@@ -1835,7 +1835,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                     final_extruder_id = tool_ordering.last_extruder();
                     assert(final_extruder_id != (uint16_t)-1);
                 }
-                 this->m_throw_if_canceled();
+                this->m_throw_if_canceled();
                 this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
                 if (finished_objects > 0) {
                     _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
@@ -1876,37 +1876,45 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                     print_object_instances_ordering = chain_print_object_instances(print);
                 }
                 bool first_layers = true;
+                final_extruder_id = initial_extruder_id;
 
-                for (coordf_t Rstart = 0, Rend = range;; Rstart += range, Rend += range) {
-                proceed_layers:
-                    bool is_layers = false;
+                coordf_t z_start = 0, z_end = range;
+                bool is_layers = true;
+                while (is_layers) {
+                    is_layers = false;
                     for (auto it_print_object_instance = print_object_instances_ordering.begin();
                          it_print_object_instance != print_object_instances_ordering.end();
                          ++it_print_object_instance) {
                         ObjectsLayerToPrint layers_to_print_range;
                         const PrintObject &       object        = *(*it_print_object_instance)->print_object;
-                        ObjectsLayerToPrint object_layers = collect_layers_to_print(object, status_monitor);
+                        ObjectsLayerToPrint object_and_support_layers = collect_layers_to_print(object, status_monitor);
+                        
+                        std::cout<<"print from "<<z_start<<" to "<< z_end<<"\n";
 
-                        for (const ObjectLayerToPrint &ltp : object_layers) {
-                            if (ltp.print_z() < Rstart || ltp.print_z() >= Rend)
+                        for (const ObjectLayerToPrint &ltp : object_and_support_layers) {
+                            if (ltp.print_z() < z_start || ltp.print_z() >= z_end)
                                 continue;
 
-                            if (!first_layers && ltp.layer()->id() == 0)
+                            // if first_layer then only id==0, else only id != 0
+                            if ( (first_layers) != (ltp.layer()->id() == 0))
                                 continue;
 
                             layers_to_print_range.push_back(ltp);
-                            if (first_layers)
-                                break;
                         }
 
-                        if (!layers_to_print_range.empty()) {
+                        // complete the tool ordering for this sequence.
+                        tool_ordering = ToolOrdering(object, layers_to_print_range, final_extruder_id);
+
+                        if (!layers_to_print_range.empty() && tool_ordering.first_extruder() != uint16_t(-1)) {
                             this->set_origin(unscale((*it_print_object_instance)->shift));
 
                             size_t finished_objects = 1 + (it_print_object_instance -
                                                            print_object_instances_ordering.begin());
                             if (finished_objects > 1)
                                 _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
-
+                            for (auto layer : layers_to_print_range) {
+                                std::cout<<"print layer @"<<layer.object_layer->print_z<<"\n";
+                            }
                             assert(!object.instances().empty());
                             assert(*it_print_object_instance >= &*object.instances().begin() &&
                                    *it_print_object_instance <= &*(object.instances().end()-1));
@@ -1914,14 +1922,15 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                                                  *it_print_object_instance - object.instances().data(),
                                                  preamble_to_put_start_layer, file);
                             is_layers = true;
+                            //update "current exturder" for the next ToolOrdering
+                            final_extruder_id = tool_ordering.last_extruder();
                         }
                     }
                     if (first_layers) {
                         first_layers = false;
-                        goto proceed_layers;
-                    }
-                    if (!is_layers) {
-                        break;
+                    } else {
+                        z_start = z_end;
+                        z_end += range;
                     }
                 }
                 /////////////////////////////////////////////// end parallel_objects_step
