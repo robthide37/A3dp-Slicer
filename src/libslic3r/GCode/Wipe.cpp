@@ -105,8 +105,14 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
     }
     retract_length = extruder.retract_to_go(retract_length);
     if (retract_length > 0 && this->has_path()) {
+        double nozzle_diameter = extruder.id() < 0 ? 0.4 : gcodegen.config().nozzle_diameter.get_at(extruder.id());
+        const double lift = extruder.id() < 0 ? 0 : gcodegen.config().wipe_lift.get_abs_value(extruder.id(), nozzle_diameter);
         const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer(), extruder.id());
-        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e, use_firmware_retract](const Vec2d &prev_quantized, Vec2d &p) {
+        const double lift_per_mm = xy_to_e * lift / retract_length;
+        const double initial_z = gcodegen.writer().get_position().z();
+        double current_z = initial_z;
+        const double final_z = gcodegen.writer().get_position().z() + lift;
+        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, &current_z, xy_to_e, use_firmware_retract, lift_per_mm, final_z](const Vec2d &prev_quantized, Vec2d &p) {
             Vec2d  p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(p);
             if (p_quantized == prev_quantized) {
                 p = prev_quantized; // keep old prev
@@ -149,11 +155,17 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             }
             p = p_quantized;
             assert(p.x() != gcodegen.writer().get_position().x() || p.y() != gcodegen.writer().get_position().y());
-            gcode += gcodegen.writer().extrude_to_xy(p, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
+            if (lift_per_mm == 0) {
+                gcode += gcodegen.writer().extrude_to_xy(p, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
+            } else {
+                current_z = std::min(final_z, current_z + segment_length * lift_per_mm);
+                Vec3d p3d(p.x(), p.y(), current_z);
+                gcode += gcodegen.writer().extrude_to_xyz(p3d, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
+            }
             retract_length -= dE;
             return done;
         };
-        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, use_firmware_retract, &wipe_linear](
+        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, &current_z, xy_to_e, use_firmware_retract, lift_per_mm, final_z, &wipe_linear](
             const Vec2d &prev_quantized, Vec2d &p, double radius_in, const bool ccw) {
             Vec2d  p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(p);
             if (p_quantized == prev_quantized) {
@@ -194,7 +206,13 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                 // use quantized version
                 p = p_quantized;
                 // The arc is valid.
-                gcode += gcodegen.writer().extrude_arc_to_xy(p, ij, ccw, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
+                if (lift_per_mm == 0) {
+                    gcode += gcodegen.writer().extrude_arc_to_xy(p, ij, ccw, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
+                } else {
+                    current_z = std::min(final_z, current_z + segment_length * lift_per_mm);
+                    Vec3d p3d(p.x(), p.y(), current_z);
+                    gcode += gcodegen.writer().extrude_arc_to_xyz(p3d, ij, ccw, use_firmware_retract ? 0 : -dE, wipe_retract_comment);
+                }
             }
             retract_length -= dE;
             return done;
@@ -223,6 +241,11 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
         auto pq = gcodegen.writer().get_default_gcode_formatter().quantize(p);
         assert(p == gcodegen.writer().get_default_gcode_formatter().quantize(p));
         gcodegen.set_last_pos(gcodegen.gcode_to_point(p));
+
+        // set extra z as lift, so we don't start to extrude in mid-air.
+        if (lift_per_mm != 0) {
+            gcodegen.writer().set_lift(gcodegen.writer().get_position().z() - initial_z);
+        }
     }
 
     // Prevent wiping again on the same path.

@@ -1153,6 +1153,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "elephant_foot_min_width" //sla ?
                 || opt_key == "first_layer_size_compensation"
                 || opt_key == "first_layer_size_compensation_layers"
+                || opt_key == "first_layer_size_compensation_no_collapse"
                 || opt_key == "first_layer_height"
                 || opt_key == "hole_size_compensation"
                 || opt_key == "hole_size_threshold"

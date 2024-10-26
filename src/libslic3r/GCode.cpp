@@ -101,7 +101,7 @@ using namespace std::literals::string_view_literals;
 #endif
 
 #include <assert.h>
-
+#pragma UNOPTIMIZE
 namespace Slic3r {
 
 // Only add a newline in case the current G-code does not end with a newline.
@@ -1537,6 +1537,8 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             print_object_instances_ordering = sort_object_instances_by_max_z(print);
         else if (print.config().complete_objects_sort.value == cosY)
             print_object_instances_ordering = sort_object_instances_by_max_y(print);
+        else if(print.config().complete_objects_sort.value == cosNearest)
+            print_object_instances_ordering = chain_print_object_instances(print);
         // Find the 1st printing object, find its tool ordering and the initial extruder ID.
         print_object_instance_sequential_active = print_object_instances_ordering.begin();
         for (; print_object_instance_sequential_active != print_object_instances_ordering.end(); ++ print_object_instance_sequential_active) {
@@ -1864,7 +1866,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                     final_extruder_id = tool_ordering.last_extruder();
                     assert(final_extruder_id != (uint16_t)-1);
                 }
-                 this->m_throw_if_canceled();
+                this->m_throw_if_canceled();
                 this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
                 if (finished_objects > 0) {
                     _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
@@ -1901,39 +1903,49 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             /////////////////////////////////////////////// begin parallel_objects_step
             if (print.config().parallel_objects_step > 0 && !has_wipe_tower) {
                 double range = std::min(print.config().parallel_objects_step, print.config().extruder_clearance_height) + EPSILON;
-                print_object_instances_ordering = chain_print_object_instances(print);
+                if (print.config().complete_objects_sort.value == cosNearest) {
+                    print_object_instances_ordering = chain_print_object_instances(print);
+                }
                 bool first_layers = true;
+                final_extruder_id = initial_extruder_id;
 
-                for (coordf_t Rstart = 0, Rend = range;; Rstart += range, Rend += range) {
-                proceed_layers:
-                    bool is_layers = false;
+                coordf_t z_start = 0, z_end = range;
+                bool is_layers = true;
+                while (is_layers) {
+                    is_layers = false;
                     for (auto it_print_object_instance = print_object_instances_ordering.begin();
                          it_print_object_instance != print_object_instances_ordering.end();
                          ++it_print_object_instance) {
                         ObjectsLayerToPrint layers_to_print_range;
                         const PrintObject &       object        = *(*it_print_object_instance)->print_object;
-                        ObjectsLayerToPrint object_layers = collect_layers_to_print(object, status_monitor);
+                        ObjectsLayerToPrint object_and_support_layers = collect_layers_to_print(object, status_monitor);
+                        
+                        std::cout<<"print from "<<z_start<<" to "<< z_end<<"\n";
 
-                        for (const ObjectLayerToPrint &ltp : object_layers) {
-                            if (ltp.print_z() < Rstart || ltp.print_z() >= Rend)
+                        for (const ObjectLayerToPrint &ltp : object_and_support_layers) {
+                            if (ltp.print_z() < z_start || ltp.print_z() >= z_end)
                                 continue;
 
-                            if (!first_layers && ltp.layer()->id() == 0)
+                            // if first_layer then only id==0, else only id != 0
+                            if ( (first_layers) != (ltp.layer()->id() == 0))
                                 continue;
 
                             layers_to_print_range.push_back(ltp);
-                            if (first_layers)
-                                break;
                         }
 
-                        if (!layers_to_print_range.empty()) {
+                        // complete the tool ordering for this sequence.
+                        tool_ordering = ToolOrdering(object, layers_to_print_range, final_extruder_id);
+
+                        if (!layers_to_print_range.empty() && tool_ordering.first_extruder() != uint16_t(-1)) {
                             this->set_origin(unscale((*it_print_object_instance)->shift));
 
                             size_t finished_objects = 1 + (it_print_object_instance -
                                                            print_object_instances_ordering.begin());
                             if (finished_objects > 1)
                                 _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
-
+                            for (auto layer : layers_to_print_range) {
+                                std::cout<<"print layer @"<<layer.object_layer->print_z<<"\n";
+                            }
                             assert(!object.instances().empty());
                             assert(*it_print_object_instance >= &*object.instances().begin() &&
                                    *it_print_object_instance <= &*(object.instances().end()-1));
@@ -1941,14 +1953,15 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                                                  *it_print_object_instance - object.instances().data(),
                                                  preamble_to_put_start_layer, file);
                             is_layers = true;
+                            //update "current exturder" for the next ToolOrdering
+                            final_extruder_id = tool_ordering.last_extruder();
                         }
                     }
                     if (first_layers) {
                         first_layers = false;
-                        goto proceed_layers;
-                    }
-                    if (!is_layers) {
-                        break;
+                    } else {
+                        z_start = z_end;
+                        z_end += range;
                     }
                 }
                 /////////////////////////////////////////////// end parallel_objects_step
@@ -4026,12 +4039,12 @@ std::string GCodeGenerator::change_layer(double print_z) {
     if (!BOOL_EXTRUDER_CONFIG(travel_ramping_lift) || m_spiral_vase_layer > 0 || m_config.lift_min.value > print_z) {
         if (BOOL_EXTRUDER_CONFIG(retract_layer_change) && m_writer.will_move_z(print_z))
             gcode += this->retract_and_wipe();
-        gcode += m_writer.travel_to_z(print_z, std::string("move to next layer (") + std::to_string(m_layer_index) + ")");
+        gcode += m_writer.travel_to_z(print_z, std::string("move to next layer (") + std::to_string(m_layer_index) + ", "+  to_string_nozero(print_z, 5) + ")");
         assert(!m_new_z_target);
         m_new_z_target.reset();
     } else {
         assert(BOOL_EXTRUDER_CONFIG(travel_ramping_lift));
-        gcode += std::string(";move to next layer (") + std::to_string(m_layer_index) + ") delayed by travel_ramping_lift.";
+        gcode += std::string(";move to next layer (") + std::to_string(m_layer_index) + ", "+  to_string_nozero(print_z, 5)+") delayed by travel_ramping_lift.\n";
         m_new_z_target = print_z;
     }
 
@@ -4987,10 +5000,10 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
         //get dist for wipe point
         coordf_t dist_point = wipe_paths.back().width();
         //get points for wipe
-        Point prev_point = wipe_paths.back().polyline.get_point_from_end(std::min(wipe_paths.back().polyline.length()/2, point_dist_for_vec));       // second to last point
+        Point prev_point = wipe_paths.back().polyline.get_point_from_end(std::min(wipe_paths.back().polyline.length()/3, point_dist_for_vec));       // second to last point
         // *(wipe_paths.back().polyline.points.end() - 2) this is the same as (or should be) as wipe_paths.front().first_point();
         Point current_point = wipe_paths.front().first_point();
-        Point next_point = wipe_paths.front().polyline.get_point_from_begin(std::min(wipe_paths.front().polyline.length()/2, point_dist_for_vec));  // second point
+        Point next_point = wipe_paths.front().polyline.get_point_from_begin(std::min(wipe_paths.front().polyline.length()/3, point_dist_for_vec));  // second point
         //safeguard : if a ExtrusionRole::ror exist abord;
         if (next_point == current_point || prev_point == current_point) {
             throw Slic3r::SlicingError(_u8L("ExtrusionRole::ror while writing gcode: two points are at the same position. Please send the .3mf project to the dev team for debugging. Extrude loop: wipe."));
@@ -5094,10 +5107,10 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
         // create the destination point along the first segment and rotate it
         // we make sure we don't exceed the segment length because we don't know
         // the rotation of the second segment so we might cross the object boundary
-        Vec2d  current_pos = current_point.cast<double>();
-        Vec2d  next_pos = next_point.cast<double>();
-        Vec2d  vec_dist = next_pos - current_pos;
-        double vec_norm = vec_dist.norm();
+        const Vec2d  current_pos = current_point.cast<double>();
+        const Vec2d  next_pos = next_point.cast<double>();
+        const Vec2d  vec_dist = next_pos - current_pos;
+        const double vec_norm = vec_dist.norm();
         double sin_a    = std::abs(std::sin(angle));
         sin_a = std::max(0.1, sin_a);
         const double setting_max_depth = (m_config.wipe_inside_depth.get_abs_value(m_writer.tool()->id(), nozzle_diam));
@@ -5332,8 +5345,9 @@ void GCodeGenerator::add_wipe_points(const std::vector<THING>& paths, bool rever
 
             wipe_polyline.append(path.polyline);
         }
-        if(reverse)
+        if (reverse) {
             wipe_polyline.reverse();
+        }
         m_wipe.set_path(wipe_polyline.get_arc());
     }
 }
@@ -6895,9 +6909,11 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
     // compensate retraction
     if (m_delayed_layer_change.empty()) {
         gcode += m_writer.unlift();//this->unretract();
+        assert(is_approx(m_writer.get_position().z(), m_layer->print_z, EPSILON));
     } else {
         //check if an unlift happens
         std::string unlift = m_writer.unlift();
+        assert(is_approx(m_writer.get_position().z(), m_layer->print_z, EPSILON));
         if (unlift.empty()) {
             unlift = m_delayed_layer_change;
         }
@@ -7253,7 +7269,6 @@ std::vector<coord_t> GCodeGenerator::get_travel_elevation(Polyline& travel, doub
     ElevatedTravelParams elevation_params{
         get_elevated_traval_params(travel, this->m_config, this->m_writer, this->m_travel_obstacle_tracker, this->layer()->id(), z_change)};
 
-    const double initial_elevation = this->m_writer.get_position().z();
     assert(elevation_params.lift_height == z_change);
 
     const double path_length = unscaled(travel.length());
@@ -7279,13 +7294,13 @@ std::vector<coord_t> GCodeGenerator::get_travel_elevation(Polyline& travel, doub
     ElevatedTravelFormula elevator{elevation_params};
 
     for (const DistancedPoint &point : extended_xy_path) {
-        result.emplace_back(scale_t(initial_elevation + elevator(unscaled(point.dist_from_start)) + SCALING_FACTOR / 2));
+        result.emplace_back(scale_t(elevator(unscaled(point.dist_from_start)) + SCALING_FACTOR / 2));
         new_polyline.points.push_back(std::move(point.point));
     }
 
     assert(travel.front() == new_polyline.front());
     assert(travel.back() == new_polyline.back());
-    assert(result.back() == scale_t(z_change + this->m_writer.get_position().z() + SCALING_FACTOR / 2)); // if false, enforce it.
+    assert(result.back() == scale_t(z_change + SCALING_FACTOR / 2)); // if false, enforce it.
 
     //return computation
     travel = std::move(new_polyline);
@@ -7297,8 +7312,8 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
     // Note: if last_pos is undefined, then travel.size() == 1
 
     // ramping travel?
-    //TODO: ramp up for th first half, then ramp down.
-    std::vector<coord_t> z_travel;
+    //TODO: ramp up for the first half, then ramp down.
+    std::vector<coord_t> z_relative_travel;
     if (BOOL_EXTRUDER_CONFIG(travel_ramping_lift) && m_spiral_vase_layer <= 0) {
         double z_diff_layer_and_lift = 0;
         // from layer change?
@@ -7309,12 +7324,10 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
                 double layer_change_diff = m_layer->print_z - m_writer.get_unlifted_position().z();
                 // move layer_change_diff into lift & z_diff_layer_and_lift
                 z_diff_layer_and_lift += layer_change_diff;
-                m_writer.set_lift(m_writer.get_lift() - layer_change_diff);
             } else {
                 // do a strait z-move (as we can't see the preious point.
                 gcode += m_writer.get_travel_to_z_gcode(m_layer->print_z, "strait z-move, as the travel is undefined.");
             }
-            m_new_z_target.reset();
         } else {
             assert(!m_new_z_target);
         }
@@ -7331,13 +7344,12 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
             z_diff_layer_and_lift -= needed_strait_lift;
             gcode += m_writer.travel_to_z(m_next_lift_min, "enforce lift_min");
             // travel_to_z touch the lift, so recompute it
-            m_writer.set_lift(m_writer.get_position().z() - m_layer->print_z);
             m_next_lift_min = 0;
         }
         // create the ramping
         if (z_diff_layer_and_lift > EPSILON) {
-            z_travel = get_travel_elevation(travel, z_diff_layer_and_lift);
-            assert(z_travel.size() == travel.size());
+            z_relative_travel = get_travel_elevation(travel, z_diff_layer_and_lift);
+            assert(z_relative_travel.size() == travel.size());
         }
     } else {
         // lift() has already been called
@@ -7373,13 +7385,13 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
             } else if (current_speed < max_speed) {
                 current_speed = max_speed;
             }
-            if (z_travel.empty()) {
+            if (z_relative_travel.empty()) {
                 gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[idx_print]),
                                                current_speed > 2 ? double(uint32_t(current_speed)) : current_speed,
                                                comment);
             } else {
-                assert(idx_print < z_travel.size());
-                gcode += m_writer.travel_to_xyz(this->point_to_gcode(travel.points[idx_print], z_travel[idx_print]), true /*is lift*/,
+                assert(idx_print < z_relative_travel.size());
+                gcode += m_writer.travel_to_xyz(this->point_to_gcode(travel.points[idx_print], z_relative_travel[idx_print]), true /*is lift*/,
                                                current_speed > 2 ? double(uint32_t(current_speed)) : current_speed,
                                                comment);
             }
@@ -7408,30 +7420,30 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
         }
 
         //finish writing moves at current speed
-        if (z_travel.empty()) {
+        if (z_relative_travel.empty()) {
             for (; idx_print < travel.size(); ++idx_print) {
                 gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[idx_print]),
                                                current_speed > 2 ? double(uint32_t(current_speed)) : current_speed,
                                                comment);
             }
         } else {
-            assert(idx_print < z_travel.size());
+            assert(idx_print < z_relative_travel.size());
             for (; idx_print < travel.size(); ++idx_print) {
-                gcode += m_writer.travel_to_xyz(this->point_to_gcode(travel.points[idx_print], z_travel[idx_print]), true /*is lift*/,
+                gcode += m_writer.travel_to_xyz(this->point_to_gcode(travel.points[idx_print], z_relative_travel[idx_print]), true /*is lift*/,
                                                 current_speed > 2 ? double(uint32_t(current_speed)) : current_speed,
                                                 comment);
             }
         }
         this->set_last_pos(travel.points.back());
     } else if (travel.size() >= 2) {
-        if (z_travel.empty()) {
+        if (z_relative_travel.empty()) {
             for (size_t i = 1; i < travel.size(); ++i) {
                 // use G1 because we rely on paths being straight (G0 may make round paths)
                 gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[i]), 0.0, comment);
             }
         } else {
             for (size_t i = 1; i < travel.size(); ++i) {
-                gcode += m_writer.travel_to_xyz(this->point_to_gcode(travel.points[i], z_travel[i]), true /*is lift*/, 0.0, comment);
+                gcode += m_writer.travel_to_xyz(this->point_to_gcode(travel.points[i], z_relative_travel[i]), true /*is lift*/, 0.0, comment);
             }
         }
         this->set_last_pos(travel.points.back());
@@ -7439,7 +7451,12 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
         gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.back()), 0.0, comment);
     }
     
-    // ramping travel -> set lift if needed (so unlift() works)
+    // ramping travel (in a new layer) -> set lift if needed (so unlift() works)
+    if (m_new_z_target) {
+        assert(this->writer().get_position().z() + EPSILON > *m_new_z_target);
+        this->writer().set_lift(this->writer().get_position().z() - *m_new_z_target);
+        m_new_z_target.reset();
+    }
     assert(is_approx(this->writer().get_unlifted_position().z(), m_layer->print_z, EPSILON));
 }
 
