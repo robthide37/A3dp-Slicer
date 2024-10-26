@@ -556,7 +556,8 @@ void Layer::build_up_down_graph(Layer& below, Layer& above)
 
 static inline bool layer_needs_raw_backup(const Layer *layer)
 {
-    return ! (layer->regions().size() == 1 && (layer->id() >= layer->object()->config().first_layer_size_compensation_layers.value || layer->object()->config().first_layer_size_compensation.value == 0));
+    return true;
+    // return ! (layer->regions().size() == 1 && (layer->id() >= layer->object()->config().first_layer_size_compensation_layers.value || layer->object()->config().first_layer_size_compensation.value == 0));
 }
 
 void Layer::backup_untyped_slices()

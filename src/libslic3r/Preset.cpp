@@ -864,6 +864,8 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_wipe_inside_end",
         "filament_wipe_inside_start",
         "filament_wipe_lift",
+        "filament_wipe_lift_length",
+        "filament_wipe_min",
         // Profile compatibility
         "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
         //merill adds

@@ -1181,6 +1181,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBools,               wipe_inside_end))
     ((ConfigOptionBools,               wipe_inside_start))
     ((ConfigOptionFloatsOrPercents,    wipe_lift))
+    ((ConfigOptionFloatsOrPercents,    wipe_lift_length))
+    ((ConfigOptionFloatsOrPercents,    wipe_min))
     ((ConfigOptionBools,               wipe_only_crossing))
     ((ConfigOptionFloats,              wipe_speed))
     ((ConfigOptionBool,                wipe_tower_no_sparse_layers))

@@ -248,6 +248,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "wipe_inside_end",
         "wipe_inside_start",
         "wipe_lift",
+        "wipe_lift_length",
+        "wipe_min",
         "wipe_only_crossing",
         "wipe_speed",
     };

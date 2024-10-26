@@ -193,6 +193,9 @@ public:
                                      || !this->ironings().empty() || !this->thin_fills().empty(); }
 
     void    simplify_extrusion_entity();
+
+    const ExPolygons &get_cached_slices() const { return m_raw_slices; }
+
 protected:
     friend class Layer;
     friend class PrintObject;
@@ -217,6 +220,7 @@ private:
     // Backed up slices before they are split into top/bottom/internal.
     // Only backed up for multi-region layers or layers with elephant foot compensation.
     //FIXME Review whether not to simplify the code by keeping the raw_slices all the time.
+    // superslicer -> layer_needs_raw_backup is now true, so evryone has their cache here.
     ExPolygons                  m_raw_slices;
 
 //FIXME make m_slices public for unit tests

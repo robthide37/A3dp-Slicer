@@ -145,7 +145,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
             });
         // Pass to the wipe cache.
         assert(gcodegen.m_wipe.path().empty());
-        gcodegen.m_wipe.set_path(std::move(path));
+        gcodegen.m_wipe.set_path(std::move(path), false);
     }
 
     // Let the planner know we are traveling between objects.
