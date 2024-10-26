@@ -339,10 +339,8 @@ public:
     // Centering offset of the sliced mesh from the scaled and rotated mesh of the model.
     const Point& 			     center_offset() const  { return m_center_offset; }
 
-    bool                         has_brim() const       {
-        return (this->config().brim_width.value > 0 && this->config().brim_width_interior.value > 0)
-            && ! this->has_raft();
-    }
+    bool                         has_brim() const;
+    Polygons                     get_brim_patch(ModelVolumeType brim_type, const PrintInstance *instance = nullptr) const;
 
     // This is the *total* layer count (including support layers)
     // this value is not supposed to be compared with Layer::id
@@ -653,26 +651,13 @@ struct ConflictResult
     ConflictResult(const std::string& objName1, const std::string& objName2, double height, const void* obj1, const void* obj2)
         : _objName1(objName1), _objName2(objName2), _height(height), _obj1(obj1), _obj2(obj2)
     {}
+    ConflictResult(const std::string& objName1, const std::string& objName2, double height, const void* obj1, const void* obj2, int layer_id)
+        : _objName1(objName1), _objName2(objName2), _height(height), _obj1(obj1), _obj2(obj2), layer(layer_id)
+    {}
     ConflictResult() = default;
 };
 
 using ConflictResultOpt = std::optional<ConflictResult>;
-
-class BrimLoop {
-public:
-    BrimLoop(const Polygon& p) : lines(Polylines{ p.split_at_first_point() }), is_loop(true) {}
-    BrimLoop(const Polyline& l) : lines(Polylines{l}), is_loop(false) {}
-    Polylines lines;
-    std::vector<BrimLoop> children;
-    bool is_loop; // has only one polyline stored and front == back
-    Polygon polygon() const{
-        assert(is_loop);
-        Polygon poly = Polygon(lines.front().points);
-        if (poly.points.front() == poly.points.back())
-            poly.points.resize(poly.points.size() - 1);
-        return poly;
-    }
-};
 
 using PrintObjectPtrs          = std::vector<PrintObject*>;
 using ConstPrintObjectPtrs     = std::vector<const PrintObject*>;

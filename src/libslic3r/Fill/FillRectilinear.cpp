@@ -3370,6 +3370,9 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
     if (!fill_surface_by_lines(surface, params, 0.f, 0.f, polylines_out)) {
         printf("FillRectilinear2::fill_surface() failed to fill a region.\n");
     }
+    if (params.fill_exactly) {
+        BOOST_LOG_TRIVIAL(info) << "Sawtooth infill can't \"fill exactly\", setting ignored.";
+    }
     if (!polylines_out.empty()) {
         ExtrusionEntityCollection *eec = new ExtrusionEntityCollection();
         /// pass the no_sort attribute to the extrusion path
@@ -3563,9 +3566,7 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
 
         extrusion_entities_append_paths(
             *eec, std::move(polylines_rectilinear),
-                    ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult,
-                                                                 params.flow.width() * params.flow_mult,
-                                                                 params.flow.height()}},
+                    ExtrusionAttributes{good_role, params.flow},
                     true);
 
         coll_nosort->append(ExtrusionEntitiesPtr{ eec });
@@ -3596,8 +3597,8 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
 
     
     // check volume coverage
-    {
-        double flow_mult_exact_volume = 1;
+    if (!coll_nosort->empty()) {
+        double mult_flow = 1;
         // check if not over-extruding
         if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
             // compute the path of the nozzle -> extruded volume
@@ -3606,17 +3607,20 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
             // compute real volume to fill
             double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
             if (extruded_volume != 0 && polyline_volume != 0)
-                flow_mult_exact_volume = polyline_volume / extruded_volume;
+                mult_flow = polyline_volume / extruded_volume;
             // failsafe, it can happen
-            if (flow_mult_exact_volume > 1.3)
-                flow_mult_exact_volume = 1.3;
-            if (flow_mult_exact_volume < 0.8)
-                flow_mult_exact_volume = 0.8;
-            BOOST_LOG_TRIVIAL(info) << "rectilinear/monotonic Infill (with gapfil) process extrude " << extruded_volume
-                                    << " mm3 for a volume of " << polyline_volume << " mm3 : we mult the flow by "
-                                    << flow_mult_exact_volume;
-            //apply to extrusions
-            ExtrusionModifyFlow{flow_mult_exact_volume}.set(*coll_nosort);
+            if (mult_flow > 1.3)
+                mult_flow = 1.3;
+            if (mult_flow < 0.8)
+                mult_flow = 0.8;
+            BOOST_LOG_TRIVIAL(info) << "rectilinear/monotonic Infill (with gapfil) process extrude "
+                                    << extruded_volume << " mm3 for a volume of " << polyline_volume
+                                    << " mm3 : we mult the flow by " << mult_flow;
+        }
+        mult_flow *= params.flow_mult;
+        if (mult_flow != 1) {
+            // apply to extrusions
+            ExtrusionModifyFlow{mult_flow}.set(*coll_nosort);
         }
     }
 

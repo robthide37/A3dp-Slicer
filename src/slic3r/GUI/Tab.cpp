@@ -1517,6 +1517,27 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
             this->on_value_change("solid_infill_every_layers", val);
         }
     }
+    if (opt_key.find("max_layer_height") != std::string::npos && m_config_base) {
+        static bool only_one_warning_per_session = true;
+        if (only_one_warning_per_session) {
+            only_one_warning_per_session= false;
+            assert(opt_key.find("#") != std::string::npos);
+            assert(opt_id.find("max_layer_height") == std::string::npos);
+            int16_t extruder_idx = atoi(opt_id.c_str());
+            const std::vector<double> &nozzle_sizes = m_config_base->option<ConfigOptionFloats>("nozzle_diameter")->get_values();
+            double max_lh = m_config_base->option("max_layer_height")->is_enabled() ?
+                m_config_base->get_computed_value("max_layer_height", extruder_idx) :
+                nozzle_sizes[extruder_idx] * 0.75f;
+            if (max_lh > nozzle_sizes[extruder_idx]) {
+                const wxString msg_text = _(
+                    L("Maximum layer height is higher than the nozzle diameter, it's dangerous!"
+                      " Be sure your extrusion width is high enough for it (it need to be equal or higher than the layer height) or use the extrusion spacing instead."
+                      "\n\nIf something wrong is detected, the slicer may try to change a value arbitrarly or emit an error.."));
+                MessageDialog dialog(m_parent, msg_text, _(L("Maximum layer height")), wxICON_WARNING | wxOK);
+                dialog.ShowModal();
+            }
+        }
+    }
 
     update();
 }
@@ -3238,10 +3259,10 @@ void TabFilament::update_filament_overrides_page()
     );
 
     const bool is_lifting =  (
-       ! m_config->option("filament_travel_max_lift")->is_enabled(0)
-        || m_config->opt_float("filament_travel_max_lift", extruder_idx) > 0
-        || !m_config->option("filament_retract_lift")->is_enabled(0)
-        || m_config->opt_float("filament_retract_lift", extruder_idx) > 0
+       // !m_config->option("filament_travel_max_lift")->is_enabled(0) ||
+       //  m_config->opt_float("filament_travel_max_lift", extruder_idx) > 0 ||
+       !m_config->option("filament_retract_lift")->is_enabled(0) ||
+        m_config->opt_float("filament_retract_lift", extruder_idx) > 0
     );
 
     for (const std::string& opt_key : print_config_def.filament_override_option_keys()) {
@@ -4137,14 +4158,14 @@ void TabPrinter::toggle_options()
     //z step checks
     double z_step = m_config->opt_float("z_step");
     if(z_step > 0){
-        int64_t z_step_Mlong = (int64_t)(z_step * 1000000.);
+        coord_t z_step_Mlong = scale_t(z_step);
         DynamicPrintConfig new_conf;
         bool has_changed = false;
         const std::vector<double>& nozzle_diameters = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_values();
         const std::vector<FloatOrPercent>& min_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("min_layer_height")->get_values();
         for (int i = 0; i < min_layer_height.size(); i++) {
             if(!min_layer_height[i].percent)
-                if (min_layer_height[i].value != 0 && (int64_t)(min_layer_height[i].value * 1000000.) % z_step_Mlong != 0) {
+                if (min_layer_height[i].value != 0 && scale_t(min_layer_height[i].value) % z_step_Mlong != 0) {
                     if (!has_changed)
                         new_conf = *m_config;
                     new_conf.option<ConfigOptionFloatsOrPercents>("min_layer_height")->set_at(FloatOrPercent{std::max(z_step, Slic3r::check_z_step(min_layer_height[i].value, z_step)), false}, i);
@@ -4154,7 +4175,7 @@ void TabPrinter::toggle_options()
         std::vector<FloatOrPercent> max_layer_height = m_config->option<ConfigOptionFloatsOrPercents>("max_layer_height")->get_values();
         for (int i = 0; i < max_layer_height.size(); i++) {
             if (!max_layer_height[i].percent)
-                if ((int64_t)(max_layer_height[i].value * 1000000.) % z_step_Mlong != 0) {
+                if (scale_t(max_layer_height[i].value) % z_step_Mlong != 0) {
                     if (!has_changed)
                         new_conf = *m_config;
                     new_conf.option<ConfigOptionFloatsOrPercents>("max_layer_height")->get_at(i).value = std::max(z_step, Slic3r::check_z_step(max_layer_height[i].value, z_step));
@@ -4371,8 +4392,6 @@ void Tab::load_current_preset()
         }
         else {
             on_presets_changed();
-            if ((type() & Preset::TYPE_PRINT1) != 0)
-                update_frequently_changed_parameters();
 
             //update width/spacing links
             if (type() == Preset::TYPE_FFF_PRINT) {
@@ -4388,6 +4407,7 @@ void Tab::load_current_preset()
                 }
             }
         }
+        update_frequently_changed_parameters();
 
         m_opt_status_value = (m_presets->get_selected_preset_parent() ? osSystemValue : 0) | osInitValue;
         init_options_list();
@@ -4943,6 +4963,9 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     save_current_preset(name, detach);
+    //ensure evrything now point to the saved preset
+    select_preset_by_name(name, true);
+    
 
     // Print bed has to be updated, when printer preset is detached from the system preset
     if (detach && type() == Preset::TYPE_PRINTER) {

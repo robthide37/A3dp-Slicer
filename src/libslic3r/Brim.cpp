@@ -3,12 +3,15 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "clipper/clipper_z.hpp"
+#include "Brim.hpp"
 
+#include "clipper/clipper_z.hpp"
 #include "ClipperUtils.hpp"
 #include "EdgeGrid.hpp"
-#include "Print.hpp"
+#include "ExtrusionEntityCollection.hpp"
+#include "Flow.hpp"
 #include "Layer.hpp"
+#include "Print.hpp"
 #include "PrintConfig.hpp"
 #include "ShortestPath.hpp"
 #include "libslic3r.h"
@@ -1377,16 +1380,18 @@ void make_brim_patch(const Print &print,
         // remove unbrimable area
         ExPolygons next = diff_ex({ExPolygon(contour)}, unbrimmable_areas);
         ensure_valid(next, scaled_resolution_brim);
-        
+
         // create polygons
         std::vector<std::vector<BrimLoop>> loops;
+        loops.emplace_back();
         next = offset2_ex(next, -flow.scaled_width() / 2 - flow.scaled_spacing() / 4, flow.scaled_spacing() / 4, jtSquare);
         while (!next.empty()) {
-            loops.emplace_back();
             for (ExPolygon &expoly : next) {
                 loops.back().emplace_back(expoly.contour);
                 for (Polygon &poly : expoly.holes) {
+                    poly.reverse();
                     loops.back().emplace_back(poly);
+                    poly.reverse();
                 }
             }
             next = ensure_valid(offset2_ex(next, - (flow.scaled_spacing() * 5) / 4, flow.scaled_spacing() / 4, jtSquare), scaled_resolution_brim);
@@ -1394,7 +1399,7 @@ void make_brim_patch(const Print &print,
 
         // create extrusions
         extrude_brim_from_tree(print, loops, {Polygon(contour)}, flow, out, true);
-        
+
         unbrimmable_areas.push_back(ExPolygon(contour));
         union_ex(unbrimmable_areas);
     }

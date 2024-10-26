@@ -58,11 +58,11 @@ public:
         LineWithIDs lines;
         for (const ExtrusionPath &path : _piles[_curPileIdx]) {
             Polyline check_polyline;
-            for (int i = 0; i < (int)_offsets.size(); ++i) {
+            for (int idx_offset = 0; idx_offset < (int)_offsets.size(); ++idx_offset) {
                 check_polyline = path.as_polyline().to_polyline();
-                check_polyline.translate(_offsets[i]);
-                for (size_t i = 1; i < check_polyline.size(); ++i) {
-                    lines.emplace_back(Line(check_polyline.points[i - 1], check_polyline.points[i]), _id, i, path.role());
+                check_polyline.translate(_offsets[idx_offset]);
+                for (size_t idx_pt = 1; idx_pt < check_polyline.size(); ++idx_pt) {
+                    lines.emplace_back(Line(check_polyline.points[idx_pt - 1], check_polyline.points[idx_pt]), _id, idx_offset, path.role());
                 }
             }
         }

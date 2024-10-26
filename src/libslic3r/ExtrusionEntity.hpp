@@ -305,6 +305,10 @@ public:
         polyline.append(p);
         z_offsets.push_back(z_offset);
     }
+    void reverse() override {
+        this->polyline.reverse();
+        std::reverse(this->z_offsets.begin(), this->z_offsets.end());
+    }
 
     //TODO: simplify only for points that have the same z-offset
     void simplify(double tolerance, ArcFittingType use_arc_fitting, double fitting_arc_tolerance) override;
@@ -477,8 +481,8 @@ public:
     // Create a new object, initialize it with this object using the move semantics.
     virtual ExtrusionEntity* clone_move() override { return new ExtrusionLoop(std::move(*this)); }
     double          area() const;
-    bool            is_counter_clockwise() const { return this->area() > 0; }
-    bool            is_clockwise() const { return this->area() < 0; }
+    bool            is_counter_clockwise() const;
+    bool            is_clockwise() const;
     // Used by PerimeterGenerator to reorient extrusion loops. (old make_clockwise() and make_counter_clockwise())
     void            reverse() override;
     const Point&    first_point() const override { return this->paths.front().polyline.front(); }
@@ -698,8 +702,14 @@ class ExtrusionModifyFlow : public ExtrusionVisitorRecursive {
 public:
     using ExtrusionVisitorRecursive::use;
     ExtrusionModifyFlow(double flow_mult) : _flow_mult(flow_mult) {}
-    void use(ExtrusionPath &path) override { path.attributes_mutable().mm3_per_mm *= _flow_mult; path.attributes_mutable().width *= _flow_mult; }
-    void use(ExtrusionPath3D &path3D) override { path3D.attributes_mutable().mm3_per_mm *= _flow_mult; path3D.attributes_mutable().width *= _flow_mult; }
+    void use(ExtrusionPath &path) override {
+        path.attributes_mutable().mm3_per_mm *= _flow_mult;
+        path.attributes_mutable().width *= _flow_mult;
+    }
+    void use(ExtrusionPath3D &path3D) override {
+        path3D.attributes_mutable().mm3_per_mm *= _flow_mult;
+        path3D.attributes_mutable().width *= _flow_mult;
+    }
     void set(ExtrusionEntityCollection &coll);
 };
 

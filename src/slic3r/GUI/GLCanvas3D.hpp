@@ -218,6 +218,11 @@ class GLCanvas3D
         const ModelObject          *m_model_object{ nullptr };
         // Maximum z of the currently selected object (Model::objects[last_object_id]).
         float                       m_object_max_z{ 0.0f };
+        //min &max for all thigns, if possible
+        bool                        m_first_launch = true;
+        float                       m_min_layer_height{ 0.05f };
+        float                       m_max_layer_height{ 0.35f };
+        bool                        m_layer_height_limit_modified{ false };
         // Owned by LayersEditing.
         std::shared_ptr<SlicingParameters> m_slicing_parameters{ nullptr };
         std::vector<double>         m_layer_height_profile;
@@ -256,12 +261,14 @@ class GLCanvas3D
         struct Profile
         {
             GLModel baseline;
+            GLModel baseline2;
             GLModel profile;
             GLModel background;
             struct OldCanvasWidth
             {
                 float background{ 0.0f };
                 float baseline{ 0.0f };
+                float baseline2{ 0.0f };
                 float profile{ 0.0f };
             };
             OldCanvasWidth old_canvas_width;

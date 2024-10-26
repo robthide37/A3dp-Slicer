@@ -295,7 +295,7 @@ ConflictComputeOpt ConflictChecker::find_inter_of_lines(const LineWithIDs &lines
 ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(SpanOfConstPtrs<PrintObject> objs,
                                                                     const WipeTowerData& wipe_tower_data) // find the first intersection point of lines in different objects
 {
-    if (objs.empty() || (objs.size() == 1 && objs.front()->instances().size() == 1)) { return {}; }
+    if (objs.empty() || (objs.size() == 1 && objs.front()->instances().size() == 1 && wipe_tower_data.number_of_toolchanges == 0)) { return {}; }
 
     // The code ported from BS uses void* to identify objects...
     // Let's use the address of this variable to represent the wipe tower.
@@ -330,36 +330,38 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(SpanOfConstP
     }
 
     bool                                   find = false;
-    tbb::concurrent_vector<std::pair<ConflictComputeResult,double>> conflict;
+    tbb::concurrent_vector<std::tuple<ConflictComputeResult, double, int>> conflict;
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, layersLines.size()), [&](tbb::blocked_range<size_t> range) {
         for (size_t i = range.begin(); i < range.end(); i++) {
             auto interRes = find_inter_of_lines(layersLines[i]);
             if (interRes.has_value()) {
                 find = true;
-                conflict.emplace_back(*interRes, heights[i]);
+                conflict.emplace_back(*interRes, heights[i], i);
                 break;
             }
         }
     });
 
     if (find) {
-        std::sort(conflict.begin(), conflict.end(), [](const std::pair<ConflictComputeResult, double>& i1, const std::pair<ConflictComputeResult, double>& i2) {
-            return i1.second < i2.second;
+        std::sort(conflict.begin(), conflict.end(), [](const std::tuple<ConflictComputeResult, double, int>& i1, const std::tuple<ConflictComputeResult, double, int>& i2) {
+            return std::get<1>(i1) < std::get<1>(i2);
         });
 
-        const void *ptr1           = conflictQueue.idToObjsPtr(conflict[0].first._obj1);
-        const void *ptr2           = conflictQueue.idToObjsPtr(conflict[0].first._obj2);
-        double      conflictHeight = conflict[0].second;
+        auto &[ccr, conflict_height, conflict_layer_id] = conflict[0];
+        const void *ptr1           = conflictQueue.idToObjsPtr(ccr._obj1);
+        const void *ptr2           = conflictQueue.idToObjsPtr(ccr._obj2);
         if (ptr1 == &wtptr || ptr2 == &wtptr) {
             assert(! wipe_tower_data.z_and_depth_pairs.empty());
             if (ptr2 == &wtptr) { std::swap(ptr1, ptr2); }
+            assert(ptr2 != &wtptr);
+            if (ptr2 == &wtptr) { return {}; }
             const PrintObject *obj2 = reinterpret_cast<const PrintObject *>(ptr2);
-            return std::make_optional<ConflictResult>("WipeTower", obj2->model_object()->name, conflictHeight, nullptr, ptr2);
+            return std::make_optional<ConflictResult>("WipeTower", obj2->model_object()->name, conflict_height, nullptr, ptr2, conflict_layer_id);
         }
         const PrintObject *obj1 = reinterpret_cast<const PrintObject *>(ptr1);
         const PrintObject *obj2 = reinterpret_cast<const PrintObject *>(ptr2);
-        return std::make_optional<ConflictResult>(obj1->model_object()->name, obj2->model_object()->name, conflictHeight, ptr1, ptr2);
+        return std::make_optional<ConflictResult>(obj1->model_object()->name, obj2->model_object()->name, conflict_height, ptr1, ptr2, conflict_layer_id);
     } else
         return {};
 }

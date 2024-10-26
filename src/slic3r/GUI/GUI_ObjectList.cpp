@@ -3368,8 +3368,9 @@ static double get_max_layer_height(const int extruder_idx)
     double max_layer_height = config.get_computed_value("max_layer_height", extruder_idx_zero_based);
 
     // In case max_layer_height is set to zero, it should default to 75 % of nozzle diameter:
-    if (max_layer_height < EPSILON)
+    if (max_layer_height < EPSILON || config.is_enabled("max_layer_height")) {
         max_layer_height = 0.75 * config.opt_float("nozzle_diameter", extruder_idx_zero_based);
+    }
 
     return max_layer_height;
 }
@@ -3546,6 +3547,13 @@ bool ObjectList::edit_layer_range(const t_layer_height_range& range, coordf_t la
         config->set_key_value("layer_height", new ConfigOptionFloat(layer_height));
         changed_object(obj_idx);
         return true;
+    } else {
+        const wxString msg_text = format_wxstr(
+            _L("The layer height need to be btween the minimum and maximum layer height, which are %1% and %2%."),
+            Slic3r::to_string_nozero(get_min_layer_height(extruder_idx), 6),
+            Slic3r::to_string_nozero(get_max_layer_height(extruder_idx), 6));
+        MessageDialog dialog(GUI::wxGetApp().plater(), msg_text, _(L("Maximum and minimum layer height")), wxICON_WARNING | wxOK);
+        dialog.ShowModal();
     }
 
     return false;

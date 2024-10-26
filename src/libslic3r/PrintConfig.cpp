@@ -66,7 +66,7 @@ static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values &
 static const t_config_enum_values s_keys_map_ArcFittingType {
     { "disabled",       int(ArcFittingType::Disabled) },
     { "bambu",          int(ArcFittingType::Bambu) },
-    { "emit_center",    int(ArcFittingType::EmitCenter) } // arwelder
+    { "emit_center",    int(ArcFittingType::ArcWelder) } // arcwelder
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ArcFittingType)
 
@@ -1945,6 +1945,30 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionStrings{ "" });
 
+    def = this->add("filament_fill_top_flow_ratio", coPercents);
+    def->label = L("Top fill");
+    def->full_label = L("Top fill flow ratio");
+    def->sidetext = L("%");
+    def->category = OptionCategory::width;
+    def->tooltip = L("You can increase this to over-extrude on the top layer if there is not enough plastic to make a good fill."
+                    "\nThis setting multiply the percentage available in the print setting."
+                    " You should only add the little percentage difference that this filament has versus your main one.");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionPercents{100});
+
+    def = this->add("filament_first_layer_flow_ratio", coPercents);
+    def->label = L("First layer");
+    def->full_label = L("First layer flow ratio");
+    def->sidetext = L("%");
+    def->category = OptionCategory::width;
+    def->tooltip = L("You can increase this to over/under-extrude on the first layer if there is not enough / too many plastic because your bed isn't levelled / flat."
+                    "\nThis setting multiply the percentage available in the print setting."
+                    " You should only add the little percentage difference that this filament has versus your main one.");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionPercents{100});
+
     def = this->add("filament_notes", coStrings);
     def->label = L("Filament notes");
     def->category = OptionCategory::notes;
@@ -2188,6 +2212,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloats { 0.0 });
+
+    def = this->add("filament_pressure_advance", coFloats);
+    def->label = L("Pressure advance");
+    def->tooltip = L("Pressure advance value (Linear advance factor for Marlin)."
+           " If enabled, the gcode will emit a pressure advance value for this filament."
+           "\nWith reprap and sprinter, 'M572 Dx Sx' is used."
+           "\nWith klipper, 'SET_PRESSURE_ADVANCE ADVANCE=x EXTRUDER=x' is used."
+           "\nWith other firmware 'M900 Kx' is used.");
+    def->category = OptionCategory::filament;
+    def->min = 0;
+    def->can_be_disabled = true;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionFloats({0.02}), true));
 
     def = this->add("filament_ramming_parameters", coStrings);
     def->label = L("Ramming parameters");
@@ -5080,7 +5118,10 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("travel_slope", coFloats);
     def->label = L("Ramping slope angle");
-    def->tooltip = L("Slope of the ramp in the initial phase of the travel.");
+    def->tooltip = L("Minimum slope of the ramp in the initial phase of the travel."
+                    " If the travel isn't long enough, the angle will be increased."
+                    "\n90° means a direct lift, like if there was no ramp."
+                    "\n0° means that the lift will always be hit at the end of the travel.");
     def->sidetext = L("°");
     def->min = 0;
     def->max = 90;
@@ -5092,21 +5133,23 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Use ramping lift");
     def->tooltip = L("Generates a ramping lift instead of lifting the extruder directly upwards. "
                      "The travel is split into two phases: the ramp and the standard horizontal travel. "
-                     "This option helps reduce stringing.");
+                     "This option helps reduce stringing."
+                     "\nAlso works for the z move when a layer change occurs.");
     def->mode = comAdvancedE | comPrusa;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ false });
 
-    def = this->add("travel_max_lift", coFloats);
-    def->label = L("Maximum ramping lift");
-    def->tooltip = L("Maximum lift height of the ramping lift. It may not be reached if the next position "
-                     "is close to the old one.");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->max_literal = {1000, false};
-    def->mode = comAdvancedE | comPrusa;
-    def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionFloats{0.0});
+    // why not reuse rretract_lift ? because it's a max? My current impl enforced the lift, so it's okay for me to remove it.
+    // def = this->add("travel_max_lift", coFloats);
+    // def->label = L("Maximum ramping lift");
+    // def->tooltip = L("Maximum lift height of the ramping lift. It may not be reached if the next position "
+                     // "is close to the old one.");
+    // def->sidetext = L("mm");
+    // def->min = 0;
+    // def->max_literal = {1000, false};
+    // def->mode = comAdvancedE | comPrusa;
+    // def->is_vector_extruder = true;
+    // def->set_default_value(new ConfigOptionFloats{0.0});
 
     def = this->add("travel_lift_before_obstacle", coBools);
     def->label = L("Steeper ramp before obstacles");
@@ -5821,8 +5864,7 @@ void PrintConfigDef::init_fff_params()
         " at and beyond which solid infill should no longer be added above/below. If this setting is equal or higher than "
         " the top/bottom solid layer count, it won't do anything. If this setting is set to 1, it will evict "
         " all solid fill above/below perimeters. "
-        "\nSet zero to disable."
-        "\n!! ensure_vertical_shell_thickness needs to be activated so this algorithm can work !!.");
+        "\nSet zero to disable.");
     def->min = 0;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionInt(2));
@@ -6570,7 +6612,7 @@ void PrintConfigDef::init_fff_params()
         "expected to take care of the toolchange yourself - Slic3r will not output any other G-code to "
         "change the filament. You can use placeholder variables for all Slic3r settings as well as {toolchange_z}, {layer_z}, {layer_num}, {max_layer_z}, {previous_extruder} "
         "and {next_extruder}, so e.g. the standard toolchange command can be scripted as T{next_extruder}."
-        "!! Warning !!: if any character is written here, Slic3r won't output any toochange command by itself.");
+        "!! Warning !!: if any character is written here, Slic3r won't output any toolchange command by itself.");
     def->multiline = true;
     def->full_width = true;
     def->height = 5;
@@ -7354,7 +7396,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap_external",
         "tool_name",
         "travel_lift_before_obstacle",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_ramping_lift",
         "travel_slope",
         "wipe",
@@ -7386,7 +7428,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "seam_gap",
         "seam_gap_external",
         "travel_lift_before_obstacle",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_ramping_lift",
         "travel_slope",
         "wipe",
@@ -7414,7 +7456,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_speed",
         "seam_gap",
         "travel_lift_before_obstacle",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_ramping_lift",
         "travel_slope",
         "wipe",
@@ -8561,6 +8603,7 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "gcode_resolution", // now in printer config.
     "enable_dynamic_fan_speeds", "overhang_fan_speed_0","overhang_fan_speed_1","overhang_fan_speed_2","overhang_fan_speed_3", // converted in composite_legacy
     "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3", // converted in composite_legacy
+    "travel_max_lift", "filament_travel_max_lift" // removed, using retract_lift also for rampping lift instead.
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value, bool remove_unkown_keys)
@@ -9101,7 +9144,7 @@ bool PrintConfigDef::is_defined(t_config_option_key &opt_key) { return print_con
 std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf) {
     std::map<std::string, std::string> output;
     if ("toolchange_gcode" == opt_key) {
-        if (!value.empty() && value.find("T{next_extruder}") == std::string::npos && value.find("T[next_extruder]") == std::string::npos) {
+        if (!value.empty() && value.find("T") == std::string::npos) {
             value = "T{next_extruder}\n" + value;
         }
     }
@@ -9538,10 +9581,13 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_dip_insertion_speed",
 "filament_enable_toolchange_part_fan",
 "filament_enable_toolchange_temp",
+"filament_fill_top_flow_ratio",
+"filament_first_layer_flow_ratio",
 "filament_max_speed",
 "filament_max_wipe_tower_speed",
 "filament_melt_zone_pause",
 "filament_max_overlap",
+"filament_pressure_advance",
 "filament_retract_lift_before_travel",
 "filament_shrink",
 "filament_skinnydip_distance",
@@ -9986,6 +10032,11 @@ std::map<std::string, std::string> PrintConfigDef::to_prusa(t_config_option_key&
             value = std::to_string(all_conf.option("fan_printer_min_speed")->get_float());
         }
     }
+    if ("travel_ramping_lift" == opt_key && "1" == value) {
+        // also add travel_max_lift from retract_lift & same from filament
+        new_entries["travel_ramping_lift"] = all_conf.option("retract_lift")->serialize();
+        new_entries["filament_travel_ramping_lift"] = all_conf.option("filament_retract_lift")->serialize();
+    }
 
     // compute max & min height from % to flat value
     if ("min_layer_height" == opt_key || "max_layer_height" == opt_key) {
@@ -10318,7 +10369,6 @@ void DynamicPrintConfig::normalize_fdm()
             this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;
             // this->opt<ConfigOptionBool>("exact_last_layer_height", true)->value = false;
-            this->opt<ConfigOptionBool>("ensure_vertical_shell_thickness", true)->value = false;
             this->opt<ConfigOptionBool>("infill_dense", true)->value = false;
             this->opt<ConfigOptionBool>("extra_perimeters", true)->value = false;
             this->opt<ConfigOptionBool>("extra_perimeters_on_overhangs", true)->value = false;
