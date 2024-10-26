@@ -90,7 +90,7 @@ public:
 	// Returns a zero based extruder this eec should be printed with, according to PrintRegion config or extruder_override if overriden.
     uint16_t extruder(const ExtrusionEntityCollection &extrusions, const PrintRegion &region) const;
 
-    coordf_t 					print_z	= 0.;
+    double                      print_z = 0.;
     bool 						has_object = false;
     bool						has_support = false;
     // Zero based extruder IDs, ordered to minimize tool switches.
@@ -111,7 +111,7 @@ public:
     // Number of wipe tower partitions to support the required number of tool switches
     // and to support the wipe tower partitions above this one.
     size_t                      wipe_tower_partitions = 0;
-    coordf_t 					wipe_tower_layer_height = 0.;
+    double                      wipe_tower_layer_height = 0.;
     // Custom G-code (color change, extruder switch, pause) to be performed before this layer starts to print.
     const CustomGCode::Item    *custom_gcode = nullptr;
 
@@ -158,8 +158,8 @@ public:
     const std::vector<uint16_t>& all_extruders() const { return m_all_printing_extruders; }
 
     // Find LayerTools with the closest print_z.
-    const LayerTools&	tools_for_layer(coordf_t print_z) const;
-    LayerTools&			tools_for_layer(coordf_t print_z) { return const_cast<LayerTools&>(std::as_const(*this).tools_for_layer(print_z)); }
+    const LayerTools*	tools_for_layer(coordf_t print_z) const;
+    LayerTools*			tools_for_layer(coordf_t print_z) { return const_cast<LayerTools*>(std::as_const(*this).tools_for_layer(print_z)); }
 
     const LayerTools&   front()       const { return m_layer_tools.front(); }
     const LayerTools&   back()        const { return m_layer_tools.back(); }
@@ -171,7 +171,7 @@ public:
     int                 toolchanges_count() const;
 
 private:
-    void				initialize_layers(std::vector<coordf_t> &zs);
+    void				initialize_layers(std::vector<double> &zs);
     void 				collect_extruders(const PrintObject &object, const std::vector<std::pair<double, uint16_t>> &per_layer_extruder_switches, const std::vector<std::pair<double, uint16_t>> &per_layer_color_changes);
     void				reorder_extruders(uint16_t last_extruder_id);
     void 				fill_wipe_tower_partitions(const PrintConfig &config, coordf_t object_bottom_z, coordf_t max_layer_height);

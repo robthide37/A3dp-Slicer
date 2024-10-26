@@ -54,8 +54,8 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
 
     std::string tcr_rotated_gcode = post_process_wipe_tower_moves(tcr, wipe_tower_offset, wipe_tower_rotation);
 
-    double current_z = gcodegen.writer().get_unlifted_position().z();
-    gcode += gcodegen.writer().travel_to_z(current_z);
+    gcode += gcodegen.writer().unlift();
+    double current_z = gcodegen.writer().get_position().z();
 
     if (z == -1.) // in case no specific z was provided, print at current_z pos
         z = current_z;
@@ -80,7 +80,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
         } else {
             // TODO: check if the z is already set
             gcode += gcodegen.writer().travel_to_xy(gcodegen.point_to_gcode(xy_point), 0.0, comment);
-            gcode += gcodegen.writer().get_travel_to_z_gcode(z, comment);
+            gcode += gcodegen.writer().get_travel_to_z_gcode(z, comment + " (travel z from wipetower)");
         }
         need_unretract = true;
     } else {
@@ -106,7 +106,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
         toolchange_gcode_str = gcodegen.set_extruder(new_extruder_id, tcr.print_z); // TODO: toolchange_z vs print_z
         if (gcodegen.config().wipe_tower) {
             const double retract_to_z = tcr.priming ? tcr.print_z + gcodegen.config().z_offset.value : z;
-            deretraction_str += gcodegen.writer().get_travel_to_z_gcode(retract_to_z, "restore layer Z");
+            deretraction_str += gcodegen.writer().unlift();
             deretraction_str += gcodegen.unretract();
         }
     }

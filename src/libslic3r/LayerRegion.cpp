@@ -153,7 +153,7 @@ void LayerRegion::make_perimeters(
         this->layer()->object()->config(),
         print_config,
         spiral_vase,
-        (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne) //use_arachne
+        (region_config.perimeter_generator.value == PerimeterGeneratorType::Arachne) //use_arachne
     );
     
 

@@ -191,6 +191,16 @@ struct SurfaceFillParams : FillParams
             RETURN_COMPARE_NON_EQUAL(config->region_gcode.value)
             RETURN_COMPARE_NON_EQUAL(config->small_area_infill_flow_compensation.value)
             RETURN_COMPARE_NON_EQUAL(config->small_area_infill_flow_compensation_model.value);
+            if (this->pattern == ipConcentric || rhs.pattern == ipConcentric) {
+                // arachne if concentric
+                RETURN_COMPARE_NON_EQUAL(config->perimeter_generator.value);
+                RETURN_COMPARE_NON_EQUAL(config->min_bead_width.value);
+                RETURN_COMPARE_NON_EQUAL(config->min_feature_size.value);
+                RETURN_COMPARE_NON_EQUAL(config->wall_distribution_count.value);
+                RETURN_COMPARE_NON_EQUAL(config->wall_transition_angle.value);
+                RETURN_COMPARE_NON_EQUAL(config->wall_transition_filter_deviation.value);
+                RETURN_COMPARE_NON_EQUAL(config->wall_transition_length.value);
+            }
         }
         if (config == nullptr || rhs.config == nullptr || max_sparse_infill_spacing == 0)
             RETURN_COMPARE_NON_EQUAL(flow.width());
@@ -223,6 +233,16 @@ struct SurfaceFillParams : FillParams
             || config->small_area_infill_flow_compensation != rhs.config->small_area_infill_flow_compensation
             || config->small_area_infill_flow_compensation_model != rhs.config->small_area_infill_flow_compensation_model
             ))
+            return false;
+        if (config != nullptr && (this->pattern == ipConcentric || rhs.pattern == ipConcentric) &&
+            // arachne if concentric
+            (config->perimeter_generator != rhs.config->perimeter_generator
+            || config->min_bead_width != rhs.config->min_bead_width
+            || config->min_feature_size != rhs.config->min_feature_size
+            || config->wall_distribution_count != rhs.config->wall_distribution_count
+            || config->wall_transition_length != rhs.config->wall_transition_length
+            || config->wall_transition_filter_deviation != rhs.config->wall_transition_filter_deviation
+            || config->wall_transition_angle != rhs.config->wall_transition_angle))
             return false;
         // then check params
         return  this->extruder              == rhs.extruder         &&
@@ -825,7 +845,6 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
     std::vector<SurfaceFill>  surface_fills  = group_fills(*this);
     const Slic3r::BoundingBox bbox           = this->object()->bounding_box();
-    const auto                perimeter_generator = this->object()->config().perimeter_generator;
 
     //sort by priority. Needed for dense support, as the order is very important.
     std::sort(surface_fills.begin(), surface_fills.end(), [](SurfaceFill& s1, SurfaceFill& s2) {
@@ -1015,7 +1034,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
             surface_fill.params.bridge_offset = 0;
             surface_fill.params.density = density;
             surface_fill.params.layer_height = m_regions[surface_fill.region_id]->layer()->height;
-            surface_fill.params.use_arachne   = (perimeter_generator == PerimeterGeneratorType::Arachne &&
+            surface_fill.params.use_arachne   = (layerm->region().config().perimeter_generator == PerimeterGeneratorType::Arachne &&
                                                surface_fill.params.pattern == ipConcentric) ||
                                               surface_fill.params.pattern == ipEnsuring;
 

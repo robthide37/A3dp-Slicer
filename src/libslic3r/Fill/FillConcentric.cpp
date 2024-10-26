@@ -473,7 +473,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
     if (params.density > 0.9999f && !params.dont_adjust) {
         coord_t                loops_count = std::max(bbox_size.x(), bbox_size.y()) / min_spacing + 1;
         Polygons               polygons    = offset(expolygon, float(min_spacing) / 2.f);
-        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_width, min_spacing, min_width, loops_count, 0, params.layer_height, *this->print_object_config, *this->print_config);
+        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_width, min_spacing, min_width, loops_count, 0, params.layer_height, *params.config, *this->print_config);
 
         std::vector<Arachne::VariableWidthLines>    loops = wallToolPaths.getToolPaths();
         std::vector<const Arachne::ExtrusionLine *> all_extrusions;

@@ -26,16 +26,16 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
     assert(config.support_material_style.value == smsTree || config.support_material_style.value == smsOrganic);
 
     // Calculate maximum external perimeter width over all printing regions, taking into account the default layer height.
-    coordf_t external_perimeter_width = 0.;
+    double external_perimeter_width = 0.;
     for (size_t region_id = 0; region_id < print_object.num_printing_regions(); ++ region_id) {
         const PrintRegion &region = print_object.printing_region(region_id);
-        external_perimeter_width = std::max<coordf_t>(external_perimeter_width, region.flow(print_object, frExternalPerimeter, config.layer_height, 2 /*not first layer, even layer*/).width());
+        external_perimeter_width = std::max<double>(external_perimeter_width, region.flow(print_object, frExternalPerimeter, config.layer_height, 2 /*not first layer, even layer*/).width());
     }
 
     this->layer_height              = scaled<coord_t>(config.layer_height.value);
     this->resolution                = scaled<coord_t>(print_config.resolution_internal.value);
-    // Arache feature
-    this->min_feature_size          = scaled<coord_t>(config.min_feature_size.value);
+    // Arache feature <- why? it's not even editable when the organic support are activated! And it doesn't take into account the %! I'll fix it to 25% of external_perimeter_width. 
+    this->min_feature_size          = scaled<coord_t>(external_perimeter_width * 0.25); //config.min_feature_size.value);
     // +1 makes the threshold inclusive
     this->support_angle             = 0.5 * M_PI - std::clamp<double>((config.support_material_threshold + 1) * M_PI / 180., 0., 0.5 * M_PI);
     this->support_line_width        = support_material_flow(&print_object, config.layer_height).scaled_width();

@@ -319,6 +319,8 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
     const auto &external_perimeter_extrusion_spacing= *print_config.option<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_spacing");
     const auto &first_layer_extrusion_width         = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width");
     const auto &first_layer_extrusion_spacing       = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_spacing");
+    const auto &first_layer_infill_extrusion_width  = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_infill_extrusion_width");
+    const auto &first_layer_infill_extrusion_spacing= *print_config.option<ConfigOptionFloatOrPercent>("first_layer_infill_extrusion_spacing");
     const auto &infill_extrusion_width              = *print_config.option<ConfigOptionFloatOrPercent>("infill_extrusion_width");
     const auto &infill_extrusion_spacing            = *print_config.option<ConfigOptionFloatOrPercent>("infill_extrusion_spacing");
     const auto &perimeter_extrusion_width           = *print_config.option<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");

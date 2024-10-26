@@ -2790,7 +2790,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(const Parameters &param
             const Polygons         last_p = to_polygons(last);
             Arachne::WallToolPaths wallToolPaths(last_p, params.get_ext_perimeter_spacing(), params.get_ext_perimeter_width(), 
                                                  params.get_perimeter_spacing(), params.get_perimeter_width(), 1, coord_t(0),
-                                                 params.layer->height, params.object_config, params.print_config);
+                                                 params.layer->height, params.config, params.print_config);
             out_shell = wallToolPaths.getToolPaths();
             // Make sure infill not overlap with wall
             // offset the InnerContour as arachne use bounds and not centerline
@@ -2829,7 +2829,7 @@ ProcessSurfaceResult PerimeterGenerator::process_arachne(const Parameters &param
     Polygons   last_p = to_polygons(last);
     Arachne::WallToolPaths wallToolPaths(last_p, params.get_ext_perimeter_spacing(), params.get_ext_perimeter_width(),
         params.get_perimeter_spacing(), params.get_perimeter_width(), loop_number, coord_t(0),
-        params.layer->height, params.object_config, params.print_config);
+        params.layer->height, params.config, params.print_config);
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
     
 #if _DEBUG
@@ -3080,7 +3080,7 @@ void PerimeterGenerator::split_top_surfaces(const ExPolygons *lower_slices,
     double  fill_nozzle_diameter = params.solid_infill_flow.nozzle_diameter();
 
     bool has_gap_fill = params.config.gap_fill_enabled &&
-                        params.object_config.perimeter_generator.value == PerimeterGeneratorType::Classic;
+                        !params.use_arachne;
 
     // split the polygons with top/not_top
     // get the offset from solid surface anchor*

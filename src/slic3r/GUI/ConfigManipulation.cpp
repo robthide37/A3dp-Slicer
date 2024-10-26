@@ -545,7 +545,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_raft);
 
     //for default_extrusion_width/spacing, you need to ahve at least an extrusion_width with 0
-    bool have_default_width = config->option("first_layer_extrusion_width")->get_float() == 0 ||
+    auto opt_first_layer_width = config->option("first_layer_extrusion_width");
+    auto opt_first_layer_infill_width = config->option("first_layer_infill_extrusion_width");
+    assert(opt_first_layer_width);
+    assert(opt_first_layer_infill_width);
+    bool have_default_width = 
+        (opt_first_layer_width->is_enabled() && opt_first_layer_width->get_float() == 0) ||
+        (opt_first_layer_infill_width->is_enabled() && opt_first_layer_infill_width->get_float() == 0) ||
         (config->option("perimeter_extrusion_width")->get_float() == 0 && (have_perimeters || have_brim)) ||
         (config->option("external_perimeter_extrusion_width")->get_float() == 0 && have_perimeters) ||
         (config->option("infill_extrusion_width")->get_float() == 0 && (have_infill || has_solid_infill)) ||
@@ -555,6 +561,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         (config->option("skirt_extrusion_width")->get_float() == 0 && have_skirt);
     toggle_field("extrusion_width", have_default_width);
     toggle_field("extrusion_spacing", have_default_width);
+    
+    toggle_field("first_layer_extrusion_spacing", opt_first_layer_width->is_enabled());
+    toggle_field("first_layer_infill_extrusion_spacing", opt_first_layer_infill_width->is_enabled());
+    
 
     bool has_PP_ironing = has_top_solid_infill && config->opt_bool("ironing");
     for (auto el : { "ironing_type", "ironing_flowrate", "ironing_spacing", "ironing_angle" })

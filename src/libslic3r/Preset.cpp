@@ -694,6 +694,8 @@ static std::vector<std::string> s_Preset_print_options {
         "extrusion_width", 
         "first_layer_extrusion_spacing", 
         "first_layer_extrusion_width", 
+        "first_layer_infill_extrusion_spacing", 
+        "first_layer_infill_extrusion_width", 
         "perimeter_round_corners",
         "perimeter_extrusion_spacing",
         "perimeter_extrusion_width",

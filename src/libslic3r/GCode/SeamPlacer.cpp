@@ -448,7 +448,7 @@ struct GlobalModelInfo {
 ;
 //Extract perimeter polylines of the given layer
 PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosition configured_seam_preference,
-        std::vector<const LayerRegion*> &corresponding_regions_out, PerimeterGeneratorType perimeter_type) {
+        std::vector<const LayerRegion*> &corresponding_regions_out) {
     
 
     PolylineWithEnds polylines;
@@ -457,12 +457,12 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
         std::vector<const LayerRegion*>& m_corresponding_regions_out;
         const LayerRegion* current_layer_region;
         SeamPosition configured_seam_preference;
-        PerimeterGeneratorType perimeter_type;
+        PerimeterGeneratorType perimeter_type = PerimeterGeneratorType::Classic;
     public:
         bool also_overhangs = false;
         bool also_thin_walls = false;
-        PerimeterCopy(std::vector<const LayerRegion*>& regions_out, PolylineWithEnds* polys, SeamPosition configured_seam, PerimeterGeneratorType perimeter_type)
-            : m_corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polylines(polys), perimeter_type(perimeter_type) {
+        PerimeterCopy(std::vector<const LayerRegion*>& regions_out, PolylineWithEnds* polys, SeamPosition configured_seam)
+            : m_corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polylines(polys) {
         }
         virtual void default_use(const ExtrusionEntity& entity) {};
         virtual void use(const ExtrusionPath &path) override {
@@ -554,8 +554,14 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
                 entity->visit(*this);
             }
         }
-        void set_current_layer_region(const LayerRegion *set) { current_layer_region = set; }
-    } visitor(corresponding_regions_out, &polylines, configured_seam_preference, perimeter_type);
+        void set_current_layer_region(const LayerRegion *set) {
+            current_layer_region = set;
+            assert(current_layer_region);
+            if (current_layer_region != nullptr) {
+                this->perimeter_type = current_layer_region->region().config().perimeter_generator.value;
+            }
+        }
+    } visitor(corresponding_regions_out, &polylines, configured_seam_preference);
 
     for (const LayerRegion *layer_region : layer->regions()) {
         for (const ExtrusionEntity *ex_entity : layer_region->perimeters()) {
@@ -575,7 +581,7 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
                     visitor.also_overhangs = false;
                     if (polylines.empty()) {
                         // shouldn't happen
-                        assert(ex_entity->role() == ExtrusionRole::ThinWall || perimeter_type == PerimeterGeneratorType::Arachne); // no loops
+                        assert(ex_entity->role() == ExtrusionRole::ThinWall || layer_region->region().config().perimeter_generator == PerimeterGeneratorType::Arachne); // no loops
                         //ex_entity->visit(visitor);
                         // what to do in this case?
                         Points pts;
@@ -1218,7 +1224,7 @@ void SeamPlacer::gather_seam_candidates(const PrintObject *po, const SeamPlacerI
                     auto unscaled_z = layer->slice_z;
                     std::vector<const LayerRegion*> regions;
                     //NOTE corresponding region ptr may be null, if the layer has zero perimeters
-                    PolylineWithEnds polygons_and_lines = extract_perimeter_polylines(layer, configured_seam_preference, regions, po->config().perimeter_generator.value);
+                    PolylineWithEnds polygons_and_lines = extract_perimeter_polylines(layer, configured_seam_preference, regions);
                     for (size_t poly_index = 0; poly_index < polygons_and_lines.size(); ++poly_index) {
                         process_perimeter_polylines(polygons_and_lines[poly_index], unscaled_z,
                                 regions[poly_index], global_model_info, layer_seams);
@@ -1308,6 +1314,10 @@ std::optional<std::pair<size_t, size_t>> SeamPlacer::find_next_seam_in_layer(
         const size_t layer_idx, const float max_distance,
         const SeamPlacerImpl::SeamComparator &comparator) const {
     using namespace SeamPlacerImpl;
+    // empty layer (nothing to print)
+    if(layers[layer_idx].points.empty())
+        return {};
+
     std::vector<size_t> nearby_points_indices = find_nearby_points(*layers[layer_idx].points_tree, projected_position,
             max_distance);
 
