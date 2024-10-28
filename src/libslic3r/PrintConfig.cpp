@@ -2233,20 +2233,6 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloats { 0.0 });
 
-    def = this->add("filament_pressure_advance", coFloats);
-    def->label = L("Pressure advance");
-    def->tooltip = L("Pressure advance value (Linear advance factor for Marlin)."
-           " If enabled, the gcode will emit a pressure advance value for this filament."
-           "\nWith reprap and sprinter, 'M572 Dx Sx' is used."
-           "\nWith klipper, 'SET_PRESSURE_ADVANCE ADVANCE=x EXTRUDER=x' is used."
-           "\nWith other firmware 'M900 Kx' is used.");
-    def->category = OptionCategory::filament;
-    def->min = 0;
-    def->can_be_disabled = true;
-    def->mode = comAdvancedE | comSuSi;
-    def->is_vector_extruder = true;
-    def->set_default_value(disable_defaultoption(new ConfigOptionFloats({0.02}), true));
-
     def = this->add("filament_ramming_parameters", coStrings);
     def->label = L("Ramming parameters");
     def->tooltip = L("This string is edited by RammingDialog and contains ramming specific parameters.");
@@ -4752,19 +4738,36 @@ void PrintConfigDef::init_fff_params()
     def->mode = comNone | comPrusa; // note: hidden setting
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
+    
+
+    def = this->add("filament_pressure_advance", coFloats);
+    def->label = L("Pressure advance");
+    def->tooltip = L("Pressure advance value (Linear advance factor for Marlin)."
+           " If enabled, the gcode will emit a pressure advance value for this filament.");
+    def->category = OptionCategory::filament;
+    def->can_be_disabled = true;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionFloats({0.02}), true));
 
     def = this->add("filament_default_pa", coFloats);
-    def->label = L("default");
+    def->label = L("Default");
+    def->full_label = L("Default pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Default linear/pressure advance. This is only activated for marlin, klipper and reprap firmware. For the other ones, you have to add it yourself in the gcode."
         "Note that the meaning of this value differ for each firmware, so if you set it, it means that this profile may be incompatible with some."
-        "\nSet 0 to deactivate.");
+        "\nWith reprap and sprinter, 'M572 Dx Sx' is used."
+        "\nWith klipper, 'SET_PRESSURE_ADVANCE ADVANCE=x EXTRUDER=x' is used."
+        "\nWith other firmware 'M900 Kx' is used.");
     def->mode = comExpert | comSuSi;
+    def->min = 0;
+    def->can_be_disabled = true;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionFloats{ 0. });
+    def->set_default_value(disable_defaultoption(new ConfigOptionFloats({0.02}), true));
 
     def = this->add("filament_bridge_pa", coFloatsOrPercents);
-    def->label = L("bridge");
+    def->label = L("Bridge");
+    def->full_label = L("Bridge pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for bridge sections. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
@@ -4773,7 +4776,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_bridge_internal_pa", coFloatsOrPercents);
-    def->label = L("internal bridge");
+    def->label = L("Internal bridge");
+    def->full_label = L("Internal bridge pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for internal bridge sections. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
@@ -4782,7 +4786,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_brim_pa", coFloatsOrPercents);
-    def->label = L("brim");
+    def->label = L("Brim");
+    def->full_label = L("Brim pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for brim. Can be a % over support pa");
     def->mode = comExpert | comSuSi;
@@ -4791,7 +4796,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_external_perimeter_pa", coFloatsOrPercents);
-    def->label = L("external perimeter");
+    def->label = L("External perimeter");
+    def->full_label = L("External perimeter pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for external perimeter. Can be a % over support pa");
     def->mode = comExpert | comSuSi;
@@ -4800,7 +4806,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_first_layer_pa", coFloatsOrPercents);
-    def->label = L("first layer");
+    def->label = L("First layer");
+    def->full_label = L("First layer pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for first layer sections. If %, it's a % over the current feature");
     def->mode = comExpert | comSuSi;
@@ -4809,7 +4816,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_first_layer_pa_over_raft", coFloatsOrPercents);
-    def->label = L("over raft");
+    def->label = L("Over raft");
+    def->full_label = L("Over raft pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for first layer sections over raft . If %, it's a % over the current feature");
     def->mode = comExpert | comSuSi;
@@ -4818,7 +4826,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_gap_fill_pa", coFloatsOrPercents);
-    def->label = L("gap fill");
+    def->label = L("Gap fill");
+    def->full_label = L("Gap fill pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for gap fill sections. Can be a % over perimeter pa");
     def->mode = comExpert | comSuSi;
@@ -4827,7 +4836,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_infill_pa", coFloatsOrPercents);
-    def->label = L("infill");
+    def->label = L("Infill");
+    def->full_label = L("Infill pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for infill sections. Can be a % over solid infill pa");
     def->mode = comExpert | comSuSi;
@@ -4836,7 +4846,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_ironing_pa", coFloatsOrPercents);
-    def->label = L("ironing");
+    def->label = L("Ironing");
+    def->full_label = L("Ironing pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for ironing sections. Can be a % over top solid infill pa");
     def->mode = comExpert | comSuSi;
@@ -4845,7 +4856,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_overhangs_pa", coFloatsOrPercents);
-    def->label = L("overhangs");
+    def->label = L("Overhangs");
+    def->full_label = L("Overhangs pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for overhang sections. Can be a % over bridge pa");
     def->mode = comExpert | comSuSi;
@@ -4854,7 +4866,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_perimeter_pa", coFloatsOrPercents);
-    def->label = L("perimeters");
+    def->label = L("Perimeters");
+    def->full_label = L("Perimeters pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for perimeter sections. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
@@ -4863,7 +4876,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_solid_infill_pa", coFloatsOrPercents);
-    def->label = L("solid infill");
+    def->label = L("Solid infill");
+    def->full_label = L("Solid infill pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for solid infill sections. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
@@ -4872,7 +4886,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_support_material_pa", coFloatsOrPercents);
-    def->label = L("support");
+    def->label = L("Support");
+    def->full_label = L("Support pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for support sections. Can be a % over default pa");
     def->mode = comExpert | comSuSi;
@@ -4881,7 +4896,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_support_material_interface_pa", coFloatsOrPercents);
-    def->label = L("support interface");
+    def->label = L("Support interface");
+    def->full_label = L("Support interface pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for support interface sections. Can be a % over support pa");
     def->mode = comExpert | comSuSi;
@@ -4891,6 +4907,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("filament_thin_walls_pa", coFloatsOrPercents);
     def->label = L("thin walls");
+    def->full_label = L("thin walls");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for thin wall sections. Can be a % over external perimeter pa");
     def->mode = comExpert | comSuSi;
@@ -4899,7 +4916,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_top_solid_infill_pa", coFloatsOrPercents);
-    def->label = L("top solid infill");
+    def->label = L("Top solid infill");
+    def->full_label = L("Top solid infill pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for top solid infill sections. Can be a % over solid infill pa");
     def->mode = comExpert | comSuSi;
@@ -4908,13 +4926,15 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
     def = this->add("filament_travel_pa", coFloatsOrPercents);
-    def->label = L("travel");
+    def->label = L("Travel");
+    def->full_label = L("Travel pressure advance");
     def->category = OptionCategory::filament;
     def->tooltip = L("Pressure advance for travel sections, may help retraction and unretraction."
             " Can be a % over default pa."
-            "\nSet -1 to let the previous pa continue in the travel.");
+            "\nDisable to let the previous pa continue in the travel.");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_default_pa";
+    def->can_be_disabled = true;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{-1,false} });
 
@@ -9674,7 +9694,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_max_wipe_tower_speed",
 "filament_melt_zone_pause",
 "filament_max_overlap",
-"filament_pressure_advance",
 "filament_retract_lift_before_travel",
 "filament_shrink",
 "filament_skinnydip_distance",

@@ -366,18 +366,42 @@ void GCodeWriter::set_pressure_advance(double pa) {
     m_current_pressure_advance = pa;
 }
 
-void GCodeWriter::write_pressure_advance(std::string& gcode) {
-    if (m_current_pressure_advance != m_last_pressure_advance) {
-        m_last_pressure_advance = m_current_pressure_advance;
-        if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy)) {
-            gcode += "M900 K" + std::to_string(m_current_pressure_advance);
-        } else if (FLAVOR_IS(gcfRepRap)) {
-            gcode += "M572 D" + std::to_string(this->tool()->id()) + " S" + std::to_string(m_current_pressure_advance);
+void GCodeWriter::_write_pressure_advance(std::string &gcode) {
+    if (m_current_pressure_advance != m_last_pressure_advance && m_current_pressure_advance >= 0) {
+        gcode += write_pressure_advance(m_current_pressure_advance);
+    }
+}
+
+std::string GCodeWriter::write_pressure_advance(double pa) {
+    std::string gcode;
+    std::string_view comment =  " ; Pressure advance value "sv;
+    int16_t tool_id = -1;
+    if (m_tool)
+        tool_id = m_tool->id();
+    if (pa >= 0) {
+        m_last_pressure_advance = pa;
+        if (FLAVOR_IS(gcfRepRap) || FLAVOR_IS(gcfSprinter)) {
+            if (tool_id >= 0) {
+                gcode += "M572 D" + std::to_string(tool_id) + " S" + to_string_nozero(pa, 4);
+            } else {
+                //is it possible to have no tool id? or a -1 is possible?
+                gcode = std::string("M572 S") + to_string_nozero(pa, 4);
+            }
         } else if (FLAVOR_IS(gcfKlipper)) {
-            gcode += "SET_PRESSURE_ADVANCE ADVANCE=" + std::to_string(m_current_pressure_advance);
+            gcode = std::string("SET_PRESSURE_ADVANCE ADVANCE=") + to_string_nozero(pa, 4);
+            if (tool_id >= 0) {
+                gcode += std::string(" EXTRUDER=") + std::to_string(tool_id);
+        }
+        } else {
+            // if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy))
+            gcode += "M900 K" + to_string_nozero(pa, 4);
+        }
+        if (this->m_config.gcode_comments) {
+            gcode += comment;
         }
         gcode += "\n";
     }
+    return gcode;
 }
 
 void GCodeWriter::set_acceleration(uint32_t acceleration)
@@ -447,7 +471,7 @@ std::string GCodeWriter::write_acceleration(){
         gcode << "\n";
     }
     std::string gcode_str = gcode.str();
-    write_pressure_advance(gcode_str);
+    _write_pressure_advance(gcode_str);
     return gcode_str;
 }
 
@@ -816,7 +840,7 @@ std::string GCodeWriter::extrude_arc_to_xyz(const Vec3d& point, const Vec2d& cen
      auto [/*double*/ delta_e, /*double*/ e_to_write]  = this->m_tool->extrude(dE + this->m_de_left);
     bool is_extrude  = std::abs(delta_e) > 0.00000001;
 
-    GCodeG2G3Formatter w(this->config.gcode_precision_xyz.value, this->config.gcode_precision_e.value, is_ccw);
+    GCodeG2G3Formatter w(this->m_config.gcode_precision_xyz.value, this->m_config.gcode_precision_e.value, is_ccw);
     bool has_x_y = w.emit_xy(Vec2d(point.x(), point.y()), m_pos_str_x, m_pos_str_y);
     assert(has_x_y);
     w.emit_z(point.z());
@@ -826,7 +850,7 @@ std::string GCodeWriter::extrude_arc_to_xyz(const Vec3d& point, const Vec2d& cen
         double delta = w.emit_e(m_extrusion_axis, e_to_write);
         this->m_de_left += delta;
     }
-    w.emit_comment(this->config.gcode_comments, comment);
+    w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
 }
 
@@ -902,7 +926,7 @@ std::string GCodeWriter::_retract(double length, std::optional<double> restart_e
     assert(dE < 10000000);
     if (dE != 0) {
         // write pa if it's set for retraction
-        write_pressure_advance(gcode);
+        _write_pressure_advance(gcode);
         //write retract gcode
         if (this->m_config.use_firmware_retraction) {
             if (FLAVOR_IS(gcfMachinekit))
@@ -940,7 +964,7 @@ std::string GCodeWriter::unretract()
     assert(dE < 10000000);
     if (dE != 0) {
         // write pa if it's set for retraction
-        write_pressure_advance(gcode);
+        _write_pressure_advance(gcode);
         //write unretract gcode
         if (this->m_config.use_firmware_retraction) {
             gcode += (FLAVOR_IS(gcfMachinekit) ? "G23 ; unretract\n" : "G11 ; unretract\n");
