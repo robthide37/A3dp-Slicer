@@ -6694,6 +6694,9 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
 
     double pa = m_config.filament_default_pa.get_at(m_writer.tool()->id());
     double travel_pa = m_config.filament_travel_pa.get_abs_value(m_writer.tool()->id(), pa);
+    if (!m_config.filament_travel_pa.is_enabled(m_writer.tool()->id())) {
+        travel_pa = (-1);
+    }
     if (pa > 0) {
         switch (extrusion_role_to_gcode_extrusion_role(path.role())) {
         case GCodeExtrusionRole::Perimeter:
@@ -7888,8 +7891,8 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
             check_add_eol(gcode);
         }
 
-        if (m_config.filament_pressure_advance.is_enabled(extruder_id)) {
-            gcode += m_writer.set_pressure_advance(m_config.filament_pressure_advance.get_at(extruder_id));
+        if (m_config.filament_default_pa.is_enabled(extruder_id)) {
+            m_writer.set_pressure_advance(m_config.filament_default_pa.get_at(extruder_id));
         }
 
         if (!no_toolchange) {
@@ -7975,8 +7978,8 @@ std::string GCodeGenerator::set_extruder(uint16_t extruder_id, double print_z, b
     if (m_ooze_prevention.enable)
         gcode += m_ooze_prevention.post_toolchange(*this);
 
-    if (m_config.filament_pressure_advance.is_enabled(extruder_id)) {
-        gcode += m_writer.set_pressure_advance(m_config.filament_pressure_advance.get_at(extruder_id));
+    if (m_config.filament_default_pa.is_enabled(extruder_id)) {
+        m_writer.set_pressure_advance(m_config.filament_default_pa.get_at(extruder_id));
     }
 
     // The position is now known after the tool change.

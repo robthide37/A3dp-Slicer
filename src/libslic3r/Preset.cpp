@@ -900,7 +900,6 @@ static std::vector<std::string> s_Preset_filament_options {
         //merill adds
         "filament_wipe_advanced_pigment",
         "chamber_temperature",
-        "filament_pressure_advance",
 };
 
 static std::vector<std::string> s_Preset_machine_limits_options {
