@@ -3216,7 +3216,7 @@ LayerResult GCodeGenerator::process_layer(
          m_config.lift_min.value > layer.print_z
             )) {
         // still do the retraction
-        gcode += m_writer.retract();
+        gcode += this->retract_and_wipe();
         gcode += m_writer.reset_e();
         m_delayed_layer_change = this->change_layer(print_z); //HACK for superslicer#1775
         assert(!m_new_z_target);
@@ -3225,6 +3225,8 @@ LayerResult GCodeGenerator::process_layer(
         if(single_object_instance_idx == size_t(-1) && (support_layer != nullptr || layers.size() > 1))
             set_extra_lift(m_last_layer_z, layer.id(), print.config(), m_writer, first_extruder_id);
         gcode += this->change_layer(print_z);  // this will increase m_layer_index
+        //forget wipe from previous layer
+        gcode += "; m_wipe.reset_path(); after change_layer\n";
         assert(m_new_z_target || is_approx(print_z, m_writer.get_unlifted_position().z(), EPSILON));
     }
     m_layer = &layer;
@@ -3872,7 +3874,8 @@ std::string GCodeGenerator::change_layer(double print_z) {
     this->m_layer_change_extruder_id = m_writer.tool()->id();
 
     // forget last wiping path as wiping after raising Z is pointless
-    m_wipe.reset_path();
+    // it's delayed, so you can still do the wipe.
+    //m_wipe.reset_path();
 
     return gcode;
 }
@@ -4890,7 +4893,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
                         coordf_t    angle         = Geometry::ArcWelder::arc_angle(current_point, segment.point, coordf_t(radius));
                         assert(angle > 0);
                         const coordf_t line_length = angle * std::abs(radius);
-                        gcode += m_writer.travel_arc_to_xy(this->point_to_gcode(segment.point), center_offset, segment.ccw(), 0.0, "; extra wipe"sv);
+                        gcode += m_writer.travel_arc_to_xy(this->point_to_gcode(segment.point), center_offset, segment.ccw(), 0.0/*speed*/, "; extra wipe"sv);
                     }
                     prev_point = current_point;
                     current_point = segment.point;
@@ -6670,6 +6673,8 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
         }
         m_delayed_layer_change.clear();
         gcode += unlift;
+        //now that we move to the new layer, forget previous layer wipe (if any).
+        gcode += "; m_wipe.reset_path(); after m_delayed_layer_change\n";
     }
     gcode += m_writer.unretract();
 
