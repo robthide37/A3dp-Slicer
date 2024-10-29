@@ -389,8 +389,10 @@ std::string GCodeWriter::write_pressure_advance(double pa) {
             }
         } else if (FLAVOR_IS(gcfKlipper)) {
             gcode = std::string("SET_PRESSURE_ADVANCE ADVANCE=") + to_string_nozero(pa, 4);
-            if (tool_id >= 0) {
-                gcode += std::string(" EXTRUDER=") + std::to_string(tool_id);
+            if(this->m_config.tool_name.size() > tool_id && !this->m_config.tool_name.get_at(tool_id).empty()) {
+                gcode += std::string(" EXTRUDER=") + this->m_config.tool_name.get_at(tool_id);
+            }else if (tool_id > 0) {
+                gcode += std::string(" EXTRUDER=extruder") + std::to_string(tool_id);
         }
         } else {
             // if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy))
