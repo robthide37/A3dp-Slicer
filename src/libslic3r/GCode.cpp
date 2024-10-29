@@ -4737,7 +4737,6 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &original_loop, con
             // swap points
             Point c = a; a = b; b = c;
         }
-        assert(ccw_angle_old_test(current_point, a, b) == abs_angle(angle_ccw( a-current_point,b-current_point)));
         double angle = abs_angle(angle_ccw( a-current_point,b-current_point)) / 3;
 
         // turn left if contour, turn right if hole
@@ -7067,8 +7066,10 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
     // ramping travel?
     //TODO: ramp up for the first half, then ramp down.
     std::vector<coord_t> z_relative_travel;
+    // note: no ramp if we don't know the previous point (only dest in travel)
     if (BOOL_EXTRUDER_CONFIG(travel_ramping_lift) && m_spiral_vase_layer <= 0) {
         double z_diff_layer_and_lift = 0;
+        bool no_ramping = false;
         // from layer change?
         if (m_new_z_target) {
             assert(is_approx(*m_new_z_target, m_layer->print_z, EPSILON));
@@ -7080,6 +7081,7 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
             } else {
                 // do a strait z-move (as we can't see the preious point.
                 gcode += m_writer.get_travel_to_z_gcode(m_layer->print_z, "strait z-move, as the travel is undefined.");
+                no_ramping = true;
             }
         } else {
             assert(!m_new_z_target);
@@ -7100,12 +7102,12 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
             m_next_lift_min = 0;
         }
         // create the ramping
-        if (z_diff_layer_and_lift > EPSILON) {
+        if (z_diff_layer_and_lift > EPSILON && !no_ramping) {
             z_relative_travel = get_travel_elevation(travel, z_diff_layer_and_lift);
             assert(z_relative_travel.size() == travel.size());
         }
     } else {
-        // lift() has already been called
+        // lift(...) has already been called
         assert(m_writer.get_extra_lift() == 0);
     }
 
@@ -7201,6 +7203,7 @@ void GCodeGenerator::write_travel_to(std::string &gcode, Polyline& travel, std::
         }
         this->set_last_pos(travel.points.back());
     } else if (travel.size() == 1){
+        //simple travel, as we don't know where we are.
         gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.back()), 0.0, comment);
     }
     
