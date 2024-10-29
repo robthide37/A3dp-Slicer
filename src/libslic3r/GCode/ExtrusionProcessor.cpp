@@ -117,6 +117,11 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
             }
         }
     }
+    // started new path, but there is noting after that.
+    if (result.back().size() == 1) {
+        //delete it
+        result.pop_back();
+    }
 #ifdef _DEBUG
     for (auto &path : result) {
         assert(path.attributes().overhang_attributes.has_value());
