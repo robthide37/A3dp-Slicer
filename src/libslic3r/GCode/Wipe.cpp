@@ -170,8 +170,8 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             //reduce length if no_lift_length in the middle
             if (no_lift_length + precision / 2 < segment_length && no_lift_length > precision) {
                 // Shorten the segment.
-                p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(
-                Vec2d(prev_quantized + (p - prev_quantized) * (no_lift_length / segment_length)));
+                p = p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(
+                    Vec2d(prev_quantized + (p - prev_quantized) * (no_lift_length / segment_length)));
                 segment_length = (p_quantized - prev_quantized).norm();
                 partial_segment = true;
                 assert(is_approx(no_lift_length, segment_length, 0.01));
@@ -180,8 +180,8 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             //reduce length if wipe_length in the middle
             if (wipe_length + precision / 2 < segment_length) {
                 // Shorten the segment.
-                p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(
-                Vec2d(prev_quantized + (p - prev_quantized) * (wipe_length / segment_length)));
+                p = p_quantized = gcodegen.writer().get_default_gcode_formatter().quantize(
+                    Vec2d(prev_quantized + (p - prev_quantized) * (wipe_length / segment_length)));
                 segment_length = (p_quantized - prev_quantized).norm();
                 partial_segment = true;
                 assert(is_approx(wipe_length, segment_length, 0.01));
