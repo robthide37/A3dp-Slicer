@@ -950,6 +950,11 @@ double clip_end(Path &path, coordf_t distance)
                 return 0;
             }
             distance -= sqrt(lsqr);
+            // check if not the same point as the one we just deleted.
+            if (distance < 0) {
+                assert(distance > -SCALED_EPSILON);
+                path.push_back(last);
+            }
         } else {
             // Circular segment
             double angle = arc_angle(path.back().point.cast<double>(), last.point.cast<double>(), last.radius);
