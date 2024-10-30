@@ -556,7 +556,8 @@ void Layer::build_up_down_graph(Layer& below, Layer& above)
 
 static inline bool layer_needs_raw_backup(const Layer *layer)
 {
-    return ! (layer->regions().size() == 1 && (layer->id() >= layer->object()->config().first_layer_size_compensation_layers.value || layer->object()->config().first_layer_size_compensation.value == 0));
+    return true;
+    // return ! (layer->regions().size() == 1 && (layer->id() >= layer->object()->config().first_layer_size_compensation_layers.value || layer->object()->config().first_layer_size_compensation.value == 0));
 }
 
 void Layer::backup_untyped_slices()
@@ -973,6 +974,7 @@ void Layer::sort_perimeters_into_islands(
     std::vector<RegionWithFillIndex> map_expolygon_to_region_and_fill;
     const bool                       has_multiple_regions = layer_region_ids.size() > 1;
     assert(has_multiple_regions || layer_region_ids.size() == 1);
+    coord_t scaled_resolution = std::max(SCALED_EPSILON , scale_t(this->object()->print()->config().resolution.value));
     // assign fill_surfaces to each layer
     if (! fill_expolygons.empty()) {
         if (has_multiple_regions) {
@@ -998,7 +1000,7 @@ void Layer::sort_perimeters_into_islands(
                 l.set_fill_surfaces().clear();
                 for (const Surface &surf: slices) {
                     ExPolygons exp = intersection_ex(ExPolygons{ surf.expolygon }, l_slices_exp);
-                    assert_valid(exp);
+                    ensure_valid(exp, scaled_resolution);
                     l.set_fill_surfaces().append(std::move(exp), surf);
                 }
                 //bounding boxes
