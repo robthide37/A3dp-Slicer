@@ -788,6 +788,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
     }
 
     Choice* choice = dynamic_cast<Choice*>(ht);
+    choice->set_values(types);
     int32_t index_in_choice = (printer_change ? std::clamp(last_in_conf - ((int32_t)ht->m_opt.enum_def->values().size() - (int32_t)types.size()), 0, (int32_t)ht->m_opt.enum_def->values().size() - 1) : last_in_conf);
     choice->set_any_value(index_in_choice, false);
     if (link.supported && link.label == _(ht->m_opt.enum_def->label(index_in_choice)))
