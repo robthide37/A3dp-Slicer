@@ -13,6 +13,7 @@
 #include <wx/display.h>
 #include <wx/file.h>
 #include "wxExtensions.hpp"
+#include "Jobs/ArrangeJob2.hpp"
 
 #if ENABLE_SCROLLABLE
 static wxSize get_screen_size(wxWindow* window)
@@ -197,7 +198,7 @@ void CalibrationBridgeDialog::create_geometry(std::string setting_to_test, bool 
         if (plat->printer_technology() == ptFFF)
             plat->active_fff_print().apply(plat->model(), *plat->config());
         Worker &ui_job_worker = plat->get_ui_job_worker();
-        plat->arrange(ui_job_worker, false);
+        plat->arrange(ui_job_worker, ArrangeSelectionMode::CurrentBedFull);
         ui_job_worker.wait_for_current_job(20000);
     }
 

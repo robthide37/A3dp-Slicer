@@ -14,7 +14,7 @@
 #include <wx/file.h>
 #include "wxExtensions.hpp"
 #include "MsgDialog.hpp"
-
+#include "Jobs/ArrangeJob2.hpp"
 #include <string>
 
 #if ENABLE_SCROLLABLE
@@ -446,7 +446,7 @@ void CalibrationFlowSpeedDialog::create_geometry(
         if (plat->printer_technology() == ptFFF)
             plat->active_fff_print().apply(plat->model(), *plat->config());
         Worker &ui_job_worker = plat->get_ui_job_worker();
-        plat->arrange(ui_job_worker, false);
+        plat->arrange(ui_job_worker, ArrangeSelectionMode::CurrentBedFull);
         ui_job_worker.wait_for_current_job(20000);
     }
     

@@ -16,6 +16,7 @@
 #include "wxExtensions.hpp"
 //#include "Jobs/ArrangeJob2.hpp"
 #include <unordered_map>
+#include "Jobs/ArrangeJob2.hpp"
 
 #pragma optimize("", off)
 #if ENABLE_SCROLLABLE
@@ -684,7 +685,7 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
         if (plat->printer_technology() == ptFFF)
             plat->active_fff_print().apply(plat->model(), *plat->config());
         Worker &ui_job_worker = plat->get_ui_job_worker();
-        plat->arrange(ui_job_worker, false);
+        plat->arrange(ui_job_worker, ArrangeSelectionMode::CurrentBedFull);
         ui_job_worker.wait_for_current_job(20000);
     }
 
