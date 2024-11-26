@@ -60,8 +60,9 @@
 namespace Slic3r {
 
 enum CompleteObjectSort {
-    cosObject, 
-    cosZ, 
+    cosNearest,
+    cosObject,
+    cosZ,
     cosY,
 };
 
@@ -1206,10 +1207,11 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<WipeAlgo>,      wipe_advanced_algo))
     ((ConfigOptionFloat,               wipe_advanced_nozzle_melted_volume))
     ((ConfigOptionFloat,               wipe_advanced_multiplier))
+    ((ConfigOptionFloats,              wipe_extra_perimeter))
     ((ConfigOptionPercents,            wipe_inside_depth))
     ((ConfigOptionBools,               wipe_inside_end))
     ((ConfigOptionBools,               wipe_inside_start))
-    ((ConfigOptionFloats,              wipe_extra_perimeter))
+    ((ConfigOptionFloatsOrPercents,    wipe_lift))
     ((ConfigOptionBools,               wipe_only_crossing))
     ((ConfigOptionFloats,              wipe_speed))
     ((ConfigOptionBool,                wipe_tower_no_sparse_layers))

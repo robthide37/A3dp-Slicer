@@ -700,7 +700,10 @@ const LayerTools* ToolOrdering::tools_for_layer(coordf_t print_z) const
         }
         dist_min = d;
     }
-    assert(dist_min < EPSILON);
+    // no layer found
+    if (dist_min > EPSILON) {
+        return nullptr;
+    }
     return &m_layer_tools[idx_lower_bound];
 }
 
