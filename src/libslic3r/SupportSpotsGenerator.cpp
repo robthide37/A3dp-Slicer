@@ -239,6 +239,7 @@ SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
 
     Polygons overlap = intersection(ClipperUtils::clip_clipper_polygons_with_subject_bbox(slice_polys, below_bb),
                                     ClipperUtils::clip_clipper_polygons_with_subject_bbox(below_polys, slice_bb));
+    ensure_valid(overlap);
 
     const Integrals integrals{overlap};
     connection.area += integrals.area;
@@ -534,12 +535,10 @@ ObjectPart::ObjectPart(
             }
         }
         void use(const ExtrusionPath &path) override {
-            assert(!path.as_polyline().has_arc());
-            use_polyline(path.as_polyline().to_polyline(), path.width());
+            use_polyline(path.as_polyline().to_polyline(path.width()/10), path.width());
         }
         void use(const ExtrusionPath3D &path) override {
-            assert(!path.as_polyline().has_arc());
-            Polyline poly = path.as_polyline().to_polyline();
+            Polyline poly = path.as_polyline().to_polyline(path.width()/10);
             poly.douglas_peucker(SCALED_EPSILON * 2);
             if(poly.length() > SCALED_EPSILON)
                 use_polyline(std::move(poly), path.width());

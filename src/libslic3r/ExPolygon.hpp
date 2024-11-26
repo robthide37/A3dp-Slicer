@@ -95,8 +95,11 @@ public:
 #ifdef _DEBUGINFO
     void assert_valid() const {
         contour.assert_valid();
-        for (const Polygon& hole : holes)
+        assert(contour.is_counter_clockwise());
+        for (const Polygon &hole : holes) {
             hole.assert_valid();
+            assert(hole.is_clockwise());
+        }
     }
     // to create a cpp multipoint to create test units.
     std::string to_debug_string();

@@ -1,18 +1,79 @@
 #!/bin/bash
+#
+# This script can download and compile dependencies, compile SuperSlicer
+# and optional build a .tgz and an appimage.
+#
+# Original script from SuperSlicer by supermerill https://github.com/supermerill/SuperSlicer
+#
+# Change log:
+#
+# 20 Nov 2023, wschadow, branding and minor changes
+# 01 Jan 2024, wschadow, added build options
+#
 
 export ROOT=`pwd`
 export NCORES=`sysctl -n hw.ncpu`
-export CMAKE_INSTALLED=`which cmake`
-#export ARCH=$(uname -m)
+
+OS_FOUND=$( command -v uname)
+
+case $( "${OS_FOUND}" | tr '[:upper:]' '[:lower:]') in
+  linux*)
+    TARGET_OS="linux"
+   ;;
+  msys*|cygwin*|mingw*)
+    # or possible 'bash on windows'
+    TARGET_OS='windows'
+   ;;
+  nt|win*)
+    TARGET_OS='windows'
+    ;;
+  darwin)
+    TARGET_OS='macos'
+    ;;
+  *)
+    TARGET_OS='unknown'
+    ;;
+esac
+
+export TERM=xterm-256color 
+
+# check operating system
+BUILD_IMG_ARCH=""
+echo
+if [ $TARGET_OS == "macos" ]; then
+    if [ $(uname -m) == "x86_64" ]; then
+        echo -e "$(tput setaf 2)macOS x86_64 found$(tput sgr0)\n"
+        Processor="x86_64"
+        BUILD_IMG_ARCH="-x"
+		echo "x86 BUILD_IMG_ARCH=${BUILD_IMG_ARCH}\n"
+    elif [[ $(uname -m) == "i386" || $(uname -m) == "i686" ]]; then
+        echo "$(tput setaf 2)macOS i386 / i686 (arm?) found$(tput sgr0)\n"
+        Processor="arm64"
+        BUILD_IMG_ARCH="-a"
+    elif [ $(uname -m) == "arm64" ]; then
+        echo "$(tput setaf 2)macOS arm64 found$(tput sgr0)\n"
+        Processor="arm64"
+        BUILD_IMG_ARCH="-a"
+    else
+        echo "$(tput setaf 1)Unsupported OS: macOS $(uname -m)"
+        exit -1
+    fi
+else
+    echo -e "$(tput setaf 1)This script doesn't support your Operating system!"
+    echo -e "Please use a macOS.$(tput sgr0)\n"
+    exit -1
+fi
+echo "BUILD_IMG_ARCH=${BUILD_IMG_ARCH}\n"
 
 # Check if CMake is installed
+export CMAKE_INSTALLED=`which cmake`
 if [[ -z "$CMAKE_INSTALLED" ]]
 then
     echo "Can't find CMake. Either is not installed or not in the PATH. Aborting!"
     exit -1
 fi
 
-while getopts ":idaxbhcstwr" opt; do
+while getopts ":idaxbhcsltwrv" opt; do
   case ${opt} in
     i )
         BUILD_IMAGE="1"
@@ -22,11 +83,11 @@ while getopts ":idaxbhcstwr" opt; do
         ;;
     a )
         BUILD_ARCH="arm64"
-        BUILD_IMG="-a"
+        BUILD_IMG_ARCH="-a"
         ;;
     x )
         BUILD_ARCH="x86_64"
-        BUILD_IMG="-x"
+        BUILD_IMG_ARCH="-x"
         ;;
     b )
         BUILD_DEBUG="1"
@@ -37,9 +98,15 @@ while getopts ":idaxbhcstwr" opt; do
     t)
         BUILD_TESTS="1"
         ;;
+    l )
+        UPDATE_POTFILE="1"
+        ;;
     c)
         BUILD_XCODE="1"
         ;;
+	v )
+		VERSION_DATE="1"
+		;;
     w )
         BUILD_WIPE="1"
         ;;
@@ -58,6 +125,7 @@ while getopts ":idaxbhcstwr" opt; do
         echo "   -s: build Slic3r/SuperSlicer"
         echo "   -t: build tests (in combination with -s)"
         echo "   -i: generate DMG image (optional)\n"
+		echo "   -v: change the version 'UNKNOWN' to the date of the day"
         exit 0
         ;;
   esac
@@ -81,6 +149,7 @@ then
 fi
 
 echo "Build architecture: ${BUILD_ARCH}"
+echo "Build IMG_ARCH=${BUILD_IMG_ARCH}\n"
 
 echo "\n/Applications:\n"
 ls /Applications
@@ -103,6 +172,9 @@ export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix zstd)/lib/
 #    export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix libiconv)/lib/
 #fi
 
+export $BUILD_ARCH
+export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix zstd)/lib/
+
 echo -n "[1/9] Updating submodules..."
 {
     # update submodule profiles
@@ -112,13 +184,18 @@ echo -n "[1/9] Updating submodules..."
 } #> $ROOT/build/Build.log # Capture all command output
 echo "done"
 
-echo -n "[2/9] Changing date in version..."
-{
+
+if [[ -n "$VERSION_DATE" ]]
+then
+	echo -n "[2/9] Changing date in version ... "
     # change date in version
-    sed "s/+UNKNOWN/_$(date '+%F')/" version.inc > version.date.inc
-    mv version.date.inc version.inc
-} #&> $ROOT/build/Build.log # Capture all command output
-echo "done"
+    sed "s/+UNKNOWN/-$(date '+%F')/" version.inc > version.date.inc
+	echo "done"
+else
+	echo -n "[2/9] Changing date in version: remove UNKNOWN ... "
+    sed "s/+UNKNOWN//" version.inc > version.date.inc
+	echo "done"
+fi
 
 if [[ -n "$BUILD_DEPS" ]]
 then
@@ -144,9 +221,9 @@ then
         BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
     fi
     # cmake deps
-    echo "Cmake command: cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET=\"10.14\" ${BUILD_ARCH} "
+    echo "Cmake command: cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET=\"10.15\" ${BUILD_ARCH} "
     pushd deps/build > /dev/null
-    cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET="10.14" $BUILD_ARGS
+    cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15" $BUILD_ARGS
 
     echo -e "\n ... done\n"
 
@@ -192,7 +269,7 @@ then
     # mkdir build
     if [ ! -d "build" ]
     then
-	mkdir build
+        mkdir build
     fi
 
     BUILD_ARGS=""
@@ -225,29 +302,30 @@ then
     if [[ -z "$BUILD_XCODE" ]]
     then
         echo -e "\n[6/9] Building Slicer ...\n"
-        make -j1
+        make -j$NCORES
         echo -e "\n ... done"
     fi
-   echo -e "\n[7/9] Generating language files ...\n"
+
+    echo -e "\n[7/9] Generating language files ...\n"
     #make .mo
+    if [[ -n "$UPDATE_POTFILE" ]]
+    then
+        make gettext_make_pot
+    fi
     make gettext_po_to_mo
 
     popd  > /dev/null
     echo -e "\n ... done"
-
-    # Give proper permissions to script
-    chmod 755 $ROOT/build/src/BuildMacOSImage.sh
-
-    pushd build  > /dev/null
-    $ROOT/build/src/BuildMacOSImage.sh -p $BUILD_IMG
     popd  > /dev/null
 
-    echo "ls ROOT"
-    ls $ROOT
-    echo "ls ROOT/build"
-    ls $ROOT/build
-    echo "ls -al ROOT/build/src"
-    ls -al $ROOT/build/src    
+    echo "> ls ROOT"
+    ls -al $ROOT
+    echo "> ls ROOT/build"
+    ls -al $ROOT/build
+    echo "> ls -al ROOT/build/bin"
+    ls -al $ROOT/build/bin
+    echo "> ls -al ROOT/build/src"
+    ls -al $ROOT/build/src
 fi
 
 if [[ -n "$BUILD_IMAGE" ]]
@@ -255,8 +333,15 @@ then
     # Give proper permissions to script
     chmod 755 $ROOT/build/src/BuildMacOSImage.sh
     pushd build  > /dev/null
-    $ROOT/build/src/BuildMacOSImage.sh -i $BUILD_IMG
+    echo "> $ROOT/build/src/BuildMacOSImage.sh -i ${BUILD_IMG_ARCH}"
+    $ROOT/build/src/BuildMacOSImage.sh -i $BUILD_IMG_ARCH
     popd  > /dev/null
+    echo "> ls ROOT"
+    ls -al $ROOT
+    echo "> ls ROOT/build"
+    ls -al $ROOT/build
+    echo "> ls -al ROOT/build/bin"
+    ls -al $ROOT/build/bin
+    echo "> ls -al ROOT/build/src"
+    ls -al $ROOT/build/src
 fi
-
-

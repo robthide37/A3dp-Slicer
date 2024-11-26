@@ -762,7 +762,7 @@ void PrintObject::simplify_extrusion_path()
         );
         //also simplify object skirt & brim
         if (enable_arc_fitting) {
-            coordf_t scaled_resolution = scale_d(print_config.resolution.value);
+            coordf_t scaled_resolution = scale_d(print_config.arc_fitting_resolution.get_abs_value(print_config.resolution.value));
             if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
             const ConfigOptionFloatOrPercent& arc_fitting_tolerance = print_config.arc_fitting_tolerance;
 
@@ -1082,6 +1082,7 @@ bool PrintObject::invalidate_state_by_config_options(
         if (
                opt_key == "arc_fitting"
             || opt_key == "external_perimeters_first"
+            || opt_key == "external_perimeters_first_force"
             || opt_key == "external_perimeters_hole"
             || opt_key == "external_perimeters_nothole"
             || opt_key == "external_perimeter_extrusion_change_odd_layers"
@@ -1153,6 +1154,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "elephant_foot_min_width" //sla ?
                 || opt_key == "first_layer_size_compensation"
                 || opt_key == "first_layer_size_compensation_layers"
+                || opt_key == "first_layer_size_compensation_no_collapse"
                 || opt_key == "first_layer_height"
                 || opt_key == "hole_size_compensation"
                 || opt_key == "hole_size_threshold"
@@ -1676,6 +1678,7 @@ ExPolygons dense_fill_fit_to_size(const ExPolygon& bad_polygon_to_cover,
 
 void PrintObject::tag_under_bridge() {
     const float COEFF_SPLIT = 1.5;
+    coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(this->print()->config().resolution.value));
 
     for (size_t region_idx = 0; region_idx < this->print()->num_print_regions(); ++ region_idx) {
         const PrintRegion* region = &this->print()->get_print_region(region_idx);
@@ -1699,7 +1702,7 @@ void PrintObject::tag_under_bridge() {
             }
             // run in parallel, it's a costly thing.
             Slic3r::parallel_for(size_t(0), this->layers().size() - 1,
-                [this, &layeridx2lregion, &new_surfaces, region, COEFF_SPLIT](const size_t idx_layer) {
+                [this, &layeridx2lregion, &new_surfaces, region, COEFF_SPLIT, scaled_resolution](const size_t idx_layer) {
                 // we our LayerRegion and the one on top
                 LayerRegion* layerm = layeridx2lregion[idx_layer];
                 const LayerRegion* previousOne = nullptr;
@@ -1853,6 +1856,7 @@ void PrintObject::tag_under_bridge() {
                                                 : intersection_ex(ExPolygons{ dense_poly }, layerm->fill_no_overlap_expolygons());
                                             //add overlap with everything
                                             offseted_dense_polys = offset_ex(offseted_dense_polys, overlap);
+                                            ensure_valid(offseted_dense_polys, scaled_resolution);
                                             for (ExPolygon offseted_dense_poly : offseted_dense_polys) {
                                                 Surface dense_surf(surface, offseted_dense_poly);
                                                 dense_surf.maxNbSolidLayersOnTop = 1;
@@ -1861,6 +1865,7 @@ void PrintObject::tag_under_bridge() {
                                             }
                                         }
                                         sparse_polys = union_ex(sparse_polys);
+                                        ensure_valid(sparse_polys, scaled_resolution);
                                         for (ExPolygon sparse_poly : sparse_polys) {
                                             Surface sparse_surf(surface, sparse_poly);
                                             surf_to_add.push_back(sparse_surf);
@@ -1869,19 +1874,25 @@ void PrintObject::tag_under_bridge() {
                                     } else {
                                         surface.maxNbSolidLayersOnTop = 1;
                                         surf_to_add.clear();
+                                        surface.expolygon.assert_valid();
                                         surf_to_add.push_back(surface);
                                         break;
                                     }
                                 } else {
                                     surf_to_add.clear();
+                                    surface.expolygon.assert_valid();
                                     surf_to_add.emplace_back(std::move(surface));
                                     // mitigation: if not possible, don't try the others.
                                     break;
                                 }
                             }
                             // break go here 
+                            for(Surface &srf : surf_to_add) srf.expolygon.assert_valid();
                             surfs_to_add.insert(surfs_to_add.begin(), surf_to_add.begin(), surf_to_add.end());
-                        } else surfs_to_add.emplace_back(std::move(surface));
+                        } else {
+                            surface.expolygon.assert_valid();
+                            surfs_to_add.emplace_back(std::move(surface));
+                        }
                     }
                     //layerm->fill_surfaces.surfaces = std::move(surfs_to_add);
                 }
@@ -3642,7 +3653,9 @@ void PrintObject::bridge_over_infill()
                 ExPolygons new_internal_infills = diff_ex(internal_infills, cut_from_infill);
                 new_internal_infills            = diff_ex(new_internal_infills, additional_ensuring);
                 ensure_valid(new_internal_infills, scaled_resolution);
+                assert_valid(new_internal_infills);
                 for (const ExPolygon &ep : new_internal_infills) {
+                    ep.assert_valid();
                     new_surfaces.emplace_back((stPosInternal | stDensSparse), ep);
                 }
 
@@ -3655,6 +3668,7 @@ void PrintObject::bridge_over_infill()
                                 tmp.surface_type = (stPosInternal | stDensSolid | stModBridge);
                                 tmp.bridge_angle = cs.bridge_angle;
                                 for (const ExPolygon &ep : ensure_valid(union_ex(cs.new_polys), scaled_resolution)) {
+                                    ep.assert_valid();
                                     new_surfaces.emplace_back(tmp, ep);
                                 }
                                 break;
@@ -3668,6 +3682,7 @@ void PrintObject::bridge_over_infill()
                 new_internal_solids = union_safety_offset_ex(new_internal_solids);
                 ensure_valid(new_internal_solids, scaled_resolution);
                 for (const ExPolygon &ep : new_internal_solids) {
+                    ep.assert_valid();
                     new_surfaces.emplace_back((stPosInternal | stDensSolid), ep);
                 }
 

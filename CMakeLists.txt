@@ -11,7 +11,11 @@
 cmake_minimum_required(VERSION 3.13)
 project(Slic3r)
 
-include("version.inc")
+if (EXISTS "version.date.inc")
+	include("version.date.inc")
+else()
+	include("version.inc")
+endif()
 include(GNUInstallDirs)
 include(CMakeDependentOption)
 
@@ -661,7 +665,7 @@ if(SLIC3R_BUILD_TESTS)
 endif()
 
 if (NOT WIN32 AND NOT APPLE)
-    configure_file(${LIBDIR}/platform/unix/build_appimage.sh.in ${CMAKE_CURRENT_BINARY_DIR}/build_appimage.sh @ONLY)
+    configure_file(${LIBDIR}/platform/unix/build_appimage.sh.in ${LIBDIR_BIN}/build_appimage.sh @ONLY)
 endif()
 
 # Resources install target, configure fhs.hpp on UNIX

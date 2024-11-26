@@ -762,6 +762,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                first_layer_min_speed))
     ((ConfigOptionFloat,                first_layer_size_compensation))  /* elefant_foot_compensation */
     ((ConfigOptionInt,                  first_layer_size_compensation_layers))
+    ((ConfigOptionBool,                 first_layer_size_compensation_no_collapse))
     ((ConfigOptionFloatOrPercent,       first_layer_speed))
     ((ConfigOptionFloatOrPercent,       first_layer_speed_over_raft))
     ((ConfigOptionFloat,                hole_size_compensation))
@@ -886,6 +887,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionPercent,              external_perimeter_overlap))
     ((ConfigOptionFloatOrPercent,       external_perimeter_speed))
     ((ConfigOptionBool,                 external_perimeters_first))
+    ((ConfigOptionBool,                 external_perimeters_first_force))
     ((ConfigOptionBool,                 external_perimeters_hole))
     ((ConfigOptionBool,                 external_perimeters_nothole))
     ((ConfigOptionBool,                 external_perimeters_vase))
@@ -1063,6 +1065,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     GCodeConfig,
 
     ((ConfigOptionEnum<ArcFittingType>, arc_fitting))
+    ((ConfigOptionFloatOrPercent,      arc_fitting_resolution))
     ((ConfigOptionFloatOrPercent,      arc_fitting_tolerance))
     ((ConfigOptionBool,                autoemit_temperature_commands))
     ((ConfigOptionString,              before_layer_gcode))
@@ -1208,10 +1211,13 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               wipe_advanced_nozzle_melted_volume))
     ((ConfigOptionFloat,               wipe_advanced_multiplier))
     ((ConfigOptionFloats,              wipe_extra_perimeter))
+    ((ConfigOptionFloatOrPercent,      wipe_tower_extrusion_width))
     ((ConfigOptionPercents,            wipe_inside_depth))
     ((ConfigOptionBools,               wipe_inside_end))
     ((ConfigOptionBools,               wipe_inside_start))
     ((ConfigOptionFloatsOrPercents,    wipe_lift))
+    ((ConfigOptionFloatsOrPercents,    wipe_lift_length))
+    ((ConfigOptionFloatsOrPercents,    wipe_min))
     ((ConfigOptionBools,               wipe_only_crossing))
     ((ConfigOptionFloats,              wipe_speed))
     ((ConfigOptionBool,                wipe_tower_no_sparse_layers))

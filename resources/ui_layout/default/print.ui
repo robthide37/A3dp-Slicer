@@ -63,10 +63,10 @@ group:Avoid crossing perimeters
 	end_line
 	setting:avoid_crossing_curled_overhangs
 group:label_width$12:Overhangs
-	line:threshold for
-		setting:script:bool:advanced:depends$overhangs_width_speed$overhangs_width:label$_:label_width$0:tooltip$Simple widget to enable/disable the overhangs detection (using 55% and 75% for the two thresholds)\nUse the expert mode to get more detailled widgets:s_overhangs
-		setting:label$Bridge speed and fan:width$5:sidetext_width$0:overhangs_width_speed
-		setting:label_width$12:label$Bridge flow:width$5:overhangs_width
+	line:Activate (threshold)
+		setting:script:bool:tags$Simple$Advanced$Prusa$SuSi:depends$overhangs_width_speed$overhangs_width:label$_:label_width$0:tooltip$Simple widget to enable/disable the overhangs detection (using 55% and 75% for the two thresholds)\nUse the expert mode to get more detailled widgets:s_overhangs
+		setting:label$for Bridge speed and fan:width$5:sidetext_width$0:overhangs_width_speed
+		setting:label_width$12:label$for Bridge flow:width$5:overhangs_width
 	end_line
 	setting:overhangs_speed_enforce
 	line:Extrusion direction
@@ -114,6 +114,7 @@ group:sidetext_width$5:Advanced
 	end_line
 group:External perimeter first
 	setting:label$Activate:external_perimeters_first
+	setting:external_perimeters_first_force
 	line:Apply on
 		setting:external_perimeters_nothole
 		setting:external_perimeters_hole
@@ -157,6 +158,7 @@ group:Modifying slices
 	line:XY First layer compensation
 		setting:width$6:first_layer_size_compensation
 		setting:width$6:first_layer_size_compensation_layers
+		setting:first_layer_size_compensation_no_collapse
 	end_line
 	line:Vertical Hole shrinking compensation
 		setting:width$6:hole_size_compensation
@@ -536,7 +538,10 @@ group:Wipe tower
 		setting:wipe_tower_cone_angle
 	end_line
 	setting:wipe_tower_bridging
-	setting:wipe_tower_extra_spacing
+	line:Purge lines
+		setting:label$Line width:wipe_tower_extrusion_width
+		setting:label$Spacing between lines:wipe_tower_extra_spacing
+	end_line
 	setting:wipe_tower_no_sparse_layers
 	line:Priming
         setting:single_extruder_multi_material_priming

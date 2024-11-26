@@ -307,7 +307,7 @@ private:
 
     void            split_at_seam_pos(ExtrusionLoop &loop, bool was_clockwise);
     template <typename THING = ExtrusionEntity> // can be templated safely because private
-    void            add_wipe_points(const std::vector<THING>& paths, bool reverse = true);
+    void            add_wipe_points(const std::vector<THING>& paths, bool reverse, bool is_loop);
     void            seam_notch(const ExtrusionLoop& original_loop, ExtrusionPaths& building_paths,
         ExtrusionPaths& notch_extrusion_start, ExtrusionPaths& notch_extrusion_end, bool is_hole_loop, bool is_full_loop_ccw);
 
@@ -358,7 +358,7 @@ private:
     // set the region config, and the overrides it contains.
     // if no m_region, then it will take the default region config from print_object
     // if no print_object, then it will take the default region config from print
-    void set_region_for_extrude(const Print &print, const PrintObject *print_object, std::string &gcode);
+    void set_region_for_extrude(const Print &print, const PrintObject *print_object, const LayerRegion *layerm, std::string &gcode);
     void extrude_perimeters(const ExtrudeArgs &print_args, const LayerIsland &island, std::string &gcode);
     void extrude_infill(const ExtrudeArgs &print_args, const LayerIsland &island, bool is_infill_first, std::string &gcode);
     void extrude_ironing(const ExtrudeArgs &print_args, const LayerIsland &island, std::string &gcode);
@@ -482,9 +482,20 @@ private:
     uint16_t                            m_print_object_instance_id = -1;
     // For crossing perimeter retraction detection  (contain the layer & nozzle widdth used to construct it)
     // !!!! not thread-safe !!!! if threaded per layer, please store it in the thread.
+    struct SliceIsland{
+        ExPolygon expolygon;
+        BoundingBox boundingbox;
+        std::vector<BoundingBox> hole_boundingboxes;
+        SliceIsland(ExPolygon &&exp, BoundingBox &&bb) : boundingbox(std::move(bb)), expolygon(std::move(exp)) {}
+#ifdef CAN_CROSS_PERIMETER_USE_GRID
+        std::optional<EdgeGrid::Grid> grid;
+        SliceIsland(ExPolygon &&exp, BoundingBox &&bb, EdgeGrid::Grid &&g) : boundingbox(std::move(bb)), expolygon(std::move(exp)), grid(std::move(g)) {}
+#endif
+        void create_hole_bb();
+    };
     struct SliceOffsetted {
-        std::vector<std::pair<ExPolygon, BoundingBox>> slices;
-        std::vector<std::pair<ExPolygon, BoundingBox>> slices_offsetted;
+        std::vector<SliceIsland> slices;
+        std::vector<SliceIsland> slices_offsetted;
         const Layer* layer;
         coord_t diameter;
     }                                   m_layer_slices_offseted{ {},{},nullptr, 0};

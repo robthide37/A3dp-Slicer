@@ -525,6 +525,7 @@ static std::vector<std::string> s_Preset_print_options {
         "staggered_inner_seams",
         // external_perimeters
         "external_perimeters_first",
+        "external_perimeters_first_force",
         "external_perimeters_vase",
         "external_perimeters_nothole",
         "external_perimeters_hole",
@@ -729,6 +730,7 @@ static std::vector<std::string> s_Preset_print_options {
         // compensation
         "first_layer_size_compensation",
         "first_layer_size_compensation_layers",
+        "first_layer_size_compensation_no_collapse",
         "xy_size_compensation",
         "xy_inner_size_compensation",
         "hole_size_compensation",
@@ -745,6 +747,7 @@ static std::vector<std::string> s_Preset_print_options {
         "wipe_tower_cone_angle",
         "wipe_tower_extra_spacing",
         "wipe_tower_extruder",
+        "wipe_tower_extrusion_width",
         "wipe_tower_no_sparse_layers",
         "wipe_tower_speed",
         "wipe_tower_wipe_starting_speed",
@@ -894,6 +897,8 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_wipe_inside_end",
         "filament_wipe_inside_start",
         "filament_wipe_lift",
+        "filament_wipe_lift_length",
+        "filament_wipe_min",
         // Profile compatibility
         "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
         //merill adds
@@ -915,6 +920,7 @@ static std::vector<std::string> s_Preset_machine_limits_options {
 
 static std::vector<std::string> s_Preset_printer_options {
     "arc_fitting",
+    "arc_fitting_resolution",
     "arc_fitting_tolerance", //TODO: keep?
     "autoemit_temperature_commands",
     "printer_technology",

@@ -675,6 +675,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
 
+    def = this->add("arc_fitting_resolution", coFloatOrPercent);
+    def->label = L("Arc fitting resolution");
+    def->sidetext = L("mm or %");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("When using the arc_fitting option, resolution used to simplify the path into an arc."
+    "\n can be a mm or a % of the slice resolution.");
+    def->mode = comExpert | comSuSi;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
     def = this->add("arc_fitting_tolerance", coFloatOrPercent);
     def->label = L("Arc fitting tolerance");
@@ -1637,6 +1646,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("external_perimeters_first_force", coBool);
+    def->label = L("force for all");
+    def->full_label = L("External perimeters first: force for all");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Print all external contours & periemter first, then the internal ones.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("external_perimeters_vase", coBool);
     def->label = L("In vase mode (no seam)");
     def->full_label = L("External perimeters in vase mode");
@@ -2458,7 +2475,7 @@ void PrintConfigDef::init_fff_params()
         ", it will choose the layer angle from the pattern as if it has started from the first layer."
         "Empty this settings to disable and recover the old behavior.");
     def->sidetext   = L("°");
-    def->min        = 0;
+    def->min        = -360;
     def->max        = 360;
     def->full_width = true;
     def->mode       = comExpert | comSuSi;
@@ -2567,6 +2584,15 @@ void PrintConfigDef::init_fff_params()
     def->max = 30;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("first_layer_size_compensation_no_collapse", coBool);
+    def->label = L("No collapse");
+    def->full_label = L("XY First layer compensation: no collapse");
+    def->category = OptionCategory::slicing;
+    def->tooltip = L("The compensations won't shrink thin areas below a threshold for the first layer(s)."
+                    "\nThe layer(s) where this is activated depends on the 'first_layer_size_compensation_layers' setting.");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("fill_smooth_width", coFloatOrPercent);
     def->label = L("Width");
@@ -3825,16 +3851,17 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats{ 1500., 1250. });
 
     def = this->add("max_gcode_per_second", coFloat);
-    def->label = L("Maximum G1 per second");
+    def->label = L("Maximum G1 per second (Experimental)");
     def->category = OptionCategory::speed;
     def->tooltip = L("If your firmware stops while printing, it may have its gcode queue full."
         " Set this parameter to merge extrusions into bigger ones to reduce the number of gcode commands the printer has to process each second."
         "\nOn 8bit controlers, a value of 150 is typical."
         "\nNote that reducing your printing speed (at least for the external extrusions) will reduce the number of time this will triggger and so increase quality."
-        "\nSet zero to disable.");
+        "\nDisabled if set to 0.");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(1500));
+    def->can_be_disabled = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionFloat(1500), true));
 
     def = this->add("max_fan_speed", coInts);
     def->label = L("Max");
@@ -5018,12 +5045,13 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When outputting gcode, this setting ensure that there is almost no commands more than this value apart."
         " Be sure to also use max_gcode_per_second instead, as it's much better when you have very different speeds for features"
         " (Too many too small commands may overload the firmware / connection)."
-        "\nSet zero to disable.");
+        "\nDisabled if set to 0.");
     def->sidetext = L("mm or %");
     def->min = 0;
     def->precision = 6;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(0.02, false));
+    def->can_be_disabled = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionFloatOrPercent(0.02, false), false));
     def->aliases = {"min_length"};
 
     def = this->add("gcode_min_resolution", coFloatOrPercent);
@@ -5036,7 +5064,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->precision = 6;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
+    def->set_default_value(new ConfigOptionFloatOrPercent(10, true));
 
     def = this->add("resolution_internal", coFloat);
     def->label = L("Internal resolution");
@@ -6874,14 +6902,34 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionPercents{ 50 });
-
+    
     def = this->add("wipe_lift", coFloatsOrPercents);
     def->label = L("Wipe lift");
     def->category = OptionCategory::extruders;
-    def->tooltip = L("when wiping, it will lift gradually to this height, so the filament can be 'cut' more easily."
-        "\nCan be a percentage of the current extruder diameter.");
+    def->tooltip = L("When wiping, it will lift gradually to this height, so the filament can be 'cut' more easily."
+        "\nCan be a percentage of the current layer height.");
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{0, false}});
+    
+    def = this->add("wipe_lift_length", coFloatsOrPercents);
+    def->label = L("Wipe lift length");
+    def->full_label = L("Wipe length with lift");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("Distance in the wipe that is used to lift."
+        " If higher than the wipe distance, then the lift began at the start of the wipe."
+        " If lower than the wipe distance, then the lift began after the start, so the end of the lift occur at the end of the wipe."
+        "\nCan be a percentage of the wipe distance.");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{50, true}});
+
+    def = this->add("wipe_min", coFloatsOrPercents);
+    def->label = L("Minimum Wipe length");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("Ensure the nozzle will move at least this much."
+        "\nCan be a percentage of the needed travel for the retraction"
+        " (if this is set to 0, then it's posisble that the end of the retraction occur after the end of the wipe).");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{150, true}});
 
     def = this->add("wipe_only_crossing", coBools);
     def->label = L("Wipe only when crossing perimeters");
@@ -6927,6 +6975,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(33, true));
 
+    def = this->add("wipe_tower_extrusion_width", coFloatOrPercent);
+    def->label = L("Wipe Tower purge line width");
+    def->category = OptionCategory::width;
+    def->tooltip = L("When wiping, the extrusion should be at least 125% of the nozzle diameter."
+        " This setting allow you to vary it, in case you need a wider one to properly flush the nozzle.");
+    def->sidetext = L("mm or %");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(150, true));
 
     def = this->add("wiping_volumes_extruders", coFloats);
     def->label = L("Purging volumes - load/unload volumes");
@@ -7416,6 +7472,8 @@ void PrintConfigDef::init_extruder_option_keys()
         "wipe_inside_end",
         "wipe_inside_start",
         "wipe_lift",
+        "wipe_lift_length",
+        "wipe_min",
         "wipe_only_crossing",
         "wipe_speed",
     };
@@ -7449,6 +7507,8 @@ void PrintConfigDef::init_extruder_option_keys()
         "wipe_inside_end",
         "wipe_inside_start",
         "wipe_lift",
+        "wipe_lift_length",
+        "wipe_min",
         "wipe_only_crossing",
         "wipe_speed",
     };
@@ -7478,6 +7538,8 @@ void PrintConfigDef::init_extruder_option_keys()
         "wipe_inside_end",
         "wipe_inside_start",
         "wipe_lift",
+        "wipe_lift_length",
+        "wipe_min",
         "wipe_only_crossing",
         "wipe_speed",
     };
@@ -8764,7 +8826,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         if (value == "1")
             value = "50%";
         else
-            value = "0";
+            value = "!50%";
     }
     if (opt_key == "print_machine_envelope") {
         opt_key = "machine_limits_usage";
@@ -8914,8 +8976,16 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             value = opt_decoder.serialize();
         }
     }
-    if ("max_layer_height" == opt_key && "0" == value) {
-        value = "!75%";
+    if ("0" == value) {
+        if ("max_layer_height" == opt_key) {
+            value = "!75%";
+        }
+        if ("gcode_min_length" == opt_key) {
+            value = "!0";
+        }
+        if ("max_gcode_per_second" == opt_key) {
+            value = "!0";
+        }
     }
     if (value == "-1") {
         if ("overhangs_bridge_threshold" == opt_key) {value = "!0";}
@@ -9014,6 +9084,7 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
     if (old && config.has("bridge_angle") && config.get_float("bridge_angle") == 0 && config.is_enabled("bridge_angle")) {
         config.option("bridge_angle")->set_enabled(false);
     }
+    bool enabled = !config.has("overhangs_width_speed") || config.is_enabled("overhangs_width_speed");
     if (old && config.has("overhangs_width_speed") && config.get_float("overhangs_width_speed") == 0 && config.is_enabled("overhangs_width_speed")) {
         config.option("overhangs_width_speed")->set_enabled(false);
     }
@@ -9540,6 +9611,7 @@ void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> set
 
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "allow_empty_layers",
+"arc_fitting_resolution",
 "arc_fitting_tolerance",
 "avoid_crossing_not_first_layer",
 "avoid_crossing_top",
@@ -9574,6 +9646,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "external_perimeter_extrusion_change_odd_layers",
 "external_perimeter_fan_speed",
 "external_perimeter_overlap",
+"external_perimeters_first_force",
 "external_perimeters_hole",
 "external_perimeters_nothole",
 "external_perimeters_vase",
@@ -9646,6 +9719,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "first_layer_infill_speed",
 "first_layer_min_speed",
 "first_layer_size_compensation_layers",
+"first_layer_size_compensation_no_collapse",
 "gcode_ascii",
 "gcode_command_buffer",
 "gcode_min_length",
@@ -9828,6 +9902,8 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "wipe_inside_end",
 "wipe_inside_start",
 "wipe_lift",
+"wipe_lift_length",
+"wipe_min",
 "wipe_only_crossing",
 "wipe_speed",
 "filament_wipe_extra_perimeter", // filament override
@@ -9835,8 +9911,11 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_wipe_inside_end", // filament override
 "filament_wipe_inside_start", // filament override
 "filament_wipe_lift", // filament override
+"filament_wipe_lift_length", // filament override
+"filament_wipe_min", // filament override
 "filament_wipe_only_crossing", // filament override
 "filament_wipe_speed", // filament override
+"wipe_tower_extrusion_width",
 "wipe_tower_speed",
 "wipe_tower_wipe_starting_speed",
 "xy_size_compensation",
@@ -11015,9 +11094,9 @@ std::string validate(const FullPrintConfig& cfg)
         return "Invalid value for --skirt-height";
     
     // extruder clearance
-    if (cfg.extruder_clearance_radius <= 0)
+    if (cfg.extruder_clearance_radius < 0)
         return "Invalid value for --extruder-clearance-radius";
-    if (cfg.extruder_clearance_height <= 0)
+    if (cfg.extruder_clearance_height < 0)
         return "Invalid value for --extruder-clearance-height";
 
     // --extrusion-multiplier

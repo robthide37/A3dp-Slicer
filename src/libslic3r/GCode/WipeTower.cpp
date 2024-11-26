@@ -763,7 +763,7 @@ void WipeTower::set_extruder(size_t idx)
         m_filpar[idx].max_e_speed = (max_vol_speed / filament_area());
 
     m_nozzle_diameter = nozzle_diameter; // all extruders are now assumed to have the same diameter
-    m_perimeter_width = nozzle_diameter * Width_To_Nozzle_Ratio; // all extruders are now assumed to have the same diameter
+    m_perimeter_width = m_config->wipe_tower_extrusion_width.get_abs_value(nozzle_diameter); // all extruders are now assumed to have the same diameter
 
     if (m_semm) {
         std::istringstream stream{m_config->filament_ramming_parameters.get_at(idx)};
