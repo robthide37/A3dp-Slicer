@@ -21,6 +21,14 @@
 #include <wx/taskbar.h>
 #endif // __APPLE__
 
+#if __MSW__
+#include <WebView2.h>
+#endif
+#include <wx/wx.h>
+#include "PrinterWebView.hpp"
+
+
+
 #include <string>
 #include <map>
 
