@@ -359,8 +359,8 @@ GUI/PrinterWebView.cpp
     Utils/UndoRedo.hpp
     Utils/HexFile.cpp
     Utils/HexFile.hpp
-    Utils/WebViewHelper.cpp
-    Utils/WebViewHelper.hpp
+    GUI/A3DPWebView.cpp
+    GUI/A3DPWebView.hpp
     Utils/TCPConsole.cpp
     Utils/TCPConsole.hpp
     Utils/MKS.cpp

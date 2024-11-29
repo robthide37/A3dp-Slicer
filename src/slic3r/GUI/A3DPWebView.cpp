@@ -1,4 +1,4 @@
-#include "WebViewHelper.hpp"
+#include "A3DPWebView.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/Utils/MacDarkMode.hpp"
 

@@ -302,6 +302,7 @@ public:
     bool m_adding_script_handler{false};
     bool is_adding_script_handler() { return m_adding_script_handler; }
     void set_adding_script_handler(bool status) { m_adding_script_handler = status; }
+    void show_printer_webview_tab();
 
     Tab*            get_tab(Preset::Type type, bool only_completed = true);
     ConfigOptionMode get_mode();

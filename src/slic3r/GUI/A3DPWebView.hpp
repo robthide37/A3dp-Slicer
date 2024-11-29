@@ -19,4 +19,4 @@ public:
     static void RecreateAll();
 };
 
-#endif // !slic3r_GUI_WebView_hpp_
+#endif // !slic3r_GUI_Utils_WebView_hpp_

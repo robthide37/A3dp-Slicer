@@ -23,7 +23,7 @@
 #include <wx/debug.h>
 #include <wx/busyinfo.h>
 
-#include "slic3r/Utils/WebViewHelper.hpp"
+#include "A3DPWebView.hpp"
 #include <wx/webview.h>
 #include <wx/msw/webview_edge.h>
 #include <wx/msw/webview_ie.h>
@@ -56,6 +56,7 @@ WebViewPanel::WebViewPanel(wxWindow *parent) : wxPanel(parent, wxID_ANY)
     
     sizer->Add(m_combo_printer, 0, wxEXPAND | wxALL, 5);  // Add padding around the combo box
     sizer->Add(m_webView, 1, wxEXPAND | wxALL, 5);  // Add padding around the web view and make it expand to fill the remaining space
+    this->Show();
 
     this->SetSizer(sizer);
 }
@@ -114,7 +115,7 @@ void WebViewPanel::load_url(wxString &url)
     if (m_webView == nullptr)
         return;
 
-    m_webView->LoadURL(url);
+    m_webView->LoadURL("https://www.google.com");
 
     if (url.IsEmpty()) {
         std::cout << "URL is empty";

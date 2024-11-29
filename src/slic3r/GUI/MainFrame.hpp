@@ -21,13 +21,12 @@
 #include <wx/taskbar.h>
 #endif // __APPLE__
 
+
 #if __MSW__
 #include <WebView2.h>
 #endif
 #include <wx/wx.h>
 #include "PrinterWebView.hpp"
-
-
 
 #include <string>
 #include <map>
@@ -163,6 +162,7 @@ public:
         PlaterPreview,
         PlaterGcode,
         LastPlater,
+        Device,
         PrintSettings,
         FilamentSettings,
         PrinterSettings,
@@ -234,6 +234,17 @@ public:
     void        select_view(const std::string& direction);
     // Propagate changed configuration from the Tab to the Plater and save changes to the AppConfig
     void        on_config_changed(const DynamicConfig &cfg) const ;
+
+// WebView Impl
+    void load_printer_url();
+    void load_printer_url(wxString url);
+
+    void remove_printer_webview_tab();
+    bool m_printer_webview_added {false};
+    void add_printer_webview_tab(const wxString &url);
+    void show_printer_webview_tab(DynamicPrintConfig* dpc, bool uploaded = false);
+    WebViewPanel*         m_webViewPanel{nullptr};
+    wxWebView*            m_webView{nullptr};
 
     bool can_save() const;
     bool can_save_as() const;
