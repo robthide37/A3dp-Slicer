@@ -359,7 +359,7 @@ std::string GCodeWriter::write_pressure_advance(double pa) {
                 gcode += std::string(" EXTRUDER=") + this->m_config.tool_name.get_at(tool_id);
             }else if (tool_id > 0) {
                 gcode += std::string(" EXTRUDER=extruder") + std::to_string(tool_id);
-            }
+        }
         } else {
             // if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy))
             gcode += "M900 K" + to_string_nozero(pa, 4);
@@ -600,14 +600,18 @@ std::string GCodeWriter::travel_arc_to_xy(const Vec2d& point, const Vec2d& cente
     m_pos.y()             = point.y();
 
     GCodeG2G3Formatter w(this->m_config.gcode_precision_xyz.value, this->m_config.gcode_precision_e.value, is_ccw);
-    w.emit_xy(point);
+    bool has_x_y = w.emit_xy(point, m_pos_str_x, m_pos_str_y);
+    if (!has_x_y) {
+        //if point too close to the other, then do not write it, it's useless.
+        return "";
+    }
     w.emit_ij(center_offset);
     w.emit_f(travel_speed * 60);
     w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
 }
 
-std::string GCodeWriter::travel_to_xyz(const Vec3d &point, bool is_lift, const double speed, const std::string_view comment)
+std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const bool is_lift, const double speed, const std::string_view comment)
 {
     assert(std::abs(point.x()) < 120000.);
     assert(std::abs(point.y()) < 120000.);
@@ -654,21 +658,26 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, bool is_lift, const d
     m_pos = point;
     
     GCodeG1Formatter w(this->get_default_gcode_formatter());
-    if (!w.emit_xy(point.head<2>(), m_pos_str_x, m_pos_str_y)) {
+    bool has_x_y = w.emit_xy(point.head<2>(), m_pos_str_x, m_pos_str_y);
+    if (!has_x_y) {
         //if point too close to the other, then whatever, as long as the z is different.
-        // //if point too close to the other, then do not write it, it's useless.
-        // w = GCodeG1Formatter(this->get_default_gcode_formatter());
+         //if point too close to the other, then do not write it, it's useless.
+         w.clear();
     }
-    if (this->m_config.z_step > SCALING_FACTOR)
-        w.emit_axis('Z', point.z(), 6);
-    else
-        w.emit_z(point.z());
+    if (this->m_config.z_step > SCALING_FACTOR) {
+        w.m_gcode_precision_xyz = 6;
+    }
+    bool has_z = w.emit_z(point.z() + this->gcode_config().z_offset.value, m_pos_str_z);
+    if (!has_x_y && !has_z) {
+        //if point too close to the other, no move are needed.
+        return "";
+    }
     w.emit_f(travel_speed * 60);
     w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
 }
 
-std::string GCodeWriter::travel_to_z(double z, const std::string_view comment)
+std::string GCodeWriter::travel_to_z(const double z, const std::string_view comment)
 {
     /*  If target Z is lower than current Z but higher than nominal Z
         we don't perform the move but we only adjust the nominal Z by
@@ -688,7 +697,7 @@ std::string GCodeWriter::travel_to_z(double z, const std::string_view comment)
 }
 
 
-std::string GCodeWriter::get_travel_to_z_gcode(double z, const std::string_view comment)
+std::string GCodeWriter::get_travel_to_z_gcode(const double z, const std::string_view comment)
 {
     m_pos.z() = z;
     double speed = this->m_config.travel_speed_z.value;
@@ -696,16 +705,19 @@ std::string GCodeWriter::get_travel_to_z_gcode(double z, const std::string_view 
         speed = this->m_config.travel_speed.value;
 
     GCodeG1Formatter w(this->get_default_gcode_formatter());
-    if (this->m_config.z_step > SCALING_FACTOR)
-        w.emit_axis('Z', z, 6);
-    else
-        w.emit_z(z);
+    if (this->m_config.z_step > SCALING_FACTOR) {
+        w.m_gcode_precision_xyz = 6;
+    }
+    bool has_z = w.emit_z(z + this->gcode_config().z_offset.value, m_pos_str_z);
+    if (!has_z) {
+        return "";
+    }
     w.emit_f(speed * 60.0);
     w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
 }
 
-bool GCodeWriter::will_move_z(double z) const
+bool GCodeWriter::will_move_z(const double z) const
 {
     /* If target Z is lower than current Z but higher than nominal Z
         we don't perform an actual Z move. */
@@ -717,7 +729,7 @@ bool GCodeWriter::will_move_z(double z) const
     return true;
 }
 
-std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment)
+std::string GCodeWriter::extrude_to_xy(const Vec2d &point, const double dE, const std::string_view comment)
 {
     assert(dE == dE);
     assert(m_pos.x() != point.x() || m_pos.y() != point.y());
@@ -729,6 +741,7 @@ std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std:
     GCodeG1Formatter w(this->get_default_gcode_formatter());
     if (!w.emit_xy(point, m_pos_str_x, m_pos_str_y)) {
         //if point too close to the other, then do not write it, it's useless.
+        this->m_tool->cancel_extrude(dE + this->m_de_left);
         this->m_de_left += dE;
         return "";
     }
@@ -741,10 +754,11 @@ std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std:
     return write_acceleration() + w.string();
 }
 
+static constexpr const std::array<double, 10> log_10{1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
 //BBS: generate G2 or G3 extrude which moves by arc
 //point is end point which means X and Y axis
 //center_offset is I and J axis
-std::string GCodeWriter::extrude_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, double dE, const bool is_ccw, const std::string_view comment)
+std::string GCodeWriter::extrude_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const double dE, const bool is_ccw, const std::string_view comment)
 {
     assert(std::abs(point.x()) < 120000.);
     assert(std::abs(point.y()) < 120000.);
@@ -755,11 +769,18 @@ std::string GCodeWriter::extrude_arc_to_xy(const Vec2d& point, const Vec2d& cent
     m_pos.x()             = point.x();
     m_pos.y()             = point.y();
      auto [/*double*/ delta_e, /*double*/ e_to_write]  = this->m_tool->extrude(dE + this->m_de_left);
+    //note: delta_e is the quantized delta.
     bool is_extrude  = std::abs(delta_e) > 0.00000001;
 
     GCodeG2G3Formatter w(this->m_config.gcode_precision_xyz.value, this->m_config.gcode_precision_e.value, is_ccw);
     bool has_x_y = w.emit_xy(point, m_pos_str_x, m_pos_str_y);
-    assert(has_x_y);
+    if (!has_x_y) {
+        //if point too close to the other, then do not write it, it's useless.
+        this->m_tool->cancel_extrude(dE + this->m_de_left);
+        this->m_de_left += dE;
+        return "";
+    }
+    // there is a move, write the arc center.
     w.emit_ij(center_offset);
     this->m_de_left += dE - delta_e;
     if (is_extrude) {
@@ -770,7 +791,7 @@ std::string GCodeWriter::extrude_arc_to_xy(const Vec2d& point, const Vec2d& cent
     return write_acceleration() + w.string();
 }
 
-std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment)
+std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, const double dE, const std::string_view comment)
 {
     assert(std::abs(point.x()) < 120000.);
     assert(std::abs(point.y()) < 120000.);
@@ -783,8 +804,25 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std
     bool is_extrude  = std::abs(delta_e) > 0.00000001;
 
     GCodeG1Formatter w(this->get_default_gcode_formatter());
+    bool has_x_y = w.emit_xy(Vec2d(point.x(), point.y()), m_pos_str_x, m_pos_str_y);
+    if (!has_x_y) {
+        w.clear();
+    }
+    bool has_z = w.emit_z(point.z() + this->gcode_config().z_offset.value, m_pos_str_z);
+    if (!has_z) {
+        if (!has_x_y) {
+            // m_pos has already been updated to the new (but indistinguishable from current one) posiiton
+            // we return nothing, as it's not worth it.
+            // just update the missing de.
+            this->m_tool->cancel_extrude(dE + this->m_de_left);
+            this->m_de_left += dE;
+            return "";
+        } else {
+            w.clear();
+            // re-write x & y. the m_pos_str_x & m_pos_str_y must stay the same, the return boolan must be 'false'
     w.emit_xy(Vec2d(point.x(), point.y()), m_pos_str_x, m_pos_str_y);
-    w.emit_z(point.z());
+        }
+    }
     this->m_de_left += dE - delta_e;
     if (is_extrude) {
         double delta = w.emit_e(m_extrusion_axis, e_to_write);
@@ -796,7 +834,7 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std
     return write_acceleration() + w.string();
 }
 
-std::string GCodeWriter::extrude_arc_to_xyz(const Vec3d& point, const Vec2d& center_offset, double dE, const bool is_ccw, const std::string_view comment)
+std::string GCodeWriter::extrude_arc_to_xyz(const Vec3d& point, const Vec2d& center_offset, const double dE, const bool is_ccw, const std::string_view comment)
 {
     assert(std::abs(point.x()) < 120000.);
     assert(std::abs(point.y()) < 120000.);
@@ -810,8 +848,14 @@ std::string GCodeWriter::extrude_arc_to_xyz(const Vec3d& point, const Vec2d& cen
 
     GCodeG2G3Formatter w(this->m_config.gcode_precision_xyz.value, this->m_config.gcode_precision_e.value, is_ccw);
     bool has_x_y = w.emit_xy(Vec2d(point.x(), point.y()), m_pos_str_x, m_pos_str_y);
-    assert(has_x_y);
-    w.emit_z(point.z());
+    bool has_z = w.emit_z(point.z() + this->gcode_config().z_offset.value, m_pos_str_z);
+    if (!has_x_y && !has_z) {
+        // m_pos has already been updated to the new (but indistinguishable from current one) posiiton
+        // we return nothing, as it's not worth it.
+        this->m_tool->cancel_extrude(dE + this->m_de_left);
+        this->m_de_left += dE;
+        return "";
+    }
     w.emit_ij(center_offset);
     this->m_de_left += dE - delta_e;
     if (is_extrude) {
@@ -950,7 +994,7 @@ std::string GCodeWriter::unretract()
     return gcode;
 }
 
-void GCodeWriter::update_position(const Vec3d &new_pos)
+void GCodeWriter::update_position_by_lift(const Vec3d &new_pos)
 {
     // move z ==> update lift
     m_lifted = m_lifted + new_pos.z() - m_pos.z();

@@ -378,6 +378,14 @@ static t_config_enum_values s_keys_map_PerimeterGeneratorType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimeterGeneratorType)
 
+static const t_config_enum_values s_keys_map_EnsureVerticalShellThickness {
+    { "disabled", int(EnsureVerticalShellThickness::Disabled) },
+    { "partial",  int(EnsureVerticalShellThickness::Partial)  },
+    { "enabled",  int(EnsureVerticalShellThickness::Enabled)  },
+    { "enabled_old",  int(EnsureVerticalShellThickness::Enabled_old)  },
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(EnsureVerticalShellThickness)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -675,6 +683,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
 
+    def = this->add("arc_fitting_resolution", coFloatOrPercent);
+    def->label = L("Arc fitting resolution");
+    def->sidetext = L("mm or %");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("When using the arc_fitting option, resolution used to simplify the path into an arc."
+    "\n can be a mm or a % of the slice resolution.");
+    def->mode = comExpert | comSuSi;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
 
     def = this->add("arc_fitting_tolerance", coFloatOrPercent);
     def->label = L("Arc fitting tolerance");
@@ -1489,6 +1506,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(true));
 
+    def = this->add("ensure_vertical_shell_thickness", coEnum);
+    def->label = L("Ensure vertical shell thickness");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Add solid infill near sloping surfaces to guarantee the vertical shell thickness "
+                   "(top+bottom solid layers).");
+    def->set_enum<EnsureVerticalShellThickness>({
+        { "disabled", L("Disabled (2.5)") },
+        { "partial",  L("partial (2.9 experimental)")  },
+        { "enabled",  L("Enabled (2.7 experimental)")  },
+        { "enabled_old",  L("Enabled (2.5)")  },
+    });
+    def->mode = comAdvancedE | comPrusa;
+    def->set_default_value(new ConfigOptionEnum<EnsureVerticalShellThickness>(EnsureVerticalShellThickness::Enabled_old));
+
     def = this->add("external_infill_margin", coFloatOrPercent);
     def->label = L("Default");
     def->full_label = L("Default infill margin");
@@ -1635,6 +1666,14 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Print contour perimeters from the outermost one to the innermost one "
         "instead of the default inverse order.");
     def->mode = comExpert | comPrusa;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("external_perimeters_first_force", coBool);
+    def->label = L("force for all");
+    def->full_label = L("External perimeters first: force for all");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Print all external contours & periemter first, then the internal ones.");
+    def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("external_perimeters_vase", coBool);
@@ -3820,16 +3859,17 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats{ 1500., 1250. });
 
     def = this->add("max_gcode_per_second", coFloat);
-    def->label = L("Maximum G1 per second");
+    def->label = L("Maximum G1 per second (Experimental)");
     def->category = OptionCategory::speed;
     def->tooltip = L("If your firmware stops while printing, it may have its gcode queue full."
         " Set this parameter to merge extrusions into bigger ones to reduce the number of gcode commands the printer has to process each second."
         "\nOn 8bit controlers, a value of 150 is typical."
         "\nNote that reducing your printing speed (at least for the external extrusions) will reduce the number of time this will triggger and so increase quality."
-        "\nSet zero to disable.");
+        "\nDisabled if set to 0.");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(0/*1500*/));
+    def->can_be_disabled = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionFloat(1500), true));
 
     def = this->add("max_fan_speed", coInts);
     def->label = L("Max");
@@ -5047,12 +5087,13 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When outputting gcode, this setting ensure that there is almost no commands more than this value apart."
         " Be sure to also use max_gcode_per_second instead, as it's much better when you have very different speeds for features"
         " (Too many too small commands may overload the firmware / connection)."
-        "\nSet zero to disable.");
+        "\nDisabled if set to 0.");
     def->sidetext = L("mm or %");
     def->min = 0;
     def->precision = 6;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(0/*0.02*/, false));
+    def->can_be_disabled = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionFloatOrPercent(0.02, false), false));
     def->aliases = {"min_length"};
 
     def = this->add("gcode_min_resolution", coFloatOrPercent);
@@ -5065,7 +5106,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->precision = 6;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
+    def->set_default_value(new ConfigOptionFloatOrPercent(10, true));
 
     def = this->add("resolution_internal", coFloat);
     def->label = L("Internal resolution");
@@ -5899,7 +5940,7 @@ void PrintConfigDef::init_fff_params()
         "\nSet zero to disable.");
     def->min = 0;
     def->mode = comAdvancedE | comSuSi;
-    def->set_default_value(new ConfigOptionInt(2));
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("support_material", coBool);
     def->label = L("Generate support material");
@@ -6976,6 +7017,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(33, true));
 
+    def = this->add("wipe_tower_extrusion_width", coFloatOrPercent);
+    def->label = L("Wipe Tower purge line width");
+    def->category = OptionCategory::width;
+    def->tooltip = L("When wiping, the extrusion should be at least 125% of the nozzle diameter."
+        " This setting allow you to vary it, in case you need a wider one to properly flush the nozzle.");
+    def->sidetext = L("mm or %");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(150, true));
 
     def = this->add("wiping_volumes_extruders", coFloats);
     def->label = L("Purging volumes - load/unload volumes");
@@ -8665,8 +8714,6 @@ static std::set<std::string> PrintConfigDef_ignore = {
     // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
     "wall_add_middle_threshold", "wall_split_middle_threshold",
     // Replaced by new concentric ensuring in 2.6.0-alpha5
-    "ensure_vertical_shell_thickness",
-    // Disabled in 2.6.0-alpha6, this option is problematic
 //    "infill_only_where_needed", <- ignore only if deactivated
     "gcode_binary", // Introduced in 2.7.0-alpha1, removed in 2.7.1 (replaced by binary_gcode).
     "gcode_resolution", // now in printer config.
@@ -8792,6 +8839,17 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     }
     if (opt_key == "preset_name") {
         opt_key = "preset_names";
+    }
+    if (opt_key == "ensure_vertical_shell_thickness") {
+        if (value == "1") {
+            value = "enabled_old";
+        } else if (value == "0") {
+            value = "disabled";
+        } else if (const t_config_enum_values &enum_keys_map = ConfigOptionEnum<EnsureVerticalShellThickness>::get_enum_values(); enum_keys_map.find(value) == enum_keys_map.end()) {
+            assert(value == "0" || value == "1");
+            // Values other than 0/1 are replaced with "partial" for handling values from different slicers.
+            value = "partial";
+        }
     }
     if (opt_key == "seam_travel") {
         if (value == "1") {
@@ -8969,8 +9027,16 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             value = opt_decoder.serialize();
         }
     }
-    if ("max_layer_height" == opt_key && "0" == value) {
-        value = "!75%";
+    if ("0" == value) {
+        if ("max_layer_height" == opt_key) {
+            value = "!75%";
+        }
+        if ("gcode_min_length" == opt_key) {
+            value = "!0";
+        }
+        if ("max_gcode_per_second" == opt_key) {
+            value = "!0";
+        }
     }
     if (value == "-1") {
         if ("overhangs_bridge_threshold" == opt_key) {value = "!0";}
@@ -9174,6 +9240,11 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
             opt.set_enabled(enable_dynamic_fan_speeds.get_at(idx), idx);
         }
         config.set_key_value("overhangs_dynamic_fan_speed", opt.clone());
+    }
+
+    
+    if (!config.has("ensure_vertical_shell_thickness") && config.has("perimeters")) {
+        config.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionEnum<EnsureVerticalShellThickness>(EnsureVerticalShellThickness::Enabled));
     }
 
     //if (config.has("thumbnails")) {
@@ -9596,6 +9667,7 @@ void deserialize_maybe_from_prusa(std::map<t_config_option_key, std::string> set
 
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "allow_empty_layers",
+"arc_fitting_resolution",
 "arc_fitting_tolerance",
 "avoid_crossing_not_first_layer",
 "avoid_crossing_top",
@@ -9630,6 +9702,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "external_perimeter_extrusion_change_odd_layers",
 "external_perimeter_fan_speed",
 "external_perimeter_overlap",
+"external_perimeters_first_force",
 "external_perimeters_hole",
 "external_perimeters_nothole",
 "external_perimeters_vase",
@@ -9897,6 +9970,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_wipe_min", // filament override
 "filament_wipe_only_crossing", // filament override
 "filament_wipe_speed", // filament override
+"wipe_tower_extrusion_width",
 "wipe_tower_speed",
 "wipe_tower_wipe_starting_speed",
 "xy_size_compensation",

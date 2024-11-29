@@ -57,11 +57,14 @@ void Layer::make_slices()
             // optimization: if we only have one region, take its slices
             slices = to_expolygons(m_regions.front()->slices().surfaces);
         } else {
-            Polygons slices_p;
-            for (LayerRegion *layerm : m_regions)
-                polygons_append(slices_p, to_polygons(layerm->slices().surfaces));
-            slices = union_safety_offset_ex(slices_p);
+            ExPolygons slices_exp;
+            for (LayerRegion *layerm : m_regions) {
+                for (const Surface &srf : layerm->slices().surfaces) srf.expolygon.assert_valid();
+                append(slices_exp, to_expolygons(layerm->slices().surfaces));
+            }
+            slices = union_safety_offset_ex(slices_exp);
         }
+        for (ExPolygon &poly : slices) for(auto &hole :poly.holes) assert(hole.is_clockwise());
         ensure_valid(slices, std::max(scale_t(this->object()->print()->config().resolution), SCALED_EPSILON));
         for (ExPolygon &poly : slices) poly.assert_valid();
         // lslices are sorted by topological order from outside to inside from the clipper union used above
@@ -593,6 +596,10 @@ void Layer::restore_untyped_slices()
 void Layer::restore_untyped_slices_no_extra_perimeters()
 {
     restore_untyped_slices();
+    for (LayerRegion *lr : m_regions) {
+        lr->set_fill_surfaces().clear();
+    }
+
 //    if (layer_needs_raw_backup(this)) {
 //        for (LayerRegion *layerm : m_regions)
 //        	if (! layerm->region().config().extra_perimeters.value)
@@ -681,6 +688,7 @@ void Layer::make_perimeters()
                             && config.external_perimeter_overlap == other_config.external_perimeter_overlap
                             && config.external_perimeter_speed == other_config.external_perimeter_speed // it os mandatory? can't this be set at gcode.cpp?
                             && config.external_perimeters_first == other_config.external_perimeters_first
+                            && config.external_perimeters_first_force == other_config.external_perimeters_first_force
                             && config.external_perimeters_hole  == other_config.external_perimeters_hole
                             && config.external_perimeters_nothole == other_config.external_perimeters_nothole
                             && config.external_perimeters_vase == other_config.external_perimeters_vase
@@ -1278,8 +1286,10 @@ void SupportLayer::simplify_support_extrusion_path() {
     const bool spiral_mode = print_config.spiral_vase;
     const bool enable_arc_fitting = print_config.arc_fitting != ArcFittingType::Disabled && !spiral_mode;
     coordf_t scaled_resolution = scale_d(print_config.resolution.value);
+    if (enable_arc_fitting) {
+        scaled_resolution = scale_d(print_config.arc_fitting_resolution.get_abs_value(unscaled(scaled_resolution)));
+    }
     if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
-
     SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting ? print_config.arc_fitting : ArcFittingType::Disabled, &print_config.arc_fitting_tolerance, enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON};
     this->support_fills.visit(visitor);
 }

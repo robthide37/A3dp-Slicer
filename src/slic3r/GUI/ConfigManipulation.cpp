@@ -364,9 +364,12 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle", "wall_distribution_count", "min_feature_size", "min_bead_width", "aaa" })
        toggle_field(el, have_arachne);
 
-    toggle_field("external_perimeters_vase", config->opt_bool("external_perimeters_first") && !config->opt_bool("perimeter_loop"));
+    bool has_external_peri_not_loop = config->opt_bool("external_perimeters_first") && !config->opt_bool("perimeter_loop");
+    toggle_field("external_perimeters_vase", has_external_peri_not_loop);
+    toggle_field("external_perimeters_first_force", has_external_peri_not_loop && !have_arachne );
+    bool is_ext_forced = config->opt_bool("external_perimeters_first_force");
     for (auto el : { "external_perimeters_nothole", "external_perimeters_hole"})
-        toggle_field(el, config->opt_bool("external_perimeters_first") && !have_arachne);
+        toggle_field(el, has_external_peri_not_loop && !have_arachne && !is_ext_forced);
 
     toggle_field("perimeter_bonding", config->opt_bool("external_perimeters_first") && !have_arachne && config->option("perimeter_overlap")->get_float() == 100.f && config->option("external_perimeter_overlap")->get_float() == 100.f);
 
@@ -451,9 +454,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("small_area_infill_flow_compensation", has_solid_infill);
     bool have_small_area_infill_flow_compensation = has_solid_infill && config->opt_bool("small_area_infill_flow_compensation");
     toggle_field("small_area_infill_flow_compensation_model", have_small_area_infill_flow_compensation);
-
-    toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill);
-    toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill);
+    
+    const bool has_ensure_vertical_shell_thickness = config->opt_enum<EnsureVerticalShellThickness>("ensure_vertical_shell_thickness") != EnsureVerticalShellThickness::Disabled;
+    toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill && has_ensure_vertical_shell_thickness);
+    toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill && has_ensure_vertical_shell_thickness);
 
     //speed
     for (auto el : { "small_perimeter_min_length", "small_perimeter_max_length" })
@@ -588,7 +592,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width",
                      "wipe_tower_cone_angle", "wipe_tower_extra_spacing",
                      "wipe_tower_bridging", "wipe_tower_brim", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming",
-                     "wipe_tower_speed", "wipe_tower_wipe_starting_speed" })
+                     "wipe_tower_speed", "wipe_tower_wipe_starting_speed",
+                     "wipe_tower_extrusion_width" })
         toggle_field(el, have_wipe_tower);
 
     bool have_non_zero_mmu_segmented_region_max_width = config->opt_float("mmu_segmented_region_max_width") > 0.;
@@ -715,18 +720,18 @@ void ConfigManipulation::toggle_printer_fff_options(DynamicPrintConfig *config, 
         toggle_field("thumbnails_tag_format", thumbnails_format->value != (GCodeThumbnailsFormat::BIQU));
     }
 
-    toggle_field("arc_fitting_tolerance", config->option("arc_fitting")->get_int() != int(ArcFittingType::Disabled));
+    bool have_arc_fitting = config->option("arc_fitting")->get_int() != int(ArcFittingType::Disabled);
+    toggle_field("arc_fitting_resolution", have_arc_fitting);
+    toggle_field("arc_fitting_tolerance", have_arc_fitting);
 
     //firmware
     bool have_remaining_times = config->opt_bool("remaining_times");
     toggle_field("remaining_times_type", have_remaining_times);
 
-    bool has_gcode_culling = config->get_float("gcode_min_length") > 0 || config->get_float("max_gcode_per_second") > 0;
-    toggle_field("gcode_min_resolution", has_gcode_culling);
-    toggle_field("gcode_command_buffer", has_gcode_culling);
-
-    bool have_arc_fitting = config->opt_enum<ArcFittingType>("arc_fitting") != ArcFittingType::Disabled;
-    toggle_field("arc_fitting_tolerance", have_arc_fitting);
+    bool gcode_min_length = config->get_float("gcode_min_length") > 0 && config->is_enabled("gcode_min_length");
+    bool max_gcode_per_second = config->get_float("max_gcode_per_second") > 0 && config->is_enabled("max_gcode_per_second");
+    toggle_field("gcode_min_resolution", gcode_min_length || max_gcode_per_second);
+    toggle_field("gcode_command_buffer", max_gcode_per_second);
 
     auto flavor = config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
     bool is_marlin_flavor = flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware;

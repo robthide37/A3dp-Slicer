@@ -491,6 +491,7 @@ static std::vector<std::string> s_Preset_print_options {
         "bottom_solid_min_thickness",
         "solid_over_perimeters",
         "duplicate_distance",
+        "ensure_vertical_shell_thickness",
         "extra_perimeters",
         "extra_perimeters_odd_layers",
         "extra_perimeters_on_overhangs",
@@ -525,6 +526,7 @@ static std::vector<std::string> s_Preset_print_options {
         "staggered_inner_seams",
         // external_perimeters
         "external_perimeters_first",
+        "external_perimeters_first_force",
         "external_perimeters_vase",
         "external_perimeters_nothole",
         "external_perimeters_hole",
@@ -746,6 +748,7 @@ static std::vector<std::string> s_Preset_print_options {
         "wipe_tower_cone_angle",
         "wipe_tower_extra_spacing",
         "wipe_tower_extruder",
+        "wipe_tower_extrusion_width",
         "wipe_tower_no_sparse_layers",
         "wipe_tower_speed",
         "wipe_tower_wipe_starting_speed",
@@ -917,6 +920,7 @@ static std::vector<std::string> s_Preset_machine_limits_options {
 
 static std::vector<std::string> s_Preset_printer_options {
     "arc_fitting",
+    "arc_fitting_resolution",
     "arc_fitting_tolerance", //TODO: keep?
     "autoemit_temperature_commands",
     "printer_technology",

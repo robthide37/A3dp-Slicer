@@ -89,12 +89,24 @@ void assert_check_loops(const std::vector<PerimeterGeneratorLoops> &loops) {
 #endif
 }
 
-PerimeterGeneratorLoops get_all_Childs(PerimeterGeneratorLoop loop) {
+PerimeterGeneratorLoops get_all_childs(const PerimeterGeneratorLoop &loop) {
     PerimeterGeneratorLoops ret;
-    for (PerimeterGeneratorLoop &child : loop.children) {
+    for (const PerimeterGeneratorLoop &child : loop.children) {
         ret.push_back(child);
-        PerimeterGeneratorLoops vals = get_all_Childs(child);
-        ret.insert(ret.end(), vals.begin(), vals.end());
+        append(ret, get_all_childs(child));
+    }
+    return ret;
+}
+
+PerimeterGeneratorLoops get_all_external_holes(const PerimeterGeneratorLoop &loop) {
+    PerimeterGeneratorLoops ret;
+    for (size_t idx = 0; idx < loop.children.size(); ++idx) {
+        if (!loop.children[idx].is_contour && loop.children[idx].depth == 0) {
+            assert(loop.children[idx].children.empty());
+            ret.push_back(loop.children[idx]);
+        } else {
+            append(ret, get_all_external_holes(loop.children[idx]));
+        }
     }
     return ret;
 }
@@ -426,7 +438,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
             loop_role = ExtrusionLoopRole(loop_role | ExtrusionLoopRole::elrFirstLoop);
         }
         if (params.config.external_perimeters_vase.value && params.config.external_perimeters_first.value && is_external) {
-            if ((loop.is_contour && params.config.external_perimeters_nothole.value) || (!loop.is_contour && params.config.external_perimeters_hole.value)) {
+            if (params.config.external_perimeters_first_force.value ||
+                (loop.is_contour && params.config.external_perimeters_nothole.value) ||
+                (!loop.is_contour && params.config.external_perimeters_hole.value)) {
                 loop_role = (ExtrusionLoopRole)(loop_role | ExtrusionLoopRole::elrVase);
             }
         }
@@ -540,9 +554,9 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
     // if brim will be printed, reverse the order of perimeters so that
     // we continue inwards after having finished the brim
     const bool reverse_contour  = (params.layer->id() == 0 && params.object_config.brim_width.value > 0) ||
-                           (params.config.external_perimeters_first.value && params.config.external_perimeters_nothole.value);
+                           (params.config.external_perimeters_first.value && (params.config.external_perimeters_nothole.value || params.config.external_perimeters_first_force.value));
     const bool reverse_hole = (params.layer->id() == 0 && params.object_config.brim_width_interior.value > 0) || 
-                           (params.config.external_perimeters_first.value && params.config.external_perimeters_hole.value);
+                           (params.config.external_perimeters_first.value && (params.config.external_perimeters_hole.value || params.config.external_perimeters_first_force.value));
     
     const bool CCW_contour = params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
     const bool CCW_hole = params.config.perimeter_direction.value == PerimeterDirection::pdCW_CCW ||  params.config.perimeter_direction.value == PerimeterDirection::pdCCW_CCW;
@@ -599,7 +613,26 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
             for(auto ee : coll) if(ee) ee->visit(LoopAssertVisitor());
 #endif
             assert(thin_walls.empty());
-            ExtrusionEntityCollection children = this->_traverse_loops_classic(params, loop.children, thin_walls, has_overhang ? 1 : (count_since_overhang < 0 ? -1 : (count_since_overhang+1)));
+            // special case: external all first
+            ExtrusionEntityCollection children_ext_holes;
+            ExtrusionEntityCollection children;
+            if (params.config.external_perimeters_first_force.value) {
+                if (loop.is_contour && loop.depth == 0) {
+                    // here, i may have some external hole as childs
+                    PerimeterGeneratorLoops ext_holes = get_all_external_holes(loop);
+                    children_ext_holes = this->_traverse_loops_classic(params, {ext_holes}, thin_walls, has_overhang ? 1 : (count_since_overhang < 0 ? -1 : (count_since_overhang+1)));
+                }
+                PerimeterGeneratorLoops children_no_ext_hole; // TODO fix nlogn copies here
+                for (const PerimeterGeneratorLoop &child : loop.children) {
+                    if (child.is_contour || child.depth != 0) {
+                        children_no_ext_hole.push_back(child);
+                    }
+                }
+                children = this->_traverse_loops_classic(params, children_no_ext_hole, thin_walls, has_overhang ? 1 : (count_since_overhang < 0 ? -1 : (count_since_overhang+1)));
+            } else {
+                //normal case
+                children = this->_traverse_loops_classic(params, loop.children, thin_walls, has_overhang ? 1 : (count_since_overhang < 0 ? -1 : (count_since_overhang+1)));
+            }
             coll[idx.first] = nullptr;
             bool has_steep_overhangs_this_loop = false;
             if (loop.is_steep_overhang && params.layer->id() % 2 == 1 && !params.config.perimeter_reverse) {
@@ -608,9 +641,14 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
             if ((loop.is_contour && !reverse_contour) || (!loop.is_contour && reverse_hole)) {
                 //note: params.layer->id() % 2 == 1 already taken into account in the is_steep_overhang compute (to save time).
                 // if CCW: reverse if steep_overhang & odd. if CW: the opposite
-                bool clockwise = ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) == (loop.is_contour ? CCW_contour : CCW_hole);
+                bool clockwise = !(loop.is_contour ? CCW_contour : CCW_hole);
+                if ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) {
+                    clockwise = !clockwise;
+                }
                 // has to reverse the direction if print external first, as the whole thing will be reverse afterwards
-                clockwise = clockwise != (loop.is_contour ? reverse_contour : reverse_hole);
+                //if (loop.is_contour ? reverse_contour : reverse_hole) {
+                //    clockwise = !clockwise;
+                //}
 
                 if (clockwise) {
                     if (!eloop->is_clockwise()) {
@@ -622,23 +660,29 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
                     }
                 }
                 //ensure that our children are printed before us
-                if (!children.empty()) {
+                if (!children.empty() || !children_ext_holes.empty()) {
                     ExtrusionEntityCollection print_child_beforeplz;
                     print_child_beforeplz.set_can_sort_reverse(false, false);
                     if (children.entities().size() > 1 && (children.can_reverse() || children.can_sort())) {
                         print_child_beforeplz.append(children);
-                    } else {
+                    } else if (!children.entities().empty()) {
                         print_child_beforeplz.append_move_from(children);
                     }
+                    if (!children_ext_holes.empty()) {print_child_beforeplz.append(std::move(children_ext_holes));}
                     print_child_beforeplz.append(*eloop);
                     coll_out.append(std::move(print_child_beforeplz));
                 } else {
                     coll_out.append(*eloop);
                 }
             } else {
-                bool counter_clockwise = ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) != (loop.is_contour ? CCW_contour : CCW_hole);
+                bool counter_clockwise = (loop.is_contour ? CCW_contour : CCW_hole);
+                if ((params.config.perimeter_reverse || has_steep_overhangs_this_loop) && params.layer->id() % 2 == 1) {
+                    counter_clockwise = !counter_clockwise;
+                }
                 // has to reverse the direction if print external first, as the whole thing will be reverse afterwards
-                counter_clockwise = counter_clockwise != (loop.is_contour ? reverse_contour : reverse_hole);
+                //if (loop.is_contour ? reverse_contour : reverse_hole) {
+                //    counter_clockwise = !counter_clockwise;
+                //}
                 // if hole: reverse if steep_overhang & odd. if contour: the opposite
                 if (counter_clockwise) {
                     if (eloop->is_clockwise()) {
@@ -650,13 +694,14 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops_classic(const Para
                     }
                 }
                 // ensure that our children are printed after us
-                if (!children.empty()) {
+                if (!children.empty()|| !children_ext_holes.empty()) {
                     ExtrusionEntityCollection print_child_afterplz;
                     print_child_afterplz.set_can_sort_reverse(false, false);
                     print_child_afterplz.append(*eloop);
+                    if (!children_ext_holes.empty()) {print_child_afterplz.append(std::move(children_ext_holes));}
                     if (children.entities().size() > 1 && (children.can_reverse() || children.can_sort())) {
                         print_child_afterplz.append(children);
-                    } else {
+                    } else  if (!children.entities().empty()) {
                         print_child_afterplz.append_move_from(children);
                     }
                     coll_out.append(std::move(print_child_afterplz));
@@ -3263,7 +3308,7 @@ void PerimeterGenerator::process(// Input:
             assert_valid(*lower_slices);
             if (get_resolution(0, false, &srf_to_use) < min_feature / 2) {
                 for (const ExPolygon& expoly : *lower_slices) {
-                    expoly.simplify(min_feature, &simplified_storage);
+                    expoly.simplify(min_feature, simplified_storage);
                 }
                 if (!simplified_storage.empty()) {
                     simplified = &simplified_storage;
@@ -3418,7 +3463,7 @@ void PerimeterGenerator::process(// Input:
         Polygons not_filled_p;
         coord_t scaled_resolution_infill = scale_t(std::max(params.print_config.resolution.value, params.print_config.resolution_internal / 4));
         for (const ExPolygon& ex : surface_process_result.inner_perimeter)
-            ex.simplify_p(scaled_resolution_infill, &not_filled_p);
+            ex.simplify_p(scaled_resolution_infill, not_filled_p);
         ExPolygons not_filled_exp = union_ex(not_filled_p);
         // collapse too narrow infill areas
         coord_t min_perimeter_infill_spacing = (coord_t)(params.get_solid_infill_spacing() * (1. - INSET_OVERLAP_TOLERANCE));
@@ -3695,7 +3740,7 @@ void PerimeterGenerator::processs_no_bridge(const Parameters params, Surfaces& a
                                 //simplify to avoid most of artefacts from printing lines.
                                 ExPolygons bridgeable_simplified;
                                 for (ExPolygon& poly : bridgeable) {
-                                    poly.simplify(params.get_perimeter_spacing(), &bridgeable_simplified);
+                                    poly.simplify(params.get_perimeter_spacing(), bridgeable_simplified);
                                 }
                                 bridgeable_simplified = offset2_ex(bridgeable_simplified, -params.get_ext_perimeter_width(), params.get_ext_perimeter_width());
                                 //bridgeable_simplified = intersection_ex(bridgeable_simplified, unsupported_filtered);
@@ -4102,7 +4147,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                     //simplify to avoid most of artefacts from printing lines.
                     ExPolygons bridgeable_simplified;
                     for (const ExPolygon& poly : bridgeable) {
-                        poly.simplify(params.get_perimeter_spacing() / 2, &bridgeable_simplified);
+                        poly.simplify(params.get_perimeter_spacing() / 2, bridgeable_simplified);
                     }
 
                     //offset by perimeter spacing because the simplify may have reduced it a bit.
@@ -4314,7 +4359,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                         resolution = get_resolution(1, false, &surface);
                         ExPolygons next_onion_temp;
                         for (ExPolygon& exp : next_onion)
-                            exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), &next_onion_temp);
+                            exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), next_onion_temp);
                         //mask
                         next_onion = intersection_ex(next_onion_temp, last);
                     }
@@ -4532,7 +4577,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             resolution = get_resolution(perimeter_idx + 1, false, &surface);
             last.clear();
             for (ExPolygon &exp : next_onion) {
-                exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), &last);
+                exp.simplify((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution), last);
             }
             assert_check_polygons(to_polygons(last));
 
@@ -4705,12 +4750,14 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             }
         }
         //remove all empty perimeters
+        while(contours.size() > 1 && contours.back().empty())
+            contours.pop_back();
         while(contours.size() > 1 && contours.front().empty())
             contours.erase(contours.begin());
         // fuse all unfused 
         // at this point, all loops should be in contours[0] (= contours.front() )
         // or no perimeters nor holes have been generated, too small area.
-
+        assert(contours.size()<=1);
         assert(contours.empty() || contours.front().size() >= 1);
         // collection of loops to add into loops
         ExtrusionEntityCollection peri_entities;
@@ -4718,7 +4765,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             if (params.config.perimeter_loop.value) {
                 // onlyone_perimeter = >fusion all perimeterLoops
                 for (PerimeterGeneratorLoop &loop : contours.front()) {
-                    ExtrusionLoop extr_loop = this->_traverse_and_join_loops(params, loop, get_all_Childs(loop),
+                    ExtrusionLoop extr_loop = this->_traverse_and_join_loops(params, loop, get_all_childs(loop),
                                                                              loop.polygon.points.front());
                     // ExtrusionLoop extr_loop = this->_traverse_and_join_loops_old(loop, loop.polygon.points.front(), true);
                     if (extr_loop.paths.back().polyline.back() != extr_loop.paths.front().polyline.front()) {
