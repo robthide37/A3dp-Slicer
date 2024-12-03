@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - debug_win
+      - rc
 
 jobs:
   build_dep:
