@@ -1,54 +1,52 @@
-name: C/C++ Release candidate arm macos
-
+name: C/C++ Release candidate macos
 on:
   push:
     branches:
       - rc
-
 jobs:
   build_dep:
-    runs-on: macos-14
-
+    runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: mkdir in deps
-      run: mkdir deps/build
-    - name: dep cache
-      id: cache-action
-      uses: actions/cache@v3
-      with:
-        key: macos_arm_2.7
-        path: deps/build/destdir
-    - if: steps.cache-action.outputs.cache-hit != 'true'
-      name: build deps if new cache
-      run: ./BuildMacOS.sh -ad
-
+      - uses: actions/checkout@v3
+      - name: mkdir in deps
+        run: mkdir -p deps/build/src
+      - name: dep cache
+        id: cache-action
+        uses: actions/cache@v3
+        with:
+          key: macos_intel_2.7
+          path: deps/build/destdir
+      - if: steps.cache-action.outputs.cache-hit != 'true'
+        name: build deps if new cache
+        run: ./BuildMacOS.sh -d
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: build_dep
-
     steps:
-    - uses: actions/checkout@v3
-    - name: dep cache
-      id: cache-action
-      uses: actions/cache@v3
-      with:
-        key: macos_arm_2.7
-        path: deps/build/destdir
-    - name: build slicer
-      run: ./BuildMacOS.sh -asi
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: rc_${{ github.event.repository.name }}-macOS-arm.dmg
-        path: build/${{ github.event.repository.name }}-macOS-arm.dmg
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: rc_${{ github.event.repository.name }}-macOS-arm.tgz
-        path: build/${{ github.event.repository.name }}-macOS-arm.tgz
-    - name: Upload app
-      uses: actions/upload-artifact@v4
-      with:
-        name: rc_${{ github.event.repository.name }}-macOS-arm.app
-        path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
+      - uses: actions/checkout@v3
+      - name: dep cache
+        id: cache-action
+        uses: actions/cache@v3
+        with:
+          key: macos_intel_2.7
+          path: deps/build/destdir
+      - name: mkdir in build
+        run: mkdir -p build/src
+      - name: build slicer
+        run: ./BuildMacOS.sh -si
+      - name: Upload dmg
+        uses: actions/upload-artifact@v3
+        with:
+          name: rc_${{ github.event.repository.name }}-macOS.dmg
+          path: build/${{ github.event.repository.name }}-macOS-intel.dmg
+      - name: Upload tar
+        uses: actions/upload-artifact@v3
+        with:
+          name: rc_${{ github.event.repository.name }}-macOS.tgz
+          path: build/${{ github.event.repository.name }}-macOS-intel.tgz
+      - name: Upload app
+        uses: actions/upload-artifact@v3
+        with:
+          name: rc_${{ github.event.repository.name }}-macOS.app
+          path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
+
