@@ -40,7 +40,7 @@ jobs:
       - name: update submodule profiles
         env: 
           PATH: C:\Program Files\PowerShell\7\;${{ env.PATH }}
-        working-directory: ./resources/profiles
+        working-directory: D:/a/A3dp-Slicer/A3dp-Slicer/resources/profiles
         run: git submodule update --init
       - name: change date in version
         shell: powershell
