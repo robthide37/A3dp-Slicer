@@ -39,7 +39,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
       - name: update submodule profiles
         env: 
-          PATH: C:\Program Files\PowerShell\7\;${{ env.PATH
+          PATH: C:\Program Files\PowerShell\7\;${{ env.PATH }}
         working-directory: ./resources/profiles
         run: git submodule update --init
       - name: change date in version
