@@ -8,6 +8,7 @@ on:
       - nightly_master
       - supermerill-Main
       - rc
+      - rc-test
 jobs:
   build_dep:
     runs-on: windows-2019
@@ -38,7 +39,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: ilammy/msvc-dev-cmd@v1
     - name: update submodule profiles
-      working-directory: ./resources/profiles
+      working-directory: D:/a/A3dp-Slicer/A3dp-Slicer/resources/profiles
       run: git submodule update --init
     - name: change date in version
       shell: powershell
