@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - debug_win
+      - robthide37-patch-4
 
 jobs:
 
