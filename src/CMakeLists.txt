@@ -44,24 +44,20 @@ if (SLIC3R_GUI)
     # include_directories(angelscript/include)
 
     if(WIN32)
-    message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
-elseif(UNIX)
-    set(wxWidgets_USE_UNICODE ON)
-    if(SLIC3R_STATIC)
-        set(wxWidgets_USE_STATIC ON)
-    else()
-        set(wxWidgets_USE_STATIC OFF)
+        message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
+    elseif(UNIX)
+        set(wxWidgets_USE_UNICODE ON)
+        if(SLIC3R_STATIC)
+            set(wxWidgets_USE_STATIC ON)
+        else()
+            set(wxWidgets_USE_STATIC OFF)
+        endif()
     endif()
-endif()
-    set(wxWidgets_USE_DEBUG ON)
-    set(wxWidgets_USE_UNICODE ON)
-    set(wxUSE_WEBVIEW_EDGE ON)
-    set(wxUSE_SCINTILLA ON)
 
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
             endif ()
-    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla webview)
+    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla)
 
     include(${wxWidgets_USE_FILE})
 
@@ -112,9 +108,11 @@ endif()
     add_subdirectory(slic3r)
 endif()
 
+# Ensure the Slic3r target is added
+add_executable(Slic3r PrusaSlicer.cpp PrusaSlicer.hpp)
 
 # Create a Slic3r executable
-# Process mainfests for various platforms.
+# Process manifests for various platforms.
 if (WIN32)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/Slic3r.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.rc @ONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/gcodeviewer.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}-gcodeviewer.rc @ONLY)
@@ -158,17 +156,13 @@ elseif (MSVC)
     # Manifest is provided through Slic3r.rc, don't generate your own.
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO")
 else ()
-    # Boost on Raspberry-Pi does not link to pthreads explicitely.
+    # Boost on Raspberry-Pi does not link to pthreads explicitly.
     target_link_libraries(Slic3r ${CMAKE_DL_LIBS} -lstdc++ Threads::Threads)
 endif ()
 
 # Add the Slic3r GUI library, libcurl, OpenGL and GLU libraries.
 if (SLIC3R_GUI)
-if (MSVC)
-    target_link_libraries(Slic3r ws2_32 uxtheme setupapi libslic3r_gui ${wxWidgets_LIBRARIES})
-    else ()
-        target_link_libraries(Slic3r libslic3r_gui ${wxWidgets_LIBRARIES})
-endif()
+    target_link_libraries(Slic3r libslic3r_gui)
     if (MSVC)
         # Generate debug symbols even in release mode.
         target_link_options(Slic3r PUBLIC "$<$<CONFIG:RELEASE>:/DEBUG>")
@@ -183,20 +177,20 @@ endif()
     if (WIN32)
         find_library(PSAPI_LIB NAMES Psapi)
         if(NOT PSAPI_LIB)
-            message("WARNING: Psapi can't be find, trying again with hint to ${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64")
+            message("WARNING: Psapi can't be found, trying again with hint to ${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64")
             find_library(PSAPI_LIB Psapi PATH "${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64")
         endif()
         target_link_libraries(Slic3r ${PSAPI_LIB})
     endif ()
 endif ()
 
-# On Windows, a shim application is required to produce a console / non console version of the Slic3r application.
+# On Windows, a shim application is required to produce a console / non-console version of the Slic3r application.
 # Also the shim may load the Mesa software OpenGL renderer if the default renderer does not support OpenGL 2.0 and higher.
 if (WIN32)
     if (MINGW)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -municode")
     endif()
-	
+    
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libslic3r/libslic3r_version.h.in ${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h @ONLY)
 
     add_executable(Slic3r_app_gui WIN32 PrusaSlicer_app_msvc.cpp ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.rc)
@@ -258,7 +252,7 @@ if (WIN32)
         )
     endif ()
 
-    # This has to be a separate target due to the windows command line lenght limits
+    # This has to be a separate target due to the windows command line length limits
     add_custom_target(slic3rDllsCopy ALL DEPENDS Slic3r)
     prusaslicer_copy_dlls(slic3rDllsCopy)
 
@@ -293,7 +287,7 @@ else ()
     endif ()
      add_custom_command(TARGET Slic3r POST_BUILD
         # COMMAND ln -sfn "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}" # make[3]: stat: src/Slic3r: Too many levels of symbolic links
-		 COMMAND cp -r "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}"
+         COMMAND cp -r "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}"
          COMMENT "Symlinking the resources directory into the build tree"
          VERBATIM)
 endif ()
