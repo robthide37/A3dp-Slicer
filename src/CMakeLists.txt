@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(Slic3r-native)
 
+add_executable(Slic3r PrusaSlicer.cpp PrusaSlicer.hpp)  # Ensure this is placed correctly
+
 add_subdirectory(build-utils)
 if (NOT APPLE)
     add_subdirectory(test-utils)
@@ -108,43 +110,7 @@ if (SLIC3R_GUI)
     add_subdirectory(slic3r)
 endif()
 
-# Ensure the Slic3r target is added
-add_executable(Slic3r PrusaSlicer.cpp PrusaSlicer.hpp)
-
-# Create a Slic3r executable
-# Process manifests for various platforms.
-if (WIN32)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/Slic3r.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.rc @ONLY)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/gcodeviewer.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}-gcodeviewer.rc @ONLY)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/PrusaSlicer.manifest.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.manifest @ONLY)
-endif ()
-if (APPLE)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/osx/Info.plist.in ${CMAKE_CURRENT_BINARY_DIR}/Info.plist @ONLY)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/osx/BuildMacOSImage.sh.in ${CMAKE_CURRENT_BINARY_DIR}/BuildMacOSImage.sh @ONLY)
-endif ()
-if (NOT WIN32 AND NOT APPLE)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/unix/BuildLinuxImage.sh.in ${CMAKE_CURRENT_BINARY_DIR}/BuildLinuxImage.sh @ONLY)
-endif ()
-
-if (WIN32)
-    add_library(Slic3r SHARED PrusaSlicer.cpp PrusaSlicer.hpp)
-else ()
-    add_executable(Slic3r PrusaSlicer.cpp PrusaSlicer.hpp)
-    target_compile_options(Slic3r PRIVATE ${_CC_DEBUG_FLAGS})
-endif ()
-
-if (MINGW)
-    target_link_options(Slic3r PUBLIC "-Wl,-allow-multiple-definition")
-    set_target_properties(Slic3r PROPERTIES PREFIX "")
-endif (MINGW)
-
-if (NOT WIN32)
-    # Binary name on unix like systems (Linux, Unix)
-    set_target_properties(Slic3r PROPERTIES OUTPUT_NAME "${SLIC3R_APP_CMD}")
-    # move the exe so it won't collide with a dir (like Slic3r)
-    set_target_properties(Slic3r PROPERTIES RUNTIME_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/bin")
-endif ()
-
+# Link libraries to Slic3r
 target_link_libraries(Slic3r libslic3r libcereal)
 
 if (APPLE)
@@ -156,13 +122,14 @@ elseif (MSVC)
     # Manifest is provided through Slic3r.rc, don't generate your own.
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO")
 else ()
-    # Boost on Raspberry-Pi does not link to pthreads explicitly.
+    # Boost on Raspberry-Pi does not link to pthreads explicitely.
     target_link_libraries(Slic3r ${CMAKE_DL_LIBS} -lstdc++ Threads::Threads)
 endif ()
 
 # Add the Slic3r GUI library, libcurl, OpenGL and GLU libraries.
 if (SLIC3R_GUI)
-    target_link_libraries(Slic3r libslic3r_gui)
+#    target_link_libraries(PrusaSlicer ws2_32 uxtheme setupapi libslic3r_gui ${wxWidgets_LIBRARIES})
+target_link_libraries(Slic3r libslic3r_gui)
     if (MSVC)
         # Generate debug symbols even in release mode.
         target_link_options(Slic3r PUBLIC "$<$<CONFIG:RELEASE>:/DEBUG>")
@@ -177,14 +144,14 @@ if (SLIC3R_GUI)
     if (WIN32)
         find_library(PSAPI_LIB NAMES Psapi)
         if(NOT PSAPI_LIB)
-            message("WARNING: Psapi can't be found, trying again with hint to ${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64")
+            message("WARNING: Psapi can't be find, trying again with hint to ${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64")
             find_library(PSAPI_LIB Psapi PATH "${CMAKE_WINDOWS_KITS_10_DIR}/Lib/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/um/x64")
         endif()
         target_link_libraries(Slic3r ${PSAPI_LIB})
     endif ()
 endif ()
 
-# On Windows, a shim application is required to produce a console / non-console version of the Slic3r application.
+# On Windows, a shim application is required to produce a console / non console version of the Slic3r application.
 # Also the shim may load the Mesa software OpenGL renderer if the default renderer does not support OpenGL 2.0 and higher.
 if (WIN32)
     if (MINGW)
@@ -252,7 +219,7 @@ if (WIN32)
         )
     endif ()
 
-    # This has to be a separate target due to the windows command line length limits
+    # This has to be a separate target due to the windows command line lenght limits
     add_custom_target(slic3rDllsCopy ALL DEPENDS Slic3r)
     prusaslicer_copy_dlls(slic3rDllsCopy)
 
