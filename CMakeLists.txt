@@ -120,12 +120,9 @@ endforeach()
 
 if (SLIC3R_GUI)
     add_definitions(-DSLIC3R_GUI)
-    # Add these lines to find wxWidgets with webview support
     find_package(wxWidgets REQUIRED COMPONENTS core base net webview)
     include(${wxWidgets_USE_FILE})
-
-    # Link wxWidgets libraries
-    target_link_libraries(Slic3r ${wxWidgets_LIBRARIES})
+    target_link_libraries(libslic3r_gui ${wxWidgets_LIBRARIES})
 endif ()
 
 if(SLIC3R_DESKTOP_INTEGRATION)
