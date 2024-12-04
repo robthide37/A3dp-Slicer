@@ -45,7 +45,7 @@ if (SLIC3R_GUI)
     include_directories(exif/include)
     add_subdirectory(angelscript)
     # include_directories(angelscript/include)
-
+    add_subdirectory(slic3r)
     if(WIN32)
         message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
     elseif(UNIX)
@@ -111,13 +111,13 @@ if (SLIC3R_GUI)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/imguizmo")
         add_subdirectory(imguizmo)
     endif()
-
-    add_subdirectory(slic3r)
 endif()
 
-# Link libraries to Slic3r
-target_link_libraries(Slic3r libslic3r libcereal)
-
+if (WIN32)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/Slic3r.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.rc @ONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/gcodeviewer.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}-gcodeviewer.rc @ONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/PrusaSlicer.manifest.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.manifest @ONLY)
+endif ()
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
 #    add_definitions(-DBOOST_THREAD_DONT_USE_CHRONO -DBOOST_NO_CXX11_RVALUE_REFERENCES -DBOOST_THREAD_USES_MOVE)
