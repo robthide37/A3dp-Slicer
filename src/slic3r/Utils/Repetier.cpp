@@ -22,11 +22,12 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/format.hpp"
 #include "Http.hpp"
+#include "nlohmann/json.hpp"
 
 
 namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
-
+using json = nlohmann::json;
 
 namespace Slic3r {
 
@@ -179,7 +180,200 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
     return res;
 }
 
+std::string removeHttpPrefix(const std::string& host) {
+    std::string cleanedHost = host;
 
+    const std::string httpPrefix = "http://";
+    const std::string httpsPrefix = "https://";
+
+    if (cleanedHost.compare(0, httpPrefix.size(), httpPrefix) == 0) {
+        cleanedHost.erase(0, httpPrefix.size());
+    } else if (cleanedHost.compare(0, httpsPrefix.size(), httpsPrefix) == 0) {
+        cleanedHost.erase(0, httpsPrefix.size());
+    }
+
+    return cleanedHost;
+}
+
+bool Repetier::cooldown_printer() const {
+    
+    std::string endpoint = "/printer/api/" + port + "?a=cooldown";
+    std::string jsonData = R"({"extruder":1, "bed":1, "chamber":1})";
+
+    std::string encoded_json = Http::url_encode(jsonData);
+    std::string cleanedHost = removeHttpPrefix(host);
+
+    std::string url = "http://" + cleanedHost + endpoint + "&data=" + encoded_json;
+    bool res = true;
+    
+    auto http = Http::post(std::move(url));
+    set_auth(http);
+    
+    http.form_add("a", "cooldown")
+        .on_complete([&](std::string body, unsigned status) {
+            std::cout << "Cooldown was successful" << std::endl;
+            res = true;
+        })
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            std::cout << "Error cooldowning" << error << std::endl;
+            res = false;
+        })
+        .perform_sync();
+    
+    
+    return res;
+}
+
+bool Repetier::preheat_extruders(DynamicPrintConfig config) const {
+    
+    bool res = true;
+    size_t first_layer_temp_count = config.option<ConfigOptionInts>("first_layer_temperature")->size();
+    
+    for (int i = 0; i < first_layer_temp_count; i++) {
+        
+        int first_layer_temp = config.option<ConfigOptionInts>("first_layer_temperature")->get_at(i);
+        
+        std::string endpoint = "/printer/api/" + port + "?a=setExtruderTemperature";
+
+        std::string jsonData = R"({"temperature": )" + std::to_string(first_layer_temp) + R"(,"extruder": )" + std::to_string(i) + "}";
+        
+        std::string cleanedHost = removeHttpPrefix(host);
+        std::string encoded_json = Http::url_encode(jsonData);
+        
+        std::string url = "http://" + cleanedHost + endpoint + "&data=" + encoded_json;
+        
+        auto http = Http::post(std::move(url));
+        set_auth(http);
+        
+        http.form_add("a", "setExtruderTemperature")
+            .on_complete([&](std::string body, unsigned status) {
+                std::cout << "Preheat was successful" << std::endl;
+            })
+            .on_error([&](std::string body, std::string error, unsigned status) {
+                std::cout << "Error preheating" << error << std::endl;
+                res = false;
+            })
+            .perform_sync(); 
+    }
+    return res;
+}
+
+bool Repetier::preheat_bed(DynamicPrintConfig config) const {
+    
+    bool res = true;
+    size_t first_layer_temp_count = config.option<ConfigOptionInts>("first_layer_bed_temperature")->size();
+    
+    for (int i = 0; i < first_layer_temp_count; i++) {
+        
+        int first_layer_temp = config.option<ConfigOptionInts>("first_layer_bed_temperature")->get_at(i);
+        
+        std::string endpoint = "/printer/api/" + port + "?a=setBedTemperature";
+
+        std::string jsonData = R"({"temperature": )" + std::to_string(first_layer_temp) + R"(,"bedId": )" + std::to_string(i) + "}";
+        
+        std::string cleanedHost = removeHttpPrefix(host);
+        std::string encoded_json = Http::url_encode(jsonData);
+        
+        std::string url = "http://" + cleanedHost + endpoint + "&data=" + encoded_json;
+        
+        auto http = Http::post(std::move(url));
+        set_auth(http);
+        
+        http.form_add("a", "setBedTemperature")
+            .on_complete([&](std::string body, unsigned status) {
+                std::cout << "Preheating bed was successful" << std::endl;
+            })
+            .on_error([&](std::string body, std::string error, unsigned status) {
+                std::cout << "Error preheating bed" << error << std::endl;
+                res = false;
+            })
+            .perform_sync(); 
+    }
+    return res;
+}
+
+
+void Repetier::get_printer_config(const CompletionHandler& handler) const {
+    std::string endpoint = "/printer/api/" + port + "?a=getPrinterConfig";
+    std::string url      = make_url((boost::format("printer/api/%1%") % port).str());
+    json json_response;
+
+    auto http = Http::get(std::move(url));
+    //Http::timeout_max()
+    set_auth(http);
+    http.timeout_connect(4000);
+    
+    http.form_add("a", "getPrinterConfig")
+        .on_complete([&](std::string body, unsigned status) {
+            json_response = json::parse(body);
+            handler(json_response, true, "");  // Call handler with success
+        })
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            handler(json(), false, error);  // Call handler with error
+        })
+        .perform_sync();
+}
+
+
+void Repetier::collect_json_values(const json &j, const std::string &key, std::vector<json> &results)
+{
+    if (j.is_object()) {
+        if (j.contains(key)) {
+            results.push_back(j.at(key));
+        }
+        for (const auto &item : j.items()) { collect_json_values(item.value(), key, results); }
+    } else if (j.is_array()) {
+        for (const auto &item : j) { collect_json_values(item, key, results); }
+    }
+}
+
+std::vector<json> Repetier::get_all_json_values(const json &j, const std::string &key)
+{
+    std::vector<json> results;
+    collect_json_values(j, key, results);
+    return results;
+}
+
+// Function to find the value of a given key in a JSON object
+bool Repetier::find_key_value(const json &j, const std::string &key, json &value)
+{
+    if (j.is_object()) {
+        // If the key is found in this object, return the value
+        if (j.contains(key)) {
+            value = j.at(key);
+            return true;
+        }
+        // If not, recursively check each item in the object
+        for (const auto &item : j.items()) {
+            if (find_key_value(item.value(), key, value)) {
+                return true;
+            }
+        }
+    } else if (j.is_array()) {
+        // If the JSON is an array, search through each element
+        for (const auto &item : j) {
+            if (find_key_value(item, key, value)) {
+                return true;
+            }
+        }
+    }
+    return false;  // Return false if the key is not found
+}
+
+// Function to filter JSON nodes based on a condition
+std::vector<json> Repetier::filter_json_by_jobstate(const json &json_array, const std::string &jobstate_filter) {
+    std::vector<json> filtered_results;
+    
+    // Iterate through each node in the JSON array
+    for (const auto &node : json_array) {
+        // Check if the node contains "jobstate" and if it matches the filter
+        if (node.contains("slug") && node.at("slug").get<std::string>() == jobstate_filter) {
+            // Add the node to the filtered results
+            filtered_results.push_back(node);
+        }
+    }
+    return filtered_results;
+}
 
 void Repetier::set_auth(Http &http) const
 {
@@ -243,6 +437,26 @@ bool Repetier::get_groups(wxArrayString& groups) const
         .perform_sync();
 
     return res;
+}
+
+void Repetier::get_list_printers(const CompletionHandler& handler) const {
+
+    std::string endpoint = "/printer/api/" + port + "?a=listPrinter";
+    std::string url      = make_url((boost::format("printer/api/%1%") % port).str());
+    json json_response;
+
+    auto http = Http::get(std::move(url));
+    set_auth(http);
+
+    http.form_add("a", "listPrinter")
+        .on_complete([&](std::string body, unsigned status) {
+            json_response = json::parse(body);
+            handler(json_response, true, "");  // Call handler with success
+        })
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            handler(json(), false, error);  // Call handler with error
+        })
+        .perform_sync();
 }
 
 bool Repetier::get_printers(wxArrayString& printers) const

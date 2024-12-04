@@ -35,7 +35,6 @@ public:
 
 	// If version check is enabled, check if chaced online slic3r version is newer, notify if so.
 	//FIXME doesn't called anymore, delete? (replaced by void GUI_App::app_version_check(bool from_user))
-	void slic3r_update_notify();
 
 	enum UpdateResult {
 		R_NOOP,

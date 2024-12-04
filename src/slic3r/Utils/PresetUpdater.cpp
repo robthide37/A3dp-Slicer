@@ -1201,29 +1201,6 @@ void PresetUpdater::cancel_sync()
 	}
 }
 
-void PresetUpdater::slic3r_update_notify()
-{
-	if (! p->enabled_version_check)
-		return;
-	auto* app_config = GUI::wxGetApp().app_config.get();
-	const auto ver_online_str = app_config->get("version_online");
-	const auto ver_online = Semver::parse(ver_online_str);
-	const auto ver_online_seen = Semver::parse(app_config->get("version_online_seen"));
-
-	if (ver_online) {
-		// Only display the notification if the version available online is newer AND if we haven't seen it before
-		if (*ver_online > Slic3r::SEMVER && (! ver_online_seen || *ver_online_seen < *ver_online)) {
-			GUI::MsgUpdateSlic3r notification(Slic3r::SEMVER, *ver_online);
-			notification.ShowModal();
-			if (notification.disable_version_check()) {
-				app_config->set("notify_release", "none");
-				p->enabled_version_check = false;
-			}
-		}
-
-		app_config->set("version_online_seen", ver_online_str);
-	}
-}
 
 static bool reload_configs_update_gui()
 {
