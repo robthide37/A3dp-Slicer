@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 project(Slic3r-native)
 
-# Ensure Slic3r target is defined
-add_executable(Slic3r PrusaSlicer.cpp PrusaSlicer.hpp)
-
 add_subdirectory(build-utils)
 if (NOT APPLE)
     add_subdirectory(test-utils)
@@ -37,15 +34,19 @@ if (SLIC3R_ENABLE_FORMAT_STEP)
     add_subdirectory(occt_wrapper)
 endif ()
 
+
 if (SLIC3R_GUI)
+set(CMAKE_CXX_STANDARD 17)
+
     add_subdirectory(imgui)
+    add_subdirectory(imguizmo)
     add_subdirectory(hidapi)
     include_directories(hidapi/include)
     add_subdirectory(exif)
     include_directories(exif/include)
     add_subdirectory(angelscript)
     # include_directories(angelscript/include)
-    add_subdirectory(slic3r)
+
     if(WIN32)
         message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
     elseif(UNIX)
@@ -56,11 +57,15 @@ if (SLIC3R_GUI)
             set(wxWidgets_USE_STATIC OFF)
         endif()
     endif()
-
+    set(wxWidgets_USE_DEBUG ON)
+    set(wxWidgets_USE_UNICODE ON)
+    set(wxUSE_WEBVIEW_EDGE ON)
+    set(wxUSE_SCINTILLA ON)
+    
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
             endif ()
-    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla)
+    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc webview)
 
     include(${wxWidgets_USE_FILE})
 
@@ -97,6 +102,7 @@ if (SLIC3R_GUI)
         list(APPEND wxWidgets_LIBRARIES ${LIBRT})
     endif()
 
+
     # This fixes a OpenGL linking issue on OSX. wxWidgets cmake build includes
     # wrong libs for opengl in the link line and it does not link to it by himself.
     # libslic3r_gui will link to opengl anyway, so lets override wx
@@ -108,16 +114,45 @@ if (SLIC3R_GUI)
 #    list(REMOVE_ITEM wxWidgets_LIBRARIES oleacc)
     message(STATUS "wx libs: ${wxWidgets_LIBRARIES}")
 
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/imguizmo")
-        add_subdirectory(imguizmo)
-    endif()
+
+    add_subdirectory(slic3r)
 endif()
 
+
+# Create a Slic3r executable
+# Process mainfests for various platforms.
 if (WIN32)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/Slic3r.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.rc @ONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/gcodeviewer.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}-gcodeviewer.rc @ONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/PrusaSlicer.manifest.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.manifest @ONLY)
 endif ()
+if (APPLE)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/osx/Info.plist.in ${CMAKE_CURRENT_BINARY_DIR}/Info.plist @ONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/osx/BuildMacOSImage.sh.in ${CMAKE_CURRENT_BINARY_DIR}/BuildMacOSImage.sh @ONLY)
+endif ()
+if (NOT WIN32 AND NOT APPLE)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/unix/BuildLinuxImage.sh.in ${CMAKE_CURRENT_BINARY_DIR}/BuildLinuxImage.sh @ONLY)
+endif ()
+
+if (WIN32)
+    add_library(Slic3r SHARED PrusaSlicer.cpp PrusaSlicer.hpp)
+else ()
+    add_executable(Slic3r PrusaSlicer.cpp PrusaSlicer.hpp)
+    target_compile_options(Slic3r PRIVATE ${_CC_DEBUG_FLAGS})
+endif ()
+
+if (MINGW)
+    target_link_options(Slic3r PUBLIC "-Wl,-allow-multiple-definition")
+    set_target_properties(Slic3r PROPERTIES PREFIX "")
+endif (MINGW)
+
+if (NOT WIN32)
+    # Binary name on unix like systems (Linux, Unix)
+    set_target_properties(Slic3r PROPERTIES OUTPUT_NAME "${SLIC3R_APP_CMD}")
+endif ()
+
+target_link_libraries(Slic3r libslic3r libcereal)
+
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
 #    add_definitions(-DBOOST_THREAD_DONT_USE_CHRONO -DBOOST_NO_CXX11_RVALUE_REFERENCES -DBOOST_THREAD_USES_MOVE)
@@ -133,7 +168,12 @@ endif ()
 
 # Add the Slic3r GUI library, libcurl, OpenGL and GLU libraries.
 if (SLIC3R_GUI)
-#    target_link_libraries(PrusaSlicer ws2_32 uxtheme setupapi libslic3r_gui ${wxWidgets_LIBRARIES})
+if (MSVC)
+    target_link_libraries(Slic3r ws2_32 uxtheme setupapi libslic3r_gui ${wxWidgets_LIBRARIES})
+    else ()
+        target_link_libraries(Slic3r libslic3r_gui ${wxWidgets_LIBRARIES})
+endif()
+    
 target_link_libraries(Slic3r libslic3r_gui)
     if (MSVC)
         # Generate debug symbols even in release mode.
@@ -162,7 +202,7 @@ if (WIN32)
     if (MINGW)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -municode")
     endif()
-    
+	
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libslic3r/libslic3r_version.h.in ${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h @ONLY)
 
     add_executable(Slic3r_app_gui WIN32 PrusaSlicer_app_msvc.cpp ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.rc)
@@ -199,8 +239,15 @@ if (WIN32)
     target_link_libraries(PrusaSlicer_app_gcodeviewer PRIVATE boost_headeronly)
 endif ()
 
+
+set(output_dlls_Release "")
+set(output_dlls_Debug "")
+set(output_dlls_RelWithDebInfo "")
+
 # Link the resources dir to where Slic3r GUI expects it
 if (WIN32)
+    add_custom_target(slic3rDllsCopy ALL DEPENDS Slic3r)
+
     if (CMAKE_CONFIGURATION_TYPES)
         foreach (CONF ${CMAKE_CONFIGURATION_TYPES})
             file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/${CONF}" WIN_CONF_OUTPUT_DIR)
@@ -215,6 +262,13 @@ if (WIN32)
                 VERBATIM
             )
         endforeach ()
+         if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+            prusaslicer_copy_dlls(slic3rDllsCopy "Debug" "d" output_dlls_Debug)
+        elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+            prusaslicer_copy_dlls(slic3rDllsCopy "RelWithDebInfo" "" output_dlls_Release)
+        else()
+            prusaslicer_copy_dlls(slic3rDllsCopy "Release" "" output_dlls_Release)
+        endif()
     else ()
         file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/resources" WIN_RESOURCES_SYMLINK)
         add_custom_command(TARGET Slic3r POST_BUILD
@@ -223,10 +277,6 @@ if (WIN32)
             VERBATIM
         )
     endif ()
-
-    # This has to be a separate target due to the windows command line lenght limits
-    add_custom_target(slic3rDllsCopy ALL DEPENDS Slic3r)
-    prusaslicer_copy_dlls(slic3rDllsCopy)
 
 else ()
     if (APPLE)
@@ -259,7 +309,7 @@ else ()
     endif ()
      add_custom_command(TARGET Slic3r POST_BUILD
         # COMMAND ln -sfn "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}" # make[3]: stat: src/Slic3r: Too many levels of symbolic links
-         COMMAND cp -r "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}"
+		 COMMAND cp -r "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}"
          COMMENT "Symlinking the resources directory into the build tree"
          VERBATIM)
 endif ()
