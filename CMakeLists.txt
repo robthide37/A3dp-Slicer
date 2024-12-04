@@ -18,7 +18,6 @@ else()
 endif()
 include(GNUInstallDirs)
 include(CMakeDependentOption)
-
 set(SLIC3R_RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(TO_NATIVE_PATH "${SLIC3R_RESOURCES_DIR}" SLIC3R_RESOURCES_DIR_WIN)
 
@@ -26,7 +25,6 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type selected, default to Release")
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (default Release)" FORCE)
 endif()
-
 if(DEFINED ENV{SLIC3R_STATIC})
         set(SLIC3R_STATIC_INITIAL $ENV{SLIC3R_STATIC})
 else()
@@ -48,12 +46,6 @@ endif()
 
 option(SLIC3R_STATIC            "Compile Slic3r with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
 option(SLIC3R_GUI               "Compile Slic3r with GUI components (OpenGL, wxWidgets)" 1)
-find_package(wxWidgets REQUIRED COMPONENTS core base html stc net webview)
-include(${wxWidgets_USE_FILE})
-
-# Link wxWidgets libraries
-target_link_libraries(Slic3r ${wxWidgets_LIBRARIES})
-
 option(SLIC3R_FHS               "Assume Slic3r is to be installed in a FHS directory structure" 0)
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
@@ -132,6 +124,8 @@ if (MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL Clang)
 else ()
     set(IS_CLANG_CL FALSE)
 endif ()
+
+
 
 if (MSVC)
     if (SLIC3R_MSVC_COMPILE_PARALLEL AND NOT IS_CLANG_CL)
@@ -238,6 +232,7 @@ endif()
 
 if (APPLE)
     add_compile_options(-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION)
+
     message("OS X SDK Path: ${CMAKE_OSX_SYSROOT}")
     if (CMAKE_OSX_DEPLOYMENT_TARGET)
         message("OS X Deployment Target: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
@@ -741,7 +736,8 @@ if (NOT WIN32)
     set(CPACK_STRIP_FILES "bin/${SLIC3R_APP_CMD}")
     set(CPACK_SYSTEM_NAME "Linux-x86_64")
     set(CPACK_TOPLEVEL_TAG "Linux-x86_64")
+    set(CPACK_WIX_UPGRADE_GUID "058245e8-20e0-4a95-9ab7-1acfe17ad511")
+
 endif()
 
 include(CPack)
-
