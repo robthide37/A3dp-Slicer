@@ -48,19 +48,12 @@ endif()
 
 option(SLIC3R_STATIC            "Compile Slic3r with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
 option(SLIC3R_GUI               "Compile Slic3r with GUI components (OpenGL, wxWidgets)" 1)
-option(SLIC3R_GUI "Compile Slic3r with GUI components (OpenGL, wxWidgets)" 1)
-# Add this line to find wxWidgets with webview support
-
-
-
-# Ensure wxWidgets components are included
 find_package(wxWidgets REQUIRED COMPONENTS core base html stc net webview)
 include(${wxWidgets_USE_FILE})
 
 # Link wxWidgets libraries
 target_link_libraries(Slic3r ${wxWidgets_LIBRARIES})
 
-option(SLIC3R_FHS "Assume Slic3r is to be installed in a FHS directory structure" 0)
 option(SLIC3R_FHS               "Assume Slic3r is to be installed in a FHS directory structure" 0)
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
