@@ -90,4 +90,3 @@ bool StateColor::setColorForStates(wxColour const &color, int states)
 }
 
 void StateColor::setTakeFocusedAsHovered(bool set) { takeFocusedAsHovered_ = set; }
-
