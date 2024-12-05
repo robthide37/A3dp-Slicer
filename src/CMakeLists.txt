@@ -34,12 +34,8 @@ if (SLIC3R_ENABLE_FORMAT_STEP)
     add_subdirectory(occt_wrapper)
 endif ()
 
-
 if (SLIC3R_GUI)
-set(CMAKE_CXX_STANDARD 17)
-
     add_subdirectory(imgui)
-    add_subdirectory(imguizmo)
     add_subdirectory(hidapi)
     include_directories(hidapi/include)
     add_subdirectory(exif)
@@ -48,24 +44,24 @@ set(CMAKE_CXX_STANDARD 17)
     # include_directories(angelscript/include)
 
     if(WIN32)
-        message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
-    elseif(UNIX)
-        set(wxWidgets_USE_UNICODE ON)
-        if(SLIC3R_STATIC)
-            set(wxWidgets_USE_STATIC ON)
-        else()
-            set(wxWidgets_USE_STATIC OFF)
-        endif()
+    message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
+elseif(UNIX)
+    set(wxWidgets_USE_UNICODE ON)
+    if(SLIC3R_STATIC)
+        set(wxWidgets_USE_STATIC ON)
+    else()
+        set(wxWidgets_USE_STATIC OFF)
     endif()
+endif()
     set(wxWidgets_USE_DEBUG ON)
     set(wxWidgets_USE_UNICODE ON)
     set(wxUSE_WEBVIEW_EDGE ON)
     set(wxUSE_SCINTILLA ON)
-    
+
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
             endif ()
-    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc webview)
+    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla)
 
     include(${wxWidgets_USE_FILE})
 
@@ -102,7 +98,6 @@ set(CMAKE_CXX_STANDARD 17)
         list(APPEND wxWidgets_LIBRARIES ${LIBRT})
     endif()
 
-
     # This fixes a OpenGL linking issue on OSX. wxWidgets cmake build includes
     # wrong libs for opengl in the link line and it does not link to it by himself.
     # libslic3r_gui will link to opengl anyway, so lets override wx
@@ -113,7 +108,6 @@ set(CMAKE_CXX_STANDARD 17)
     endif ()
 #    list(REMOVE_ITEM wxWidgets_LIBRARIES oleacc)
     message(STATUS "wx libs: ${wxWidgets_LIBRARIES}")
-
 
     add_subdirectory(slic3r)
 endif()
@@ -149,6 +143,8 @@ endif (MINGW)
 if (NOT WIN32)
     # Binary name on unix like systems (Linux, Unix)
     set_target_properties(Slic3r PROPERTIES OUTPUT_NAME "${SLIC3R_APP_CMD}")
+    # move the exe so it won't collide with a dir (like Slic3r)
+    set_target_properties(Slic3r PROPERTIES RUNTIME_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/bin")
 endif ()
 
 target_link_libraries(Slic3r libslic3r libcereal)
@@ -173,8 +169,6 @@ if (MSVC)
     else ()
         target_link_libraries(Slic3r libslic3r_gui ${wxWidgets_LIBRARIES})
 endif()
-    
-target_link_libraries(Slic3r libslic3r_gui)
     if (MSVC)
         # Generate debug symbols even in release mode.
         target_link_options(Slic3r PUBLIC "$<$<CONFIG:RELEASE>:/DEBUG>")
@@ -239,15 +233,8 @@ if (WIN32)
     target_link_libraries(PrusaSlicer_app_gcodeviewer PRIVATE boost_headeronly)
 endif ()
 
-
-set(output_dlls_Release "")
-set(output_dlls_Debug "")
-set(output_dlls_RelWithDebInfo "")
-
 # Link the resources dir to where Slic3r GUI expects it
 if (WIN32)
-    add_custom_target(slic3rDllsCopy ALL DEPENDS Slic3r)
-
     if (CMAKE_CONFIGURATION_TYPES)
         foreach (CONF ${CMAKE_CONFIGURATION_TYPES})
             file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/${CONF}" WIN_CONF_OUTPUT_DIR)
@@ -262,13 +249,6 @@ if (WIN32)
                 VERBATIM
             )
         endforeach ()
-         if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-            prusaslicer_copy_dlls(slic3rDllsCopy "Debug" "d" output_dlls_Debug)
-        elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
-            prusaslicer_copy_dlls(slic3rDllsCopy "RelWithDebInfo" "" output_dlls_Release)
-        else()
-            prusaslicer_copy_dlls(slic3rDllsCopy "Release" "" output_dlls_Release)
-        endif()
     else ()
         file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/resources" WIN_RESOURCES_SYMLINK)
         add_custom_command(TARGET Slic3r POST_BUILD
@@ -277,6 +257,10 @@ if (WIN32)
             VERBATIM
         )
     endif ()
+
+    # This has to be a separate target due to the windows command line lenght limits
+    add_custom_target(slic3rDllsCopy ALL DEPENDS Slic3r)
+    prusaslicer_copy_dlls(slic3rDllsCopy)
 
 else ()
     if (APPLE)
