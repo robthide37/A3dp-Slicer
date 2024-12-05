@@ -230,11 +230,8 @@ public:
     wxWebView *m_webView;
 };
 
-wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
-{
-#if wxUSE_WEBVIEW_EDGE
-    // Check if a fixed version of edge is present in
-    // $executable_path/edge_fixed and use it
+wxWebView* WebView::CreateWebView(wxWindow *parent, wxString const &url) {
+    #if wxUSE_WEBVIEW_EDGE
     wxFileName edgeFixedDir(wxStandardPaths::Get().GetExecutablePath());
     edgeFixedDir.SetFullName("");
     edgeFixedDir.AppendDir("edge_fixed");
@@ -242,41 +239,44 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
         wxWebViewEdge::MSWSetBrowserExecutableDir(edgeFixedDir.GetFullPath());
         wxLogMessage("Using fixed edge version");
     }
-#endif
-    auto url2  = url;
-#ifdef __WIN32__
-    url2.Replace("\\", "/");
-#endif
-    if (!url2.empty()) { url2 = wxURI(url2).BuildURI(); }
+    #endif
+    auto url2 = url;
+    #ifdef __WIN32__
+    url2.Replace("\\\\", "/");
+    #endif
+    if (!url2.empty()) {
+        url2 = wxURI(url2).BuildURI();
+    }
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << ": " << url2.ToUTF8();
-
-#ifdef __WIN32__
+    #ifdef __WIN32__
     wxWebView* webView = new WebViewEdge;
-#elif defined(__WXOSX__)
+    #elif defined(__WXOSX__)
     wxWebView *webView = new WebViewWebKit;
-#else
+    #else
     auto webView = wxWebView::New();
-#endif
+    #endif
     if (webView) {
         webView->SetBackgroundColour(wxColour(*wxWHITE));
-#ifdef __WIN32__
-        webView->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.52", SLIC3R_VERSION, 
-            Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light"));
+        #ifdef __WIN32__
+        webView->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.52", SLIC3R_VERSION, Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light"));
         webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-        // We register the wxfs:// protocol for testing purposes
         webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewArchiveHandler("bbl")));
-        // And the memory: file system
         webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewFSHandler("memory")));
-#else
-        // With WKWebView handlers need to be registered before creation
+        #else
         webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewArchiveHandler("wxfs")));
-        // And the memory: file system
         webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewFSHandler("memory")));
         webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-        webView->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)", SLIC3R_VERSION,
-                                               Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light"));
-#endif
+        webView->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)", SLIC3R_VERSION, Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light"));
+        #endif
+        webView->EnableContextMenu(true);
+    } else {
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": failed. Use fake web view.";
+        webView = new FakeWebView;
+    }
+    webView->SetRefData(new WebViewRef(webView));
+    g_webviews.push_back(webView);
+    return webView;
+}
 #ifdef __WXMAC__
         WKWebView * wkWebView = (WKWebView *) webView->GetNativeBackend();
         //Slic3r::GUI::WKWebView_setTransparentBackground(wkWebView);
@@ -327,16 +327,18 @@ bool WebView::DownloadAndInstallWebViewRuntime()
     return DownloadAndInstallWV2RT() == 0;
 }
 #endif
-void WebView::LoadUrl(wxWebView * webView, wxString const &url)
-{
-    auto url2  = url;
-#ifdef __WIN32__
-    url2.Replace("\\", "/");
-#endif
-    if (!url2.empty()) { url2 = wxURI(url2).BuildURI(); }
-    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << url2.ToUTF8();
+void WebView::LoadUrl(wxWebView * webView, wxString const &url) {
+    auto url2 = url;
+    #ifdef __WIN32__
+    url2.Replace("\\\\", "/");
+    #endif
+    if (!url2.empty()) {
+        url2 = wxURI(url2).BuildURI();
+    }
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << ": " << url2.ToUTF8();
     webView->LoadURL(url2);
 }
+
 
 bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
 {
