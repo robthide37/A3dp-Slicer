@@ -73,7 +73,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/Selection.hpp
     GUI/Selection.cpp
     GUI/PrinterWebView.hpp
-GUI/PrinterWebView.cpp
+    GUI/PrinterWebView.cpp
     GUI/Gizmos/GLGizmosManager.cpp
     GUI/Gizmos/GLGizmosManager.hpp
     GUI/Gizmos/GLGizmosCommon.cpp
