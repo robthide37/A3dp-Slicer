@@ -1758,10 +1758,12 @@ void GUI_App::update_ui_colours_from_appconfig()
             m_color_label_phony = wxColour(str);
     }
 
+/*
     Slic3r::GUI::Widget::set_clr_border_hovered(change_endian_int24(
         app_config->create_color(0.86f, 0.93f, AppConfig::EAppColorType::Highlight)));
     Slic3r::GUI::Widget::set_clr_background_focused(change_endian_int24(
         app_config->create_color(0.86f, 0.93f, AppConfig::EAppColorType::Main)));
+*/
 
 #ifdef _WIN32
     bool is_dark_mode = dark_mode();
@@ -2311,7 +2313,7 @@ void GUI_App::calibration_pressureadv_dialog()
 }
 void GUI_App::freecad_script_dialog()
 {
-    change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
+  // change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
 }
 void GUI_App::tiled_canvas_dialog()
 {

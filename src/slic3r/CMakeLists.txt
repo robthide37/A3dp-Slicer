@@ -1,4 +1,4 @@
-#/|/ Copyright (c) Prusa Research 2018 - 2023 Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, Vojtěch Král @vojtechkral
+    #/|/ Copyright (c) Prusa Research 2018 - 2023 Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, Vojtěch Král @vojtechkral
 #/|/ Copyright (c) 2023 Pedro Lamas @PedroLamas
 #/|/ Copyright (c) 2020 Sergey Kovalev @RandoMan70
 #/|/ Copyright (c) 2021 Boleslaw Ciesielski
@@ -21,6 +21,12 @@ include(PrecompiledHeader)
 set(SLIC3R_GUI_SOURCES
     pchheader.cpp
     pchheader.hpp
+    GUI/Downloader.cpp
+    GUI/Downloader.hpp
+    GUI/DownloaderFileGet.cpp
+    GUI/DownloaderFileGet.hpp
+    GUI/PrinterWebView.cpp   
+    GUI/PrinterWebView.hpp
     GUI/AboutDialog.cpp
     GUI/AboutDialog.hpp
     GUI/ArrangeSettingsDialogImgui.hpp
@@ -43,6 +49,56 @@ set(SLIC3R_GUI_SOURCES
     GUI/CalibrationCubeDialog.hpp
     GUI/CalibrationFlowDialog.cpp
     GUI/CalibrationFlowDialog.hpp
+    GUI/A3DPWebView.cpp
+    GUI/A3DPWebView.hpp
+
+    GUI/Widgets/Button.cpp
+    GUI/Widgets/Button.hpp
+    GUI/Widgets/CheckBox.cpp
+    GUI/Widgets/CheckBox.hpp
+
+    GUI/Widgets/ProgressDialog.hpp
+    GUI/Widgets/ProgressDialog.cpp
+    GUI/Widgets/RoundedRectangle.hpp
+    GUI/Widgets/RoundedRectangle.cpp
+    GUI/Widgets/ComboBox.cpp
+    GUI/Widgets/ComboBox.hpp
+
+    GUI/Widgets/DropDown.cpp
+    GUI/Widgets/DropDown.hpp
+    GUI/Widgets/PopupWindow.cpp
+    GUI/Widgets/PopupWindow.hpp
+    GUI/Widgets/Label.cpp
+    GUI/Widgets/Label.hpp
+    GUI/Widgets/Scrollbar.cpp
+    GUI/Widgets/Scrollbar.hpp
+    GUI/Widgets/ScrolledWindow.cpp
+    GUI/Widgets/ScrolledWindow.hpp
+    GUI/Widgets/StaticBox.cpp
+    GUI/Widgets/StaticBox.hpp
+    GUI/Widgets/SwitchButton.cpp
+    GUI/Widgets/SwitchButton.hpp
+    GUI/Widgets/SpinInput.cpp
+    GUI/Widgets/SpinInput.hpp
+
+    GUI/Widgets/StateColor.cpp
+    GUI/Widgets/StateColor.hpp
+    GUI/Widgets/StateHandler.cpp
+    GUI/Widgets/StateHandler.hpp
+    GUI/Widgets/TabCtrl.cpp
+    GUI/Widgets/TabCtrl.hpp
+    GUI/Widgets/TextInput.cpp
+    GUI/Widgets/TextInput.hpp
+
+    GUI/Widgets/Scrollbar.cpp
+    GUI/Widgets/Scrollbar.hpp
+    GUI/Widgets/ScrolledWindow.cpp
+    GUI/Widgets/ScrolledWindow.hpp
+
+    GUI/Widgets/ProgressBar.cpp
+    GUI/Widgets/ProgressBar.hpp
+    GUI/Widgets/ErrorMsgStaticText.cpp
+    GUI/Widgets/ErrorMsgStaticText.hpp
     GUI/CalibrationOverBridgeDialog.cpp
     GUI/CalibrationOverBridgeDialog.hpp
     GUI/CalibrationTempDialog.cpp
@@ -71,9 +127,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/OpenGLManager.hpp
     GUI/OpenGLManager.cpp
     GUI/Selection.hpp
-    GUI/Selection.cpp
-    GUI/PrinterWebView.hpp
-    GUI/PrinterWebView.cpp
+    GUI/Selection.cpp    
     GUI/Gizmos/GLGizmosManager.cpp
     GUI/Gizmos/GLGizmosManager.hpp
     GUI/Gizmos/GLGizmosCommon.cpp
@@ -233,6 +287,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/MsgDialog.hpp
     GUI/UpdateDialogs.cpp
     GUI/UpdateDialogs.hpp
+
     GUI/FirmwareDialog.cpp
     GUI/FirmwareDialog.hpp
     GUI/PrintHostDialogs.cpp
@@ -274,6 +329,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Notebook.hpp
     GUI/ObjectDataViewModel.cpp
     GUI/ObjectDataViewModel.hpp
+    GUI/Widgets/PopupWindow.cpp
+    GUI/Widgets/PopupWindow.hpp
     GUI/InstanceCheck.cpp
     GUI/InstanceCheck.hpp
     GUI/Search.cpp
@@ -360,8 +417,6 @@ set(SLIC3R_GUI_SOURCES
     Utils/UndoRedo.hpp
     Utils/HexFile.cpp
     Utils/HexFile.hpp
-    GUI/A3DPWebView.cpp
-    GUI/A3DPWebView.hpp
     Utils/TCPConsole.cpp
     Utils/TCPConsole.hpp
     Utils/MKS.cpp
@@ -408,7 +463,6 @@ target_compile_definitions(libslic3r_gui PRIVATE $<$<BOOL:${SLIC3R_ALPHA}>:SLIC3
 if (WIN32)
     target_include_directories(libslic3r_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/WebView2/include)
 endif()
-
 foreach(_source IN ITEMS ${SLIC3R_GUI_SOURCES})
     get_filename_component(_source_path "${_source}" PATH)
     string(REPLACE "/" "\\" _group_path "${_source_path}")
