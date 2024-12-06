@@ -1,10 +1,20 @@
+#/|/ Copyright (c) Prusa Research 2017 - 2023 Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
+#/|/ Copyright (c) 2023 Ben Greiner
+#/|/ Copyright (c) 2021 D-mo @dimitry-ishenko
+#/|/ Copyright (c) 2020 Pascal de Bruijn @pmjdebruijn
+#/|/ Copyright (c) 2019 Sam Segers
+#/|/ Copyright (c) 2019 Colin Gilgenbach @hexane360
+#/|/ Copyright (c) 2018 Dan Kortschak
+#/|/
+#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+#/|/
 cmake_minimum_required(VERSION 3.13)
 project(Slic3r)
 
 if (EXISTS "version.date.inc")
-    include("version.date.inc")
+	include("version.date.inc")
 else()
-    include("version.inc")
+	include("version.inc")
 endif()
 include(GNUInstallDirs)
 include(CMakeDependentOption)
@@ -13,18 +23,18 @@ set(SLIC3R_RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(TO_NATIVE_PATH "${SLIC3R_RESOURCES_DIR}" SLIC3R_RESOURCES_DIR_WIN)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    message(STATUS "No build type selected, default to Release")
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (default Release)" FORCE)
+  message(STATUS "No build type selected, default to Release")
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (default Release)" FORCE)
 endif()
 
 if(DEFINED ENV{SLIC3R_STATIC})
-    set(SLIC3R_STATIC_INITIAL $ENV{SLIC3R_STATIC})
+        set(SLIC3R_STATIC_INITIAL $ENV{SLIC3R_STATIC})
 else()
-    if (MSVC OR MINGW OR APPLE)
-        set(SLIC3R_STATIC_INITIAL 1)
-    else()
-        set(SLIC3R_STATIC_INITIAL 0)
-    endif()
+        if (MSVC OR MINGW OR APPLE)
+                set(SLIC3R_STATIC_INITIAL 1)
+        else()
+                set(SLIC3R_STATIC_INITIAL 0)
+        endif()
 endif()
 
 if(NOT WIN32)
@@ -36,37 +46,21 @@ if(NOT WIN32)
     )
 endif()
 
-option(SLIC3R_STATIC "Compile Slic3r with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
-option(SLIC3R_GUI "Compile Slic3r with GUI components (OpenGL, wxWidgets)" 1)
-option(SLIC3R_FHS "Assume Slic3r is to be installed in a FHS directory structure" 0)
-option(SLIC3R_PCH "Use precompiled headers" 1)
+option(SLIC3R_STATIC            "Compile Slic3r with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
+option(SLIC3R_GUI               "Compile Slic3r with GUI components (OpenGL, wxWidgets)" 1)
+option(SLIC3R_FHS               "Assume Slic3r is to be installed in a FHS directory structure" 0)
+option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
-option(SLIC3R_MSVC_PDB "Generate PDB files on MSVC in Release mode" 1)
-option(SLIC3R_ASAN "Enable ASan on Clang and GCC" 0)
-option(SLIC3R_UBSAN "Enable UBSan on Clang and GCC" 0)
+option(SLIC3R_MSVC_PDB          "Generate PDB files on MSVC in Release mode" 1)
+option(SLIC3R_ASAN              "Enable ASan on Clang and GCC" 0)
+option(SLIC3R_UBSAN             "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" ON)
-
-# Define the Slic3r target
-add_executable(Slic3r main.cpp)
-
-# Add this line to find wxWidgets with webview support
-find_package(wxWidgets REQUIRED COMPONENTS core base net webview)
-
-# Add this line to include wxWidgets in your project
-include(${wxWidgets_USE_FILE})
-
-# Link wxWidgets libraries
-target_link_libraries(Slic3r ${wxWidgets_LIBRARIES})
-
-# Continue with the rest of your CMakeLists.txt file
-
-
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
 CMAKE_DEPENDENT_OPTION(SLIC3R_DESKTOP_INTEGRATION "Allow perfoming desktop integration during runtime" 1 "NOT SLIC3R_FHS" 0)
 
 set(OPENVDB_FIND_MODULE_PATH "" CACHE PATH "Path to OpenVDB installation's find modules.")
 
-set(SLIC3R_GTK "3" CACHE STRING "GTK version to use with wxWidgets on Linux")
+set(SLIC3R_GTK "2" CACHE STRING "GTK version to use with wxWidgets on Linux")
 
 set(IS_CROSS_COMPILE FALSE)
 
