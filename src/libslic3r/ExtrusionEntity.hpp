@@ -183,13 +183,23 @@ public:
 
     //ExtrusionPath(ExtrusionRole role) : ExtrusionEntity(true), m_attributes{role} {}
     ExtrusionPath(const ExtrusionAttributes &attributes, bool can_reverse = true) : ExtrusionEntity(can_reverse), m_attributes(attributes) {}
-    ExtrusionPath(const ExtrusionPath &rhs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(rhs.polyline), m_attributes(rhs.m_attributes) {}
-    ExtrusionPath(ExtrusionPath &&rhs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(std::move(rhs.polyline)), m_attributes(rhs.m_attributes) {}
+    ExtrusionPath(const ExtrusionPath &rhs) : ExtrusionEntity(rhs.m_can_reverse), polyline(rhs.polyline), m_attributes(rhs.m_attributes) {}
+    ExtrusionPath(ExtrusionPath &&rhs) : ExtrusionEntity(rhs.m_can_reverse), polyline(std::move(rhs.polyline)), m_attributes(rhs.m_attributes) {}
     ExtrusionPath(const ArcPolyline &polyline, const ExtrusionAttributes &attribs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(polyline), m_attributes(attribs) {}
     ExtrusionPath(ArcPolyline &&polyline, const ExtrusionAttributes &attribs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(std::move(polyline)), m_attributes(attribs) {}
 
-    ExtrusionPath& operator=(const ExtrusionPath &rhs) { this->polyline = rhs.polyline; m_attributes = rhs.m_attributes; return *this; }
-    ExtrusionPath& operator=(ExtrusionPath &&rhs) { this->polyline = std::move(rhs.polyline); m_attributes = rhs.m_attributes; return *this; }
+    ExtrusionPath &operator=(const ExtrusionPath &rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->polyline = rhs.polyline;
+        m_attributes = rhs.m_attributes;
+        return *this;
+    }
+    ExtrusionPath &operator=(ExtrusionPath &&rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->polyline = std::move(rhs.polyline);
+        m_attributes = rhs.m_attributes;
+        return *this;
+    }
 
 	ExtrusionEntity* clone() const override { return new ExtrusionPath(*this); }
     // Create a new object, initialize it with this object using the move semantics.
@@ -280,19 +290,19 @@ public:
 
     ExtrusionPath3D &operator=(const ExtrusionPath3D &rhs)
     {
-        this->m_attributes.role = rhs.role();
-        this->m_attributes.mm3_per_mm = rhs.mm3_per_mm();
-        this->m_attributes.width      = rhs.width();
-        this->m_attributes.height     = rhs.height(); 
-        this->polyline = rhs.polyline; z_offsets = rhs.z_offsets; return *this;
+        this->m_can_reverse = rhs.m_can_reverse; 
+        this->m_attributes = rhs.m_attributes;
+        this->polyline = rhs.polyline;
+        z_offsets = rhs.z_offsets;
+        return *this;
     }
     ExtrusionPath3D &operator=(ExtrusionPath3D &&rhs)
     {
-        this->m_attributes.role       = rhs.role();
-        this->m_attributes.mm3_per_mm = rhs.mm3_per_mm();
-        this->m_attributes.width      = rhs.width();
-        this->m_attributes.height     = rhs.height(); 
-        this->polyline = std::move(rhs.polyline); z_offsets = std::move(rhs.z_offsets); return *this;
+        this->m_can_reverse = rhs.m_can_reverse; 
+        this->m_attributes = rhs.m_attributes;
+        this->polyline = std::move(rhs.polyline);
+        z_offsets = std::move(rhs.z_offsets);
+        return *this;
     }
     virtual ExtrusionPath3D* clone() const override { return new ExtrusionPath3D(*this); }
     virtual ExtrusionPath3D* clone_move() override { return new ExtrusionPath3D(std::move(*this)); }
@@ -316,6 +326,7 @@ public:
 typedef std::vector<ExtrusionPath3D> ExtrusionPaths3D;
 
 // Single continuous extrusion path, possibly with varying extrusion thickness, extrusion height or bridging / non bridging.
+// it's like an unsortable collection of only unreversable THING
 template <typename THING = ExtrusionEntity>
 class ExtrusionMultiEntity : public ExtrusionEntity {
 public:
@@ -327,8 +338,16 @@ public:
     ExtrusionMultiEntity(const std::vector<THING> &paths) : paths(paths), ExtrusionEntity(false) {};
     ExtrusionMultiEntity(const THING &path): ExtrusionEntity(false) { this->paths.push_back(path); }
 
-    ExtrusionMultiEntity& operator=(const ExtrusionMultiEntity &rhs) { this->paths = rhs.paths; return *this; }
-    ExtrusionMultiEntity& operator=(ExtrusionMultiEntity &&rhs) { this->paths = std::move(rhs.paths); return *this; }
+    ExtrusionMultiEntity &operator=(const ExtrusionMultiEntity &rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = rhs.paths;
+        return *this;
+    }
+    ExtrusionMultiEntity &operator=(ExtrusionMultiEntity &&rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = std::move(rhs.paths);
+        return *this;
+    }
 
     bool is_loop() const override { return false; }
     virtual const Point& first_point() const override { return this->paths.front().polyline.front(); }
@@ -405,6 +424,7 @@ public:
 };
 
 // Single continuous extrusion path, possibly with varying extrusion thickness, extrusion height or bridging / non bridging.
+// it's like an unsortable collection of only unreversable ExtrusionPaths
 class ExtrusionMultiPath : public ExtrusionMultiEntity<ExtrusionPath> {
 public:
 
@@ -414,8 +434,16 @@ public:
     ExtrusionMultiPath(const ExtrusionPaths &paths) : ExtrusionMultiEntity(paths) {};
     ExtrusionMultiPath(const ExtrusionPath &path) :ExtrusionMultiEntity(path) {}
 
-    ExtrusionMultiPath& operator=(const ExtrusionMultiPath& rhs) { this->paths = rhs.paths; return *this; }
-    ExtrusionMultiPath& operator=(ExtrusionMultiPath&& rhs) { this->paths = std::move(rhs.paths); return *this; }
+    ExtrusionMultiPath &operator=(const ExtrusionMultiPath &rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = rhs.paths;
+        return *this;
+    }
+    ExtrusionMultiPath &operator=(ExtrusionMultiPath &&rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = std::move(rhs.paths);
+        return *this;
+    }
 
     void set_can_reverse(bool can_reverse) { m_can_reverse = can_reverse; }
 

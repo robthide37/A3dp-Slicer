@@ -8,7 +8,7 @@ group:freq_settings_event:no_title:no_search:
 #		setting:brim_width
 #		setting:label$Infill:width$8:sidetext$  :fill_density
 
-		setting:simple:script:percent:depends$fill_density$solid_infill_every_layers:hints$0$none$5$5$10$10$15$15 $25$25$35$35$50$50$75$75$100$solid:depends$fill_density$solid_infill_every_layers:label$Fill density:tooltip$Density of internal infill, expressed in the range 0% - 100%:width$6:sidetext$%:sidetext_width$4:label$Fill density:tooltip$Density of internal infill, expressed in the range 0% - 100%.\nSet 0 to remove any sparse infill.\nA value of 100% will activate 'solid_infill_every_layers' to have solid infill, with the solid infill pattern.:s_fill_density
+		setting:simple:script:percent:depends$fill_density$solid_infill_every_layers:hints$0$none$4$4$5.5$5.5$7.5$7.5$10$10$13$13 $18$18$23$23$31$31$42$42$55$55$75$75$100$solid:depends$fill_density$solid_infill_every_layers:label$Fill density:tooltip$Density of internal infill, expressed in the range 0% - 100%:width$6:sidetext$%:sidetext_width$4:label$Fill density:tooltip$Density of internal infill, expressed in the range 0% - 100%.\nSet 0 to remove any sparse infill.\nA value of 100% will activate 'solid_infill_every_layers' to have solid infill, with the solid infill pattern.:s_fill_density
 
 		setting:simple:script:bool:depends$brim_width:label$Brim:tooltip$Set the brim. Will be set to 5mm if nothing was previously set.:s_brim
 		freq_purging_volumes
