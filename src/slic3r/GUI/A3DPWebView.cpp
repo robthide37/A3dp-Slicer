@@ -1,7 +1,7 @@
 #include "A3DPWebView.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/Utils/MacDarkMode.hpp"
-
+#include <wx/webview.h>
 #include <boost/log/trivial.hpp>
 #include <slic3r/GUI/Widgets/StateColor.hpp>
 #include <wx/webviewarchivehandler.h>

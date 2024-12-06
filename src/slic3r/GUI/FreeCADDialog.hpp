@@ -1,6 +1,5 @@
-#ifndef slic3r_GUI_FreeCADDialog_hpp_
-#define slic3r_GUI_FreeCADDialog_hpp_
 
+/*
 #include <map>
 #include <vector>
 #include <regex>
@@ -97,3 +96,4 @@ protected:
 } // namespace Slic3r
 
 #endif
+*/

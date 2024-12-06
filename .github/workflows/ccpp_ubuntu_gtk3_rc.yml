@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - rc
-      - robthide37-patch-4
+      - A3dp-main
 
 jobs:
   build:
