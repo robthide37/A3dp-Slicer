@@ -3,8 +3,7 @@ name: C/C++ Release candidate windows x64
 on:
   push:
     branches:
-      - rc
-      - robthide37-patch-4
+      - supermerill-Main
 
 jobs:
   build_dep:

@@ -35,9 +35,11 @@ if (SLIC3R_ENABLE_FORMAT_STEP)
 endif ()
 
 if (SLIC3R_GUI)
-    add_subdirectory(imgui)
+set(CMAKE_CXX_STANDARD 17)
+    add_subdirectory(imgui) 
     add_subdirectory(hidapi)
     include_directories(hidapi/include)
+    add_subdirectory(imguizmo)
     add_subdirectory(exif)
     include_directories(exif/include)
     add_subdirectory(angelscript)
@@ -60,8 +62,8 @@ endif()
 
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
-            endif ()
-    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla webview)
+    endif ()
+    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl webview stc)
 
     include(${wxWidgets_USE_FILE})
 
