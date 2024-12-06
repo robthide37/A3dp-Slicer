@@ -1943,7 +1943,9 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                                                            print_object_instances_ordering.begin());
                             if (finished_objects > 1)
                                 _move_to_print_object(preamble_to_put_start_layer, print, finished_objects, initial_extruder_id);
-
+                            for (auto layer : layers_to_print_range) {
+                                std::cout<<"print layer @"<<layer.object_layer->print_z<<"\n";
+                            }
                             assert(!object.instances().empty());
                             assert(*it_print_object_instance >= &*object.instances().begin() &&
                                    *it_print_object_instance <= &*(object.instances().end()-1));

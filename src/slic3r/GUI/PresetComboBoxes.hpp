@@ -144,6 +144,34 @@ private:
     void fill_width_height();
 };
 
+// ---------------------------------
+// ***  DevicePresetComboBox  ***
+// ---------------------------------
+
+class DevicePresetComboBox : public PresetComboBox
+{
+public:
+    DevicePresetComboBox(wxWindow *parent, Preset::Type preset_type);
+    ~DevicePresetComboBox();
+
+    ScalableButton* edit_btn { nullptr };
+
+    void set_extruder_idx(const int extr_idx)   { m_extruder_idx = extr_idx; }
+    int  get_extruder_idx() const               { return m_extruder_idx; }
+
+    void switch_to_tab();
+    void change_extruder_color();
+    void show_edit_menu();
+
+    wxString get_preset_name(const Preset& preset) override;
+    void update() override;
+    void OnSelect(wxCommandEvent& evt) override;
+
+private:
+    int     m_extruder_idx = -1;
+};
+
+
 
 // ---------------------------------
 // ***  PlaterPresetComboBox  ***

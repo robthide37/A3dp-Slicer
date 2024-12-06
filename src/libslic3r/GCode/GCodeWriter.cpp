@@ -770,6 +770,7 @@ std::string GCodeWriter::extrude_arc_to_xy(const Vec2d& point, const Vec2d& cent
     m_pos.y()             = point.y();
     auto [/*double*/ delta_e, /*double*/ e_to_write]  = this->m_tool->extrude(dE + this->m_de_left);
     //note: delta_e is the quantized delta.
+    //note: delta_e is the quantized delta.
     bool is_extrude  = std::abs(delta_e) > 0.00000001;
 
     GCodeG2G3Formatter w(this->m_config.gcode_precision_xyz.value, this->m_config.gcode_precision_e.value, is_ccw);

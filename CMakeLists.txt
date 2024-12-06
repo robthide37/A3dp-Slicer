@@ -648,6 +648,16 @@ function(prusaslicer_copy_dlls target)
         COMMENT "Copy mpfr runtime to build tree"
         VERBATIM)
 
+        add_custom_command(TARGET ${target} POST_BUILD 
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/WebView2/lib/win${_bits}/WebView2Loader.dll ${_out_dir}
+        COMMENT "Copy mpfr runtime to build tree"
+        VERBATIM)
+
+     set(${output_dlls}
+     ${_out_dir}/WebView2Loader.dll
+     PARENT_SCOPE
+     )
+
 endfunction()
 
 
@@ -729,4 +739,3 @@ if (NOT WIN32)
 endif()
 
 include(CPack)
-

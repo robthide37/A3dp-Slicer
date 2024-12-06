@@ -968,6 +968,9 @@ struct OpenPolyline {
 // Only connects segments crossing triangles of the same orientation.
 static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polygons &loops, std::vector<OpenPolyline> &open_polylines)
 {
+    for(auto &loop : loops)
+        assert(!loop.points.front().coincides_with(loop.points.back()));
+
     // Build a map of lines by edge_a_id and a_id.
     std::vector<IntersectionLine*> by_edge_a_id;
     std::vector<IntersectionLine*> by_a_id;

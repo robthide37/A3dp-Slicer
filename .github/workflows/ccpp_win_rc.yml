@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rc
+      - robthide37-patch-4
 
 jobs:
   build_dep:

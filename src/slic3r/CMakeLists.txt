@@ -71,7 +71,9 @@ set(SLIC3R_GUI_SOURCES
     GUI/OpenGLManager.hpp
     GUI/OpenGLManager.cpp
     GUI/Selection.hpp
-    GUI/Selection.cpp    
+    GUI/Selection.cpp
+    GUI/PrinterWebView.hpp
+GUI/PrinterWebView.cpp
     GUI/Gizmos/GLGizmosManager.cpp
     GUI/Gizmos/GLGizmosManager.hpp
     GUI/Gizmos/GLGizmosCommon.cpp
@@ -358,6 +360,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/UndoRedo.hpp
     Utils/HexFile.cpp
     Utils/HexFile.hpp
+    GUI/A3DPWebView.cpp
+    GUI/A3DPWebView.hpp
     Utils/TCPConsole.cpp
     Utils/TCPConsole.hpp
     Utils/MKS.cpp
@@ -400,6 +404,10 @@ endif ()
 
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
 target_compile_definitions(libslic3r_gui PRIVATE $<$<BOOL:${SLIC3R_ALPHA}>:SLIC3R_ALPHA>)
+
+if (WIN32)
+    target_include_directories(libslic3r_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/WebView2/include)
+endif()
 
 foreach(_source IN ITEMS ${SLIC3R_GUI_SOURCES})
     get_filename_component(_source_path "${_source}" PATH)
