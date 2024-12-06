@@ -69,9 +69,12 @@ endif()
 # Link wxWidgets libraries
 target_link_libraries(Slic3r ${wxWidgets_LIBRARIES})
 
+# Add custom commands for the Slic3r target
+add_custom_command(TARGET Slic3r POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Custom command for Slic3r"
+)
+
 # Continue with the rest of your CMakeLists.txt file
-
-
 
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
 CMAKE_DEPENDENT_OPTION(SLIC3R_DESKTOP_INTEGRATION "Allow perfoming desktop integration during runtime" 1 "NOT SLIC3R_FHS" 0)
