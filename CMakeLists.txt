@@ -53,19 +53,24 @@ else()
     set(SLIC3R_GTK "3" CACHE STRING "GTK version to use with wxWidgets on Linux")
 endif()
 
-# Define the Slic3r target
-add_executable(Slic3r main.cpp)
-
 # Add this line to find wxWidgets with webview support
 find_package(wxWidgets REQUIRED COMPONENTS core base net webview)
 
 # Add this line to include wxWidgets in your project
 include(${wxWidgets_USE_FILE})
 
+# Define the Slic3r target conditionally based on platform
+if (WIN32)
+    add_executable(Slic3r WIN32 main.cpp)
+else()
+    add_executable(Slic3r main.cpp)
+endif()
+
 # Link wxWidgets libraries
 target_link_libraries(Slic3r ${wxWidgets_LIBRARIES})
 
 # Continue with the rest of your CMakeLists.txt file
+
 
 
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
