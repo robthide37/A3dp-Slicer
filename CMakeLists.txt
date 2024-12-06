@@ -46,6 +46,13 @@ option(SLIC3R_ASAN "Enable ASan on Clang and GCC" 0)
 option(SLIC3R_UBSAN "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" ON)
 
+# Set GTK version based on platform
+if (WIN32)
+    set(SLIC3R_GTK "2" CACHE STRING "GTK version to use with wxWidgets on Windows")
+else()
+    set(SLIC3R_GTK "3" CACHE STRING "GTK version to use with wxWidgets on Linux")
+endif()
+
 # Define the Slic3r target
 add_executable(Slic3r main.cpp)
 
@@ -59,6 +66,7 @@ include(${wxWidgets_USE_FILE})
 target_link_libraries(Slic3r ${wxWidgets_LIBRARIES})
 
 # Continue with the rest of your CMakeLists.txt file
+
 
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
 CMAKE_DEPENDENT_OPTION(SLIC3R_DESKTOP_INTEGRATION "Allow perfoming desktop integration during runtime" 1 "NOT SLIC3R_FHS" 0)
