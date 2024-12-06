@@ -115,7 +115,7 @@ void WebViewPanel::load_url(wxString &url)
     if (m_webView == nullptr)
         return;
 
-    m_webView->LoadURL("https://www.google.com");
+    m_webView->LoadURL(url);
 
     if (url.IsEmpty()) {
         std::cout << "URL is empty";
