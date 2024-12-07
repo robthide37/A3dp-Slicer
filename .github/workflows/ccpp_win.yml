@@ -7,6 +7,7 @@ on:
       - nightly_dev
       - nightly_master
       - supermerill-Main
+      - 2.7.61
 
 jobs:
   build_dep:
