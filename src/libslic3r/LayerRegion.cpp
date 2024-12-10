@@ -567,6 +567,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
             srf.surface_type == (stPosInternal | stDensSparse) ||
             //srf.surface_type == (stPosInternal | stDensSolid | stModBridge) || // not created yet
             //srf.surface_type == (stPosInternal | stDensSparse | stModBridge) || // not created yet
+
             srf.surface_type == (stPosInternal | stDensVoid) ||
             srf.surface_type == (stPosTop | stDensSolid) ||
             srf.surface_type == (stPosBottom | stDensSolid) ||
@@ -620,6 +621,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         stPosBottom | stDensSolid,
         stPosTop | stDensSolid,
         stPosInternal | stDensSparse,
+
         //stPosInternal | stDensSparse | stModBridge, // not yet created
         stPosInternal | stDensSolid });
 #ifdef _DEBUG
@@ -658,6 +660,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
                 for (auto &expoly : intersect) {
                     area += expoly.area();
                 }
+
                 // assert(area < SCALED_EPSILON * SCALED_EPSILON /** 100*/);
                 assert(area < scale_t(1) * scale_t(1));
             }

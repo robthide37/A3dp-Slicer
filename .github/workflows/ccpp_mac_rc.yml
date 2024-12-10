@@ -7,8 +7,7 @@ on:
 
 jobs:
   build_dep:
-    runs-on: macos-13
-
+    runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
     - name: mkdir in deps
@@ -33,7 +32,7 @@ jobs:
       run: ./BuildMacOS.sh -d
 
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
     needs: build_dep
 
     steps:
@@ -47,17 +46,17 @@ jobs:
     - name: build slicer
       run: ./BuildMacOS.sh -si
     - name: Upload dmg
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: rc_${{ github.event.repository.name }}-macOS.dmg
         path: build/${{ github.event.repository.name }}-macOS-intel.dmg
     - name: Upload tar
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: rc_${{ github.event.repository.name }}-macOS.tgz
         path: build/${{ github.event.repository.name }}-macOS-intel.tgz
     - name: Upload app
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: rc_${{ github.event.repository.name }}-macOS.app
         path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app

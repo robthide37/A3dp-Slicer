@@ -808,6 +808,7 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, const double dE, con
     if (!has_x_y) {
         w.clear();
     }
+
     bool has_z = w.emit_z(point.z() + this->m_config.z_offset.value, m_pos_str_z);
     if (!has_z) {
         if (!has_x_y) {
@@ -820,6 +821,7 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, const double dE, con
         } else {
             w.clear();
             // re-write x & y. the m_pos_str_x & m_pos_str_y must stay the same, the return boolan must be 'false'
+
             w.emit_xy(Vec2d(point.x(), point.y()), m_pos_str_x, m_pos_str_y);
         }
     }

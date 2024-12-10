@@ -110,7 +110,6 @@ public:
     bool intersection(const Line& line, Point* intersection) const;
     bool first_intersection(const Line& line, Point* intersection) const;
     bool intersections(const Line &line, Points *intersections) const;
-
     // Considering CCW orientation of this polygon
     // (it means that a ccw (contour) is mostly convex, while a cw (hole) is mostly concave),
     // find all convex resp. concave points

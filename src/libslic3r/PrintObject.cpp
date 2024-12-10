@@ -510,7 +510,6 @@ void PrintObject::prepare_infill()
             }
         }
     }
-#endif
     
     if (ensure_vertical_shell_thickness == EnsureVerticalShellThickness::Partial || ensure_vertical_shell_thickness == EnsureVerticalShellThickness::Enabled) {
         // this will detect bridges and reverse bridges
@@ -557,7 +556,6 @@ void PrintObject::prepare_infill()
                 }
             }
         }
-#endif
     }
 
     // Debugging output.
