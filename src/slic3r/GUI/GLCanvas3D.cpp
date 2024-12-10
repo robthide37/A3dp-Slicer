@@ -48,6 +48,7 @@
 #include "slic3r/GUI/BitmapCache.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 
 #if ENABLE_RETINA_GL
 #include "slic3r/Utils/RetinaHelper.hpp"
@@ -125,6 +126,8 @@ void GLCanvas3D::select_bed(int i, bool triggered_by_user)
     wxGetApp().plater()->canvas3D()->m_process->stop();
     m_sequential_print_clearance.m_evaluating = true;
     reset_sequential_print_clearance();
+
+    post_event(Event<bool>(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, is_sliceable(s_print_statuses[i])));
 
     // The stop call above schedules some events that would be processed after the switch.
     // Among else, on_process_completed would be called, which would stop slicing of
@@ -1776,8 +1779,9 @@ bool GLCanvas3D::check_volumes_outside_state(GLVolumeCollection& volumes, ModelI
             if (volume->printable) {
                 if (overall_state == ModelInstancePVS_Inside && volume->is_outside)
                     overall_state = ModelInstancePVS_Fully_Outside;
-                if (overall_state == ModelInstancePVS_Fully_Outside && volume->is_outside && state == BuildVolume::ObjectState::Colliding)
+                if (overall_state == ModelInstancePVS_Fully_Outside && volume->is_outside && state == BuildVolume::ObjectState::Colliding) {
                     overall_state = ModelInstancePVS_Partly_Outside;
+                }
                 contained_min_one |= !volume->is_outside;
 
                 if (bed_idx != -1 && bed_idx == s_multiple_beds.get_number_of_beds())
@@ -2184,7 +2188,7 @@ float project_overview_table(float scale) {
 
         }
 
-        ImGui::PushStyleColor(ImGuiCol_Text, COL_TURQUOISE_LIGHT);
+        ImGui::PushStyleColor(ImGuiCol_Text, COL_ORANGE_LIGHT);
 
         const StatisticsSum statistics_sum{get_statistics_sum()};
         ImGui::TableNextRow();
@@ -2276,7 +2280,7 @@ void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, cons
             ImGui::Text("%s", wxString::Format("%.2f", statistics.filament_length).ToStdString().c_str());
         }
 
-       ImGui::PushStyleColor(ImGuiCol_Text, COL_TURQUOISE_LIGHT);
+       ImGui::PushStyleColor(ImGuiCol_Text, COL_ORANGE_LIGHT);
 
         const ExtruderStatistics extruder_statistics_sum{sum_extruder_statistics(extruder_statistics)};
         ImGui::TableNextRow();
@@ -2475,22 +2479,20 @@ void GLCanvas3D::render()
         if (m_picking_enabled && m_rectangle_selection.is_dragging())
             m_rectangle_selection.render(*this);
     } else {
-        const auto &prints{
-            tcb::span{wxGetApp().plater()->get_fff_prints()}
-            .subspan(0, s_multiple_beds.get_number_of_beds())
-        };
+        const auto &prints{wxGetApp().plater()->get_fff_prints()};
 
-        const bool all_finished{std::all_of(
-            prints.begin(),
-            prints.end(),
-            [](const std::unique_ptr<Print> &print){
-                return print->finished() || print->empty();
+        bool all_finished{true};
+        for (std::size_t bed_index{}; bed_index < s_multiple_beds.get_number_of_beds(); ++bed_index) {
+            const std::unique_ptr<Print> &print{prints[bed_index]};
+            if (!print->finished() && is_sliceable(s_print_statuses[bed_index])) {
+                all_finished = false;
+                break;
             }
-        )};
+        }
 
         if (!all_finished) {
             render_autoslicing_wait();
-            if (fff_print()->finished() || fff_print()->empty()) {
+            if (fff_print()->finished() || !is_sliceable(s_print_statuses[s_multiple_beds.get_active_bed()])) {
                 s_multiple_beds.autoslice_next_bed();
                 wxYield();
             } else {
@@ -3183,7 +3185,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     // checks for geometry outside the print volume to render it accordingly
     if (!m_volumes.empty()) {
         ModelInstanceEPrintVolumeState state;
-        const bool contained_min_one = check_volumes_outside_state(m_volumes, &state, !force_full_scene_refresh);
+        check_volumes_outside_state(m_volumes, &state, !force_full_scene_refresh);
         const bool partlyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Partly_Outside);
         const bool fullyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Fully_Outside);
 
@@ -3206,15 +3208,11 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 _set_warning_notification(EWarning::SlaSupportsOutside, false);
             }
         }
-
-        post_event(Event<bool>(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, 
-                               contained_min_one && !m_model->objects.empty() && !partlyOut));
     }
     else {
         _set_warning_notification(EWarning::ObjectOutside, false);
         _set_warning_notification(EWarning::ObjectClashed, false);
         _set_warning_notification(EWarning::SlaSupportsOutside, false);
-        post_event(Event<bool>(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, false));
     }
 
     refresh_camera_scene_box();
@@ -7057,21 +7055,15 @@ void GLCanvas3D::_render_overlays()
 
 #define use_scrolling 1
 
-enum class PrintStatus {
-    idle,
-    running,
-    finished,
-    outside,
-    invalid,
-    empty,
-    toolpath_outside
-};
-
 std::string get_status_text(PrintStatus status) {
     switch(status) {
         case PrintStatus::idle: return _u8L("Unsliced");
         case PrintStatus::running: return _u8L("Slicing...");
         case PrintStatus::finished: return _u8L("Sliced");
+        case PrintStatus::outside: return _u8L("Outside");
+        case PrintStatus::invalid: return _u8L("Invalid");
+        case PrintStatus::empty: return _u8L("Empty");
+        case PrintStatus::toolpath_outside: return _u8L("Toolpath exceeds bounds");
     }
     return {};
 }
@@ -7133,8 +7125,8 @@ bool bed_selector_thumbnail(
 bool slice_all_beds_button(bool is_active, const ImVec2 size, const ImVec2 padding) 
 {
     ImGui::PushStyleColor(ImGuiCol_Button, COL_GREY_DARK);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, COL_TURQUOISE_DARK);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, COL_TURQUOISE_DARK);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, COL_ORANGE_DARK);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, COL_ORANGE_DARK);
     ImGui::PushStyleColor(ImGuiCol_Border, is_active ? COL_BUTTON_ACTIVE : COL_GREY_DARK);
 
     std::string slice_all_btn_name = boost::nowide::narrow(std::wstring{ ImGui::SliceAllBtnIcon });
@@ -7169,39 +7161,41 @@ void GLCanvas3D::_render_bed_selector() {
 
         auto render_bed_button = [btn_side, btn_border, btn_size, btn_padding, this, &extra_frame, scale](int i)
         {
-            bool empty = ! s_multiple_beds.is_bed_occupied(i);
+
             bool inactive = i != s_multiple_beds.get_active_bed() || s_multiple_beds.is_autoslicing();
 
             ImGui::PushStyleColor(ImGuiCol_Button, COL_GREY_DARK);
             ImGui::PushStyleColor(ImGuiCol_Border, inactive ? COL_GREY_DARK : COL_BUTTON_ACTIVE);
 
-            if (empty)
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-
-            bool clicked = false;
-
-            std::optional<PrintStatus> print_status;
+            PrintStatus print_status { s_print_statuses[i] };
+            
             if (current_printer_technology() == ptFFF) {
-                print_status = PrintStatus::idle;
-                if (wxGetApp().plater()->get_fff_prints()[i]->finished()) {
-                    print_status = PrintStatus::finished;
-                } else if (m_process->fff_print() == wxGetApp().plater()->get_fff_prints()[i].get() && m_process->running()) {
-                    print_status = PrintStatus::running;
+                if (!previous_print_status[i] || print_status != previous_print_status[i]) {
+                    extra_frame = true;
                 }
-            }
-
-            if (!previous_print_status[i] || print_status != previous_print_status[i]) {
-                extra_frame = true;
-            }
             previous_print_status[i] = print_status;
+        }
 
             if (s_bed_selector_thumbnail_changed[i]) {
                 extra_frame = true;
                 s_bed_selector_thumbnail_changed[i] = false;
             }
 
-            if (i >= int(s_bed_selector_thumbnail_texture_ids.size()) || empty) {
-                clicked = ImGui::Button(empty ? "empty" : std::to_string(i + 1).c_str(), btn_size + btn_padding);
+            if (!is_sliceable(print_status)) {
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            }
+
+            bool clicked = false;
+            if (!is_sliceable(print_status)) {
+                ImGui::Button(get_status_text(print_status).c_str(), btn_size + btn_padding);
+            } else if (
+                i >= int(s_bed_selector_thumbnail_texture_ids.size())
+            ) {
+                clicked = ImGui::Button(
+                    std::to_string(i + 1).c_str(), btn_size + btn_padding
+                );
+
+
             } else {
                 clicked = bed_selector_thumbnail(
                     btn_size,
@@ -7210,19 +7204,21 @@ void GLCanvas3D::_render_bed_selector() {
                     btn_border,
                     scale,
                     s_bed_selector_thumbnail_texture_ids[i],
-                    print_status
+                    current_printer_technology() == ptFFF ? std::optional{print_status} : std::nullopt
+
                 );
             }
 
-            if (clicked && ! empty)
+            if (clicked && is_sliceable(print_status))
                 select_bed(i, true);
 
             ImGui::PopStyleColor(2);
-            if (empty)
+            if (!is_sliceable(print_status)) {
                 ImGui::PopItemFlag();
+            }
 
-            if (print_status) {
-                const std::string status_text{get_status_text(*print_status)};
+            if (current_printer_technology() == ptFFF) {
+                const std::string status_text{get_status_text(print_status)};
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("%s", status_text.c_str());
                 }
