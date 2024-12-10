@@ -2311,7 +2311,7 @@ void GUI_App::calibration_pressureadv_dialog()
 }
 void GUI_App::freecad_script_dialog()
 {
-    change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
+    change_calibration_dialog(nullptr, new Slic3r::GUI::FreeCADDialog(this, mainframe));
 }
 void GUI_App::tiled_canvas_dialog()
 {

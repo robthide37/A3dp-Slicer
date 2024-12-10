@@ -61,7 +61,7 @@ endif()
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
             endif ()
-    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla webview)
+    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl webview stc scintilla)
 
     include(${wxWidgets_USE_FILE})
 

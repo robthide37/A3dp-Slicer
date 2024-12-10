@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - rc
-      - robthide37-patch-4
+      - merge1
 
 jobs:
   build_dep:
@@ -15,14 +15,8 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
     - name: mkdir in deps
       run: mkdir deps/build
-    - name: dep cache
-      id: cache-action
-      uses: actions/cache@v3
-      with:
-        key: win_2.7
-        path: deps/build/destdir
-    - if: steps.cache-action.outputs.cache-hit != 'true'
-      name: build deps if new cache
+
+    - name: build deps if new cache
       working-directory: ./deps/build
       run: |
         cmake .. -G "Visual Studio 16 2019" -A x64

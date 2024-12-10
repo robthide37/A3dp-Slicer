@@ -74,7 +74,7 @@ if (SLIC3R_STATIC)
 endif ()
 
 # Dependency build management
-option(${PROJECT_NAME}_BUILD_DEPS "Build dependencies before the project" OFF)
+option(${PROJECT_NAME}_BUILD_DEPS "Build dependencies before the project" ON)
 option(${PROJECT_NAME}_DEPS_OUTPUT_QUIET "Don't print build output for dependencies" OFF)
 set(${PROJECT_NAME}_DEPS_PRESET "default" CACHE STRING "Preset of the dependencies when ${PROJECT_NAME}_BUILD_DEPS is ON")
 set(${PROJECT_NAME}_DEPS_BUILD_DIR "" CACHE PATH "Binary dir of the dependencies build when ${PROJECT_NAME}_BUILD_DEPS is ON")
