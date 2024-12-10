@@ -3501,6 +3501,16 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(disable_defaultoption(new ConfigOptionInts({ 100 })));
     def->aliases = { "bridge_internal_fan_speed" };
 
+    def = this->add("internal_bridge_min_width", coFloatOrPercent);
+    def->label = L("Internal bridge infill threshold width");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Minimum width for the solid infill to convert into an internal bridge infill."
+                    "\nCan be a % of the current solid infill spacing.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(300, true));
+
     def = this->add("internal_bridge_speed", coFloatOrPercent);
     def->label = L("Internal bridges");
     def->full_label = L("Internal bridge speed");
@@ -5664,7 +5674,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::infill;
     def->tooltip = L("Force solid infill for parts of regions having a smaller width than the specified threshold."
                     "\nCan be a % of the current solid infill spacing."
-                    "\nSet 0 to disable");
+                    "\nSet 0 to disable.");
     def->sidetext = L("mm or %");
     def->min = 0;
     def->mode = comExpert | comSuSi;
@@ -9821,6 +9831,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "internal_bridge_acceleration",
 "internal_bridge_expansion",
 "internal_bridge_fan_speed",
+"internal_bridge_min_width",
 "internal_bridge_speed",
 "ironing_acceleration",
 "ironing_angle",
