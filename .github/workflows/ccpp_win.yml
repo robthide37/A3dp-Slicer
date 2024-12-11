@@ -5,7 +5,7 @@ on:
     branches:
       - rc
       - robthide37-patch-5
-      - supermerill-Main
+      - A3dp-main
 
 jobs:
   build_dep:
