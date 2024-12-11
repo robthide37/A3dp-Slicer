@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - #rc
-      - #supermerill-Main
+      - A3dp-main
 
 jobs:
   build:
