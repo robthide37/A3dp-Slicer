@@ -2419,6 +2419,7 @@ public:
     bool                            has_values() const { return ! m_values.empty(); }
     bool                            has_labels() const { return ! m_labels.empty(); }
     const std::vector<std::string>& values() const { return m_values; }
+    // idx is a value of an index in the combobox in the gui, not an enum value. Use enum_to_index before.
     const std::string&              value(int idx) const { return m_values[idx]; }
     // Used for open enums (gui_type is set to GUIType::i_enum_open" resp. GUIType::f_enum_open).
     // If values not defined, use labels.
@@ -2438,7 +2439,8 @@ public:
     // Such a mapping may fail, thus an optional is returned.
     std::optional<int> enum_to_index(int enum_val) const;
 
-    // Look up an index of value / label of this combo box based on value string. 
+    // Look up an index of value / label of this combo box based on value string.
+    // strval = value(idx) <=> idx = value_to_index(strval)
     std::optional<int> value_to_index(const std::string &value) const;
 
     // Look up an index of label of this combo box. Used for open enums.
