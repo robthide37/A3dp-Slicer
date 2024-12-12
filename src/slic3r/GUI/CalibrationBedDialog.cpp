@@ -36,6 +36,8 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
     Model& model = plat->model();
     if (!plat->new_project(L("First layer calibration")))
         return;
+    // wait for slicing end if needed
+    wxGetApp().Yield();
 
     //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
@@ -100,7 +102,9 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
         (bed_size.x() > offsetx * 2 + 10 * xyScale && bed_size.y() > offsety * 2 + 10 * xyScale);
     if (!large_enough){
         //problem : too small, use arrange instead and let the user place them.
-        plat->arrange();
+        Worker &ui_job_worker = plat->get_ui_job_worker();
+        plat->arrange(ui_job_worker, false);
+        ui_job_worker.wait_for_current_job(20000);
         //TODO add message
     } else {
         model.objects[objs_idx[0]]->translate({ bed_min.x() + offsetx,               bed_min.y() + bed_size.y() - offsety, 1 * zscale });

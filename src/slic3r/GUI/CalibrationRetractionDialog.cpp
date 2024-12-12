@@ -103,6 +103,8 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
     Model& model = plat->model();
     if (!plat->new_project(L("Retraction calibration")))
         return;
+    // wait for slicing end if needed
+    wxGetApp().Yield();
 
     //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
@@ -283,12 +285,9 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        plat->arrange();
-        // std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        // ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        // arranger.prepare_all();
-        // arranger.process();
-        // arranger.finalize();
+        Worker &ui_job_worker = plat->get_ui_job_worker();
+        plat->arrange(ui_job_worker, false);
+        ui_job_worker.wait_for_current_job(20000);
     }
 
     plat->reslice();

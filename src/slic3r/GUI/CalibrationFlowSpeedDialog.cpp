@@ -13,6 +13,7 @@
 #include <wx/display.h>
 #include <wx/file.h>
 #include "wxExtensions.hpp"
+#include "MsgDialog.hpp"
 
 #include <string>
 
@@ -302,6 +303,8 @@ void CalibrationFlowSpeedDialog::create_geometry(
     Model& model = plat->model();
     if (!plat->new_project(L("Flow calibration")))
         return;
+    // wait for slicing end if needed
+    wxGetApp().Yield();
 
     //GLCanvas3D::set_warning_freeze(true);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
@@ -360,7 +363,7 @@ void CalibrationFlowSpeedDialog::create_geometry(
     // same for filament config
     DynamicPrintConfig new_filament_config = *filament_config; //make a copy
     new_filament_config.option<ConfigOptionFloats>("slowdown_below_layer_time")->set_at(0, 0);
-
+    
     /// --- custom config ---
     float layer_height = print_config->option("layer_height")->get_float();
     layer_height = std::max(layer_height, float(print_config->get_computed_value("first_layer_height", 0)));
@@ -436,15 +439,17 @@ void CalibrationFlowSpeedDialog::create_geometry(
     //update everything, easier to code.
     ObjectList* obj = this->gui_app->obj_list();
     obj->update_after_undo_redo();
-
+    
     // arrange if needed, after new settings, to take them into account
     if (true) { //has_to_arrange) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        plat->arrange();
+        Worker &ui_job_worker = plat->get_ui_job_worker();
+        plat->arrange(ui_job_worker, false);
+        ui_job_worker.wait_for_current_job(20000);
     }
-
+    
     plat->reslice();
 
     if (autocenter) {

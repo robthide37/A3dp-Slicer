@@ -59,6 +59,8 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     Model& model = plat->model();
     if (!plat->new_project(L("Temperature calibration")))
         return;
+    // wait for slicing end if needed
+    wxGetApp().Yield();
 
     //GLCanvas3D::set_warning_freeze(true);
     std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{
