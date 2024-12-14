@@ -756,7 +756,7 @@ void DevicePresetComboBox::switch_to_tab()
             wxGetApp().mainframe->select_tab(MainFrame::ETabType::Plater3D, true);
 
         else if (m_type == Preset::Type::TYPE_PRINTER)
-            wxGetApp().mainframe->select_tab(MainFrame::ETabType::PrintSettings, true);
+            wxGetApp().mainframe->select_tab(MainFrame::ETabType::Device, true);
 
         else
             wxGetApp().mainframe->select_tab(MainFrame::ETabType::LastSettings, false);
