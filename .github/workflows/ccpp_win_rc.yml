@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rc
+      - debug_win
 
 jobs:
   build_dep:
@@ -89,7 +90,7 @@ jobs:
     - name: copy from release
       working-directory: ./build
       shell: powershell
-      run: '(new-object System.Net.WebClient).DownloadFile("https://github.com/supermerill/SuperSlicer_deps/releases/download/1.75/Slic3r_win_build.zip", "Slic3r_win_build.zip")'
+      run: '(new-object System.Net.WebClient).DownloadFile("https://github.com/supermerill/SuperSlicer_deps/releases/download/1.8/Slic3r_win_build.zip", "Slic3r_win_build.zip")'
     - name: unzip
       working-directory: ./build
       shell: cmd
