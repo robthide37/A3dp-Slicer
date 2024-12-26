@@ -18,6 +18,8 @@ build*
 build-linux/*
 deps/build*
 deps/build-linux/*
+deps/usr/local
+deps/usr/local/bin
 
 # MacOS Ignores
 .DS_Store
