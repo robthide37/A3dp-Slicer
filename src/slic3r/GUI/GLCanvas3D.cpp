@@ -7197,7 +7197,9 @@ bool button_with_icon(const wchar_t icon, const std::string& tooltip, bool is_ac
     bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, flags);
 
     // Render
-    const ImU32 col = ImGui::GetColorU32((held && hovered) ? COL_TURQUOISE_DARK : hovered ? COL_TURQUOISE_DARK : COL_GREY_DARK);
+    const ImU32 col = ImGui::GetColorU32((held && hovered) ? COL_ORANGE_DARK :
+                                             hovered       ? COL_ORANGE_DARK :
+                                                             COL_GREY_DARK);
     ImGui::RenderNavHighlight(bb, id);
     ImGui::PushStyleColor(ImGuiCol_Border, is_active ? COL_BUTTON_ACTIVE : COL_GREY_DARK);
     ImGui::RenderFrame(bb.Min, bb.Max, col, true, style.FrameRounding);
