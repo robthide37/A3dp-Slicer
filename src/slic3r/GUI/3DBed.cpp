@@ -477,7 +477,7 @@ void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, co
 {
     if (!bottom) {
         render_model(view_matrix, projection_matrix);
-
+    }
     if (show_texture)
         render_texture(bottom, canvas, view_matrix, projection_matrix, is_active);
     else if (bottom)
