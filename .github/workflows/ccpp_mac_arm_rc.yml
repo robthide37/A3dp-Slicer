@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - rc
-      - A3dp-main
+      - multiple-beds-prusa
 jobs:
   build_dep:
     runs-on: macos-14
