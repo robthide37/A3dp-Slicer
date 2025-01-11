@@ -5260,7 +5260,8 @@ std::string GCodeGenerator::extrude_multi_path3D(const ExtrusionMultiPath3D &mul
         // reverse to get a shorter point (hopefully there is still no feature that choose a point that need no perimeter crossing before).
         // extrude along the  reversedpath
         for (size_t idx_path = multipath3D.paths.size() - 1; idx_path < multipath3D.paths.size(); --idx_path) {
-            assert(multipath3D.paths[idx_path].can_reverse());
+            //childs of multipath can't reverse themseves. the one that can decide to reverse is the multipath.
+            assert(!multipath3D.paths[idx_path].can_reverse());
             // extrude_path will reverse the path by itself, no need to copy it do to it here.
             gcode += extrude_path_3D(multipath3D.paths[idx_path], description, speed);
         }
@@ -5423,7 +5424,9 @@ std::string GCodeGenerator::extrude_path_3D(const ExtrusionPath3D &path, const s
     //path.simplify(SCALED_RESOLUTION);
     ExtrusionPath3D simplifed_path = path;
     if (this->visitor_flipped) {
-        assert(path.can_reverse());
+        // in a multipath, the multipath can be reversed, but all individual path are marqued as 'unreversable', even if they can be reversed by the multipath.
+        // hence, it's possible to have a !can_reverse and a visitor_flipped from the multipath.
+        //assert(path.can_reverse());
         simplifed_path.reverse();
     }
 
@@ -5453,6 +5456,11 @@ std::string GCodeGenerator::extrude_path_3D(const ExtrusionPath3D &path, const s
         }
     }
     gcode += this->_after_extrude(simplifed_path);
+    // ensure z is reset
+    if (!is_approx(m_writer.get_position().z(), m_layer->print_z, EPSILON)) {
+        assert(m_writer.get_position().z() > m_layer->print_z);
+        m_writer.set_lift(m_writer.get_position().z() - m_layer->print_z);
+    }
 
     if (m_wipe.is_enabled()) {
         ArcPolyline temp = simplifed_path.as_polyline();
