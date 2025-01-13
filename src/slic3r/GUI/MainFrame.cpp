@@ -1384,7 +1384,7 @@ void MainFrame::show_printer_webview_tab(DynamicPrintConfig *dpc, bool uploaded)
         add_printer_webview_tab(url);
 
         if (m_tabpanel->GetCurrentPage() == m_webViewPanel) 
-            select_tab(ETabType::Device, true);
+            select_tab(ETabType::PrintSettings, true);
         
     } else {
         this->m_webViewPanel->Hide();
@@ -1393,9 +1393,6 @@ void MainFrame::show_printer_webview_tab(DynamicPrintConfig *dpc, bool uploaded)
         remove_printer_webview_tab();
     }
 }
-
-
-
 
 #ifdef WIN32
 void MainFrame::register_win32_callbacks()
@@ -2683,7 +2680,7 @@ MainFrame::ETabType MainFrame::selected_tab() const
 
 void MainFrame::select_tab(ETabType tab /* = Any*/, bool keep_tab_type)
 {
-    bool tabpanel_was_hidden = false;
+   bool tabpanel_was_hidden = false;
 
     //failsafe
     if (!wxGetApp().is_editor()) {
