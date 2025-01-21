@@ -5191,19 +5191,15 @@ std::string GCodeGenerator::extrude_multi_path(const ExtrusionMultiPath &multipa
 
     bool saved_flipped = this->visitor_flipped;
     if (should_reverse) {
-        this->visitor_flipped = true;
         //reverse to get a shorter point (hopefully there is still no feature that choose a point that need no perimeter crossing before).
+
+        // it's possible to have un-reverseable paths into a reversable multipath: this means that only the whole thing can be reversed, and not individual paths.
+        // but it's not possible to reverse individual paths inside a multipath anyway.
+        this->visitor_flipped = true;
         // extrude along the  reversedpath
         for (size_t idx_path = multipath.paths.size() - 1; idx_path < multipath.paths.size(); --idx_path) {
-            //it's possible to have un-reverseable paths into a reversable multipath: this means that only the whole thing can be reversed, and not individual apths.
-            if (multipath.paths[idx_path].can_reverse()) {
-                // extrude_path will reverse the path by itself, no need to copy it do to it here.
-                gcode += extrude_path(multipath.paths[idx_path], description, speed);
-            } else {
-                ExtrusionPath path = multipath.paths[idx_path];
-                path.reverse();
-                gcode += extrude_path(path, description, speed);
-            }
+            // extrude_path will reverse the path by itself, no need to copy it do to it here.
+            gcode += extrude_path(multipath.paths[idx_path], description, speed);
         }
         add_wipe_points(multipath.paths, false, false);
     } else {
@@ -5323,6 +5319,7 @@ std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, const std::s
     ExtrusionPath simplifed_path = path;
     for (int i = 1; i < simplifed_path.polyline.size(); ++i)
         assert(!simplifed_path.polyline.get_point(i - 1).coincides_with_epsilon(simplifed_path.polyline.get_point(i)));
+    
     if (this->visitor_flipped) {
         // in a multipath, the multipath can be reversed, but all individual path are marqued as 'unreversable', even if they can be reversed by the multipath.
         // hence, it's possible to have a !can_reverse and a visitor_flipped from the multipath.
