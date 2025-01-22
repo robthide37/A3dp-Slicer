@@ -1942,7 +1942,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                     m_wipe_tower = std::make_unique<GCode::WipeTowerIntegration>(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get());
 
                     // Set position for wipe tower generation.
-                    file.write(this->writer().travel_to_z(first_layer_height, "Move to first z, for wipe tower"));
+                    preamble_to_put_start_layer.append(this->writer().travel_to_z(first_layer_height, "Move to first z, for wipe tower"));
                     m_last_layer_z = first_layer_height;
                     m_max_layer_z = std::max(m_max_layer_z, this->writer().get_unlifted_position().z());
 
