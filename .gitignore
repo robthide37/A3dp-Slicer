@@ -21,7 +21,9 @@ deps/build-linux/*
 **/.idea/
 .pkg_cache
 CMakeUserPresets.json
-
+deps/build*
+deps/deps-*
+deps/usr/*
 # MacOS Ignores
 .DS_Store
 
