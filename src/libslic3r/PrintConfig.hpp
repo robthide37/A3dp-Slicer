@@ -360,7 +360,7 @@ public:
     static bool is_defined(t_config_option_key& opt_key);
     static std::map<std::string, std::string> to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
     static std::map<std::string, std::string> from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
-    static void handle_legacy_composite(DynamicPrintConfig &config, std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted);
+    static void handle_legacy_composite(DynamicPrintConfig &config, std::map<t_config_option_key, std::string> &opt_deleted);
 
     // Array options growing with the number of extruders
     const std::vector<std::string>& extruder_option_keys() const { return m_extruder_option_keys; }
@@ -469,7 +469,7 @@ public:
     // Called after a config is loaded as a whole.
     // Perform composite conversions, for example merging multiple keys into one key.
     // For conversion of single options, the handle_legacy() method above is called.
-    void                handle_legacy_composite(std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted) override
+    void                handle_legacy_composite(std::map<t_config_option_key, std::string> &opt_deleted) override
         { PrintConfigDef::handle_legacy_composite(*this, opt_deleted); }
     void                to_prusa(t_config_option_key& opt_key, std::string& value) const override
         { PrintConfigDef::to_prusa(opt_key, value, *this); }
@@ -953,6 +953,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                 infill_first))
     ((ConfigOptionFloatOrPercent,       internal_bridge_acceleration))
     ((ConfigOptionBool,                 internal_bridge_expansion))
+    ((ConfigOptionFloatOrPercent,       internal_bridge_min_width))
     ((ConfigOptionFloatOrPercent,       internal_bridge_speed))
     // Ironing options
     ((ConfigOptionBool,                 ironing))
@@ -1003,7 +1004,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                print_retract_length))
     ((ConfigOptionFloat,                print_retract_lift))
     ((ConfigOptionString,               region_gcode))
-    ((ConfigOptionBool,                 small_area_infill_flow_compensation))
     ((ConfigOptionGraph,                small_area_infill_flow_compensation_model))
     ((ConfigOptionFloatOrPercent,       small_perimeter_speed))
     ((ConfigOptionFloatOrPercent,       small_perimeter_min_length))
@@ -1941,9 +1941,9 @@ public:
 
 
     // utilities to help convert from prusa config.
-    // if with_phony, then the phony settigns will be set to phony if needed.
+    // if with_phony, then the phony settings will be set to phony if needed.
     void convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony);
-    void handle_legacy_composite(std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted)
+    void handle_legacy_composite(std::map<t_config_option_key, std::string> &opt_deleted)
         { PrintConfigDef::handle_legacy_composite(m_data, opt_deleted); }
 
 private:

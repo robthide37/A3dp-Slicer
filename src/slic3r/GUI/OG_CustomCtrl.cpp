@@ -187,7 +187,10 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
                 option_set.front().side_widget == nullptr && line.get_extra_widgets().size() == 0)
             {
                 Field* field = opt_group->get_field(option_set.front().opt_id);
-                h_pos += (field->has_enable_ui() ? 3 : 2) * blinking_button_width;
+                int width_units = 2;
+                width_units += (field->has_enable_ui() ? 1 : 0);
+                width_units += (option_set.front().opt.can_be_disabled ? 1 : 0);
+                h_pos += width_units * blinking_button_width;
                 correct_line_height(ctrl_line.height, field->getWindow());
                 //correct_horiz_pos(h_pos, field); //TODO test
                 break;
@@ -322,7 +325,7 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
 
     wxString language = wxGetApp().app_config->get("translation_language");
 
-    const bool suppress_hyperlinks = get_app_config()->get_bool("suppress_hyperlinks");
+    const bool suppress_hyperlinks = get_app_config()->get("suppress_hyperlinks") == "disable";
 
     for (CtrlLine& line : ctrl_lines) {
         line.is_focused = false;

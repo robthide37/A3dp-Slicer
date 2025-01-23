@@ -574,9 +574,9 @@ void PrintConfigDef::init_common_params()
     def = this->add("printhost_port", coString);
     def->label = L("Printer");
     def->tooltip = L("Name of the printer");
-    def->gui_type = ConfigOptionDef::GUIType::select_close;
     def->mode = comAdvancedE | comPrusa;
     def->cli = ConfigOptionDef::nocli;
+    def->set_enum_values(ConfigOptionDef::GUIType::select_open, {"no printers"});
     def->set_default_value(new ConfigOptionString(""));
     
     // only if there isn't a native SSL support
@@ -1630,7 +1630,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 100;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionPercent(100));
+    def->set_default_value(new ConfigOptionPercent(80));
 
     def = this->add("external_perimeter_acceleration", coFloatOrPercent);
     def->label = L("External");
@@ -2490,7 +2490,6 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats(0.));
 
     def = this->add("fill_density", coPercent);
-    def->gui_flags = "show_value";
     def->label = L("Fill density");
     def->category = OptionCategory::infill;
     def->tooltip = L("Density of internal infill, expressed in the range 0% - 100%."
@@ -2630,24 +2629,18 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->set_default_value(new ConfigOptionPercent(10));
 
-    def = this->add("small_area_infill_flow_compensation", coBool);
-    def->label = L("Enable small area flow compensation");
-    def->category = OptionCategory::infill;
-    def->tooltip = L("Enable flow compensation for small infill areas."
-                    "\nFirst layer is always disabled, to not compromise adhesion.");
-    def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionBool(false));
-
     def = this->add("small_area_infill_flow_compensation_model", coGraph);
     def->label = L("Flow Compensation Model");
     def->category = OptionCategory::infill;
     def->tooltip = L("Flow Compensation Model, used to adjust the flow for small solid infill "
                      "lines. The model is a graph of flow correction factors (between 0 and 1) per extrusion length (in mm)."
-                     "\nThe first point length has to be 0mm. the last point need to have a flow correction of 1.");
+                     "\nThe first point length has to be 0mm. the last point need to have a flow correction of 1."
+                    "\nIt's always disabled on the first layer, to not compromise adhesion.");
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionGraph(GraphData(0,10, GraphData::GraphType::SPLINE,
+    def->can_be_disabled = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionGraph(GraphData(0,10, GraphData::GraphType::SPLINE,
         {{0,0},{0.2,0.44},{0.4,0.61},{0.6,0.7},{0.8,0.76},{1.5,0.86},{2,0.89},{3,0.92},{5,0.95},{10,1}}
-    )));
+    ))));
     def->graph_settings = std::make_shared<GraphSettings>();
     def->graph_settings->title       = L("Flow Compensation Model");
     def->graph_settings->description = def->tooltip;
@@ -3034,7 +3027,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 100;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionPercent(100));
+    def->set_default_value(new ConfigOptionPercent(80));
 
     def = this->add("gap_fill_speed", coFloatOrPercent);
     def->label = L("Gap fill");
@@ -3178,6 +3171,19 @@ void PrintConfigDef::init_fff_params()
     def->min = 1;
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("idle_temperature", coInts);
+    def->label = L("Idle temperature");
+    def->tooltip = L("Nozzle temperature when the tool is currently not used in multi-tool setups."
+                     "\nThis is only used when 'Ooze prevention' is active in Print Settings.");
+    def->sidetext = L("°C");
+    def->category = OptionCategory::filament;
+    def->min = 0;
+    def->max = max_temp;
+    def->can_be_disabled = true;
+    def->mode = comSimpleAE | comPrusa;
+    def->is_vector_extruder = true;
+    def->set_default_value(disable_defaultoption(new ConfigOptionInts{30}));
 
     auto def_infill_anchor_min = def = this->add("infill_anchor", coFloatOrPercent);
     def->label = L("Length of the infill anchor");
@@ -3500,6 +3506,16 @@ void PrintConfigDef::init_fff_params()
     def->can_be_disabled = true;
     def->set_default_value(disable_defaultoption(new ConfigOptionInts({ 100 })));
     def->aliases = { "bridge_internal_fan_speed" };
+
+    def = this->add("internal_bridge_min_width", coFloatOrPercent);
+    def->label = L("Internal bridge infill threshold width");
+    def->category = OptionCategory::infill;
+    def->tooltip = L("Minimum width for the solid infill to convert into an internal bridge infill."
+                    "\nCan be a % of the current solid infill spacing.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(300, true));
 
     def = this->add("internal_bridge_speed", coFloatOrPercent);
     def->label = L("Internal bridges");
@@ -4233,12 +4249,12 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->can_be_disabled = true;
     def->mode       = comExpert | comPrusa;
-    def->set_default_value(disable_defaultoption(new ConfigOptionGraphs({GraphData(0,4, GraphData::GraphType::LINEAR,
+    def->set_default_value(disable_defaultoption(new ConfigOptionGraphs({GraphData(0,5, GraphData::GraphType::LINEAR,
         {{0,100},{25,80},{50,60},{75,40},{100,20}}
     )})));
     def->graph_settings = std::make_shared<GraphSettings>();
     def->graph_settings->title       = L("Overhangs fan speed by % of overlap");
-    def->graph_settings->description = L("Choose the Overhangs maximu fan speed for each percentage of overlap with the layer below."
+    def->graph_settings->description = L("Choose the Overhangs maximum fan speed for each percentage of overlap with the layer below."
         "If the current fan speed (from perimeter, external, of default) is higher, then this setting won't slow the fan."
         "\n100% overlap is when the extrusion is fully on top of the previous layer's extrusion."
         "\n0% overlap is when the extrusion centerline is at a distance of 'overhangs threshold for speed'(overhangs_bridge_threshold)"
@@ -4269,16 +4285,17 @@ void PrintConfigDef::init_fff_params()
     def->sidetext   = L("mm/s");
     def->can_be_disabled = true;
     def->mode       = comExpert | comPrusa;
-    def->set_default_value(disable_defaultoption(new ConfigOptionGraph(GraphData(0,4, GraphData::GraphType::LINEAR,
+    def->set_default_value(disable_defaultoption(new ConfigOptionGraph(GraphData(0,5, GraphData::GraphType::LINEAR,
         {{0,0},{25,10},{50,40},{75,70},{100,100}}
     ))));
     def->graph_settings = std::make_shared<GraphSettings>();
     def->graph_settings->title       = L("Overhangs speed ratio by % of overlap");
     def->graph_settings->description = L("Choose the Overhangs speed for each percentage of overlap with the layer below."
-        "\nThe speed is a percentage ratio between overhangs speed (for 0% overlap) and perimeter / external perimeter speed (for 100% overlap)."
+        "\nThe speed is a percentage ratio between overhangs speed (for 0% overlap) and"
+        "\nperimeter / external perimeter speed (for 100% overlap)."
         "\n100% overlap is when the extrusion is fully on top of the previous layer's extrusion."
-        "\n0% overlap is when the extrusion centerline is at a distance of 'overhangs threshold for speed'(overhangs_bridge_threshold)"
-        "\nfrom the nearest extrusion of the previous layer.");
+        "\n0% overlap is when the extrusion centerline is at a distance of 'overhangs threshold for speed'"
+        "\n(overhangs_bridge_threshold) from the nearest extrusion of the previous layer.");
     def->graph_settings->x_label     = L("overlap % with previous layer");
     def->graph_settings->y_label     = L("Speed ratio (%)");
     def->graph_settings->null_label  = L("Uses overhangs speed");
@@ -4590,7 +4607,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 100;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionPercent(100));
+    def->set_default_value(new ConfigOptionPercent(80));
 
     def = this->add("perimeter_reverse", coBool);
     def->label = L("Perimeter reversal on even layers");
@@ -5664,7 +5681,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::infill;
     def->tooltip = L("Force solid infill for parts of regions having a smaller width than the specified threshold."
                     "\nCan be a % of the current solid infill spacing."
-                    "\nSet 0 to disable");
+                    "\nSet 0 to disable.");
     def->sidetext = L("mm or %");
     def->min = 0;
     def->mode = comExpert | comSuSi;
@@ -8256,17 +8273,6 @@ void PrintConfigDef::init_sla_params()
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0.3));
 
-    def = this->add("idle_temperature", coInts);
-    def->label = L("Idle temperature");
-    def->tooltip = L("Nozzle temperature when the tool is currently not used in multi-tool setups."
-                     "\nThis is only used when 'Ooze prevention' is active in Print Settings.");
-    def->sidetext = L("°C");
-    def->min = 0;
-    def->max = max_temp;
-    def->can_be_disabled = true;
-    def->mode = comSimpleAE | comPrusa;
-    def->set_default_value(disable_defaultoption(new ConfigOptionInts{30}));
-
     def = this->add("bottle_volume", coFloat);
     def->label = L("Bottle volume");
     def->tooltip = L("Bottle volume");
@@ -8728,7 +8734,8 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "gcode_resolution", // now in printer config.
     "enable_dynamic_fan_speeds", "overhang_fan_speed_0","overhang_fan_speed_1","overhang_fan_speed_2","overhang_fan_speed_3", // converted in composite_legacy
     "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3", // converted in composite_legacy
-    "travel_max_lift", "filament_travel_max_lift" // removed, using retract_lift also for rampping lift instead.
+    "travel_max_lift", "filament_travel_max_lift", // removed, using retract_lift also for rampping lift instead.
+    "small_area_infill_flow_compensation",
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value, bool remove_unkown_keys)
@@ -9101,29 +9108,8 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 // Called after a config is loaded as a whole.
 // Perform composite conversions, for example merging multiple keys into one key.
 // Don't convert single options here, implement such conversion in PrintConfigDef::handle_legacy() instead.
-void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted)
+void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::map<t_config_option_key, std::string> &opt_deleted)
 {
-    std::map<t_config_option_key, std::string> useful_items;
-    for (auto& opt_pair : opt_deleted) {
-        t_config_option_key &opt_key = opt_pair.first;
-        std::string &value = opt_pair.second;
-        if (opt_key.find("overhang_fan_speed_") != std::string::npos) {
-            useful_items[opt_key] = value;
-            opt_key = "";
-        }
-        if ("enable_dynamic_fan_speeds" == opt_key) {
-            useful_items[opt_key] = value;
-            opt_key = "";
-        }
-        if (opt_key.find("overhang_speed_") != std::string::npos) {
-            useful_items[opt_key] = value;
-            opt_key = "";
-        }
-        if ("enable_dynamic_overhang_speeds" == opt_key) {
-            useful_items[opt_key] = value;
-            opt_key = "";
-        }
-    }
     bool old = true;
     if (config.has("print_version")) {
         std::string str_version = config.option<ConfigOptionString>("print_version")->value;
@@ -9150,6 +9136,31 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
     }
     if (old && config.has("overhangs_width") && config.get_float("overhangs_width") == 0 && config.is_enabled("overhangs_width")) {
         config.option("overhangs_width")->set_enabled(false);
+    }
+    
+    // enable_dynamic_overhang/fan_speeds
+    std::map<t_config_option_key, std::string> useful_items;
+    std::vector<t_config_option_key> to_erase;
+    for (auto& [opt_key, value] : opt_deleted) {
+        if (opt_key.find("overhang_fan_speed_") != std::string::npos) {
+            useful_items[opt_key] = value;
+            to_erase.push_back(opt_key);
+        }
+        if ("enable_dynamic_fan_speeds" == opt_key) {
+            useful_items[opt_key] = value;
+            to_erase.push_back(opt_key);
+        }
+        if (opt_key.find("overhang_speed_") != std::string::npos) {
+            useful_items[opt_key] = value;
+            to_erase.push_back(opt_key);
+        }
+        if ("enable_dynamic_overhang_speeds" == opt_key) {
+            useful_items[opt_key] = value;
+            to_erase.push_back(opt_key);
+        }
+    }
+    for (const t_config_option_key &opt_key : to_erase) {
+        useful_items.erase(opt_key);
     }
     if (useful_items.find("enable_dynamic_overhang_speeds") != useful_items.end()) {
         ConfigOptionBool enable_dynamic_overhang_speeds;
@@ -9250,12 +9261,13 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ve
         }
         config.set_key_value("overhangs_dynamic_fan_speed", opt.clone());
     }
-
     
-    if (!config.has("ensure_vertical_shell_thickness") && config.has("perimeters")) {
-        config.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionEnum<EnsureVerticalShellThickness>(EnsureVerticalShellThickness::Enabled));
+    if (auto it = opt_deleted.find("small_area_infill_flow_compensation"); it != opt_deleted.end()) {
+        if (config.has("small_area_infill_flow_compensation_model")) {
+            config.option("small_area_infill_flow_compensation_model")->set_enabled(it->second == "1");
+        }
     }
-
+    
     //if (config.has("thumbnails")) {
     //    std::string extention;
     //    if (config.has("thumbnails_format")) {
@@ -9407,7 +9419,7 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         // format (the first) is still set by prusa, no need to parse it.
         //output["thumbnails_format"] = opt_format.serialize();
     }
-/*
+    /*
     if ("thumbnails" == opt_key) {
         //check if their format is inside the size
         if (value.find('/') != std::string::npos) {
@@ -9540,7 +9552,7 @@ void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::stri
                                            bool                                       with_phony,
                                            bool                                       check_prusa)
 {
-    std::vector<std::pair<t_config_option_key, std::string>> deleted_keys;
+    std::map<t_config_option_key, std::string> deleted_keys;
     std::vector<std::pair<t_config_option_key, std::string>> unknown_keys;
     const ConfigDef *def = config.def();
     for (const auto &[key, value] : settings) {
@@ -9556,7 +9568,7 @@ void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::stri
                     config.set_deserialize(opt_key, opt_value, config_substitutions);
                 }
             } else {
-                deleted_keys.emplace_back(key, value);
+                deleted_keys[key] = value;
             }
         } catch (UnknownOptionException & /* e */) {
             // log & ignore
@@ -9821,6 +9833,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "internal_bridge_acceleration",
 "internal_bridge_expansion",
 "internal_bridge_fan_speed",
+"internal_bridge_min_width",
 "internal_bridge_speed",
 "ironing_acceleration",
 "ironing_angle",
@@ -9912,7 +9925,6 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "skirt_brim",
 "skirt_distance_from_brim",
 "skirt_extrusion_width",
-"small_area_infill_flow_compensation",
 "small_area_infill_flow_compensation_model",
 "small_perimeter_max_length",
 "small_perimeter_min_length",
@@ -10404,37 +10416,42 @@ double min_object_distance(const PrintConfig& config)
 double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
 {
     if (printer_technology(*config) == ptSLA) return 6.;
-    
+
     const ConfigOptionFloat* dd_opt = config->option<ConfigOptionFloat>("duplicate_distance");
-    //test if called from usaslicer::l240 where it's called on an empty config...
+    //test if called from prusaslicer::l240 where it's called on an empty config...
     if (dd_opt == nullptr) return 0;
 
     double base_dist = 0;
     //std::cout << "START min_object_distance =>" << base_dist << "\n";
-    const ConfigOptionBool* co_opt = config->option<ConfigOptionBool>("complete_objects");
-    if ((config->option("parallel_objects_step")->get_float() > 0) || (co_opt && co_opt->value)) {
+    const ConfigOptionBool* opt_complete_object = config->option<ConfigOptionBool>("complete_objects");
+    const ConfigOption* opt_parallel_objects_step = config->option("parallel_objects_step");
+    if ((opt_parallel_objects_step && opt_parallel_objects_step->get_float() > 0) || (opt_complete_object && opt_complete_object->value)) {
         double skirt_dist = 0;
+        double brim_dist = 0;
         try {
             std::vector<double> vals = dynamic_cast<const ConfigOptionFloats*>(config->option("nozzle_diameter"))->get_values();
             double max_nozzle_diam = 0;
             for (double val : vals) max_nozzle_diam = std::fmax(max_nozzle_diam, val);
 
             // min object distance is max(duplicate_distance, clearance_radius)
-            // /2 becasue we only count the grawing for the current object
-            //add 1 as safety offset.
-            double extruder_clearance_radius = config->option("extruder_clearance_radius")->get_float() / 2;
+            // add 1 as safety offset.
+            const double extruder_clearance_radius = config->option("extruder_clearance_radius")->get_float();
             if (extruder_clearance_radius > base_dist) {
                 base_dist = extruder_clearance_radius;
             }
 
+            // Add aso the skirt dist if per object, as the arrange & check method don't use it yet.
             // we use the max nozzle, just to be on the safe side
             //ideally, we should use print::first_layer_height()
-            const double first_layer_height = dynamic_cast<const ConfigOptionFloatOrPercent*>(config->option("first_layer_height"))->get_abs_value(max_nozzle_diam);
+            const double first_layer_height = 
+                dynamic_cast<const ConfigOptionFloatOrPercent *>(config->option("first_layer_height"))
+                    ->get_abs_value(max_nozzle_diam);
             //add the skirt
             int skirts = config->option("skirts")->get_int();
             if (skirts > 0 && ref_height == 0)
                 skirts += config->option("skirt_brim")->get_int();
-            if (skirts > 0 && config->option("skirt_height")->get_int() >= 1 && !config->option("complete_objects_one_skirt")->get_bool()) {
+            if (skirts > 0 && config->option("skirt_height")->get_int() >= 1 &&
+                !config->option("complete_objects_one_skirt")->get_bool()) {
                 float overlap_ratio = 1;
                 //can't know the extruder, so we settle on the worst: 100%
                 //if (config->option<ConfigOptionPercents>("filament_max_overlap")) overlap_ratio = config->get_computed_value("filament_max_overlap");
@@ -10450,9 +10467,6 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
                         0
                     );
                     skirt_dist += skirt_flow.width() + (skirt_flow.spacing() * ((double)skirts - 1));
-                    base_dist = std::max(base_dist, skirt_dist + 1);
-                    //set to 0 becasue it's incorporated into the base_dist, so we don't want to be added in to it again.
-                    skirt_dist = 0;
                 } else {
                     double skirt_height = ((double)config->option("skirt_height")->get_int() - 1) * config->get_computed_value("layer_height") + first_layer_height;
                     if (ref_height <= skirt_height) {
@@ -10469,13 +10483,33 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
                         skirt_dist += skirt_flow.width() + (skirt_flow.spacing() * ((double)skirts - 1));
                     }
                 }
+                // send a warning in print.validate if oneskirt, the skirt height is > 1mm and the skirt distance (from brim) is < extruder_clearance_radius
+                // send a warning in print.validate if not oneskirt and skirt height > 1mm (you might collide the skirt while printing another one)
+            }
+            // Add also the biggest object brim, as the arrange & check method don't use it yet.
+            // mm we don't have access to each object config... then send a warning in print.validate.
+            const ConfigOption *opt_brim_per_object = config->option("brim_per_object");
+            const ConfigOption *opt_skirt_distance_from_brim = config->option("skirt_distance_from_brim");
+            const bool has_brim = (ref_height == 0 && opt_brim_per_object && opt_brim_per_object->get_bool());
+            const bool skirt_is_pushed = skirt_dist > 0 && opt_skirt_distance_from_brim && opt_skirt_distance_from_brim->get_bool();
+            if ( has_brim || skirt_is_pushed) {
+                double max_brim = config->option("brim_width")->get_float();
+                max_brim = std::max(max_brim, config->option("brim_width_interior")->get_float());
+            }
+
+            // if skirt_distance_from_brim, then push it further back
+            if (skirt_is_pushed) {
+                skirt_dist += brim_dist;
+                brim_dist = 0;
             }
         }
         catch (const std::exception & ex) {
             boost::nowide::cerr << ex.what() << std::endl;
         }
-        return base_dist + skirt_dist;
+
+        return base_dist + std::max(skirt_dist, brim_dist);
     }
+    // else (not cmplete object/step)
     return base_dist;
 }
 
@@ -11855,7 +11889,7 @@ static std::map<t_custom_gcode_key, t_config_option_keys> s_CustomGcodeSpecificP
     {"layer_gcode",             {"layer_num", "layer_z", "previous_layer_z", "max_layer_z"}},
     {"feature_gcode",           {"layer_num", "layer_z", "max_layer_z", "previous_extrusion_role", "next_extrusion_role", /*deprecated*/"extrusion_role", "last_extrusion_role" /*deprecated*/}},
     {"toolchange_gcode",        {"layer_num", "layer_z", "max_layer_z", "previous_extruder", "next_extruder", "toolchange_z"}},
-    {"color_change_gcode",      {"color_change_extruder"}},
+    {"color_change_gcode",      {"color_change_extruder", "next_color", "next_colour"}},
     {"pause_print_gcode",       {"color_change_extruder"}},
     {"between_objects_gcode",   {"layer_num", "layer_z"}},
 };
@@ -11908,6 +11942,16 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     // TRN: This is a label in custom g-code editor dialog, belonging to color_change_extruder. Denoted index of the extruder for which color change is performed.
     def->label = L("Color change extruder");
     def->tooltip = L("Index of the extruder for which color change will be performed. The index is zero based (first extruder has index 0).");
+
+    def = this->add("next_color", coString);
+    // TRN: This is a label in custom g-code editor dialog, belonging to color_change_extruder. Denoted index of the extruder for which color change is performed.
+    def->label = L("Next color");
+    def->tooltip = L("Next color to display when a color change is performed, in #ffffff format.");
+
+    def = this->add("next_colour", coString);
+    // TRN: This is a label in custom g-code editor dialog, belonging to color_change_extruder. Denoted index of the extruder for which color change is performed.
+    def->label = L("Next colour");
+    def->tooltip = L("Next colour to display when a colour change is performed, in #ffffff format.");
 }
 
 const CustomGcodeSpecificConfigDef custom_gcode_specific_config_def;

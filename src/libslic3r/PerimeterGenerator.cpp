@@ -27,6 +27,7 @@
 #include "Surface.hpp"
 #include "SurfaceCollection.hpp"
 #include "SVG.hpp"
+#include "Thread.hpp"
 
 #include "Arachne/WallToolPaths.hpp"
 #include "Arachne/utils/ExtrusionLine.hpp"
@@ -199,8 +200,8 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
 {
     const coordf_t min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
     const coordf_t range_random_point_dist = fuzzy_skin_point_dist / 2.;
-    coordf_t dist_next_point = //min_dist_between_points / 4 + (coordf_t(rand()) * range_random_point_dist / double(RAND_MAX)); // the distance to be traversed on the line before making the first new point
-        coordf_t(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+    coordf_t dist_next_point = //min_dist_between_points / 4 + (coordf_t(safe_rand()) * range_random_point_dist / double(RAND_MAX)); // the distance to be traversed on the line before making the first new point
+        coordf_t(safe_rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
 
     // check if the paths length is enough for at least 3 points, or return.
     {
@@ -249,9 +250,9 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
             if (dist_next_point < p0p1_size) {
                 coordf_t p0pa_dist;
                 for (p0pa_dist = dist_next_point; p0pa_dist < p0p1_size;
-                    p0pa_dist += min_dist_between_points + coordf_t(rand()) * range_random_point_dist / double(RAND_MAX))
+                    p0pa_dist += min_dist_between_points + coordf_t(safe_rand()) * range_random_point_dist / double(RAND_MAX))
                 {
-                    coordf_t r = coordf_t(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
+                    coordf_t r = coordf_t(safe_rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
                     out.emplace_back(p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
                     assert(out.size() > 1 && !out.back().coincides_with_epsilon(out[out.size()-2]));
                 }
@@ -329,7 +330,7 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
 {
     const double min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
     const double range_random_point_dist = fuzzy_skin_point_dist / 2.;
-    double dist_left_over = double(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+    double dist_left_over = double(safe_rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
     Point* p0 = &poly.points.back();
     Points out;
     out.reserve(poly.points.size());
@@ -340,9 +341,9 @@ static void fuzzy_polygon(Polygon& poly, coordf_t fuzzy_skin_thickness, coordf_t
         // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
         double dist_last_point = dist_left_over + p0p1_size * 2.;
         for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
-            p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX))
+            p0pa_dist += min_dist_between_points + double(safe_rand()) * range_random_point_dist / double(RAND_MAX))
         {
-            double r = double(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
+            double r = double(safe_rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
             out.emplace_back(*p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
             dist_last_point = p0pa_dist;
         }
@@ -370,7 +371,7 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
 {
     const double min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
     const double range_random_point_dist = fuzzy_skin_point_dist / 2.;
-    double       dist_left_over          = double(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+    double       dist_left_over          = double(safe_rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
 
     auto                                   *p0 = &ext_lines.front();
     std::vector<Arachne::ExtrusionJunction> out;
@@ -386,8 +387,8 @@ static void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, double fuzzy
         double p0p1_size = p0p1.norm();
         // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
         double dist_last_point = dist_left_over + p0p1_size * 2.;
-        for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size; p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX)) {
-            double r = double(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
+        for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size; p0pa_dist += min_dist_between_points + double(safe_rand()) * range_random_point_dist / double(RAND_MAX)) {
+            double r = double(safe_rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
             out.emplace_back(p0->p + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>(), p1.w, p1.perimeter_index);
             dist_last_point = p0pa_dist;
         }
@@ -2470,10 +2471,14 @@ ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int ind
 
     ExtrusionPaths filtered;
     filtered.reserve(reconnected.size());
-    for (ExtrusionPath &p : reconnected) {
-        if (p.length() > 3 * extrusion_spacing) {
-            filtered.push_back(p);
+    for (ExtrusionPath &path : reconnected) {
+        if (path.length() > 3 * extrusion_spacing) {
+            filtered.push_back(std::move(path));
         }
+    }
+
+    for (ExtrusionPath &path : filtered) {
+        assert(!path.can_reverse());
     }
 
     return filtered;
@@ -2483,7 +2488,8 @@ ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int ind
 // #define EXTRA_PERIM_DEBUG_FILES
 // Function will generate extra perimeters clipped over nonbridgeable areas of the provided surface and returns both the new perimeters and
 // Polygons filled by those clipped perimeters
-std::tuple<std::vector<ExtrusionPaths>, ExPolygons, ExPolygons> generate_extra_perimeters_over_overhangs(const ExPolygons      &infill_area,
+std::tuple<std::vector<ExtrusionPaths>, ExPolygons, ExPolygons> generate_extra_perimeters_over_overhangs(const ExPolygon &island,
+                                                                                           const ExPolygons      &infill_area,
                                                                                            const Parameters        &params,
                                                                                            const int                perimeter_count,
                                                                                            coordf_t                 scaled_resolution
@@ -2509,7 +2515,8 @@ std::tuple<std::vector<ExtrusionPaths>, ExPolygons, ExPolygons> generate_extra_p
     if (overhangs.empty()) { return {}; }
 
     AABBTreeLines::LinesDistancer<Line> lower_layer_aabb_tree{to_lines(optimized_lower_slices)};
-    const Polygons                      anchors             = intersection(infill_area, optimized_lower_slices);
+    // use island instead of infill_area, to be able to use already extruded (hopefully not-overhang) perimeters.
+    const Polygons                      anchors             = intersection({island}, optimized_lower_slices);
     const ExPolygons                    inset_anchors       = diff_ex(anchors,
                                                                    offset_ex(overhangs, anchors_size /*+ 0.1 * params.overhang_flow.scaled_width()*/, EXTRA_PERIMETER_OFFSET_PARAMETERS));
     const ExPolygons                    inset_overhang_area = diff_ex(infill_area, inset_anchors);
@@ -2547,12 +2554,13 @@ std::tuple<std::vector<ExtrusionPaths>, ExPolygons, ExPolygons> generate_extra_p
         ExtrusionPaths &overhang_region = extra_perims.emplace_back();
 
         const ExPolygons anchoring         = intersection_ex(expanded_overhang_to_cover, inset_anchors);
-        ExPolygons perimeter_polygon = offset_ex(union_ex(offset_ex(overhang_to_cover, 0.1 * overhang_scaled_spacing), anchoring),
-                                            -overhang_scaled_spacing * 0.6);
+        ExPolygons perimeter_polygon = offset2_ex(union_ex(offset_ex(overhang_to_cover, 0.1 * overhang_scaled_spacing), anchoring),
+                                            -overhang_scaled_spacing * (0.1 + 0.5 + 0.1), overhang_scaled_spacing * 0.1);
 
         const Polygon anchoring_convex_hull = Geometry::convex_hull(anchoring);
-        const double  unbridgeable_area     = area(diff(real_overhang, {anchoring_convex_hull}));
+        double  unbridgeable_area     = area(diff(real_overhang, {anchoring_convex_hull}));
 
+        //try with the quick bridge detector
         auto [dir, unsupp_dist] = detect_bridging_direction(real_overhang, anchors);
 
 #ifdef EXTRA_PERIM_DEBUG_FILES
@@ -2568,6 +2576,48 @@ std::tuple<std::vector<ExtrusionPaths>, ExPolygons, ExPolygons> generate_extra_p
             svg.draw(to_polylines(diff_ex(perimeter_polygon, {anchoring_convex_hull})), "black", scale_(0.10));
             svg.draw((diff_pl(to_polylines(diff(real_overhang, anchors)), expand(anchors, float(SCALED_EPSILON)))), "blue", scale_(0.30));
             svg.Close();
+        }
+#endif
+#ifdef _DEBUG
+        // this seems unneeded, and seems to create memory crashes (on linux).
+        if (unbridgeable_area > 0.2 * area(real_overhang) || unsupp_dist > total_length(real_overhang) * 0.2) {
+            // try with the real bridge detector
+            BridgeDetector bd(
+                union_ex(real_overhang),
+                union_ex(anchors),
+                params.overhang_flow.scaled_spacing(),
+                scale_t(params.print_config.bridge_precision.get_abs_value(params.overhang_flow.spacing())),
+                params.layer->id()
+            );
+            // set angle
+            double bridge_angle = 0;
+            if (params.config.bridge_angle.is_enabled()) {
+                bridge_angle = Geometry::deg2rad(params.config.bridge_angle.value);
+            } else if (bd.detect_angle()) {
+                bridge_angle = bd.angle;
+            }
+            // detection
+            Polylines unsupported_lines = bd.unsupported_edges(bridge_angle);
+            unsupp_dist = 0;
+            for (Polyline &polyline : unsupported_lines) {
+                unsupp_dist += polyline.length();
+            }
+            // coverage
+            unbridgeable_area = area(diff(real_overhang, bd.coverage(bridge_angle)));
+#ifdef EXTRA_PERIM_DEBUG_FILES
+        {
+            static int iInst=0;
+            BoundingBox bbox = get_extents(anchoring_convex_hull);
+            bbox.offset(scale_(1.));
+            ::Slic3r::SVG svg(debug_out_path("%d_%d_%d_bridge_check_v2", params.layer->id(), iRun, iInst++).c_str(), bbox);
+            svg.draw(to_polylines(perimeter_polygon), "purple", scale_(0.09));
+            svg.draw(to_polylines(anchoring), "yellow", scale_(0.08));
+            svg.draw(to_polylines(real_overhang), "red", scale_(0.07));
+            svg.draw(unsupported_lines, "cyan", scale_(0.06));
+            svg.draw(to_polylines(bd.coverage(bridge_angle)), "blue", scale_(0.05));
+            svg.Close();
+        }
+#endif
         }
 #endif
 
@@ -2593,7 +2643,7 @@ std::tuple<std::vector<ExtrusionPaths>, ExPolygons, ExPolygons> generate_extra_p
                     ExPolygons shrinked = intersection_ex(offset_ex(prev, -0.3 * overhang_scaled_spacing), expanded_overhang_to_cover);
                     if (!shrinked.empty())
                         extrusion_paths_append(overhang_region, reconnect_polylines(perimeter, overhang_scaled_spacing, scaled_resolution),
-                                               ExtrusionAttributes{ ExtrusionRole::OverhangPerimeter, params.overhang_flow });
+                                               ExtrusionAttributes{ ExtrusionRole::OverhangPerimeter, params.overhang_flow }, false);
 
                     Polylines  fills;
                     ExPolygons gap = shrinked.empty() ? offset_ex(prev, overhang_scaled_spacing * 0.5) : shrinked;
@@ -2604,12 +2654,12 @@ std::tuple<std::vector<ExtrusionPaths>, ExPolygons, ExPolygons> generate_extra_p
                     if (!fills.empty()) {
                         fills = intersection_pl(fills, shrinked_overhang_to_cover);
                         extrusion_paths_append(overhang_region, reconnect_polylines(fills, overhang_scaled_spacing, scaled_resolution),
-                                               ExtrusionAttributes{ ExtrusionRole::OverhangPerimeter, params.overhang_flow });
+                                               ExtrusionAttributes{ ExtrusionRole::OverhangPerimeter, params.overhang_flow }, false);
                     }
                     break;
                 } else {
                     extrusion_paths_append(overhang_region, reconnect_polylines(perimeter, overhang_scaled_spacing, scaled_resolution),
-                                           ExtrusionAttributes{ExtrusionRole::OverhangPerimeter, params.overhang_flow });
+                                           ExtrusionAttributes{ExtrusionRole::OverhangPerimeter, params.overhang_flow }, false);
                 }
 
                 if (intersection(perimeter_polygon, real_overhang).empty()) { continuation_loops--; }
@@ -3524,7 +3574,8 @@ void PerimeterGenerator::process(// Input:
 
 
             // Generate extra perimeters on overhang areas, and cut them to these parts only, to save print time and material
-            auto [extra_perimeters, filled_area, unfilled_area] = generate_extra_perimeters_over_overhangs(polyWithoutOverlap.empty() ? infill_exp : polyWithoutOverlap,
+            auto [extra_perimeters, filled_area, unfilled_area] = generate_extra_perimeters_over_overhangs(surface.expolygon,
+                                                                                            polyWithoutOverlap.empty() ? infill_exp : polyWithoutOverlap,
                                                                                             params,
                                                                                             std::min(nb_loop_holes, nb_loop_contour) + 1,
                                                                                             scaled_resolution_infill);
@@ -3546,7 +3597,18 @@ void PerimeterGenerator::process(// Input:
                 }
                 assert(loops->entities().size() >= first_loop_coll_index);
                 if (!this_islands_perimeters.empty()) {
-                    loops->append_at(std::move(this_islands_perimeters), first_loop_coll_index);
+                    for (auto *peri : loops->entities()) assert(!peri->empty());
+                    // move the perimeters of the island in the unsortable collection, so the ordering is preserved
+                    for (size_t loop_idx = first_loop_coll_index; loop_idx < loops->size(); ++loop_idx) {
+                        assert(!loops->entities()[loop_idx]->empty());
+                        // !!! dangerous!! here the pointer ownership is transfered to this_islands_perimeters !!!
+                        this_islands_perimeters.append(ExtrusionEntitiesPtr{loops->set_entities()[loop_idx]});
+                    }
+                    // remove pointers transfered to this_islands_perimeters !!! to complete the transfert of ownership !!!
+                    loops->set_entities().erase(loops->set_entities().begin() + first_loop_coll_index, loops->set_entities().end());
+                    assert(loops->size() == first_loop_coll_index);
+                    // add this_islands_perimeters (back) into loops.
+                    loops->append(std::move(this_islands_perimeters));
                     for (auto *peri : loops->entities()) assert(!peri->empty());
                     // clip infill area
                     // TODO: 2.7 test if ok for infill_peri_overlap -> NOT OK FIXME
@@ -4786,6 +4848,9 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                     peri_entities = this->_traverse_loops_classic(params, contours.front(), thin_walls_thickpolys);
                 }
             }
+        } else {
+            // no loop perimeter : ignore perimeter_loop and thin_walls_merge
+            peri_entities = this->_traverse_loops_classic(params, {}, thin_walls_thickpolys);
         }
 #if _DEBUG
         LoopAssertVisitor visitor;

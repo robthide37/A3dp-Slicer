@@ -30,6 +30,19 @@ static wxSize get_screen_size(wxWindow* window)
 namespace Slic3r {
 namespace GUI {
 
+std::string replaceCommaWithDot(const std::string& input) {
+    std::string result = input;
+    size_t pos = 0;
+
+    // Replace all occurrences of ',' with '.'
+    while ((pos = result.find(',', pos)) != std::string::npos) {
+        result.replace(pos, 1, ".");
+        pos += 1; // Move past the replaced dot
+    }
+
+    return result;
+}
+
 //BUG: custom gcode ' between extrusion role changes' should that be before or after region gcode?
 
 void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
@@ -134,6 +147,8 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
     Model& model = plat->model();
     if (!plat->new_project(L("Pressure calibration")))
         return;
+    // wait for slicing end if needed
+    wxGetApp().Yield();
 
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
     if (autocenter) {
@@ -199,10 +214,9 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
     std::vector < std::vector<ModelObject*>> pressure_tower;
     bool smooth_time = false;
 
-    std::string nozzle_diameter_str = std::to_string(nozzle_diameter);
+    std::string nozzle_diameter_str = replaceCommaWithDot(std::to_string(nozzle_diameter));
     nozzle_diameter_str.erase(nozzle_diameter_str.find_last_not_of('0') + 2, std::string::npos);
 
-    
     if (nozzle_diameter_str.back() == '.') {//if nozzle_diameter_str broke fix it by adding '0' to end, prob not needed?
         nozzle_diameter_str += '0';
     }
@@ -222,15 +236,16 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
         //need to move this to another function.....
         wxString firstPaValue = dynamicFirstPa[id_item]->GetValue();
         wxString startPaValue = dynamicStartPa[id_item]->GetValue();
-        wxString endPaValue = dynamicEndPa[id_item]->GetValue();
+        wxString endPaValue = dynamicEndPa[id_item]->GetValue();        
         wxString paIncrementValue = dynamicPaIncrement[id_item]->GetValue();
         wxString erPaValue = dynamicExtrusionRole[id_item]->GetValue();
         smooth_time = dynamicEnableST[id_item]->GetValue();
+        std::locale::global(std::locale("C")); // Ensure "." is used as the decimal separator
 
-        double first_pa = wxAtof(firstPaValue);
-        double start_pa = wxAtof(startPaValue);
-        double end_pa = wxAtof(endPaValue);
-        double pa_increment = wxAtof(paIncrementValue);
+        double first_pa = std::stod(firstPaValue.ToStdString());
+        double start_pa = std::stod(startPaValue.ToStdString());
+        double end_pa = std::stod(endPaValue.ToStdString());
+        double pa_increment = std::stod(paIncrementValue.ToStdString());
         extrusion_role = dynamicExtrusionRole[id_item]->GetValue().ToStdString();
 
         int countincrements = 0;
@@ -681,12 +696,9 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
             plat->fff_print().apply(plat->model(), *plat->config());
-        plat->arrange();
-        //std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        //ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        //arranger.prepare_all();
-        //arranger.process();
-        //arranger.finalize();
+        Worker &ui_job_worker = plat->get_ui_job_worker();
+        plat->arrange(ui_job_worker, false);
+        ui_job_worker.wait_for_current_job(20000);
     }
 
     if (extrusion_role != "Verify") {//don't auto slice so user can manual add PA values

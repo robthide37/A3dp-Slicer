@@ -661,7 +661,7 @@ Sidebar::priv::~priv()
 
 void Sidebar::priv::show_preset_comboboxes()
 {
-    PrinterTechnology tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
+    PrinterTechnology tech = wxGetApp().get_current_printer_technology();
 
     for (size_t i = 0; i < 2; ++i)
         sizer_presets->Show(i, tech == ptFFF);
@@ -3672,18 +3672,18 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
     }
 
     //update tab if needed
-    // auto_switch_preview == 0 means "no force tab change"
-    if (wxGetApp().is_editor() && invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && get_app_config()->get("auto_switch_preview") != "0")
+    // auto_switch_preview == "never" means "no force tab change"
+    if (wxGetApp().is_editor() && invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && get_app_config()->get("auto_switch_preview") != "never")
     {
-        // auto_switch_preview == 3 means "force tab change only if for gcode"
-        if (get_app_config()->get("auto_switch_preview") == "3") {
+        // auto_switch_preview == "gcode" means "force tab change only if for gcode"
+        if (get_app_config()->get("auto_switch_preview") == "gcode") {
             if (this->preview->can_display_gcode())
                 main_frame->select_tab(MainFrame::ETabType::PlaterGcode, true);
-            // auto_switch_preview == 1 means "force tab change"
-        } else if (get_app_config()->get("auto_switch_preview") == "1") {
+            // auto_switch_preview == "always" means "force tab change"
+        } else if (get_app_config()->get("auto_switch_preview") == "always") {
             main_frame->select_tab(MainFrame::ETabType::Plater3D, true);
-            // auto_switch_preview == 2 means "force tab change only if already on a platter one"
-        } else if (get_app_config()->get("auto_switch_preview") == "2" || main_frame->selected_tab() < MainFrame::ETabType::LastPlater) {
+            // auto_switch_preview == "platter" means "force tab change only if already on a platter one"
+        } else if (get_app_config()->get("auto_switch_preview") == "platter" || main_frame->selected_tab() < MainFrame::ETabType::LastPlater) {
             if (this->preview->can_display_gcode())
                 main_frame->select_tab(MainFrame::ETabType::PlaterGcode, true);
             else if (this->preview->can_display_volume() && background_process.running()) // don't switch to plater3D if you modify a gcode settign and you don't have background processing
@@ -4489,7 +4489,7 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 
 void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
 {
-    if( ( get_app_config()->get("auto_switch_preview") == "1" || (get_app_config()->get("auto_switch_preview") == "2"
+    if( ( get_app_config()->get("auto_switch_preview") == "gcode" || (get_app_config()->get("auto_switch_preview") == "platter"
           && main_frame->selected_tab() < MainFrame::ETabType::LastPlater) )
         && !this->preview->can_display_gcode())
         main_frame->select_tab(MainFrame::ETabType::PlaterPreview);
@@ -4589,13 +4589,13 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
 //    this->statusbar()->reset_cancel_callback();
 //    this->statusbar()->stop_busy();
     notification_manager->set_slicing_progress_export_possible();
-    // auto_switch_preview == 0 means "no force tab change"
-    // auto_switch_preview == 1 means "force tab change"
-    // auto_switch_preview == 2 means "force tab change only if already on a plater one"
-    // auto_switch_preview == 3 means "force tab change only if for gcode"
-    if (get_app_config()->get("auto_switch_preview") == "1" 
-        || (get_app_config()->get("auto_switch_preview") == "2" && main_frame->selected_tab() < MainFrame::ETabType::LastPlater) 
-        || get_app_config()->get("auto_switch_preview") == "3")
+    // auto_switch_preview == "never" means "no force tab change"
+    // auto_switch_preview == "always" means "force tab change"
+    // auto_switch_preview == "platter" means "force tab change only if already on a plater one"
+    // auto_switch_preview == "gcode" means "force tab change only if for gcode"
+    if (get_app_config()->get("auto_switch_preview") == "always" 
+        || (get_app_config()->get("auto_switch_preview") == "platter" && main_frame->selected_tab() < MainFrame::ETabType::LastPlater) 
+        || get_app_config()->get("auto_switch_preview") == "gcode")
         main_frame->select_tab(MainFrame::ETabType::PlaterGcode);
 
     // Reset the "export G-code path" name, so that the automatic background processing will be enabled again.
@@ -8718,7 +8718,7 @@ bool Plater::can_paste_from_clipboard() const
     if (clipboard.is_empty() && p->sidebar->obj_list()->clipboard_is_empty())
         return false;
 
-    if ((wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) && !clipboard.is_sla_compliant())
+    if ((wxGetApp().get_current_printer_technology() == ptSLA) && !clipboard.is_sla_compliant())
         return false;
 
     Selection::EMode mode = clipboard.get_mode();
@@ -8737,7 +8737,7 @@ bool Plater::can_copy_to_clipboard() const
         return false;
 
     const Selection& selection = p->view3D->get_canvas3d()->get_selection();
-    if ((wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) && !selection.is_sla_compliant())
+    if ((wxGetApp().get_current_printer_technology() == ptSLA) && !selection.is_sla_compliant())
         return false;
 
     return true;

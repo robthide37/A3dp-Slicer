@@ -231,7 +231,10 @@ group:sidetext_width$5:Advanced
 		setting:label$From region:solid_infill_below_area
 		setting:label$From the whole layer:solid_infill_below_layer_area
 	end_line
-	setting:solid_infill_below_width
+	line:Solid infill width threshold
+		setting:solid_infill_below_width
+		setting:internal_bridge_min_width
+	end_line
 	line:Anchor solid infill by X mm
 		setting:label_width$8:width$5:external_infill_margin
 		setting:label_width$6:width$5:bridged_infill_margin
@@ -246,9 +249,7 @@ group:Advanced Infill options
 		setting:label_width$8:width$5:fill_smooth_distribution
 		setting:label_width$26:label$Spacing between ironing lines:width$5:sidetext_width$7:fill_smooth_width
 	end_line
-	line:Small Area Infill Flow Compensation (beta)
-		setting:label$_:sidetext_width$0:small_area_infill_flow_compensation
-		setting:label$_:small_area_infill_flow_compensation_model
+	setting:label$Small Area Infill Flow Compensation (beta):small_area_infill_flow_compensation_model
 	end_line
 group:title_width$19:Ironing post-process (This will go on top of infills and perimeters)
 	line:Enable ironing post-process
@@ -557,7 +558,7 @@ group:Advanced
 	end_line
 
 page:Output options:output+page_white
-group:Plater
+group:Platter
 	setting:duplicate_distance
 group:Sequential printing
 	setting:tags$Advanced$Expert$Prusa:complete_objects

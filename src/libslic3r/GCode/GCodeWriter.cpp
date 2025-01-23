@@ -797,7 +797,7 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, const double dE, con
     assert(std::abs(point.y()) < 120000.);
     assert(std::abs(point.z()) < 120000.);
     assert(dE == dE);
-    assert(point.z() >= m_pos.z());
+    assert(point.z() >= m_pos.z() - EPSILON);
     m_pos = point;
     m_lifted = 0;
      auto [/*double*/ delta_e, /*double*/ e_to_write]  = this->m_tool->extrude(dE + this->m_de_left);
@@ -986,7 +986,7 @@ std::string GCodeWriter::unretract()
             GCodeG1Formatter w(this->get_default_gcode_formatter());
             w.emit_e(m_extrusion_axis, emit_E);
             w.emit_f(m_tool->deretract_speed() * 60.);
-            w.emit_comment(this->m_config.gcode_comments, " ; unretract");
+            w.emit_comment(this->m_config.gcode_comments, "unretract");
             gcode += w.string();
         }
     }

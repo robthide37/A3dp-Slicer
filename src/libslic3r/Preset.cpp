@@ -543,6 +543,7 @@ static std::vector<std::string> s_Preset_print_options {
         "infill_every_layers",
 //      "infill_only_where_needed",
         "solid_infill_every_layers",
+        "internal_bridge_min_width",
         // ironing
         "ironing",
         "ironing_type",
@@ -728,7 +729,7 @@ static std::vector<std::string> s_Preset_print_options {
         "enforce_full_fill_volume",
         "external_infill_margin", "bridged_infill_margin",
         "internal_bridge_expansion",
-        "small_area_infill_flow_compensation", "small_area_infill_flow_compensation_model",
+        "small_area_infill_flow_compensation_model",
         // compensation
         "first_layer_size_compensation",
         "first_layer_size_compensation_layers",

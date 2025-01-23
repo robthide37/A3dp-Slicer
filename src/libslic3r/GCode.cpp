@@ -1770,9 +1770,6 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     // Write the custom start G-code
     preamble_to_put_start_layer.append(start_gcode).append("\n");
 
-    if (!last_pos_defined()) {
-        set_last_pos({0, 0});
-    }
 
     // Disable fan.
     if ((initial_extruder_id != (uint16_t) -1) && !this->config().start_gcode_manual && print.config().disable_fan_first_layers.get_at(initial_extruder_id)) {
@@ -1883,8 +1880,6 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                 } else {
                     set_extra_lift(0, 0, print.config(), m_writer, initial_extruder_id);
                 }
-                //reinit the seam placer on the new object
-                m_seam_placer.init(print, this->m_throw_if_canceled);
                 // Reset the cooling buffer internal state (the current position, feed rate, accelerations).
                 m_cooling_buffer->reset(this->writer().get_position());
                 m_cooling_buffer->set_current_extruder(initial_extruder_id);
@@ -2891,6 +2886,7 @@ namespace ProcessLayer
 
         DynamicConfig cfg;
         cfg.set_key_value("color_change_extruder", new ConfigOptionInt(color_change_extruder));
+        cfg.set_key_value("next_color", new ConfigOptionString(custom_gcode.color));
         cfg.set_key_value("next_colour", new ConfigOptionString(custom_gcode.color));
         if (single_extruder_multi_material && !single_extruder_printer && color_change_extruder >= 0 && first_extruder_id != unsigned(color_change_extruder)) {
             //! FIXME_in_fw show message during print pause
@@ -3124,14 +3120,16 @@ LayerResult GCodeGenerator::process_layer(
         }
         assert(l.layer() == nullptr || layer_id == l.layer()->id());
     }
-    assert(layer_id < layer_count());
     assert(object_layer != nullptr || support_layer != nullptr);
     const Layer         &layer         = (object_layer != nullptr) ? *object_layer : *support_layer;
+    assert(layer_id < layer_count() || !layer.has_extrusions());
     assert(layer_id == layer.id());
     LayerResult   result { {}, layer.id(), false, last_layer, false};
     if (layer_tools.extruders.empty())
         // Nothing to extrude.
         return result;
+
+    assert(layer_id < layer_count());
 
     if (object_layer) {
         if (single_object_instance_idx != size_t(-1)) {
@@ -4129,8 +4127,10 @@ std::string GCodeGenerator::extrude_loop_vase(const ExtrusionLoop &original_loop
             // swap points
             Point c = a; a = b; b = c;
         }
+#ifdef _DEBUG
         assert(ccw_angle_old_test(paths.front().first_point(), a, b) ==
                abs_angle(angle_ccw( a - paths.front().first_point(),b - paths.front().first_point())));
+#endif
         double angle = abs_angle(angle_ccw(a-paths.front().first_point(),b-paths.front().first_point())) * 2 / 3;
 
         // turn left if contour, turn right if hole
@@ -4278,7 +4278,9 @@ std::string GCodeGenerator::extrude_loop_vase(const ExtrusionLoop &original_loop
             // swap points
             Point c = a; a = b; b = c;
         }
+#ifdef _DEBUG
         assert(ccw_angle_old_test(paths.front().first_point(), a, b) == abs_angle(angle_ccw( a - paths.front().first_point(),b - paths.front().first_point())));
+#endif
         double angle = abs_angle(angle_ccw( a - paths.front().first_point(),b - paths.front().first_point())) / 3;
 
         // turn left if contour, turn right if hole
@@ -4640,16 +4642,13 @@ void GCodeGenerator::seam_notch(const ExtrusionLoop& original_loop,
         if(min_angle >= 359.9) min_angle += 1;
         min_angle *= PI / 180.;
         if (end_point.distance_to_square(start_point) < SCALED_EPSILON * SCALED_EPSILON) {
-            assert(ccw_angle_old_test(start_point, prev_point, next_point) == abs_angle(angle_ccw( prev_point -start_point,next_point- start_point)));
             check_angle = abs_angle(angle_ccw( prev_point -start_point,next_point- start_point));
         } else {
-            assert(is_approx(ccw_angle_old_test(end_point, prev_point, start_point), abs_angle(angle_ccw(prev_point- end_point, start_point -end_point)), EPSILON));
             check_angle = abs_angle(angle_ccw(prev_point- end_point, start_point -end_point));
             if ((is_hole_loop ? -check_angle : check_angle) > min_angle) {
                 BOOST_LOG_TRIVIAL(debug) << "notch abord: too big angle\n";
                 return;
             }
-            assert(is_approx(ccw_angle_old_test(start_point, end_point, next_point), abs_angle(angle_ccw( end_point - start_point,next_point - start_point)), EPSILON));
             check_angle = abs_angle(angle_ccw( end_point - start_point,next_point - start_point));
         }
         assert(end_point != start_point);
@@ -5374,19 +5373,15 @@ std::string GCodeGenerator::extrude_multi_path(const ExtrusionMultiPath &multipa
 
     bool saved_flipped = this->visitor_flipped;
     if (should_reverse) {
-        this->visitor_flipped = true;
         //reverse to get a shorter point (hopefully there is still no feature that choose a point that need no perimeter crossing before).
+
+        // it's possible to have un-reverseable paths into a reversable multipath: this means that only the whole thing can be reversed, and not individual paths.
+        // but it's not possible to reverse individual paths inside a multipath anyway.
+        this->visitor_flipped = true;
         // extrude along the  reversedpath
         for (size_t idx_path = multipath.paths.size() - 1; idx_path < multipath.paths.size(); --idx_path) {
-            //it's possible to have un-reverseable paths into a reversable multipath: this means that only the whole thing can be reversed, and not individual apths.
-            if (multipath.paths[idx_path].can_reverse()) {
-                // extrude_path will reverse the path by itself, no need to copy it do to it here.
-                gcode += extrude_path(multipath.paths[idx_path], description, speed);
-            } else {
-                ExtrusionPath path = multipath.paths[idx_path];
-                path.reverse();
-                gcode += extrude_path(path, description, speed);
-            }
+            // extrude_path will reverse the path by itself, no need to copy it do to it here.
+            gcode += extrude_path(multipath.paths[idx_path], description, speed);
         }
         add_wipe_points(multipath.paths, false, false);
     } else {
@@ -5443,7 +5438,8 @@ std::string GCodeGenerator::extrude_multi_path3D(const ExtrusionMultiPath3D &mul
         // reverse to get a shorter point (hopefully there is still no feature that choose a point that need no perimeter crossing before).
         // extrude along the  reversedpath
         for (size_t idx_path = multipath3D.paths.size() - 1; idx_path < multipath3D.paths.size(); --idx_path) {
-            assert(multipath3D.paths[idx_path].can_reverse());
+            //childs of multipath can't reverse themseves. the one that can decide to reverse is the multipath.
+            assert(!multipath3D.paths[idx_path].can_reverse());
             // extrude_path will reverse the path by itself, no need to copy it do to it here.
             gcode += extrude_path_3D(multipath3D.paths[idx_path], description, speed);
         }
@@ -5482,9 +5478,12 @@ void GCodeGenerator::use(const ExtrusionEntityCollection &collection) {
                 collection.entities()[idx]->visit(*this);
             }
         } else {
+            bool was_flipped = this->visitor_flipped;
+            this->visitor_flipped = false;
             for (const ExtrusionEntity *next_entity : collection.entities()) {
                 next_entity->visit(*this);
             }
+            this->visitor_flipped = was_flipped;
         }
     } else {
         bool reversed = this->visitor_flipped;
@@ -5502,6 +5501,7 @@ std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, const std::s
     ExtrusionPath simplifed_path = path;
     for (int i = 1; i < simplifed_path.polyline.size(); ++i)
         assert(!simplifed_path.polyline.get_point(i - 1).coincides_with_epsilon(simplifed_path.polyline.get_point(i)));
+    
     if (this->visitor_flipped) {
         // in a multipath, the multipath can be reversed, but all individual path are marqued as 'unreversable', even if they can be reversed by the multipath.
         // hence, it's possible to have a !can_reverse and a visitor_flipped from the multipath.
@@ -5515,55 +5515,39 @@ std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, const std::s
         simplifed_path.reverse();
     }
 
-    // simplify with gcode_resolution (not used yet). Simplify by jusntion deviation before the g1/sec count, to be able to use that decimation to reduce max_gcode_per_second triggers.
-    // But as it can be visible on cylinders, should only be called if a max_gcode_per_second trigger may come.
+    // print or fuse with previous "too small" extrusion
+    if (!m_last_too_small.empty()) {
+        //ensure that it's a continous thing of the same type
+        if (m_last_too_small.last_point().distance_to_square(path.first_point()) < EPSILON * EPSILON * 4 && 
+            (path.role() == m_last_too_small.role() || m_last_too_small.length() < scale_d(m_last_too_small.width()/10))) {
+            // mean the attributes
+            simplifed_path.attributes_mutable().height = float(m_last_too_small.height() * m_last_too_small.length() +
+                                                               simplifed_path.height() * simplifed_path.length()) /
+                float(m_last_too_small.length() + simplifed_path.length());
+            simplifed_path.attributes_mutable().mm3_per_mm = (m_last_too_small.mm3_per_mm() * m_last_too_small.length() +
+                                                              simplifed_path.mm3_per_mm() * simplifed_path.length()) /
+                (m_last_too_small.length() + simplifed_path.length());
+            simplifed_path.attributes_mutable().width = float(m_last_too_small.width() * m_last_too_small.length() +
+                                                               simplifed_path.width() * simplifed_path.length()) /
+                float(m_last_too_small.length() + simplifed_path.length());
+            // append this path after the previous one.
+            m_last_too_small.polyline.append(simplifed_path.polyline);
+            simplifed_path.polyline.swap(m_last_too_small.polyline);
+            // check not nan
+            assert(simplifed_path.height() == simplifed_path.height());
+            assert(simplifed_path.mm3_per_mm() == simplifed_path.mm3_per_mm());
+            assert(simplifed_path.width() == simplifed_path.width());
+        } else {
+            //finish extrude the little thing that was left before us and incompatible with our next extrusion.
+            gcode += this->_extrude(m_last_too_small, m_last_description, m_last_speed_mm_per_sec);
+        }
+        m_last_too_small.polyline.clear();
+    }
+
+    // if the path is too small to be printed, put in the queue to be merge with the next one.
     const coordf_t scaled_min_length = this->config().gcode_min_length.is_enabled() ?
         scale_d(this->config().gcode_min_length.get_abs_value(m_current_perimeter_extrusion_width)) :
         0;
-    const coordf_t scaled_min_resolution = scale_d(this->config().gcode_min_resolution.get_abs_value(m_current_perimeter_extrusion_width));
-    const int32_t max_gcode_per_second = this->config().max_gcode_per_second.is_enabled() ?
-        this->config().max_gcode_per_second.value :
-        0;
-    double fan_speed;
-    if (max_gcode_per_second > 0) {
-        const int32_t gcode_buffer_window = this->config().gcode_command_buffer.value;
-        double speed = _compute_speed_mm_per_sec(path, speed_mm_per_sec, fan_speed, nullptr);
-        coordf_t scaled_mean_length = scale_d(speed / max_gcode_per_second);
-        if (!m_last_too_small.empty()) {
-            //ensure that it's a continous thing of the same type
-            if (m_last_too_small.last_point().distance_to_square(path.first_point()) < EPSILON * EPSILON * 4 && 
-                (path.role() == m_last_too_small.role() || m_last_too_small.length() < scale_d(m_last_too_small.width()/10))) {
-                simplifed_path.attributes_mutable().height = float(m_last_too_small.height() * m_last_too_small.length() + simplifed_path.height() * simplifed_path.length()) / float(m_last_too_small.length() + simplifed_path.length());
-                simplifed_path.attributes_mutable().mm3_per_mm = (m_last_too_small.mm3_per_mm() * m_last_too_small.length() + simplifed_path.mm3_per_mm() * simplifed_path.length()) / (m_last_too_small.length() + simplifed_path.length());
-                m_last_too_small.polyline.append(simplifed_path.polyline);
-                simplifed_path.polyline.swap(m_last_too_small.polyline);
-                assert(simplifed_path.height() == simplifed_path.height());
-                assert(simplifed_path.mm3_per_mm() == simplifed_path.mm3_per_mm());
-                m_last_too_small.polyline.clear();
-            } else {
-                //finish extrude the little thing that was left before us and incompatible with our next extrusion.
-                ExtrusionPath to_finish = m_last_too_small;
-                gcode += this->_extrude(m_last_too_small, m_last_description, m_last_speed_mm_per_sec);
-                // put this very small segment in the buffer, as it's very small
-                m_last_command_buffer_used++;
-                m_last_too_small.polyline.clear();
-            }
-        }
-    
-        //set at least 2 buffer space, to not over-erase first lines.
-        if (gcode_buffer_window > 2 && gcode_buffer_window - m_last_command_buffer_used < 2) {
-            m_last_command_buffer_used = gcode_buffer_window - 2;
-        }
-
-        //simplify
-        m_last_command_buffer_used = simplifed_path.polyline.simplify_straits(scaled_min_resolution,
-                                                                              scaled_min_length, scaled_mean_length,
-                                                                              gcode_buffer_window,
-                                                                              m_last_command_buffer_used);
-    } else if (scaled_min_length > 0) {
-        simplifed_path.polyline.simplify_straits(scaled_min_resolution, scaled_min_length);
-    }
-    // if the path is too small to be printed, put in the queue to be merge with the next one.
     if (scaled_min_length > 0 && simplifed_path.length() < scaled_min_length) {
         m_last_too_small = simplifed_path;
         m_last_description = description;
@@ -5571,8 +5555,38 @@ std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, const std::s
         return gcode;
     }
 
+    // simplify with gcode_resolution (not used yet). Simplify by junction deviation before the g1/sec count, to be able to use that decimation to reduce max_gcode_per_second triggers.
+    // But as it can be visible on cylinders, should only be called if a max_gcode_per_second trigger may come.
+    const coordf_t scaled_min_resolution = scale_d(this->config().gcode_min_resolution.get_abs_value(m_current_perimeter_extrusion_width));
+    const int32_t max_gcode_per_second = (false /*disabled*/&& this->config().max_gcode_per_second.is_enabled()) ?
+        this->config().max_gcode_per_second.value :
+        0;
+    double fan_speed;
+    if (max_gcode_per_second > 0) {
+        // if (broken) max_gcode_per_second is used, simplify the segment with it
+        const int32_t gcode_buffer_window = this->config().gcode_command_buffer.value;
+        double speed = _compute_speed_mm_per_sec(path, speed_mm_per_sec, fan_speed, nullptr);
+        coordf_t scaled_mean_length = scale_d(speed / max_gcode_per_second);
+
+        // set at least 2 buffer space, to not over-erase first lines.
+        if (gcode_buffer_window > 2 && gcode_buffer_window - m_last_command_buffer_used < 2) {
+            m_last_command_buffer_used = gcode_buffer_window - 2;
+        }
+
+        // simplify
+        m_last_command_buffer_used = simplifed_path.polyline.simplify_straits(scaled_min_resolution,
+                                                                                scaled_min_length,
+                                                                                scaled_mean_length,
+                                                                                gcode_buffer_window,
+                                                                                m_last_command_buffer_used);
+    } else if (scaled_min_length > 0) {
+        // else, simplify with the simple algo only
+        simplifed_path.polyline.simplify_straits(scaled_min_resolution, scaled_min_length);
+    }
+
     for(int i=1;i<simplifed_path.polyline.size();++i)
         assert(!simplifed_path.polyline.get_point(i - 1).coincides_with_epsilon(simplifed_path.polyline.get_point(i)));
+    // print the path
     gcode += this->_extrude(simplifed_path, description, speed_mm_per_sec);
 
     //simplifed_path will be discarded i can reuse it to create the wipe
@@ -5589,7 +5603,9 @@ std::string GCodeGenerator::extrude_path_3D(const ExtrusionPath3D &path, const s
     //path.simplify(SCALED_RESOLUTION);
     ExtrusionPath3D simplifed_path = path;
     if (this->visitor_flipped) {
-        assert(path.can_reverse());
+        // in a multipath, the multipath can be reversed, but all individual path are marqued as 'unreversable', even if they can be reversed by the multipath.
+        // hence, it's possible to have a !can_reverse and a visitor_flipped from the multipath.
+        //assert(path.can_reverse());
         simplifed_path.reverse();
     }
 
@@ -5619,6 +5635,11 @@ std::string GCodeGenerator::extrude_path_3D(const ExtrusionPath3D &path, const s
         }
     }
     gcode += this->_after_extrude(simplifed_path);
+    // ensure z is reset
+    if (!is_approx(m_writer.get_position().z(), m_layer->print_z, EPSILON)) {
+        assert(m_writer.get_position().z() > m_layer->print_z);
+        m_writer.set_lift(m_writer.get_position().z() - m_layer->print_z);
+    }
 
     if (m_wipe.is_enabled()) {
         ArcPolyline temp = simplifed_path.as_polyline();
@@ -5681,7 +5702,7 @@ void GCodeGenerator::extrude_perimeters(const ExtrudeArgs &print_args, const Lay
     const Print       &print  = *print_args.print_instance.print_object.print();
     m_region = &print.get_print_region(layerm.region().print_region_id());
     bool first = true;
-    std::vector<const ExtrusionEntity*> to_extrude;
+    ExtrusionEntityCollection to_extrude(true, true);
 //
 //#ifdef _DEBUG
 //    struct OverhangAssertVisitor : public ExtrusionVisitorRecursiveConst {
@@ -5696,7 +5717,7 @@ void GCodeGenerator::extrude_perimeters(const ExtrudeArgs &print_args, const Lay
 //#endif
     for (uint32_t perimeter_id : island.perimeters) {
         // Extrusions inside islands are expected to be ordered already.
-        // Don't reorder them.
+        // Don't reorder them. (supermerill: it's reordered afterwards by the chain_extrusion_references)
         assert(dynamic_cast<const ExtrusionEntityCollection*>(layerm.perimeters().entities()[perimeter_id]));
         const ExtrusionEntityCollection *eec = static_cast<const ExtrusionEntityCollection*>(layerm.perimeters().entities()[perimeter_id]);
         if (shall_print_this_extrusion_collection(print_args, eec, *m_region)) {
@@ -5707,10 +5728,11 @@ void GCodeGenerator::extrude_perimeters(const ExtrudeArgs &print_args, const Lay
                 // Apply region-specific settings
                 set_region_for_extrude(print, nullptr, &layerm, gcode);
             }
-            to_extrude.push_back(eec);
+            // flatten it to allow better reordering
+            eec->flatten(true, to_extrude);
         }
     }
-
+    // reorder
     ExtrusionEntityReferences chained = chain_extrusion_references(to_extrude, last_pos_defined() ? &last_pos() : nullptr);
     for (const ExtrusionEntityReference &next_entity : chained) {
 //#ifdef _DEBUG
@@ -5971,7 +5993,7 @@ void GCodeGenerator::_extrude_line(std::string& gcode_str, const Line& line, con
     // small_area_infill_flow_compensation
     // this is only done in _extrude_line and not in _extrude_line_cut_corner because _extrude_line_cut_corner doesn't apply to solid infill, but only for external perimeters.
     if (!this->on_first_layer() && (role == ExtrusionRole::SolidInfill || role == ExtrusionRole::TopSolidInfill) &&
-        m_config.small_area_infill_flow_compensation.value &&
+        m_config.small_area_infill_flow_compensation_model.is_enabled() &&
         m_config.small_area_infill_flow_compensation_model.value.data_size() > 1) {
         GraphData graph = m_config.small_area_infill_flow_compensation_model.value;
         assert(graph.begin_idx >= 0 && graph.begin_idx + 1 < graph.end_idx && graph.end_idx <= graph.graph_points.size());
@@ -5998,8 +6020,6 @@ void GCodeGenerator::_extrude_line(std::string& gcode_str, const Line& line, con
 void GCodeGenerator::_extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, Point& last_pos, const double path_width) {
     {
         if (line.a == line.b) return; //todo: investigate if it happens (it happens in perimeters)
-        //check the angle
-        assert(ccw_angle_old_test(line.a, last_pos, line.b) == abs_angle(angle_ccw( last_pos - line.a,line.b - line.a)));
         double angle = line.a == last_pos ? PI : abs_angle(angle_ccw( last_pos - line.a,line.b - line.a));
         //convert the angle from the angle of the line to the angle of the "joint" (Circular segment)
         if (angle > PI) angle = angle - PI;
@@ -6676,7 +6696,7 @@ std::pair<double, double> GCodeGenerator::_compute_acceleration(const ExtrusionP
 }
 
 void GCodeGenerator::cooldown_marker_init() {
-    if (!_cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)].empty()) {
+    if (_cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)].empty()) {
         std::string allow_speed_change = ";_EXTRUDE_SET_SPEED";
         //only change speed on external perimeter (and similar) speed if really necessary.
         std::string maybe_allow_speed_change = ";_EXTRUDE_SET_SPEED_MAYBE";

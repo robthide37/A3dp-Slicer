@@ -1669,7 +1669,7 @@ void Choice::BUILD() {
 
 void Choice::propagate_value()
 {
-    if (m_opt.type == coStrings) {
+    if (m_opt.type == coStrings || m_opt.type == coString) {
         on_change_field();
         return;
     }
@@ -1779,7 +1779,7 @@ void Choice::set_internal_any_value(const boost::any &value, bool change_event)
            m_opt.gui_type == ConfigOptionDef::GUIType::select_open ||
            m_opt.gui_type == ConfigOptionDef::GUIType::f_enum_open ||
            m_opt.gui_type == ConfigOptionDef::GUIType::i_enum_open ||
-           (m_opt.gui_type == ConfigOptionDef::GUIType::select_close && m_opt.opt_key == "printhost_port") //FIXME
+           (m_opt.gui_type == ConfigOptionDef::GUIType::select_close && m_opt.type == coString)
     );
 
     choice_ctrl* field = dynamic_cast<choice_ctrl*>(window);
@@ -1794,7 +1794,11 @@ void Choice::set_internal_any_value(const boost::any &value, bool change_event)
         wxString text_value = any_to_wxstring(value, m_opt, m_opt_idx);
         int sel_idx = -1;
         if (m_opt.enum_def) {
-            if (auto idx = m_opt.enum_def->label_to_index(into_u8(text_value)); idx.has_value())
+            std::optional<int> idx;
+            // select_close: try values first.
+            if (idx = m_opt.enum_def->value_to_index(into_u8(text_value)); idx.has_value() && m_opt.gui_type == ConfigOptionDef::GUIType::select_close)
+                sel_idx = *idx;
+            else if (idx = m_opt.enum_def->label_to_index(into_u8(text_value)); idx.has_value())
                 sel_idx = *idx;
             else if (idx = m_opt.enum_def->value_to_index(into_u8(text_value)); idx.has_value())
                 sel_idx = *idx;
@@ -1892,14 +1896,17 @@ boost::any& Choice::get_value()
 	if (m_opt.type == coEnum)
         // Closed enum: The combo box item index returned by the field must be convertible to an enum value.
         m_value = m_opt.enum_def->index_to_enum(field->GetSelection());
-    else if (m_opt.gui_type == ConfigOptionDef::GUIType::f_enum_open || m_opt.gui_type == ConfigOptionDef::GUIType::i_enum_open) {
-        // Open enum: The combo box item index returned by the field 
+    else if (m_opt.gui_type == ConfigOptionDef::GUIType::f_enum_open ||
+             m_opt.gui_type == ConfigOptionDef::GUIType::i_enum_open) {
+        // Open enum: The combo box item index returned by the field
         const int ret_enum = field->GetSelection();
-        if (m_opt.enum_def->has_values() && (m_opt.type == coString || m_opt.type == coStrings) && ret_enum >=0 && ret_enum < int(m_opt.enum_def->values().size())) {
+        if (m_opt.enum_def->has_values() && (m_opt.type == coString || m_opt.type == coStrings) && ret_enum >= 0 &&
+            ret_enum < int(m_opt.enum_def->values().size())) {
             m_value = m_opt.enum_def->value(ret_enum);
         } else if (ret_enum < 0 || !m_opt.enum_def->has_values() || m_opt.type == coStrings ||
-            (into_u8(ret_str) != m_opt.enum_def->value(ret_enum) && ret_str != _(m_opt.enum_def->label(ret_enum)))) {
-			// modifies ret_string!
+                   (into_u8(ret_str) != m_opt.enum_def->value(ret_enum) &&
+                    ret_str != _(m_opt.enum_def->label(ret_enum)))) {
+            // modifies ret_string!
             get_value_by_opt_type(ret_str);
         } else if (m_opt.type == coFloatOrPercent) {
             m_value = FloatOrPercent{string_to_double_decimal_point(m_opt.enum_def->value(ret_enum)),
@@ -1909,10 +1916,26 @@ boost::any& Choice::get_value()
         } else {
             m_value = string_to_double_decimal_point(m_opt.enum_def->value(ret_enum));
         }
-    }
-	else
-		// modifies ret_string!
+    } else if (m_opt.gui_type == ConfigOptionDef::GUIType::select_close && m_opt.type == coString) {
+        assert(m_opt.enum_def->has_values());
+        int enum_int = field->GetSelection();
+        if (m_opt.enum_def->has_values() && (m_opt.type == coString || m_opt.type == coStrings) && enum_int >= 0 &&
+            enum_int < int(m_opt.enum_def->values().size())) {
+            m_value = m_opt.enum_def->value(enum_int);
+        } else {
+            std::optional<int> maybe_enum_int = m_opt.enum_def->label_to_index(into_u8(ret_str));
+            if (maybe_enum_int && m_opt.enum_def->has_values() && (m_opt.type == coString || m_opt.type == coStrings) &&
+                (*maybe_enum_int) >= 0 && (*maybe_enum_int) < int(m_opt.enum_def->values().size())) {
+                m_value = m_opt.enum_def->value((*maybe_enum_int));
+            } else {
+                assert(false);
+                m_value = field->GetValue();
+            }
+        }
+    } else {
+        // modifies ret_string!
         get_value_by_opt_type(ret_str);
+    }
 
 	return m_value;
 }
@@ -2078,26 +2101,33 @@ void ColourPicker::msw_rescale()
 void ColourPicker::sys_color_changed()
 {
 #ifdef _WIN32
-	if (wxWindow* win = this->getWindow())
-		if (wxColourPickerCtrl* picker = dynamic_cast<wxColourPickerCtrl*>(win))
-			wxGetApp().UpdateDarkUI(picker->GetPickerCtrl(), true);
+    if (wxWindow* win = this->getWindow())
+        if (wxColourPickerCtrl* picker = dynamic_cast<wxColourPickerCtrl*>(win))
+            wxGetApp().UpdateDarkUI(picker->GetPickerCtrl(), true);
 #endif
 }
 
 
 void GraphButton::BUILD()
 {
-    auto size = wxSize(def_width() * m_em_unit, wxDefaultCoord);
+    wxSize size(def_width() * m_em_unit, wxDefaultCoord);
     if (m_opt.height >= 0) size.SetHeight(m_opt.height*m_em_unit);
     if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
     assert(m_opt.type == coGraph || m_opt.type == coGraphs);
-    if (m_opt.type == coGraphs)
+    if (m_opt.type == coGraphs) {
         current_value = m_opt.get_default_value<ConfigOptionGraphs>()->get_at(m_opt_idx);
-    if (m_opt.type == coGraph)
+    } else if (m_opt.type == coGraph) {
         current_value = m_opt.get_default_value<ConfigOptionGraph>()->value;
+    }
 
-    wxButton* bt_widget = new wxButton(m_parent, wxID_ANY, _L("Edit graph"), wxDefaultPosition, size);
+    wxSize bitmap_size = size;
+    if (bitmap_size.GetWidth() > 0 && bitmap_size.GetHeight() <= 0) {
+        bitmap_size.SetHeight(bitmap_size.GetWidth() / 2);
+    } else if (bitmap_size.GetWidth() <= 0) {
+        bitmap_size.Set(40, 20);
+    }
+    GraphBitmapButton* bt_widget = new GraphBitmapButton(m_parent, bitmap_size);//, wxID_ANY, _L("Edit graph"), wxDefaultPosition, size);
     if (parent_is_custom_ctrl && m_opt.height < 0)
         opt_height = (double)bt_widget->GetSize().GetHeight() / m_em_unit;
     bt_widget->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -2105,8 +2135,7 @@ void GraphButton::BUILD()
 
     wxGetApp().UpdateDarkUI(bt_widget);
 
-    // recast as a wxWindow to fit the calling convention
-    window = dynamic_cast<wxWindow*>(bt_widget);
+    window = bt_widget;
 
     //window->Bind(wxEVT_COLOURPICKER_CHANGED, ([this](wxCommandEvent e) { on_change_field(); }), window->GetId());
     
@@ -2140,6 +2169,7 @@ void GraphButton::BUILD()
         GraphDialog dlg(this->window, current_value, settings);
         if (dlg.ShowModal() == wxID_OK) {
             m_value = current_value = dlg.get_data();
+            this->window->update_bitmap(settings, current_value);
             this->on_change_field();
         }
     }));
@@ -2147,6 +2177,11 @@ void GraphButton::BUILD()
         this->set_tooltip(current_value.serialize());
     } else {
         this->set_tooltip(wxString("Disabled (") + current_value.serialize() + ")");
+    }
+
+    
+    if (this->m_opt.graph_settings) {
+        this->window->update_bitmap(*this->m_opt.graph_settings, current_value);
     }
 }
 
@@ -2160,9 +2195,15 @@ void GraphButton::set_internal_any_value(const boost::any &value, bool change_ev
         if (!graphs.empty()) {
             assert(m_opt_idx <graphs.size());
             m_value = current_value = graphs[m_opt_idx <graphs.size() ? m_opt_idx : 0];
+            if (this->m_opt.graph_settings) {
+                this->window->update_bitmap(*this->m_opt.graph_settings, current_value);
+            }
         }
     } else if (this->m_opt.type == coGraph || this->m_opt.type == coGraphs) {
         m_value = current_value = boost::any_cast<GraphData>(value);
+        if (this->m_opt.graph_settings) {
+            this->window->update_bitmap(*this->m_opt.graph_settings, current_value);
+        }
     }
 }
 
@@ -2176,7 +2217,7 @@ void GraphButton::msw_rescale()
 {
     Field::msw_rescale();
 
-    wxButton* field = dynamic_cast<wxButton*>(window);
+    GraphBitmapButton* field = window;
     auto size = wxSize(def_width() * m_em_unit, wxDefaultCoord);
     if (m_opt.height >= 0)
         size.SetHeight(m_opt.height * m_em_unit);

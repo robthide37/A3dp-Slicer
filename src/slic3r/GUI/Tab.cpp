@@ -4282,6 +4282,27 @@ void Tab::load_current_preset()
 
     update_btns_enabling();
 
+    //fix phony before update()
+    //merill note: this is a bit of anti-inheritance pattern
+    if (type() == Preset::TYPE_FFF_PRINT) {
+        assert(m_config);
+        // verify that spacings are set
+        if (m_config &&
+            m_config->update_phony({&wxGetApp()
+                                            .preset_bundle->prints(wxGetApp().plater()->printer_technology())
+                                            .get_edited_preset()
+                                            .config,
+                                    &wxGetApp()
+                                            .preset_bundle->materials(wxGetApp().plater()->printer_technology())
+                                            .get_edited_preset()
+                                            .config,
+                                    &wxGetApp().preset_bundle->printers.get_edited_preset().config}) != nullptr) {
+            update_dirty(); // will call on_presets_changed() again
+            reload_config();
+        }
+    }
+
+
     update();
     if (type() == Slic3r::Preset::TYPE_PRINTER) {
         // For the printer profile, generate the extruder pages.
@@ -4392,20 +4413,6 @@ void Tab::load_current_preset()
         }
         else {
             on_presets_changed();
-
-            //update width/spacing links
-            if (type() == Preset::TYPE_FFF_PRINT) {
-                assert(m_config);
-                //verify that spacings are set
-                if (m_config && m_config->update_phony({
-                        &wxGetApp().preset_bundle->prints(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
-                        &wxGetApp().preset_bundle->materials(wxGetApp().plater()->printer_technology()).get_edited_preset().config,
-                        &wxGetApp().preset_bundle->printers.get_edited_preset().config
-                    }) != nullptr) {
-                    update_dirty(); // will call on_presets_changed() again
-                    reload_config();
-                }
-            }
         }
         update_frequently_changed_parameters();
 
