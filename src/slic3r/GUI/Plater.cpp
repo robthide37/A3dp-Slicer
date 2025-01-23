@@ -2366,6 +2366,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     background_process.set_fff_print(fff_prints.front().get());
     background_process.set_sla_print(sla_prints.front().get());
     background_process.set_gcode_result(gcode_results.front());
+    
     background_process.set_thumbnail_cb([this](const ThumbnailsParams& params) { return this->generate_thumbnails(params, Camera::EType::Ortho); });
     background_process.set_slicing_completed_event(EVT_SLICING_COMPLETED);
     background_process.set_finished_event(EVT_PROCESS_COMPLETED);
@@ -4562,7 +4563,6 @@ void Plater::priv::set_current_panel(wxTitledPanel* panel)
     wxTitledPanel* old_panel = current_panel;
     current_panel = panel;
 
-    
     // to reduce flickering when changing view, first set as visible the new current panel
     for (wxPanel* p : panels) {
         if (p == current_panel) {
@@ -4623,7 +4623,7 @@ void Plater::priv::set_current_panel(wxTitledPanel* panel)
                 && is_sliceable(s_print_statuses[s_multiple_beds.get_active_bed()])
             ) {
                 preview->get_canvas3d()->init_gcode_viewer();
-                preview->load_gcode_shells();
+                preview->get_canvas3d()->load_gcode_shells();
                 q->reslice();
             }
             // keeps current gcode preview, if any
@@ -4631,7 +4631,6 @@ void Plater::priv::set_current_panel(wxTitledPanel* panel)
 
             if (! s_multiple_beds.is_bed_occupied(s_multiple_beds.get_active_bed()))
                 preview->get_canvas3d()->reset_gcode_toolpaths();
-
         }
     }
 
@@ -5407,8 +5406,7 @@ void Plater::priv::enable_preview_moves_slider(bool enable)
 
 void Plater::priv::reset_gcode_toolpaths()
 {
-    gcode_results[s_multiple_beds.get_active_bed()].reset();
-    preview->reset_gcode_toolpaths();
+    preview->get_canvas3d()->reset_gcode_toolpaths();
 }
 
 bool Plater::priv::can_set_instance_to_object() const
@@ -9512,7 +9510,6 @@ wxMenu* Plater::multi_selection_menu()  { return p->menus.multi_selection_menu()
 
 Print& Plater::active_fff_print() { return *p->fff_prints[s_multiple_beds.get_active_bed()]; }
 SLAPrint& Plater::active_sla_print()  { return *p->sla_prints[s_multiple_beds.get_active_bed()]; }
-
 
 SuppressBackgroundProcessingUpdate::SuppressBackgroundProcessingUpdate() :
     m_was_scheduled(wxGetApp().plater()->is_background_process_update_scheduled())
