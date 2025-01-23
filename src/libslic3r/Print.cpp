@@ -826,8 +826,8 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
             && m_config.gcode_flavor != gcfMarlinFirmware
             && m_config.gcode_flavor != gcfKlipper )
             return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/Sprinter and Repetier G-code flavors.") };
-        if (! m_config.use_relative_e_distances)
-            return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).") };
+        //if (! m_config.use_relative_e_distances)
+            //return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).") };
         if (m_config.ooze_prevention && m_config.single_extruder_multi_material)
             return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("Ooze prevention is currently not supported with the wipe tower enabled.") };
         if (m_config.use_volumetric_e)
