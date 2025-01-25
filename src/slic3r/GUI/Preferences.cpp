@@ -1058,7 +1058,6 @@ void PreferencesDialog::build()
             m_optkey_to_optgroup[is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer"] = m_tabid_2_optgroups.back().back();
             wxGetApp().sidebar().get_searcher().add_key(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer", Preset::TYPE_PREFERENCES, m_tabid_2_optgroups.back().back()->config_category(), L("Preferences"), def_combobox);
         }
-
         append_bool_option(m_tabid_2_optgroups.back().back(), "restore_win_position",
             L("Restore window position on start"),
             L("If enabled, Slic3r will be open at the position it was closed"),
@@ -1281,22 +1280,23 @@ void PreferencesDialog::accept(wxEvent&)
 		wxGetApp().force_sys_colors_update();
 #endif
 
-    auto it_background_processing = m_values.find("background_processing");
+	auto it_background_processing = m_values.find("background_processing");
     if (it_background_processing != m_values.end() && it_background_processing->second == "1" &&
         app_config->get("background_processing") != it_background_processing->second) {
-        bool warning = app_config->get("auto_switch_preview") != "never";
-        auto it_auto_switch_preview = m_values.find("auto_switch_preview");
-        if (it_auto_switch_preview != m_values.end()) {
-            warning = it_auto_switch_preview->second != "never";
-        }
-        if(warning) {
-            wxMessageDialog dialog(nullptr, "Using background processing with automatic tab switching may be combersome"
-                ", are-you sure to keep the automatic tab switching?", _L("Are you sure?"), wxOK | wxCANCEL | wxICON_QUESTION);
-            if (dialog.ShowModal() == wxID_CANCEL) {
-                m_values["auto_switch_preview"] = "never";
-            }
-        }
-    }
+		bool warning = app_config->get("auto_switch_preview") != "never";
+		auto it_auto_switch_preview = m_values.find("auto_switch_preview");
+		if (it_auto_switch_preview != m_values.end())
+			warning = it_auto_switch_preview->second != "never";
+		if(warning) {
+			wxMessageDialog dialog(nullptr, "Using background processing with automatic tab switching may be combersome"
+				", are-you sure to keep the automatic tab switching?", _L("Are you sure?"), wxOK | wxCANCEL | wxICON_QUESTION);
+			if (dialog.ShowModal() == wxID_CANCEL)
+				m_values["auto_switch_preview"] = "never";
+		}
+	}
+
+	for (std::map<std::string, std::string>::iterator it = m_values.begin(); it != m_values.end(); ++it)
+		app_config->set(it->first, it->second);
 
 	// `set_label_clr_default` BEFORE  `app_config->set` to set the right color (light or dark mode)
 	if (wxGetApp().is_editor()) {
@@ -1357,6 +1357,10 @@ void PreferencesDialog::revert(wxEvent&)
 			m_optkey_to_optgroup[key]->set_value(key, app_config->get(key) == "none", true, false);
 			continue;
 		}
+		//if (key == "notify_release") {
+		//	m_optkey_to_optgroup[key]->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)), true, false);
+		//	continue;
+		//}
 		if (key == "old_settings_layout_mode") {
 			m_rb_old_settings_layout_mode->SetValue(app_config->get_bool(key));
 			m_settings_layout_changed = false;
@@ -1392,20 +1396,20 @@ void PreferencesDialog::revert(wxEvent&)
 			continue;
 		}
         if (field->m_opt.type == coStrings) {
-            assert(false);
-            continue;
-        }
+			assert(false);
+			continue;
+		}
         if (field->m_opt.type == coInt) {
-            field->set_any_value(ConfigOptionInt(app_config->get_int(key)).get_any(), false);
-            continue;
-        }
+			field->set_any_value(ConfigOptionInt(app_config->get_int(key)).get_any(), false);
+			continue;
+		}
         if (field->m_opt.type == coEnum) {
-            assert(field->m_opt.enum_def);
-            std::optional<int> idx = field->m_opt.enum_def->value_to_index(app_config->get(key));
-            assert(idx.has_value());
-            field->set_any_value(int32_t(*idx), false);
-            continue;
-        }
+			assert(field->m_opt.enum_def);
+			std::optional<int> idx = field->m_opt.enum_def->value_to_index(app_config->get(key));
+			assert(idx.has_value());
+			field->set_any_value(int32_t(*idx), false);
+			continue;
+		}
 		assert(false);
 	}
 

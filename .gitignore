@@ -27,3 +27,4 @@ deps/usr/*
 # MacOS Ignores
 .DS_Store
 
+/deps/usr/local

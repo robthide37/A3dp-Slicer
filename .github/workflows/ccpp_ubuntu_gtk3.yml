@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - dev
-
+      - supermnerill-Main
 jobs:
   build:
 
@@ -34,7 +34,7 @@ jobs:
       name: build deps if new cache
       run: ./BuildLinux.sh -d
     - name: slicer, tar & appimage
-      run: ./BuildLinux.sh -siv
+      run: ./BuildLinux.sh -siv -b release -g 3
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:

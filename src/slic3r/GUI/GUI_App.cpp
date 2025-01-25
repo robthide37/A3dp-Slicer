@@ -1582,6 +1582,14 @@ bool GUI_App::on_init_inner()
 
     obj_list()->set_min_height();
 
+    show_printer_webview_tab();
+    DynamicPrintConfig *selected_printer_config = preset_bundle->physical_printers.get_selected_printer_config();
+    if (selected_printer_config)
+        if (selected_printer_config->has("print_host"))
+            if (selected_printer_config->opt_string("print_host") != "")
+                //plater_->set_physical_printer_config(selected_printer_config);
+
+
     update_mode(); // update view mode after fix of the object_list size
 
 #ifdef __APPLE__
@@ -2421,7 +2429,7 @@ void GUI_App::calibration_pressureadv_dialog()
 }
 void GUI_App::freecad_script_dialog()
 {
-    change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
+  // change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
 }
 void GUI_App::tiled_canvas_dialog()
 {
@@ -4171,6 +4179,10 @@ void GUI_App::open_wifi_config_dialog(bool forced, const wxString& drive_path/* 
         app_config->set("wifi_config_dialog_declined", "1");
     }
     m_wifi_config_dialog_shown = false;
+}
+
+void GUI_App::show_printer_webview_tab() {
+    mainframe->show_printer_webview_tab(preset_bundle->physical_printers.get_selected_printer_config());
 }
 
 } // GUI

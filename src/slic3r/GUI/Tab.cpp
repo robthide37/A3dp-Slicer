@@ -4310,6 +4310,8 @@ void Tab::load_current_preset()
             on_preset_loaded();
         else
             wxGetApp().sidebar().update_objects_list_extruder_column(1);
+
+        wxGetApp().show_printer_webview_tab();
     }
     // Reload preset pages with the new configuration values.
     reload_config();
@@ -5129,6 +5131,8 @@ void Tab::delete_preset()
         PhysicalPrinter& printer = physical_printers.get_selected_printer();
         if (printer.preset_names.size() == 1) {
             if (m_presets_choice->del_physical_printer(_L("It's a last preset for this physical printer.")))
+                wxGetApp().show_printer_webview_tab();
+
                 Layout();
             return;
         }

@@ -580,6 +580,8 @@ struct PrintStatistics
     std::map<uint8_t, double>       estimated_print_time;
     std::map<uint8_t, std::string>  estimated_print_time_str;
     double                          total_used_filament;
+    float                           normal_print_time_seconds;
+    std::string                     estimated_normal_print_time;
     std::vector<std::pair<size_t, double>> color_extruderid_to_used_filament; // id -> mm (length)
     double                          total_extruded_volume;
     double                          total_cost;

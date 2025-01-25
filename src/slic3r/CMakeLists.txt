@@ -1,4 +1,4 @@
-#/|/ Copyright (c) Prusa Research 2018 - 2023 Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, Vojtěch Král @vojtechkral
+    #/|/ Copyright (c) Prusa Research 2018 - 2023 Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka, Lukáš Hejl @hejllukas, Vojtěch Král @vojtechkral
 #/|/ Copyright (c) 2023 Pedro Lamas @PedroLamas
 #/|/ Copyright (c) 2020 Sergey Kovalev @RandoMan70
 #/|/ Copyright (c) 2021 Boleslaw Ciesielski
@@ -21,6 +21,12 @@ include(PrecompiledHeader)
 set(SLIC3R_GUI_SOURCES
     pchheader.cpp
     pchheader.hpp
+    GUI/Downloader.cpp
+    GUI/Downloader.hpp
+    GUI/DownloaderFileGet.cpp
+    GUI/DownloaderFileGet.hpp
+    GUI/PrinterWebView.cpp   
+    GUI/PrinterWebView.hpp
     GUI/AboutDialog.cpp
     GUI/AboutDialog.hpp
     GUI/ArrangeSettingsDialogImgui.hpp
@@ -45,6 +51,9 @@ set(SLIC3R_GUI_SOURCES
     GUI/CalibrationFlowDialog.hpp
     GUI/CalibrationFlowSpeedDialog.cpp
     GUI/CalibrationFlowSpeedDialog.hpp
+    GUI/A3DPWebView.cpp
+    GUI/A3DPWebView.hpp
+    
     GUI/CalibrationOverBridgeDialog.cpp
     GUI/CalibrationOverBridgeDialog.hpp
     GUI/CalibrationTempDialog.cpp
@@ -156,6 +165,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/EditGCodeDialog.cpp
     GUI/SavePresetDialog.hpp
     GUI/SavePresetDialog.cpp
+    GUI/BulkExportDialog.hpp
+    GUI/BulkExportDialog.cpp
     GUI/PhysicalPrinterDialog.hpp
     GUI/PhysicalPrinterDialog.cpp
     GUI/GUI_Factories.cpp
@@ -233,6 +244,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/MsgDialog.hpp
     GUI/UpdateDialogs.cpp
     GUI/UpdateDialogs.hpp
+
     GUI/FirmwareDialog.cpp
     GUI/FirmwareDialog.hpp
     GUI/PrintHostDialogs.cpp
@@ -274,6 +286,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Notebook.hpp
     GUI/ObjectDataViewModel.cpp
     GUI/ObjectDataViewModel.hpp
+    GUI/Widgets/PopupWindow.cpp
+    GUI/Widgets/PopupWindow.hpp
     GUI/InstanceCheck.cpp
     GUI/InstanceCheck.hpp
     GUI/Search.cpp
@@ -405,6 +419,9 @@ endif ()
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
 target_compile_definitions(libslic3r_gui PRIVATE $<$<BOOL:${SLIC3R_ALPHA}>:SLIC3R_ALPHA>)
 
+if (WIN32)
+    target_include_directories(libslic3r_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/WebView2/include)
+endif()
 foreach(_source IN ITEMS ${SLIC3R_GUI_SOURCES})
     get_filename_component(_source_path "${_source}" PATH)
     string(REPLACE "/" "\\" _group_path "${_source_path}")

@@ -19,7 +19,6 @@ CheckBox::CheckBox(wxWindow* parent, const wxString& name)
     Bind(wxEVT_ENTER_WINDOW, &CheckBox::updateBitmap, this);
     Bind(wxEVT_LEAVE_WINDOW, &CheckBox::updateBitmap, this);
 #endif
-
 	update();
 }
 

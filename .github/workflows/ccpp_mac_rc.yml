@@ -3,16 +3,20 @@ name: C/C++ Release candidate macos
 on:
   push:
     branches:
-      - rc
-
+      - multiple-beds-prusa
+      - test-yaml-fix
 jobs:
   build_dep:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v3
     - name: mkdir in deps
       run: mkdir deps/build
+    - name: Install Autoconf
+      run: |
+        brew update
+        brew install autoconf
     - name: update automake for mpfr
       run: |
         curl -O -L http://ftpmirror.gnu.org/automake/automake-1.16.5.tar.gz
@@ -33,7 +37,7 @@ jobs:
       run: ./BuildMacOS.sh -d
 
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
     needs: build_dep
 
     steps:
