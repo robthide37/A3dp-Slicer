@@ -366,7 +366,7 @@ double GraphData::interpolate(double x_value) const{
     } else if (this->graph_points.size() == 1 || this->graph_points[begin_idx].x() >= x_value) {
         y_value = this->graph_points.front().y();
     } else if (this->graph_points[end_idx - 1].x() <= x_value) {
-        y_value = this->graph_points.back().y();
+        y_value = this->graph_points[end_idx - 1].y();
     } else {
         // find first and second datapoint
         for (size_t idx = this->begin_idx; idx < this->end_idx; ++idx) {
@@ -1614,7 +1614,7 @@ ConfigSubstitutions ConfigBase::load_from_ini_string_commented(std::string &&dat
 
 ConfigSubstitutions ConfigBase::load(const boost::property_tree::ptree &tree, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::map<t_config_option_key, std::string> opt_deleted;
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
     for (const boost::property_tree::ptree::value_type &v : tree) {
         t_config_option_key opt_key = v.first;
@@ -1631,7 +1631,7 @@ ConfigSubstitutions ConfigBase::load(const boost::property_tree::ptree &tree, Fo
                     this->set_deserialize(opt_key, value, substitutions_ctxt);
                 }
             } else {
-                opt_deleted.emplace_back(saved_key, value);
+                opt_deleted[saved_key] = value;
             }
         } catch (UnknownOptionException & /* e */) {
             // ignore
@@ -1712,7 +1712,7 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
     if (str == nullptr)
         return 0;
     
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::map<t_config_option_key, std::string> opt_deleted;
     // Walk line by line in reverse until a non-configuration key appears.
     const char *data_start = str;
     // boost::nowide::ifstream seems to cook the text data somehow, so less then the 64k of characters may be retrieved.
@@ -1733,7 +1733,7 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
                     ++num_key_value_pairs;
                 }
             } else {
-                opt_deleted.emplace_back(saved_key, value);
+                opt_deleted[saved_key] = value;
             }
         }
         catch (UnknownOptionException & /* e */) {
@@ -1871,7 +1871,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
     size_t                    key_value_pairs = 0;
     
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::map<t_config_option_key, std::string> opt_deleted;
     if (has_delimiters)
     {
         // Slic3r starting with 2.4.0 (and Prusaslicer from 2.4.0-alpha0) delimits the config section stored into G-code with 
@@ -1918,7 +1918,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename
                             ++ key_value_pairs;
                         }
                     } else {
-                        opt_deleted.emplace_back(key, value);
+                        opt_deleted[key] = value;
                     }
                 } catch (UnknownOptionException & /* e */) {
                     // ignore
@@ -1985,14 +1985,14 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
     if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
     
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::map<t_config_option_key, std::string> opt_deleted;
     // extracts data from block
     for (const auto& [key, value] : slicer_metadata_block.raw_data) {
         t_config_option_key test_key = key;
         std::string test_val = value;
         PrintConfigDef::handle_legacy(test_key, test_val, true);
         if (test_key.empty()) {
-            opt_deleted.emplace_back(key, test_val);
+            opt_deleted[key] = test_val;
         }
 
         this->set_deserialize(key, value, substitutions_ctxt);

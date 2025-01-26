@@ -75,7 +75,7 @@ void CalibrationAbstractDialog::create(boost::filesystem::path html_path, std::s
     html_viewer->Bind(wxEVT_HTML_LINK_CLICKED, [this](wxHtmlLinkEvent& evt) {
         wxLaunchDefaultBrowser(evt.GetLinkInfo().GetHref());
     });
-    main_sizer->Add(html_viewer, 1, wxEXPAND | wxALL, 5);
+    main_sizer->Add(html_viewer, 1, wxEXPAND | wxALL, 15);
 
     wxDisplay display(wxDisplay::GetFromWindow(main_frame));
     wxRect screen = display.GetClientArea();
@@ -92,10 +92,16 @@ void CalibrationAbstractDialog::create(boost::filesystem::path html_path, std::s
     close->SetFocus();
     SetAffirmativeId(wxID_CLOSE);
     buttons->Realize();
-    main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 5);
+    main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 15);
 
     SetSizer(main_sizer);
     this->SetSize(dialog_size.x, dialog_size.y);
+
+    wxGetApp().UpdateDlgDarkUI(this);
+#ifdef _MSW_DARK_MODE
+    // can't change html tet color, so keep white background
+    html_viewer->SetHTMLBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+#endif
 }
 
 void CalibrationAbstractDialog::close_me(wxCommandEvent& event_args) {

@@ -360,7 +360,7 @@ public:
     static bool is_defined(t_config_option_key& opt_key);
     static std::map<std::string, std::string> to_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
     static std::map<std::string, std::string> from_prusa(t_config_option_key& opt_key, std::string& value, const DynamicConfig& all_conf);
-    static void handle_legacy_composite(DynamicPrintConfig &config, std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted);
+    static void handle_legacy_composite(DynamicPrintConfig &config, std::map<t_config_option_key, std::string> &opt_deleted);
 
     // Array options growing with the number of extruders
     const std::vector<std::string>& extruder_option_keys() const { return m_extruder_option_keys; }
@@ -469,7 +469,7 @@ public:
     // Called after a config is loaded as a whole.
     // Perform composite conversions, for example merging multiple keys into one key.
     // For conversion of single options, the handle_legacy() method above is called.
-    void                handle_legacy_composite(std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted) override
+    void                handle_legacy_composite(std::map<t_config_option_key, std::string> &opt_deleted) override
         { PrintConfigDef::handle_legacy_composite(*this, opt_deleted); }
     void                to_prusa(t_config_option_key& opt_key, std::string& value) const override
         { PrintConfigDef::to_prusa(opt_key, value, *this); }
@@ -1004,7 +1004,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                print_retract_length))
     ((ConfigOptionFloat,                print_retract_lift))
     ((ConfigOptionString,               region_gcode))
-    ((ConfigOptionBool,                 small_area_infill_flow_compensation))
     ((ConfigOptionGraph,                small_area_infill_flow_compensation_model))
     ((ConfigOptionFloatOrPercent,       small_perimeter_speed))
     ((ConfigOptionFloatOrPercent,       small_perimeter_min_length))
@@ -1081,10 +1080,11 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionString,              before_layer_gcode))
     ((ConfigOptionString,              between_objects_gcode))
     ((ConfigOptionBool,                binary_gcode))
+    ((ConfigOptionFloat,               cooling_tube_retraction))
+    ((ConfigOptionFloat,               cooling_tube_length))
     ((ConfigOptionFloats,              deretract_speed))
     ((ConfigOptionString,              end_gcode))
     ((ConfigOptionStrings,             end_filament_gcode))
-    ((ConfigOptionFloats,              filament_pressure_advance))
     ((ConfigOptionFloat,               extra_loading_move))
     ((ConfigOptionGraphs,              extruder_extrusion_multiplier_speed))
     ((ConfigOptionPercents,            extruder_fan_offset))
@@ -1098,6 +1098,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionStrings,             fan_name))
     ((ConfigOptionBool,                fan_speedup_overhangs))
     ((ConfigOptionFloat,               fan_speedup_time))
+    ((ConfigOptionString,              feature_gcode))
     ((ConfigOptionFloats,              filament_cooling_final_speed))
     ((ConfigOptionFloats,              filament_cooling_initial_speed))
     ((ConfigOptionInts,                filament_cooling_moves))
@@ -1130,6 +1131,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInts,                filament_toolchange_part_fan_speed))
     ((ConfigOptionFloats,              filament_dip_insertion_speed))
     ((ConfigOptionFloats,              filament_dip_extraction_speed)) /* SKINNYDIP OPTIONS END */
+    ((ConfigOptionFloats,              filament_pressure_advance))
     ((ConfigOptionBools,               filament_soluble))
     ((ConfigOptionFloats,              filament_toolchange_delay))
     ((ConfigOptionFloats,              filament_unloading_speed))
@@ -1172,18 +1174,19 @@ PRINT_CONFIG_CLASS_DEFINE(
     //      i - case insensitive
     //      w - whole word
     ((ConfigOptionStrings,             gcode_substitutions))
+    ((ConfigOptionBool,                high_current_on_filament_swap))
     ((ConfigOptionString,              layer_gcode))
-    ((ConfigOptionString,              feature_gcode))
     ((ConfigOptionFloat,               max_gcode_per_second))
     ((ConfigOptionFloatOrPercent,      max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))
     ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_positive))
     ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_negative))
     ((ConfigOptionFloats,              milling_z_lift))
-    ((ConfigOptionBools,               travel_ramping_lift))
-    // ((ConfigOptionFloats,              travel_max_lift))
-    ((ConfigOptionFloats,              travel_slope))
-    ((ConfigOptionBools,               travel_lift_before_obstacle))
+    ((ConfigOptionFloat,               parking_pos_retraction))
+    ((ConfigOptionInt,                 print_bed_temperature))
+    ((ConfigOptionInt,                 print_first_layer_bed_temperature))
+    ((ConfigOptionBool,                remaining_times))
+    ((ConfigOptionEnum<RemainingTimeType>, remaining_times_type))
     ((ConfigOptionPercents,            retract_before_wipe))
     ((ConfigOptionFloats,              retract_length))
     ((ConfigOptionFloats,              retract_length_toolchange))
@@ -1197,10 +1200,15 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              retract_restart_extra_toolchange))
     ((ConfigOptionFloats,              retract_speed))
     ((ConfigOptionStrings,             start_filament_gcode))
+    ((ConfigOptionBool,                silent_mode))
     ((ConfigOptionString,              start_gcode))
     ((ConfigOptionBool,                start_gcode_manual))
     ((ConfigOptionBool,                single_extruder_multi_material))
     ((ConfigOptionBool,                single_extruder_multi_material_priming))
+    ((ConfigOptionBools,               travel_ramping_lift))
+    // ((ConfigOptionFloats,              travel_max_lift))
+    ((ConfigOptionFloats,              travel_slope))
+    ((ConfigOptionBools,               travel_lift_before_obstacle))
     ((ConfigOptionStrings,             tool_name))
     ((ConfigOptionString,              toolchange_gcode))
     ((ConfigOptionFloat,               travel_speed))
@@ -1209,13 +1217,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                use_relative_e_distances))
     ((ConfigOptionBool,                use_volumetric_e))
     ((ConfigOptionBool,                variable_layer_height))
-    ((ConfigOptionFloat,               cooling_tube_retraction))
-    ((ConfigOptionFloat,               cooling_tube_length))
-    ((ConfigOptionBool,                high_current_on_filament_swap))
-    ((ConfigOptionFloat,               parking_pos_retraction))
-    ((ConfigOptionBool,                remaining_times))
-    ((ConfigOptionEnum<RemainingTimeType>, remaining_times_type))
-    ((ConfigOptionBool,                silent_mode))
     ((ConfigOptionBool,                wipe_advanced))
     ((ConfigOptionEnum<WipeAlgo>,      wipe_advanced_algo))
     ((ConfigOptionFloat,               wipe_advanced_nozzle_melted_volume))
@@ -1942,9 +1943,9 @@ public:
 
 
     // utilities to help convert from prusa config.
-    // if with_phony, then the phony settigns will be set to phony if needed.
+    // if with_phony, then the phony settings will be set to phony if needed.
     void convert_from_prusa(const DynamicPrintConfig& global_config, bool with_phony);
-    void handle_legacy_composite(std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted)
+    void handle_legacy_composite(std::map<t_config_option_key, std::string> &opt_deleted)
         { PrintConfigDef::handle_legacy_composite(m_data, opt_deleted); }
 
 private:

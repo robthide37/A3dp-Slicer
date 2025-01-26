@@ -141,6 +141,17 @@ const wxBitmapBundle *UndoValueUIManager::enable_bitmap() const {
     return bmp;
 }
 
+CheckBoxWidget_t *Field::create_enable_widget(wxWindow *parent) {
+    assert(!m_enable_widget);
+    m_enable_widget = new ::CheckBox(parent == nullptr ? m_parent : parent, "");
+    set_enable_tooltip(_L("This Setting can be disabled/enabled by clicking on this checkbox."));
+    m_enable_widget->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent e) {
+        on_enable_value();
+        m_enable_widget->Update();
+    });
+    return m_enable_widget;
+}
+
 Field::~Field()
 {
 	if (m_on_kill_focus)
@@ -2101,26 +2112,33 @@ void ColourPicker::msw_rescale()
 void ColourPicker::sys_color_changed()
 {
 #ifdef _WIN32
-	if (wxWindow* win = this->getWindow())
-		if (wxColourPickerCtrl* picker = dynamic_cast<wxColourPickerCtrl*>(win))
-			wxGetApp().UpdateDarkUI(picker->GetPickerCtrl(), true);
+    if (wxWindow* win = this->getWindow())
+        if (wxColourPickerCtrl* picker = dynamic_cast<wxColourPickerCtrl*>(win))
+            wxGetApp().UpdateDarkUI(picker->GetPickerCtrl(), true);
 #endif
 }
 
 
 void GraphButton::BUILD()
 {
-    auto size = wxSize(def_width() * m_em_unit, wxDefaultCoord);
+    wxSize size(def_width() * m_em_unit, wxDefaultCoord);
     if (m_opt.height >= 0) size.SetHeight(m_opt.height*m_em_unit);
     if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
     assert(m_opt.type == coGraph || m_opt.type == coGraphs);
-    if (m_opt.type == coGraphs)
+    if (m_opt.type == coGraphs) {
         current_value = m_opt.get_default_value<ConfigOptionGraphs>()->get_at(m_opt_idx);
-    if (m_opt.type == coGraph)
+    } else if (m_opt.type == coGraph) {
         current_value = m_opt.get_default_value<ConfigOptionGraph>()->value;
+    }
 
-    wxButton* bt_widget = new wxButton(m_parent, wxID_ANY, _L("Edit graph"), wxDefaultPosition, size);
+    wxSize bitmap_size = size;
+    if (bitmap_size.GetWidth() > 0 && bitmap_size.GetHeight() <= 0) {
+        bitmap_size.SetHeight(bitmap_size.GetWidth() / 2);
+    } else if (bitmap_size.GetWidth() <= 0) {
+        bitmap_size.Set(40, 20);
+    }
+    GraphBitmapButton* bt_widget = new GraphBitmapButton(m_parent, bitmap_size);//, wxID_ANY, _L("Edit graph"), wxDefaultPosition, size);
     if (parent_is_custom_ctrl && m_opt.height < 0)
         opt_height = (double)bt_widget->GetSize().GetHeight() / m_em_unit;
     bt_widget->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -2128,8 +2146,7 @@ void GraphButton::BUILD()
 
     wxGetApp().UpdateDarkUI(bt_widget);
 
-    // recast as a wxWindow to fit the calling convention
-    window = dynamic_cast<wxWindow*>(bt_widget);
+    window = bt_widget;
 
     //window->Bind(wxEVT_COLOURPICKER_CHANGED, ([this](wxCommandEvent e) { on_change_field(); }), window->GetId());
     
@@ -2163,6 +2180,7 @@ void GraphButton::BUILD()
         GraphDialog dlg(this->window, current_value, settings);
         if (dlg.ShowModal() == wxID_OK) {
             m_value = current_value = dlg.get_data();
+            this->window->update_bitmap(settings, current_value);
             this->on_change_field();
         }
     }));
@@ -2170,6 +2188,11 @@ void GraphButton::BUILD()
         this->set_tooltip(current_value.serialize());
     } else {
         this->set_tooltip(wxString("Disabled (") + current_value.serialize() + ")");
+    }
+
+    
+    if (this->m_opt.graph_settings) {
+        this->window->update_bitmap(*this->m_opt.graph_settings, current_value);
     }
 }
 
@@ -2183,9 +2206,15 @@ void GraphButton::set_internal_any_value(const boost::any &value, bool change_ev
         if (!graphs.empty()) {
             assert(m_opt_idx <graphs.size());
             m_value = current_value = graphs[m_opt_idx <graphs.size() ? m_opt_idx : 0];
+            if (this->m_opt.graph_settings) {
+                this->window->update_bitmap(*this->m_opt.graph_settings, current_value);
+            }
         }
     } else if (this->m_opt.type == coGraph || this->m_opt.type == coGraphs) {
         m_value = current_value = boost::any_cast<GraphData>(value);
+        if (this->m_opt.graph_settings) {
+            this->window->update_bitmap(*this->m_opt.graph_settings, current_value);
+        }
     }
 }
 
@@ -2199,7 +2228,7 @@ void GraphButton::msw_rescale()
 {
     Field::msw_rescale();
 
-    wxButton* field = dynamic_cast<wxButton*>(window);
+    GraphBitmapButton* field = window;
     auto size = wxSize(def_width() * m_em_unit, wxDefaultCoord);
     if (m_opt.height >= 0)
         size.SetHeight(m_opt.height * m_em_unit);

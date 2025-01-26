@@ -1338,9 +1338,9 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
 
             if (object_config.dont_support_bridges) {
                 // FIXME Expensive, potentially not precise enough. Misses gap fill extrusions, which bridge.
-                remove_bridges_from_contacts(print_config, lower_layer, *layerm, fw, diff_polygons);
-
                 assert_valid(diff_polygons);
+                remove_bridges_from_contacts(print_config, lower_layer, *layerm, fw, diff_polygons);
+                ensure_valid(diff_polygons, resolution);
             }
 
             if (diff_polygons.empty())
@@ -1413,8 +1413,9 @@ static inline std::tuple<Polygons, Polygons, Polygons, float> detect_overhangs(
                     polygons_append(overhang_polygons, enforcer_polygons);
                     slices_margin_update(std::min(lower_layer_offset, float(scale_(gap_xy))), no_interface_offset);
                     polygons_append(contact_polygons, diff(enforcer_polygons, slices_margin.all_polygons.empty() ? slices_margin.polygons : slices_margin.all_polygons));
+                    //ensure_valid(overhang_polygons, resolution);
                     assert_valid(overhang_polygons);
-                    assert_valid(contact_polygons);
+                    ensure_valid(contact_polygons, resolution);
                 }
             }
         }
@@ -1618,7 +1619,7 @@ static inline void fill_contact_layer(
             , "top_contact_polygons4", iRun, layer_id, layer.print_z
 #endif // SLIC3R_DEBUG
             ));
-        assert_valid(*new_layer.enforcer_polygons);
+        ensure_valid(*new_layer.enforcer_polygons, support_params.resolution);
         Polygons new_polygons;
         bool needs_union = ! new_layer.polygons.empty();
         if (reduce_interfaces) {
@@ -1655,7 +1656,7 @@ static inline void fill_contact_layer(
         append(new_layer.polygons, std::move(new_polygons));
         if (needs_union)
             new_layer.polygons = union_(new_layer.polygons);
-        assert_valid(new_layer.polygons);
+        ensure_valid(new_layer.polygons, support_params.resolution);
     }
 
 #ifdef SLIC3R_DEBUG

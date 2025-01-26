@@ -363,6 +363,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Widgets/ComboBox.hpp
     GUI/Widgets/DropDown.cpp
     GUI/Widgets/DropDown.hpp
+    GUI/Widgets/GraphBitmapButton.cpp
+    GUI/Widgets/GraphBitmapButton.hpp
     GUI/Widgets/StateColor.cpp
     GUI/Widgets/StateColor.hpp
     GUI/Widgets/StateHandler.cpp

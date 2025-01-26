@@ -27,15 +27,19 @@ namespace Slic3r {
 namespace GUI {
 
 void CalibrationTempDialog::create_buttons(wxStdDialogButtonSizer* buttons){
+    const wxSize size(6 * em_unit(), wxDefaultCoord);
     wxString choices_steps[] = { "5","10","15","20" };
-    steps = new wxComboBox(this, wxID_ANY, wxString{ "10" }, wxDefaultPosition, wxDefaultSize, 4, choices_steps);
+    //steps = new wxComboBox(this, wxID_ANY, wxString{ "10" }, wxDefaultPosition, wxDefaultSize, 4, choices_steps);
+    steps = new ComboBox(this, wxID_ANY, wxString{ "10" }, wxDefaultPosition, size, 4, choices_steps);
     steps->SetToolTip(_L("Select the step in celcius between two tests.\nNote that only multiple of 5 are engraved on the part."));
     steps->SetSelection(1);
     wxString choices_nb[] = { "0","1","2","3","4","5","6","7" };
-    nb_down = new wxComboBox(this, wxID_ANY, wxString{ "2" }, wxDefaultPosition, wxDefaultSize, 8, choices_nb);
+    //nb_down = new wxComboBox(this, wxID_ANY, wxString{ "2" }, wxDefaultPosition, wxDefaultSize, 8, choices_nb);
+    nb_down = new ComboBox(this, wxID_ANY, wxString{ "2" }, wxDefaultPosition, size, 8, choices_nb);
     nb_down->SetToolTip(_L("Select the number of tests with lower temperature than the current one."));
     nb_down->SetSelection(2);
-    nb_up = new wxComboBox(this, wxID_ANY, wxString{ "2" }, wxDefaultPosition, wxDefaultSize, 8, choices_nb);
+    //nb_up = new wxComboBox(this, wxID_ANY, wxString{ "2" }, wxDefaultPosition, wxDefaultSize, 8, choices_nb);
+    nb_up = new ComboBox(this, wxID_ANY, wxString{ "2" }, wxDefaultPosition, size, 8, choices_nb);
     nb_up->SetToolTip(_L("Select the number of tests with higher temperature than the current one."));
     nb_up->SetSelection(2);
 
@@ -61,8 +65,8 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
         return;
     // wait for slicing end if needed
     wxGetApp().Yield();
-
-    //GLCanvas3D::set_warning_freeze(true);
+    
+    std::unique_ptr<wxWindowUpdateLocker> freeze_gui = std::make_unique<wxWindowUpdateLocker>(this);
     std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / "Smart_compact_temperature_calibration_item.amf").string()}, true, false, false, false);
 
@@ -145,13 +149,6 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
 
 
     /// --- translate ---
-    bool autocenter = gui_app->app_config->get("autocenter") == "1";
-    if (!autocenter) {
-        const ConfigOptionPoints* bed_shape = printer_config->option<ConfigOptionPoints>("bed_shape");
-        Vec2d bed_size = BoundingBoxf(bed_shape->get_values()).size();
-        Vec2d bed_min = BoundingBoxf(bed_shape->get_values()).min;
-        model.objects[objs_idx[0]]->translate({ bed_min.x() + bed_size.x() / 2, bed_min.y() + bed_size.y() / 2, 5 * xyzScale - 5 });
-    }
 
     /// --- main config, please modify object config when possible ---
     DynamicPrintConfig new_print_config = *print_config; //make a copy
@@ -204,7 +201,7 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     //update everything, easier to code.
     ObjectList* obj = this->gui_app->obj_list();
     obj->update_after_undo_redo();
-
+    freeze_gui.reset();
 
     plat->reslice();
 }

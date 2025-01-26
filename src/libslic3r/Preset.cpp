@@ -729,7 +729,7 @@ static std::vector<std::string> s_Preset_print_options {
         "enforce_full_fill_volume",
         "external_infill_margin", "bridged_infill_margin",
         "internal_bridge_expansion",
-        "small_area_infill_flow_compensation", "small_area_infill_flow_compensation_model",
+        "small_area_infill_flow_compensation_model",
         // compensation
         "first_layer_size_compensation",
         "first_layer_size_compensation_layers",
@@ -785,6 +785,8 @@ static std::vector<std::string> s_Preset_print_options {
         "print_first_layer_temperature",
         "print_retract_length",
         "print_temperature",
+        "print_bed_temperature",
+        "print_first_layer_bed_temperature",
         "print_retract_lift",
         "external_perimeter_cut_corners",
         "external_perimeter_overlap",
