@@ -733,9 +733,6 @@ void ConfigManipulation::toggle_printer_fff_options(DynamicPrintConfig *config, 
     // Disable silent mode for non-marlin firmwares.
     toggle_field("silent_mode", is_marlin_flavor);
 
-    // only allow to disable autoemit_temperature_commands if it's not already disabled by start_gcode_manual
-    toggle_field("autoemit_temperature_commands", !config->get_bool("start_gcode_manual"));
-
     for (size_t i = 0; i < extruder_count; ++i) {
         
         bool have_retract_length = config->opt_float("retract_length", i) > 0;

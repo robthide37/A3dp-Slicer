@@ -15,9 +15,11 @@ jobs:
     runs-on: macos-14
 
     steps:
-    - uses: actions/checkout@v4
-    - name: install autoconf
-      run: brew install autoconf
+    - uses: actions/checkout@v3
+    - name: Install Autoconf
+      run: |
+        brew update
+        brew install autoconf
     - name: check autoconf version
       run: autoconf --version
     - name: update automake for mpfr

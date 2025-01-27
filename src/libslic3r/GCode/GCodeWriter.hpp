@@ -25,12 +25,11 @@ namespace Slic3r {
 
 class GCodeWriter {
 protected:
-    GCodeConfig m_config;
     // override from region
     const PrintRegionConfig* m_region_config = nullptr;
 public:
     bool multiple_extruders = false;
-    
+    GCodeConfig m_config;
     GCodeWriter() {}
     void                reset();
     Tool*               tool()             { return m_tool; }
@@ -60,7 +59,7 @@ public:
     std::string set_temperature(int16_t temperature, bool wait = false, int tool = -1);
     std::string set_bed_temperature(uint32_t temperature, bool wait = false);
     std::string set_chamber_temperature(uint32_t temperature, bool wait = false);
-    void        set_pressure_advance(double pa); // set pressure advance for next acceleration
+    std::string set_pressure_advance(double pa) const; // set pressure advance for next acceleration
     std::string write_pressure_advance(double pa);
     void        set_acceleration(uint32_t acceleration);
     void        set_travel_acceleration(uint32_t acceleration);
@@ -153,6 +152,7 @@ private:
     uint8_t         m_last_fan_speed = 0;
     int16_t         m_last_temperature = 0;
     int16_t         m_last_temperature_with_offset = 0;
+    bool            m_last_temperature_with_offset_waited = false;
     int16_t         m_last_bed_temperature = 0;
     bool            m_last_bed_temperature_reached = true;
     int16_t         m_last_chamber_temperature = 0;
