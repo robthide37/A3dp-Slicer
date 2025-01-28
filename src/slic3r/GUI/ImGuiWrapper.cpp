@@ -278,11 +278,6 @@ void ImGuiWrapper::set_language(const std::string &language)
     }
 }
 
-bool ImGuiWrapper::need_display_size() {
-    ImGuiIO& io = ImGui::GetIO();
-    return io.DisplaySize.x < 0 || io.DisplaySize.y < 0;
-}
-
 void ImGuiWrapper::set_display_size(float w, float h)
 {
     ImGuiIO& io = ImGui::GetIO();
