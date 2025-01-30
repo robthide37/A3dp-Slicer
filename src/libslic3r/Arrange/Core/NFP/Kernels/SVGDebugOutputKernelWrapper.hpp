@@ -9,9 +9,9 @@
 
 #include "KernelTraits.hpp"
 
-#include "arrange/PackingContext.hpp"
-#include "arrange/NFP/NFPArrangeItemTraits.hpp"
-#include "arrange/Beds.hpp"
+#include "arrange/Core/PackingContext.hpp"
+#include "arrange/Core/NFP/NFPArrangeItemTraits.hpp"
+#include "arrange/Core/Beds.hpp"
 
 #include <libslic3r/SVG.hpp>
 
