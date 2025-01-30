@@ -1271,10 +1271,11 @@ PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3
 			incompats_map.emplace(std::make_pair(incompat.vendor, std::move(restrictions)));
 		}
 
-		GUI::MsgDataIncompatible dlg(std::move(incompats_map));
-		const auto res = dlg.ShowModal();
+/* annoying.
+	//	GUI::MsgDataIncompatible dlg(std::move(incompats_map));
+	//	const auto res = dlg.ShowModal();
 		if (res == wxID_REPLACE) {
-			BOOST_LOG_TRIVIAL(info) << "User wants to re-configure...";
+//			BOOST_LOG_TRIVIAL(info) << "User wants to re-configure...";
 
 			// This effectively removes the incompatible bundles:
 			// (snapshot is taken beforehand)
@@ -1288,6 +1289,7 @@ PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3
 			BOOST_LOG_TRIVIAL(info) << "User wants to exit Slic3r, bye...";
 			return R_INCOMPAT_EXIT;
 		}
+*/
 
 	} else if (updates.updates.size() > 0) {
 
