@@ -1611,7 +1611,7 @@ void Tab::activate_option(const std::string& opt_key, const wxString& category)
 
 void TabFrequent::activate_option(const std::string &opt_key, const wxString &category){
     wxGetApp().plater()->collapse_sidebar(false);
-    wxGetApp().mainframe->select_tab(MainFrame::ETabType::Plater3D);
+    wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpPlater);
     // no act btns -> no blink arrow
     //std::pair<OG_CustomCtrl*, bool*> ctrl = get_custom_ctrl_with_blinking_ptr(opt_key);
     //m_highlighter.init(ctrl);

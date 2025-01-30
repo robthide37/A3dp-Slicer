@@ -6182,7 +6182,7 @@ bool GLCanvas3D::_init_main_toolbar()
     item.enabling_callback    = GLToolbarItem::Default_Enabling_Callback;
     item.visibility_callback  = []() { return get_app_config()->get_bool("new_settings_layout_mode") ||
                                                    get_app_config()->get_bool("dlg_settings_layout_mode"); };
-    item.left.action_callback = []() { wxGetApp().mainframe->select_tab(MainFrame::ETabType::LastSettings); };
+   item.left.action_callback = []() { wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpLastSettings); };
     if (!m_main_toolbar.add_item(item))
         return false;
 
@@ -8895,7 +8895,7 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
                         wxGetApp().plater()->set_preview_layers_slider_values_range(0, layer_id - 1);
                         // select_tab also set the notebook, it's better.
                         //wxGetApp().plater()->select_view_3D("3D");
-                        wxGetApp().mainframe->select_tab(MainFrame::ETabType::Plater3D);
+                       wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpPlater);
                         wxGetApp().plater()->canvas3D()->reset_all_gizmos();
                         wxGetApp().plater()->canvas3D()->get_selection().add_object(obj_idx, true);
                         wxGetApp().obj_list()->update_selections();

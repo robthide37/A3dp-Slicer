@@ -1610,6 +1610,8 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab, std::shared_p
 			m_values["dlg_settings_layout_mode"] = (id == 3) ? "1" : "0";
 		});
 	};
+ 
+   app_config->set("tab_settings_layout_mode", "1");
 
 
 	add_radio(&m_rb_dlg_settings_layout_mode, ++id, app_config->get_bool("tab_settings_layout_mode"));

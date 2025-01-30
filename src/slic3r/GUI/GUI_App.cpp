@@ -1547,9 +1547,9 @@ bool GUI_App::on_init_inner()
     mainframe = new MainFrame(get_app_font_pt_size(app_config.get()));
     // hide settings tabs after first Layout
     if (is_editor())
-        mainframe->select_tab(MainFrame::ETabType::LastPlater);
+        mainframe->select_tab(MainFrame::TabPosition::tpPlater, true);
     else
-        mainframe->select_tab(MainFrame::ETabType::PlaterGcode);
+        mainframe->select_tab(MainFrame::TabPosition::tpPlater, true);
 
     sidebar().obj_list()->init_objects(); // propagate model objects to object list
 //     update_mode(); // !!! do that later
@@ -2312,11 +2312,12 @@ void GUI_App::recreate_GUI(const wxString& msg_name)
 
     MainFrame *old_main_frame = mainframe;
     mainframe = new MainFrame(get_app_font_pt_size(app_config.get()));
+    // hide settings tabs after first Layout
     if (is_editor())
-        // hide settings tabs after first Layout
-        mainframe->select_tab(MainFrame::ETabType::LastPlater);
+        mainframe->select_tab(MainFrame::TabPosition::tpPlater, true);
     else
-        mainframe->select_tab(MainFrame::ETabType::PlaterGcode);
+        mainframe->select_tab(MainFrame::TabPosition::tpPlater, true);
+
     // Propagate model objects to object list.
     sidebar().obj_list()->init_objects();
     SetTopWindow(mainframe);
@@ -3224,7 +3225,7 @@ void GUI_App::open_preferences(const std::string& highlight_option /*= std::stri
         // hide full main_sizer for mainFrame
         mainframe->GetSizer()->Show(false);
         mainframe->update_layout();
-        mainframe->select_tab(MainFrame::ETabType::LastPlater);
+        mainframe->select_tab(MainFrame::TabPosition::tpPlater, true);
     }
 }
 
