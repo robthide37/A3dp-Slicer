@@ -59,8 +59,8 @@ void CalibrationFlowSpeedDialog::create_buttons(wxStdDialogButtonSizer* buttons)
         max_speed = curr_speed * 10;
     if (max_vol_flow > 0) {
         float layer_height = print_config->option("layer_height")->get_float();
-        layer_height = std::max(layer_height, float(print_config->get_computed_value("first_layer_height", 0)));
         float nz = printer_config->option("nozzle_diameter")->get_float(0);
+        layer_height = std::max(layer_height, float(print_config->get_abs_value("first_layer_height", nz)));
         float filament_max_overlap = filament_config->option("filament_max_overlap")->get_float();
         Flow  flow                 = Flow::new_from_config(FlowRole::frSolidInfill, *print_config, nz, layer_height,
                                           filament_max_overlap / 100.f, false);
@@ -183,15 +183,15 @@ std::tuple<float, float, Flow> CalibrationFlowSpeedDialog::get_cube_size(float o
     std::string str = cmb_gram->GetValue().ToStdString();
     float weight = std::stof(str);
 
+    float nz = printer_config->option("nozzle_diameter")->get_float(0);
     // get max height
     float max_height = print_config->option("extruder_clearance_height")->get_float();
     // multiple of layer height
     float layer_height = print_config->option("layer_height")->get_float();
-    layer_height = std::max(layer_height, float(print_config->get_computed_value("first_layer_height", 0)));
+    layer_height = std::max(layer_height, float(print_config->get_abs_value("first_layer_height", nz)));
     max_height = int(max_height / layer_height) * layer_height;
     
     //compute flow
-    float nz = printer_config->option("nozzle_diameter")->get_float(0);
     Flow flow;
     float mult_size_for_overlap = 1;
     if (overlap < 100) {
@@ -374,8 +374,9 @@ void CalibrationFlowSpeedDialog::create_geometry(
     new_filament_config.option<ConfigOptionFloats>("slowdown_below_layer_time")->set_at(0, 0);
     
     /// --- custom config ---
+    float nz = printer_config->option("nozzle_diameter")->get_float(0);
     float layer_height = print_config->option("layer_height")->get_float();
-    layer_height = std::max(layer_height, float(print_config->get_computed_value("first_layer_height", 0)));
+    layer_height = std::max(layer_height, float(print_config->get_abs_value("first_layer_height", nz)));
     const float extrusion_mult = filament_config->option("extrusion_multiplier")->get_float(0);
     assert(objs_flow.size() == objs.size());
     assert(nb_steps == objs.size());

@@ -3157,13 +3157,24 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
         const bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
         const bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
-            
-            const float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
-            const float bw = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_brim_width"))->value;
-            const float ca = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_cone_angle"))->value;
 
         if (extruders_count > 1 && wt && !co) {
+            // can't get these one from wipe_tower_data, as these use the platter's config, not the print one.
+            const float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
+            const float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
+            const float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
+            const float a = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_rotation_angle"))->value;
+            const float ca = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_cone_angle"))->value;
+
+            const Print *print = m_process->fff_print();
+            //FIXME use real nozzle diameter, or the biggest
             const double first_nozzle_diameter = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
+            const WipeTowerData& wipe_tower_data = print->wipe_tower_data();
+            const float depth = wipe_tower_data.depth;
+            const float bw = wipe_tower_data.brim_width;
+            const std::vector<std::pair<float, float>> z_and_depth_pairs = wipe_tower_data.z_and_depth_pairs;
+            const float height_real = wipe_tower_data.height; // -1.f = unknown
+            
 
           // const double real_nozzle_diameter = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(wxGetApp().preset_bundle->printers.get_selected_idx());
             
@@ -3174,9 +3185,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 const float y = m_model->get_wipe_tower_vector()[bed_idx].position.y();
                 const float a = m_model->get_wipe_tower_vector()[bed_idx].rotation;
                 
-                const float depth = print->wipe_tower_data(extruders_count, first_nozzle_diameter ).depth;
-                const std::vector<std::pair<float, float>> z_and_depth_pairs = print->wipe_tower_data(extruders_count, first_nozzle_diameter).z_and_depth_pairs;
-                const float height_real = print->wipe_tower_data(extruders_count, first_nozzle_diameter).height; // -1.f = unknown
+                const float depth = print->wipe_tower_data().depth;
+                const std::vector<std::pair<float, float>> z_and_depth_pairs = print->wipe_tower_data().z_and_depth_pairs;
+                const float height_real = print->wipe_tower_data().height; // -1.f = unknown
                 
                 const bool is_wipe_tower_step_done = print->is_step_done(psWipeTower);
 
@@ -6171,7 +6182,7 @@ bool GLCanvas3D::_init_main_toolbar()
     item.enabling_callback    = GLToolbarItem::Default_Enabling_Callback;
     item.visibility_callback  = []() { return get_app_config()->get_bool("new_settings_layout_mode") ||
                                                    get_app_config()->get_bool("dlg_settings_layout_mode"); };
-    item.left.action_callback = []() { wxGetApp().mainframe->select_tab(MainFrame::ETabType::LastSettings); };
+   item.left.action_callback = []() { wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpLastSettings); };
     if (!m_main_toolbar.add_item(item))
         return false;
 
@@ -8884,7 +8895,7 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
                         wxGetApp().plater()->set_preview_layers_slider_values_range(0, layer_id - 1);
                         // select_tab also set the notebook, it's better.
                         //wxGetApp().plater()->select_view_3D("3D");
-                        wxGetApp().mainframe->select_tab(MainFrame::ETabType::Plater3D);
+                       wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpPlater);
                         wxGetApp().plater()->canvas3D()->reset_all_gizmos();
                         wxGetApp().plater()->canvas3D()->get_selection().add_object(obj_idx, true);
                         wxGetApp().obj_list()->update_selections();

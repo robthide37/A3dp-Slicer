@@ -141,6 +141,17 @@ const wxBitmapBundle *UndoValueUIManager::enable_bitmap() const {
     return bmp;
 }
 
+CheckBoxWidget_t *Field::create_enable_widget(wxWindow *parent) {
+    assert(!m_enable_widget);
+    m_enable_widget = new ::CheckBox(parent == nullptr ? m_parent : parent, "");
+    set_enable_tooltip(_L("This Setting can be disabled/enabled by clicking on this checkbox."));
+    m_enable_widget->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent e) {
+        on_enable_value();
+        m_enable_widget->Update();
+    });
+    return m_enable_widget;
+}
+
 Field::~Field()
 {
 	if (m_on_kill_focus)
@@ -191,14 +202,13 @@ void Field::PostInitialize()
 	if (getWindow())
 		getWindow()->Bind(wxEVT_KEY_UP, [](wxKeyEvent& evt) {
             if ((evt.GetModifiers() & wxMOD_CONTROL) != 0 && (evt.GetModifiers() & wxMOD_ALT) == 0) {
-                MainFrame::ETabType tab_id = MainFrame::ETabType::Any;
+                MainFrame::TabPosition tab_id = MainFrame::TabPosition::Any;
                 switch (evt.GetKeyCode()) {
-                case '1': { tab_id = MainFrame::ETabType::Plater3D; break; }
-                case '2': { tab_id = MainFrame::ETabType::PlaterPreview; break; }
-                case '3': { tab_id = MainFrame::ETabType::PlaterGcode; break; }
-                case '4': { tab_id = MainFrame::ETabType::PrintSettings; break; }
-                case '5': { tab_id = MainFrame::ETabType::FilamentSettings; break; }
-                case '6': { tab_id = MainFrame::ETabType::PrinterSettings; break; }
+                case '1': { tab_id = MainFrame::TabPosition::tpPlater; break; }
+                case '2': { tab_id = MainFrame::TabPosition::tpPlaterGCode; break; }
+                case '3': { tab_id = MainFrame::TabPosition::tpPrintSettings; break; }
+                case '4': { tab_id = MainFrame::TabPosition::tpFilamentSettings; break; }
+                case '5': { tab_id = MainFrame::TabPosition::tpPrinterSettings; break; }
 #ifdef __APPLE__
 				case 'f':
 #else /* __APPLE__ */
@@ -207,11 +217,11 @@ void Field::PostInitialize()
 				case 'F': { wxGetApp().plater()->search(false); break; }
 			    default: break;
 			    }
-                if (tab_id < MainFrame::ETabType::Any) {
+               if (tab_id < MainFrame::TabPosition::Any) {
                     wxGetApp().mainframe->select_tab(tab_id);
                     if (wxGetApp().mainframe->get_layout() == MainFrame::ESettingsLayout::Tabs
                         || wxGetApp().mainframe->get_layout() == MainFrame::ESettingsLayout::Old
-                        || tab_id >= MainFrame::ETabType::PrintSettings)
+                        || tab_id >= MainFrame::TabPosition::tpPrintSettings)
                         // tab panel should be focused for correct navigation between tabs
                         wxGetApp().tab_panel()->SetFocus();
                 }

@@ -397,13 +397,13 @@ void FreqChangedParams::msw_rescale()
 
 void FreqChangedParams::sys_color_changed()
 {
-    if(m_og) m_og->sys_color_changed();
-    for (auto& entry : m_og_other)
-        entry.second->sys_color_changed();
-
+    if (m_og)
+        m_og->sys_color_changed();
+    for (auto &entry : m_og_other) entry.second->sys_color_changed();
+    
     for (auto btn: m_empty_buttons)
         btn->sys_color_changed();
-
+    
     wxGetApp().UpdateDarkUI(m_wiping_dialog_button, true);
 }
 
@@ -582,17 +582,9 @@ void FreqChangedParams::Show(bool visible) {
 
 void FreqChangedParams::Show(PrinterTechnology tech)
 {
-    if(m_og) m_og->Show( (tech & PrinterTechnology::ptFFF) != 0);
-    for (auto& entry : m_og_other)
-        entry.second->Show( (entry.first & tech) != 0);
-
-    // correct showing of the FreqChangedParams sizer when m_wiping_dialog_button is hidden
-    assert(m_wiping_dialog_button);
-    if (m_wiping_dialog_button) {
-        const bool is_wdb_shown = m_wiping_dialog_button->IsShown();
-        if ((tech & PrinterTechnology::ptFFF) != 0 && !is_wdb_shown)
-            m_wiping_dialog_button->Hide();
-    }
+    const bool is_wdb_shown = true;
+    m_og->Show((tech & PrinterTechnology::ptFFF) != 0);
+    for (auto &entry : m_og_other) entry.second->Show((entry.first & tech) != 0);
 }
 
 ConfigOptionsGroup* FreqChangedParams::get_og(PrinterTechnology tech)
@@ -1899,18 +1891,17 @@ bool emboss_svg(Plater& plater, const wxString &svg_file, const Vec2d& mouse_dro
     canvas->on_mouse(evt); // call render where is call GLCanvas3D::_picking_pass()
 
     return svg->create_volume(svg_file_str, mouse_drop_position, ModelVolumeType::MODEL_PART);
-}
+  }
 }
 
-bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames)
-{
+bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames) {
 #ifdef WIN32
     // hides the system icon
     this->MSWUpdateDragImageOnLeave();
 #endif // WIN32
 
     m_mainframe.Raise();
-    m_mainframe.select_tab(MainFrame::ETabType::Plater3D);
+    m_mainframe.select_tab(MainFrame::TabPosition::tpPlater);
     if (wxGetApp().is_editor())
         m_plater.select_view_3D("3D");
 
@@ -2341,6 +2332,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
         "wipe_tower", "wipe_tower_brim_width", "wipe_tower_rotation_angle", "wipe_tower_width", "wipe_tower_x", "wipe_tower_y",
         "wipe_tower_cone_angle", "wipe_tower_extra_spacing", "wipe_tower_extruder",
+        "filament_minimal_purge_on_wipe_tower", "wiping_volumes_matrix", // for wipe_tower_data
         "extruder_colour", "filament_colour", "material_colour",
         "printer_model", "printer_notes", "printer_technology",
         // These values are necessary to construct SlicingParameters by the Canvas3D variable layer height editor.
@@ -3991,23 +3983,22 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
     //update tab if needed
     // auto_switch_preview == "never" means "no force tab change"
-    if (wxGetApp().is_editor() && invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && get_app_config()->get("auto_switch_preview") != "never")
-    {
+   if (wxGetApp().is_editor() && invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && get_app_config()->get("auto_switch_preview") != "0") {
         // auto_switch_preview == "gcode" means "force tab change only if for gcode"
         if (get_app_config()->get("auto_switch_preview") == "gcode") {
             if (this->preview->can_display_gcode())
-                main_frame->select_tab(MainFrame::ETabType::PlaterGcode, true);
+                main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
             // auto_switch_preview == "always" means "force tab change"
         } else if (get_app_config()->get("auto_switch_preview") == "always") {
-            main_frame->select_tab(MainFrame::ETabType::Plater3D, true);
+            main_frame->select_tab(MainFrame::TabPosition::tpPlater, true);
             // auto_switch_preview == "platter" means "force tab change only if already on a platter one"
-        } else if (get_app_config()->get("auto_switch_preview") == "platter" || main_frame->selected_tab() < MainFrame::ETabType::LastPlater) {
+        } else if (get_app_config()->get("auto_switch_preview") == "platter" || main_frame->selected_tab() < MainFrame::TabPosition::tpPlaterGCode) {
             if (this->preview->can_display_gcode())
-                main_frame->select_tab(MainFrame::ETabType::PlaterGcode, true);
-            else if (this->preview->can_display_volume() && background_process.running()) // don't switch to plater3D if you modify a gcode settign and you don't have background processing
-                main_frame->select_tab(MainFrame::ETabType::PlaterPreview, true);
-            else
-                main_frame->select_tab(MainFrame::ETabType::Plater3D, true);
+                main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
+            else if (this->preview->can_display_volume() &&
+                     background_process.running()) // don't switch to plater3D if you modify a gcode settign and you
+                // don't have background processing
+                main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
         }
     }
 
@@ -4867,12 +4858,11 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
     }
 }
 
-void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
-{
+void Plater::priv::on_slicing_completed(wxCommandEvent & evt) {
     if( ( get_app_config()->get("auto_switch_preview") == "gcode" || (get_app_config()->get("auto_switch_preview") == "platter"
-          && main_frame->selected_tab() < MainFrame::ETabType::LastPlater) )
+          && main_frame->selected_tab() < MainFrame::TabPosition::tpPlaterGCode))
         && !this->preview->can_display_gcode())
-        main_frame->select_tab(MainFrame::ETabType::PlaterPreview);
+        main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
 
     if (view3D->is_dragging()) // updating scene now would interfere with the gizmo dragging
         delayed_scene_refresh = true;
@@ -4975,9 +4965,9 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
     // auto_switch_preview == "platter" means "force tab change only if already on a plater one"
     // auto_switch_preview == "gcode" means "force tab change only if for gcode"
     if (get_app_config()->get("auto_switch_preview") == "always" 
-        || (get_app_config()->get("auto_switch_preview") == "platter" && main_frame->selected_tab() < MainFrame::ETabType::LastPlater) 
+        || (get_app_config()->get("auto_switch_preview") == "platter" && main_frame->selected_tab() < MainFrame::TabPosition::tpPlaterGCode) 
         || get_app_config()->get("auto_switch_preview") == "gcode")
-        main_frame->select_tab(MainFrame::ETabType::PlaterGcode);
+        main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode);
 
     // Reset the "export G-code path" name, so that the automatic background processing will be enabled again.
     this->background_process.reset_export();
@@ -7559,7 +7549,7 @@ void Plater::export_gcode(bool prefer_removable)
         if (printer_technology() == ptFFF) {
            const ConfigOptionStrings *filaments = active_fff_print().full_print_config().opt<ConfigOptionStrings>(
                                                                                                             "filament_settings_id");
-            assert(filaments->size() == fff_print().config().filament_type.size());
+            assert(filaments->size() == active_fff_print().config().filament_type.size());
             for (int i = 0; i < filaments->size(); i++) {
                 str_material += "\n" + format(_L("'%1%' of type %2%"), filaments->get_at(i),
                                               active_fff_print().config().filament_type.get_at(i));
