@@ -26,6 +26,9 @@ jobs:
       run: |
         cmake .. -G "Visual Studio 16 2019" -A x64
         msbuild /m ALL_BUILD.vcxproj
+     - run: dir deps
+     - run: dir deps/build
+     - run: dir deps/build/destdir
   build:
     runs-on: windows-2019
     needs: build_dep
