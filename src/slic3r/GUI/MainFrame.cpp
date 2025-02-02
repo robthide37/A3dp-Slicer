@@ -1640,14 +1640,21 @@ static wxMenu* generate_help_menu()
 {
     wxMenu* helpMenu = new wxMenu();
     append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Releases"), SLIC3R_APP_NAME), wxString::Format(_L("Open the %s releases page in your browser"), SLIC3R_APP_NAME),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog(SLIC3R_DOWNLOAD, nullptr, false); });
-
-    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Website"), SLIC3R_APP_NAME), _L("Open the SliCR-3D website in your browser"),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://www.cr3d.de"); });
-        
-    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Shop"), "CR-3D"), _L("Open our shop in your browser "),
-            [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://www.cr3d.de/kategorie/empfohlen/"); });
-
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog(SLIC3R_DOWNLOAD); });
+    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s wiki"), SLIC3R_APP_NAME), wxString::Format(_L("Open the %s wiki in your browser"), SLIC3R_APP_NAME),
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("http://github.com/" SLIC3R_GITHUB "/wiki"); });
+    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s website"), SLIC3R_APP_NAME), _L("Open the Slic3r website in your browser"),
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("http://slic3r.org"); });
+    //#        my $versioncheck = $self->_append_menu_item($helpMenu, "Check for &Updates...", "Check for new Slic3r versions", sub{
+    //#            wxTheApp->check_version(1);
+    //#        });
+    //#        $versioncheck->Enable(wxTheApp->have_version_check);
+    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("Slic3r Manual")),
+        wxString::Format(_L("Open the Slic3r Manual in your browser")),
+        //            [this](wxCommandEvent&) { wxGetApp().open_web_page_localized("http://manual.slic3r.org"); });
+        //        append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s &Manual"), SLIC3R_APP_NAME),
+        //                                             wxString::Format(_L("Open the %s manual in your browser"), SLIC3R_APP_NAME),
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("http://manual.slic3r.org/"); });
     helpMenu->AppendSeparator();
         
     append_menu_item(helpMenu, wxID_ANY, _L("System &Info"), _L("Show system information"),

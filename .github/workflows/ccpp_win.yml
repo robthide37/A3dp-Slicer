@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - Nigthly
-      - nightly_dev
-      - nightly_master
+      - rc
       - debug_win
 
 jobs:

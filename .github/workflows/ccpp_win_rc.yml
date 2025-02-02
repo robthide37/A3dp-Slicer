@@ -5,6 +5,9 @@ on:
     branches:
       - rc
       - 2.7.61
+      - multiple-beds-prusa
+      - debug_win
+
 jobs:
   build_dep:
     runs-on: windows-2019

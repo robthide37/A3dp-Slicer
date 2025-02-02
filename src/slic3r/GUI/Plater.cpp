@@ -4734,7 +4734,6 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
                 notification_manager->set_slicing_progress_percentage(formatter.str(), evt.status.percent / 100.f, 0 == (evt.status.flags & PrintBase::SlicingStatus::FlagBits::SECONDARY_STATE));
             }
         }
-        notification_manager->set_slicing_progress_percentage(evt.status.main_text, (float)evt.status.percent / 100.0f);
     }
 
     // Check template filaments and add warning
@@ -4858,9 +4857,11 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
     }
 }
 
-void Plater::priv::on_slicing_completed(wxCommandEvent & evt) {
+
+void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
+{
     if( ( get_app_config()->get("auto_switch_preview") == "gcode" || (get_app_config()->get("auto_switch_preview") == "platter"
-          && main_frame->selected_tab() < MainFrame::TabPosition::tpPlaterGCode))
+          && main_frame->selected_tab() < MainFrame::ETabType::LastPlater) )
         && !this->preview->can_display_gcode())
         main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
 
@@ -4965,9 +4966,9 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
     // auto_switch_preview == "platter" means "force tab change only if already on a plater one"
     // auto_switch_preview == "gcode" means "force tab change only if for gcode"
     if (get_app_config()->get("auto_switch_preview") == "always" 
-        || (get_app_config()->get("auto_switch_preview") == "platter" && main_frame->selected_tab() < MainFrame::TabPosition::tpPlaterGCode) 
+        || (get_app_config()->get("auto_switch_preview") == "platter" && main_frame->selected_tab() < MainFrame::ETabType::LastPlater) 
         || get_app_config()->get("auto_switch_preview") == "gcode")
-        main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode);
+        main_frame->select_tab(MainFrame::ETabType::PlaterGcode);
 
     // Reset the "export G-code path" name, so that the automatic background processing will be enabled again.
     this->background_process.reset_export();

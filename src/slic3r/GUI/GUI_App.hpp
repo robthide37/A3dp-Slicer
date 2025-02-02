@@ -104,9 +104,6 @@ enum ConfigMenuIDs {
     ConfigMenuFlashFirmware,
     ConfigMenuWifiConfigFile,
     ConfigMenuCnt,
-    //ConfigMenuModeSimple,
-    //ConfigMenuModeAdvanced,
-    //ConfigMenuModeExpert,
 };
 
 class Tab;
@@ -133,24 +130,23 @@ private:
     EAppMode m_app_mode{EAppMode::Editor};
     bool m_is_recreating_gui{false};
     bool m_opengl_initialized{false};
+    wxColour m_color_label_modified;
+    wxColour m_color_label_sys;
+    wxColour m_color_label_default;
+    wxColour m_color_label_phony;
+    wxColour m_color_dark_mode_label_modified;
+    wxColour m_color_dark_mode_label_sys;
+    wxColour  m_color_dark_mode_label_default;
+    wxColour m_color_dark_mode_label_phony;
+    wxColour m_color_window_default;
 
-    wxColour        m_color_label_modified;
-    wxColour        m_color_label_sys;
-    wxColour        m_color_label_default;
-    wxColour        m_color_label_phony;
-    wxColour        m_color_dark_mode_label_modified;
-    wxColour        m_color_dark_mode_label_sys;
-    wxColour        m_color_dark_mode_label_default;
-    wxColour        m_color_dark_mode_label_phony;
-    wxColour        m_color_window_default;
-    wxColour        m_color_highlight_label_default;
-    wxColour        m_color_hovered_btn_label;
-    wxColour        m_color_hovered_btn;
-    wxColour        m_color_default_btn_label;
-    wxColour        m_color_highlight_default;
-    wxColour        m_color_selected_btn_bg;
-    bool            m_force_colors_update { false };
-    //std::vector<std::string>     m_mode_palette; //replaced by Slic3r::GUI::get_app_config()->tags()
+    wxColour m_color_highlight_label_default;
+    wxColour m_color_hovered_btn_label;
+    wxColour m_color_hovered_btn;
+    wxColour m_color_default_btn_label;
+    wxColour m_color_highlight_default;
+    wxColour m_color_selected_btn_bg;
+    bool m_force_colors_update{false};
 
     wxFont m_small_font;
     wxFont m_bold_font;
@@ -345,12 +341,8 @@ public:
 
     virtual bool OnExceptionInMainLoop() override;
     // Calls wxLaunchDefaultBrowser if user confirms in dialog.
-    // Add "Rememeber my choice" checkbox to question dialog, when it is forced or a "suppress_hyperlinks" option has
-    // empty value
-    bool open_browser_with_warning_dialog(const wxString &url,
-                                          wxWindow *parent = nullptr,
-                                          bool force_remember_choice = true,
-                                          int flags = 0);
+    // Add "Rememeber my choice" checkbox to question dialog, when it is forced or a "suppress_hyperlinks" option has empty value
+    bool open_browser_with_warning_dialog(const wxString& url, wxWindow* parent = nullptr, bool allow_remember_choice = true, int flags = 0);
 #ifdef __APPLE__
     void OSXStoreOpenFiles(const wxArrayString &files) override;
     // wxWidgets override to get an event on open files.
@@ -384,7 +376,8 @@ public:
     std::mutex not_modal_dialog_mutex;
     wxDialog *not_modal_dialog = nullptr;
 
-	PresetUpdater*  get_preset_updater() { return preset_updater.get(); }
+
+    PresetUpdater *get_preset_updater() { return preset_updater.get(); }
     PrinterTechnology get_current_printer_technology() const;
 
     wxBookCtrlBase *tab_panel() const;

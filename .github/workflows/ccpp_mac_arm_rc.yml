@@ -17,6 +17,12 @@ jobs:
         brew install autoconf
     - name: check autoconf version
       run: autoconf --version
+    - name: Install Autoconf
+      run: |
+        brew update
+        brew install autoconf
+    - name: check autoconf version
+      run: autoconf --version
     - name: update automake for mpfr
       run: |
         curl -O -L http://ftpmirror.gnu.org/automake/automake-1.16.5.tar.gz
