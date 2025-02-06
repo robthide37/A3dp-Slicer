@@ -75,7 +75,7 @@ enum FileType {
     FT_PROJECT,
     FT_FONTS,
     FT_GALLERY,
-
+    FT_HFP,
     FT_INI,
     FT_SVG,
 
@@ -284,7 +284,7 @@ public:
     void            bridge_tuning_dialog();
     void            over_bridge_dialog();
     void            calibration_cube_dialog();
-	void            calibration_retraction_dialog();
+    void            calibration_retraction_dialog();
     void            calibration_pressureadv_dialog();
     void            freecad_script_dialog();
     void            tiled_canvas_dialog();
@@ -298,6 +298,7 @@ public:
     // void            support_tuning(); //have to do multiple, in a submenu
     void load_project(wxWindow *parent, wxString &input_file) const;
     void import_model(wxWindow *parent, wxArrayString &input_files) const;
+    void import_model_modifier(wxWindow* parent, wxString& input_file) const;
     void import_zip(wxWindow *parent, wxString &input_file) const;
     void load_gcode(wxWindow *parent, wxString &input_file) const;
 

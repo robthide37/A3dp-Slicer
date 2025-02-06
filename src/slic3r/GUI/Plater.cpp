@@ -135,6 +135,7 @@
 #include "Gizmos/GLGizmoCut.hpp"
 #include "FileArchiveDialog.hpp"
 #include "BulkExportDialog.hpp"
+#include "libslic3r/Format/HFP.hpp"
 
 #ifdef __APPLE__
 #include "Gizmos/GLGizmosManager.hpp"
@@ -1970,7 +1971,8 @@ struct Plater::priv
     BackgroundSlicingProcess    background_process;
     bool suppressed_backround_processing_update { false };
     std::function<void(int)> process_done_callback = [](int) {};
-
+    HFP* hueforge;
+   
     // TODO: A mechanism would be useful for blocking the plater interactions:
     // objects would be frozen for the user. In case of arrange, an animation
     // could be shown, or with the optimize orientations, partial results
@@ -3992,17 +3994,17 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
         } else if (get_app_config()->get("auto_switch_preview") == "always") {
             main_frame->select_tab(MainFrame::TabPosition::tpPlater, true);
             // auto_switch_preview == "platter" means "force tab change only if already on a platter one"
-        } else if (get_app_config()->get("auto_switch_preview") == "platter" || main_frame->selected_tab() < MainFrame::TabPosition::tpPlaterGCode) {
+        } else if (get_app_config()->get("auto_switch_preview") == "platter") {
             if (this->preview->can_display_gcode())
                 main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
             else if (this->preview->can_display_volume() &&
                      background_process.running()) // don't switch to plater3D if you modify a gcode settign and you
-                // don't have background processing
+                // don't have background processing on
                 main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
         }
     }
 
-    this->q->object_list_changed();
+    //this->q->object_list_changed();
     return return_state;
 }
 
@@ -6074,9 +6076,30 @@ void Plater::add_model(bool imperial_units/* = false*/)
     }
 
     Plater::TakeSnapshot snapshot(this, snapshot_label);
-    if (! load_files(paths, true, false, true, imperial_units).empty())
+    if (!load_files(paths, true, false, true, imperial_units).empty())
         wxGetApp().mainframe->update_title();
 }
+
+void Plater::add_model_modifier() {
+   wxString input_file;
+   wxGetApp().import_model_modifier(this, input_file);
+   
+   if (input_file.empty())
+      return;
+   
+   bool result = false;
+   std::string input_file_str = input_file.ToStdString();
+   
+   if (boost::algorithm::iends_with(input_file_str.c_str(), ".hfp")) {
+      result = p->hueforge->load_hfp(input_file_str.c_str(), this->config());
+   } else {
+        throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");
+   }
+   
+    if (!result)
+        throw Slic3r::RuntimeError("Loading of a model file failed.");
+}
+
 
 void Plater::import_zip_archive()
 {
@@ -7031,7 +7054,6 @@ void Plater::set_force_preview(Preview::ForceState force) {
 Preview::ForceState Plater::get_force_preview() {
     return p->preview->get_force_state();
 }
-
 
 bool Plater::is_preview_shown() const { return p->is_preview_shown(); }
 bool Plater::is_preview_loaded() const { return p->is_preview_loaded(); }

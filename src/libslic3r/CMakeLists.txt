@@ -152,6 +152,8 @@ set(SLIC3R_SOURCES
     Format/SL1.cpp
     Format/SL1_SVG.hpp
     Format/SL1_SVG.cpp
+    Format/HFP.cpp
+    Format/HFP.hpp
     Format/AnycubicSLA.hpp
     Format/AnycubicSLA.cpp
     Format/CWS.hpp
