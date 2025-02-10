@@ -4004,7 +4004,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
         }
     }
 
-    //this->q->object_list_changed();
+    this->q->object_list_changed();
     return return_state;
 }
 
@@ -6091,6 +6091,8 @@ void Plater::add_model_modifier() {
    std::string input_file_str = input_file.ToStdString();
    
    if (boost::algorithm::iends_with(input_file_str.c_str(), ".hfp")) {
+       HFP *hfp = new HFP();
+       p->hueforge = hfp;
       result = p->hueforge->load_hfp(input_file_str.c_str(), this->config());
    } else {
         throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");

@@ -20,18 +20,42 @@ class Model;
 class DynamicPrintConfig;
 
 class HFP {
+
 public:
-    HFP() = default;    
-    
+    HFP();
+    ~HFP();
+
+    struct Filament
+    {
+        std::string Brand;
+        std::string Color;
+        std::string Name;
+        bool Owned;
+        double Transmissivity;
+        std::string Type;
+        std::string uuid;
+    };
+
     bool valid_hfp() const;
     bool load_hfp(const std::string& input_file, const DynamicPrintConfig* config);
-    std::vector<std::pair<std::string, std::any>> get_hfp_values() const;
     bool apply_to_config();  // NEW FUNCTION TO APPLY VALUES TO CONFIG
+
+    // Getter functions
+    const std::vector<Filament> &get_filament_set() const;
+    const std::vector<int> &get_slider_values() const;
+    const float *get_base_layer_height() const;
+    const float *get_layer_height() const;
 
 private:
     std::string file_path;
     nlohmann::json json_data;
     DynamicPrintConfig* cfg;
+    const float* m_base_layer_height;
+    const float* m_layer_height;
+    std::vector<Filament> m_filament_set;
+    // always increase slider_values by +1
+    std::vector<int> m_slider_values;
+
 };
 
 } // namespace Slic3r
