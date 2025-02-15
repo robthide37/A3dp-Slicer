@@ -1335,8 +1335,15 @@ void Sidebar::jump_to_option(size_t selected)
                 return;
             }
         }
-
         wxGetApp().get_tab(opt.type, false)->activate_option(opt.opt_key_with_idx(), boost::nowide::narrow(opt.category));
+        // Switch to the Settings NotePad
+        if (opt.type == Preset::TYPE_PRINTER) {
+            wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpPrinterSettings, false);
+        } else if (opt.type == Preset::TYPE_FFF_PRINT || opt.type == Preset::TYPE_PRINT1) {
+            wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpPrintSettings, false);
+        } else if (opt.type == Preset::TYPE_FFF_FILAMENT || opt.type == Preset::TYPE_FFF) {
+            wxGetApp().mainframe->select_tab(MainFrame::TabPosition::tpFilamentSettings, false);
+        }
     }
 
 }
@@ -3983,7 +3990,8 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
     //update tab if needed
     // auto_switch_preview == "never" means "no force tab change"
-   if (wxGetApp().is_editor() && invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && get_app_config()->get("auto_switch_preview") != "0") {
+    if (wxGetApp().is_editor() && invalidated != Print::ApplyStatus::APPLY_STATUS_UNCHANGED && get_app_config()->get("auto_switch_preview") != "0")
+    {
         // auto_switch_preview == "gcode" means "force tab change only if for gcode"
         if (get_app_config()->get("auto_switch_preview") == "gcode") {
             if (this->preview->can_display_gcode())
@@ -4814,10 +4822,6 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
             }
         }
 
-
-
-
-
         for (int warning_step : warning_steps) {
             for (ObjectID object_id : object_ids) {
                 if ((flags & PrintBase::SlicingStatus::UPDATE_PRINT_STEP_WARNINGS) &&
@@ -4860,7 +4864,7 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 
 void Plater::priv::on_slicing_completed(wxCommandEvent & evt) {
     if( ( get_app_config()->get("auto_switch_preview") == "gcode" || (get_app_config()->get("auto_switch_preview") == "platter"
-          && main_frame->selected_tab() < MainFrame::TabPosition::tpPlaterGCode))
+                                                                      && main_frame->selected_tab() < MainFrame::TabPosition::tpPlater))
         && !this->preview->can_display_gcode())
         main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
 
