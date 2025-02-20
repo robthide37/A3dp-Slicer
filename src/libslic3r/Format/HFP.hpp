@@ -50,6 +50,7 @@ private:
     std::string file_path;
     nlohmann::json json_data;
     DynamicPrintConfig* cfg;
+    Model* m_model;
     const float* m_base_layer_height;
     const float* m_layer_height;
     std::vector<Filament> m_filament_set;

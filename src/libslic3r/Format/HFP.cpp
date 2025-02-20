@@ -28,8 +28,10 @@ HFP::~HFP() {
 }
 
 
-bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig *config) {
+bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig *config, Model& model) {
     std::ifstream file(input_file);
+    if (!model)
+        return false;
 
     if (!file.is_open()) {
         BOOST_LOG_TRIVIAL(error) << "Failed to open HFP file: " << input_file;
