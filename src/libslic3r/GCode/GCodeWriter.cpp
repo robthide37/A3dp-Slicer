@@ -206,6 +206,40 @@ std::string GCodeWriter::postamble() const
     return gcode.str();
 }
 
+std::string GCodeWriter::set_pressure_advance(double pa) const {
+    if (pa < 0)
+        return "";
+    std::string_view comment =  " ; Pressure advance value "sv;
+    int16_t tool_id = -1;
+    if (m_tool)
+        tool_id = m_tool->id();
+    std::string gcode;
+    if (FLAVOR_IS(gcfKlipper)) {
+        gcode = std::string("SET_PRESSURE_ADVANCE ADVANCE=") + to_string_nozero(pa, 4);
+        if (tool_id >= 0 && !this->m_config.single_extruder_multi_material.value) {
+            if (this->m_config.tool_name.size() > tool_id && !this->m_config.tool_name.get_at(tool_id).empty()) {
+                gcode += std::string(" EXTRUDER=") + this->m_config.tool_name.get_at(tool_id);
+            } else {
+                gcode += std::string(" EXTRUDER=extruder") + std::to_string(tool_id);
+            }
+        }
+    } else if (FLAVOR_IS(gcfRepRap) || FLAVOR_IS(gcfSprinter)) {
+        if (tool_id >= 0) {
+            gcode = std::string("M572 D") + std::to_string(tool_id) + " S" + to_string_nozero(pa, 4);
+        } else {
+            //is it possible to have no tool id? or a -1 is possible?
+            gcode = std::string("M572 S") + to_string_nozero(pa, 4);
+        }
+    } else {
+        gcode = std::string("M900 K") + to_string_nozero(pa, 4);
+    }
+    if (this->m_config.gcode_comments) {
+        gcode += comment;
+    }
+    return gcode + "\n";
+}
+
+
 std::string GCodeWriter::set_temperature(const int16_t temperature, bool wait, int tool)
 {
     //use m_tool if tool isn't set
@@ -265,12 +299,20 @@ std::string GCodeWriter::set_temperature(const int16_t temperature, bool wait, i
             FLAVOR_IS_NOT(gcfRepRap)) {
             gcode << " T" << tool;
         }
-        gcode << " ; " << comment << "\n";
+        if (this->m_config.gcode_comments && !comment.empty()) {
+            gcode << " ; " << comment;
+        }
+        gcode << "\n";
     }
     // emit wait (for  gcfTeacup, gcfRepRap, gcfNematX)
     if (wait && !can_M109) {
-        if ((FLAVOR_IS(gcfTeacup) || FLAVOR_IS(gcfRepRap)))
-            gcode << "M116 ; wait for temperature to be reached\n";
+        if ((FLAVOR_IS(gcfTeacup) || FLAVOR_IS(gcfRepRap))) {
+            gcode << "M116";
+            if (this->m_config.gcode_comments) {
+                gcode << " ; wait for temperature to be reached";
+            }
+            gcode << "\n";
+        }
     }
     // update internal var to prevent repeat
     m_last_temperature = temperature;
@@ -299,7 +341,7 @@ std::string GCodeWriter::set_bed_temperature(uint32_t temperature, bool wait)
         code = "M140"sv;
         comment = "set bed temperature"sv;
     }
-    
+
     std::ostringstream gcode;
     gcode << code << " ";
     if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMachinekit)) {
@@ -307,11 +349,20 @@ std::string GCodeWriter::set_bed_temperature(uint32_t temperature, bool wait)
     } else {
         gcode << "S";
     }
-    gcode << temperature << " ; " << comment << "\n";
-    
-    if (FLAVOR_IS(gcfTeacup) && wait)
-        gcode << "M116 ; wait for bed temperature to be reached\n";
-    
+    gcode << temperature;
+    if (this->m_config.gcode_comments && !comment.empty()) {
+         gcode << " ; " << comment;
+    }
+    gcode << "\n";
+
+    if (FLAVOR_IS(gcfTeacup) && wait) {
+        gcode << "M116";
+        if (this->m_config.gcode_comments) {
+            gcode << " ; wait for temperature to be reached";
+        }
+        gcode << "\n";
+    }
+
     return gcode.str();
 }
 
@@ -338,43 +389,13 @@ std::string GCodeWriter::set_chamber_temperature(uint32_t temperature, bool wait
     }
     
     std::ostringstream gcode;
-    gcode << code << " " << "S";
-    gcode << temperature << " ; " << comment << "\n";
+    gcode << code << " " << "S" << temperature;
+    if (this->m_config.gcode_comments && !comment.empty()) {
+        gcode << " ; " << comment;
+    }
+    gcode << "\n";
     
     return gcode.str();
-}
-
-std::string GCodeWriter::set_pressure_advance(double pa) const {
-    if (pa < 0)
-        return "";
-    std::string_view comment =  " ; Pressure advance value "sv;
-    int16_t tool_id = -1;
-    if (m_tool)
-        tool_id = m_tool->id();
-    std::string gcode;
-    if (FLAVOR_IS(gcfKlipper)) {
-        gcode = std::string("SET_PRESSURE_ADVANCE ADVANCE=") + to_string_nozero(pa, 4);
-        if (tool_id >= 0) {
-            if (this->m_config.tool_name.size() > tool_id && !this->m_config.tool_name.get_at(tool_id).empty()) {
-                gcode += std::string(" EXTRUDER=") + this->m_config.tool_name.get_at(tool_id);
-            } else {
-                gcode += std::string(" EXTRUDER=extruder") + std::to_string(tool_id);
-            }
-        }
-    } else if (FLAVOR_IS(gcfRepRap) || FLAVOR_IS(gcfSprinter)) {
-        if (tool_id >= 0) {
-            gcode = std::string("M572 D") + std::to_string(tool_id) + " S" + to_string_nozero(pa, 4);
-        } else {
-            //is it possible to have no tool id? or a -1 is possible?
-            gcode = std::string("M572 S") + to_string_nozero(pa, 4);
-        }
-    } else {
-        gcode = std::string("M900 K") + to_string_nozero(pa, 4);
-    }
-    if (this->m_config.gcode_comments) {
-        gcode += comment;
-    }
-    return gcode + "\n";
 }
 
 void GCodeWriter::_write_pressure_advance(std::string &gcode) {
@@ -531,10 +552,10 @@ std::string GCodeWriter::update_progress(uint32_t num, uint32_t tot, bool allow_
 
 std::string GCodeWriter::toolchange_prefix() const
 {
-    return FLAVOR_IS(gcfMakerWare) ? "M135 T" :
-           FLAVOR_IS(gcfSailfish) ? "M108 T" :
-           FLAVOR_IS(gcfKlipper) ? "ACTIVATE_EXTRUDER EXTRUDER=" :
-           "T";
+    return FLAVOR_IS(gcfMakerWare)                                                  ? "M135 T" :
+        FLAVOR_IS(gcfSailfish)                                                      ? "M108 T" :
+        FLAVOR_IS(gcfKlipper) && !this->m_config.single_extruder_multi_material.value ? "ACTIVATE_EXTRUDER EXTRUDER=" :
+                                                                                      "T";
 }
 
 std::string GCodeWriter::toolchange(uint16_t tool_id)
@@ -563,9 +584,11 @@ std::string GCodeWriter::toolchange(uint16_t tool_id)
 
     // return the toolchange command
     // if we are running a single-extruder setup, just set the extruder and return nothing
+    // no, still output TX to let the firmware know to change the filament
     std::ostringstream gcode;
     if (this->multiple_extruders) {
-        if (FLAVOR_IS(gcfKlipper)) {
+        // if klipper and not in single_extruder_multi_material, then you need to select the extruder by name.
+        if (FLAVOR_IS(gcfKlipper) && !this->m_config.single_extruder_multi_material.value) {
             //check if we can use the tool_name field or not
             if (tool_id > 0 && tool_id < this->m_config.tool_name.size() && !this->m_config.tool_name.get_at(tool_id).empty()
                 // NOTE: this will probably break if there's more than 10 tools, as it's relying on the
@@ -574,14 +597,15 @@ std::string GCodeWriter::toolchange(uint16_t tool_id)
                 gcode << this->toolchange_prefix() << this->m_config.tool_name.get_at(tool_id);
             } else {
                 gcode << this->toolchange_prefix() << "extruder";
-                if (tool_id > 0)
+                if (tool_id > 0) {
                     gcode << tool_id;
+                }
             }
         } else {
             gcode << this->toolchange_prefix() << tool_id;
         }
         if (this->m_config.gcode_comments)
-            gcode << " ; change extruder";
+            gcode << (this->m_config.single_extruder_multi_material.value ? " ; change filament" : " ; change extruder");
         gcode << "\n";
         gcode << this->reset_e(true);
     }
@@ -1117,58 +1141,75 @@ std::string GCodeWriter::unlift()
     return gcode;
 }
 
-std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_idx, uint8_t speed, const std::string_view comment/*=""*/)
+std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, uint8_t speed, uint8_t tool_fan_offset, bool is_fan_percentage, const std::string_view comment/*=""*/)
 {
+/*
+    std::ostringstream gcode;
+    if (speed == 0) {
+        switch (gcode_flavor) {
+        case gcfTeacup:
+            gcode << "M106 S0"; break;
+        case gcfMakerWare:
+        case gcfSailfish:
+            gcode << "M127";    break;
+        default:
+            gcode << "M107";    break;
+        }
+        if (gcode_comments)
+            gcode << " ; disable fan";
+        gcode << "\n";
+    } else {
+        switch (gcode_flavor) {
+        case gcfMakerWare:
+        case gcfSailfish:
+            gcode << "M126";    break;
+        case gcfMach3:
+        case gcfMachinekit:
+            gcode << "M106 P" << 255.0 * speed / 100.0; break;
+        default:
+            gcode << "M106 S" << 255.0 * speed / 100.0; break;
+        }
+        if (gcode_comments) 
+            gcode << " ; enable fan";
+        gcode << "\n";
+    }
+    return gcode.str();*/
 
     std::ostringstream gcode;
-    assert(extruder_idx < config.extruder_fan_offset.size());
-    assert(extruder_idx < config.fan_name.size());
-
-    const GCodeFlavor gcode_flavor = config.gcode_flavor;
-    
-    double fan_baseline = (config.fan_percentage ? 100.0 : 255.0);
 
     //add fan_offset
     int16_t fan_speed = int8_t(std::min(uint8_t(100), speed));
-    fan_speed += (uint8_t)config.extruder_fan_offset.get_abs_value(extruder_idx, 1.0);
+    fan_speed += tool_fan_offset;
     fan_speed = std::max(int16_t(0), std::min(int16_t(100), fan_speed));
+    const double fan_baseline = (is_fan_percentage ? 100.0 : 255.0);
 
-    //check if we should use a special fan
-    if ((gcfKlipper == gcode_flavor) && !config.fan_name.get_at(extruder_idx).empty()) {
-        //note: if another fan has to be set to 0 before, it's the caller rsponsibility.*
-        fan_baseline = 1.0;
-        gcode << "SET_FAN_SPEED FAN=" << config.fan_name.get_at(extruder_idx);
-        gcode << " SPEED=" << PRECISION((fan_baseline * (fan_speed / 100.0)), 3) << "\n";
-    } else {
-        // write it
-        if (fan_speed == 0) {
-            if ((gcfTeacup == gcode_flavor || gcfRepRap == gcode_flavor)) {
-                gcode << "M106 S0";
-            } else if ((gcfMakerWare == gcode_flavor) || (gcfSailfish == gcode_flavor)) {
-                gcode << "M127";
-            } else {
-                gcode << "M107";
-            }
-            if (config.gcode_comments.value)
-                gcode << " ; " << (comment.empty() ? "disable fan" : comment);
-            gcode << "\n";
+    // write it
+    if (fan_speed == 0) {
+        if ((gcfTeacup == gcode_flavor || gcfRepRap == gcode_flavor)) {
+            gcode << "M106 S0";
+        } else if ((gcfMakerWare == gcode_flavor) || (gcfSailfish == gcode_flavor)) {
+            gcode << "M127";
         } else {
-            if ((gcfMakerWare == gcode_flavor) || (gcfSailfish == gcode_flavor)) {
-                gcode << "M126 T";
-            } else {
-                gcode << "M106 ";
-                if ((gcfMach3 == gcode_flavor) || (gcfMachinekit == gcode_flavor)) {
-                    gcode << "P";
-                } else {
-                    gcode << "S";
-                }
-                gcode << (fan_baseline * (fan_speed / 100.0));
-            }
-            if (config.gcode_comments.value) gcode << " ; enable fan";
-            gcode << "\n";
+            gcode << "M107";
         }
-        if (config.gcode_comments.value)
+        if (gcode_comments)
+            gcode << " ; " << (comment.empty() ? "disable fan" : comment);
+        gcode << "\n";
+    } else {
+        if ((gcfMakerWare == gcode_flavor) || (gcfSailfish == gcode_flavor)) {
+            gcode << "M126 T";
+        } else {
+            gcode << "M106 ";
+            if ((gcfMach3 == gcode_flavor) || (gcfMachinekit == gcode_flavor)) {
+                gcode << "P";
+            } else {
+                gcode << "S";
+            }
+        }
+        gcode << (fan_baseline * (fan_speed / 100.0));
+        if (gcode_comments)
             gcode << " ; " << (comment.empty() ? "enable fan" : comment);
+        gcode << "\n";
     }
     return gcode.str();
 }
@@ -1176,9 +1217,8 @@ std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_id
 std::string GCodeWriter::set_fan(const uint8_t speed, uint16_t default_tool)
 {
     const Tool *tool = m_tool == nullptr ? get_tool(default_tool) : m_tool;
-    if(!tool) BOOST_LOG_TRIVIAL(error) << "Error: trying to set fan without any tool accociated.\n";
     m_last_fan_speed = speed;
-    return GCodeWriter::set_fan(this->m_config, tool ? tool->id() : 0, speed);
+    return GCodeWriter::set_fan(this->m_config.gcode_flavor.value, this->m_config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, this->m_config.fan_percentage.value);
 }
 
 } // namespace Slic3r

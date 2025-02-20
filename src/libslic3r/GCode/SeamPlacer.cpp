@@ -462,13 +462,15 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
         SeamPosition configured_seam_preference;
         PerimeterGeneratorType perimeter_type = PerimeterGeneratorType::Classic;
     public:
-        bool also_overhangs = false;
+        // set to true to resolve some issues. when overhangs cut a loop in two, it can fail to go to the right spot.
+        bool also_overhangs = true; // false;
         bool also_thin_walls = false;
         PerimeterCopy(std::vector<const LayerRegion*>& regions_out, PolylineWithEnds* polys, SeamPosition configured_seam)
             : m_corresponding_regions_out(regions_out), configured_seam_preference(configured_seam), polylines(polys) {
         }
         virtual void default_use(const ExtrusionEntity& entity) {};
         virtual void use(const ExtrusionPath &path) override {
+            if(path.attributes().no_seam) return;
             if (
                 // path: first case: Arachne, second case: ThinWall/gapfill, third case: extra overhangs
                 (perimeter_type == PerimeterGeneratorType::Arachne && path.role() != ExtrusionRole::ThinWall && !path.role().is_overhang()) ||
@@ -476,13 +478,17 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
                 (also_overhangs && path.role().is_overhang())) {
                 //path.polygons_covered_by_width(*polygons, SCALED_EPSILON);
                 assert(m_corresponding_regions_out.size() == polylines->size());
-                polylines->emplace_back(path.polyline.to_polyline().points, true, true, PolylineWithEnd::PolyDir::BOTH); // TODO: more point for arcs
+                //if path, start at one end. so only two points allowed.
+                polylines->emplace_back(path.polyline.to_polyline().points, true, true, PolylineWithEnd::PolyDir::BOTH);
                 assert(path.polyline.front() != path.polyline.back());
                 assert(path.polyline.size() > 1);
                 //while (m_corresponding_regions_out->size() < polylines->size()) {
                     m_corresponding_regions_out.push_back(current_layer_region);
                 //}
             }
+        }
+        virtual void use(const ExtrusionPath3D &path3D) override {
+            this->use(*static_cast<const ExtrusionPath*>(&path3D));
         }
         virtual void use(const ExtrusionLoop& loop) override {
             bool is_ccw = loop.polygon().is_counter_clockwise();
@@ -503,22 +509,25 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
                 bool current_collected = false;
                 for (const ExtrusionPath &path : loop.paths) {
                     current_collected = false;
-                    if (path.role() == ExtrusionRole::ExternalPerimeter) {
-                        if(!previous_collected)
-                            polys.emplace_back(false, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
-                        path.collect_points(polys.back().points);
-                        assert(polys.back().size() > 1);
-                        count_paths_collected++;
-                        current_collected = true;
-                    }
-                    if ( path.role().is_overhang() &&
-                        also_overhangs) { // TODO find a way to search for external overhangs only
-                        if(!previous_collected)
-                            polys.emplace_back(false, false, is_ccw ? PolylineWithEnd::PolyDir::CCW : PolylineWithEnd::PolyDir::CW);
-                        path.collect_points(polys.back().points);
-                        assert(polys.back().size() > 1);
-                        count_paths_collected++;
-                        current_collected = true;
+                    if (path.role().is_external_perimeter()) {
+                        if (!path.role().is_overhang() || also_overhangs) {
+                            if (!path.attributes().no_seam) {
+                                if (!previous_collected) {
+                                    polys.emplace_back(false, false,
+                                                       is_ccw ? PolylineWithEnd::PolyDir::CCW :
+                                                                PolylineWithEnd::PolyDir::CW);
+                                } else if (!polys.back().empty() &&
+                                           polys.back().points.back() == path.polyline.front()) {
+                                    polys.back().points.pop_back();
+                                }
+                                path.collect_points(polys.back().points);
+                                assert(polys.back().size() > 1);
+                                current_collected = true;
+                                count_paths_collected++;
+                            } else {
+                                current_collected = previous_collected; // don't break the polyline, just skip the points.
+                            }
+                        }
                     }
                     //if (path.role() == ExtrusionRole::erThinWall && also_thin_walls) {
                     //    path.collect_points(p); // TODO: 2.7: reactivate when it's possible to distinguish between thinwalltravel & thinextrusions
@@ -545,6 +554,22 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
             if (perimeter_type == PerimeterGeneratorType::Arachne) {
                 for (size_t idx = 0; idx < collection.size(); idx++) {
                     const ExtrusionPath &path = collection.paths[idx];
+                    assert(m_corresponding_regions_out.size() == polylines->size());
+                    polylines->emplace_back(path.polyline.to_polyline().points,
+                                            idx == 0 ? true : false,
+                                            idx + 1 < collection.size() ? false : true,
+                                            PolylineWithEnd::PolyDir::BOTH); // TODO: more points for arcs
+                    assert(path.polyline.front() != path.polyline.back());
+                    assert(path.polyline.size() > 1);
+                    m_corresponding_regions_out.push_back(current_layer_region);
+                }
+            }
+        }
+        virtual void use(const ExtrusionMultiPath3D& collection) override {
+            
+            if (perimeter_type == PerimeterGeneratorType::Arachne) {
+                for (size_t idx = 0; idx < collection.size(); idx++) {
+                    const ExtrusionPath3D &path = collection.paths[idx];
                     assert(m_corresponding_regions_out.size() == polylines->size());
                     polylines->emplace_back(path.polyline.to_polyline().points,
                                             idx == 0 ? true : false,
@@ -583,9 +608,10 @@ PolylineWithEnds extract_perimeter_polylines(const Layer *layer, const SeamPosit
                 ex_entity->visit(visitor);
                 if (polylines.empty()) {
                     // can happen if the external is fully an overhang
+                    bool old = visitor.also_overhangs;
                     visitor.also_overhangs = true;
                     ex_entity->visit(visitor);
-                    visitor.also_overhangs = false;
+                    visitor.also_overhangs = old;
                     if (polylines.empty()) {
                         // shouldn't happen
                         assert(ex_entity->role() == ExtrusionRole::ThinWall || layer_region->region().config().perimeter_generator == PerimeterGeneratorType::Arachne); // no loops
@@ -962,9 +988,14 @@ struct SeamComparator {
         }
 
         //avoid overhangs
+        float overhang_penalty_a = 0.f;
+        float overhang_penalty_b = 0.f;
         if ((a.overhang > a.perimeter.flow_width / 4 && b.overhang == 0.0f) ||
             (b.overhang > b.perimeter.flow_width / 4 && a.overhang == 0.0f)) {
             return a.overhang < b.overhang;
+        } else if (a.overhang > 0 || b.overhang > 0) {
+            overhang_penalty_a = std::clamp(2 * (a.overhang - a.perimeter.flow_width / 8) / a.perimeter.flow_width, 0.f, 3.f);
+            overhang_penalty_b = std::clamp(2 * (b.overhang - b.perimeter.flow_width / 8) / b.perimeter.flow_width, 0.f, 3.f);
         }
 
         // prefer hidden points (more than 0.5 mm inside)
@@ -987,11 +1018,11 @@ struct SeamComparator {
         }
 
         // the penalites are kept close to range [0-1.x] however, it should not be relied upon
-        float penalty_a = 2 * a.overhang / a.perimeter.flow_width
+        float penalty_a = overhang_penalty_a
                 + visibility_importance * a.visibility
                 + angle_importance * compute_angle_penalty(a.local_ccw_angle)
                 + travel_importance * distance_penalty_a;
-        float penalty_b = 2 * b.overhang / b.perimeter.flow_width
+        float penalty_b = overhang_penalty_b
                 + visibility_importance * b.visibility
                 + angle_importance * compute_angle_penalty(b.local_ccw_angle)
                 + travel_importance * distance_penalty_b;
@@ -1945,10 +1976,11 @@ Point SeamPlacer::place_seam(const Layer *layer, const ExtrusionLoop &loop, cons
         seam_index = perimeter.seam_index;
     } else {
         seam_index =
+            // only recompute for spNearest, spCost and spCustom, as these are the only one that uses the current position to compute the seam ( see is_first_better).
                 (po->config().seam_position.value == spNearest || po->config().seam_position.value == spCost || po->config().seam_position.value == spCustom) ?
-                        pick_nearest_seam_point_index(layer_perimeters.points, perimeter.start_index,
-                                unscaled<float>(last_pos), *po) :
-                        perimeter.seam_index;
+                        pick_nearest_seam_point_index(layer_perimeters.points, perimeter.start_index, unscaled<float>(last_pos), *po)
+                        : perimeter.seam_index
+            ;
         seam_position = layer_perimeters.points[seam_index].position;
     }
 

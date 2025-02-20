@@ -836,8 +836,8 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 	}
 
     if (this->set_value(opt_key, value, enabled, false)) {
-        assert(config.option(opt_short_key));
-        on_change_OG(opt_key, config.option(opt_short_key)->is_enabled(opt_index), get_value(opt_key));
+        // assert(config.option(opt_short_key)); // extruder_count: not a real config item
+        on_change_OG(opt_key, config.has(opt_short_key) ? config.option(opt_short_key)->is_enabled(opt_index) : true, get_value(opt_key));
     }
 }
 
@@ -1081,7 +1081,7 @@ std::pair<OG_CustomCtrl*, bool*> ConfigOptionsGroup::get_custom_ctrl_with_blinki
 }
 
 // Change an option on m_config, possibly call ModelConfig::touch().
-void ConfigOptionsGroup::change_opt_value(const t_config_option_key& opt_key, bool enable, const boost::any& value, int opt_index /*= 0*/)
+void ConfigOptionsGroup::change_opt_value(const t_config_option_key& opt_key, bool enable, const boost::any& value, int opt_index /*= -1*/)
 {
     if (m_config_mutable) {
         ConfigOption *opt = m_config_mutable->option(opt_key);

@@ -3169,7 +3169,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             const Print *print = m_process->fff_print();
             //FIXME use real nozzle diameter, or the biggest
             const double first_nozzle_diameter = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
-            const WipeTowerData& wipe_tower_data = print->wipe_tower_data();
+            const WipeTowerData& wipe_tower_data = print->wipe_tower_data(m_config, first_nozzle_diameter);
             const float depth = wipe_tower_data.depth;
             const float bw = wipe_tower_data.brim_width;
             const std::vector<std::pair<float, float>> z_and_depth_pairs = wipe_tower_data.z_and_depth_pairs;
