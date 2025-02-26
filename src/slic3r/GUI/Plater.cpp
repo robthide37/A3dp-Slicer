@@ -6093,7 +6093,22 @@ void Plater::add_model_modifier() {
    if (boost::algorithm::iends_with(input_file_str.c_str(), ".hfp")) {
        HFP *hfp = new HFP();
        p->hueforge = hfp;
-      result = p->hueforge->load_hfp(input_file_str.c_str(), this->config());
+       DynamicPrintConfig print_config = wxGetApp().preset_bundle->fff_prints.get_selected_preset().config;
+
+      result = p->hueforge->load_hfp(input_file_str.c_str(), print_config, p->model);
+
+      if (result) {
+          DynamicPrintConfig new_print_config = print_config;
+
+         // float precise_value_layer_height = std::floor((*p->hueforge->get_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
+         // float precise_value_base_layer_height = std::floor((*p->hueforge->get_base_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
+          new_print_config.set_key_value("layer_height", new ConfigOptionFloat(*p->hueforge->get_layer_height()));
+          new_print_config.set_key_value("first_layer_height",
+                                         new ConfigOptionFloatOrPercent(*p->hueforge->get_base_layer_height(), false));
+
+          wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
+          wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->reload_config();
+      }
    } else {
         throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");
    }
