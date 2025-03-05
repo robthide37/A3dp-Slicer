@@ -572,6 +572,7 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".amf"sv, ".zip.amf"sv } },
     /* FT_FONTS */   { "Font files"sv,      { ".ttc"sv, ".ttf"sv } },
     /* FT_GALLERY */ { "Known files"sv,     { ".stl"sv, ".obj"sv } },
+    /* FT_HFP     */ { "Modifier files"sv,  { ".hfp"sv } },
 
     /* FT_INI */     { "INI files"sv,       { ".ini"sv } },
     /* FT_SVG */     { "SVG files"sv,       { ".svg"sv } },
@@ -2570,6 +2571,22 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 
     if (dialog.ShowModal() == wxID_OK)
         dialog.GetPaths(input_files);
+}
+
+void GUI_App::import_model_modifier(wxWindow *parent, wxString& input_file) const {
+
+    // Clear the input file before importing
+    input_file.Clear();
+
+    // Open dialog to select the .HFP file
+    wxFileDialog dialog(parent ? parent : GetTopWindow(),
+            _L("Choose your modifier file (HFP):"),
+            from_u8(app_config->get_last_dir()), "",
+            file_wildcards(FT_HFP), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+            
+       if (dialog.ShowModal() == wxID_OK)
+           input_file = dialog.GetPath();
+       std::cout << dialog.GetPath() << std::endl;
 }
 
 void GUI_App::import_zip(wxWindow* parent, wxString& input_file) const

@@ -1770,6 +1770,10 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(import_menu, wxID_ANY, _L("Import STL/3MF/STEP/OBJ/AM&F") + dots + "\tCtrl+I", _L("Load a model"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->add_model(); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr; }, this);
+
+        append_menu_item(import_menu, wxID_ANY, _L("Import HFP") + dots + "\tCtrl+P", _L("Load a .hfp file to your model."),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->add_model_modifier(); }, "import_plater", nullptr,
+            [this](){return m_plater != nullptr; }, this);
         
         append_menu_item(import_menu, wxID_ANY, _L("Import STL (Imperial Units)"), _L("Load an model saved with imperial units"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->add_model(true); }, "import_plater", nullptr,

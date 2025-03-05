@@ -521,7 +521,7 @@ void PrintConfigDef::init_common_params()
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("layer_height", coFloat);
-    def->label = L("Base Layer height");
+    def->label = L("Layer height");
     def->category = OptionCategory::slicing;
     def->tooltip = L("This setting controls the height (and thus the total number) of the slices/layers. "
         "Thinner layers give better accuracy but take more time to print.");
