@@ -5,6 +5,7 @@ on:
     branches:
       - rc
       - debug_win
+      - debug_win
 
 
 jobs:

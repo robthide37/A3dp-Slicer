@@ -102,6 +102,12 @@ namespace Slic3r {
 
 namespace GUI {
 
+wxIcon icon_from_bitmap(const wxBitmap &bitmap) {
+    wxIcon temp_icon;
+    temp_icon.CopyFromBitmap(bitmap);
+    return temp_icon;
+}
+
 PreferencesDialog::PreferencesDialog(wxWindow* parent) :
     DPIDialog(parent, wxID_ANY, _L("Preferences"), wxDefaultPosition, 
               wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "preferences")
@@ -113,6 +119,14 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 
     wxSize sz = GetSize();
     bool is_scrollbar_shown = false;
+
+    wxBitmapBundle* bmp_cog = get_bmp_bundle("cog");
+    wxIconBundle cog_icon;
+    cog_icon.AddIcon(icon_from_bitmap(bmp_cog->GetBitmap(wxSize(16,16))));
+    cog_icon.AddIcon(icon_from_bitmap(bmp_cog->GetBitmap(wxSize(32,32))));
+    cog_icon.AddIcon(icon_from_bitmap(bmp_cog->GetBitmap(wxSize(48,48))));
+    cog_icon.AddIcon(icon_from_bitmap(bmp_cog->GetBitmap(wxSize(64,64))));
+    SetIcons(cog_icon);
 
     const size_t pages_cnt = tabs->GetPageCount();
     for (size_t tab_id = 0; tab_id < pages_cnt; tab_id++) {
@@ -167,23 +181,25 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 
     // Set enum value
     // set Field for notify_release to its value
-    std::vector<std::pair<std::string, t_config_enum_values>> enums = {
-        {"notify_release", s_keys_map_NotifyReleaseMode},
-        {"auto_switch_preview", s_keys_map_AutoSwitchPreview},
-        {"suppress_hyperlinks", s_keys_map_SuppressHyperlinks},
-    };
-    for (auto key2map : enums) {
-        if (m_optkey_to_optgroup.find(key2map.first) != m_optkey_to_optgroup.end()) {
-            if (auto field = m_optkey_to_optgroup[key2map.first]->get_field(key2map.first); field != nullptr) {
-                std::string current_value = wxGetApp().app_config->get(key2map.first);
-                assert(key2map.second.find(current_value) != key2map.second.end());
-                boost::any val;
-                if (key2map.second.find(current_value) != key2map.second.end()) {
-                    val = int32_t(key2map.second.at(current_value));
-                } else {
-                    val = int32_t(key2map.second.begin()->second);
+    if (wxGetApp().is_editor()) {
+        std::vector<std::pair<std::string, t_config_enum_values>> enums = {
+            {"notify_release", s_keys_map_NotifyReleaseMode},
+            {"auto_switch_preview", s_keys_map_AutoSwitchPreview},
+            {"suppress_hyperlinks", s_keys_map_SuppressHyperlinks},
+        };
+        for (auto key2map : enums) {
+            if (m_optkey_to_optgroup.find(key2map.first) != m_optkey_to_optgroup.end()) {
+                if (auto field = m_optkey_to_optgroup[key2map.first]->get_field(key2map.first); field != nullptr) {
+                    std::string current_value = wxGetApp().app_config->get(key2map.first);
+                    assert(key2map.second.find(current_value) != key2map.second.end());
+                    boost::any val;
+                    if (key2map.second.find(current_value) != key2map.second.end()) {
+                        val = int32_t(key2map.second.at(current_value));
+                    } else {
+                        val = int32_t(key2map.second.begin()->second);
+                    }
+                    field->set_any_value(val, false);
                 }
-                field->set_any_value(val, false);
             }
         }
     }
@@ -256,73 +272,74 @@ void PreferencesDialog::create_options_tab(const wxString& title)
 }
 
 
-std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(const wxString& title, wxBookCtrlBase* tabs, int page_idx)
-{
-
-	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>((wxPanel*)tabs->GetPage(page_idx), title, true);
-	optgroup->title_width = 40;
-	optgroup->label_width = 40;
-	optgroup->set_config_category_and_type(title, int(Preset::TYPE_PREFERENCES));
-	optgroup->m_on_change = [this, tabs, optgroup](t_config_option_key opt_key, bool enabled, boost::any value) {
+std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(const wxString &title,
+                                                                            wxBookCtrlBase *tabs,
+                                                                            int page_idx) {
+    std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>((wxPanel *) tabs->GetPage(
+                                                                                            page_idx),
+                                                                                        title, true);
+    optgroup->title_width = 40;
+    optgroup->label_width = 40;
+    optgroup->set_config_category_and_type(title, int(Preset::TYPE_PREFERENCES));
+    optgroup->m_on_change = [this, tabs, optgroup](t_config_option_key opt_key, bool enabled, boost::any value) {
         assert(enabled);
-		Field* field = optgroup->get_field(opt_key);
-		if (auto it = m_values.find(opt_key); it != m_values.end()) { //TODO: test that
-			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
-			return;
-		}
-		//very special cases
-		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" || opt_key == "default_action_on_new_project")
-			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
-		else if (opt_key == "default_action_on_dirty_project")
-			m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
-		else if ("ui_layout" == opt_key) {
-			std::vector<std::string> splitted;
-			boost::split(splitted, boost::any_cast<std::string>(value), boost::is_any_of(":"));
-			m_values[opt_key] = splitted[0];
-		} else if (field) {
-			//common cases
-			if (field->m_opt.type == coBool) {
-				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
-			} else if (field->m_opt.type == coInt) {
-				m_values[opt_key] = std::to_string(boost::any_cast<int>(value));
-			} else if (field->m_opt.type == coString && field->m_opt.gui_type == ConfigOptionDef::GUIType::color) {
-				std::string str_color = boost::any_cast<std::string>(value);
-				if (str_color.size() >= 6 && str_color.size() <= 7) {
-					m_values[opt_key] = str_color[0] == '#' ? str_color.substr(1) : str_color;
-				}
-			} else if (field->m_opt.type == coString || field->m_opt.type == coStrings) {
-				m_values[opt_key] = boost::any_cast<std::string>(value);
-			} else if (field->m_opt.type == coEnum) {
+        Field *field = optgroup->get_field(opt_key);
+        // very special cases
+        if (opt_key == "use_custom_toolbar_size") {
+            m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
+            refresh_og(m_optkey_to_optgroup["use_custom_toolbar_size"]);
+            get_app_config()->set("use_custom_toolbar_size", boost::any_cast<bool>(value) ? "1" : "0");
+            wxGetApp().plater()->get_current_canvas3D()->render();
+            return;
+        } else if (opt_key == "tabs_as_menu") {
+            bool disable_new_layout = boost::any_cast<bool>(value);
+            m_rb_new_settings_layout_mode->Show(!disable_new_layout);
+            if (disable_new_layout && m_rb_new_settings_layout_mode->GetValue()) {
+                m_rb_new_settings_layout_mode->SetValue(false);
+                m_rb_old_settings_layout_mode->SetValue(true);
+            }
+            refresh_og(m_optkey_to_optgroup["tabs_as_menu"]);
+        } else if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" ||
+                   opt_key == "default_action_on_new_project") {
+            m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
+        } else if (opt_key == "default_action_on_dirty_project") {
+            m_values[opt_key] = boost::any_cast<bool>(value) ? "" : "0";
+        } else if ("ui_layout" == opt_key) {
+            std::vector<std::string> splitted;
+            boost::split(splitted, boost::any_cast<std::string>(value), boost::is_any_of(":"));
+            m_values[opt_key] = splitted[0];
+        } else if (field) {
+            // common cases
+            if (field->m_opt.type == coBool) {
+                // we shouldn't change value, if some of those parameters were selected, and then deselected
+                if (auto it = m_values.find(opt_key); it != m_values.end()) {
+                    m_values.erase(it);
+                    return;
+                } else {
+                    m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+                }
+            } else if (field->m_opt.type == coInt) {
+                m_values[opt_key] = std::to_string(boost::any_cast<int>(value));
+            } else if (field->m_opt.type == coString && field->m_opt.gui_type == ConfigOptionDef::GUIType::color) {
+                std::string str_color = boost::any_cast<std::string>(value);
+                if (str_color.size() >= 6 && str_color.size() <= 7) {
+                    m_values[opt_key] = str_color[0] == '#' ? str_color.substr(1) : str_color;
+                }
+            } else if (field->m_opt.type == coString || field->m_opt.type == coStrings) {
+                m_values[opt_key] = boost::any_cast<std::string>(value);
+            } else if (field->m_opt.type == coEnum) {
                 int value_idx = boost::any_cast<int32_t>(value);
-                assert( int(field->m_opt.enum_def->values().size()) > value_idx && value_idx >= 0);
+                assert(int(field->m_opt.enum_def->values().size()) > value_idx && value_idx >= 0);
                 if (int(field->m_opt.enum_def->values().size()) > value_idx && value_idx >= 0) {
                     m_values[opt_key] = field->m_opt.enum_def->value(value_idx);
-				}
-			}
-		} else {
-			assert(false);
-			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
-		}
-
-		if (opt_key == "use_custom_toolbar_size") {
-			m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
-			refresh_og(m_optkey_to_optgroup["use_custom_toolbar_size"]);
-			get_app_config()->set("use_custom_toolbar_size", boost::any_cast<bool>(value) ? "1" : "0");
-			wxGetApp().plater()->get_current_canvas3D()->render();
-			return;
-		}
-		if (opt_key == "tabs_as_menu") {
-			bool disable_new_layout = boost::any_cast<bool>(value);
-			m_rb_new_settings_layout_mode->Show(!disable_new_layout);
-			if (disable_new_layout && m_rb_new_settings_layout_mode->GetValue()) {
-				m_rb_new_settings_layout_mode->SetValue(false);
-				m_rb_old_settings_layout_mode->SetValue(true);
-			}
-			refresh_og(m_optkey_to_optgroup["tabs_as_menu"]);
-		}
-
-	};
-	return optgroup;
+                }
+            }
+        } else {
+            assert(false);
+            m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+        }
+    };
+    return optgroup;
 }
 
 static void activate_options_tab(std::shared_ptr<ConfigOptionsGroup> optgroup, int padding = 20)
@@ -781,12 +798,13 @@ void PreferencesDialog::build()
 
 
 #if defined(_WIN32) || defined(__APPLE__)
-	//m_tabid_2_optgroups.back().back()->append_separator();
-	
-	append_bool_option(m_tabid_2_optgroups.back().back(), "use_legacy_3DConnexion",
-		L("Enable support for legacy 3DConnexion devices"),
-		L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M"),
-		app_config->get_bool("use_legacy_3DConnexion"));
+    // m_tabid_2_optgroups.back().back()->append_separator();
+
+    append_bool_option(
+        m_tabid_2_optgroups.back().back(), "use_legacy_3DConnexion",
+        L("Enable support for legacy 3DConnexion devices"),
+        L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M"),
+        app_config->get_bool("use_legacy_3DConnexion"));
 #endif // _WIN32 || __APPLE__
 
 	append_bool_option(m_tabid_2_optgroups.back().back(), "compress_png_texture",
@@ -808,37 +826,38 @@ void PreferencesDialog::build()
 		  "If disabled, changes made using the sequential slider, in preview, apply to the whole gcode."),
 		app_config->get_bool("seq_top_layer_only"));
 
-    {
-        std::string suppress_hyperlinks_value = app_config->get("suppress_hyperlinks");
-        bool need_set = true;
-        if (app_config->get("suppress_hyperlinks") == "0") {
-            suppress_hyperlinks_value = "disable";
-        } else if (app_config->get("suppress_hyperlinks") == "1") {
-            suppress_hyperlinks_value = "confirm";
-        } else {
-            need_set = false;
+    if (is_editor) {
+        {
+            std::string suppress_hyperlinks_value = app_config->get("suppress_hyperlinks");
+            bool need_set = true;
+            if (app_config->get("suppress_hyperlinks") == "0") {
+                suppress_hyperlinks_value = "disable";
+            } else if (app_config->get("suppress_hyperlinks") == "1") {
+                suppress_hyperlinks_value = "confirm";
+            } else if (suppress_hyperlinks_value.empty()) {
+                suppress_hyperlinks_value = "confirm";
+            } else {
+                need_set = false;
+            }
+            if (need_set) {
+                app_config->set("suppress_hyperlinks", suppress_hyperlinks_value);
+            }
+            if (s_keys_map_SuppressHyperlinks.find(suppress_hyperlinks_value) == s_keys_map_SuppressHyperlinks.end()) {
+                assert(false);
+                suppress_hyperlinks_value = "confirm";
+            }
+            append_enum_option<SuppressHyperlinks>(m_tabid_2_optgroups.back().back(), "suppress_hyperlinks",
+                L("Allow to open hyperlink in browser"),
+                L("Sometimes an option is available to be opened in your browser, to have a link to documentation or a resource."
+                    "\nDo you want to disabled these links (Disable)?"
+                    "\nDo you want to have a confirm dialog (Confirm)?"
+                    "\nDo you prefer to allow these (Allow)?"),
+                new ConfigOptionEnum<SuppressHyperlinks>(static_cast<SuppressHyperlinks>(s_keys_map_SuppressHyperlinks.at(suppress_hyperlinks_value))),
+                { { "disable", L("Disable") },
+                    { "confirm", L("Confirm") },
+                    { "allow", L("Allow") }
+                });
         }
-        if (need_set) {
-            app_config->set("suppress_hyperlinks", suppress_hyperlinks_value);
-        }
-        if (s_keys_map_SuppressHyperlinks.find(suppress_hyperlinks_value) == s_keys_map_SuppressHyperlinks.end()) {
-            assert(false);
-            suppress_hyperlinks_value = "confirm";
-        }
-        append_enum_option<SuppressHyperlinks>(m_tabid_2_optgroups.back().back(), "suppress_hyperlinks",
-            L("Allow to open hyperlink in browser"),
-            L("Sometimes an option is available to be opened in your browser, to have a link to documentation or a resource."
-                "\nDo you want to disabled these links (Disable)?"
-                "\nDo you want to have a confirm dialog (Confirm)?"
-                "\nDo you prefer to allow these (Allow)?"),
-            new ConfigOptionEnum<SuppressHyperlinks>(static_cast<SuppressHyperlinks>(s_keys_map_SuppressHyperlinks.at(suppress_hyperlinks_value))),
-            { { "disable", L("Disable") },
-                { "confirm", L("Confirm") },
-                { "allow", L("Allow") }
-            });
-    }
-
-	if (is_editor) {
 		append_bool_option(m_tabid_2_optgroups.back().back(), "show_collapse_button",
 			L("Show sidebar collapse/expand button"),
 			L("If enabled, the button for the collapse sidebar will be appeared in top right corner of the 3D Scene"),
@@ -968,7 +987,13 @@ void PreferencesDialog::build()
 			L("Show layer area on the scroll bar"),
 			L("Add the layer area (the number just below the layer id) next to a widget of the layer double-scrollbar."),
 			app_config->get_bool("show_layer_area_doubleslider"));
-	}
+		
+        append_int_option(m_tabid_2_optgroups.back().back(), "side_panel_width", L("Side Panel Width"),
+                          L("The width of the right panel, where the objects , presets and slicing information are "
+                            "displayeed. It's in 'display unit'."),
+                          6, app_config->get_int("side_panel_width"));
+        m_values_need_restart.push_back("side_panel_width");
+    }
 
 	append_int_option(m_tabid_2_optgroups.back().back(), "gcodeviewer_decimals",
 		L("Decimals for gcode viewer colors"),
@@ -984,11 +1009,10 @@ void PreferencesDialog::build()
 	activate_options_tab(m_tabid_2_optgroups.back().back(), 3);
 
     if (is_editor) {
-
-        //create layout options
+        // create layout options
         assert(m_tabid_2_optgroups.size() - 1 == 2);
         create_settings_mode_widget(tabs->GetPage(m_tabid_2_optgroups.size() - 1), m_tabid_2_optgroups.back().back());
-        //create ui_layout check
+        // create ui_layout check
         {
             m_tabid_2_optgroups.back().emplace_back(create_options_group(_L("Settings layout and colors"), tabs, 2));
             m_tabid_2_optgroups.back().back()->title_width = 0;
@@ -996,85 +1020,91 @@ void PreferencesDialog::build()
             ConfigOptionDef def_combobox;
             def_combobox.label = "_";
             def_combobox.type = coString;
-            def_combobox.tooltip = L("Choose the gui package to use. It controls colors, settings layout, quick settings, tags (simple/expert).");
-            def_combobox.full_width = false; //true doesn't set the space for the search arrow (and add a line before for it but it fails).
+            def_combobox.tooltip = L("Choose the gui package to use. It controls colors, settings layout, quick "
+                                     "settings, tags (simple/expert).");
+            def_combobox.full_width =
+                false; // true doesn't set the space for the search arrow (and add a line before for it but it fails).
             def_combobox.width = 64;
-            //get all available configs
+            // get all available configs
             std::vector<std::string> enum_values;
-            for (const AppConfig::LayoutEntry& layout : get_app_config()->get_ui_layouts()) {
-                enum_values.push_back(layout.name+": "+layout.description);
+            for (const AppConfig::LayoutEntry &layout : get_app_config()->get_ui_layouts()) {
+                enum_values.push_back(layout.name + ": " + layout.description);
             }
             def_combobox.set_enum_values(ConfigOptionDef::GUIType::select_close, enum_values);
             def_combobox.gui_flags = "show_value";
 
             AppConfig::LayoutEntry selected = get_app_config()->get_ui_layout();
-            def_combobox.set_default_value(new ConfigOptionStrings{ selected.name+": "+ selected.description });
+            def_combobox.set_default_value(new ConfigOptionStrings{selected.name + ": " + selected.description});
             Option option = Option(def_combobox, "ui_layout");
             m_tabid_2_optgroups.back().back()->append_single_option_line(option);
             m_values_need_restart.push_back("ui_layout");
             m_optkey_to_optgroup["ui_layout"] = m_tabid_2_optgroups.back().back();
-            wxGetApp().sidebar().get_searcher().add_key("ui_layout", Preset::TYPE_PREFERENCES, m_tabid_2_optgroups.back().back()->config_category(), L("Preferences"), def_combobox);
+            wxGetApp().sidebar().get_searcher().add_key("ui_layout", Preset::TYPE_PREFERENCES,
+                                                        m_tabid_2_optgroups.back().back()->config_category(),
+                                                        L("Preferences"), def_combobox);
             activate_options_tab(m_tabid_2_optgroups.back().back(), 3);
         }
+    }
 
-        m_tabid_2_optgroups.back().emplace_back(create_options_group(_L("Splash screen"), tabs, 2));
+    m_tabid_2_optgroups.back().emplace_back(create_options_group(_L("Splash screen"), tabs, 2));
 
-        // Show/Hide splash screen
-        append_bool_option(m_tabid_2_optgroups.back().back(), "show_splash_screen",
-            L("Show splash screen"),
-            L("Show splash screen"),
-            app_config->get_bool("show_splash_screen"));
+    // Show/Hide splash screen
+    append_bool_option(m_tabid_2_optgroups.back().back(), "show_splash_screen",
+        L("Show splash screen"),
+        L("Show splash screen"),
+        app_config->get_bool("show_splash_screen"));
 
-        // splashscreen image
-        {
+    // splashscreen image
+    {
 
-            ConfigOptionDef def_combobox;
-            def_combobox.opt_key = is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer";
-            def_combobox.label = L("Splash screen image");
-            def_combobox.type = coString;
-            def_combobox.tooltip = L("Choose the image to use as splashscreen");
-            std::vector<std::pair<std::string,std::string>> enum_key_values = {
-                {"default", L("Default")}, 
-                {"icon", L("Icon")}, 
-                {"random", L("Random")}
-                };
-            //get all images in the spashscreen dir
-            for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
-                if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
-                    enum_key_values.push_back({dir_entry.path().filename().string(), dir_entry.path().stem().string()});
-                }
+        ConfigOptionDef def_combobox;
+        def_combobox.opt_key = is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer";
+        def_combobox.label = L("Splash screen image");
+        def_combobox.type = coString;
+        def_combobox.tooltip = L("Choose the image to use as splashscreen");
+        std::vector<std::pair<std::string,std::string>> enum_key_values = {
+            {"default", L("Default")}, 
+            {"icon", L("Icon")}, 
+            {"random", L("Random")}
+            };
+        //get all images in the spashscreen dir
+        for (const boost::filesystem::directory_entry& dir_entry : boost::filesystem::directory_iterator(boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen")) {
+            if (dir_entry.path().has_extension() && std::set<std::string>{ ".jpg", ".JPG", ".jpeg" }.count(dir_entry.path().extension().string()) > 0) {
+                enum_key_values.push_back({dir_entry.path().filename().string(), dir_entry.path().stem().string()});
             }
-            def_combobox.set_enum_values(ConfigOptionDef::GUIType::select_close, enum_key_values);
-            assert(def_combobox.enum_def->is_valid_open_enum());
-            std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
-            if (std::find(def_combobox.enum_def->values().begin(), def_combobox.enum_def->values().end(), current_file_name) == def_combobox.enum_def->values().end()) {
-                assert(false);
-                current_file_name = def_combobox.enum_def->values()[0];
-                app_config->set(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer", current_file_name);
-            }
-            def_combobox.set_default_value(new ConfigOptionString{ current_file_name });
-            Option option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
-            m_tabid_2_optgroups.back().back()->append_single_option_line(option);
-            m_optkey_to_optgroup[is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer"] = m_tabid_2_optgroups.back().back();
-            wxGetApp().sidebar().get_searcher().add_key(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer", Preset::TYPE_PREFERENCES, m_tabid_2_optgroups.back().back()->config_category(), L("Preferences"), def_combobox);
         }
+        def_combobox.set_enum_values(ConfigOptionDef::GUIType::select_close, enum_key_values);
+        assert(def_combobox.enum_def->is_valid_open_enum());
+        std::string current_file_name = app_config->get(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
+        if (std::find(def_combobox.enum_def->values().begin(), def_combobox.enum_def->values().end(), current_file_name) == def_combobox.enum_def->values().end()) {
+            assert(false);
+            current_file_name = def_combobox.enum_def->values()[0];
+            app_config->set(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer", current_file_name);
+        }
+        def_combobox.set_default_value(new ConfigOptionString{ current_file_name });
+        Option option = Option(def_combobox, is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer");
+        m_tabid_2_optgroups.back().back()->append_single_option_line(option);
+        m_optkey_to_optgroup[is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer"] = m_tabid_2_optgroups.back().back();
+        wxGetApp().sidebar().get_searcher().add_key(is_editor ? "splash_screen_editor" : "splash_screen_gcodeviewer", Preset::TYPE_PREFERENCES, m_tabid_2_optgroups.back().back()->config_category(), L("Preferences"), def_combobox);
+    }
 
-        append_bool_option(m_tabid_2_optgroups.back().back(), "restore_win_position",
-            L("Restore window position on start"),
-            L("If enabled, Slic3r will be open at the position it was closed"),
-            app_config->get_bool("restore_win_position"));
+    append_bool_option(m_tabid_2_optgroups.back().back(), "restore_win_position",
+        L("Restore window position on start"),
+        L("If enabled, Slic3r will be open at the position it was closed"),
+        app_config->get_bool("restore_win_position"));
 
 #ifdef WIN32
-        // Clear Undo / Redo stack on new project
-        append_bool_option(m_tabid_2_optgroups.back().back(), "check_blacklisted_library",
-            L("Check for problematic dynamic libraries"),
-            L("Some software like (for example) ASUS Sonic Studio injects a DLL (library) that is known to create some instabilities."
-            " This option let Slic3r check at startup if they are loaded."),
-            app_config->get_bool("check_blacklisted_library"));
+    // Clear Undo / Redo stack on new project
+    append_bool_option(m_tabid_2_optgroups.back().back(), "check_blacklisted_library",
+        L("Check for problematic dynamic libraries"),
+        L("Some software like (for example) ASUS Sonic Studio injects a DLL (library) that is known to create some instabilities."
+        " This option let Slic3r check at startup if they are loaded."),
+        app_config->get_bool("check_blacklisted_library"));
 #endif
 
-        activate_options_tab(m_tabid_2_optgroups.back().back(), 3);
+    activate_options_tab(m_tabid_2_optgroups.back().back(), 3);
 
+    if (is_editor) {
 #if ENABLE_ENVIRONMENT_MAP
         // Add "Render" tab
         create_options_tab(L("Render"));
@@ -1123,45 +1153,47 @@ void PreferencesDialog::build()
         activate_options_tab(m_tabid_2_optgroups.back().back(), 3);
     }
 #endif //_WIN32
+    
+    if (is_editor) {
+        m_tabid_2_optgroups.back().emplace_back(create_options_group(_L("Gui Colors"), tabs, 3));
+        //prusa hue : ~22, Susi hue: ~216, slic3r hue: ~55
+        // color prusa -> susie
+        //ICON 237, 107, 33 -> ed6b21 ; 2172eb
+        //DARK 237, 107, 33 -> ed6b21 ; 32, 113, 234 2071ea
+        //MAIN 253, 126, 66 -> fd7e42 ; 66, 141, 253 428dfd
+        //LIGHT 254, 177, 139 -> feac8b; 139, 185, 254 8bb9fe
+        //TEXT 1.0f, 0.49f, 0.22f, 1.0f ff7d38 ; 0.26f, 0.55f, 1.0f, 1.0f 428cff
 
-	m_tabid_2_optgroups.back().emplace_back(create_options_group(_L("Gui Colors"), tabs, 3));
-	//prusa hue : ~22, Susi hue: ~216, slic3r hue: ~55
-	// color prusa -> susie
-	//ICON 237, 107, 33 -> ed6b21 ; 2172eb
-	//DARK 237, 107, 33 -> ed6b21 ; 32, 113, 234 2071ea
-	//MAIN 253, 126, 66 -> fd7e42 ; 66, 141, 253 428dfd
-	//LIGHT 254, 177, 139 -> feac8b; 139, 185, 254 8bb9fe
-	//TEXT 1.0f, 0.49f, 0.22f, 1.0f ff7d38 ; 0.26f, 0.55f, 1.0f, 1.0f 428cff
+        // PS 237 107 33 ; SuSi 33 114 235
+        append_color_option(m_tabid_2_optgroups.back().back(), "color_light",
+            L("Platter icons Color template"),
+            _u8L("Color template used by the icons on the platter.") +" "+
+            _u8L("It may need a lighter color, as it's used to replace white on top of a dark background.") +"\n"+
+            _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed"),
+            app_config->get("color_light"));
 
-	// PS 237 107 33 ; SuSi 33 114 235
-	append_color_option(m_tabid_2_optgroups.back().back(), "color_light",
-		L("Platter icons Color template"),
-		_u8L("Color template used by the icons on the platter.") +" "+
-		_u8L("It may need a lighter color, as it's used to replace white on top of a dark background.") +"\n"+
-		_u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 3d83ed"),
-		app_config->get("color_light"));
+        // PS 253 126 66 ; SuSi 66 141 253
+        append_color_option(m_tabid_2_optgroups.back().back(), "color",
+            L("Main Gui color template"),
+            _u8L("Main color template.") +" "+
+            _u8L("If you use a color with higher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.") +"\n"+
+            _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc"),
+            app_config->get("color"));
 
-	// PS 253 126 66 ; SuSi 66 141 253
-	append_color_option(m_tabid_2_optgroups.back().back(), "color",
-		L("Main Gui color template"),
-		_u8L("Main color template.") +" "+
-		_u8L("If you use a color with higher than 80% saturation and/or value, these will be increased. If lower, they will be decreased.") +"\n"+
-		_u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 296acc"),
-		app_config->get("color"));
+        // PS 254 172 139 ; SS 139 185 254
+        append_color_option(m_tabid_2_optgroups.back().back(), "color_dark",
+            L("Text color template"),
+            _u8L("This template will be used for drawing button text on hover.") +" "+
+            _u8L("It can be a good idea to use a bit darker color, as some hues can be a bit difficult to read.") +"\n"+
+            _u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad"),
+            app_config->get("color_dark"));
 
-	// PS 254 172 139 ; SS 139 185 254
-	append_color_option(m_tabid_2_optgroups.back().back(), "color_dark",
-		L("Text color template"),
-		_u8L("This template will be used for drawing button text on hover.") +" "+
-		_u8L("It can be a good idea to use a bit darker color, as some hues can be a bit difficult to read.") +"\n"+
-		_u8L("Slic3r(yellow): ccbe29, PrusaSlicer(orange): cc6429, SuperSlicer(blue): 275cad"),
-		app_config->get("color_dark"));
+        activate_options_tab(m_tabid_2_optgroups.back().back(), 3);
 
-	activate_options_tab(m_tabid_2_optgroups.back().back(), 3);
-
-	//create text options
-	create_settings_text_color_widget(tabs->GetPage(m_tabid_2_optgroups.size() - 1), m_tabid_2_optgroups.back().back());
-	create_settings_mode_color_widget(tabs->GetPage(m_tabid_2_optgroups.size() - 1), m_tabid_2_optgroups.back().back());
+        //create text options
+        create_settings_text_color_widget(tabs->GetPage(m_tabid_2_optgroups.size() - 1), m_tabid_2_optgroups.back().back());
+        create_settings_mode_color_widget(tabs->GetPage(m_tabid_2_optgroups.size() - 1), m_tabid_2_optgroups.back().back());
+    }
 
 	// update alignment of the controls for all tabs
 	//update_ctrls_alignment();
@@ -1567,7 +1599,9 @@ void PreferencesDialog::create_icon_size_slider(wxWindow* tab, std::shared_ptr<C
         win->SetBackgroundStyle(wxBG_STYLE_PAINT);
     }
 
-	opt_grp->parent()->GetSizer()->Add(m_icon_size_sizer, 0, wxEXPAND | wxALL, em);
+    // opt_grp->parent()->GetSizer()->Add(m_icon_size_sizer, 0, wxEXPAND | wxALL, em);
+    wxBoxSizer *parent_sizer = static_cast<wxBoxSizer *>(tab->GetSizer());
+    parent_sizer->Add(m_icon_size_sizer, 0, wxEXPAND | wxALL, 3);
 }
 
 void PreferencesDialog::create_settings_mode_widget(wxWindow* tab, std::shared_ptr<ConfigOptionsGroup> opt_grp)

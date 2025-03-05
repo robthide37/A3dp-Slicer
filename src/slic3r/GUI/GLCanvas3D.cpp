@@ -3127,22 +3127,25 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
         const bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
         const bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
-            
-            const float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
-            const float ca = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_cone_angle"))->value;
 
         if (extruders_count > 1 && wt && !co) {
-            const double first_nozzle_diameter = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
-
-          // const double real_nozzle_diameter = m_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(wxGetApp().preset_bundle->printers.get_selected_idx());
-            
+            //supermerill note: weird. we're using m_config, so it's only for the current bed, i guess, so why iterating over all of them?
             for (size_t bed_idx = 0; bed_idx < s_multiple_beds.get_max_beds(); ++bed_idx) {
+                // can't get these one from wipe_tower_data, as these use the platter's config, not the print one.
+                //supermerill note: and here what to do?
+                const float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
+                const float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
+                const float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
+                const float a = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_rotation_angle"))->value;
+                const float ca = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_cone_angle"))->value;
+                
+                //const float x = m_model->get_wipe_tower_vector()[bed_idx].position.x();
+                //const float y = m_model->get_wipe_tower_vector()[bed_idx].position.y();
+                //const float a = m_model->get_wipe_tower_vector()[bed_idx].rotation;
+
                 const Print *print = wxGetApp().plater()->get_fff_prints()[bed_idx].get();
-
-                const float x = m_model->get_wipe_tower_vector()[bed_idx].position.x();
-                const float y = m_model->get_wipe_tower_vector()[bed_idx].position.y();
-                const float a = m_model->get_wipe_tower_vector()[bed_idx].rotation;
-
+                //FIXME use real nozzle diameter, or the biggest
+                const double first_nozzle_diameter = print->config().option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
                 const WipeTowerData& wipe_tower_data = print->wipe_tower_data(m_config, first_nozzle_diameter);
                 const float depth = wipe_tower_data.depth;
                 const float bw = wipe_tower_data.brim_width;
@@ -3150,10 +3153,10 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 const float height_real = wipe_tower_data.height; // -1.f = unknown
                 
                 const bool is_wipe_tower_step_done = print->is_step_done(psWipeTower);
-
+                // Height of a print (Show at least a slab).
                 const double height = height_real < 0.f ? std::max(m_model->max_z(), 10.0) : height_real;
 
-            if (depth != 0.) {
+                if (depth != 0.) {
 #if SLIC3R_OPENGL_ES
                     if (bed_idx >= m_wipe_tower_meshes.size())
                         m_wipe_tower_meshes.resize(bed_idx + 1);

@@ -265,12 +265,20 @@ std::string GCodeWriter::set_temperature(const int16_t temperature, bool wait, i
             FLAVOR_IS_NOT(gcfRepRap)) {
             gcode << " T" << tool;
         }
-        gcode << " ; " << comment << "\n";
+        if (this->m_config.gcode_comments && !comment.empty()) {
+            gcode << " ; " << comment;
+        }
+        gcode << "\n";
     }
     // emit wait (for  gcfTeacup, gcfRepRap, gcfNematX)
     if (wait && !can_M109) {
-        if ((FLAVOR_IS(gcfTeacup) || FLAVOR_IS(gcfRepRap)))
-            gcode << "M116 ; wait for temperature to be reached\n";
+        if ((FLAVOR_IS(gcfTeacup) || FLAVOR_IS(gcfRepRap))) {
+            gcode << "M116";
+            if (this->m_config.gcode_comments) {
+                gcode << " ; wait for temperature to be reached";
+            }
+            gcode << "\n";
+        }
     }
     // update internal var to prevent repeat
     m_last_temperature = temperature;
@@ -299,7 +307,7 @@ std::string GCodeWriter::set_bed_temperature(uint32_t temperature, bool wait)
         code = "M140"sv;
         comment = "set bed temperature"sv;
     }
-    
+
     std::ostringstream gcode;
     gcode << code << " ";
     if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMachinekit)) {
@@ -307,11 +315,20 @@ std::string GCodeWriter::set_bed_temperature(uint32_t temperature, bool wait)
     } else {
         gcode << "S";
     }
-    gcode << temperature << " ; " << comment << "\n";
-    
-    if (FLAVOR_IS(gcfTeacup) && wait)
-        gcode << "M116 ; wait for bed temperature to be reached\n";
-    
+    gcode << temperature;
+    if (this->m_config.gcode_comments && !comment.empty()) {
+         gcode << " ; " << comment;
+    }
+    gcode << "\n";
+
+    if (FLAVOR_IS(gcfTeacup) && wait) {
+        gcode << "M116";
+        if (this->m_config.gcode_comments) {
+            gcode << " ; wait for temperature to be reached";
+        }
+        gcode << "\n";
+    }
+
     return gcode.str();
 }
 
@@ -338,8 +355,11 @@ std::string GCodeWriter::set_chamber_temperature(uint32_t temperature, bool wait
     }
     
     std::ostringstream gcode;
-    gcode << code << " " << "S";
-    gcode << temperature << " ; " << comment << "\n";
+    gcode << code << " " << "S" << temperature;
+    if (this->m_config.gcode_comments && !comment.empty()) {
+        gcode << " ; " << comment;
+    }
+    gcode << "\n";
     
     return gcode.str();
 }
@@ -363,7 +383,7 @@ std::string GCodeWriter::write_pressure_advance(double pa) {
     if (pa >= 0) {
         m_last_pressure_advance = pa;
         if (FLAVOR_IS(gcfRepRap) || FLAVOR_IS(gcfSprinter)) {
-            if (tool_id >= 0) {
+            if (tool_id >= 0 && !this->m_config.single_extruder_multi_material.value) {
                 gcode += "M572 D" + std::to_string(tool_id) + " S" + to_string_nozero(pa, 4);
             } else {
                 //is it possible to have no tool id? or a -1 is possible?
@@ -502,10 +522,10 @@ std::string GCodeWriter::update_progress(uint32_t num, uint32_t tot, bool allow_
 
 std::string GCodeWriter::toolchange_prefix() const
 {
-    return FLAVOR_IS(gcfMakerWare) ? "M135 T" :
-           FLAVOR_IS(gcfSailfish) ? "M108 T" :
-           FLAVOR_IS(gcfKlipper) ? "ACTIVATE_EXTRUDER EXTRUDER=" :
-           "T";
+    return FLAVOR_IS(gcfMakerWare)                                                  ? "M135 T" :
+        FLAVOR_IS(gcfSailfish)                                                      ? "M108 T" :
+        FLAVOR_IS(gcfKlipper) && !this->m_config.single_extruder_multi_material.value ? "ACTIVATE_EXTRUDER EXTRUDER=" :
+                                                                                      "T";
 }
 
 std::string GCodeWriter::toolchange(uint16_t tool_id)
@@ -534,9 +554,11 @@ std::string GCodeWriter::toolchange(uint16_t tool_id)
 
     // return the toolchange command
     // if we are running a single-extruder setup, just set the extruder and return nothing
+    // no, still output TX to let the firmware know to change the filament
     std::ostringstream gcode;
     if (this->multiple_extruders) {
-        if (FLAVOR_IS(gcfKlipper)) {
+        // if klipper and not in single_extruder_multi_material, then you need to select the extruder by name.
+        if (FLAVOR_IS(gcfKlipper) && !this->m_config.single_extruder_multi_material.value) {
             //check if we can use the tool_name field or not
             if (tool_id > 0 && tool_id < this->m_config.tool_name.size() && !this->m_config.tool_name.get_at(tool_id).empty()
                 // NOTE: this will probably break if there's more than 10 tools, as it's relying on the
@@ -545,14 +567,15 @@ std::string GCodeWriter::toolchange(uint16_t tool_id)
                 gcode << this->toolchange_prefix() << this->m_config.tool_name.get_at(tool_id);
             } else {
                 gcode << this->toolchange_prefix() << "extruder";
-                if (tool_id > 0)
+                if (tool_id > 0) {
                     gcode << tool_id;
+                }
             }
         } else {
             gcode << this->toolchange_prefix() << tool_id;
         }
         if (this->m_config.gcode_comments)
-            gcode << " ; change extruder";
+            gcode << (this->m_config.single_extruder_multi_material.value ? " ; change filament" : " ; change extruder");
         gcode << "\n";
         gcode << this->reset_e(true);
     }
@@ -1133,13 +1156,12 @@ std::string GCodeWriter::set_fan(const GCodeConfig& config, uint16_t extruder_id
                 } else {
                     gcode << "S";
                 }
-                gcode << (fan_baseline * (fan_speed / 100.0));
             }
-            if (config.gcode_comments.value) gcode << " ; enable fan";
-            gcode << "\n";
+            gcode << (fan_baseline * (fan_speed / 100.0));
+            if (config.gcode_comments.value)
+                gcode << " ; " << (comment.empty() ? "enable fan" : comment);
         }
-        if (config.gcode_comments.value)
-            gcode << " ; " << (comment.empty() ? "enable fan" : comment);
+        gcode << "\n";
     }
     return gcode.str();
 }

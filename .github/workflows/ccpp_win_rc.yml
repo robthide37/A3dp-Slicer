@@ -6,6 +6,7 @@ on:
       - #rc
       - multiple-beds-prusa
       - debug_win
+      - debug_win
 
 jobs:
   build_dep:

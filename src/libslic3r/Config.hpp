@@ -442,6 +442,9 @@ inline PrinterTechnology operator&=(PrinterTechnology& a, PrinterTechnology b) {
     a = a & b; return a;
 }
 
+PrinterTechnology parse_printer_technology(const std::string &);
+std::string to_string(PrinterTechnology);
+
 // defined here isntead of PrintConfig to be more visible.
 enum OutputFormat : uint16_t {
     ofUnknown = 0,
@@ -2913,11 +2916,13 @@ public:
     virtual t_config_option_keys    keys() const = 0;
 
 protected:
-    // Verify whether the opt_key has not been obsoleted or renamed.
-    // Both opt_key and value may be modified by handle_legacy().
-    // If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by handle_legacy().
-    // handle_legacy() is called internally by set_deserialize().
+    //// Verify whether the opt_key has not been obsoleted or renamed.
+    //// Both opt_key and value may be modified by handle_legacy().
+    //// If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by handle_legacy().
+    //// handle_legacy() is called internally by set_deserialize().
+#ifdef _DEBUGINFO
     virtual void                    handle_legacy(t_config_option_key &/*opt_key*/, std::string &/*value*/) const {}
+#endif
     // Verify whether the opt_key has to be converted or isn't present in prusaslicer
     // Both opt_key and value may be modified by to_prusa().
     // If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by to_prusa().
@@ -2999,7 +3004,7 @@ public:
     void set(const std::string &opt_key, const std::string &value, bool create = false)
     	{ this->option_throw<ConfigOptionString>(opt_key, create)->value = value; }
 
-    // Set a configuration value from a string, it will call an overridable handle_legacy() 
+    // Set a configuration value from a string, it will NOT call an overridable handle_legacy(), so please call it before.
     // to resolve renamed and removed configuration keys.
     bool set_deserialize_nothrow(const t_config_option_key &opt_key_src, const std::string &value_src, ConfigSubstitutionContext& substitutions, bool append = false);
 	// May throw BadOptionTypeException() if the operation fails.

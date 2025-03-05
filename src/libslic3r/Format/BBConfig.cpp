@@ -792,16 +792,20 @@ bool read_json_file_bambu(const std_path &temp_file,
     // transform entries into susi config
     std::map<std::string, std::string>              good_key_values;
     std::map<std::string, std::vector<std::string>> good_key_vector_values;
-    for (auto &entry : key_values) {
-        t_config_option_key opt_key = entry.first;
-        std::string         value   = entry.second;
-
-        if (push_into_custom_variable(config, opt_key, value))
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
+    for (const auto& [bb_key, value] : key_values) {
+        if (push_into_custom_variable(config, bb_key, value))
             continue;
 
-        if (auto it = key_translation_map.find(opt_key); it != key_translation_map.end())
-            opt_key = it->second;
-        PrintConfigDef::handle_legacy(opt_key, value, false);
+        std::string my_key = bb_key;
+        if (auto it = key_translation_map.find(bb_key); it != key_translation_map.end())
+            my_key = it->second;
+
+        dict_opt[my_key] = {my_key, value};
+    }
+    PrintConfigDef::handle_legacy_map(dict_opt, false);
+    for (auto &[saved_key, key_val] : dict_opt) {
+        auto &[opt_key, value] = key_val;
 
         complicated_convert(opt_key, value, key_values, good_key_values);
 
@@ -814,25 +818,35 @@ bool read_json_file_bambu(const std_path &temp_file,
         //else
         //    config_substitutions.substitutions.push_back(ConfigSubstitution{ nullptr, entry.first+std::string(" : ")+value, nullptr});
     }
-
+    
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt_vector;
+    std::unordered_map<t_config_option_key, std::string> dict_old_value;
     for (auto &entry : key_vector_values) {
-        t_config_option_key      key    = entry.first;
+        t_config_option_key key = entry.first;
         std::vector<std::string> values = entry.second;
         if (push_into_custom_variables(config, key, values))
             continue;
         if (auto it = key_translation_map.find(key); it != key_translation_map.end())
             key = it->second;
+
+        dict_opt_vector[key] = {key, values[0]};
+    }
+    PrintConfigDef::handle_legacy_map(dict_opt_vector, false);
+    for (auto &[saved_key, key_val] : dict_opt_vector) {
+        auto &[opt_key, value] = key_val;
         
-        std::string check_val = values[0];
-        PrintConfigDef::handle_legacy(key, values[0], false);
-        if (!key.empty()) {
-            if (check_val != values[0]) {
-                for (size_t idx = 1; idx < values.size(); ++idx) {
-                    PrintConfigDef::handle_legacy(key, values[0], false);
-                    assert(!key.empty());
+        std::string saved_val = key_vector_values[saved_key][0];
+        if (!opt_key.empty()) {
+            if (saved_val != value) {
+                for (size_t idx = 1; idx < key_vector_values[saved_key].size(); ++idx) {
+                    PrintConfigDef::handle_legacy_pair(opt_key, key_vector_values[saved_key][idx], false);
+                    assert(!opt_key.empty());
                 }
             }
-            good_key_vector_values[key] = values;
+            if (!opt_key.empty()) {
+                key_vector_values[saved_key][0] = value;
+                good_key_vector_values[opt_key] = key_vector_values[saved_key];
+            }
         }
         //else
         //    config_substitutions.substitutions.push_back(ConfigSubstitution{ nullptr, entry.first+std::string(" : ")+(values.empty()?"":values.front()), nullptr});
@@ -901,19 +915,28 @@ bool read_json_file_bambu(const std_path &temp_file,
     // final transform
     //config.convert_from_prusa(with_phony);
     std::map<t_config_option_key, std::string> settings_to_change;
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt_final;
     for (auto &entry : good_key_values) {
         if (!config_def->has(entry.first)) {
             std::string opt_key = entry.first;
             std::string value = entry.second;
-            std::map<std::string,std::string> result = PrintConfigDef::from_prusa(opt_key, value, config);
+            std::map<std::string, std::string> result = PrintConfigDef::from_prusa(opt_key, value, config);
             settings_to_change.insert(result.begin(), result.end());
-            if (!opt_key.empty())
-                //check if good this time
-                PrintConfigDef::handle_legacy(opt_key, value, false);
+            if (!opt_key.empty()) {
+                // check if good this time
+                // PrintConfigDef::handle_legacy(opt_key, value, false);
+                dict_opt_final[opt_key] = {opt_key, value};
+            }
+        }
+    }
+    PrintConfigDef::handle_legacy_map(dict_opt_final, false);
+    for (const auto &[saved_key, saved_value] : good_key_values) {
+        if (auto it = dict_opt_final.find(saved_key); it != dict_opt_final.end()) {
+            auto &[opt_key, value] = it->second;
             if (!opt_key.empty()) {
                 if (!config_def->has(opt_key)) {
                     if (config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable) {
-                        config_substitutions.add(ConfigSubstitution(entry.first, value));
+                        config_substitutions.add(ConfigSubstitution(saved_key, value));
                     }
                 } else {
                     try {
@@ -924,8 +947,9 @@ bool read_json_file_bambu(const std_path &temp_file,
                         // log the error
                         if (config_def == nullptr)
                             throw e;
-                        const ConfigOptionDef *optdef = config_def->get(entry.first);
-                        config_substitutions.emplace(optdef, std::string(entry.second), ConfigOptionUniquePtr(optdef->default_value->clone()));
+                        const ConfigOptionDef *optdef = config_def->get(saved_key);
+                        config_substitutions.emplace(optdef, std::string(saved_value),
+                                                     ConfigOptionUniquePtr(optdef->default_value->clone()));
                     }
                 }
             }
@@ -969,17 +993,23 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
         init();
     
     // transform entries into susi config
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
     std::map<std::string, std::string>              good_key_values;
     for (auto &entry : bambu_settings_serialized) {
         t_config_option_key opt_key = entry.first;
-        std::string         value   = entry.second;
+        std::string value = entry.second;
 
         if (push_into_custom_variable(print_config, opt_key, value))
             continue;
 
         if (auto it = key_translation_map.find(opt_key); it != key_translation_map.end())
             opt_key = it->second;
-        PrintConfigDef::handle_legacy(opt_key, value, false);
+
+        dict_opt[opt_key] = {opt_key, value};
+    }
+    PrintConfigDef::handle_legacy_map(dict_opt, false);
+    for (auto &[saved_key, key_val] : dict_opt) {
+        auto &[opt_key, value] = key_val;
         
         complicated_convert(opt_key, value, bambu_settings_serialized, good_key_values);
 
@@ -1024,13 +1054,18 @@ bool convert_settings_from_bambu(std::map<std::string, std::string> bambu_settin
         init();
     
     // transform entries into susi config
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
     std::map<std::string, std::string>              good_key_values;
     for (auto &entry : bambu_settings_serialized) {
         t_config_option_key opt_key = entry.first;
         std::string         value   = entry.second;
         if (auto it = key_translation_map.find(opt_key); it != key_translation_map.end())
             opt_key = it->second;
-        PrintConfigDef::handle_legacy(opt_key, value, false);
+        dict_opt[opt_key] = {opt_key, value};
+    }
+    PrintConfigDef::handle_legacy_map(dict_opt, false);
+    for (auto &[saved_key, key_val] : dict_opt) {
+        auto &[opt_key, value] = key_val;
         
         complicated_convert(opt_key, value, bambu_settings_serialized, good_key_values);
 

@@ -282,7 +282,11 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
             line = deretraction_from_wipe_tower_generator(gcodegen, tcr, new_extruder_id);
             line = "; deretraction_from_wipe_tower_generator\n" + line + "; END deretraction_from_wipe_tower_generator\n";
         } else if (boost::starts_with(line, "[toolchange_gcode_disable_linear_advance]")) {
-            line = gcodegen.writer().write_pressure_advance(0);
+            if (gcodegen.config().filament_pressure_advance.is_enabled(tcr.initial_tool)) {
+                line = gcodegen.writer().write_pressure_advance(0);
+            } else {
+                line = "";
+            }
         } else if (boost::starts_with(line, "[toolchange_gcode_enable_linear_advance]")) {
             if (gcodegen.config().filament_default_pa.is_enabled(new_extruder_id)) {
                 line = gcodegen.writer().write_pressure_advance(gcodegen.config().filament_default_pa.get_at(gcodegen.writer().tool()->id()));
