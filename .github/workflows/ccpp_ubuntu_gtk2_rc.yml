@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rc
+      - 2.7.61
 
 jobs:
 
@@ -34,7 +35,7 @@ jobs:
         path: deps/build/destdir
     - if: steps.cache-action.outputs.cache-hit != 'true'
       name: build deps if new cache
-      run: ./BuildLinux.sh -d -g 2
+      run: ./BuildLinux.sh -dr -g 2
     - name: slicer, tar & appimage
       run: ./BuildLinux.sh -si -g 2
     - name: Upload artifact

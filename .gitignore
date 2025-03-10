@@ -28,3 +28,5 @@ deps/usr/*
 .DS_Store
 
 /deps/usr/local
+**/bad_*
+
