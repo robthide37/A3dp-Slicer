@@ -6091,28 +6091,30 @@ void Plater::add_model(bool imperial_units/* = false*/)
         wxGetApp().mainframe->update_title();
 }
 
-void Plater::add_model_modifier() {
+void Plater::add_model_modifier(const std::string& path) {
    wxString input_file;
-   wxGetApp().import_model_modifier(this, input_file);
-   
-   if (input_file.empty())
-      return;
-   
    bool result = false;
-   std::string input_file_str = input_file.ToStdString();
+   bool dragged = false;
    
-   if (boost::algorithm::iends_with(input_file_str.c_str(), ".hfp")) {
+   if (path.empty()) {
+      wxGetApp().import_model_modifier(this, input_file);
+   } else {
+      dragged = true;
+   }
+
+   if (boost::algorithm::iends_with(input_file.ToStdString().c_str(), ".hfp") || boost::algorithm::iends_with(path.c_str(), ".hfp")) {
        HFP *hfp = new HFP();
        p->hueforge = hfp;
        DynamicPrintConfig print_config = wxGetApp().preset_bundle->fff_prints.get_selected_preset().config;
-
-      result = p->hueforge->load_hfp(input_file_str.c_str(), print_config, p->model);
-
+      
+      if (dragged) {
+         result = p->hueforge->load_hfp(path, print_config, p->model);
+      } else {
+         result = p->hueforge->load_hfp(input_file.ToStdString().c_str(), print_config, p->model);
+      }
+ 
       if (result) {
           DynamicPrintConfig new_print_config = print_config;
-
-         // float precise_value_layer_height = std::floor((*p->hueforge->get_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
-         // float precise_value_base_layer_height = std::floor((*p->hueforge->get_base_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
           new_print_config.set_key_value("layer_height", new ConfigOptionFloat(*p->hueforge->get_layer_height()));
           new_print_config.set_key_value("first_layer_height",
                                          new ConfigOptionFloatOrPercent(*p->hueforge->get_base_layer_height(), false));
@@ -6121,7 +6123,7 @@ void Plater::add_model_modifier() {
           wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->reload_config();
       }
    } else {
-        throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");
+        throw Slic3r::RuntimeError("Unknown file format. Input file must have .hfp extension.");
    }
    
     if (!result)
@@ -6935,6 +6937,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
 {
     const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp|zip)", std::regex::icase);
     const std::regex pattern_gcode_drop(".*[.](gcode|g|bgcode|bgc)", std::regex::icase);
+    const std::regex pattern_hfp(".*[.](hfp)", std::regex::icase);
 
     std::vector<fs::path> paths;
 
@@ -6962,7 +6965,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
     // editor section
     for (const auto& filename : filenames) {
         fs::path path(into_path(filename));
-        if (std::regex_match(path.string(), pattern_drop))
+        if (std::regex_match(path.string(), pattern_drop) || std::regex_match(path.string(), pattern_hfp))
             paths.push_back(std::move(path));
         else if (std::regex_match(path.string(), pattern_gcode_drop))
             start_new_gcodeviewer(&filename);
@@ -6976,6 +6979,11 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
     // searches for project files
     for (std::vector<fs::path>::const_reverse_iterator it = paths.rbegin(); it != paths.rend(); ++it) {
         std::string filename = (*it).filename().string();
+        
+        if (boost::algorithm::iends_with(filename, ".hfp")) {
+           wxGetApp().plater_->add_model_modifier(it->string());
+            return true;
+        }
 
         bool handle_as_project = (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf"));
         if (boost::algorithm::iends_with(filename, ".zip") && (is_project_3mf(it->string()) || is_project_bambu_3mf(it->string()))) {
