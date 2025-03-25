@@ -525,7 +525,7 @@ typedef std::map<std::string /* = vendor ID */,
                            PagePrinters* /* = SLA page */>> Pages3rdparty;
 
 
-class ConfigWizardIndex: public wxPanel
+class ConfigWizardIndex: public wxScrolledWindow
 {
 public:
     ConfigWizardIndex(wxWindow *parent);

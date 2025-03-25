@@ -2930,7 +2930,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Extension");
     def->full_label = L("Gap fill: extra extension");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Increase the length of all gapfills by this amount (may overextrude a little bit)\nCan be a % of the perimeter width");
+    def->tooltip = L("Increase the length of all gapfills by this amount (may overextrude a little bit)"
+        "\nCan be a % of the extrusion width"
+        "\nIs also used by infill's gapfill.");
     def->ratio_over = "perimeter_width";
     def->sidetext = L("mm or %");
     def->min = 0;
@@ -2977,7 +2979,10 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Max width");
     def->full_label = L("Gapfill: Max width");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("This setting represents the maximum width of a gapfill. Points wider than this threshold won't be created.\nCan be a % of the perimeter width\n0 to auto");
+    def->tooltip = L("This setting represents the maximum width of a gapfill. Points wider than this threshold won't be created."
+        "\nCan be a % of the extrusion width"
+        "\n0 to auto"
+        "\nIs also used by infill's gapfill.");
     def->ratio_over = "perimeter_width";
     def->sidetext = L("mm or %");
     def->min = 0;
@@ -2988,7 +2993,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Min surface");
     def->full_label = L("Gapfill: Min surface");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("This setting represents the minimum mm² for a gapfill extrusion to be created.\nCan be a % of (perimeter width)²");
+    def->tooltip = L("This setting represents the minimum mm² for a gapfill extrusion to be created."
+        "\nCan be a % of (extrusion width)²"
+        "\nIs also used by infill's gapfill.");
     def->ratio_over = "perimeter_width_square";
     def->sidetext = L("mm² or %");
     def->min = 0;
@@ -2999,7 +3006,10 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Min length");
     def->full_label = L("Gapfill: Min length");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("This setting represents the minimum mm for a gapfill extrusion to be extruded.\nCan be a % of the perimeter width\n0 to auto");
+    def->tooltip = L("This setting represents the minimum mm for a gapfill extrusion to be extruded."
+        "\nCan be a % of the extrusion width"
+        "\n0 to auto"
+        "\nIs also used by infill's gapfill.");
     def->ratio_over = "perimeter_width";
     def->sidetext = L("mm or %");
     def->min = 0;
@@ -3010,7 +3020,10 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Min width");
     def->full_label = L("Gapfill: Min width");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("This setting represents the minimum width of a gapfill. Points thinner than this threshold won't be created.\nCan be a % of the perimeter width\n0 to auto");
+    def->tooltip = L("This setting represents the minimum width of a gapfill. Points thinner than this threshold won't be created."
+        "\nCan be a % of the extrusion width"
+        "\n0 to auto"
+        "\nIs also used by infill's gapfill.");
     def->ratio_over = "perimeter_width";
     def->sidetext = L("mm or %");
     def->min = 0;
@@ -9241,13 +9254,41 @@ void _handle_legacy(std::unordered_map<t_config_option_key, std::pair<t_config_o
             continue;
         }
         std::string &value = it->second.second;
+        //array?
+        if ("max_layer_height" == opt_key) {
+            bool changed = false;
+            std::vector<std::string> value_array;
+            boost::split(value_array, value, boost::is_any_of(","), boost::token_compress_off);
+            for (std::string &val : value_array) {
+                if ("0" == val) {
+                    val = "!75%";
+                    changed = true;
+                }
+            }
+            if (changed) {
+                value = "";
+                for (std::string &val : value_array) {
+                    if (!value.empty()) {
+                        value += ",";
+                    }
+                    value += val;
+                }
+            }
+        }
         // 0-> disabled
         if ("0" == value) {
-            if ("max_layer_height" == opt_key) {value = "!75%";}
-            if ("gcode_min_length" == opt_key) {value = "!0";}
-            if ("max_gcode_per_second" == opt_key) {value = "!0";}
-            if ("print_temperature" == opt_key) {value = "!0";}
-            if ("print_first_layer_temperature" == opt_key) {value = "!0";}
+            if ("max_gcode_per_second" == opt_key) {
+                value = "!0";
+            }
+            if ("gcode_min_length" == opt_key) {
+                value = "!0";
+            }
+            if ("print_temperature" == opt_key) {
+                value = "!0";
+            }
+            if ("print_first_layer_temperature" == opt_key) {
+                value = "!0";
+            }
         }
         //-1-> disabled
         if (value == "-1") {

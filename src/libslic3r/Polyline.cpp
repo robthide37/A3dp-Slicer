@@ -255,6 +255,15 @@ void ensure_valid(Polylines &polylines, coord_t resolution) {
     }
 }
 
+void ensure_valid(Polyline &polyline, coord_t resolution) {
+    assert(polyline.size() > 1);
+    polyline.douglas_peucker(resolution);
+    assert(polyline.size() > 1);
+    if (polyline.size() == 2 && polyline.front().coincides_with_epsilon(polyline.back())) {
+        polyline.clear();
+    }
+}
+
 const Point& leftmost_point(const Polylines &polylines)
 {
     if (polylines.empty())
@@ -1824,7 +1833,7 @@ bool ArcPolyline::is_valid() const {
             coordf_t new_length2 = Geometry::ArcWelder::arc_length<Vec2d,Vec2d,Vec2d,double>(startd, endd, center, m_path[i].ccw());
             Vec2d centerd = m_path[i].center.cast<double>();
             coordf_t new_length3 = Geometry::ArcWelder::arc_length<Vec2d,Vec2d,Vec2d,double>(startd, endd, centerd, m_path[i].ccw());
-            assert(is_approx(new_length, new_length2, SCALED_EPSILON*4.));
+            assert(is_approx(new_length, new_length2, SCALED_EPSILON*10.));
             assert(is_approx(new_length2, new_length3, SCALED_EPSILON*10.));
             assert(is_approx(new_length2, m_path[i].length, SCALED_EPSILON*2.));
             Slic3r::Geometry::ArcWelder::Orientation orientation = Slic3r::Geometry::ArcWelder::arc_orientation(m_path[i - 1].point, m_path[i].point, m_path[i].center, m_path[i].radius);

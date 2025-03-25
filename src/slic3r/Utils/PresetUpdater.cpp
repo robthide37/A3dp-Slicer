@@ -811,15 +811,25 @@ void PresetUpdater::priv::check_install_indices() const
 					const auto ver_from_resource = idx_rsrc.find(version);
 					if (ver_from_resource != idx_rsrc.end()) {
 						if (idx_cache.version() < idx_rsrc.version()) {
-							if (fs::exists(bundle_path)) {
-								BOOST_LOG_TRIVIAL(info) << "Update index from resources (new version): " << path.filename();
-								copy_file_fix(path, path_in_cache);
-							}
+							BOOST_LOG_TRIVIAL(info) << "Update index from resources (new version): " << path.filename();
+							copy_file_fix(path, path_in_cache);
 						} else if (ver_from_cache == idx_cache.end()) {
 							BOOST_LOG_TRIVIAL(info) << "Update index from resources (only way to have a consistent idx): " << path.filename();
 							copy_file_fix(path, path_in_cache);
-						}
-					}
+                        } else {
+                            // don't update the idx, as the resources one is from an older version.
+                            BOOST_LOG_TRIVIAL(info) << "No Update index from resources (current version is more recent) : " << path.filename();
+                        }
+                    } else {
+                        // the resource idx doesn't have our version, maybe it was a prerelease? check if we have the next one.
+                        if (version < idx_rsrc.version()) {
+                            BOOST_LOG_TRIVIAL(info) << "Update index from resources (installed version don't exist in this idx but no biggy): " << path.filename();
+                            copy_file_fix(path, path_in_cache);
+                        } else {
+                            // don't update the idx, as the resources one is from an older version.
+                            BOOST_LOG_TRIVIAL(info) << "No Update index from resources (current unknown version is more recent) : " << path.filename();
+                        }
+                    }
 				} else if (idx_cache.version() < idx_rsrc.version() || idx_cache.configs().back().max_slic3r_version < idx_rsrc.configs().back().max_slic3r_version) {
 					//not installed, force update the .idx from resource
 					BOOST_LOG_TRIVIAL(info) << "Update index from resources (uninstalled & more up-to-date): " << path.filename();
@@ -912,7 +922,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 				updates.incompats.emplace_back(std::move(bundle_path), *ver_current, vp.name);
 				continue;
 			}
-		current_not_supported = true;
+			current_not_supported = true;
 		}
 
 		if (recommended->config_version < vp.config_version) {
@@ -1033,7 +1043,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 			}
 #endif // 0
 			updates.updates.emplace_back(std::move(new_update));
-			// 'Install' the index in the vendor directory. This is used to memoize
+			// 'Install' the index in the vendor directory. This is used to memorize
 			// offered updates and to not offer the same update again if it was cancelled by the user.
 			copy_file_fix(bundle_path_idx_to_install, bundle_path_idx);
 		} else {
@@ -1246,30 +1256,32 @@ static bool reload_configs_update_gui()
 
 PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3r_version, UpdateParams params) const
 {
-	if (! p->enabled_config_update) { return R_NOOP; }
+    if (!p->enabled_config_update) {
+        return R_NOOP;
+    }
 
-	auto updates = p->get_config_updates(old_slic3r_version);
-	if (updates.incompats.size() > 0) {
-		BOOST_LOG_TRIVIAL(info) << format("%1% bundles incompatible. Asking for action...", updates.incompats.size());
+    Updates updates = p->get_config_updates(old_slic3r_version);
+    if (updates.incompats.size() > 0) {
+        BOOST_LOG_TRIVIAL(info) << format("%1% bundles incompatible. Asking for action...", updates.incompats.size());
 
-		std::unordered_map<std::string, wxString> incompats_map;
-		for (const auto &incompat : updates.incompats) {
-			const auto min_slic3r = incompat.version.min_slic3r_version;
-			const auto max_slic3r = incompat.version.max_slic3r_version;
-			wxString restrictions;
-			if (min_slic3r != Semver::zero() && max_slic3r != Semver::inf()) {
-                restrictions = GUI::format_wxstr(_L("requires min. %s and max. %s"),
-                    min_slic3r.to_string(),
-                    max_slic3r.to_string());
-			} else if (min_slic3r != Semver::zero()) {
-				restrictions = GUI::format_wxstr(_L("requires min. %s"), min_slic3r.to_string());
-				BOOST_LOG_TRIVIAL(debug) << "Bundle is not downgrade, user will now have to do whole wizard. This should not happen.";
-			} else {
+        std::unordered_map<std::string, wxString> incompats_map;
+        for (const auto &incompat : updates.incompats) {
+            const auto min_slic3r = incompat.version.min_slic3r_version;
+            const auto max_slic3r = incompat.version.max_slic3r_version;
+            wxString restrictions;
+            if (min_slic3r != Semver::zero() && max_slic3r != Semver::inf()) {
+                restrictions = GUI::format_wxstr(_L("requires min. %s and max. %s"), min_slic3r.to_string(),
+                                                 max_slic3r.to_string());
+            } else if (min_slic3r != Semver::zero()) {
+                restrictions = GUI::format_wxstr(_L("requires min. %s"), min_slic3r.to_string());
+                BOOST_LOG_TRIVIAL(debug)
+                    << "Bundle is not downgrade, user will now have to do whole wizard. This should not happen.";
+            } else {
                 restrictions = GUI::format_wxstr(_L("requires max. %s"), max_slic3r.to_string());
-			}
+            }
 
-			incompats_map.emplace(std::make_pair(incompat.vendor, std::move(restrictions)));
-		}
+            incompats_map.emplace(std::make_pair(incompat.vendor, std::move(restrictions)));
+        }
 
 /* annoying.
 	//	GUI::MsgDataIncompatible dlg(std::move(incompats_map));
@@ -1301,37 +1313,65 @@ PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3
 		}
 
 		//forced update
-		if (incompatible_version)
-		{
-			BOOST_LOG_TRIVIAL(info) << format("Update of %1% bundles available. At least one requires higher version of Slicer.", updates.updates.size());
+        if (incompatible_version) {
+            assert(updates.incompats.empty());
+            BOOST_LOG_TRIVIAL(info) << format(
+                "Update of %1% bundles available. At least one requires higher version of Slicer.",
+                updates.updates.size());
 
-			std::vector<GUI::MsgUpdateForced::Update> updates_msg;
-			for (const auto& update : updates.updates) {
-				std::string changelog_url = update.version.config_version.prerelease() == nullptr ? update.changelog_url : std::string();
-				std::string printers;
-				for (size_t i = 0; i < update.new_printers.size(); i++) {
-					if (i > 0)
-						printers += ", ";
-					printers += update.new_printers[i];
-			}
-				updates_msg.emplace_back(update.vendor, update.version.config_version, update.version.comment, std::move(changelog_url), std::move(printers));
-			}
+            std::vector<GUI::MsgUpdateForced::Update> updates_msg;
+            for (const auto &update : updates.updates) {
+                std::string changelog_url = update.version.config_version.prerelease() == nullptr ?
+                    update.changelog_url :
+                    std::string();
+                std::string printers;
+                for (size_t i = 0; i < update.new_printers.size(); i++) {
+                    if (i > 0)
+                        printers += ", ";
+                    printers += update.new_printers[i];
+                }
+                updates_msg.emplace_back(update.vendor, update.version.config_version, update.version.comment,
+                                         std::move(changelog_url), std::move(printers));
+            }
 
-			GUI::MsgUpdateForced dlg(updates_msg);
+            GUI::MsgUpdateForced dlg(updates_msg);
 
-			const auto res = dlg.ShowModal();
-			if (res == wxID_OK) {
-				BOOST_LOG_TRIVIAL(info) << "User wants to update...";
-				if (! p->perform_updates(std::move(updates)) ||
-					! reload_configs_update_gui())
-					return R_INCOMPAT_EXIT;
-				return R_UPDATE_INSTALLED;
-			}
-			else {
-				BOOST_LOG_TRIVIAL(info) << "User wants to exit Slic3r, bye...";
-				return R_INCOMPAT_EXIT;
-			}
-		}
+            const auto res = dlg.ShowModal();
+            if (res == wxID_OK) {
+                BOOST_LOG_TRIVIAL(info) << "User wants to update...";
+                if (!p->perform_updates(std::move(updates)) || !reload_configs_update_gui())
+                    return R_INCOMPAT_EXIT;
+                return R_UPDATE_INSTALLED;
+            } else if (res == wxID_NO) {
+                return R_UPDATE_REJECT;
+            } else if (res == wxID_EDIT) {
+                bool one_not_installed = false;
+                Updates new_updates;
+                //new_updates.updates = updates.updates;
+                for (size_t idx = 0; idx < updates.updates.size(); ++idx) {
+                    GUI::MsgUpdateForced dlg_one({updates_msg[idx]});
+                    const auto res_one = dlg_one.ShowModal();
+                    if (res_one == wxID_OK) {
+                        new_updates.updates.push_back(updates.updates[idx]);
+                    } else if (res_one == wxID_NO) {
+                        one_not_installed = true;
+                    } else { // wxID_EXIT
+                        BOOST_LOG_TRIVIAL(info) << "User wants to exit Slic3r, bye...";
+                        return R_INCOMPAT_EXIT;
+                    }
+                }
+                if (!new_updates.updates.empty()) {
+                    BOOST_LOG_TRIVIAL(info) << "User wants to update...";
+                    if (!p->perform_updates(std::move(new_updates)) || !reload_configs_update_gui()) {
+                        one_not_installed = true;
+                    }
+                }
+                return one_not_installed ? R_UPDATE_REJECT : R_UPDATE_INSTALLED;
+            } else { // wxID_EXIT
+                BOOST_LOG_TRIVIAL(info) << "User wants to exit Slic3r, bye...";
+                return R_INCOMPAT_EXIT;
+            }
+        }
 
 		// regular update
 		if (params == UpdateParams::SHOW_NOTIFICATION) {

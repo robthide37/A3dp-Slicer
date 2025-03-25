@@ -647,6 +647,7 @@ std::string GCodeWriter::travel_to_xy(const Vec2d &point, const double speed, co
         //if point too close to the other, then do not write it, it's useless.
         return "";
     }
+    assert(travel_speed > 0.);
     w.emit_f(travel_speed * 60);
     w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
@@ -675,6 +676,7 @@ std::string GCodeWriter::travel_arc_to_xy(const Vec2d& point, const Vec2d& cente
         return "";
     }
     w.emit_ij(center_offset);
+    assert(travel_speed > 0.);
     w.emit_f(travel_speed * 60);
     w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
@@ -741,6 +743,7 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const bool is_lift, c
         //if point too close to the other, no move are needed.
         return "";
     }
+    assert(travel_speed > 0.);
     w.emit_f(travel_speed * 60);
     w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
@@ -781,6 +784,7 @@ std::string GCodeWriter::get_travel_to_z_gcode(const double z, const std::string
     if (!has_z) {
         return "";
     }
+    assert(speed > 0.);
     w.emit_f(speed * 60.0);
     w.emit_comment(this->m_config.gcode_comments, comment);
     return write_acceleration() + w.string();
@@ -1017,8 +1021,10 @@ std::string GCodeWriter::_retract(double length, std::optional<double> restart_e
         } else if (!m_extrusion_axis.empty()) {
             GCodeG1Formatter w(this->get_default_gcode_formatter());
             w.emit_e(m_extrusion_axis, emit_E);
-            w.emit_f(m_tool->retract_speed() * 60.);
-            w.emit_comment(this->m_config.gcode_comments, comment);
+            if (int speed = m_tool->retract_speed(); speed > 0.) {
+                w.emit_f(speed * 60.);
+            }
+            w.emit_comment(this->config.gcode_comments, comment);
             gcode += w.string();
         }
     }
@@ -1054,8 +1060,10 @@ std::string GCodeWriter::unretract()
             // use G1 instead of G0 because G0 will blend the restart with the previous travel move
             GCodeG1Formatter w(this->get_default_gcode_formatter());
             w.emit_e(m_extrusion_axis, emit_E);
-            w.emit_f(m_tool->deretract_speed() * 60.);
-            w.emit_comment(this->m_config.gcode_comments, "unretract");
+            if (int speed = m_tool->deretract_speed(); speed > 0.) {
+                w.emit_f(speed * 60.);
+            }
+            w.emit_comment(this->config.gcode_comments, "unretract");
             gcode += w.string();
         }
     }

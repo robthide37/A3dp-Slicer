@@ -514,6 +514,7 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
 
                 } else {
                     er_width = print_config->get_abs_value("solid_infill_extrusion_width", nozzle_diameter); //used for gapfill_width/bridges selection. TODO: add the bits for this here since gapfill/bridges need special calculations
+                    er_width = (er_width != 0) ? er_width : default_er_width;
                     er_width = std::round((er_width * 100 / nozzle_diameter) * 100.0) / 100.0;
                     first_layer_width = default_first_layer_width;
                     first_layer_spacing = default_first_layer_spacing;
@@ -786,7 +787,7 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
     // => settings that are for object or region should be added to the model (see below, in the for loop), not here
     DynamicPrintConfig new_print_config = *print_config;
     DynamicPrintConfig new_printer_config = *printer_config;
-    //DynamicPrintConfig new_filament_config = *filament_config;
+    DynamicPrintConfig new_filament_config = *filament_config;
     //check if setting any config values to 45° breaks it. or it might be the default value for rotation adding part?
     new_print_config.set_key_value("avoid_crossing_perimeters", new ConfigOptionBool(false));
     new_print_config.set_key_value("complete_objects", new ConfigOptionBool(false)); //true is required for multi tests on single plate?
@@ -794,7 +795,7 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
     new_print_config.set_key_value("first_layer_size_compensation", new ConfigOptionFloat(0));
     new_print_config.set_key_value("xy_inner_size_compensation", new ConfigOptionFloat(0));
     new_print_config.set_key_value("xy_outer_size_compensation", new ConfigOptionFloat(0));
-    //new_filament_config.set_key_value("filament_pressure_advance", new ConfigOptionFloat(0)); syntax for disable?
+    new_filament_config.set_key_value("filament_pressure_advance", (new ConfigOptionFloats({0.00}))->set_can_be_disabled(true));
     new_print_config.set_key_value("print_custom_variables", new ConfigOptionString("calibration_print"));//created this as an extra check for when generating gcode to not include "feature_gcode"
                                                                                                           // unless i disable the "generate" button if the keywords are detected in the custom gcode ?
 
@@ -811,7 +812,7 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
         wxString firstPaValue = dynamicFirstPa[id_item]->GetValue();
         firstPaValue.Replace(",", ".");
         double first_pa = wxAtof(firstPaValue);
-        smooth_time = dynamicEnableST[id_item]->GetValue();
+        smooth_time = dynamicEnableST.size() > id_item ? dynamicEnableST[id_item]->GetValue() : 0;
         selected_extrusion_role = dynamicExtrusionRole[id_item]->GetValue().ToStdString();
 
         if (selected_extrusion_role == "CheckAll") {// have to keep it in range
@@ -1106,14 +1107,15 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
     plat->on_config_change(new_print_config);
     this->gui_app->get_tab(Preset::TYPE_PRINTER)->load_config(new_printer_config);
     plat->on_config_change(new_printer_config);
-    //this->gui_app->get_tab(Preset::TYPE_MATERIAL)->load_config(new_filament_config);
-    //plat->on_config_change(new_filament_config);
+    this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->load_config(new_filament_config);
+    plat->on_config_change(new_filament_config);
     //enable it later as a safeguard?, shouldn't be needed though.
     //for (size_t obj_idx : objs_idx) { model.objects[obj_idx]->ensure_on_bed(); } // put at the correct z (kind of arrange-z))
     //for (size_t obj_idx : objs_idx) { model.objects[obj_idx]->center_around_origin();}
     plat->changed_objects(objs_idx);
     this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->update_dirty();
     this->gui_app->get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->update_dirty();
     plat->is_preview_shown();
     //update everything, easier to code.
     ObjectList* obj = this->gui_app->obj_list();
@@ -1145,7 +1147,7 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
 
     if (selected_extrusion_role != "CheckAll") {//don't auto slice so user can manual add PA values
 #if !DEBUG
-            //plat->reslice(); //forces a slice of plater.
+            plat->reslice(); //forces a slice of plater.
 #endif
     }
 
@@ -1389,7 +1391,10 @@ void CalibrationPressureAdvDialog::on_row_change(wxCommandEvent& event) {
             dynamicEndPa.pop_back();
             dynamicPaIncrement.pop_back();
             dynamicExtrusionRole.pop_back();
-            dynamicEnableST.pop_back();
+            if (dynamicEnableST.size() > 0) {
+                dynamicEnableST.pop_back();
+                assert(dynamicEnableST.size() == dynamicExtrusionRole.size());
+            }
         }
     }
 

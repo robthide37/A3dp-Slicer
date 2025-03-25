@@ -5,6 +5,7 @@ on:
     branches:
       - multiple-beds-prusa
       - test-yaml-fix
+      - 2.7.61
 jobs:
   build_dep:
     runs-on: macos-latest
@@ -52,18 +53,13 @@ jobs:
         path: deps/build/destdir
     - name: build slicer
       run: ./BuildMacOS.sh -si
-    - name: Upload dmg
-      uses: actions/upload-artifact@v4
-      with:
-        name: rc_${{ github.event.repository.name }}-macOS.dmg
-        path: build/${{ github.event.repository.name }}-macOS-intel.dmg
-    - name: Upload tar
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: rc_${{ github.event.repository.name }}-macOS.tgz
         path: build/${{ github.event.repository.name }}-macOS-intel.tgz
-    - name: Upload app
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rc_${{ github.event.repository.name }}-macOS.app
-        path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
+        name: rc_${{ github.event.repository.name }}-macOS.dmg
+        path: build/${{ github.event.repository.name }}-macOS-intel.dmg

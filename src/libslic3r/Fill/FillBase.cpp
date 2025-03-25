@@ -348,23 +348,50 @@ void
 Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, ExtrusionEntitiesPtr& coll_out) const {
 
     ThickPolylines polylines_gapfill;
-    double min = 0.4 * scale_(params.flow.nozzle_diameter()) * (1 - INSET_OVERLAP_TOLERANCE);
-    double max = 2. * params.flow.scaled_width();
+    coord_t min = coord_t(0.4 * scale_t(params.flow.nozzle_diameter()) * (1 - INSET_OVERLAP_TOLERANCE));
+    coord_t max = 2 * params.flow.scaled_width();
+    // note that the infill surface isn't split by these parameters, so if there is a modifier with them, the one shoosent will be random.
+    // most of the parameters % are about "periemter width". But infill can be printed with a bigger nozzl,e so it's
+    double unscaled_width = params.flow.width();
+    // safer to use the current flow for it.
+    if (params.config != nullptr) {
+        const coord_t minwidth = scale_t(params.config->gap_fill_min_width.get_abs_value(unscaled_width));
+        const coord_t maxwidth = scale_t(params.config->gap_fill_max_width.get_abs_value(unscaled_width));
+        if (minwidth > 0) {
+            min = std::max(min, minwidth);
+        }
+        if (maxwidth > 0) {
+            max = std::min(max, maxwidth);
+        }
+    }
+    const double minarea = scale_d(scale_d((params.config == nullptr) ?
+                                               sqr(unscaled_width) :
+                                               params.config->gap_fill_min_area.get_abs_value(sqr(unscaled_width))));
+    const coord_t minlength = (params.config == nullptr) ?
+        0 :
+        scale_t(params.config->gap_fill_min_length.get_abs_value(unscaled_width));
+    const coord_t gapfill_extension = (params.config == nullptr) ?
+        0 :
+        scale_t(params.config->gap_fill_extension.get_abs_value(unscaled_width));
     // collapse 
     //be sure we don't gapfill where the perimeters are already touching each other (negative spacing).
-    min = std::max(min, double(Flow::new_from_spacing((float)EPSILON, (float)params.flow.nozzle_diameter(), (float)params.flow.height(), 1, false).scaled_width()));
-    //ExPolygons gapfill_areas_collapsed = diff_ex(
-    //    offset2_ex(gapfill_areas, double(-min / 2), double(+min / 2)),
-    //    offset2_ex(gapfill_areas, double(-max / 2), double(+max / 2)),
-    //    true);
+    min = std::max(min,
+                   Flow::new_from_spacing((float) EPSILON, (float) params.flow.nozzle_diameter(),
+                                          (float) params.flow.height(), 1, false)
+                       .scaled_width());
     ExPolygons gapfill_areas_collapsed = offset2_ex(gapfill_areas, double(-min / 2), double(+min / 2));
-    double minarea = double(params.flow.scaled_width()) * double(params.flow.scaled_width());
-    if (params.config != nullptr) minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
     for (const ExPolygon& ex : gapfill_areas_collapsed) {
         //remove too small gaps that are too hard to fill.
         //ie one that are smaller than an extrusion with width of min and a length of max.
         if (ex.area() > minarea) {
-            Geometry::MedialAxis{ ex, params.flow.scaled_width() * 2, params.flow.scaled_width() / 5, coord_t(params.flow.height()) }.build(polylines_gapfill);
+            Geometry::MedialAxis md{ ex, max, min, coord_t(params.flow.height()) };
+            if (minlength > 0) {
+                md.set_min_length(minlength);
+            }
+            if (gapfill_extension > 0) {
+                md.set_extension_length(gapfill_extension);
+            }
+            md.build(polylines_gapfill);
         }
     }
     if (!polylines_gapfill.empty() && !params.role.is_bridge()) {
@@ -381,7 +408,10 @@ Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, Ext
 
         ExtrusionEntitiesPtr gap_fill_entities =
             Geometry::thin_variable_width(polylines_gapfill, ExtrusionRole::GapFill, params.flow,
-                                          scale_t(params.config->get_computed_value("resolution_internal")), true);
+                                          scale_t((params.config == nullptr) ?
+                                                      EPSILON :
+                                                      params.config->get_computed_value("resolution_internal")),
+                                          true);
 
         ////set role if needed
         //if (params.role != ExtrusionRole::SolidInfill) {

@@ -345,7 +345,7 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
     MsgDialog(nullptr, wxString::Format(_(L("%s incompatibility")), SLIC3R_APP_NAME), _(L("You must install a configuration update.")) + " ", wxOK | wxICON_ERROR)
 {
 	auto* text = new wxStaticText(this, wxID_ANY, wxString::Format(_(L(
-		"%s will now start updates. Otherwise it won't be able to start.\n\n"
+		"%s will now start updates. Otherwise these profiles may have some settings modified after loading, and they may not work as expected.\n\n"
 		"Note that a full configuration snapshot will be created first. It can then be restored at any time "
 		"should there be a problem with the new version.\n\n"
 		"Updated configuration bundles:"
@@ -392,11 +392,20 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(2 * VERT_SPACING);
 
-	add_button(wxID_EXIT, false, wxString::Format(_L("Exit %s"), SLIC3R_APP_NAME));
-	for (auto ID : { wxID_EXIT, wxID_OK })
-		get_button(ID)->Bind(wxEVT_BUTTON, [this](const wxCommandEvent& evt) { this->EndModal(evt.GetId()); });
+    if (updates.size() > 1) {
+        add_button(wxID_EDIT , false, _L("Choose which one to install"));
+    }
+    add_button(wxID_NO, false, wxString::Format(_L("Don't install")));
+    add_button(wxID_EXIT, false, wxString::Format(_L("Exit %s"), SLIC3R_APP_NAME));
 
-	finalize();
+    get_button(wxID_EXIT)->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &evt) { this->EndModal(evt.GetId()); });
+    get_button(wxID_NO)->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &evt) { this->EndModal(evt.GetId()); });
+    if (updates.size() > 1) {
+        get_button(wxID_EDIT)->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &evt) { this->EndModal(evt.GetId()); });
+    }
+    get_button(wxID_OK)->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &evt) { this->EndModal(evt.GetId()); });
+
+    finalize();
 }
 
 MsgUpdateForced::~MsgUpdateForced() {}

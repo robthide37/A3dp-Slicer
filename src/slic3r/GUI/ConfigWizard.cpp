@@ -2098,7 +2098,7 @@ void PageTemperatures::apply_custom_config(DynamicPrintConfig &config)
 // Index
 
 ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
-    : wxPanel(parent)
+    : wxScrolledWindow(parent)
     , bg(ScalableBitmap(parent, SLIC3R_APP_KEY "_192px_transparent.png", 192))
     , bullet_black(ScalableBitmap(parent, "bullet_black.png"))
     , bullet_blue(ScalableBitmap(parent, "bullet_blue.png"))
@@ -2111,6 +2111,11 @@ ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
     SetDoubleBuffered(true);// SetDoubleBuffered exists on Win and Linux/GTK, but is missing on OSX
 #endif //__WXOSX__
     SetMinSize(bg.GetSize());
+
+    // scrollling: only vertical, by 30 pixels at a time.
+    SetScrollRate(30, 30);
+    EnableScrolling(false, true); // does nothing
+    ShowScrollbars(wxSHOW_SB_NEVER, wxSHOW_SB_DEFAULT);
 
     const wxSize size = GetTextExtent("m");
     em_w = size.x;
@@ -2228,45 +2233,60 @@ void ConfigWizardIndex::clear()
     item_active = NO_ITEM;
 }
 
-void ConfigWizardIndex::on_paint(wxPaintEvent & evt)
+void ConfigWizardIndex::on_paint(wxPaintEvent &evt)
 {
-    const auto size = GetClientSize();
-    if (size.GetHeight() == 0 || size.GetWidth() == 0) { return; }
-   
+    const wxSize size = GetClientSize();
+    if (size.GetHeight() == 0 || size.GetWidth() == 0) {
+        return;
+    }
+    const wxPoint start = GetViewStart() * 30; // GetViewStart is in scroll unit
+
     wxPaintDC dc(this);
-    
+    DoPrepareDC(dc);
+
     const auto bullet_w = bullet_black.GetWidth();
     const auto bullet_h = bullet_black.GetHeight();
     const int yoff_icon = bullet_h < em_h ? (em_h - bullet_h) / 2 : 0;
     const int yoff_text = bullet_h > em_h ? (bullet_h - em_h) / 2 : 0;
     const int yinc = item_height();
-   
+
     int index_width = 0;
+    wxCoord index_height = yinc * items.size();
 
     unsigned y = 0;
     for (size_t i = 0; i < items.size(); i++) {
-        const Item& item = items[i];
-        unsigned x = em_w/2 + item.indent * em_w;
+        const Item &item = items[i];
+        unsigned x = em_w / 2 + item.indent * em_w;
 
-        if (i == item_active || (item_hover >= 0 && i == (size_t)item_hover)) {
+        if (i == item_active || (item_hover >= 0 && i == (size_t) item_hover)) {
             dc.DrawBitmap(bullet_blue.get_bitmap(), x, y + yoff_icon, false);
+        } else if (i < item_active) {
+            dc.DrawBitmap(bullet_black.get_bitmap(), x, y + yoff_icon, false);
+        } else if (i > item_active) {
+            dc.DrawBitmap(bullet_white.get_bitmap(), x, y + yoff_icon, false);
         }
-        else if (i < item_active)  { dc.DrawBitmap(bullet_black.get_bitmap(), x, y + yoff_icon, false); }
-        else if (i > item_active)  { dc.DrawBitmap(bullet_white.get_bitmap(), x, y + yoff_icon, false); }
 
-        x += + bullet_w + em_w/2;
+        x += +bullet_w + em_w / 2;
         const auto text_size = dc.GetTextExtent(item.label);
         dc.SetTextForeground(wxGetApp().get_label_clr_default());
         dc.DrawText(item.label, x, y + yoff_text);
 
         y += yinc;
-        index_width = std::max(index_width, (int)x + text_size.x);
+        index_width = std::max(index_width, (int) x + text_size.x);
     }
-    
-    //draw logo
-    if (int y = size.y - bg.GetHeight(); y>=0) {
+
+    // draw logo
+    if (int y = start.y + size.y - bg.GetHeight(); y >= 0) {
         dc.DrawBitmap(bg.get_bitmap(), 0, y, false);
         index_width = std::max(index_width, bg.GetWidth() + em_w / 2);
+    }
+
+    index_height = std::max(index_height, bg.GetHeight() + em_w / 2);
+
+    int virtual_width, virtual_height;
+    wxSize virtual_size = GetVirtualSize();
+    if (virtual_size.GetWidth() != index_width && virtual_size.GetHeight() != index_height) {
+        SetVirtualSize(index_width, index_height);
     }
 
     if (GetMinSize().x < index_width) {
@@ -2279,7 +2299,8 @@ void ConfigWizardIndex::on_paint(wxPaintEvent & evt)
 
 void ConfigWizardIndex::on_mouse_move(wxMouseEvent &evt)
 {
-    const wxClientDC dc(this);
+    wxClientDC dc(this);
+    DoPrepareDC(dc);
     const wxPoint pos = evt.GetLogicalPosition(dc);
 
     const ssize_t item_hover_new = pos.y / item_height();
