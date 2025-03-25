@@ -8467,7 +8467,8 @@ inline void for_ech_entry(std::unordered_map<t_config_option_key, std::pair<t_co
                           std::initializer_list<t_config_option_key> &&list,
                           const std::function<void(t_config_option_key &opt_key, std::string &value)> &do_something) {
     for (const t_config_option_key &key : list) {
-        if (auto last_search_result = dict.find(key); last_search_result != dict.end() && last_search_result->second.first == key) {
+        if (auto last_search_result = dict.find(key); last_search_result != dict.end()) {
+            // assert(last_search_result->second.first == key); it's possibly different because of alias.
             do_something(last_search_result->second.first, last_search_result->second.second);
         }
     }
@@ -8476,7 +8477,7 @@ inline void for_ech_entry(std::unordered_map<t_config_option_key, std::pair<t_co
                           const std::set<t_config_option_key> &list,
                           const std::function<void(t_config_option_key &opt_key, std::string &value)> &do_something) {
     for (const t_config_option_key &key : list) {
-        if (last_search_result = dict.find(key); last_search_result != dict.end() && last_search_result->second.first == key) {
+        if (last_search_result = dict.find(key); last_search_result != dict.end()) {
             do_something(last_search_result->second.first, last_search_result->second.second);
         }
     }
@@ -8897,7 +8898,7 @@ void _handle_legacy(std::unordered_map<t_config_option_key, std::pair<t_config_o
     assert(!has(dict, "bridge_internal_fan_speed"s));
     for_ech_entry(dict, {
         "bridge_fan_speed"s, "default_fan_speed"s, "min_fan_speed"s/* this is default_fan_speed's alias*/, "external_perimeter_fan_speed"s,
-        "gap_fill_fan_speed"s, "infill_fan_speed"s, "internal_bridge_fan_speed"s, "overhangs_fan_speed"s,
+        "gap_fill_fan_speed"s, "infill_fan_speed"s, "internal_bridge_fan_speed"s, "bridge_internal_fan_speed"s, "overhangs_fan_speed"s,
         "perimeter_fan_speed"s, "solid_infill_fan_speed"s, "support_material_fan_speed"s, "support_material_interface_fan_speed"s, "top_fan_speed"s},
                   [](Key &opt_key, Val &value) {
             assert(print_config_def.get(opt_key) && print_config_def.get(opt_key)->type == coInts);
