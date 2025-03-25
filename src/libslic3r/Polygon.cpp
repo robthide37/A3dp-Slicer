@@ -49,6 +49,7 @@ Polyline Polygon::split_at_vertex(const Point &point) const
 Polyline
 Polygon::split_at_index(size_t index) const
 {
+    assert(index < this->points.size());
     Polyline polyline;
     polyline.points.reserve(this->points.size() + 1);
     for (Points::const_iterator it = this->points.begin() + index; it != this->points.end(); ++it)
@@ -673,6 +674,15 @@ Polygons ensure_valid(Polygons &&polygons, coord_t resolution /*= SCALED_EPSILON
 
 Polygons ensure_valid(coord_t resolution, Polygons &&polygons) {
     return ensure_valid(std::move(polygons), resolution);
+}
+
+bool ensure_valid(Polygon &polygon, coord_t resolution) {
+    polygon.douglas_peucker(resolution);
+    if (polygon.size() < 3) {
+        polygon.clear();
+        return false;
+    }
+    return true;
 }
 
 #ifdef _DEBUGINFO
