@@ -676,6 +676,15 @@ Polygons ensure_valid(coord_t resolution, Polygons &&polygons) {
     return ensure_valid(std::move(polygons), resolution);
 }
 
+bool ensure_valid(Polygon &polygon, coord_t resolution) {
+    polygon.douglas_peucker(resolution);
+    if (polygon.size() < 3) {
+        polygon.clear();
+        return false;
+    }
+    return true;
+}
+
 #ifdef _DEBUGINFO
 void assert_valid(const Polygons &polygons) {
     for (const Polygon &polygon : polygons) {
