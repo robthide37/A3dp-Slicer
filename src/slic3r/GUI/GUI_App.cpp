@@ -1829,6 +1829,7 @@ void GUI_App::update_ui_colours_from_appconfig()
     }
 #endif
 
+// merill: i don't know hy these were commented, but it's needed to have a color at startup
     Slic3r::GUI::Widget::set_clr_border_hovered(change_endian_int24(
         app_config->create_color(0.86f, 0.93f, AppConfig::EAppColorType::Highlight)));
     Slic3r::GUI::Widget::set_clr_background_focused(change_endian_int24(

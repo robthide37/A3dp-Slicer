@@ -2515,7 +2515,7 @@ std::vector<std::optional<double>> compute_new_position(GCodeGenerator &gcodegen
     if (gcodegen.last_pos_defined()) {
         position[0] = gcodegen.writer().get_position().x();
         position[1] = gcodegen.writer().get_position().y();
-        position[2] = gcodegen.writer().get_position().z() + gcodegen.writer().m_config.z_offset.value;
+        position[2] = gcodegen.writer().get_position().z() + gcodegen.writer().gcode_config().z_offset.value;
     }
     if(gcode.empty()) return position;
     parser.parse_buffer(gcode,
@@ -2632,7 +2632,7 @@ std::string GCodeGenerator::placeholder_parser_process(
             // Update G-code writer. (without z_offset)
             m_writer.update_position_by_lift({position_vec[0] ? *position_vec[0] : m_writer.get_position().x(),
                                               position_vec[1] ? *position_vec[1] : m_writer.get_position().y(),
-                                              position_vec[2] ? *position_vec[2] - m_writer.m_config.z_offset.value :
+                                              position_vec[2] ? *position_vec[2] - m_writer.gcode_config().z_offset.value :
                                                                 m_writer.get_position().z()});
         }
 

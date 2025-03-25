@@ -2148,6 +2148,19 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
         return;
     }
 
+    // laser start tag
+    if (boost::starts_with(comment, reserved_tag(ETags::Laser_Start))) {
+        m_laser = true;
+        return;
+    }
+
+    // laser end tag
+    if (boost::starts_with(comment, reserved_tag(ETags::Laser_End))) {
+        m_laser = false;
+        store_move_vertex(EMoveType::Seam);
+        return;
+    }
+
     if (!producers_enabled || m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3r || m_producer == EProducer::SuperSlicer) {
         // height tag
         if (boost::starts_with(comment, reserved_tag(ETags::Height))) {

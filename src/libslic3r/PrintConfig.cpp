@@ -4925,9 +4925,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("External perimeter");
     def->full_label = L("External perimeter pressure advance");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for external perimeter. Can be a % over support pa");
+    def->tooltip = L("Pressure advance for external perimeter. Can be a % over perimeter pa");
     def->mode = comExpert | comSuSi;
-    def->ratio_over = "filament_support_material_pa";
+    def->ratio_over = "filament_perimeter_pa";
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
 
@@ -10170,6 +10170,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "filament_use_skinnydip",
 "filament_wipe_advanced_pigment",
 //pa
+"filament_pressure_advance",
 "filament_bridge_internal_pa",
 "filament_bridge_pa",
 "filament_brim_pa",

@@ -4751,7 +4751,6 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
                 notification_manager->set_slicing_progress_percentage(formatter.str(), evt.status.percent / 100.f, 0 == (evt.status.flags & PrintBase::SlicingStatus::FlagBits::SECONDARY_STATE));
             }
         }
-        notification_manager->set_slicing_progress_percentage(evt.status.main_text, (float)evt.status.percent / 100.0f);
     }
 
     // Check template filaments and add warning

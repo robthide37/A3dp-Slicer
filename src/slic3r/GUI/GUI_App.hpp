@@ -104,9 +104,9 @@ enum ConfigMenuIDs {
     ConfigMenuFlashFirmware,
     ConfigMenuWifiConfigFile,
     ConfigMenuCnt,
-    //ConfigMenuModeSimple,
-    //ConfigMenuModeAdvanced,
-    //ConfigMenuModeExpert,
+    // ConfigMenuModeSimple,
+    // ConfigMenuModeAdvanced,
+    // ConfigMenuModeExpert,
 };
 
 class Tab;
@@ -385,7 +385,7 @@ public:
     std::mutex not_modal_dialog_mutex;
     wxDialog *not_modal_dialog = nullptr;
 
-	PresetUpdater*  get_preset_updater() { return preset_updater.get(); }
+    PresetUpdater*  get_preset_updater() { return preset_updater.get(); }
     PrinterTechnology get_current_printer_technology() const;
 
     wxBookCtrlBase *tab_panel() const;
