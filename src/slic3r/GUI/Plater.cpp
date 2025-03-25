@@ -5483,10 +5483,8 @@ bool Plater::priv::can_reload_from_disk() const
 void Plater::priv::set_bed_shape(const Pointfs& shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom)
 {
     bool new_shape = bed.set_shape(shape, max_print_height, custom_texture, custom_model, force_as_custom);
-    if (new_shape) {
-        if (view3D) view3D->bed_shape_changed();
-        if (preview) preview->bed_shape_changed();
-    }
+    if (view3D) view3D->bed_shape_changed();
+    if (preview) preview->bed_shape_changed();
 }
 
 bool Plater::priv::can_delete() const
@@ -6109,8 +6107,7 @@ void Plater::add_model_modifier() {
       result = p->hueforge->load_hfp(input_file_str.c_str(), print_config, p->model);
 
       if (result) {
-          DynamicPrintConfig new_print_config = print_config;
-
+        DynamicPrintConfig new_print_config = print_config;
          // float precise_value_layer_height = std::floor((*p->hueforge->get_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
          // float precise_value_base_layer_height = std::floor((*p->hueforge->get_base_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
           new_print_config.set_key_value("layer_height", new ConfigOptionFloat(*p->hueforge->get_layer_height()));
