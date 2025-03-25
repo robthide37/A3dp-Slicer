@@ -1024,7 +1024,7 @@ std::string GCodeWriter::_retract(double length, std::optional<double> restart_e
             if (int speed = m_tool->retract_speed(); speed > 0.) {
                 w.emit_f(speed * 60.);
             }
-            w.emit_comment(this->config.gcode_comments, comment);
+            w.emit_comment(this->m_config.gcode_comments, comment);
             gcode += w.string();
         }
     }
@@ -1063,7 +1063,7 @@ std::string GCodeWriter::unretract()
             if (int speed = m_tool->deretract_speed(); speed > 0.) {
                 w.emit_f(speed * 60.);
             }
-            w.emit_comment(this->config.gcode_comments, "unretract");
+            w.emit_comment(this->m_config.gcode_comments, "unretract");
             gcode += w.string();
         }
     }
