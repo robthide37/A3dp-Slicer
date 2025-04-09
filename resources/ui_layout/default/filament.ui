@@ -74,10 +74,10 @@ group:Fan speed - default
 	line:Support Material fan speed
 		setting:id$0:label_width$12:label$Default:support_material_fan_speed
 		setting:id$0:label_width$12:label$Interface:support_material_interface_fan_speed
-	line:Bridges fan speed
-		setting:id$0:label_width$12:label$Bridges:bridge_fan_speed
-		setting:id$0:label_width$12:label$Internal bridges:internal_bridge_fan_speed
-	line:Overhangs Perimeter fan speed
+	line:Bridge Infill fan speed
+		setting:id$0:label_width$12:label$External:bridge_fan_speed
+		setting:id$0:label_width$12:label$Internal:internal_bridge_fan_speed
+	line:Overhang Perimeter fan speed
 		setting:id$0:label_width$12:label$Overhangs:overhangs_fan_speed
         setting:id$0:overhangs_dynamic_fan_speed
 	line:Gap fill fan speed

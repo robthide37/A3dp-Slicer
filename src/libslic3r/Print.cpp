@@ -40,7 +40,7 @@
 #include "BuildVolume.hpp"
 #include "format.hpp"
 
-#include <float.h>
+#include <cfloat>
 
 #include <algorithm>
 #include <limits>
@@ -52,7 +52,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/regex.hpp>
 
-#include <tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_for.h>
 
 namespace Slic3r {
 

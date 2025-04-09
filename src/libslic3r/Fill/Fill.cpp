@@ -7,8 +7,8 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <assert.h>
-#include <stdio.h>
+#include <cassert>
+#include <cstdio>
 #include <memory>
 
 #include "../ClipperUtils.hpp"
@@ -526,7 +526,6 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 } else if (fill.expolygons.size() > 1 || !all_expolygons.empty()) {
                     assert_valid(fill.expolygons);
                     // subtract the preceding polygons, to avoid overlapping infills.
-                    fill.expolygons = offset2_ex(fill.expolygons, fill.params.flow.scaled_width() / 4, -fill.params.flow.scaled_width() / 4);
                     if (!all_expolygons.empty()) {
                         fill.expolygons = diff_ex(fill.expolygons, all_expolygons, ApplySafetyOffset::Yes);
                         ensure_valid(fill.expolygons, resolution);
@@ -673,11 +672,29 @@ static LayerIsland *get_fill_island(Layer &layer,
         // Sort the extrusion range into its LayerIsland.
         // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
         // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
+        // That is because layer.lslices() is topologically sorted. 
         auto point_inside_surface = [&layer](const size_t lslice_idx, const Point &point) {
             const BoundingBox &bbox = layer.lslices_ex[lslice_idx].bbox;
             return point.x() >= bbox.min.x() && point.x() < bbox.max.x() && point.y() >= bbox.min.y() && point.y() < bbox.max.y() &&
                    layer.lslices()[lslice_idx].contour.contains(point);
         };
+#ifdef _DEBUG
+        // check topological sort
+        if (layer.lslices().size() > 1) {
+            std::vector<BoundingBox> bboxes;
+            bboxes.emplace_back(layer.lslices()[0].contour.points);
+            for (size_t check_idx = 1; check_idx < layer.lslices().size(); ++check_idx) {
+                assert(bboxes.size() == check_idx);
+                bboxes.emplace_back(layer.lslices()[check_idx].contour.points);
+                for (size_t bigger_idx = 0; bigger_idx < check_idx; ++bigger_idx) {
+                    // higher idx can be inside holes, but not the opposite!
+                    if (bboxes[check_idx].contains(bboxes[bigger_idx])) {
+                        assert(!layer.lslices()[check_idx].contour.contains(layer.lslices()[bigger_idx].contour.first_point()));
+                    }
+                }
+            }
+        }
+#endif
         int   lslice_idx = int(layer.lslices_ex.size()) - 1;
         for (; lslice_idx >= 0; --lslice_idx)
             if (point_inside_surface(lslice_idx, point))
@@ -760,6 +777,7 @@ static void insert_ironings_into_islands(Layer &layer, uint32_t layer_region_id,
     	// Sort the extrusion range into its LayerIsland.
 	    // Traverse the slices in an increasing order of bounding box size, so that the islands inside another islands are tested first,
 	    // so we can just test a point inside ExPolygon::contour and we may skip testing the holes.
+        // That is because layer.lslices() is topologically sorted. 
 	    auto point_inside_surface = [&layer](const size_t lslice_idx, const Point &point) {
 	        const BoundingBox &bbox = layer.lslices_ex[lslice_idx].bbox;
 	        return point.x() >= bbox.min.x() && point.x() < bbox.max.x() &&

@@ -100,7 +100,7 @@ function check_available_memory_and_disk() {
 function check_distribution() {
     DISTRIBUTION=$(awk -F= '/^ID=/ {print $2}' /etc/os-release)
     # treat ubuntu as debian
-    if [ "${DISTRIBUTION}" == "ubuntu" ]
+    if [ "${DISTRIBUTION}" == "ubuntu" ] || [ "${DISTRIBUTION}" == "linuxmint" ]
     then
         DISTRIBUTION="debian"
     fi

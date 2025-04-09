@@ -41,7 +41,7 @@
 #include <boost/nowide/iostream.hpp>
 
 #include <algorithm>
-#include <float.h>
+#include <cfloat>
 
 namespace Slic3r {
 
@@ -847,7 +847,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(200, true));
 
     def = this->add("bridge_fan_speed", coInts);
-    def->label = L("Bridges fan speed");
+    def->label = L("Bridge Infill fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during bridges and overhangs. It won't slow down the fan if it's currently running at a higher speed."
         "\nSet to 0 to stop the fan."
@@ -956,7 +956,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("bridge_speed", coFloatOrPercent);
     def->label = L("Bridges");
-    def->full_label = L("Bridge speed");
+    def->full_label = L("Bridge Infill speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Speed for printing bridges."
         "\nThis can be expressed as a percentage (for example: 60%) over the Default speed."
@@ -3127,6 +3127,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("xyz decimals");
     def->category = OptionCategory::output;
     def->tooltip = L("Choose how many digits after the dot for xyz coordinates.");
+    def->min = 0;
+    def->max = 7;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionInt(3));
 
@@ -3134,6 +3136,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Extruder decimals");
     def->category = OptionCategory::output;
     def->tooltip = L("Choose how many digits after the dot for extruder moves.");
+    def->min = 0;
+    def->max = 7;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionInt(5));
 
@@ -3506,7 +3510,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("internal_bridge_fan_speed", coInts);
-    def->label = L("Infill bridges fan speed");
+    def->label = L("Internal Bridge Infill fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during all infill bridges. It won't slow down the fan if it's currently running at a higher speed."
         "\nSet to 0 to stop the fan."
@@ -3532,8 +3536,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(300, true));
 
     def = this->add("internal_bridge_speed", coFloatOrPercent);
-    def->label = L("Internal bridges");
-    def->full_label = L("Internal bridge speed");
+    def->label = L("Internal Bridge Infill speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Speed for printing the bridges that support the top layer.\nCan be a % of the bridge speed.");
     def->sidetext = L("mm/s or %");
@@ -4358,7 +4361,7 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Overhangs speed");
     def->category = OptionCategory::speed;
     def->tooltip = L("Speed for printing overhangs."
-        "\nCan be a % of the bridge speed."
+        "\nCan be a % of the bridge infill speed."
         "\nSet zero to use autospeed for this feature.");
     def->sidetext = L("mm/s");
     def->ratio_over = "bridge_speed";
@@ -4616,7 +4619,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::width;
     def->tooltip = L("This setting allows you to reduce the overlap between the perimeters, to reduce the impact of the perimeters' artifacts."
         " 100% means that no gap is left, and 0% means that perimeters are not touching each other anymore."
-        "\nIt's very experimental, please report about the usefulness. It may be removed if there is no use for it.");
+        "\nIt's very experimental, please report about the usefulness.");
     def->sidetext = L("%");
     def->min = 0;
     def->max = 100;
@@ -5216,12 +5219,12 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Internal resolution");
     def->category = OptionCategory::slicing;
     def->tooltip = L("Minimum detail resolution, used for internal structures (gapfill and some infill patterns)."
-            "\nDon't put a too-small value (0.05mm is way too low for many printers A3dp machines .1 rec), as it may create too many very small segments that may be difficult to display and print.");
+            "\nDon't put a too-small value (0.05mm is way too low for many printers A3dp machines .1 rec), as it may create too many very small segments that may be difficult to display and print if your main resolution parameter is also very small.");
     def->sidetext = L("mm");
-    def->min = 0.001;
+    def->min = 0.0001;
     def->precision = 8;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionFloat(0.1));
+    def->set_default_value(new ConfigOptionFloat(0.025));
 
     def = this->add("retract_before_travel", coFloats);
     def->label = L("Minimum travel after retraction");
@@ -8475,11 +8478,11 @@ void PrintConfigDef::init_sla_params()
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
 
-    def = this->add("sla_print_settings_id", coBool);
+    def = this->add("sla_print_settings_modified", coBool);
     def->set_default_value(new ConfigOptionBool(false));
     def->cli = ConfigOptionDef::nocli;
 
-    def = this->add("sla_print_settings_modified", coString);
+    def = this->add("sla_print_settings_id", coString);
     def->set_default_value(new ConfigOptionString(""));
     def->cli = ConfigOptionDef::nocli;
 

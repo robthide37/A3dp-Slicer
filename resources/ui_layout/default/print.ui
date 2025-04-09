@@ -374,14 +374,14 @@ group:label_width$8:sidetext_width$7:Speed for print moves
 		setting:width$4:support_material_speed
 		setting:width$4:support_material_interface_speed
 		setting:width$4:brim_speed
-	line:Bridge speed
-		setting:width$4:bridge_speed
-		setting:width$4:internal_bridge_speed
+	line:Bridge Infill speed
+		setting:label$External:width$4:bridge_speed
+		setting:label$Internal:width$4:internal_bridge_speed
 	line:Overhangs speed
-		setting:width$4:overhangs_speed
-		setting:overhangs_dynamic_speed
+		setting:label$Maximum:width$4:overhangs_speed
+		setting:label$Dynamic:overhangs_dynamic_speed
 	line:Gap fill speed
-		setting:width$4:label$Maximum speed:gap_fill_speed
+		setting:width$4:label$Maximum:gap_fill_speed
 		setting:width$4:label$Cap with:sidetext$% of perimeter flow:sidetext_width$20:gap_fill_flow_match_perimeter
 	line:Other speed
 		setting:width$4:thin_walls_speed
