@@ -1,0 +1,8 @@
+min_slic3r_version = 2.7.0
+2.0.0 reanmaed to troodon, updated profiles.
+min_slic3r_version = 2.5.0
+1.1.0-slic3r new printer: a3dp from 400 top 525
+min_slic3r_version = 2.4.0
+1.0.1-slic3r sync slic3r-profile with prusa 2.4
+min_slic3r_version = 2.3.57
+0.0.1 Initial version

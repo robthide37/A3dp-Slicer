@@ -6118,7 +6118,12 @@ void Plater::add_model_modifier(const std::string& path) {
 
           wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
           wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->reload_config();
-      }
+
+          // Show notification
+          get_notification_manager()->push_notification(NotificationType::CustomNotification,
+                                                  NotificationManager::NotificationLevel::RegularNotificationLevel,
+                                                  format(_L("Hueforge file successfully imported.")));
+          }
    } else {
         throw Slic3r::RuntimeError("Unknown file format. Input file must have .hfp extension.");
    }
