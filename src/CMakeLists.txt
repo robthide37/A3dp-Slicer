@@ -62,7 +62,12 @@ endif()
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
             endif ()
-    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl webview stc)
+    if(WIN32)
+        find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla)
+    else()
+        find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc)
+    endif()
+
     include(${wxWidgets_USE_FILE})
 
     slic3r_remap_configs(wx::wxhtml wx::wxadv wx::wxgl wx::wxcore wx::wxbase RelWithDebInfo Release)

@@ -144,10 +144,5 @@
   <string>NSApplication</string>
   <key>NSHighResolutionCapable</key>
   <true/>
-  <key>LSEnvironment</key>
-  <dict>
-    <key>ASAN_OPTIONS</key>
-    <string>detect_container_overflow=0</string>
-  </dict>
 </dict>
 </plist>
