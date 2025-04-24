@@ -238,9 +238,13 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
 
     bool result = false;
     if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
-        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion);
+        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model,
+                          options & LoadAttribute::CheckVersion);
     else if (boost::algorithm::iends_with(input_file, ".zip.amf"))
-        result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
+        result = load_amf(input_file.c_str(), config, config_substitutions, &model,
+                          options & LoadAttribute::CheckVersion);
+    else if (boost::algorithm::iends_with(input_file, ".hfp"))
+        result = false;
     else
         throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");
 

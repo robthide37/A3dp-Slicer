@@ -1999,6 +1999,7 @@ struct Plater::priv
     static const std::regex pattern_any_amf;
     static const std::regex pattern_prusa;
     static const std::regex pattern_zip;
+    static const std::regex pattern_hfp;
 
     priv(Plater *q, MainFrame *main_frame);
     ~priv();
@@ -2307,14 +2308,19 @@ const std::regex Plater::priv::pattern_zip_amf(".*[.]zip[.]amf", std::regex::ica
 const std::regex Plater::priv::pattern_any_amf(".*[.](amf|amf[.]xml|zip[.]amf)", std::regex::icase);
 const std::regex Plater::priv::pattern_prusa(".*prusa", std::regex::icase);
 const std::regex Plater::priv::pattern_zip(".*zip", std::regex::icase);
+const std::regex Plater::priv::pattern_hfp(".*hfp", std::regex::icase);
 
 Plater::priv::priv(Plater *q, MainFrame *main_frame)
     : q(q)
     , main_frame(main_frame)
     , config(Slic3r::DynamicPrintConfig::new_from_defaults_keys({
         // These keys are used by (at least) printconfig::min_object_distance
-        "bed_shape", "bed_custom_texture", "bed_custom_model", 
-        "brim_width", "brim_width_interior","brim_separation",
+        "bed_shape", 
+        "bed_custom_texture", 
+        "bed_custom_model", 
+        "brim_width", 
+        "brim_width_interior",
+        "brim_separation",
         "complete_objects",
         "parallel_objects_step",
         "complete_objects_sort",
@@ -2329,7 +2335,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "max_print_height",
         "perimeter_extrusion_width",
         "extrusion_width",
-        "skirts", "skirt_brim", "skirt_distance", "skirt_distance_from_brim", 
+        "skirts", 
+        "skirt_brim", 
+        "skirt_distance", "skirt_distance_from_brim", 
         "skirt_extrusion_width", "skirt_height", "first_layer_extrusion_spacing", "perimeter_extrusion_spacing", "extrusion_spacing",
         "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
         "wipe_tower", "wipe_tower_brim_width", "wipe_tower_rotation_angle", "wipe_tower_width", "wipe_tower_x", "wipe_tower_y",
@@ -2818,57 +2826,61 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const bool type_zip_amf = !type_3mf && std::regex_match(path.string(), pattern_zip_amf);
         const bool type_any_amf = !type_3mf && std::regex_match(path.string(), pattern_any_amf);
         const bool type_prusa = std::regex_match(path.string(), pattern_prusa);
+        const bool type_hfp = std::regex_match(path.string(), pattern_hfp);
 
         Slic3r::Model model;
         bool is_project_file = type_prusa;
         try {
             if (type_3mf || type_zip_amf) {
 #ifdef __linux__
-                // On Linux Constructor of the ProgressDialog calls DisableOtherWindows() function which causes a disabling of all children of the find_toplevel_parent(q)
-                // And a destructor of the ProgressDialog calls ReenableOtherWindows() function which revert previously disabled children.
-                // But if printer technology will be changes during project loading, 
-                // then related SLA Print and Materials Settings or FFF Print and Filaments Settings will be unparent from the wxNoteBook
-                // and that is why they will never be enabled after destruction of the ProgressDialog.
-                // So, distroy progress_gialog if we are loading project file
+                // On Linux Constructor of the ProgressDialog calls DisableOtherWindows() function which causes a disabling
+                // of all children of the find_toplevel_parent(q) And a destructor of the ProgressDialog calls
+                // ReenableOtherWindows() function which revert previously disabled children. But if printer technology
+                // will be changes during project loading, then related SLA Print and Materials Settings or FFF Print
+                // and Filaments Settings will be unparent from the wxNoteBook and that is why they will never be enabled
+                // after destruction of the ProgressDialog. So, distroy progress_gialog if we are loading project file
                 if (input_files_size == 1 && progress_dlg) {
                     progress_dlg->Destroy();
                     progress_dlg = nullptr;
                 }
 #endif
+
                 DynamicPrintConfig config;
-                PrinterTechnology loaded_printer_technology {ptFFF};
+                PrinterTechnology loaded_printer_technology{ptFFF};
                 {
                     DynamicPrintConfig config_loaded;
-                    ConfigSubstitutionContext config_substitutions{ ForwardCompatibilitySubstitutionRule::Enable };
-                    model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions, only_if(load_config, Model::LoadAttribute::CheckVersion));
+                    ConfigSubstitutionContext config_substitutions{ForwardCompatibilitySubstitutionRule::Enable};
+                    model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions,
+                                                             only_if(load_config, Model::LoadAttribute::CheckVersion));
                     if (load_config && !config_loaded.empty()) {
                         // Based on the printer technology field found in the loaded config, select the base for the config,
                         loaded_printer_technology = Preset::printer_technology(config_loaded);
 
                         // We can't to load SLA project if there is at least one multi-part object on the bed
                         if (loaded_printer_technology == ptSLA) {
-                            const ModelObjectPtrs& objects = q->model().objects;
+                            const ModelObjectPtrs &objects = q->model().objects;
                             for (auto object : objects)
                                 if (object->volumes.size() > 1) {
-                                    Slic3r::GUI::show_info(nullptr,
-                                        _L("You cannot load SLA project with a multi-part object on the bed") + "\n\n" +
-                                        _L("Please check your object list before preset changing."),
+                                    Slic3r::GUI::show_info(
+                                        nullptr,
+                                        _L("You cannot load SLA project with a multi-part object on the bed") +
+                                            "\n\n" + _L("Please check your object list before preset changing."),
                                         _L("Attention!"));
                                     return obj_idxs;
                                 }
                         }
 
                         config.apply(loaded_printer_technology == ptFFF ?
-                            static_cast<const ConfigBase&>(FullPrintConfig::defaults()) :
-                            static_cast<const ConfigBase&>(SLAFullPrintConfig::defaults()));
+                                         static_cast<const ConfigBase &>(FullPrintConfig::defaults()) :
+                                         static_cast<const ConfigBase &>(SLAFullPrintConfig::defaults()));
                         // Disable all the optional values in defaults.
                         config.disable_optionals();
                         // and place the loaded config over the base.
                         config += std::move(config_loaded);
                     }
-                    if (! config_substitutions.empty())
+                    if (!config_substitutions.empty())
                         show_substitutions_info(config_substitutions.get(), filename.string());
-                    
+
                     if (load_config) {
                         this->model.get_custom_gcode_per_print_z_vector() = model.get_custom_gcode_per_print_z_vector();
                         this->model.get_wipe_tower_vector() = model.get_wipe_tower_vector();
@@ -2877,7 +2889,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
                 if (load_config) {
                     if (!config.empty()) {
-                        const auto* post_process = config.opt<ConfigOptionStrings>("post_process");
+                        const auto *post_process = config.opt<ConfigOptionStrings>("post_process");
                         size_t max_size = 0;
                         if (post_process != nullptr && !post_process->empty()) {
                             for (std::string str : post_process->get_values()) {
@@ -2887,10 +2899,12 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         }
                         if (max_size > 0) {
                             // TRN The placeholder is either "3MF" or "AMF"
-                            wxString msg = GUI::format_wxstr(_L("The selected %1% file contains a post-processing script.\n"
-                                "Please review the script carefully before exporting G-code."), type_3mf ? "3MF" : "AMF" );
+                            wxString msg =
+                                GUI::format_wxstr(_L("The selected %1% file contains a post-processing script.\n"
+                                                     "Please review the script carefully before exporting G-code."),
+                                                  type_3mf ? "3MF" : "AMF");
                             std::string text;
-                            for (const std::string& s : post_process->get_values())
+                            for (const std::string &s : post_process->get_values())
                                 text += s;
 
                             InfoDialog msg_dlg(nullptr, msg, from_u8(text), true, wxOK | wxICON_WARNING);
@@ -2899,26 +2913,34 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         }
 
                         Preset::normalize(config);
-                        PresetBundle* preset_bundle = wxGetApp().preset_bundle.get();
+                        PresetBundle *preset_bundle = wxGetApp().preset_bundle.get();
                         preset_bundle->load_config_model(filename.string(), std::move(config));
                         q->notify_about_installed_presets();
 
-                        //if (loaded_printer_technology == ptFFF)
-                        //    CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z(), &preset_bundle->project_config);
+                        // if (loaded_printer_technology == ptFFF)
+                        //     CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z(),
+                        //     &preset_bundle->project_config);
 
-                        // For exporting from the amf/3mf we shouldn't check printer_presets for the containing information about "Print Host upload"
+                        // For exporting from the amf/3mf we shouldn't check printer_presets for the containing
+                        // information about "Print Host upload"
                         wxGetApp().load_current_presets(false);
-                        // Update filament colors for the MM-printer profile in the full config 
-                        // to avoid black (default) colors for Extruders in the ObjectList, 
+                        // Update filament colors for the MM-printer profile in the full config
+                        // to avoid black (default) colors for Extruders in the ObjectList,
                         // when for extruder colors are used filament colors
                         q->update_filament_colors_in_full_config();
                         is_project_file = true;
                     }
-                    if(!in_temp && update_dirs)
+                    if (!in_temp && update_dirs)
                         wxGetApp().app_config->update_config_dir(path.parent_path().string());
                 }
-            }
-            else {
+            } else if (type_hfp && this->model.objects.empty()) {
+                std::string message = GUI::format(
+                    _L("Cannot load HFP if there is no model loaded on the bed. Please load a model first."));
+                GUI::show_error(q, message);
+            } else if (type_hfp) {
+                q->add_model_modifier(path.string());
+
+            } else {
                 model = Slic3r::Model::read_from_file(path.string(), nullptr, nullptr, only_if(load_config, Model::LoadAttribute::CheckVersion));
                 for (auto obj : model.objects) {
                     if (obj->name.empty()) {
@@ -6080,42 +6102,52 @@ void Plater::add_model(bool imperial_units/* = false*/)
         wxGetApp().mainframe->update_title();
 }
 
-void Plater::add_model_modifier() {
-   wxString input_file;
-   wxGetApp().import_model_modifier(this, input_file);
-   
-   if (input_file.empty())
-      return;
-   
-   bool result = false;
-   std::string input_file_str = input_file.ToStdString();
-   
-   if (boost::algorithm::iends_with(input_file_str.c_str(), ".hfp")) {
-       HFP *hfp = new HFP();
-       p->hueforge = hfp;
-       DynamicPrintConfig print_config = wxGetApp().preset_bundle->fff_prints.get_selected_preset().config;
+void Plater::add_model_modifier(const std::string &path) {
+    wxString input_file;
+    bool result = false;
+    bool dragged = false;
 
-      result = p->hueforge->load_hfp(input_file_str.c_str(), print_config, p->model);
+    if (path.empty()) {
+        wxGetApp().import_model_modifier(this, input_file);
+    } else {
+        dragged = true;
+    }
 
-      if (result) {
-          DynamicPrintConfig new_print_config = print_config;
+    if (p->model.objects.empty()) {
+            throw Slic3r::RuntimeError("No object loaded. Please load an object first.");
+        return;
+    }
 
-         // float precise_value_layer_height = std::floor((*p->hueforge->get_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
-         // float precise_value_base_layer_height = std::floor((*p->hueforge->get_base_layer_height()) * 1000.0) / 1000.0; // Truncate to 3 decimal places
-          new_print_config.set_key_value("layer_height", new ConfigOptionFloat(*p->hueforge->get_layer_height()));
-          new_print_config.set_key_value("first_layer_height",
-                                         new ConfigOptionFloatOrPercent(*p->hueforge->get_base_layer_height(), false));
+    if (boost::algorithm::iends_with(input_file.ToStdString().c_str(), ".hfp") ||
+        boost::algorithm::iends_with(path.c_str(), ".hfp")) {
+        HFP *hfp = new HFP();
+        p->hueforge = hfp;
+        DynamicPrintConfig print_config = wxGetApp().preset_bundle->fff_prints.get_selected_preset().config;
 
-          wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
-          wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->reload_config();
-      }
-   } else {
-        throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");
-   }
-   
+        if (dragged)
+            { result = p->hueforge->load_hfp(path, print_config, p->model); }
+        else {
+            result = p->hueforge->load_hfp(input_file.ToStdString().c_str(), print_config, p->model);
+        }
+
+        if (result) {
+            DynamicPrintConfig new_print_config = print_config;
+            new_print_config.set_key_value("layer_height", new ConfigOptionFloat(*p->hueforge->get_layer_height()));
+            new_print_config.set_key_value("first_layer_height",
+                                           new ConfigOptionFloatOrPercent(*p->hueforge->get_base_layer_height(),
+                                                                          false));
+
+            wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
+            wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->reload_config();
+        }
+    } else {
+        throw Slic3r::RuntimeError("Unknown file format. Input file must have .hfp extension.");
+    }
+
     if (!result)
         throw Slic3r::RuntimeError("Loading of a model file failed.");
 }
+
 
 
 void Plater::import_zip_archive()
@@ -6924,24 +6956,26 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
 {
     const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp|zip)", std::regex::icase);
     const std::regex pattern_gcode_drop(".*[.](gcode|g|bgcode|bgc)", std::regex::icase);
+    const std::regex pattern_hfp(".*[.](hfp)", std::regex::icase);
 
     std::vector<fs::path> paths;
 
     // gcode viewer section
     if (wxGetApp().is_gcode_viewer()) {
-        for (const auto& filename : filenames) {
+        for (const auto &filename : filenames) {
             fs::path path(into_path(filename));
             if (std::regex_match(path.string(), pattern_gcode_drop))
                 paths.push_back(std::move(path));
         }
 
         if (paths.size() > 1) {
-            //wxMessageDialog(static_cast<wxWindow*>(this), _L("You can open only one .gcode file at a time."),
-            MessageDialog(static_cast<wxWindow*>(this), _L("You can open only one .gcode file at a time."),
-                wxString(SLIC3R_APP_NAME) + " - " + _L("Drag and drop G-code file"), wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
+            // wxMessageDialog(static_cast<wxWindow*>(this), _L("You can open only one .gcode file at a time."),
+            MessageDialog(static_cast<wxWindow *>(this), _L("You can open only one .gcode file at a time."),
+                          wxString(SLIC3R_APP_NAME) + " - " + _L("Drag and drop G-code file"),
+                          wxCLOSE | wxICON_WARNING | wxCENTRE)
+                .ShowModal();
             return false;
-        }
-        else if (paths.size() == 1) {
+        } else if (paths.size() == 1) {
             load_gcode(from_path(paths.front()));
             return true;
         }
@@ -6951,7 +6985,8 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
     // editor section
     for (const auto& filename : filenames) {
         fs::path path(into_path(filename));
-        if (std::regex_match(path.string(), pattern_drop))
+        if (std::regex_match(path.string(), pattern_drop) || std::regex_match(path.string(), pattern_hfp))
+
             paths.push_back(std::move(path));
         else if (std::regex_match(path.string(), pattern_gcode_drop))
             start_new_gcodeviewer(&filename);
