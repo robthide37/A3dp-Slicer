@@ -36,7 +36,7 @@ HFP::~HFP() {
 }
 
 
-bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &config, Model& model) {
+bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &config, Model &model) {
     std::ifstream file(input_file);
 
     if (!file.is_open()) {
@@ -89,6 +89,13 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
                     m_filament_set.push_back(filament);
                     BOOST_LOG_TRIVIAL(info) << "Loaded filament: " << filament.Brand << " (" << filament.Name << ")";
                 }
+
+                // Reverse the filament set if "reverse_litho" is true
+                if (json_data.value("reverse_litho", false)) {
+                    std::reverse(m_filament_set.begin(), m_filament_set.end());
+                    BOOST_LOG_TRIVIAL(info) << "'reverse_litho' is true. Reversed filament set.";
+                }
+
             } else {
                 BOOST_LOG_TRIVIAL(warning) << "No 'filament_set' found in JSON.";
             }
@@ -146,7 +153,6 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
                     }
                     // Handle filaments dynamically (if stored as key-value in this format)
                     else if (key.find("filament_") == 0) {
-
                         filament.Name = key;
                         filament.Brand = value;
                         m_filament_set.push_back(filament);
@@ -160,21 +166,31 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
         return false;
     }
 
-    for (CustomGCode::Info& info : model.get_custom_gcode_per_print_z_vector())
+    for (CustomGCode::Info &info : model.get_custom_gcode_per_print_z_vector())
         info.gcodes.clear();
 
     int extruder = 1;
     CustomGCode::Type type = CustomGCode::ColorChange;
     std::string extra;
 
-    
-    if (!m_filament_set.empty()) {
-            for (int i = 0; i < m_filament_set.size(); i++) {
-                model.get_custom_gcode_per_print_z_vector()[s_multiple_beds.get_active_bed()].gcodes.push_back(
-                    CustomGCode::Item{*m_layer_height * m_slider_values[i], type, extruder, m_filament_set[i].Color,
-                                      extra});
-            }
+    if (!m_filament_set.empty() && !m_slider_values.empty()) {
+        auto &gcode_vector = model.get_custom_gcode_per_print_z_vector()[s_multiple_beds.get_active_bed()];
+
+        // First color before the first slider value
+        gcode_vector.gcodes.push_back(CustomGCode::Item{0.0, // Beginning of print
+                                                        type, extruder, m_filament_set.front().Color, extra});
+
+        // Color changes at each slider-defined height
+        for (int i = 0; i < m_slider_values.size(); i++) {
+            double z_height = *m_layer_height * m_slider_values[i];
+            gcode_vector.gcodes.push_back(CustomGCode::Item{z_height, type, extruder, m_filament_set[i].Color, extra});
+        }
+
+        // Last color after the last slider value (use a large value to ensure it's at the end)
+        double final_z = *m_layer_height * (m_slider_values.back() + 1); // or max Z height if known
+        gcode_vector.gcodes.push_back(CustomGCode::Item{final_z, type, extruder, m_filament_set.back().Color, extra});
     }
+
     return true;
 }
 
