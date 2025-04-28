@@ -1,10 +1,12 @@
-name: C/C++ Release candidate arm macos
+name: C/C++ Nightly arm macos
 
 on:
   push:
     branches:
-      - master
-      - 2.7.61
+      - Nigthly
+      - nightly_dev
+      - nightly_master
+      - debug_macos
 
 jobs:
   build_dep:
@@ -52,14 +54,14 @@ jobs:
         key: macos_arm_2.7
         path: deps/build/destdir
     - name: build slicer
-      run: ./BuildMacOS.sh -asi
+      run: ./BuildMacOS.sh -asiv
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rc_${{ github.event.repository.name }}-macOS-arm.dmg
+        name: nightly_${{ github.event.repository.name }}-macOS-arm.dmg
         path: build/${{ github.event.repository.name }}-macOS-arm.dmg
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rc_${{ github.event.repository.name }}-macOS-arm.tgz
+        name: nightly_${{ github.event.repository.name }}-macOS-arm.tgz
         path: build/${{ github.event.repository.name }}-macOS-arm.tgz

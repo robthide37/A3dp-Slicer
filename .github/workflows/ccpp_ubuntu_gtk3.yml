@@ -1,10 +1,13 @@
-name: C/C++ dev ubuntu-GTK3
+name: C/C++ Nightly ubuntu-GTK3
 
 on:
   push:
     branches:
-      - dev
-      - supermnerill-Main
+      - Nigthly
+      - nightly_dev
+      - nightly_master
+      - debug_ubuntu
+
 jobs:
   build:
 
@@ -34,7 +37,7 @@ jobs:
       name: build deps if new cache
       run: ./BuildLinux.sh -d
     - name: slicer, tar & appimage
-      run: ./BuildLinux.sh -siv -b release -g 3
+      run: ./BuildLinux.sh -siv
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:

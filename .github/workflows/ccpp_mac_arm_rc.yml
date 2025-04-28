@@ -3,8 +3,8 @@ name: C/C++ Release candidate arm macos
 on:
   push:
     branches:
-      - rc
-      - multiple-beds-prusa
+      - master_27
+
 jobs:
   build_dep:
     runs-on: macos-14
@@ -62,8 +62,3 @@ jobs:
       with:
         name: rc_${{ github.event.repository.name }}-macOS-arm.tgz
         path: build/${{ github.event.repository.name }}-macOS-arm.tgz
-    - name: Upload app
-      uses: actions/upload-artifact@v4
-      with:
-        name: rc_${{ github.event.repository.name }}-macOS-arm.app
-        path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app

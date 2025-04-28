@@ -1,14 +1,13 @@
-name: C/C++ dev macos
+name: C/C++ Nightly macos
 
 on:
   push:
     branches:
-      - Main
+      - Nigthly
       - nightly_dev
       - nightly_master
       - debug_macos
-      - dev
-      - A3dp-main
+
 jobs:
   build_dep:
     runs-on: macos-13
@@ -47,7 +46,7 @@ jobs:
     needs: build_dep
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     - name: check autoconf version
       run: autoconf --version
     - name: update automake for mpfr

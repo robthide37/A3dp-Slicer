@@ -3,8 +3,7 @@ name: C/C++ Release candidate ubuntu-GTK2
 on:
   push:
     branches:
-      - rc
-      - 2.7.61
+      - master_27
 
 jobs:
 
@@ -14,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        ref: 'rc'
+        ref: 'master_27'
     - name: Setup cmake
       uses: jwlawson/actions-setup-cmake@v1.13
       with:
@@ -35,9 +34,10 @@ jobs:
         path: deps/build/destdir
     - if: steps.cache-action.outputs.cache-hit != 'true'
       name: build deps if new cache
-      run: ./BuildLinux.sh -dr -g 2
+      run: ./BuildLinux.sh -g 2 -d
+      
     - name: slicer, tar & appimage
-      run: ./BuildLinux.sh -si -g 2
+      run: ./BuildLinux.sh -g 2 -s -i
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:

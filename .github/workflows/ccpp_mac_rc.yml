@@ -3,12 +3,11 @@ name: C/C++ Release candidate macos
 on:
   push:
     branches:
-      - multiple-beds-prusa
-      - test-yaml-fix
-      - 2.7.61
+      - master_27
+
 jobs:
   build_dep:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
     - uses: actions/checkout@v3
@@ -40,7 +39,7 @@ jobs:
       run: ./BuildMacOS.sh -d
 
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
     needs: build_dep
 
     steps:
