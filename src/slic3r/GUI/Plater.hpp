@@ -213,7 +213,8 @@ public:
     void load_project();
     void load_project(const wxString& filename);
     void add_model(bool imperial_units = false);
-    void add_model_modifier(const std::string& path = "");
+    void add_model_modifier(const std::string &path = "");
+
     void import_zip_archive();
     void import_sl1_archive();
     void extract_config_from_project();
