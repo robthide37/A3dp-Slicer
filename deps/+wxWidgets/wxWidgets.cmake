@@ -34,6 +34,7 @@ add_cmake_project(wxWidgets
         -DwxUSE_UNICODE_UTF8=${_unicode_utf8}
         -DwxUSE_OPENGL=ON
         -DwxUSE_WEBVIEW=ON
+        -DwxUSE_WEBVIEW_EDGE=ON
         -DwxUSE_WEBVIEW_WEBKIT=ON
         -DwxUSE_LIBPNG=sys
         -DwxUSE_ZLIB=sys
