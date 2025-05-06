@@ -1,7 +1,7 @@
-#include "A3DPWebView.hpp"
+#include "CR3DWebView.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/Utils/MacDarkMode.hpp"
-#include <wx/webview.h>
+
 #include <boost/log/trivial.hpp>
 #include <slic3r/GUI/Widgets/StateColor.hpp>
 #include <wx/webviewarchivehandler.h>
@@ -12,11 +12,11 @@
 #include <wx/osx/webview_webkit.h>
 #endif
 #include <wx/uri.h>
-#if defined(__WIN32__) || defined(__WXMAC__)
+#if defined(_WIN32) || defined(__WXMAC__)
 #include "wx/private/jsscriptwrapper.h"
 #endif
 
-#ifdef __WIN32__
+#ifdef _WIN32
 #include <WebView2.h>
 #include <Shellapi.h>
 #include <slic3r/Utils/Http.hpp>
@@ -44,7 +44,7 @@ webkit_javascript_result_unref              (WebKitJavascriptResult *js_result);
 
 namespace fs = boost::filesystem;
 
-#ifdef __WIN32__
+#ifdef _WIN32
 // Run Download and Install in another thread so we don't block the UI thread
 DWORD DownloadAndInstallWV2RT() {
 
@@ -244,13 +244,13 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
     }
 #endif
     auto url2  = url;
-#ifdef __WIN32__
+#ifdef _WIN32
     url2.Replace("\\", "/");
 #endif
     if (!url2.empty()) { url2 = wxURI(url2).BuildURI(); }
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << ": " << url2.ToUTF8();
 
-#ifdef __WIN32__
+#ifdef _WIN32
     wxWebView* webView = new WebViewEdge;
 #elif defined(__WXOSX__)
     wxWebView *webView = new WebViewWebKit;
@@ -259,7 +259,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 #endif
     if (webView) {
         webView->SetBackgroundColour(wxColour(*wxWHITE));
-#ifdef __WIN32__
+#ifdef _WIN32
         webView->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.52", SLIC3R_VERSION, 
             Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light"));
@@ -289,7 +289,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
             Slic3r::GUI::wxGetApp().set_adding_script_handler(false);
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": finished add script message handler for wx.";
         };
-#ifndef __WIN32__
+#ifndef _WIN32
         webView->CallAfter([webView, addScriptMessageHandler] {
 #endif
             if (Slic3r::GUI::wxGetApp().is_adding_script_handler()) {
@@ -302,7 +302,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
                         addScriptMessageHandler(wv);
                 }
             }
-#ifndef __WIN32__
+#ifndef _WIN32
         });
 #endif
         webView->EnableContextMenu(true);
@@ -330,7 +330,7 @@ bool WebView::DownloadAndInstallWebViewRuntime()
 void WebView::LoadUrl(wxWebView * webView, wxString const &url)
 {
     auto url2  = url;
-#ifdef __WIN32__
+#ifdef _WIN32
     url2.Replace("\\", "/");
 #endif
     if (!url2.empty()) { url2 = wxURI(url2).BuildURI(); }
@@ -346,7 +346,7 @@ bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
         wxLogMessage("Running JavaScript:\n%s\n", javascript);
         */
     try {
-#ifdef __WIN32__
+#ifdef _WIN32
         ICoreWebView2 *   webView2 = (ICoreWebView2 *) webView->GetNativeBackend();
         if (webView2 == nullptr)
             return false;
