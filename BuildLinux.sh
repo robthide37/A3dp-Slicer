@@ -288,7 +288,7 @@ then
     if [[ -n "$FOUND_GTK3_DEV" ]]; then
         BUILD_ARGS="-DSLIC3R_GTK=3"
     fi
-    if [[ $BUILD_MODE == "debug" ]]; 
+    if [[ $BUILD_MODE == "debug" ]]; then
         BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
     elif [[ $BUILD_MODE == "release" ]]; then
         if [[ -n "$BUILD_DEBUG" ]]
