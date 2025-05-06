@@ -234,7 +234,7 @@ public:
 
 wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 {
-#if wxUSE_WEBVIEW_EDGE
+#if defined(__WXMSW__) && wxUSE_WEBVIEW_EDGE
     // Check if a fixed version of edge is present in
     // $executable_path/edge_fixed and use it
     wxFileName edgeFixedDir(wxStandardPaths::Get().GetExecutablePath());
