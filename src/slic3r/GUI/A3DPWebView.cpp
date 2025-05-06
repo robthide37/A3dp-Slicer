@@ -6,23 +6,17 @@
 #include <slic3r/GUI/Widgets/StateColor.hpp>
 #include <wx/webviewarchivehandler.h>
 #include <wx/webviewfshandler.h>
-
 #if wxUSE_WEBVIEW_EDGE
-    #include <wx/msw/webview_edge.h>    // Windows with Edge backend
+#include <wx/msw/webview_edge.h>
 #elif defined(__WXMAC__)
-    #include <wx/osx/webview_webkit.h>  // macOS with WebKit
-#elif defined(__WXGTK__)
-    #include <wx/gtk/webview_webkit.h>  // Linux GTK with WebKit
-#else
-    #error "Unsupported platform or wxWebView backend not configured"
+#include <wx/osx/webview_webkit.h>
 #endif
-
 #include <wx/uri.h>
-#if defined(_WIN32) || defined(__WXMAC__)
+#if defined(__WIN32__) || defined(__WXMAC__)
 #include "wx/private/jsscriptwrapper.h"
 #endif
 
-#ifdef _WIN32
+#ifdef __WIN32__
 #include <WebView2.h>
 #include <Shellapi.h>
 #include <slic3r/Utils/Http.hpp>
@@ -50,7 +44,7 @@ webkit_javascript_result_unref              (WebKitJavascriptResult *js_result);
 
 namespace fs = boost::filesystem;
 
-#ifdef _WIN32
+#ifdef __WIN32__
 // Run Download and Install in another thread so we don't block the UI thread
 DWORD DownloadAndInstallWV2RT() {
 
@@ -238,7 +232,7 @@ public:
 
 wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 {
-#if defined(_WIN32) && wxUSE_WEBVIEW_EDGE
+#if wxUSE_WEBVIEW_EDGE
     // Check if a fixed version of edge is present in
     // $executable_path/edge_fixed and use it
     wxFileName edgeFixedDir(wxStandardPaths::Get().GetExecutablePath());
@@ -250,13 +244,13 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
     }
 #endif
     auto url2  = url;
-#ifdef _WIN32
+#ifdef __WIN32__
     url2.Replace("\\", "/");
 #endif
     if (!url2.empty()) { url2 = wxURI(url2).BuildURI(); }
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << ": " << url2.ToUTF8();
 
-#ifdef _WIN32
+#ifdef __WIN32__
     wxWebView* webView = new WebViewEdge;
 #elif defined(__WXOSX__)
     wxWebView *webView = new WebViewWebKit;
@@ -265,7 +259,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 #endif
     if (webView) {
         webView->SetBackgroundColour(wxColour(*wxWHITE));
-#ifdef _WIN32
+#ifdef __WIN32__
         webView->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.52", SLIC3R_VERSION, 
             Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light"));
@@ -295,7 +289,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
             Slic3r::GUI::wxGetApp().set_adding_script_handler(false);
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": finished add script message handler for wx.";
         };
-#ifndef _WIN32
+#ifndef __WIN32__
         webView->CallAfter([webView, addScriptMessageHandler] {
 #endif
             if (Slic3r::GUI::wxGetApp().is_adding_script_handler()) {
@@ -308,7 +302,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
                         addScriptMessageHandler(wv);
                 }
             }
-#ifndef _WIN32
+#ifndef __WIN32__
         });
 #endif
         webView->EnableContextMenu(true);
@@ -320,7 +314,6 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
     g_webviews.push_back(webView);
     return webView;
 }
-
 #if wxUSE_WEBVIEW_EDGE
 bool WebView::CheckWebViewRuntime()
 {
@@ -334,11 +327,10 @@ bool WebView::DownloadAndInstallWebViewRuntime()
     return DownloadAndInstallWV2RT() == 0;
 }
 #endif
-
 void WebView::LoadUrl(wxWebView * webView, wxString const &url)
 {
     auto url2  = url;
-#ifdef _WIN32
+#ifdef __WIN32__
     url2.Replace("\\", "/");
 #endif
     if (!url2.empty()) { url2 = wxURI(url2).BuildURI(); }
@@ -354,7 +346,7 @@ bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
         wxLogMessage("Running JavaScript:\n%s\n", javascript);
         */
     try {
-#ifdef _WIN32
+#ifdef __WIN32__
         ICoreWebView2 *   webView2 = (ICoreWebView2 *) webView->GetNativeBackend();
         if (webView2 == nullptr)
             return false;
