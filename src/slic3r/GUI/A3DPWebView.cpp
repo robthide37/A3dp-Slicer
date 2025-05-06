@@ -319,7 +319,9 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 #if defined(__WXMSW__) && wxUSE_WEBVIEW_EDGE
 bool WebView::CheckWebViewRuntime()
 {
-    return wxWebViewEdge::IsBackendAvailable();
+    wxWebViewFactoryEdge factory;
+    auto wxVersion = factory.GetVersionInfo();
+    return wxVersion.GetMajor() != 0;
 }
 #else
 bool WebView::CheckWebViewRuntime()
