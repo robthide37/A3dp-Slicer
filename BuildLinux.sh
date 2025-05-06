@@ -17,12 +17,12 @@ export ROOT=`pwd`
 export NCORES=`nproc`
 
 function usage() {
-    echo "Usage: ./BuildLinux.sh [-h][-u][-w][-r][-d][-s][-l][-t][-i][-v][-b debug|release][-g 2|3]"
+    echo "Usage: ./BuildLinux.sh [-h][-u][-w][-g][-b][-r][-d][-s][-l][-t][-i][-v]"
     echo "   -h: this message"
     echo "   -u: only update dependency packets (optional and need sudo)"
     echo "   -w: wipe build directories before building"
-    echo "   -g: force gtk2 build, need to then write the verison: '2' or '3' (BuildLinux.sh -g 2)"
-    echo "   -b: build with debug symbols. Build in full debug mode if then followed by 'debug' (need to be lowercase)"
+    echo "   -g: force gtk2 build"
+    echo "   -b: build in debug mode"
     echo "   -r: clean dependencies"
     echo "   -d: build deps"
     echo "   -s: build Slic3r"
@@ -32,6 +32,7 @@ function usage() {
     echo "   -v: change the version 'UNKNOWN' to the date of the day"
     echo -e "\n   For a first use, you want to 'sudo ./BuildLinux.sh -u'"
     echo -e "   and then './BuildLinux.sh -dsi'\n"
+    exit 0
 }
 
 function check_operating_system() {
@@ -120,10 +121,8 @@ check_available_memory_and_disk
 
 #---------------------------------------------------------------------------------------
 #check command line arguments
-GTK_VERSION="3"
-BUILD_MODE="release"
 unset name
-while getopts ":bdhilrstuvwg:" opt; do
+while getopts ":bdghilrstuvw" opt; do
     case ${opt} in
         u )
             UPDATE_LIB="1"
@@ -145,10 +144,9 @@ while getopts ":bdhilrstuvwg:" opt; do
             ;;
         b )
             BUILD_DEBUG="1"
-            BUILD_MODE=$OPTARG
             ;;
         g )
-            GTK_VERSION=$OPTARG
+            FORCE_GTK2="-g"
             ;;
         r )
             BUILD_CLEANDEPEND="1"
@@ -160,10 +158,10 @@ while getopts ":bdhilrstuvwg:" opt; do
             BUILD_WIPE="1"
             ;;
         h ) usage
-            exit 0
+#            exit 0
             ;;
         * ) usage
-            exit -1
+#            exit 0
             ;;
     esac
 done
@@ -172,7 +170,7 @@ done
 if [ ${OPTIND} -eq 1 ]
 then
     usage
-    exit -1
+    exit 0
 fi
 
 #---------------------------------------------------------------------------------------
@@ -181,19 +179,15 @@ fi
 
 source ./src/platform/unix/linux.d/${DISTRIBUTION}
 
-if [[ "$GTK_VERSION" == 2 ]]; then
+if [[ -n "$FORCE_GTK2" ]]
+then
     FOUND_GTK2=$(dpkg -l libgtk* | grep gtk2)
     FOUND_GTK2_DEV=$(dpkg -l libgtk* | grep gtk2.0-dev)
     echo -e "\nFOUND_GTK2:\n$FOUND_GTK2\n"
-    echo -e "\FOUND_GTK2_DEV:\n$FOUND_GTK2_DEV\n"
-elif [[ "$GTK_VERSION" == 3 ]]; then
+else
     FOUND_GTK3=$(dpkg -l libgtk* | grep gtk-3)
     FOUND_GTK3_DEV=$(dpkg -l libgtk* | grep gtk-3-dev)
     echo -e "\nFOUND_GTK3:\n$FOUND_GTK3)\n"
-    echo -e "\nFOUND_GTK2_DEV:\n$FOUND_GTK3_DEV)\n"
-else
-    echo -e "\nError, only GTK2 and GTK3 verison are supported. Asked GTK version: '$GTK_VERSION'\n"
-    exit -1
 fi
 
 if [[ -n "$BUILD_DEPS" ]]
@@ -217,7 +211,7 @@ then
     else
         BUILD_ARGS="-DDEP_WX_GTK3=OFF"
     fi
-    if [[ $BUILD_MODE == "debug" ]]
+    if [[ -n "$BUILD_DEBUG" ]]
     then
         # have to build deps with debug & release or the cmake won't find evrything it needs
     if [ ! -d "deps/build/release" ]
@@ -278,26 +272,25 @@ then
 	else
 		sed "s/+UNKNOWN//" version.inc > version.date.inc
     fi
-
+	
     # mkdir build
-    if [ ! -d "build" ]; then
-        mkdir build
+    if [ ! -d "build" ]
+    then
+    mkdir build
     fi
 
     BUILD_ARGS=""
-    if [[ -n "$FOUND_GTK3_DEV" ]]; then
+    if [[ -n "$FOUND_GTK3_DEV" ]]
+    then
         BUILD_ARGS="-DSLIC3R_GTK=3"
     fi
-    if [[ $BUILD_MODE == "debug" ]]; then
+    if [[ -n "$BUILD_DEBUG" ]]
+    then
         BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
-    elif [[ $BUILD_MODE == "release" ]]; then
-        if [[ -n "$BUILD_DEBUG" ]]
-            # add debug symbols (relwithdebinfo)
-            BUILD_ARGS="${BUILD_ARGS} -g"
-        fi
     fi
 
-   if [[ -n "$BUILD_TESTS" ]]; then
+   if [[ -n "$BUILD_TESTS" ]]
+   then
        BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TESTS=1"
    else
        BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TESTS=0"
@@ -328,12 +321,13 @@ then
     chmod 755 $ROOT/build/src/BuildLinuxImage.sh
 
     pushd build  > /dev/null
-    $ROOT/build/src/BuildLinuxImage.sh -a -g $GTK_VERSION
+    $ROOT/build/src/BuildLinuxImage.sh -a $FORCE_GTK2
     popd  > /dev/null
     echo "> ls ROOT"
     ls -al $ROOT
     echo "> ls ROOT/build"
     ls -al $ROOT/build
+    mkdir $ROOT/build/bin
     echo "> ls -al ROOT/build/bin"
     ls -al $ROOT/build/bin
     echo "> ls -al ROOT/build/src"
@@ -345,7 +339,7 @@ then
     # Give proper permissions to script
     chmod 755 $ROOT/build/src/BuildLinuxImage.sh
     pushd build  > /dev/null
-    $ROOT/build/src/BuildLinuxImage.sh -i -g $GTK_VERSION
+    $ROOT/build/src/BuildLinuxImage.sh -i $FORCE_GTK2
     popd  > /dev/null
     echo "> ls ROOT"
     ls -al $ROOT
