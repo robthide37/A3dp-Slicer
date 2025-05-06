@@ -27,7 +27,7 @@ add_cmake_project(wxWidgets
         ${_wx_toolkit}
         -DwxUSE_MEDIACTRL=OFF
         ${_wx_edge}
-        -DwxUSE_WEBVIEW_IE=ON
+        -DwxUSE_WEBVIEW_IE=OFF
         -DwxUSE_SCINTILLA=ON
         -DwxUSE_DETECT_SM=OFF
         -DwxUSE_UNICODE=ON

@@ -6,11 +6,17 @@
 #include <slic3r/GUI/Widgets/StateColor.hpp>
 #include <wx/webviewarchivehandler.h>
 #include <wx/webviewfshandler.h>
+
 #if wxUSE_WEBVIEW_EDGE
-#include <wx/msw/webview_edge.h>
+    #include <wx/msw/webview_edge.h>    // Windows with Edge backend
 #elif defined(__WXMAC__)
-#include <wx/osx/webview_webkit.h>
+    #include <wx/osx/webview_webkit.h>  // macOS with WebKit
+#elif defined(__WXGTK__)
+    #include <wx/gtk/webview_webkit.h>  // Linux GTK with WebKit
+#else
+    #error "Unsupported platform or wxWebView backend not configured"
 #endif
+
 #include <wx/uri.h>
 #if defined(_WIN32) || defined(__WXMAC__)
 #include "wx/private/jsscriptwrapper.h"
@@ -232,7 +238,7 @@ public:
 
 wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 {
-#if wxUSE_WEBVIEW_EDGE
+#if defined(_WIN32) && wxUSE_WEBVIEW_EDGE
     // Check if a fixed version of edge is present in
     // $executable_path/edge_fixed and use it
     wxFileName edgeFixedDir(wxStandardPaths::Get().GetExecutablePath());
