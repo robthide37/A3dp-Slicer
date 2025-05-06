@@ -6,10 +6,12 @@
 #include <slic3r/GUI/Widgets/StateColor.hpp>
 #include <wx/webviewarchivehandler.h>
 #include <wx/webviewfshandler.h>
-#if wxUSE_WEBVIEW_EDGE
-#include <wx/msw/webview_edge.h>
+#if defined(_WIN32) && wxUSE_WEBVIEW_EDGE
+    #include <wx/msw/webview_edge.h>
 #elif defined(__WXMAC__)
-#include <wx/osx/webview_webkit.h>
+    #include <wx/osx/webview_webkit.h>
+#elif defined(__WXGTK__)
+    #include <wx/gtk/webview_webkit.h>
 #endif
 #include <wx/uri.h>
 #if defined(__WIN32__) || defined(__WXMAC__)
@@ -314,19 +316,26 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
     g_webviews.push_back(webView);
     return webView;
 }
-#if wxUSE_WEBVIEW_EDGE
+#if defined(__WXMSW__) && wxUSE_WEBVIEW_EDGE
 bool WebView::CheckWebViewRuntime()
 {
-    wxWebViewFactoryEdge factory;
-    auto wxVersion = factory.GetVersionInfo();
-    return wxVersion.GetMajor() != 0;
+    return wxWebViewEdge::IsBackendAvailable();
 }
+#else
+bool WebView::CheckWebViewRuntime()
+{
+    // On macOS and Linux, assume always available
+    return true;
+}
+#endif
 
+#if defined(__WXMSW__) && wxUSE_WEBVIEW_EDGE
 bool WebView::DownloadAndInstallWebViewRuntime()
 {
     return DownloadAndInstallWV2RT() == 0;
 }
 #endif
+
 void WebView::LoadUrl(wxWebView * webView, wxString const &url)
 {
     auto url2  = url;
