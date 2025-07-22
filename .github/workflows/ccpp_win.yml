@@ -7,6 +7,7 @@ on:
       - nightly_dev
       - nightly_master
       - debug_win
+      - master_27_dev_1
 
 jobs:
   build_dep:
