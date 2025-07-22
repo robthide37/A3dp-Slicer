@@ -92,7 +92,7 @@ public:
     bool is_clockwise() const;
     bool make_counter_clockwise();
     bool make_clockwise();
-    bool is_valid() const { return this->points.size() >= 3; assert_valid(); }
+    bool is_valid() const { assert_valid(); return this->points.size() >= 3; }
     void douglas_peucker(coord_t tolerance) override;
 
     // Does an unoriented polygon contain a point?
@@ -128,14 +128,9 @@ public:
     size_t remove_collinear_angle(double angle);
 
 #ifdef _DEBUGINFO
-    void assert_valid() const override {
-        assert(size() > 2);
-        for (size_t i_pt = 1; i_pt < size(); ++i_pt)
-            release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
-        release_assert(!points.front().coincides_with_epsilon(points.back()));
-    }
+    void assert_valid() const override;
 #else
-    void assert_valid() const {}
+    void assert_valid() const;
 #endif
 
     using iterator = Points::iterator;

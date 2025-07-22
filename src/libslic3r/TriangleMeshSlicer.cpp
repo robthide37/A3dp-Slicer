@@ -1951,7 +1951,7 @@ std::vector<ExPolygons> slice_mesh_ex(
         if (params.mode_below == MeshSlicingParams::SlicingMode::PositiveLargestContour)
             slicing_params.mode_below = MeshSlicingParams::SlicingMode::Positive;
         layers_p = slice_mesh(mesh, zs, slicing_params, throw_on_cancel);
-        for(Polygons &polys : layers_p) ensure_valid(polys, std::max(SCALED_EPSILON, scale_t(params.resolution) / 4));
+        for(Polygons &polys : layers_p) ensure_valid(polys);
     }
     
 //    BOOST_LOG_TRIVIAL(debug) << "slice_mesh make_expolygons in parallel - start";
@@ -1990,16 +1990,17 @@ std::vector<ExPolygons> slice_mesh_ex(
                 }
                 assert(!has_duplicate_points(expolygons));
 #endif // NDEBUG
-                //FIXME simplify
+                // simplify
                 if (this_mode == MeshSlicingParams::SlicingMode::PositiveLargestContour)
                     keep_largest_contour_only(expolygons);
                 if (resolution != 0.) {
-                    ExPolygons simplified;
-                    simplified.reserve(expolygons.size());
-                    for (const ExPolygon &ex : expolygons)
-                        append(simplified, ex.simplify(resolution));
-                    expolygons = std::move(simplified);
+                    expolygons = union_safety_offset_ex(expolygons);
+                    //for (expolygons) ex.simplify(resolution));
+                    ensure_valid(expolygons, resolution);
+                } else {
+                    ensure_valid(expolygons);
                 }
+                assert_valid(expolygons);
 #if 0
 //#ifndef NDEBUG
                 for (const ExPolygon &ex : expolygons) {
@@ -2247,7 +2248,25 @@ Polygons project_mesh(
     std::vector<Polygons> top, bottom;
     std::vector<float>    zs { -1e10, 1e10 };
     slice_mesh_slabs(mesh, zs, trafo, &top, &bottom, throw_on_cancel);
-    return union_(top.front(), bottom.back());
+    //note: on some edge case, this union is too difficult (the complexity is too high)
+    //so we need to do it by little chunks
+    Polygons p_union;
+    const int step = 10;
+    for (Polygons *storage : {&top.front(), &bottom.back()}) {
+        if (storage->size() > 1000) {
+            int i;
+            for (i = step; i < storage->size(); i += step) {
+                p_union.insert(p_union.begin(), storage->begin() + i - step, storage->begin() + i);
+                p_union = union_(p_union);
+            }
+            assert(i > p_union.size() && i - step >= 0);
+            p_union.insert(p_union.begin(), storage->begin() + i - step, storage->end());
+            p_union = union_(p_union);
+        } else {
+            p_union = union_(p_union, *storage);
+        }
+    }
+    return p_union;
 }
 
 void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *upper, indexed_triangle_set *lower, bool triangulate_caps)

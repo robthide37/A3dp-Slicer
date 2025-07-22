@@ -599,7 +599,7 @@ protected:
                 const ConfigOptionDef *def = defs->get(kvp.first);
                 assert(def != nullptr);
                 if (def->default_value)
-                    opt->set(def->default_value.get());
+                    opt->set(*def->default_value);
             }
         }
 
@@ -793,6 +793,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                model_precision))
     ((ConfigOptionPercent,              perimeter_bonding))
     ((ConfigOptionFloat,                raft_contact_distance))
+    ((ConfigOptionEnum<SupportZDistanceType>, raft_contact_distance_type))
     ((ConfigOptionFloat,                raft_expansion))
     ((ConfigOptionPercent,              raft_first_layer_density))
     ((ConfigOptionFloat,                raft_first_layer_expansion))
@@ -935,6 +936,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       gap_fill_min_length))
     ((ConfigOptionFloatOrPercent,       gap_fill_min_width))
     ((ConfigOptionPercent,              gap_fill_overlap))
+    ((ConfigOptionBool,                 gap_fill_perimeter))
     ((ConfigOptionFloatOrPercent,       gap_fill_speed))
     ((ConfigOptionFloatOrPercent,       infill_anchor))
     ((ConfigOptionFloatOrPercent,       infill_anchor_max))

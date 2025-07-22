@@ -292,6 +292,27 @@ float compute_fill_angle(const PrintRegionConfig &region_config, size_t layer_id
     return angle;
 }
 
+#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
+void export_group_fills_to_svg(const char *path, const std::vector<SurfaceFill> &fills)
+{
+    BoundingBox bbox;
+    for (const auto &fill : fills)
+        for (const auto &expoly : fill.expolygons)
+            bbox.merge(get_extents(expoly));
+    Point legend_size = export_surface_type_legend_to_svg_box_size();
+    Point legend_pos(bbox.min(0), bbox.max(1));
+    bbox.merge(Point(std::max(bbox.min(0) + legend_size(0), bbox.max(0)), bbox.max(1) + legend_size(1)));
+
+    SVG svg(path, bbox);
+    const float transparency = 0.5f;
+    for (const auto &fill : fills)
+        for (const auto &expoly : fill.expolygons)
+            svg.draw(expoly, surface_type_to_color_name(fill.surface.surface_type), transparency);
+    export_surface_type_legend_to_svg(svg, legend_pos);
+    svg.Close(); 
+}
+#endif
+
 std::vector<SurfaceFill> group_fills(const Layer &layer)
 {
     std::vector<SurfaceFill> surface_fills;
@@ -489,9 +510,9 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
     for (size_t region_id = 0; region_id < layer.regions().size(); ++ region_id) {
         const LayerRegion &layerm = *layer.regions()[region_id];
-	    for (const Surface &surface : layerm.fill_surfaces())
+        for (const Surface &surface : layerm.fill_surfaces())
             if (surface.surface_type != (stPosInternal | stDensVoid)) {
-	        	const SurfaceFillParams *params = region_to_surface_params[region_id][&surface - &layerm.fill_surfaces().surfaces.front()];
+                const SurfaceFillParams *params = region_to_surface_params[region_id][&surface - &layerm.fill_surfaces().surfaces.front()];
                 if (params != nullptr) {
                     SurfaceFill &fill = surface_fills[params->idx];
                     if (fill.region_id == size_t(-1)) {
@@ -506,18 +527,27 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 }
             }
     }
+#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
+    {
+        static int iRun = 0;
+        export_group_fills_to_svg(debug_out_path("Layer-fill_surfaces-2_fill-in_progress-%d.svg", iRun ++).c_str(), surface_fills);
+    }
+#endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
     // merge polygons and ensure no fill overlap.
     {
-        const coord_t resolution = std::max(SCALED_EPSILON, scale_t(layer.object()->print()->config().resolution_internal.value));
         ExPolygons all_expolygons;
         for (SurfaceFill &fill : surface_fills) {
+            const coord_t resolution = std::min(fill.params.flow.scaled_width() / 16, 
+                std::max(SCALED_EPSILON, scale_t(layer.object()->print()->config().resolution_internal.value)));
             assert_valid(fill.expolygons);
             // note: Bridges are processed first (see SurfaceFill::operator<())
             if (!fill.expolygons.empty()) {
                 if (fill.expolygons.size() > 1) {
                     // ensure it's fused (should be union_safety_offset_ex, but something in slicing set bridges area farther apart than normal).
-                    fill.expolygons = offset2_ex(fill.expolygons, fill.params.flow.scaled_width() / 4, -fill.params.flow.scaled_width() / 4);
+                    fill.expolygons = offset2_ex(fill.expolygons, fill.params.flow.scaled_width() / 8, -fill.params.flow.scaled_width() / 8);
+                    // need safety thing or there is self-interscting things (may use offset_remove_narrow instead of offset2_ex)
+                    fill.expolygons = union_safety_offset_ex(fill.expolygons);
                     ensure_valid(fill.expolygons, resolution);
                 }
                 if (fill.params.priority > 0) {
@@ -539,6 +569,12 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
             assert_valid(fill.expolygons);
         }
     }
+#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
+    {
+        static int iRun = 0;
+        export_group_fills_to_svg(debug_out_path("Layer-fill_surfaces-3_fill-in_progress-%d.svg", iRun ++).c_str(), surface_fills);
+    }
+#endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
     // we need to detect any narrow surfaces that might collapse
     // when adding spacing below
@@ -637,34 +673,20 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                 fill.params.pattern = ipEnsuring;
             }
     }*/
-
-    for (auto &srf : surface_fills) {
-        assert_valid(srf.expolygons);
+    //union with safety offset to avoid separation from the appends of different surface with same settings.
+    for (auto &surface_fill : surface_fills) {
+        surface_fill.expolygons = union_safety_offset_ex(surface_fill.expolygons);
+        //assert_valid(surface_fill.expolygons); //TODO: uncomment when union_safety_offset_ex will be improve
+        //simplify (also, it's possible rn that some point are below EPSILON distance).
+        //ensure_valid(surface_fill.expolygons, surface_fill.params.fill_resolution);
+        ensure_valid(surface_fill.expolygons);
+        surface_fill.expolygons = simplify_polygons_ex(to_polygons(surface_fill.expolygons));
+        ensure_valid(surface_fill.expolygons);
+        //assert_valid(surface_fill.expolygons); //TODO: uncomment when union_safety_offset_ex will be improve
     }
 
     return surface_fills;
 }
-
-#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-void export_group_fills_to_svg(const char *path, const std::vector<SurfaceFill> &fills)
-{
-    BoundingBox bbox;
-    for (const auto &fill : fills)
-        for (const auto &expoly : fill.expolygons)
-            bbox.merge(get_extents(expoly));
-    Point legend_size = export_surface_type_legend_to_svg_box_size();
-    Point legend_pos(bbox.min(0), bbox.max(1));
-    bbox.merge(Point(std::max(bbox.min(0) + legend_size(0), bbox.max(0)), bbox.max(1) + legend_size(1)));
-
-    SVG svg(path, bbox);
-    const float transparency = 0.5f;
-    for (const auto &fill : fills)
-        for (const auto &expoly : fill.expolygons)
-            svg.draw(expoly, surface_type_to_color_name(fill.surface.surface_type), transparency);
-    export_surface_type_legend_to_svg(svg, legend_pos);
-    svg.Close(); 
-}
-#endif
 
 static LayerIsland *get_fill_island(Layer &layer,
                                            uint32_t fill_region_id,
@@ -877,7 +899,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 	this->clear_fills();
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-//    this->export_region_fill_surfaces_to_svg_debug("10_fill-initial");
+    this->export_region_fill_surfaces_to_svg_debug("10_fill-initial");
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
     std::vector<SurfaceFill>  surface_fills  = group_fills(*this);
@@ -961,21 +983,23 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
     };
     //surface_fills is sorted by region_id
     size_t current_region_id = -1;
-	size_t first_object_layer_id = this->object()->get_layer(0)->id();
+    uint16_t current_extruder = -1;
+    size_t first_object_layer_id = this->object()->get_layer(0)->id();
     for (SurfaceFill &surface_fill : surface_fills) {
         // store the region fill when changing region. 
-        if (current_region_id != size_t(-1) && current_region_id != surface_fill.region_id) {
+        if (current_region_id != size_t(-1) && (current_region_id != surface_fill.region_id || current_extruder != surface_fill.params.extruder)) {
             store_fill(current_region_id);
         }
         current_region_id = surface_fill.region_id;
+        current_extruder = surface_fill.params.extruder;
         const LayerRegion* layerm = this->m_regions[surface_fill.region_id];
-        
+
         // Create the filler object.
         std::unique_ptr<Fill> f = std::unique_ptr<Fill>(Fill::new_from_type(surface_fill.params.pattern));
         f->set_bounding_box(bbox);
-		// Layer ID is used for orienting the infill in alternating directions.
-		// Layer::id() returns layer ID including raft layers, subtract them to make the infill direction independent
-		// from raft.
+        // Layer ID is used for orienting the infill in alternating directions.
+        // Layer::id() returns layer ID including raft layers, subtract them to make the infill direction independent
+        // from raft.
         f->layer_id = this->id() - first_object_layer_id;
         f->z        = this->print_z;
         f->angle    = surface_fill.params.angle;
@@ -1042,12 +1066,9 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         //params.resolution        = resolution;
         //params.use_arachne       = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipEnsuring;
         //params.layer_height      = layerm->layer()->height;
-        surface_fill.params.fill_resolution = std::max(SCALED_EPSILON, scale_t(this->object()->print()->config().resolution_internal.value));
+        surface_fill.params.fill_resolution = std::min(surface_fill.params.flow.scaled_width() / 16, 
+            std::max(SCALED_EPSILON, scale_t(this->object()->print()->config().resolution_internal.value)));
 
-        //union with safety offset to avoid separation from the appends of different surface with same settings.
-        surface_fill.expolygons = union_safety_offset_ex(surface_fill.expolygons);
-        //simplify (also, it's possible rn that some point are below EPSILON distance).
-        ensure_valid(surface_fill.expolygons, surface_fill.params.fill_resolution);
 
         //store default values, before modification.
         bool dont_adjust = surface_fill.params.dont_adjust;
@@ -1156,7 +1177,15 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                 //check no over or underextrusion if fill_exactly
                 if(surface_fill.params.fill_exactly && surface_fill.params.density == 1 && !surface_fill.params.flow.bridge()) {
                     ExtrusionVolume compute_volume;
-                    ExtrusionVolume compute_volume_no_gap_fill(false);
+                    ExtrusionVolume compute_volume_no_gap_fill;
+                    compute_volume_no_gap_fill.set_use_gap_fill(false);
+                    double ratio = 1.;
+                    if (surface_fill.params.flow.spacing_ratio() != 1) {
+                        Flow bigger_flow = Flow::new_from_spacing(surface_fill.params.flow.spacing(), surface_fill.params.flow.nozzle_diameter(), surface_fill.params.flow.height(), 1.f , false);
+                        ratio = bigger_flow.mm3_per_mm() / surface_fill.params.flow.mm3_per_mm();
+                        compute_volume.set_flow_mult(ratio);
+                        compute_volume_no_gap_fill.set_flow_mult(ratio);
+                    }
                     //check that it doesn't overextrude
                     for(size_t idx = 0; idx < fills_by_priority[(size_t)surface_fill.params.priority].back()->size(); ++idx){
                         fills_by_priority[(size_t)surface_fill.params.priority].back()->entities()[idx]->visit(compute_volume);

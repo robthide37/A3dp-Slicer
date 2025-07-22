@@ -71,7 +71,7 @@ double Polygon::area(const Points &points)
             p1 = p2;
         }
     }
-    assert(is_approx(ClipperLib::Area(points), 0.5 * a, SCALED_EPSILON * 1.));
+    assert(is_approx(ClipperLib::Area(points), 0.5 * a, SCALED_EPSILON * SCALED_EPSILON * 1.));
     return 0.5 * a;
 }
 
@@ -519,6 +519,17 @@ size_t Polygon::remove_collinear_angle(double angle_radian) {
 
     return nb_del;
 }
+
+#ifdef _DEBUGINFO
+void Polygon::assert_valid() const {
+    assert(size() > 2);
+    for (size_t i_pt = 1; i_pt < size(); ++i_pt)
+        release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
+    release_assert(!points.front().coincides_with_epsilon(points.back()));
+}
+#else
+void Polygon::assert_valid() const {}
+#endif
 
 BoundingBox get_extents(const Polygon &poly) 
 { 

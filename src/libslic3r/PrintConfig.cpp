@@ -435,6 +435,7 @@ void PrintConfigDef::init_common_params()
     // defautl to none : only set if loaded. only write our version
     def->set_default_value(new ConfigOptionStringVersion());
     def->cli = ConfigOptionDef::nocli;
+    def->can_phony = true;
 
     def = this->add("printer_technology", coEnum);
     def->label = L("Printer technology");
@@ -3043,6 +3044,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionPercent(80));
 
+    def = this->add("gap_fill_perimeter", coBool);
+    def->label = L("Allow Periemter inside Gap fill");
+    def->full_label = L("Allow Periemter inside Gap fill");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Allow to create a perimeter inside a gapfill area if it's possible.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("gap_fill_speed", coFloatOrPercent);
     def->label = L("Gap fill");
     def->full_label = L("Gap fill speed");
@@ -5076,6 +5085,22 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloat(0.1));
 
+    def = this->add("raft_contact_distance_type", coEnum);
+    def->label = L("Type");
+    def->full_label = L("Raft contact distance type");
+    def->category = OptionCategory::support;
+    def->tooltip = L("How to compute the vertical z-distance.\n"
+        "From filament: it uses the nearest bit of the filament. When a bridge is extruded, it goes below the current plane.\n"
+        "From plane: it uses the plane-z. Same as 'from filament' if no 'bridge' is extruded.\n"
+        "None: No z-offset. Useful for Soluble supports.\n");
+    def->set_enum<SupportZDistanceType>({
+        { "filament", L("From filament") },
+        { "plane",    L("From plane") },
+        { "none",     L("None (soluble)") }
+    });
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionEnum<SupportZDistanceType>(zdPlane));
+
     def = this->add("raft_expansion", coFloat);
     def->label = L("Raft expansion");
     def->category = OptionCategory::support;
@@ -7030,6 +7055,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When wiping, it will lift gradually to this height, so the filament can be 'cut' more easily."
         "\nCan be a percentage of the current layer height.");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{0, false}});
     
     def = this->add("wipe_lift_length", coFloatsOrPercents);
@@ -7041,6 +7067,7 @@ void PrintConfigDef::init_fff_params()
         " If lower than the wipe distance, then the lift began after the start, so the end of the lift occur at the end of the wipe."
         "\nCan be a percentage of the wipe distance.");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{50, true}});
 
     def = this->add("wipe_min", coFloatsOrPercents);
@@ -7050,6 +7077,7 @@ void PrintConfigDef::init_fff_params()
         "\nCan be a percentage of the needed travel for the retraction"
         " (if this is set to 0, then it's posisble that the end of the retraction occur after the end of the wipe).");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{150, true}});
 
     def = this->add("wipe_only_crossing", coBools);
@@ -7066,6 +7094,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Speed in mm/s of the wipe. If it's faster, it will try to go further away, as the wipe time is set by ( 100% - 'retract before wipe') * 'retaction length' / 'retraction speed'."
         "\nIf set to zero, the travel speed is used.");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloats{ 0 });
 
     def = this->add("wipe_tower", coBool);
@@ -9334,7 +9363,7 @@ void _handle_legacy(std::unordered_map<t_config_option_key, std::pair<t_config_o
                 case coFloatsOrPercents: {
                     for (size_t idx = 0; idx < default_opt->size(); idx++) {
                         if (std::abs(default_opt->get_float(idx)) > std::numeric_limits<int>::max() / 2) {
-                            default_opt->set(def->default_value.get(), idx);
+                            default_opt->set(*def->default_value, idx);
                             default_opt->set_enabled(false, idx);
                         }
                     }
@@ -9744,6 +9773,16 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
             // A first_layer_height isn't a % of layer_height but from nozzle_diameter now!
             // can't really convert right now, so put it at a safe value like 50%.
             value = "50%";
+        }
+    }
+    if ("max_layer_height" == opt_key) {
+        double dbl_val = std::atof(value.c_str());
+        double min = 10;
+        if (all_conf.has("nozzle_diameter")) {
+            min = all_conf.option("nozzle_diameter")->get_float();
+        }
+        if (dbl_val > min) {
+            value += "%";
         }
     }
     if ("resolution" == opt_key && value == "0") {
@@ -10227,6 +10266,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "gap_fill_min_length",
 "gap_fill_min_width",
 "gap_fill_overlap",
+"gap_fill_perimeter",
 "gcode_filename_illegal_char",
 "gcode_precision_e",
 "gcode_precision_xyz",
@@ -10320,8 +10360,9 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "printer_custom_variables",
 "printhost_client_cert",
 "printhost_client_cert_password",
-"raft_layer_height",
+"raft_contact_distance_type",
 "raft_interface_layer_height",
+"raft_layer_height",
 "region_gcode",
 "remaining_times_type",
 "resolution_internal",

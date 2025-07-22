@@ -387,6 +387,11 @@ Points MultiPoint::_douglas_peucker_plus(const Points& pts, const double toleran
     return result_pts;
 }
 #ifdef _DEBUGINFO
+void MultiPoint::assert_valid() const {
+    assert(size() > 1);
+    for (size_t i_pt = 1; i_pt < size(); ++i_pt)
+        release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
+}
 // to create a cpp multipoint to create test units.
 std::string MultiPoint::to_debug_string()
 {
@@ -403,6 +408,8 @@ std::string MultiPoint::to_debug_string()
     ret += std::string("}");
     return ret;
 }
+#else
+void MultiPoint::assert_valid() const {}
 #endif
 
 void MultiPoint3::translate(double x, double y)

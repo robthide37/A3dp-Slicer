@@ -243,15 +243,11 @@ public:
     inline auto crend() const { return points.crend(); }
 
 #ifdef _DEBUGINFO
-    virtual void assert_valid() const {
-        assert(size() > 1);
-        for (size_t i_pt = 1; i_pt < size(); ++i_pt)
-            release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
-    }
+    virtual void assert_valid() const;
     // to create a cpp multipoint to create test units.
     std::string to_debug_string();
 #else
-    void assert_valid() const {}
+    void assert_valid() const;
 #endif
 };
 

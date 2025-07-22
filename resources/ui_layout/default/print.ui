@@ -94,7 +94,10 @@ group:sidetext_width$5:Gap Fill
 		setting:label$_:gap_fill_enabled
 		setting:width$5:gap_fill_last
 	end_line
-	setting:width$5:gap_fill_extension
+	line:Advanced
+		setting:width$5:gap_fill_extension
+		setting:width$5:gap_fill_perimeter
+	end_line
 	line:Gap Fill threshold
 		setting:width$5:gap_fill_min_width
 		setting:width$5:gap_fill_max_width
@@ -303,10 +306,11 @@ group:Raft
 		setting:raft_first_layer_density
 		setting:raft_first_layer_expansion
 	end_line
-	line:Advanced
-		setting:raft_contact_distance
-		setting:raft_expansion
+	line:Z-offset
+		setting:width$13:raft_contact_distance_type
+		setting:width$6:raft_contact_distance
 	end_line
+	setting:raft_expansion
 group:Options for support material and raft
 	setting:support_material_style
 	setting:support_material_layer_height

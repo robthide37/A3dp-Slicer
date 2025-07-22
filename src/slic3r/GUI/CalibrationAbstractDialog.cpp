@@ -49,16 +49,9 @@ CalibrationAbstractDialog::CalibrationAbstractDialog(GUI_App* app, MainFrame* ma
 void CalibrationAbstractDialog::create(boost::filesystem::path html_path, std::string html_name, wxSize dialog_size, bool include_close_button){
 
     const AppConfig* app_config = get_app_config();
-    bool dark_mode = app_config->get_bool("dark_color_mode");// i guss these can be set as global variables?
-    std::string user_color_text = app_config->get("color_dark");
-    wxColour text_color("#" + user_color_text);
-
-    std::string color_background = dark_mode ? "333233" : "ffffff";//dark grey and white. whats the offical dark mode color ?
-    wxColour background_color("#" + color_background);
 
     // Create a panel for the entire content
-    wxPanel* main_panel = new wxPanel(this, wxID_ANY);
-    main_panel->SetBackgroundColour(background_color);
+    wxPanel* main_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxFULL_REPAINT_ON_RESIZE);
 
     // Create the sizer for the panel's content
     wxBoxSizer* panel_sizer = new wxBoxSizer(wxVERTICAL);
@@ -102,7 +95,7 @@ void CalibrationAbstractDialog::create(boost::filesystem::path html_path, std::s
     create_buttons(buttons);
 
     if (!include_close_button) {//if you want to define a custom location for the close button
-        wxButton* close = new wxButton(main_panel, wxID_CLOSE, _L("Close"));
+        wxButton* close = new wxButton(main_panel, wxID_CLOSE , _L("Close"));
         close->Bind(wxEVT_BUTTON, &CalibrationAbstractDialog::close_me, this);
         buttons->AddButton(close);
         close->SetDefault();
@@ -124,10 +117,11 @@ void CalibrationAbstractDialog::create(boost::filesystem::path html_path, std::s
     main_panel->Lower();// this may break some calibration windows... willl have to call Raise() on other calibration windows that have a panel
 
     wxGetApp().UpdateDlgDarkUI(this);
-#ifdef _MSW_DARK_MODE
-    // can't change html tet color, so keep white background
+    // bool dark_mode = app_config->get_bool("dark_color_mode");// i guss these can be set as global variables?
+    // if (dark_mode) {
+    // can't change html text color, so keep white background
     html_viewer->SetHTMLBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-#endif
+    // }
 }
 
 void CalibrationAbstractDialog::close_me(wxCommandEvent& event_args) {
