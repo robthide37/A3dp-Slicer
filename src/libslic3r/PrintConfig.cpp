@@ -9979,9 +9979,10 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config, std::ma
     if (old && config.has("overhangs_width_speed") && config.get_float("overhangs_width_speed") == 0 && config.is_enabled("overhangs_width_speed")) {
         config.option("overhangs_width_speed")->set_enabled(false);
     }
-    if (old && config.has("overhangs_width") && config.has("overhangs_flow_ratio") && config.get_float("overhangs_width") == 0 && config.is_enabled("overhangs_flow_ratio")) {
-        config.option("overhangs_flow_ratio")->set_enabled(false);
+    if (old && config.has("overhangs_width") && config.get_float("overhangs_width") == 0 && config.is_enabled("overhangs_width")) {
+        config.option("overhangs_width")->set_enabled(false);
     }
+
     // enable_dynamic_overhang/fan_speeds
     std::map<t_config_option_key, std::string> useful_items;
     std::vector<t_config_option_key> to_erase;

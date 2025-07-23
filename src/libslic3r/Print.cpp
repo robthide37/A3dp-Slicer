@@ -544,7 +544,7 @@ std::set<uint16_t> Print::extruders(float z /*= -1*/) const
 
     if (z < 0) {
         // The wipe tower extruder can also be set. When the wipe tower is enabled and it will be generated,
-        // append its extruder into the list too.
+     // append its extruder into the list too.
         if (has_wipe_tower() && config().wipe_tower_extruder != 0 && extruders.size() > 1) {
             assert(config().wipe_tower_extruder > 0 &&
                    config().wipe_tower_extruder < int(config().nozzle_diameter.size()));
