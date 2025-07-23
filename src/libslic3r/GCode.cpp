@@ -7266,7 +7266,7 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
     gcode += m_writer.unretract();
 
     //set pa after unretraction (do nothing if it isn't changed)
-    m_writer.set_pressure_advance(pa);
+   // m_writer.set_pressure_advance(pa);
 
     if (!m_pending_pre_extrusion_gcode.empty()) {
         // There is G-Code that is due to be inserted before an extrusion starts. Insert it.
