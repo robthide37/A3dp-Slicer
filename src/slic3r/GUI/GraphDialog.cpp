@@ -416,12 +416,24 @@ GraphPanel::GraphPanel(wxWindow *parent, GraphData data, const GraphSettings &se
 
     update_ui(bt_reset);
     update_ui(bt_type);
-    update_ui(m_widget_min_x);
-    update_ui(m_widget_max_x);
-    update_ui(m_widget_min_y);
-    update_ui(m_widget_max_y);
-    update_ui(m_widget_x);
-    update_ui(m_widget_y);
+    if (m_widget_min_x) {
+        update_ui(m_widget_min_x);
+    }
+    if (m_widget_max_x) {
+        update_ui(m_widget_max_x);
+    }
+    if (m_widget_min_y) {
+        update_ui(m_widget_min_y);
+    }
+    if (m_widget_max_y) {
+        update_ui(m_widget_max_y);
+    }
+    if (m_widget_x) {
+        update_ui(m_widget_x);
+    }
+    if (m_widget_y) {
+        update_ui(m_widget_y);
+    }
     Refresh(true); // erase background
 }
 

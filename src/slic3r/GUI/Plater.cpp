@@ -31,6 +31,7 @@
 #include <string>
 #include <regex>
 #include <future>
+#include <utility>
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -140,6 +141,7 @@
 #include "Widgets/CheckBox.hpp"
 #include "BulkExportDialog.hpp"
 #include "libslic3r/Format/HFP.hpp"
+#include "LoadStepDialog.hpp"
 
 #ifdef __APPLE__
 #include "Gizmos/GLGizmosManager.hpp"
@@ -2019,6 +2021,8 @@ struct Plater::priv
     static const std::regex pattern_any_amf;
     static const std::regex pattern_prusa;
     static const std::regex pattern_zip;
+    static const std::regex pattern_printRequest;
+    static const std::regex pattern_step;
     static const std::regex pattern_hfp;
 
     priv(Plater *q, MainFrame *main_frame);
@@ -2328,6 +2332,7 @@ const std::regex Plater::priv::pattern_zip_amf(".*[.]zip[.]amf", std::regex::ica
 const std::regex Plater::priv::pattern_any_amf(".*[.](amf|amf[.]xml|zip[.]amf)", std::regex::icase);
 const std::regex Plater::priv::pattern_prusa(".*prusa", std::regex::icase);
 const std::regex Plater::priv::pattern_zip(".*zip", std::regex::icase);
+const std::regex Plater::priv::pattern_step(".*[.](step|stp)", std::regex::icase);
 const std::regex Plater::priv::pattern_hfp(".*hfp", std::regex::icase);
 
 Plater::priv::priv(Plater *q, MainFrame *main_frame)
@@ -2821,6 +2826,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     int answer_convert_from_meters          = wxOK_DEFAULT;
     int answer_convert_from_imperial_units  = wxOK_DEFAULT;
     int answer_consider_as_multi_part_objects = wxOK_DEFAULT;
+    bool apply_step_import_parameters_to_all   { false }; 
 
     bool in_temp = false; 
     const fs::path temp_path = wxStandardPaths::Get().GetTempDir().utf8_str().data();
@@ -2846,8 +2852,27 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const bool type_zip_amf = !type_3mf && std::regex_match(path.string(), pattern_zip_amf);
         const bool type_any_amf = !type_3mf && std::regex_match(path.string(), pattern_any_amf);
         const bool type_prusa = std::regex_match(path.string(), pattern_prusa);
+        const bool type_step = std::regex_match(path.string(), pattern_step);
         const bool type_hfp = std::regex_match(path.string(), pattern_hfp);
 
+        if (type_step && !apply_step_import_parameters_to_all &&
+            wxGetApp().app_config->get_bool("show_step_import_parameters")) {
+
+            double linear_precision = string_to_double_decimal_point(wxGetApp().app_config->get("linear_precision"));
+            double angle_precision = string_to_double_decimal_point(wxGetApp().app_config->get("angle_precision"));
+
+            LoadStepDialog dlg(q, filename.string(), linear_precision, angle_precision, (input_files_size - i) > 1);
+            if (dlg.ShowModal() == wxID_OK) {
+                wxGetApp().app_config->set("linear_precision", float_to_string_decimal_point(dlg.get_linear_precision()));
+                wxGetApp().app_config->set("angle_precision", float_to_string_decimal_point(dlg.get_angle_precision()));
+                if (dlg.IsCheckBoxChecked())
+                    wxGetApp().app_config->set("show_step_import_parameters", "0");
+                apply_step_import_parameters_to_all = dlg.IsApplyToAllClicked();
+            } else
+                continue;
+        }
+        
+        
         Slic3r::Model model;
         bool is_project_file = type_prusa;
         try {
@@ -2962,9 +2987,27 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 GUI::show_error(q, message);
             } else if (type_hfp) {
                 q->add_model_modifier(path.string());
-
             } else {
-                model = Slic3r::Model::read_from_file(path.string(), nullptr, nullptr, only_if(load_config, Model::LoadAttribute::CheckVersion));
+               
+               if (load_model) {
+                  if (type_step) {
+                  // Do not load config with STEP type
+                        load_config = false;
+                        double linear_precision = string_to_double_decimal_point(wxGetApp().app_config->get("linear_precision"));
+                        double angle_precision = string_to_double_decimal_point(wxGetApp().app_config->get("angle_precision"));
+                        model = Slic3r::Model::read_from_file(path.string(),
+                                                                 nullptr,
+                                                                 nullptr,
+                                                                 only_if(load_config, Model::LoadAttribute::CheckVersion),
+                                                                 std::make_pair(linear_precision, angle_precision));
+                  } else {
+                        model = Slic3r::Model::read_from_file(path.string(),
+                                          nullptr,
+                                          nullptr,
+                                          only_if(load_config, Model::LoadAttribute::CheckVersion));
+                  }
+               }
+               
                 for (auto obj : model.objects) {
                     if (obj->name.empty()) {
                         obj->name = fs::path(obj->input_file).filename().string();

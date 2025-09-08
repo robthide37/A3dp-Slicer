@@ -126,7 +126,8 @@ private:
             if (m_chart->m_x_precision <= 0) {
                 m_pos.m_x = int(m_pos.m_x);
             } else if (m_chart->m_x_precision < 10){
-                m_pos.m_x = int(m_pos.m_x * pow10[m_chart->m_x_precision]) / double(pow10[m_chart->m_x_precision]);
+                //m_pos.m_x = int(m_pos.m_x * pow10[m_chart->m_x_precision]) / double(pow10[m_chart->m_x_precision]);
+                m_pos.m_x = std::round(m_pos.m_x / m_chart->m_x_legend_incr) * m_chart->m_x_legend_incr;
             }
             if (m_chart->m_y_precision <= 0) {
                 m_pos.m_y = int(m_pos.m_y);

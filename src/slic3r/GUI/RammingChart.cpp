@@ -4,6 +4,7 @@
 ///|/
 #include <algorithm>
 #include <wx/dcbuffer.h>
+#include <wx/graphics.h>
 
 #include "RammingChart.hpp"
 #include "GUI.hpp"
@@ -80,7 +81,54 @@ void Chart::draw() {
             }
         }
     }
-
+    
+    // drag value
+    //
+    {
+        // get values
+        wxPoint2DDouble pos;
+        if (m_dragged) {
+            pos = m_dragged->get_pos();
+        } else if (m_is_hover_point) {
+            pos = m_mouse_hover_point;
+        } else {
+            pos = screen_to_math(m_previous_mouse);
+        }
+        // show on bottom right
+        // TODO: compute legend height instead of '3 * scale_unit'
+        wxPoint ptx = math_to_screen(wxPoint2DDouble(m_visible_area.m_x + m_visible_area.m_width, m_visible_area.m_y));
+        wxPoint pty = math_to_screen(wxPoint2DDouble(m_visible_area.m_x + m_visible_area.m_width, m_visible_area.m_y));
+        ptx.x -= 1 * legend_side;
+        ptx.y -= 1 * legend_side;
+        pty.x -= 1 * legend_side;
+        pty.y -= 0.5 * legend_side;
+        //{
+        //    wxFont font = dc.GetFont();
+        //    font.MakeBold();
+        //    wxDCTextColourChanger colour_changer(dc, GetBackgroundColour());
+        //    wxDCFontChanger font_changer(dc, font);
+        //    dc.DrawText(wxString().Format(wxT("x: %.3f"), pos.m_x), ptx);
+        //    font.MakeLarger();
+        //    font_changer.Set(font);
+        //    dc.DrawText(wxString().Format(wxT("y: %.3f"), pos.m_y), pty);
+        //}
+        // need wxGraphicsContext to draw semi-transaperent
+        wxGraphicsContext *gc = wxGraphicsContext::Create( dc ); 
+        if (gc) {
+                wxColour bcol = GetBackgroundColour();
+                bcol = wxColour(bcol.Red(), bcol.Green(), bcol.Blue(), 127);
+                gc->SetBrush(bcol);
+                gc->DrawRectangle(ptx.x - 2, ptx.y, legend_side + 2, legend_side);
+                delete gc;
+                dc.DrawText(wxString().Format(wxT("x: %.3f"), pos.m_x), ptx);
+                dc.DrawText(wxString().Format(wxT("y: %.3f"), pos.m_y), pty);
+        } else {
+                dc.SetBackgroundMode(wxSOLID);
+                dc.DrawText(wxString().Format(wxT("x: %.3f"), pos.m_x), ptx);
+                dc.DrawText(wxString().Format(wxT("y: %.3f"), pos.m_y), pty);
+                dc.SetBackgroundMode(wxTRANSPARENT);
+        }
+    }
     // draw draggable buttons
     dc.SetBrush(*wxBLUE_BRUSH);
 #ifdef _WIN32
@@ -148,31 +196,8 @@ void Chart::draw() {
     dc.GetTextExtent(m_y_legend, &text_width, &text_height);
     dc.DrawRotatedText(m_y_legend, wxPoint(0,0.5*(m_rect.GetBottom()+m_rect.GetTop())+text_width/2.f), 90);
 
-    // drag value
-    //
-    {
-        // get values
-        wxPoint2DDouble pos;
-        if (m_dragged) {
-            pos = m_dragged->get_pos();
-        } else if (m_is_hover_point) {
-            pos = m_mouse_hover_point;
-        } else {
-            pos = screen_to_math(m_previous_mouse);
-        }
-        // show on bottom right
-        // TODO: compute legend height instead of '3 * scale_unit'
-        wxPoint ptx = math_to_screen(wxPoint2DDouble(m_visible_area.m_x + m_visible_area.m_width, m_visible_area.m_y));
-        wxPoint pty = math_to_screen(wxPoint2DDouble(m_visible_area.m_x + m_visible_area.m_width, m_visible_area.m_y));
-        ptx.x -= 1 * legend_side;
-        ptx.y -= 1 * legend_side;
-        pty.x -= 1 * legend_side;
-        pty.y -= 0.5 * legend_side;
-        dc.DrawText(wxString().Format(wxT("x: %.3f"), pos.m_x), ptx);
-        dc.DrawText(wxString().Format(wxT("y: %.3f"), pos.m_y), pty);
-    }
 
-    //refresh clicked point position
+    // refresh clicked point position
     if (m_func_selected_point_moved && m_clicked && m_last_clicked_position != m_clicked->get_pos()) {
         m_last_clicked_position = m_clicked->get_pos();
         (*m_func_selected_point_moved)(m_last_clicked_position);
@@ -214,13 +239,17 @@ void Chart::mouse_clicked(wxMouseEvent& event) {
         m_dragged = &m_buttons[button_index];
         m_clicked = m_dragged;
         m_last_clicked_position = m_clicked->get_pos();
-        (*m_func_selected_point_moved)(m_last_clicked_position);
+        if (m_func_selected_point_moved) {
+            (*m_func_selected_point_moved)(m_last_clicked_position);
+        }
         m_previous_mouse = point;
         m_mouse_hover_point = m_dragged->get_pos();
         m_is_hover_point = true;
     } else {
         m_clicked = nullptr;
-        (*m_func_selected_point_moved)(std::nullopt);
+        if (m_func_selected_point_moved) {
+            (*m_func_selected_point_moved)(std::nullopt);
+        }
     }
     this->Refresh();
 }
