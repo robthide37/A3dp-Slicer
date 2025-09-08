@@ -7870,7 +7870,7 @@ void PrintConfigDef::init_laser_params()
     def->sidetext = L("mm");
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionPoints{ Vec2d(0,0) });
+    def->set_default_value(new ConfigOptionPoints( Vec2d(0,0) ));
 
     def = this->add("laser_z_offset", coFloats);
     def->label = L("Tool z offset");
@@ -11072,13 +11072,15 @@ void DynamicPrintConfig::set_num_milling(unsigned int num_milling)
 
 void DynamicPrintConfig::set_num_laser(unsigned int num_laser)
 {
-    const auto& defaults = FullPrintConfig::defaults();
     for (const std::string& key : print_config_def.laser_option_keys()) {
         auto* opt = this->option(key, false);
         assert(opt != nullptr);
         assert(opt->is_vector());
-        if (opt != nullptr && opt->is_vector())
-            static_cast<ConfigOptionVectorBase*>(opt)->resize(num_laser, defaults.option(key));
+        if (opt != nullptr && opt->is_vector()) {
+            auto default_opt_it = print_config_def.options.find(key);
+            assert(default_opt_it != print_config_def.options.end());
+            static_cast<ConfigOptionVectorBase *>(opt)->resize(num_laser, default_opt_it->second.default_value.get());
+        }
     }
 }
 
