@@ -94,7 +94,10 @@ group:sidetext_width$5:Gap Fill
 		setting:label$_:gap_fill_enabled
 		setting:width$5:gap_fill_last
 	end_line
-	setting:width$5:gap_fill_extension
+	line:Advanced
+		setting:width$5:gap_fill_extension
+		setting:width$5:gap_fill_perimeter
+	end_line
 	line:Gap Fill threshold
 		setting:width$5:gap_fill_min_width
 		setting:width$5:gap_fill_max_width

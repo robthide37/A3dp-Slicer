@@ -2128,7 +2128,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     
     if (export_to_binary_gcode) {
         bgcode::binarize::BinaryData& binary_data = m_processor.get_binary_data();
-        if (status_monitor.stats().total_toolchanges > 0)
+        //if (status_monitor.stats().total_toolchanges > 0)
             binary_data.print_metadata.raw_data.emplace_back("total toolchanges", std::to_string(status_monitor.stats().total_toolchanges));
         char buf[1024];
         sprintf(buf, "%.2lf", m_max_layer_z);
@@ -2140,7 +2140,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
         file.write_format(PrintStatistics::TotalFilamentUsedGValueMask.c_str(), status_monitor.stats().total_weight);
         file.write_format(PrintStatistics::TotalFilamentCostValueMask.c_str(), status_monitor.stats().total_cost);
         file.write_format(PrintStatistics::TotalFilamentUsedWipeTowerValueMask.c_str(), status_monitor.stats().total_wipe_tower_filament_weight);
-        if (status_monitor.stats().total_toolchanges > 0)
+        //if (status_monitor.stats().total_toolchanges > 0) // always write the line, so the parser has something reliable to read.
             file.write_format("; total toolchanges = %i\n", status_monitor.stats().total_toolchanges);
         file.write_format("; objects layers count = %i\n", object_layer_count());
         file.write_format("; total layers count = %i\n", layer_count());
@@ -4739,23 +4739,30 @@ void GCodeGenerator::seam_notch(const ExtrusionLoop& original_loop,
         if (building_paths.size() == 1)
             assert(is_full_loop_ccw == Polygon(building_paths.front().polyline.to_polyline().points).is_counter_clockwise());
 
+        for ( ExtrusionPath &path :building_paths) {
+            assert(!path.empty());
+        }
+
         // extract paths from the start
         coordf_t dist = notch_length;
         while (dist > SCALED_EPSILON) {
             coordf_t length = building_paths.front().as_polyline().length();
-            if (length > dist) {
+            if (length > dist + SCALED_EPSILON) {
                 // found the place to split
                 notch_extrusion_start.emplace_back(building_paths.front().attributes(),
                                                    building_paths.front().can_reverse());
                 ArcPolyline ap2;
                 building_paths.front().as_polyline().split_at(dist, notch_extrusion_start.back().polyline, ap2);
+                assert(!ap2.empty());
                 building_paths.front().polyline = ap2;
+                assert(!notch_extrusion_start.back().empty());
                 dist = 0;
                 assert(notch_extrusion_start.back().polyline.back() == building_paths.front().polyline.front());
             } else {
                 notch_extrusion_start.push_back(std::move(building_paths.front()));
                 building_paths.erase(building_paths.begin());
                 dist -= length;
+                assert(!notch_extrusion_start.back().empty());
                 assert(notch_extrusion_start.back().polyline.back() == building_paths.front().polyline.front());
             }
             assert(notch_extrusion_start.back().polyline.back() == building_paths.front().polyline.front());
@@ -4764,19 +4771,22 @@ void GCodeGenerator::seam_notch(const ExtrusionLoop& original_loop,
         dist = notch_length;
         while (dist > SCALED_EPSILON) {
             coordf_t length = building_paths.back().as_polyline().length();
-            if (length > dist) {
+            if (length > dist + SCALED_EPSILON) {
                 // found the place to split
                 notch_extrusion_end.emplace_back(building_paths.back().attributes(),
                                                  building_paths.back().can_reverse());
                 ArcPolyline ap2;
                 building_paths.back().polyline.split_at(length - dist, ap2, notch_extrusion_end.back().polyline);
+                assert(!ap2.empty());
                 building_paths.back().polyline = ap2;
+                assert(!notch_extrusion_start.back().empty());
                 dist = 0;
                 assert(building_paths.back().polyline.back() == notch_extrusion_end.back().polyline.front());
             } else {
                 notch_extrusion_end.push_back(std::move(building_paths.back()));
                 building_paths.pop_back();
                 dist -= length;
+                assert(!notch_extrusion_start.back().empty());
                 assert(building_paths.back().polyline.back() == notch_extrusion_end.back().polyline.front());
             }
             assert(building_paths.back().polyline.back() == notch_extrusion_end.back().polyline.front());
@@ -7330,6 +7340,7 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
     assert(grole < GCodeExtrusionRole::Count);
     if (m_enable_cooling_markers) {
         assert(m_check_markers == 0);
+        //if overhang, first set the periemter kind before setting the overhang on top.
         if (grole == GCodeExtrusionRole::OverhangPerimeter) {
             gcode += ";_EXTRUDETYPE_";
             if (path.role() == ExtrusionRole::OverhangPerimeter) {
@@ -7341,14 +7352,15 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
             gcode += "\n";
             m_check_markers++;
         }
-        if (m_overhang_fan_override >= 0) {
-            gcode += ";_SET_MIN_FAN_SPEED" + std::to_string(int(m_overhang_fan_override)) + "\n";
-        } else {
+        {
             // Send the current extrusion type to Coolingbuffer
             gcode += ";_EXTRUDETYPE_";
             gcode += char('A' + uint8_t(grole));
             gcode += "\n";
             m_check_markers++;
+        }
+        if (m_overhang_fan_override >= 0) {
+            gcode += ";_SET_MIN_FAN_SPEED" + std::to_string(int(m_overhang_fan_override)) + "\n";
         }
         // comment to be on the same line as the speed command.
         cooling_marker_setspeed_comments = GCodeGenerator::_cooldown_marker_speed[uint8_t(grole)];
@@ -7364,15 +7376,11 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
 std::string GCodeGenerator::_after_extrude(const ExtrusionPath &path) {
     std::string gcode;
     if (m_enable_cooling_markers) {
-    
         if (m_overhang_fan_override >= 0) {
             gcode += ";_RESET_MIN_FAN_SPEED\n";
             m_overhang_fan_override = -1.;
-            if (m_last_extrusion_role == GCodeExtrusionRole::OverhangPerimeter) {
-                gcode += ";_EXTRUDE_END\n";
-                m_check_markers--;
-            }
-        } else {
+        }
+        {
             // Notify Coolingbuffer that the current extrusion end.
             assert(m_check_markers > 0);
             gcode += ";_EXTRUDE_END\n";

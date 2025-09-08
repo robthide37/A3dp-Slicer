@@ -26,6 +26,7 @@ void Chart::set_x_label(const wxString &label, float incr)
 
 void Chart::set_y_label(const wxString &label, float incr)
 {
+    assert(incr > 0.0001);
     m_y_legend      = label;
     m_y_legend_incr = incr;
     for (int i = 0; i < 6; i++) {
@@ -106,8 +107,8 @@ void Chart::draw() {
     }
 
     // draw x-axis:
-    float last_mark = -10000;
-    for (float math_x = int(m_moveable_area.m_x * 10) / 10.f; math_x <= (m_moveable_area.m_x + m_moveable_area.m_width); math_x += m_x_legend_incr) {
+    double last_mark = -10000;
+    for (double math_x = int(m_moveable_area.m_x * 10) / 10.f; math_x <= (m_moveable_area.m_x + m_moveable_area.m_width); math_x += m_x_legend_incr) {
         int x = math_to_screen(wxPoint2DDouble(math_x, m_visible_area.m_y)).x;
         int y = m_rect.GetBottom();
         if (x-last_mark < legend_side) continue;
@@ -124,7 +125,7 @@ void Chart::draw() {
 
     // draw y-axis:
     last_mark=10000;
-    for (float math_y = int(m_moveable_area.m_y * 10) / 10.f; math_y < (m_moveable_area.m_y + m_moveable_area.m_height); math_y += m_y_legend_incr) {
+    for (double math_y = int(m_moveable_area.m_y * 10) / 10.f; math_y < (m_moveable_area.m_y + m_moveable_area.m_height); math_y += m_y_legend_incr) {
         int y = math_to_screen(wxPoint2DDouble(m_visible_area.m_x, math_y)).y;
         int x = m_rect.GetLeft();
         if (last_mark-y < legend_side / 2) continue;    

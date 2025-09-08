@@ -259,11 +259,23 @@ static ExPolygons PolyTreeToExPolygons(ClipperLib::PolyTree &&polytree)
             (*expolygons)[cnt].contour.points = std::move(polynode.Contour);
             double area = std::abs((*expolygons)[cnt].contour.area());
             // I saw a clockwise artifact with 4 points
-            if ((*expolygons)[cnt].contour.size() < 5 && !(*expolygons)[cnt].contour.is_counter_clockwise()) {
+            if (!(*expolygons)[cnt].contour.is_counter_clockwise() &&
+                ((*expolygons)[cnt].contour.size() < 5 ||
+                 std::abs((*expolygons)[cnt].contour.area()) < (SCALED_EPSILON * SCALED_EPSILON * 10))) {
                 assert( std::abs((*expolygons)[cnt].contour.area()) < SCALED_EPSILON * SCALED_EPSILON * SCALED_EPSILON);
                 // error, delete.
                 (*expolygons).pop_back();
                 return;
+            }
+            // 3 points and two are too close
+            if ((*expolygons)[cnt].contour.size() < 4) {
+                if ((*expolygons)[cnt].contour[0].coincides_with_epsilon((*expolygons)[cnt].contour[2]) ||
+                    (*expolygons)[cnt].contour[0].coincides_with_epsilon((*expolygons)[cnt].contour[1]) ||
+                    (*expolygons)[cnt].contour[1].coincides_with_epsilon((*expolygons)[cnt].contour[2])) {
+                    // error, delete.
+                    (*expolygons).pop_back();
+                    return;
+                }
             }
             assert((*expolygons)[cnt].contour.is_counter_clockwise());
             (*expolygons)[cnt].holes.resize(polynode.ChildCount());
@@ -500,6 +512,8 @@ static TResult offset_paths(PathsProvider &&paths, double offset, ClipperLib::Jo
 
 Slic3r::Polygons offset(const Slic3r::Polygon &polygon, const double delta, ClipperLib::JoinType joinType, double miterLimit)
     { return to_polygons(raw_offset(ClipperUtils::SinglePathProvider(polygon.points), delta, joinType, miterLimit)); }
+Slic3r::ExPolygons offset_ex(const Slic3r::Polygon &polygon, const double delta, ClipperLib::JoinType joinType, double miterLimit)
+    { return PolyTreeToExPolygons(offset_paths<ClipperLib::PolyTree>(ClipperUtils::SinglePathProvider(polygon.points), delta, joinType, miterLimit)); }
 
 Slic3r::Polygons offset(const Slic3r::Polygons &polygons, const double delta, ClipperLib::JoinType joinType, double miterLimit)
     { return to_polygons(offset_paths<ClipperLib::Paths>(ClipperUtils::PolygonsProvider(polygons), delta, joinType, miterLimit)); }
@@ -912,6 +926,8 @@ Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::Poly
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
@@ -937,6 +953,8 @@ Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygons &subject, const Slic
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::Surfaces &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)

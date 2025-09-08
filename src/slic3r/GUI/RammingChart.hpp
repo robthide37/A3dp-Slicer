@@ -99,9 +99,9 @@ private:
     int legend_side;
     wxString m_x_legend;
     wxString m_y_legend;
-    float m_x_legend_incr = 0.1f;
+    double m_x_legend_incr = 0.1f;
     int m_x_precision = 0;
-    float m_y_legend_incr = 1.f;
+    double m_y_legend_incr = 1.f;
     int m_y_precision = 0;
     wxString m_no_point_legend;
     bool m_manual_points_manipulation = false;

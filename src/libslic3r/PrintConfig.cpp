@@ -3044,6 +3044,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionPercent(80));
 
+    def = this->add("gap_fill_perimeter", coBool);
+    def->label = L("Allow Periemter inside Gap fill");
+    def->full_label = L("Allow Periemter inside Gap fill");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Allow to create a perimeter inside a gapfill area if it's possible.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("gap_fill_speed", coFloatOrPercent);
     def->label = L("Gap fill");
     def->full_label = L("Gap fill speed");
@@ -7047,6 +7055,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("When wiping, it will lift gradually to this height, so the filament can be 'cut' more easily."
         "\nCan be a percentage of the current layer height.");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{0, false}});
     
     def = this->add("wipe_lift_length", coFloatsOrPercents);
@@ -7058,6 +7067,7 @@ void PrintConfigDef::init_fff_params()
         " If lower than the wipe distance, then the lift began after the start, so the end of the lift occur at the end of the wipe."
         "\nCan be a percentage of the wipe distance.");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{50, true}});
 
     def = this->add("wipe_min", coFloatsOrPercents);
@@ -7067,6 +7077,7 @@ void PrintConfigDef::init_fff_params()
         "\nCan be a percentage of the needed travel for the retraction"
         " (if this is set to 0, then it's posisble that the end of the retraction occur after the end of the wipe).");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{FloatOrPercent{150, true}});
 
     def = this->add("wipe_only_crossing", coBools);
@@ -7083,6 +7094,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Speed in mm/s of the wipe. If it's faster, it will try to go further away, as the wipe time is set by ( 100% - 'retract before wipe') * 'retaction length' / 'retraction speed'."
         "\nIf set to zero, the travel speed is used.");
     def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloats{ 0 });
 
     def = this->add("wipe_tower", coBool);
@@ -10254,6 +10266,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "gap_fill_min_length",
 "gap_fill_min_width",
 "gap_fill_overlap",
+"gap_fill_perimeter",
 "gcode_filename_illegal_char",
 "gcode_precision_e",
 "gcode_precision_xyz",

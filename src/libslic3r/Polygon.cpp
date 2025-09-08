@@ -520,6 +520,17 @@ size_t Polygon::remove_collinear_angle(double angle_radian) {
     return nb_del;
 }
 
+#ifdef _DEBUGINFO
+void Polygon::assert_valid() const {
+    assert(size() > 2);
+    for (size_t i_pt = 1; i_pt < size(); ++i_pt)
+        release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
+    release_assert(!points.front().coincides_with_epsilon(points.back()));
+}
+#else
+void Polygon::assert_valid() const {}
+#endif
+
 BoundingBox get_extents(const Polygon &poly) 
 { 
     return poly.bounding_box();

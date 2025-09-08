@@ -936,6 +936,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       gap_fill_min_length))
     ((ConfigOptionFloatOrPercent,       gap_fill_min_width))
     ((ConfigOptionPercent,              gap_fill_overlap))
+    ((ConfigOptionBool,                 gap_fill_perimeter))
     ((ConfigOptionFloatOrPercent,       gap_fill_speed))
     ((ConfigOptionFloatOrPercent,       infill_anchor))
     ((ConfigOptionFloatOrPercent,       infill_anchor_max))
