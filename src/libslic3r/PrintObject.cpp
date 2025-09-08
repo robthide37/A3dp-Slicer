@@ -1424,6 +1424,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "overhangs_bridge_threshold"
                 || opt_key == "overhangs_bridge_upper_layers"
                 || opt_key == "raft_contact_distance"
+                || opt_key == "raft_contact_distance_type"
                 || opt_key == "raft_interface_layer_height"
                 || opt_key == "raft_layers"
                 || opt_key == "raft_layer_height"
@@ -2254,7 +2255,7 @@ void PrintObject::detect_surfaces_type()
                     ExPolygons     layerm_slices_surfaces = to_expolygons(layerm->slices().surfaces);
                     // no_perimeter_full_bridge allow to put bridges where there are nothing, hence adding area to slice, that's why we need to start from the result of PerimeterGenerator.
                     if (layerm->region().config().no_perimeter_unsupported_algo.value == npuaFilled) {
-                        append(layerm_slices_surfaces, to_expolygons(layerm->fill_surfaces().surfaces));
+                        append(layerm_slices_surfaces, layerm->fill_expolygons());
                         layerm_slices_surfaces = union_ex(layerm_slices_surfaces);
                         assert_valid(layerm_slices_surfaces);
                     }
@@ -2328,7 +2329,7 @@ void PrintObject::detect_surfaces_type()
                         // Note: PS 2.4 changed that by "no bridge"... i dont know why?
                         for (Surface& surface : bottom)
                             surface.surface_type = //stPosBottom | stDensSolid;
-                                (m_config.raft_layers.value > 0 && m_config.support_material_contact_distance_type.value != zdNone) ?
+                                (m_config.raft_layers.value > 0 && m_config.raft_contact_distance_type.value != zdNone) ?
                                 stPosBottom | stDensSolid | stModBridge : stPosBottom | stDensSolid;
                     }
                     
@@ -3332,7 +3333,9 @@ void PrintObject::bridge_over_infill()
                     lower_layer_solids = shrink(lower_layer_solids, spacing); // first remove thin regions that will not support anything
                     lower_layer_solids = expand(lower_layer_solids, spacing + common_internal_bridge_min_width); // then expand back (opening), and further for parts supported by internal solids
                     // By shrinking the unsupported area, we avoid making bridges from narrow ensuring region along perimeters.
-                    unsupported_area   = shrink(unsupported_area, common_internal_bridge_min_width);
+                    if (common_internal_bridge_min_width > 0) {
+                        unsupported_area = shrink(unsupported_area, common_internal_bridge_min_width);
+                    }
                     unsupported_area   = diff(unsupported_area, lower_layer_solids);
                 } else {
                     // get the regions ordered per internal_bridge_min_width value
@@ -4261,7 +4264,7 @@ static void apply_to_print_region_config(PrintRegionConfig &out, const DynamicPr
                     if (extruder > 0)
                         static_cast<ConfigOptionInt *>(my_opt)->value = (extruder);
                 } else
-                    my_opt->set(it->second.get());
+                    my_opt->set(*it->second);
             }
 }
 
@@ -4509,20 +4512,20 @@ void PrintObject::discover_horizontal_shells()
     coord_t scaled_resolution = std::max(SCALED_EPSILON, scale_t(this->print()->config().resolution.value));
 
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id) {
-        for (size_t i = 0; i < m_layers.size(); ++i) {
+        for (size_t layer_id = 0; layer_id < m_layers.size(); ++layer_id) {
             m_print->throw_if_canceled();
-            Layer                   *layer         = m_layers[i];
+            Layer                   *layer         = m_layers[layer_id];
             LayerRegion             *layerm        = layer->get_region(region_id);
             const PrintRegionConfig &region_config = layerm->region().config();
             if (region_config.solid_infill_every_layers.value > 0 && region_config.fill_density.value > 0 &&
-                (i % region_config.solid_infill_every_layers) == 0) {
+                (layer_id % region_config.solid_infill_every_layers) == 0) {
                 // Insert a solid internal layer. Mark stInternal surfaces as stInternalSolid or stInternalBridge.
-                SurfaceType type = (region_config.fill_density == 100 || region_config.solid_infill_every_layers == 1) ?
-                                       (stPosInternal | stDensSolid) :
-                                       (stPosInternal | stDensSolid | stModBridge);
-                    for (Surface& surface : layerm->set_fill_surfaces().surfaces)
-                        if (surface.surface_type == (stPosInternal | stDensSparse))
-                            surface.surface_type = type;
+                for (Surface &surface : layerm->set_fill_surfaces().surfaces) {
+                    if (surface.surface_type == (stPosInternal | stDensSparse)) {
+                        // Note: solid internal bridges will be set automatically afterward where it's okay
+                        surface.surface_type = (stPosInternal | stDensSolid);
+                    }
+                }
             }
             for (const Surface &srf : layerm->fill_surfaces().surfaces) {
                 srf.expolygon.assert_valid();
@@ -4531,7 +4534,7 @@ void PrintObject::discover_horizontal_shells()
             // If ensure_vertical_shell_thickness, then the rest has already been performed by discover_vertical_shells().
             if (region_config.ensure_vertical_shell_thickness.value != EnsureVerticalShellThickness::Disabled)
                 continue;
-                
+
             assert(region_config.ensure_vertical_shell_thickness.value == EnsureVerticalShellThickness::Disabled);
 
             coordf_t print_z = layer->print_z;
@@ -4572,12 +4575,12 @@ void PrintObject::discover_horizontal_shells()
                 //                Slic3r::debugf "Layer %d has %s surfaces\n", $i, (($type & stTop) != 0) ? 'top' : 'bottom';
 
                 // Scatter top / bottom regions to other layers. Scattering process is inherently serial, it is difficult to parallelize without locking.
-                for (int n = ((type & stPosTop) == stPosTop) ? int(i) - 1 : int(i) + 1;
+                for (int n = ((type & stPosTop) == stPosTop) ? int(layer_id) - 1 : int(layer_id) + 1;
 
                     ((type & stPosTop) == stPosTop) ?
-                    (n >= 0 && (int(i) - n < num_solid_layers ||
+                    (n >= 0 && (int(layer_id) - n < num_solid_layers ||
                         print_z - m_layers[n]->print_z < region_config.top_solid_min_thickness.value - EPSILON)) :
-                    (n < int(m_layers.size()) && (n - int(i) < num_solid_layers ||
+                    (n < int(m_layers.size()) && (n - int(layer_id) < num_solid_layers ||
                         m_layers[n]->bottom_z() - bottom_z < region_config.bottom_solid_min_thickness.value - EPSILON));
 
                     ((type & stPosTop) == stPosTop) ? --n : ++n)
@@ -4585,6 +4588,7 @@ void PrintObject::discover_horizontal_shells()
                     //                    Slic3r::debugf "  looking for neighbors on layer %d...\n", $n;                  
                                         // Reference to the lower layer of a TOP surface, or an upper layer of a BOTTOM surface.
                     LayerRegion* neighbor_layerm = m_layers[n]->regions()[region_id];
+                    float        extperi_width   = float(neighbor_layerm->flow(frExternalPerimeter).scaled_width());
 
                     // find intersection between neighbor and current layer's surfaces
                     // intersections have contours and holes
@@ -4598,12 +4602,16 @@ void PrintObject::discover_horizontal_shells()
                     //FIXME How does it work for stInternalBRIDGE? This is set for sparse infill. Likely this does not work.
                     ExPolygons new_internal_solid;
                     {
-                        ExPolygons internal;
+                        ExPolygons internal_no_voids;
                         for (const Surface& surface : neighbor_layerm->fill_surfaces().surfaces)
                             if (surface.has_pos_internal() && (surface.has_fill_sparse() || surface.has_fill_solid()))
-                                internal.push_back(surface.expolygon);
-                        internal = union_ex(internal);
-                        new_internal_solid = intersection_ex(solid, internal, ApplySafetyOffset::Yes);
+                                internal_no_voids.push_back(surface.expolygon);
+                        internal_no_voids = union_ex(internal_no_voids);
+                        new_internal_solid = intersection_ex(solid, internal_no_voids, ApplySafetyOffset::Yes);
+                        // remove thin area from diff(new_internal_solid, internal_no_voids); and put them into new_internal_solid
+                        ExPolygons not_merged_internal = diff_ex(internal_no_voids, new_internal_solid);
+                        not_merged_internal = offset2_ex(not_merged_internal, -extperi_width / 2, extperi_width / 2);
+                        new_internal_solid = diff_ex(internal_no_voids, not_merged_internal);
                     }
                     if (new_internal_solid.empty()) {
                         // No internal solid needed on this layer. In order to decide whether to continue
@@ -4628,83 +4636,45 @@ void PrintObject::discover_horizontal_shells()
                         // and it's not wanted in a hollow print even if it would make sense when
                         // obeying the solid shell count option strictly (DWIM!)
                         // (disregard if sprial vase, as it's a completly different process)
-                        float margin = float(neighbor_layerm->flow(frExternalPerimeter).scaled_width());
                         ExPolygons too_narrow = diff_ex(
                             new_internal_solid,
-                            opening(new_internal_solid, margin, margin + ClipperSafetyOffset, jtMiter, 5)); //-+
+                            opening(new_internal_solid, extperi_width, extperi_width + ClipperSafetyOffset, jtMiter, 5)); //-+
                         // Trim the regularized region by the original region.
                         if (!too_narrow.empty()) {
                             solid = new_internal_solid = diff_ex(new_internal_solid, too_narrow);
                         }
                     }
 
-
                     //merill: this is creating artifacts, and i can't recreate the issue it wants to fix.
-
-                    // make sure the new internal solid is wide enough, as it might get collapsed
-                    // when spacing is added in Fill.pm
-                    if(false){
-                        //FIXME Vojtech: Disable this and you will be sorry.
-                        // https://github.com/prusa3d/PrusaSlicer/issues/26 bottom
-                        float margin = 3.f * layerm->flow(frSolidInfill).scaled_width(); // require at least this size
-                        // we use a higher miterLimit here to handle areas with acute angles
-                        // in those cases, the default miterLimit would cut the corner and we'd
-                        // get a triangle in $too_narrow; if we grow it below then the shell
-                        // would have a different shape from the external surface and we'd still
-                        // have the same angle, so the next shell would be grown even more and so on.
-                        ExPolygons too_narrow = diff_ex(
-                            new_internal_solid,
-                        opening(new_internal_solid, margin, margin + ClipperSafetyOffset, ClipperLib::jtMiter, 5)); // -+
-                        if (!too_narrow.empty()) {
-                            // grow the collapsing parts and add the extra area to  the neighbor layer 
-                            // as well as to our original surfaces so that we support this 
-                            // additional area in the next shell too
-                            // make sure our grown surfaces don't exceed the fill area
-                            ExPolygons internal;
-                            for (const Surface& surface : neighbor_layerm->fill_surfaces().surfaces)
-                                if (surface.has_pos_internal() && !surface.has_mod_bridge())
-                                    internal.push_back(surface.expolygon);
-                            expolygons_append(new_internal_solid,
-                                intersection_ex(
-                                    offset_ex(too_narrow, +margin), //expand_ex
-                                    // Discard bridges as they are grown for anchoring and we can't
-                                    // remove such anchors. (This may happen when a bridge is being 
-                                    // anchored onto a wall where little space remains after the bridge
-                                    // is grown, and that little space is an internal solid shell so 
-                                    // it triggers this too_narrow logic.)
-                                    union_ex(internal)));
-                            // see https://github.com/prusa3d/PrusaSlicer/pull/3426
-                            // solid = new_internal_solid;
-                        }
-                    }
                     for (const Surface &srf : layerm->fill_surfaces().surfaces) {
                         srf.expolygon.assert_valid();
                     }
 
-                    // internal-solid are the union of the existing internal-solid surfaces
-                    // and new ones
+                    // prepare to move in the new & old surfaces
                     SurfaceCollection backup = std::move(neighbor_layerm->set_fill_surfaces());
+                    neighbor_layerm->set_fill_surfaces().clear();
+                    // internal-solid are the union of the existing internal-solid surfaces and new ones
                     expolygons_append(new_internal_solid, to_expolygons(backup.filter_by_type(stPosInternal | stDensSolid)));
-                    ExPolygons internal_solid = ensure_valid(union_ex(new_internal_solid), scaled_resolution);
-                    // assign new internal-solid surfaces to layer
-                    neighbor_layerm->set_fill_surfaces().set(internal_solid, stPosInternal | stDensSolid);
+                    new_internal_solid = ensure_valid(union_ex(new_internal_solid), scaled_resolution);
+                    neighbor_layerm->set_fill_surfaces().set(new_internal_solid, stPosInternal | stDensSolid);
                     // subtract intersections from layer surfaces to get resulting internal surfaces
-                    //ExPolygons polygons_internal = to_polygons(std::move(internal_solid));
-                    ExPolygons expolys_internal = diff_ex(to_expolygons(backup.filter_by_type(stPosInternal | stDensSparse)), internal_solid, ApplySafetyOffset::Yes);
-                    ensure_valid(expolys_internal, scaled_resolution);
-                    // assign resulting internal surfaces to layer
-                    neighbor_layerm->set_fill_surfaces().append(expolys_internal, stPosInternal | stDensSparse);
-                    expolygons_append(internal_solid, expolys_internal);
-                    // assign top and bottom surfaces to layer
-                    backup.keep_types({ stPosTop | stDensSolid, stPosBottom | stDensSolid, stPosBottom | stDensSolid | stModBridge });
-                    //backup.keep_types_flag(stPosTop | stPosBottom);
-                    std::vector<SurfacesPtr> top_bottom_groups;
-                    backup.group(&top_bottom_groups);
-                    for (SurfacesPtr& group : top_bottom_groups) {
-                        neighbor_layerm->set_fill_surfaces().append(
-                            ensure_valid(diff_ex(to_expolygons(group), union_ex(internal_solid)), scaled_resolution),
-                            // Use an existing surface as a template, it carries the bridge angle etc.
-                            *group.front());
+                    for (Surface &surface : backup) {
+                        // (stPosInternal | stDensSolid) are already inside new_internal_solid
+                        if (surface.surface_type != (stPosInternal | stDensSolid)) {
+                            if (surface.has_pos_internal() &&
+                                (surface.has_fill_sparse() || surface.has_fill_solid())) {
+                                // diff if it has been intersected with
+                                for (ExPolygon &expoly :
+                                     ensure_valid(offset2_ex(diff_ex(ExPolygons{surface.expolygon}, new_internal_solid),
+                                                             -extperi_width / 4, extperi_width / 4, jtMiter, 5),
+                                                  scaled_resolution)) {
+                                    neighbor_layerm->set_fill_surfaces().surfaces.emplace_back(surface, std::move(expoly));
+                                }
+                            } else {
+                                // it hasn't changed, just keep it.
+                                neighbor_layerm->set_fill_surfaces().surfaces.emplace_back(std::move(surface));
+                            }
+                        }
                     }
                 }
             EXTERNAL:;
