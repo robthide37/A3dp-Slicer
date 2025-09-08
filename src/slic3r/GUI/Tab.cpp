@@ -868,18 +868,22 @@ void Tab::update_changed_ui()
     // special case for filament
     if (type() == Preset::TYPE_FFF_FILAMENT) {
         // compatible_print[er]s isn't added with "#0" by the presetcollection;
-        auto found = dirty_options.find(OptionKeyIdx::scalar("compatible_print"));
-        if (found != dirty_options.end()) {
-            dirty_options.emplace(OptionKeyIdx{"compatible_print", 0}, found->second);
-            dirty_options.erase(found);
+        for (const std::string special_key : {"compatible_print", "compatible_prints_condition", "compatible_printers",
+                                    "compatible_printers_condition", "inherits"}) {
+            auto found = dirty_options.find(OptionKeyIdx::scalar(special_key));
+            if (found != dirty_options.end()) {
+                dirty_options.emplace(OptionKeyIdx{special_key, 0}, found->second);
+                dirty_options.erase(found);
+            }
+            found = nonsys_options.find(OptionKeyIdx::scalar(special_key));
+            if (found != nonsys_options.end()) {
+                uint16_t tool_id = found->second;
+                nonsys_options.erase(found);
+                nonsys_options.emplace(OptionKeyIdx{special_key, 0}, tool_id);
+            }
         }
         for (auto &entry : dirty_options) {
             assert(entry.first.idx >= 0);
-        }
-        found = nonsys_options.find(OptionKeyIdx::scalar("compatible_print"));
-        if (found != nonsys_options.end()) {
-            nonsys_options.emplace(OptionKeyIdx{"compatible_print", 0}, found->second);
-            nonsys_options.erase(found);
         }
         for (auto &entry : nonsys_options) {
             assert(entry.first.idx >= 0);
@@ -939,7 +943,7 @@ void Tab::update_changed_ui()
             }
         } else {
             //note: shouldn't happen as it's alaready added by dirty_options
-            assert(false);
+            assert(opt_key_id.key != "inherits");
         }
     }
 
@@ -1626,7 +1630,6 @@ void Tab::on_value_change(const OptionKeyIdx& opt_key_idx, const boost::any& val
         if (only_one_warning_per_session) {
             only_one_warning_per_session= false;
             assert(opt_key_idx.idx >= 0);
-            assert(opt_key_idx.key.find("max_layer_height") == std::string::npos);
             const std::vector<double> &nozzle_sizes = m_config_base->option<ConfigOptionFloats>("nozzle_diameter")->get_values();
             assert(opt_key_idx.idx < nozzle_sizes.size());
             double max_lh = m_config_base->option("max_layer_height")->is_enabled(opt_key_idx.idx) ?
@@ -3522,8 +3525,8 @@ void TabFilament::toggle_options()
         // bool fan_always_on = m_config->opt_bool("fan_always_on", 0);
 
         //get_field("max_fan_speed")->toggle_widget_enable(m_config->opt_float("fan_below_layer_time", 0) > 0);
-        toggle_option("min_print_speed", m_config->opt_float("slowdown_below_layer_time", 0) > 0);
-        toggle_option("max_speed_reduction", m_config->opt_float("slowdown_below_layer_time", 0) > 0);
+        toggle_option("min_print_speed", m_config->opt_float("slowdown_below_layer_time", 0) > 0, 0);
+        toggle_option("max_speed_reduction", m_config->opt_float("slowdown_below_layer_time", 0) > 0, 0);
 
         // hidden 'cooling', it's now deactivated.
              //for (auto el : { "min_fan_speed", "disable_fan_first_layers" })
@@ -3555,8 +3558,8 @@ void TabFilament::toggle_options()
     //if (m_active_page->title() == "Advanced")
     {
         bool multitool_ramming = m_config->opt_bool("filament_multitool_ramming", 0);
-        toggle_option("filament_multitool_ramming_volume", multitool_ramming);
-        toggle_option("filament_multitool_ramming_flow", multitool_ramming);
+        toggle_option("filament_multitool_ramming_volume", multitool_ramming, 0);
+        toggle_option("filament_multitool_ramming_flow", multitool_ramming, 0);
     }
 
     //if (m_active_page->title() == "Filament Overrides")

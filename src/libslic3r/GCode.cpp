@@ -1340,6 +1340,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     // resets analyzer's tracking data
     m_last_height  = 0.f;
     m_last_layer_z = 0.f;
+    m_last_layers_z = 0.;
     m_max_layer_z  = 0.f;
     m_last_width = 0.f;
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -1422,6 +1423,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
     print.set_status(int(0), std::string(L("Generating G-code layer %s / %s")), std::vector<std::string>{ std::to_string(0), std::to_string(layer_count()) }, PrintBase::SlicingStatus::DEFAULT | PrintBase::SlicingStatus::SECONDARY_STATE);
 
     m_enable_cooling_markers = true;
+    m_last_object_layers.clear();
 
     m_volumetric_speed = DoExport::autospeed_volumetric_limit(print);
      this->m_throw_if_canceled();
@@ -2577,17 +2579,17 @@ std::string GCodeGenerator::placeholder_parser_process(
     if (config_override) {
         const auto& custom_gcode_placeholders = custom_gcode_specific_placeholders();
 
-        // 1-st check: custom G-code "name" have to be present in s_CustomGcodeSpecificOptions;
+        // 1-st check: custom G-code "name" have to be present in s_CustomGcodeSpecificPlaceholders;
         //if (custom_gcode_placeholders.count(name) > 0) {
         //    const auto& placeholders = custom_gcode_placeholders.at(name);
         if (auto it = custom_gcode_placeholders.find(name); it != custom_gcode_placeholders.end()) {
             const auto& placeholders = it->second;
 
             for (const std::string& key : config_override->keys()) {
-                // 2-nd check: "key" have to be present in s_CustomGcodeSpecificOptions for "name" custom G-code ;
+                // 2-nd check: "key" have to be present in s_CustomGcodeSpecificPlaceholders for "name" custom G-code ;
                 if (std::find(placeholders.begin(), placeholders.end(), key) == placeholders.end())
                     throw Slic3r::PlaceholderParserError(format("\"%s\" placeholder for \"%s\" custom G-code \n"
-                                                                "needs to be added to s_CustomGcodeSpecificOptions", key.c_str(), name.c_str()));
+                                                                "needs to be added to s_CustomGcodeSpecificPlaceholders", key.c_str(), name.c_str()));
                 // 3-rd check: "key" have to be present in CustomGcodeSpecificConfigDef for "key" placeholder;
                 if (!custom_gcode_specific_config_def.has(key))
                     throw Slic3r::PlaceholderParserError(format("Definition of \"%s\" placeholder \n"
@@ -2595,7 +2597,7 @@ std::string GCodeGenerator::placeholder_parser_process(
             }
         }
         else
-            throw Slic3r::PlaceholderParserError(format("\"%s\" custom G-code needs to be added to s_CustomGcodeSpecificOptions", name.c_str()));
+            throw Slic3r::PlaceholderParserError(format("\"%s\" custom G-code needs to be added to s_CustomGcodeSpecificPlaceholders", name.c_str()));
     }
 #endif
 
@@ -3410,8 +3412,14 @@ LayerResult GCodeGenerator::process_layer(
         //gcode += "; m_wipe.reset_path(); after change_layer\n";
         assert(m_new_z_target || is_approx(print_z, m_writer.get_unlifted_position().z(), EPSILON));
     }
-    if (object_layer != nullptr) {
-        m_last_object_layer = object_layer;
+    for (const ObjectLayerToPrint &l : layers) {
+        if (l.object_layer) {
+            if (!is_approx(m_last_layers_z, l.object_layer->print_z, EPSILON)) {
+                m_last_object_layers.clear();
+                m_last_layers_z = l.object_layer->print_z;
+            }
+            m_last_object_layers.push_back(l.object_layer);
+        }
     }
     m_layer = &layer;
     if (this->line_distancer_is_required(layer_tools.extruders) && this->m_layer != nullptr && this->m_layer->lower_layer != nullptr)
@@ -3794,6 +3802,7 @@ void GCodeGenerator::process_layer_single_object(
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             m_avoid_crossing_perimeters.disable_once();
+            m_last_too_small.polyline.clear();
         }
         this->set_origin(offset);
     }
@@ -4742,10 +4751,12 @@ void GCodeGenerator::seam_notch(const ExtrusionLoop& original_loop,
                 building_paths.front().as_polyline().split_at(dist, notch_extrusion_start.back().polyline, ap2);
                 building_paths.front().polyline = ap2;
                 dist = 0;
+                assert(notch_extrusion_start.back().polyline.back() == building_paths.front().polyline.front());
             } else {
                 notch_extrusion_start.push_back(std::move(building_paths.front()));
                 building_paths.erase(building_paths.begin());
                 dist -= length;
+                assert(notch_extrusion_start.back().polyline.back() == building_paths.front().polyline.front());
             }
             assert(notch_extrusion_start.back().polyline.back() == building_paths.front().polyline.front());
         }
@@ -4761,17 +4772,21 @@ void GCodeGenerator::seam_notch(const ExtrusionLoop& original_loop,
                 building_paths.back().polyline.split_at(length - dist, ap2, notch_extrusion_end.back().polyline);
                 building_paths.back().polyline = ap2;
                 dist = 0;
+                assert(building_paths.back().polyline.back() == notch_extrusion_end.back().polyline.front());
             } else {
                 notch_extrusion_end.push_back(std::move(building_paths.back()));
-                notch_extrusion_end.back().polyline.reverse();
                 building_paths.pop_back();
                 dist -= length;
+                assert(building_paths.back().polyline.back() == notch_extrusion_end.back().polyline.front());
             }
-            assert(building_paths.back().polyline.back() == notch_extrusion_end.front().polyline.front());
+            assert(building_paths.back().polyline.back() == notch_extrusion_end.back().polyline.front());
         }
         // notch_extrusion_end has benn created "in-reverse", I have to put it the right way
         std::reverse(notch_extrusion_end.begin(), notch_extrusion_end.end());
         assert(building_paths.back().polyline.back() == notch_extrusion_end.front().polyline.front());
+        for (size_t i = 1; i < notch_extrusion_end.size(); i++) {
+            assert(notch_extrusion_end[i - 1].polyline.back() == notch_extrusion_end[i].polyline.front());
+        }
 
         //kind of the same as the wipe
         Point prev_point = notch_extrusion_end.back().first_point();       // second to last point
@@ -8019,21 +8034,55 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
               !(m_config.enforce_retract_first_layer && m_layer_index == 0)) &&
              m_config.fill_density.value > 0) ||
             m_config.avoid_crossing_perimeters) {
-            assert(m_last_object_layer == m_layer || dynamic_cast<const Layer*>(m_layer) ||
-                (dynamic_cast<const SupportLayer*>(m_layer) != nullptr && m_last_object_layer->print_z <= m_layer->print_z + EPSILON));
-            assert(m_last_object_layer);
-            if (m_layer_slices_offseted.layer != m_last_object_layer && m_last_object_layer != nullptr) {
-                m_layer_slices_offseted.layer    = m_last_object_layer;
+            const bool is_support_layer = dynamic_cast<const SupportLayer *>(m_layer) != nullptr;
+            assert(m_last_object_layers.empty() ||
+                   (std::find(m_last_object_layers.begin(), m_last_object_layers.end(), m_layer) !=
+                        m_last_object_layers.end() && m_layer != nullptr && !is_support_layer) ||
+                    (is_support_layer && m_last_layers_z <= m_layer->print_z + EPSILON));
+            if (m_last_object_layers.empty()) {
+                // we didn't see any object yet (we are on the raft)
+                return true;
+            }
+            if (!m_last_object_layers.empty() && m_layer_slices_offseted.last_layer != m_layer) {
+                //note: if printing support, we need all the already printed objects layers.
+                // but if we're printing an object, we only need our island (that is in our layer) and don't need any other layer.
+                // is it worth it to recompute the slices each time ?
+                // TODO: I think it's possible to have the SliceIsland for each layer, and then loop over all of them
+                // only if for SupportLayer
+                m_layer_slices_offseted.last_layer = m_layer;
                 m_layer_slices_offseted.diameter = scale_t(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4)) / 2;
-                ExPolygons slices                = m_last_object_layer->lslices();
-                ExPolygons slices_offsetted = offset_ex(m_last_object_layer->lslices(), -m_layer_slices_offseted.diameter * 1.5f);
-                //also offset in the other side, to avoid a travel that may cross it from the exterior
-                append(slices_offsetted, offset_ex(m_last_object_layer->lslices(), m_layer_slices_offseted.diameter * .5f));
+                ExPolygons slices;
+                ExPolygons slices_offsetted;
+                bool found_our_layer = false;
+                // support or object layer?
+                if (is_support_layer) {
+                    // add all layers slices already printed & our current layer at this z into the slices
+                    for (const Layer *layer : m_last_object_layers) {
+                        append(slices, layer->lslices());
+                        // we are interserted to not going near it, so offset it to the exterior
+                        append(slices_offsetted, offset_ex(layer->lslices(), m_layer_slices_offseted.diameter * 1.5f));
+                    }
+                } else {
+                    // our layer
+                    append(slices, m_layer->lslices());
+                    //w e are interested to not cross outside of it.
+                    append(slices_offsetted,
+                            offset_ex(m_layer->lslices(), -m_layer_slices_offseted.diameter * 1.5f));
+                }
+                slices = union_ex(slices);
+                slices_offsetted = union_ex(slices_offsetted);
                 // remove top surfaces
-                for (const LayerRegion *reg : m_last_object_layer->regions()) {
-                    m_throw_if_canceled();
-                    slices_offsetted = diff_ex(slices_offsetted, to_expolygons(reg->fill_surfaces().filter_by_type_flag(SurfaceType::stPosTop)));
-                    slices           = diff_ex(slices, to_expolygons(reg->fill_surfaces().filter_by_type_flag(SurfaceType::stPosTop)));
+                // if support i don't care becasue i need to cross external perimter before anyway.
+                if (!is_support_layer) {
+                    for (const LayerRegion *reg : m_layer->regions()) {
+                        m_throw_if_canceled();
+                        slices_offsetted = diff_ex(slices_offsetted,
+                                                   to_expolygons(reg->fill_surfaces().filter_by_type_flag(
+                                                       SurfaceType::stPosTop)));
+                        slices = diff_ex(slices,
+                                         to_expolygons(
+                                             reg->fill_surfaces().filter_by_type_flag(SurfaceType::stPosTop)));
+                    }
                 }
                 // create bb for speeding things up.
                 m_layer_slices_offseted.slices.clear();
@@ -8080,24 +8129,27 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
                     }
                 }
             }
-        //{
+        //if (is_approx(m_layer_slices_offseted.last_layer->print_z, 22.34, 0.01)) {
         //    static int aodfjiaqsdz = 0;
         //    std::stringstream stri;
-        //    stri << this->m_layer->id() << "_avoid_" <<"_"<<(aodfjiaqsdz++) << ".svg";
+        //    
+        //    stri << this->m_layer->id() << "_avoid_" <<
+        //        (dynamic_cast<const SupportLayer *>(m_layer) != nullptr ? "support": "object")
+        //        <<"_"<<(aodfjiaqsdz++) << ".svg";
         //    SVG svg(stri.str());
         //    svg.draw(m_layer->lslices(), "grey");
-        //    for (auto &entry : offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices) {
+        //    for (SliceIsland &entry : offset ? m_layer_slices_offseted.slices_offsetted : m_layer_slices_offseted.slices) {
         //        bool checked  = (travel.size() > 1 && 
-        //            (entry.second.contains(travel.front()) ||
-        //            entry.second.contains(travel.back()) ||
-        //            entry.second.contains(travel.points[travel.size() / 2]) ||
-        //            entry.second.cross(travel) )
+        //            (entry.boundingbox.contains(travel.front()) ||
+        //            entry.boundingbox.contains(travel.back()) ||
+        //            entry.boundingbox.contains(travel.points[travel.size() / 2]) ||
+        //            entry.boundingbox.cross(travel) )
         //            );
-        //        svg.draw((entry.second.polygon().split_at_first_point()), checked?"green":"orange", scale_t(0.03));
+        //        svg.draw((entry.boundingbox.polygon().split_at_first_point()), checked?"green":"orange", scale_t(0.03));
         //        int diff_count =0;
         //        if(checked)
-        //            diff_count = diff_pl(travel, entry.first.contour).size();
-        //        svg.draw(to_polylines(entry.first), diff_count==0?"blue":diff_count==1?"teal":"yellow", scale_t(0.05));
+        //            diff_count = diff_pl(travel, entry.expolygon.contour).size();
+        //        svg.draw(to_polylines(entry.expolygon), diff_count==0?"blue":diff_count==1?"teal":"yellow", scale_t(0.05));
         //    }
         //    svg.draw(travel, "red", scale_t(0.05));
         //    svg.Close();
@@ -8116,11 +8168,12 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
                     // first, check if it's inside the contour (still, it can go over holes)
                     bool has_front = contains(expoly_2_bb.expolygon.contour, travel.front(), true);
                     bool has_back = contains(expoly_2_bb.expolygon.contour, travel.back(), true);
-                    if (!has_front || !has_back) {
-                        // has_intersect = true;
+                    if (!has_front && has_back || has_front && !has_back) {
+                        // has to cross something, stop here.
                         return true;
                     }
                     assert(travel.size() >= 2);
+                    //second, check if it's crossing this contour
 #ifdef CAN_CROSS_PERIMETER_USE_GRID
                     // Can't find any performance improvement, need more testing
                     if (travel.size() == 2 && expoly_2_bb.grid) {
@@ -8130,8 +8183,11 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
                         expoly_2_bb.grid->visit_cells_intersecting_line(tester.test_line.a, tester.test_line.b, tester);
                         if (!tester.intersect) {
                             // inside or outside?
-                            // whatever, check all
-                            continue;
+                            if (!has_front && !has_back) {
+                                //is not inside, search again another island.
+                                continue;
+                            }
+                            // is inside, continue to check holes.
                         } else {
                             // cross something, stop here.
                             return true;
@@ -8155,7 +8211,7 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
                         }
                         // no intersect detected
                         // if inside the contour, then we need to check for holes.
-                        if (!expoly_2_bb.expolygon.contour.contains(travel.front())) {
+                        if (!has_front/*expoly_2_bb.expolygon.contour.contains(travel.front())*/) {
                             // if not, go to next island
                             continue;
                         }
@@ -8166,41 +8222,39 @@ bool GCodeGenerator::can_cross_perimeter(const Polyline& travel, bool offset)
                             continue;
                         }
                         if (!diff_result.empty()) {
-                            //has_intersect = true;
+                            // cross something, stop here.
                             return true;
                         }
 #endif
                     }
-                    //second, check if it's crossing this contour
-                    // third, check if it's going over a hole
-                    // TODO: kdtree to get the ones interesting
-                    //bool  has_intersect = false;
-                    Line  travel_line;
-                    Point whatever;
-                    expoly_2_bb.create_hole_bb();
-                    for (size_t i = 0; i < expoly_2_bb.expolygon.holes.size(); ++i) {
-                        const Polygon &hole = expoly_2_bb.expolygon.holes[i];
-                        const BoundingBox &hole_bb = expoly_2_bb.hole_boundingboxes[i];
-                        m_throw_if_canceled();
-                        for (size_t idx_travel = travel.size() - 1; idx_travel > 0; --idx_travel) {
-                            travel_line.a = travel.points[idx_travel];
-                            travel_line.b = travel.points[idx_travel - 1];
-                            if (hole.size() > 10) {
-                                // bb.cross call 4 intersections (one for each side), do it only if the hole has enough lines.
-                                if (!hole_bb.cross(travel_line) && !hole_bb.contains(travel_line.a)) {
-                                    // don't cross bb and not inside, so it's not for this hole.
-                                    continue;
+                    // third, if inside a contour, check if it's going over a hole
+                    if (has_front && has_back) {
+                        // TODO: kdtree to get the ones interesting
+                        Line travel_line;
+                        Point whatever;
+                        expoly_2_bb.create_hole_bb();
+                        for (size_t i = 0; i < expoly_2_bb.expolygon.holes.size(); ++i) {
+                            const Polygon &hole = expoly_2_bb.expolygon.holes[i];
+                            const BoundingBox &hole_bb = expoly_2_bb.hole_boundingboxes[i];
+                            m_throw_if_canceled();
+                            for (size_t idx_travel = travel.size() - 1; idx_travel > 0; --idx_travel) {
+                                travel_line.a = travel.points[idx_travel];
+                                travel_line.b = travel.points[idx_travel - 1];
+                                if (hole.size() > 10) {
+                                    // bb.cross call 4 intersections (one for each side), do it only if the hole has
+                                    // enough lines.
+                                    if (!hole_bb.cross(travel_line) && !hole_bb.contains(travel_line.a)) {
+                                        // don't cross bb and not inside, so it's not for this hole.
+                                        continue;
+                                    }
                                 }
-                            }
-                            if (hole.first_intersection(travel_line, &whatever) ||
-                                Line(hole.first_point(), hole.last_point()).intersection(travel_line, &whatever)) {
-                                //has_intersect = true;
-                                //break;
-                                return true;
+                                if (hole.first_intersection(travel_line, &whatever) ||
+                                    Line(hole.first_point(), hole.last_point()).intersection(travel_line, &whatever)) {
+                                    return true;
+                                }
                             }
                         }
                     }
-                    //note: can be inside multiple contours, so we need to checl all of them
                 }
             }
             // never crossed a perimeter or a hole

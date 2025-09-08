@@ -289,6 +289,7 @@ static void connect_layer_slices(
                     if (it_below != links_below.end() && it_below->slice_idx == j) {
                         it_below->area += area;
                     } else {
+                        key = LayerSlice::Link{i};
                         auto it_above = std::lower_bound(links_above.begin(), links_above.end(), key, [](auto &l, auto &r){ return l.slice_idx < r.slice_idx; });
                         if (it_above != links_above.end() && it_above->slice_idx == i) {
                             it_above->area += area;
@@ -1013,28 +1014,30 @@ void Layer::sort_perimeters_into_islands(
             });
             map_expolygon_to_region_and_fill.assign(fill_expolygons.size(), {});
             for (uint32_t region_idx : layer_region_ids) {
-                LayerRegion &l = *m_regions[region_idx];
-                ExPolygons l_slices_exp = to_expolygons(l.slices().surfaces);
-                l.m_fill_expolygons = intersection_ex(l_slices_exp, fill_expolygons);
-                ensure_valid(l.m_fill_expolygons, scaled_resolution);
-                //copy m_fill_no_overlap_expolygons in sister LayerRegion. It will serve as a mask (with intersection). TODO: maybe to intersection(m_fill_no_overlap_expolygons, l.slices().surfaces)
-                if (&this_layer_region != &l) {
-                    assert(l.m_fill_no_overlap_expolygons.empty());
-                    l.m_fill_no_overlap_expolygons = this_layer_region.m_fill_no_overlap_expolygons;
+                LayerRegion &layer_region = *m_regions[region_idx];
+                ExPolygons l_slices_exp = to_expolygons(layer_region.slices().surfaces);
+                layer_region.m_fill_expolygons = intersection_ex(l_slices_exp, fill_expolygons);
+                ensure_valid(layer_region.m_fill_expolygons);
+                //copy m_fill_no_overlap_expolygons in sister LayerRegion. It will serve as a mask (with intersection). TODO: maybe to intersection(m_fill_no_overlap_expolygons, layer_region.slices().surfaces)
+                if (&this_layer_region != &layer_region) {
+                    assert(layer_region.m_fill_no_overlap_expolygons.empty());
+                    layer_region.m_fill_no_overlap_expolygons = this_layer_region.m_fill_no_overlap_expolygons;
                 }
                 // ensure fill_surface is good (this was deleted in prusa2.7, i wonder if prusa ever used fill_surfaces after perimetergeneration)
-                l.set_fill_surfaces().clear();
+                layer_region.set_fill_surfaces().clear();
                 for (const Surface &surf: slices) {
                     ExPolygons exp = intersection_ex(ExPolygons{ surf.expolygon }, l_slices_exp);
-                    ensure_valid(exp, scaled_resolution);
-                    l.set_fill_surfaces().append(std::move(exp), surf);
+                    ensure_valid(exp);
+                    layer_region.set_fill_surfaces().append(std::move(exp), surf);
                 }
                 //bounding boxes
-                l.m_fill_expolygons_bboxes.reserve(l.fill_expolygons().size());
-                for (const ExPolygon &expolygon : l.fill_expolygons()) {
+                layer_region.m_fill_expolygons_bboxes.reserve(layer_region.fill_expolygons().size());
+                for (const ExPolygon &expolygon : layer_region.fill_expolygons()) {
                     BoundingBox bbox = get_extents(expolygon);
-                    l.m_fill_expolygons_bboxes.emplace_back(bbox);
-                    auto it_bbox = std::lower_bound(fill_expolygons_bboxes_sorted.begin(), fill_expolygons_bboxes_sorted.end(), bbox, [&fill_expolygons_bboxes](uint32_t lhs, const BoundingBox &bbr){
+                    layer_region.m_fill_expolygons_bboxes.emplace_back(bbox);
+                    auto it_bbox = std::lower_bound(fill_expolygons_bboxes_sorted.begin(),
+                                                    fill_expolygons_bboxes_sorted.end(), bbox,
+                                                    [&fill_expolygons_bboxes](uint32_t lhs, const BoundingBox &bbr) {
                         const BoundingBox &bbl = fill_expolygons_bboxes[lhs];
                         return bbl.min < bbr.min || (bbl.min == bbr.min && bbl.max < bbr.max);
                     });
@@ -1046,7 +1049,7 @@ void Layer::sort_perimeters_into_islands(
                                 // Only one expolygon produced by intersection with LayerRegion surface may match an expolygon of fill_expolygons.
                                 assert(ref.region_id == -1 && ref.fill_in_region_id == -1);
                                 ref.region_id         = region_idx;
-                                ref.fill_in_region_id = int(&expolygon - l.fill_expolygons().data());
+                                ref.fill_in_region_id = int(&expolygon - layer_region.fill_expolygons().data());
                             }
                         }
                 }
