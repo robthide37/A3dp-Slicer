@@ -131,3 +131,52 @@ jobs:
       with:
         name: nightly_win64
         path: build/package/
+
+# MSI CREATION
+  create_msi:
+    runs-on: windows-2022
+    needs: build
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: nightly_win64
+        path: build/package
+    - name: Install WiX Toolset
+      run: choco install wixtoolset -y
+    - name: Prepare license file for MSI
+      shell: powershell
+      working-directory: ./build
+      run: |
+        # Convert LICENSE to RTF format for WiX installer
+        $licenseContent = Get-Content ..\LICENSE -Raw
+        $rtfContent = "{\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}}{\f0\fs20 " + $licenseContent.Replace('\', '\\').Replace("`n", "\par ") + "}}"
+        $rtfContent | Out-File -FilePath "package\LICENSE.rtf" -Encoding ASCII
+    - name: Harvest files for MSI
+      shell: cmd
+      working-directory: ./build
+      run: |
+        heat.exe dir package -dr INSTALLFOLDER -cg Package -gg -sreg -srd -var var.SourceDir -out files.wxs -sfrag
+    - name: Generate installer version
+      shell: powershell
+      run: |
+        $fullVersion = (Get-Content version.inc | Select-String -Pattern 'set\(SLIC3R_VERSION_FULL \"(.*?)\"\)' | ForEach-Object { $_.Matches.Groups[1].Value })
+        $dateSuffix = (Get-Date -Format 'yyMMdd')
+        $env:InstallerVersion = "$fullVersion$dateSuffix" -replace '\.0\.', '.'
+        echo "InstallerVersion=$env:InstallerVersion" >> $env:GITHUB_ENV
+        $env:ReleaseSuffix = "-Beta-Nightly"
+        echo "ReleaseSuffix=$env:ReleaseSuffix" >> $env:GITHUB_ENV
+    - name: Build MSI installer
+      shell: cmd
+      working-directory: ./build
+      run: |
+        set MSIFileName=SuperSlicer_%InstallerVersion%.msi
+        candle.exe -dSourceDir="package" -dInstallerVersion="%InstallerVersion%" -dReleaseSuffix="%ReleaseSuffix%" ..\winInstaller.wxs files.wxs
+        light.exe -b package -ext WixUIExtension winInstaller.wixobj files.wixobj -o %MSIFileName% -sw1076
+    - name: Upload MSI artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly_win64_MSI_${{ env.InstallerVersion }}
+        path: build/SuperSlicer_${{ env.InstallerVersion }}.msi

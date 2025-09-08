@@ -639,17 +639,22 @@ ExPolygons Layer::merged(coordf_t offset_scaled) const
         offset_scaled  = float(  SCALED_EPSILON);
         offset_scaled2 = float(- SCALED_EPSILON);
     }
-    Polygons polygons;
-	for (LayerRegion *layerm : m_regions) {
-		const PrintRegionConfig &config = layerm->region().config();
-		// Our users learned to bend Slic3r to produce empty volumes to act as subtracters. Only add the region if it is non-empty.
-		if (config.bottom_solid_layers > 0 || config.top_solid_layers > 0 || config.fill_density > 0. || config.perimeters > 0 || (config.solid_infill_every_layers.value > 0 && config.fill_density.value > 0))
-			append(polygons, offset(layerm->slices().surfaces, offset_scaled));
-	}
-    ExPolygons out = union_ex(polygons);
-	if (offset_scaled2 != 0.f)
-		out = offset_ex(out, offset_scaled2);
-    return out;
+    ExPolygons expolygons;
+    for (LayerRegion *layerm : m_regions) {
+        const PrintRegionConfig &config = layerm->region().config();
+        // Our users learned to bend Slic3r to produce empty volumes to act as subtracters. Only add the region if it is non-empty.
+        if (config.bottom_solid_layers > 0 || config.top_solid_layers > 0 || config.fill_density > 0. ||
+            config.perimeters > 0 || (config.solid_infill_every_layers.value > 0 && config.fill_density.value > 0)) {
+            append(expolygons, offset_ex(layerm->slices().surfaces, offset_scaled));
+        }
+    }
+    expolygons = union_ex(expolygons);
+    if (offset_scaled2 != 0.f)
+        expolygons = offset_ex(expolygons, offset_scaled2);
+
+    // with +- offset, you can have dupicated points. ensure_valid will remove them.
+    ensure_valid(expolygons);
+    return expolygons;
 }
 
 // Here the perimeters are created cummulatively for all layer regions sharing the same parameters influencing the perimeters.
@@ -715,6 +720,7 @@ void Layer::make_perimeters()
                             && config.external_perimeters_hole  == other_config.external_perimeters_hole
                             && config.external_perimeters_nothole == other_config.external_perimeters_nothole
                             && config.external_perimeters_vase == other_config.external_perimeters_vase
+                            && config.external_perimeters_vase_min_height == other_config.external_perimeters_vase_min_height
                             && config.extra_perimeters_odd_layers == other_config.extra_perimeters_odd_layers
                             && config.extra_perimeters_on_overhangs == other_config.extra_perimeters_on_overhangs
                             && config.gap_fill_enabled          == other_config.gap_fill_enabled

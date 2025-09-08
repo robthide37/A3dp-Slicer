@@ -1636,7 +1636,7 @@ void PrintObject::slice_volumes()
                                 const coord_t eps = scale_t(m_config.slice_closing_radius.value * 1.5);
                                 trimming = offset_ex(layer->merged(eps), -eps);
                             } else {
-                                trimming = layer->merged();
+                                trimming = merged_poly;
                             }
                             if (first_layer_compensation < 0) {
                                 Flow min_ext_peri_flow = layer->regions().front()->flow(frExternalPerimeter);

@@ -166,6 +166,7 @@ public:
     const std::vector<FoundOption>& found_options() { return found; }
     const GroupAndCategory &get_group_and_category(const std::string &grp_key, ConfigOptionMode tags) const;
     std::string& search_string() { return search_line; }
+    wxString get_tooltip(const SearchOption &opt, bool with_icon);
 
     bool is_sorted() { return sorted; }
 
@@ -194,7 +195,9 @@ class SearchDialog : public GUI::DPIDialog
     CheckBox*           check_english       { nullptr };
     wxCheckBox*         check_exact         { nullptr };
     wxCheckBox*         check_all_mode      { nullptr };
+    wxStaticText*       tooltip             { nullptr };
 
+    wxDataViewItem selected;
     OptionsSearcher*    searcher            { nullptr };
 
     void OnInputText(wxCommandEvent& event);

@@ -133,6 +133,7 @@ public:
     const Vec2d&    origin() const { return m_origin; }
     void            set_origin(const Vec2d &pointf);
     void            set_origin(const coordf_t x, const coordf_t y) { this->set_origin(Vec2d(x, y)); }
+    uint16_t        last_extruder() const { return m_writer.tool() ? m_writer.tool()->id() : size_t(0); }
     const Point&    last_pos() const { assert(m_last_pos); return *m_last_pos; }
     bool            last_pos_defined() const { return m_last_pos.has_value(); }
     void            set_last_pos(const Point &pos) { m_last_pos = pos; }
@@ -299,7 +300,7 @@ private:
     virtual void use(const ExtrusionEntityCollection &collection) override;
     std::string     extrude_entity(const ExtrusionEntityReference &entity, const std::string_view description, double speed = -1.);
     std::string     extrude_loop(const ExtrusionLoop &loop, const std::string_view description, double speed = -1.);
-    std::string     extrude_loop_vase(const ExtrusionLoop &loop, const std::string_view description, double speed = -1.);
+    std::string     extrude_loop_vase(const ExtrusionPaths& normal_loop_paths, const ExtrusionLoop &original_loop, const std::string_view description, double speed = -1.);
     std::string     extrude_multi_path(const ExtrusionMultiPath &multipath, const std::string_view description, double speed = -1.);
     std::string     extrude_multi_path3D(const ExtrusionMultiPath3D &multipath, const std::string_view description, double speed = -1.);
     std::string     extrude_path(const ExtrusionPath &path, const std::string_view description, double speed = -1.);
@@ -469,6 +470,7 @@ private:
 #ifdef _DEBUGINFO
     std::vector<coord_t>                 m_layers_z;
     std::vector<coord_t>                 m_layers_with_supp_z;
+    bool                                 m_loop_vase_mode = false;
 #endif
     uint32_t                            m_layer_with_support_count;
     // Progress bar indicator. Increments from -1 up to layer_count.
@@ -501,6 +503,8 @@ private:
         std::vector<SliceIsland> slices_offsetted;
         const Layer* last_layer;
         const PrintObject* last_object;
+        const PrintInstance* last_instance;
+        uint16_t last_extruder;
         coord_t diameter;
     }                                   m_layer_slices_offseted{ {},{},nullptr, 0};
     double                              m_volumetric_speed;

@@ -65,10 +65,10 @@ uint16_t LayerTools::solid_infill_extruder(const PrintRegion &region) const
 // Returns a zero based extruder this eec should be printed with, according to PrintRegion config or extruder_override if overriden.
 uint16_t LayerTools::extruder(const ExtrusionEntityCollection &extrusions, const PrintRegion &region) const
 {
-	assert(region.config().perimeter_extruder.value > 0);
-	assert(region.config().infill_extruder.value > 0);
-	assert(region.config().solid_infill_extruder.value > 0);
-	// 1 based extruder ID.
+    assert(region.config().perimeter_extruder.value > 0);
+    assert(region.config().infill_extruder.value > 0);
+    assert(region.config().solid_infill_extruder.value > 0);
+    // 1 based extruder ID.
     uint16_t extruder = this->extruder_override;
     if (this->extruder_override == 0)
         if (HasRoleVisitor::search(extrusions, HasInfillVisitor{}))
@@ -78,7 +78,7 @@ uint16_t LayerTools::extruder(const ExtrusionEntityCollection &extrusions, const
                 extruder = region.config().infill_extruder;
         else
             extruder = region.config().perimeter_extruder.value;
-	return (extruder == 0) ? 0 : extruder - 1;
+    return (extruder == 0) ? 0 : extruder - 1;
 }
 
 static double calc_max_layer_height(const PrintConfig &config, double max_object_layer_height)

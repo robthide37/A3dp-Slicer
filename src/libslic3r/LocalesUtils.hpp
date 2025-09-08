@@ -51,6 +51,8 @@ std::string float_to_string_decimal_point(double value, int precision = -1);
 //std::string float_to_string_decimal_point(float value,  int precision = -1);
 double string_to_double_decimal_point(const std::string_view str, size_t* pos = nullptr);
 float  string_to_float_decimal_point (const std::string_view str, size_t* pos = nullptr);
+std::string from_dot_to_local(const std::string &in);
+float parse_float_all_locale(const std::string &in);
 
 // Set locales to "C".
 inline void set_c_locales()

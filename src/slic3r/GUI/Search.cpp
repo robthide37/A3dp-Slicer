@@ -267,6 +267,30 @@ static bool strong_match(const std::wregex &search_pattern,
     return out_score > 0;
 }
 
+wxString OptionsSearcher::get_tooltip(const SearchOption &opt, bool with_icon) {
+    // add "\n" to long tooltip lines
+    std::wstring tooltip;
+    int length = 0;
+    for (int i = 0; i < opt.tooltip_local.size(); i++) {
+        if (length >= 80 && opt.tooltip_local[i] == u' ') {
+            tooltip.push_back(u'\n');
+        } else {
+            tooltip.push_back(opt.tooltip_local[i]);
+        }
+        length++;
+        if (tooltip.back() == u'\n') {
+            length = 0;
+        }
+    }
+    wxString ret;
+    if (with_icon) {
+        ret = marker_by_type(opt.type, printer_technology);
+    }
+    ret += opt.category_local + L" : " + opt.group_local + L" : " +
+        opt.label_local + "\n\n" + tooltip;
+    return ret;
+}
+
 bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
 {
     if (search_line == search && !force)
@@ -319,30 +343,6 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
         return out;
     };
 
-    auto get_tooltip = [this, &sep](const SearchOption& opt)
-    {
-        //add "\n" to long tooltip lines
-        std::wstring tooltip;
-        int length = 0;
-        for (int i = 0; i < opt.tooltip_local.size(); i++) {
-            if (length >= 80 && opt.tooltip_local[i] == u' ') {
-                tooltip.push_back(u'\n');
-            } else {
-                tooltip.push_back(opt.tooltip_local[i]);
-            }
-            length++;
-            if (tooltip.back() == u'\n') {
-                length = 0;
-            }
-        }
-
-
-        return  marker_by_type(opt.type, printer_technology) +
-            opt.category_local + sep +
-            opt.group_local + sep + opt.label_local +
-            "\n\n" + tooltip;
-    };
-
     std::wstring wsearch = boost::nowide::widen(search);
     boost::trim_left(wsearch);
     boost::algorithm::to_lower(wsearch);
@@ -377,7 +377,7 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
                 }
                 label += "}";
             }
-            found.emplace_back(FoundOption{ label, label, boost::nowide::narrow(get_tooltip(opt)), i, 0 });
+            found.emplace_back(FoundOption{ label, label, boost::nowide::narrow(get_tooltip(opt, true)), i, 0 });
             continue;
         }
 
@@ -456,7 +456,7 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
             boost::erase_all(label_plain, std::string(1, char(ImGui::ColorMarkerStart)));
             boost::erase_all(label_plain, std::string(1, char(ImGui::ColorMarkerEnd)));
 #endif
-	        found.emplace_back(FoundOption{ label_plain, label_u8, boost::nowide::narrow(get_tooltip(opt)), i, score });
+	        found.emplace_back(FoundOption{ label_plain, label_u8, boost::nowide::narrow(get_tooltip(opt, true)), i, score });
         }
     }
 
@@ -738,11 +738,14 @@ SearchDialog::SearchDialog(OptionsSearcher* searcher)
     check_sizer->AddStretchSpacer(border);
     check_sizer->Add(cancel_btn,     0, wxALIGN_CENTER_VERTICAL);
 
+    tooltip = new wxStaticText(this, wxID_ANY, "text\ntext2", wxDefaultPosition, wxDefaultSize);
+
     wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
 
     topSizer->Add(search_line, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(search_list, 1, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(check_sizer, 0, wxEXPAND | wxALL, border);
+    topSizer->Add(tooltip, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
 
     search_line->Bind(wxEVT_TEXT,    &SearchDialog::OnInputText, this);
     search_line->Bind(wxEVT_LEFT_UP, &SearchDialog::OnLeftUpInTextCtrl, this);
@@ -848,7 +851,7 @@ void SearchDialog::OnKeyDown(wxKeyEvent& event)
         // So, for the next correct navigation, set focus on the search_list
         search_list->SetFocus();
 
-        auto item = search_list->GetSelection();
+        wxDataViewItem item = search_list->GetSelection();
 
         if (item.IsOk()) {
             unsigned selection = search_list_model->GetRow(item);
@@ -859,8 +862,21 @@ void SearchDialog::OnKeyDown(wxKeyEvent& event)
                 selection++;
 
             prevent_list_events = true;
-            search_list->Select(search_list_model->GetItem(selection));
+            item = search_list_model->GetItem(selection);
+            search_list->Select(item);
             prevent_list_events = false;
+
+            //create tooltip
+            if (selected != item) {
+                const Slic3r::Search::SearchOption &opt = searcher->get_option(selection);
+                search_list->SetToolTip(searcher->get_tooltip(opt, false));
+                selected = item;
+            }
+
+        } else {
+            search_list->SetToolTip("");
+            // reset
+            selected = wxDataViewItem();
         }
     }
     // process "Enter" pressed
@@ -938,6 +954,15 @@ void SearchDialog::OnMotion(wxMouseEvent& event)
     win = search_list;
 #endif
     search_list->HitTest(wxGetMousePosition() - win->GetScreenPosition(), item, col);
+    if (selected != item) {
+        selected = item;
+        if (item.IsOk()) {
+            const Slic3r::Search::SearchOption &opt = searcher->get_option(search_list_model->GetRow(item));
+            search_list->SetToolTip(searcher->get_tooltip(opt, false));
+        } else {
+            search_list->SetToolTip("");
+        }
+    }
     search_list->Select(item);
 
     event.Skip();

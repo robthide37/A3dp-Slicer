@@ -4578,6 +4578,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
     coord_t resolution = get_resolution(0, false, &surface);
     ExPolygons last    = union_ex(surface.expolygon.simplify_p((resolution < SCALED_EPSILON ? SCALED_EPSILON : resolution)));
     ExPolygons gaps;
+    // to store gap area that is transformed into a perimeter to be able to remove it from infill area.
+    ExPolygons perimeter_gaps_ex;
     double last_area   = -1;
 
     // list of Expolygons where contour or holes aren't growing.
@@ -5148,12 +5150,15 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
                                                       (float) (params.get_perimeter_spacing() / 2));
                         // there was an offset, simplify to avoid too small sections
                         new_contour = new_contour.front().simplify(SCALED_EPSILON);
-                        if (new_contour.size() == 1) {
+                        ExPolygons extents_new_perimeter = offset_ex(new_gaps.front().contour, (float) (params.get_perimeter_spacing()));
+                        if (new_contour.size() == 1 && extents_new_perimeter.size() == 1) {
                             // OK
+                            //create our periemter area (can also use offset over the polyline from new_contour)
+                            perimeter_gaps_ex = union_ex(perimeter_gaps_ex, diff(extents_new_perimeter.front().contour, new_gaps.front().contour));
                             // gap fill outside of the new contour
-                            append(gaps, ensure_valid(diff_ex(expoly, offset_ex(new_gaps.front().contour, (float) (params.get_perimeter_spacing()))), resolution));
+                            append(gaps, ensure_valid(diff_ex(expoly, extents_new_perimeter), resolution));
                             // gapfill after the perimeter
-                            append(gaps, new_gaps);
+                            append(gaps, ensure_valid(std::move(new_gaps), resolution));
                             // remove our old gapfill
                             gaps.erase(gaps.begin() + gap_idx);
                             looked_gap--;
@@ -5470,6 +5475,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(const Parameters &     
             results.gap_srf = intersection_ex(results.gap_srf, gaps_ex);
             // the diff(last, gap) will be done after, as we have to keep the last un-gapped to avoid unneeded gap/infill offset
         }
+        results.gap_srf = union_ex(results.gap_srf, perimeter_gaps_ex);
     }
 
     if (contour_count == 0 && holes_count == 0) {

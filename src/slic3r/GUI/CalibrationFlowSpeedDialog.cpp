@@ -1,8 +1,9 @@
 #include "CalibrationFlowSpeedDialog.hpp"
 #include "I18N.hpp"
+#include "libslic3r/AppConfig.hpp"
+#include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Utils.hpp"
-#include "libslic3r/AppConfig.hpp"
 #include "Jobs/ArrangeJob.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI.hpp"
@@ -76,20 +77,20 @@ void CalibrationFlowSpeedDialog::create_buttons(wxStdDialogButtonSizer* buttons)
             max_speed             = std::min(max_speed, max_feedarete_x);
         }
     }
-    
+
     float min_speed = std::max(filament_config->option("min_print_speed")->get_float(0), 0.);
     if (min_speed <= 0)
         min_speed = curr_speed / 10;
-    txt_min_speed = new wxTextCtrl(this, wxID_ANY, Slic3r::to_string_nozero(min_speed, 4), wxDefaultPosition, size);
+    txt_min_speed = new wxTextCtrl(this, wxID_ANY, Slic3r::from_dot_to_local(Slic3r::to_string_nozero(min_speed, 4)), wxDefaultPosition, size);
     txt_min_speed->SetToolTip(_L("Speed of the first patch."));
 
-    txt_max_speed = new wxTextCtrl(this, wxID_ANY, Slic3r::to_string_nozero(max_speed, 4), wxDefaultPosition, size);
+    txt_max_speed = new wxTextCtrl(this, wxID_ANY, Slic3r::from_dot_to_local(Slic3r::to_string_nozero(max_speed, 4)), wxDefaultPosition, size);
     txt_max_speed->SetToolTip(_L("Speed of the first patch."));
 
-    txt_min_flow = new wxTextCtrl(this, wxID_ANY, Slic3r::to_string_nozero(0.9, 4), wxDefaultPosition, size);
+    txt_min_flow = new wxTextCtrl(this, wxID_ANY, Slic3r::from_dot_to_local(Slic3r::to_string_nozero(0.9, 4)), wxDefaultPosition, size);
     txt_min_flow->SetToolTip(_L("Minimum extrusion multiplier."));
 
-    txt_max_flow = new wxTextCtrl(this, wxID_ANY, Slic3r::to_string_nozero(1.3, 4), wxDefaultPosition, size);
+    txt_max_flow = new wxTextCtrl(this, wxID_ANY, Slic3r::from_dot_to_local(Slic3r::to_string_nozero(1.3, 4)), wxDefaultPosition, size);
     txt_max_flow->SetToolTip(_L("Maximum extrusion multiplier."));
 
     wxString choices_min_overlap[] = { "0","10","20","30","40","50","60","70","80","90"};
@@ -112,44 +113,45 @@ void CalibrationFlowSpeedDialog::create_buttons(wxStdDialogButtonSizer* buttons)
     wxBoxSizer* hsizer_flow =new wxBoxSizer(wxHORIZONTAL);
     wxBoxSizer* hsizer_speed =new wxBoxSizer(wxHORIZONTAL);
 
-    hsizer_common->Add(new wxStaticText(this, wxID_ANY, _L("Patch weight:"), wxDefaultPosition, {9 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_common->Add(new wxStaticText(this, wxID_ANY, _L("Patch weight:"), wxDefaultPosition, {15 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_common->Add(cmb_gram);
-    hsizer_common->Add(new wxStaticText(this, wxID_ANY, _L("g"), wxDefaultPosition, {3 * em_unit(), -1}, wxALIGN_LEFT));
+    hsizer_common->Add(new wxStaticText(this, wxID_ANY, wxString(" ") + _L("g"), wxDefaultPosition, {4 * em_unit(), -1}, wxALIGN_LEFT));
     hsizer_common->AddSpacer(20);
-    hsizer_common->Add(new wxStaticText(this, wxID_ANY, _L("steps:"), wxDefaultPosition, {6 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_common->Add(new wxStaticText(this, wxID_ANY, _L("steps:"), wxDefaultPosition, {8 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_common->Add(cmb_nb_steps);
     //hsizer_common->AddSpacer(20);
     
-    hsizer_flow->Add(new wxStaticText(this, wxID_ANY, _L("Extrusion multiplier:") + " " + _L("min:"), wxDefaultPosition, {12 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_flow->Add(new wxStaticText(this, wxID_ANY, _L("Extrusion multiplier:") + wxString(" ") + _L("min:"), wxDefaultPosition, {15 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_flow->Add(txt_min_flow);
+    hsizer_flow->Add(new wxStaticText(this, wxID_ANY, wxString(" "), wxDefaultPosition, {4 * em_unit(), -1}, wxALIGN_LEFT));
     hsizer_flow->AddSpacer(20);
-    hsizer_flow->Add(new wxStaticText(this, wxID_ANY, _L("max:"), wxDefaultPosition, {6 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_flow->Add(new wxStaticText(this, wxID_ANY, _L("max:"), wxDefaultPosition, {8 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_flow->Add(txt_max_flow);
-    hsizer_flow->Add(new wxStaticText(this, wxID_ANY, wxString(" "), wxDefaultPosition, {3 * em_unit(), -1}, wxALIGN_LEFT));
+    hsizer_flow->Add(new wxStaticText(this, wxID_ANY, wxString(" "), wxDefaultPosition, {4 * em_unit(), -1}, wxALIGN_LEFT));
     hsizer_flow->AddSpacer(20);
     wxButton* bt_flow = new wxButton(this, wxID_FILE2, _L("Generate for multiple flows"), wxDefaultPosition, bt_size);
     bt_flow->Bind(wxEVT_BUTTON, &CalibrationFlowSpeedDialog::create_flow, this);
     hsizer_flow->Add(bt_flow);
 
-    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, _L("min overlap:"), wxDefaultPosition, {9 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, _L("min overlap:"), wxDefaultPosition, {15 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_overlap->Add(cmb_min_overlap);
-    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, _L("%"), wxDefaultPosition, {3 * em_unit(), -1}, wxALIGN_LEFT));
+    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, wxString(" ") + _L("%"), wxDefaultPosition, {4 * em_unit(), -1}, wxALIGN_LEFT));
     hsizer_overlap->AddSpacer(20);
-    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, _L("max overlap:"), wxDefaultPosition, {6 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, _L("max overlap:"), wxDefaultPosition, {8 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_overlap->Add(cmb_max_overlap);
-    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, wxString(" ") + _L("%"), wxDefaultPosition, {3 * em_unit(), -1}, wxALIGN_LEFT));
+    hsizer_overlap->Add(new wxStaticText(this, wxID_ANY, wxString(" ") + _L("%"), wxDefaultPosition, {4 * em_unit(), -1}, wxALIGN_LEFT));
     hsizer_overlap->AddSpacer(20);
     wxButton* bt_overlap = new wxButton(this, wxID_FILE3, _L("Generate for multiple overlaps"), wxDefaultPosition, bt_size); 
     bt_overlap->Bind(wxEVT_BUTTON, &CalibrationFlowSpeedDialog::create_overlap, this);
     hsizer_overlap->Add(bt_overlap);
 
-    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, _L("min speed:"), wxDefaultPosition, {9 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, _L("min speed:"), wxDefaultPosition, {15 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_speed->Add(txt_min_speed);
-    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, wxString(" ") + _L("mm/s"), wxDefaultPosition, {3 * em_unit(), -1}, wxALIGN_LEFT));
+    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, wxString(" ") + _L("mm/s"), wxDefaultPosition, {4 * em_unit(), -1}, wxALIGN_LEFT));
     hsizer_speed->AddSpacer(20);
-    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, _L("max speed:"), wxDefaultPosition, {6 * em_unit(), -1}, wxALIGN_RIGHT));
+    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, _L("max speed:"), wxDefaultPosition, {8 * em_unit(), -1}, wxALIGN_RIGHT));
     hsizer_speed->Add(txt_max_speed);
-    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, wxString(" ") +  _L("mm/s"), wxDefaultPosition, {3 * em_unit(), -1}, wxALIGN_LEFT));
+    hsizer_speed->Add(new wxStaticText(this, wxID_ANY, wxString(" ") + _L("mm/s"), wxDefaultPosition, {4 * em_unit(), -1}, wxALIGN_LEFT));
     hsizer_speed->AddSpacer(20);
     wxButton* bt_speed = new wxButton(this, wxID_FILE1, _L("Generate for multiple speeds"), wxDefaultPosition, bt_size);
     bt_speed->Bind(wxEVT_BUTTON, &CalibrationFlowSpeedDialog::create_speed, this);
@@ -181,7 +183,7 @@ std::tuple<float, float, Flow> CalibrationFlowSpeedDialog::get_cube_size(float o
     density = density / 1000.f;
 
     std::string str = cmb_gram->GetValue().ToStdString();
-    float weight = std::stof(str);
+    float weight = parse_float_all_locale(str);
 
     float nz = printer_config->option("nozzle_diameter")->get_float(0);
     // get max height
@@ -190,7 +192,7 @@ std::tuple<float, float, Flow> CalibrationFlowSpeedDialog::get_cube_size(float o
     float layer_height = print_config->option("layer_height")->get_float();
     layer_height = std::max(layer_height, float(print_config->get_abs_value("first_layer_height", nz)));
     max_height = int(max_height / layer_height) * layer_height;
-    
+
     //compute flow
     Flow flow;
     float mult_size_for_overlap = 1;
@@ -241,9 +243,9 @@ std::tuple<float, float, Flow> CalibrationFlowSpeedDialog::get_cube_size(float o
 void CalibrationFlowSpeedDialog::create_overlap(wxCommandEvent &event_args) 
 {
     std::string str_parse = cmb_min_overlap->GetValue().ToStdString();
-    float min_overlap = std::stof(str_parse);
+    float min_overlap = parse_float_all_locale(str_parse);
     str_parse = cmb_max_overlap->GetValue().ToStdString();
-    float max_overlap = std::stof(str_parse);
+    float max_overlap = parse_float_all_locale(str_parse);
 
     //const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
     //const DynamicPrintConfig* printer_config = this->gui_app->get_tab(Preset::TYPE_PRINTER)->get_config();
@@ -252,18 +254,19 @@ void CalibrationFlowSpeedDialog::create_overlap(wxCommandEvent &event_args)
     //full_config.apply(*printer_config);
     //full_config.apply(*filament_config);
     //float speed = full_config.get_computed_value("solid_infill_speed", 0);
-    
+
     const DynamicPrintConfig* filament_config = this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->get_config();
     float extrusion_mult = filament_config->option("extrusion_multiplier")->get_float(0);
 
     create_geometry(extrusion_mult, extrusion_mult, 0, 0, min_overlap, max_overlap);
 }
+
 void CalibrationFlowSpeedDialog::create_flow(wxCommandEvent &event_args) 
 {
-    std::string str_parse = txt_min_flow->GetValue().ToStdString();
-    float min_flow = std::stof(str_parse);
-    str_parse = txt_max_flow->GetValue().ToStdString();
-    float max_flow = std::stof(str_parse);
+    std::string str_parse_min = txt_min_flow->GetValue().ToStdString();
+    float min_flow = parse_float_all_locale(str_parse_min);
+    std::string str_parse_max = txt_max_flow->GetValue().ToStdString();
+    float max_flow = parse_float_all_locale(str_parse_max);
 
     //const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
     //const DynamicPrintConfig* printer_config = this->gui_app->get_tab(Preset::TYPE_PRINTER)->get_config();
@@ -272,7 +275,7 @@ void CalibrationFlowSpeedDialog::create_flow(wxCommandEvent &event_args)
     //full_config.apply(*printer_config);
     //full_config.apply(*filament_config);
     //float speed = full_config.get_computed_value("solid_infill_speed", 0);
-    
+
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
     const DynamicPrintConfig* filament_config = this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->get_config();
     float overlap      = print_config->option("solid_infill_overlap")->get_float();
@@ -282,13 +285,14 @@ void CalibrationFlowSpeedDialog::create_flow(wxCommandEvent &event_args)
 
     create_geometry(min_flow, max_flow, 0, 0, std::min(80.f, overlap), std::min(80.f, overlap));
 }
+
 void CalibrationFlowSpeedDialog::create_speed(wxCommandEvent &event_args) 
 {
     std::string str_parse = txt_min_speed->GetValue().ToStdString();
-    float min_speed = std::stof(str_parse);
+    float min_speed = parse_float_all_locale(str_parse);
     str_parse = txt_max_speed->GetValue().ToStdString();
-    float max_speed = std::stof(str_parse);
-    
+    float max_speed = parse_float_all_locale(str_parse);
+
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
     const DynamicPrintConfig* filament_config = this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->get_config();
     float overlap      = print_config->option("solid_infill_overlap")->get_float();
@@ -299,6 +303,7 @@ void CalibrationFlowSpeedDialog::create_speed(wxCommandEvent &event_args)
 
     create_geometry(extrusion_mult, extrusion_mult, min_speed, max_speed, overlap, overlap);
 }
+
 void CalibrationFlowSpeedDialog::create_geometry(
     float min_flow, //0-2
     float max_flow, //0-2
@@ -321,10 +326,10 @@ void CalibrationFlowSpeedDialog::create_geometry(
         //disable auto-center for this calibration.
         gui_app->app_config->set("autocenter", "0");
     }
-    
+
     std::string str_parse = cmb_nb_steps->GetValue().ToStdString();
     int         nb_steps  = std::stoi(str_parse);
-    
+
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
     const DynamicPrintConfig* printer_config = this->gui_app->get_tab(Preset::TYPE_PRINTER)->get_config();
     const DynamicPrintConfig* filament_config = this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->get_config();
@@ -391,7 +396,7 @@ void CalibrationFlowSpeedDialog::create_geometry(
                     new ConfigOptionPercent(100 * (min_flow + i * (max_flow - min_flow) / (nb_steps - 1)) / extrusion_mult));
             }
         }
-        
+
         float overlap = max_overlap;
         if (nb_steps > 1 && min_overlap < max_overlap)
             overlap = min_overlap + i * (max_overlap - min_overlap) / (nb_steps - 1);
@@ -409,7 +414,7 @@ void CalibrationFlowSpeedDialog::create_geometry(
         //objs[i]->config.set_key_value("first_layer_extrusion_width", new ConfigOptionFloatOrPercent(flow.width(), false));
 
         objs[i]->config.set_key_value("first_layer_size_compensation", new ConfigOptionFloat(0));
-        
+
         // no brim (but a skirt for primming)
         objs[i]->config.set_key_value("brim_ears", new ConfigOptionBool(false));
         objs[i]->config.set_key_value("brim_width", new ConfigOptionFloat(0));
@@ -448,7 +453,7 @@ void CalibrationFlowSpeedDialog::create_geometry(
     //update everything, easier to code.
     ObjectList* obj = this->gui_app->obj_list();
     obj->update_after_undo_redo();
-    
+
     // arrange if needed, after new settings, to take them into account
     if (true) { //has_to_arrange) {
         //update print config (done at reslice but we need it here)
@@ -458,7 +463,7 @@ void CalibrationFlowSpeedDialog::create_geometry(
         plat->arrange(ui_job_worker, ArrangeSelectionMode::CurrentBedFull);
         ui_job_worker.wait_for_current_job(20000);
     }
-    
+
     plat->reslice();
 
     if (autocenter) {

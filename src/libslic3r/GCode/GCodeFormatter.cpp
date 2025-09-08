@@ -9,6 +9,12 @@
 
 namespace Slic3r {
 
+int GCodeFormatter::quantize_int(double v, size_t ndigits) const {
+    if (ndigits == size_t(-1)) {
+        ndigits = m_gcode_precision_xyz;
+    }
+    return int(std::round(v * pow_10[ndigits]));
+}
 
 bool GCodeFormatter::emit_xy(const Vec2d &point, std::string &old_x, std::string &old_y)
 {

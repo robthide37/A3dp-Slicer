@@ -1298,7 +1298,7 @@ static std::vector<std::pair<ExPolygon, ExPolygon>> inner_offset(const ExPolygon
 //#define INCLUDE_SUPPORTS_IN_BOUNDARY
 
 // called by AvoidCrossingPerimeters::travel_to()
-static ExPolygons get_boundary(const Layer &layer, std::vector<std::pair<ExPolygon, ExPolygon>> &slice_2_boundary, ExPolygons &to_avoid)
+static ExPolygons get_boundary(const Layer &layer, uint16_t extruder_id, std::vector<std::pair<ExPolygon, ExPolygon>> &slice_2_boundary, ExPolygons &to_avoid)
 {
     const coord_t perimeter_spacing = get_perimeter_spacing(layer);
     const coord_t perimeter_offset  = perimeter_spacing / 2;
@@ -1355,7 +1355,58 @@ static ExPolygons get_boundary(const Layer &layer, std::vector<std::pair<ExPolyg
         top_layer_polygons = union_ex(top_layer_polygons);
         boundary = union_ex(boundary);
         append(to_avoid, top_layer_polygons);
-        return diff_ex(boundary, top_layer_polygons);
+        boundary = diff_ex(boundary, top_layer_polygons);
+    }
+
+    // multiple extruders?
+    // clip by region
+    const LayerRegionPtrs &all_regions = layer.regions();
+    bool multiple_extruders = false;
+    for (const LayerRegion *lregion : all_regions) {
+            multiple_extruders = multiple_extruders ||
+                lregion->region().config().perimeter_extruder.value !=
+                    extruder_id + 1;
+            multiple_extruders = multiple_extruders ||
+                lregion->region().config().infill_extruder.value !=
+                    extruder_id + 1;
+            multiple_extruders = multiple_extruders ||
+                lregion->region().config().solid_infill_extruder.value !=
+                    extruder_id + 1;
+            if (multiple_extruders) {
+                break;
+            }
+    }
+    if (multiple_extruders) {
+        ExPolygons clip;
+        for (const LayerRegion *lregion : all_regions) {
+            bool same_extruders = lregion->region().config().perimeter_extruder.value ==
+                    lregion->region().config().infill_extruder.value &&
+                lregion->region().config().infill_extruder.value ==
+                    lregion->region().config().solid_infill_extruder.value;
+
+            if (same_extruders) {
+                if (lregion->region().config().perimeter_extruder.value ==
+                    extruder_id + 1) {
+                    clip = union_ex(clip, lregion->get_cached_slices());
+                }
+            } else {
+                if (lregion->region().config().infill_extruder.value !=
+                    lregion->region().config().solid_infill_extruder.value) {
+                    BOOST_LOG_TRIVIAL(warning) << "";
+                }
+                if (lregion->region().config().perimeter_extruder.value ==
+                    extruder_id + 1) {
+                    assert(lregion->region().config().infill_extruder.value !=
+                            extruder_id + 1);
+                    clip = union_ex(clip, diff_ex(lregion->get_cached_slices(), lregion->fill_expolygons()));
+                } else {
+                    assert(lregion->region().config().infill_extruder.value ==
+                            extruder_id + 1);
+                    clip = union_ex(clip, lregion->fill_expolygons());
+                }
+            }
+        }
+        boundary = intersection_ex(boundary, offset_ex(clip, SCALED_EPSILON * 10 /*safety offset*/));
     }
 
     return boundary;
@@ -1462,15 +1513,16 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCodeGenerator &gcodegen, cons
     Vec2d startf = start.cast<double>();
     Vec2d endf   = end  .cast<double>();
 
-    const ExPolygons &lslices           = gcodegen.layer()->lslices();
+    //const ExPolygons &lslices           = gcodegen.layer()->lslices();
     const coord_t     perimeter_spacing = get_perimeter_spacing(*gcodegen.layer());
     bool              is_support_layer  = dynamic_cast<const SupportLayer *>(gcodegen.layer()) != nullptr;
+
     if (!use_external && (is_support_layer || (!m_lslices_offset.empty() 
          /* already done by the caller && !any_expolygon_contains(m_lslices_offset, m_lslices_offset_bboxes, m_grid_lslices_offset, travel)*/))) {
         // Initialize m_internal only when it is necessary.
         if (m_internal.boundaries.empty()) {
             std::vector<std::pair<ExPolygon, ExPolygon>> boundary_growth;
-            init_boundary(&m_internal, to_polygons(get_boundary(*gcodegen.layer(), boundary_growth, m_internal.to_avoid)), perimeter_spacing * 2);
+            init_boundary(&m_internal, to_polygons(get_boundary(*gcodegen.layer(), gcodegen.last_extruder(), boundary_growth, m_internal.to_avoid)), perimeter_spacing * 2);
             m_internal.boundary_growth = std::move(boundary_growth);
         }
 

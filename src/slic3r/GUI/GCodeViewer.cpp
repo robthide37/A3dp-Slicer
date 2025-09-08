@@ -4396,10 +4396,10 @@ void GCodeViewer::render_legend(float& legend_height)
 
         std::string longest_used_filament_string;
         for (double item : used_filaments_m) {
-            char buffer[64];
-            ::sprintf(buffer, imperial_units ? "%.2f in" : "%.2f m", item);
-            if (::strlen(buffer) > longest_used_filament_string.length())
-                longest_used_filament_string = buffer;
+            std::string str = Slic3r::to_string_nozero(item, this->decimal_precision);
+            if (str.size() + (imperial_units ? 3 : 2) > longest_used_filament_string.size()) {
+                longest_used_filament_string = str + (imperial_units ? " in" : " m");
+            }
         }
 
         offsets = calculate_offsets(labels, times, { _u8L("Feature type"), _u8L("Time"), longest_percentage_string, longest_used_filament_string }, icon_size);

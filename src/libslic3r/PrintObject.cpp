@@ -1343,6 +1343,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "external_perimeter_extrusion_spacing"
             || opt_key == "external_perimeter_extrusion_width"
             || opt_key == "external_perimeters_vase"
+            || opt_key == "external_perimeters_vase_min_height"
             || opt_key == "gap_fill_extension"
             || opt_key == "gap_fill_last"
             || opt_key == "gap_fill_max_width"

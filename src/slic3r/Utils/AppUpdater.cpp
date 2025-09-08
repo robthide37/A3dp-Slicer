@@ -325,7 +325,8 @@ void AppUpdater::priv::version_check(const std::string& version_check_url)
 {
 	assert(!version_check_url.empty());
 	std::string error_message;
-	bool res = http_get_file(version_check_url, 1024
+    // 02/09/2025: for superslcier, it's currently at 9k char in the string body. 32kio should be plenty.
+	bool res = http_get_file(version_check_url, 32 * 1024
 		// on_progress
 		, [](Http::Progress progress) { return true; }
 		// on_complete

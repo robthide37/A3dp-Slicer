@@ -38,7 +38,7 @@ void CalibrationOverBridgeDialog::create_buttons(wxStdDialogButtonSizer* buttons
 
 void CalibrationOverBridgeDialog::create_geometry1(wxCommandEvent& event_args) {
     Plater* plat = this->main_frame->plater();
-    if (!plat->new_project(L("'Above the Bridges flow calibration")))
+    if (!plat->new_project(L("Above the Bridges flow calibration")))
         return;
     create_geometry(true);
 }
@@ -87,7 +87,7 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     }
     for (size_t i = 0; i < 6; i++)
         model.objects[objs_idx[i]]->scale(xyz_scale * 1.5f, xyz_scale * 1.5f, xyz_scale);
-    
+
     // it's rotated but not around the good origin: correct that
     double init_z_rotate_angle = Geometry::deg2rad(plat->config()->opt_float("init_z_rotate"));
     Matrix3d rot_matrix = Eigen::Quaterniond(Eigen::AngleAxisd(init_z_rotate_angle, Vec3d{0,0,1})).toRotationMatrix();
@@ -124,17 +124,18 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     /// --- custom config ---
     for (size_t i = 0; i < 6; i++) {
         model.objects[objs_idx[i]]->config.set_key_value("perimeters", new ConfigOptionInt(2));
-        model.objects[objs_idx[i]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(0));
+        model.objects[objs_idx[i]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(1)); // at least the first, to prevent adhesion issues.
         model.objects[objs_idx[i]]->config.set_key_value("top_solid_layers", new ConfigOptionInt(3));
         model.objects[objs_idx[i]]->config.set_key_value("fill_density", new ConfigOptionPercent(5.5));
         model.objects[objs_idx[i]]->config.set_key_value("fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
         model.objects[objs_idx[i]]->config.set_key_value("infill_dense", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value("ironing", new ConfigOptionBool(false));
         //calibration setting. Use 100 & 5 step as it's the numbers printed on the samples
-        if(over_bridge)
+        if (over_bridge) {
             model.objects[objs_idx[i]]->config.set_key_value("over_bridge_flow_ratio", new ConfigOptionPercent(/*print_config->option<ConfigOptionPercent>("over_bridge_flow_ratio")->get_abs_value(100)*/100 + i * 5));
-        else
+        } else {
             model.objects[objs_idx[i]]->config.set_key_value("fill_top_flow_ratio", new ConfigOptionPercent(/*print_config->option<ConfigOptionPercent>("fill_top_flow_ratio")->get_abs_value(100)*/100 + i * 5));
+        }
         model.objects[objs_idx[i]]->config.set_key_value("layer_height", new ConfigOptionFloat(nozzle_diameter / 2));
         model.objects[objs_idx[i]]->config.set_key_value("external_infill_margin", new ConfigOptionFloatOrPercent(400,true));
         model.objects[objs_idx[i]]->config.set_key_value("top_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipSmooth));

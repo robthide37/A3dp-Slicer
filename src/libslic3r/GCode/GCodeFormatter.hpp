@@ -78,6 +78,7 @@ public:
     {
         return {quantize(pt.x(), m_gcode_precision_xyz), quantize(pt.y(), m_gcode_precision_xyz), quantize(pt.z(), m_gcode_precision_xyz)};
     }
+    int quantize_int(double v, size_t ndigits = size_t(-1)) const;
 
     // retunr the pointer to the begining of the digit written (without the axis)
     // please don't use it but the other safer methods, if available.

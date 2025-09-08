@@ -205,6 +205,8 @@ void CalibrationRetractionDialog::create_geometry(wxCommandEvent& event_args) {
             model.objects[objs_idx[id_item]]->volumes[1]->rotate(PI / 2, Vec3d(0, 0, 1));
             model.objects[objs_idx[id_item]]->volumes[1]->rotate(-PI / 2, Vec3d(1, 0, 0));
             //model.objects[objs_idx[id_item]]->volumes[1]->rotate(Geometry::deg2rad(plat->config()->opt_float("init_z_rotate")), Axis::Z);
+        } else {
+            filament_temp_item_name.push_back("");
         }
         for (int num_retract = 0; num_retract < nb_retract; num_retract++) {
             add_part(model.objects[objs_idx[id_item]], 
