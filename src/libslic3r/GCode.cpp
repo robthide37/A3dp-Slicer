@@ -6946,39 +6946,7 @@ std::pair<double, double> GCodeGenerator::_compute_acceleration(const ExtrusionP
     return {acceleration, travel_acceleration};
 }
 
-void GCodeGenerator::cooldown_marker_init() {
-    if (_cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)].empty()) {
-        std::string allow_speed_change = ";_EXTRUDE_SET_SPEED";
-        //only change speed on external perimeter (and similar) speed if really necessary.
-        std::string maybe_allow_speed_change = ";_EXTRUDE_SET_SPEED_MAYBE";
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::None)]                 = "";
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Perimeter)]            = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)]    = maybe_allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::OverhangPerimeter)]    = "";
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::InternalInfill)]       = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::SolidInfill)]          = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::TopSolidInfill)]       = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Ironing)]              = maybe_allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::BridgeInfill)]         = "";
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = maybe_allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ThinWall)]             = maybe_allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::GapFill)]              = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Skirt)]                = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::SupportMaterial)]      = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::SupportMaterialInterface)] = maybe_allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::WipeTower)]                = allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Milling)]                  = "";
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Custom)]                   = maybe_allow_speed_change;
-        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Travel)]                   = maybe_allow_speed_change;
-    }
-}
-
-std::string GCodeGenerator::_travel_before_extrude(const ExtrusionPath &path, const std::string_view description_in, double speed_mm_s) {
-    std::string gcode;
-    std::string description{ description_in };
-
-    auto [/*double*/acceleration, /*double*/travel_acceleration] = _compute_acceleration(path);
-
+std::pair<double, double> GCodeGenerator::_compute_pressure_advance(const ExtrusionPath &path) const {
     double pa = m_config.filament_default_pa.get_at(m_writer.tool()->id());
     double travel_pa = m_config.filament_travel_pa.get_abs_value(m_writer.tool()->id(), pa);
     if (!m_config.filament_travel_pa.is_enabled(m_writer.tool()->id())) {
@@ -7029,13 +6997,13 @@ std::string GCodeGenerator::_travel_before_extrude(const ExtrusionPath &path, co
         case GCodeExtrusionRole::ThinWall:
             pa = m_config.get_computed_value("filament_thin_walls_pa", m_writer.tool()->id());
             break;
-        default:
-            break;
+        default: break;
         }
 
         if (this->on_first_layer() && m_config.filament_first_layer_pa.get_at(m_writer.tool()->id()).value > 0) {
             pa = std::min(pa, m_config.filament_first_layer_pa.get_abs_value(m_writer.tool()->id(), pa));
-        } else if (this->object_layer_over_raft() && m_config.filament_first_layer_pa_over_raft.get_at(m_writer.tool()->id()).value > 0) {
+        } else if (this->object_layer_over_raft() &&
+                   m_config.filament_first_layer_pa_over_raft.get_at(m_writer.tool()->id()).value > 0) {
             pa = m_config.filament_first_layer_pa_over_raft.get_abs_value(m_writer.tool()->id(), pa);
         }
         if (pa < 0) {
@@ -7045,12 +7013,41 @@ std::string GCodeGenerator::_travel_before_extrude(const ExtrusionPath &path, co
         pa = 0;
         travel_pa = -1;
     }
+    return {pa, travel_pa};
+}
 
-    if (travel_pa >= 0) {
-        m_writer.set_pressure_advance(travel_pa);
-    } else {
-        m_writer.set_pressure_advance(pa);
+void GCodeGenerator::cooldown_marker_init() {
+    if (_cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)].empty()) {
+        std::string allow_speed_change = ";_EXTRUDE_SET_SPEED";
+        //only change speed on external perimeter (and similar) speed if really necessary.
+        std::string maybe_allow_speed_change = ";_EXTRUDE_SET_SPEED_MAYBE";
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::None)]                 = "";
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Perimeter)]            = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ExternalPerimeter)]    = maybe_allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::OverhangPerimeter)]    = "";
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::InternalInfill)]       = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::SolidInfill)]          = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::TopSolidInfill)]       = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Ironing)]              = maybe_allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::BridgeInfill)]         = "";
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::InternalBridgeInfill)] = maybe_allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::ThinWall)]             = maybe_allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::GapFill)]              = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Skirt)]                = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::SupportMaterial)]      = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::SupportMaterialInterface)] = maybe_allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::WipeTower)]                = allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Milling)]                  = "";
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Custom)]                   = maybe_allow_speed_change;
+        _cooldown_marker_speed[uint8_t(GCodeExtrusionRole::Travel)]                   = maybe_allow_speed_change;
     }
+}
+
+std::string GCodeGenerator::_travel_before_extrude(const ExtrusionPath &path, const std::string_view description_in, double speed_mm_s) {
+    std::string gcode;
+    std::string description{ description_in };
+
+    auto [/*double*/acceleration, /*double*/travel_acceleration] = _compute_acceleration(path);
 
     bool moved_to_point = last_pos_defined() && last_pos().coincides_with_epsilon(path.first_point());
     if (m_config.travel_deceleration_use_target) {
@@ -7215,6 +7212,14 @@ std::string GCodeGenerator::_before_extrude(const ExtrusionPath &path, const std
     // compute speed here to be able to know it for travel_deceleration_use_target
     std::string speed_comment = "";
     speed_mm_s = _compute_speed_mm_per_sec(path, speed_mm_s, m_overhang_fan_override, m_config.gcode_comments ? &speed_comment : nullptr);
+    auto[pa, travel_pa] = _compute_pressure_advance(path);
+
+    //set pa before travel (and so before the previous wipe...)
+    if (travel_pa >= 0) {
+        m_writer.set_pressure_advance(travel_pa);
+    } else {
+        m_writer.set_pressure_advance(pa);
+    }
 
     gcode += this->_travel_before_extrude(path, description_in, speed_mm_s);
 
