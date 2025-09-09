@@ -336,6 +336,8 @@ bool WebView::DownloadAndInstallWebViewRuntime()
 {
     return DownloadAndInstallWV2RT() == 0;
 }
+#else
+bool WebView::DownloadAndInstallWebViewRuntime() { return true; }
 #endif
 
 void WebView::LoadUrl(wxWebView * webView, wxString const &url)
