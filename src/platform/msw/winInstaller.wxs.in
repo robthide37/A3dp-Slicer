@@ -1,7 +1,7 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product
     Id="*"
-    Name="SuperSlicer$(var.ReleaseSuffix)"
+    Name="@SLIC3R_APP_KEY@$(var.ReleaseSuffix)"
     Language="1033"
     Version="$(var.InstallerVersion)"
     Manufacturer="Supermerill"
@@ -11,8 +11,8 @@
       InstallerVersion="500"
       Compressed="yes"
       InstallScope="perMachine"
-      Description="SuperSlicer - Advanced 3D printing slicer"
-      Comments="SuperSlicer installer package"
+      Description="@SLIC3R_APP_NAME@ - Advanced 3D printing slicer"
+      Comments="@SLIC3R_APP_NAME@ installer package"
     />
 
     <MediaTemplate EmbedCab="yes" />
@@ -21,19 +21,19 @@
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
-        <Directory Id="INSTALLFOLDER" Name="SuperSlicer"></Directory>
+        <Directory Id="INSTALLFOLDER" Name="@SLIC3R_APP_KEY@"></Directory>
       </Directory>
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="SuperSlicer" />
+        <Directory Id="ApplicationProgramsFolder" Name="@SLIC3R_APP_KEY@" />
       </Directory>
       <Directory Id="DesktopFolder" Name="Desktop" />
     </Directory>
 
     <Feature
       Id="DefaultFeature"
-      Title="SuperSlicer Application"
+      Title="@SLIC3R_APP_NAME@ Application"
       Level="1"
-      Description="The main SuperSlicer application and required files."
+      Description="The main @SLIC3R_APP_NAME@ application and required files."
     >
       <ComponentGroupRef Id="Package" />
       <ComponentRef Id="ApplicationShortcut" />
@@ -45,16 +45,16 @@
       <Component Id="ApplicationShortcut" Guid="*">
         <Shortcut
           Id="ApplicationStartMenuShortcut"
-          Name="SuperSlicer"
+          Name="@SLIC3R_APP_KEY@"
           Description="Advanced 3D printing slicer"
-          Target="[INSTALLFOLDER]superslicer.exe"
+          Target="[INSTALLFOLDER]@SLIC3R_APP_CMD@.exe"
           WorkingDirectory="INSTALLFOLDER"
-          Icon="SuperSlicerIcon.exe"
+          Icon="@SLIC3R_APP_PROG_ID@Icon.exe"
         />
         <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
         <RegistryValue
           Root="HKCU"
-          Key="Software\SuperSlicer\StartMenu"
+          Key="Software\@SLIC3R_APP_KEY@\StartMenu"
           Name="installed"
           Type="integer"
           Value="1"
@@ -67,15 +67,15 @@
       <Component Id="DesktopShortcut" Guid="*">
         <Shortcut
           Id="ApplicationDesktopShortcut"
-          Name="SuperSlicer"
+          Name="@SLIC3R_APP_KEY@"
           Description="Advanced 3D printing slicer"
-          Target="[INSTALLFOLDER]superslicer.exe"
+          Target="[INSTALLFOLDER]@SLIC3R_APP_CMD@.exe"
           WorkingDirectory="INSTALLFOLDER"
-          Icon="SuperSlicerIcon.exe"
+          Icon="@SLIC3R_APP_PROG_ID@Icon.exe"
         />
         <RegistryValue
           Root="HKCU"
-          Key="Software\SuperSlicer\Desktop"
+          Key="Software\@SLIC3R_APP_KEY@\Desktop"
           Name="installed"
           Type="integer"
           Value="1"
@@ -94,22 +94,22 @@
     />
 
     <Icon
-      Id="SuperSlicerIcon.exe"
-      SourceFile="$(var.SourceDir)\superslicer.exe"
+      Id="@SLIC3R_APP_PROG_ID@Icon.exe"
+      SourceFile="$(var.SourceDir)\@SLIC3R_APP_CMD@.exe"
     />
-    <Property Id="ARPPRODUCTICON" Value="SuperSlicerIcon.exe" />
+    <Property Id="ARPPRODUCTICON" Value="@SLIC3R_APP_PROG_ID@Icon.exe" />
 
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="CleanupComponent" Guid="*">
         <RemoveFolder Id="INSTALLFOLDER" On="uninstall" />
         <RegistryKey
           Root="HKCU"
-          Key="Software\SuperSlicer"
+          Key="Software\@SLIC3R_APP_KEY@"
           ForceDeleteOnUninstall="yes"
         />
         <RegistryValue
           Root="HKCU"
-          Key="Software\SuperSlicer\Cleanup"
+          Key="Software\@SLIC3R_APP_KEY@\Cleanup"
           Name="installed"
           Type="integer"
           Value="1"

@@ -10,6 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-22.04
 
+    env:
+      EXEC_NAME: "${{ github.event.repository.name }}"
     steps:
     - uses: actions/checkout@v3
       with:
@@ -36,10 +38,10 @@ jobs:
         path: deps/build/destdir
     - if: steps.cache-action.outputs.cache-hit != 'true'
       name: build deps if new cache
-      run: ./BuildLinux.sh -g 2 -d
+      run: ./BuildLinux.sh -gd
       
     - name: slicer, tar & appimage
-      run: ./BuildLinux.sh -g 2 -s -i
+      run: ./BuildLinux.sh -gsi
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:

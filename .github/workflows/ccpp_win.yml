@@ -87,19 +87,15 @@ jobs:
     - name: copy dll
       working-directory: ./build
       run: msbuild /m /P:Configuration=RelWithDebInfo src\slic3rDllsCopy.vcxproj
-    - name: create directory and copy into it
-      working-directory: ./build
-      run: ls
-    - name: create directory and copy into it
+    - name: create package directory
       working-directory: ./build
       shell: powershell
-        #todo: add the opengl folder
       run: mkdir package
-    - name: copy from release
+    - name: download dll package
       working-directory: ./build
       shell: powershell
       run: '(new-object System.Net.WebClient).DownloadFile("https://github.com/supermerill/SuperSlicer_deps/releases/download/1.8/Slic3r_win_build.zip", "Slic3r_win_build.zip")'
-    - name: unzip
+    - name: unzip dll package
       working-directory: ./build
       shell: cmd
       run: '"C:/Program Files/7-Zip/7z.exe" x Slic3r_win_build.zip'
@@ -133,17 +129,17 @@ jobs:
         path: build/package/
 
 # MSI CREATION
-  create_msi:
-    runs-on: windows-2022
-    needs: build
+  # create_msi:
+    # runs-on: windows-2022
+    # needs: build
 
-    steps:
-    - uses: actions/checkout@v3
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: nightly_win64
-        path: build/package
+    # steps:
+    # - uses: actions/checkout@v3
+    # - name: Download build artifact
+      # uses: actions/download-artifact@v4
+      # with:
+        # name: nightly_win64
+        # path: build/package
     - name: Install WiX Toolset
       run: choco install wixtoolset -y
     - name: Prepare license file for MSI
@@ -172,11 +168,11 @@ jobs:
       shell: cmd
       working-directory: ./build
       run: |
-        set MSIFileName=SuperSlicer_%InstallerVersion%.msi
-        candle.exe -dSourceDir="package" -dInstallerVersion="%InstallerVersion%" -dReleaseSuffix="%ReleaseSuffix%" ..\winInstaller.wxs files.wxs
+        set MSIFileName=${{ github.event.repository.name }}_%InstallerVersion%.msi
+        candle.exe -dSourceDir="package" -dInstallerVersion="%InstallerVersion%" -dReleaseSuffix="%ReleaseSuffix%" src\winInstaller.wxs files.wxs
         light.exe -b package -ext WixUIExtension winInstaller.wixobj files.wixobj -o %MSIFileName% -sw1076
     - name: Upload MSI artifact
       uses: actions/upload-artifact@v4
       with:
-        name: nightly_win64_MSI_${{ env.InstallerVersion }}
-        path: build/SuperSlicer_${{ env.InstallerVersion }}.msi
+        name: nightly_${{ github.event.repository.name }}-win64-${{ env.InstallerVersion }}.msi
+        path: build/${{ github.event.repository.name }}_${{ env.InstallerVersion }}.msi
