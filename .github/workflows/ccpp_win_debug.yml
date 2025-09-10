@@ -8,7 +8,7 @@ on:
 jobs:
 
   build_dep:
-    runs-on: windows-2019
+    runs-on: windows-2022
 
     steps:
     - uses: actions/checkout@v3
@@ -25,11 +25,11 @@ jobs:
       name: build deps if new cache
       working-directory: ./deps/build
       run: |
-        cmake .. -G "Visual Studio 16 2019" -A x64
+        cmake .. -G "Visual Studio 17 2022" -A x64
         msbuild /m ALL_BUILD.vcxproj
 
   build_pot:
-    runs-on: windows-2019
+    runs-on: windows-2022
     needs: build_dep
     
     steps:
@@ -64,7 +64,7 @@ jobs:
     - run: mkdir build
     - name: cmake
       working-directory: ./build
-      run: cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="d:\a\${{ github.event.repository.name }}\${{ github.event.repository.name }}\deps\destdir\usr\local"
+      run: cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="d:\a\${{ github.event.repository.name }}\${{ github.event.repository.name }}\deps\destdir\usr\local"
     - name: make .mo
       working-directory: ./build
       run: msbuild /m /P:Configuration=RelWithDebInfo gettext_po_to_mo.vcxproj
@@ -73,7 +73,7 @@ jobs:
       run: msbuild /m /P:Configuration=RelWithDebInfo gettext_make_pot.vcxproj
 
   build:
-    runs-on: windows-2019
+    runs-on: windows-2022
     needs: build_dep
     
     steps:
