@@ -39,6 +39,7 @@ jobs:
       working-directory: ./resources/profiles
       run: git submodule update --init
     - run: mkdir deps/destdir
+    - run: mkdir deps/destdir/usr
     - name: dep cache
       id: cache-action
       uses: actions/cache@v3
