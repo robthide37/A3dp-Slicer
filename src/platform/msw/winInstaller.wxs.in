@@ -49,7 +49,7 @@
           Description="Advanced 3D printing slicer"
           Target="[INSTALLFOLDER]@SLIC3R_APP_CMD@.exe"
           WorkingDirectory="INSTALLFOLDER"
-          Icon="@SLIC3R_APP_KEY@Icon.exe"
+          Icon="A3dp_SlicerIcon_exe"
         />
         <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
         <RegistryValue
@@ -71,7 +71,7 @@
           Description="Advanced 3D printing slicer"
           Target="[INSTALLFOLDER]@SLIC3R_APP_CMD@.exe"
           WorkingDirectory="INSTALLFOLDER"
-          Icon="@SLIC3R_APP_KEY@Icon.exe"
+          Icon="A3dp_SlicerIcon_exe"
         />
         <RegistryValue
           Root="HKCU"
@@ -94,10 +94,10 @@
     />
 
     <Icon
-      Id="@SLIC3R_APP_KEY@Icon.exe"
+      Id="A3dp_SlicerIcon_exe"
       SourceFile="$(var.SourceDir)\@SLIC3R_APP_CMD@.exe"
     />
-    <Property Id="ARPPRODUCTICON" Value="@SLIC3R_APP_KEY@Icon.exe" />
+    <Property Id="ARPPRODUCTICON" Value="A3dp_SlicerIcon_exe" />
 
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="CleanupComponent" Guid="*">
