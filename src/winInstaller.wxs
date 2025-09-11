@@ -1,0 +1,121 @@
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="A3dp-Slicer$(var.ReleaseSuffix)"
+    Language="1033"
+    Version="$(var.InstallerVersion)"
+    Manufacturer="A3dp-Slicer"
+    UpgradeCode="c8bfb05c-4ec5-4e18-9b6c-4b6c3e8e2b2a"
+  >
+    <Package
+      InstallerVersion="500"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Description="A3dp-Slicer - Advanced 3D printing slicer"
+      Comments="A3dp-Slicer installer package"
+    />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="A3dp-Slicer"></Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="A3dp-Slicer" />
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+
+    <Feature
+      Id="DefaultFeature"
+      Title="A3dp-Slicer Application"
+      Level="1"
+      Description="The main A3dp-Slicer application and required files."
+    >
+      <ComponentGroupRef Id="Package" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="CleanupComponent" />
+    </Feature>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="*">
+        <Shortcut
+          Id="ApplicationStartMenuShortcut"
+          Name="A3dp-Slicer"
+          Description="Advanced 3D printing slicer"
+          Target="[INSTALLFOLDER]a3dp-slicer.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="a3dp-slicer.exe"
+        />
+        <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\A3dp-Slicer\StartMenu"
+          Name="installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes"
+        />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="*">
+        <Shortcut
+          Id="ApplicationDesktopShortcut"
+          Name="A3dp-Slicer"
+          Description="Advanced 3D printing slicer"
+          Target="[INSTALLFOLDER]a3dp-slicer.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="a3dp-slicer.exe"
+        />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\A3dp-Slicer\Desktop"
+          Name="installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes"
+        />
+      </Component>
+    </DirectoryRef>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="WixUI_InstallDir" />
+
+    <WixVariable
+      Id="WixUILicenseRtf"
+      Value="$(var.SourceDir)\LICENSE.rtf"
+      Overridable="yes"
+    />
+
+    <Icon
+      Id="a3dp-slicer.exe"
+      SourceFile="$(var.SourceDir)\a3dp-slicer.exe"
+    />
+    <Property Id="ARPPRODUCTICON" Value="a3dp-slicer.exe" />
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="CleanupComponent" Guid="*">
+        <RemoveFolder Id="INSTALLFOLDER" On="uninstall" />
+        <RegistryKey
+          Root="HKCU"
+          Key="Software\A3dp-Slicer"
+          ForceDeleteOnUninstall="yes"
+        />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\A3dp-Slicer\Cleanup"
+          Name="installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes"
+        />
+      </Component>
+    </DirectoryRef>
+  </Product>
+</Wix>
