@@ -21,6 +21,7 @@
 #include "Downloader.hpp"
 
 #include <wx/app.h>
+#include <wx/busyinfo.h>
 #include <wx/colour.h>
 #include <wx/font.h>
 #include <wx/string.h>
@@ -70,6 +71,8 @@ enum FileType {
     FT_STEP,
     FT_AMF,
     FT_3MF,
+    FT_3MF_TRSF, //3mf without baked transformation in mesh
+    FT_3MF_UNKBAKE, //3mf with baked transformation in mesh, and will be unbake
     FT_GCODE,
     FT_MODEL,
     FT_PROJECT,
@@ -288,19 +291,18 @@ public:
     void            calibration_pressureadv_dialog();
     void            freecad_script_dialog();
     void            tiled_canvas_dialog();
+    //void            support_tuning(); //have to do multiple, in a submenu
+    bool            load_project(wxWindow *parent, wxString& input_file) const;
+    void            import_model(wxWindow *parent, wxArrayString& input_files) const;
+    void            import_model_hueforge(wxWindow* parent, wxString& input_file) const;
+    void            import_zip(wxWindow* parent, wxString& input_file) const;
+    void            load_gcode(wxWindow* parent, wxString& input_file) const;
     void            show_printer_webview_tab();
 
     // Webview
     bool m_adding_script_handler{false};
     bool is_adding_script_handler() { return m_adding_script_handler; }
     void set_adding_script_handler(bool status) { m_adding_script_handler = status; }
-
-    // void            support_tuning(); //have to do multiple, in a submenu
-    void load_project(wxWindow *parent, wxString &input_file) const;
-    void import_model(wxWindow *parent, wxArrayString &input_files) const;
-    void import_model_modifier(wxWindow* parent, wxString& input_file) const;
-    void import_zip(wxWindow *parent, wxString &input_file) const;
-    void load_gcode(wxWindow *parent, wxString &input_file) const;
 
     static bool catch_error(std::function<void()> cb, const std::string &err);
 
@@ -377,6 +379,7 @@ public:
     std::unique_ptr<AppConfig> app_config;
 
     std::unique_ptr<PresetBundle> preset_bundle;
+    std::unique_ptr<wxBusyInfo>   wait_dialog;
 
     std::unique_ptr<PresetUpdater> preset_updater;
     MainFrame *mainframe{nullptr};
@@ -410,12 +413,13 @@ public:
 
     PrintHostJobQueue &printhost_job_queue() { return *m_printhost_job_queue.get(); }
 
-    void open_web_page_localized(const std::string &http_address);
-    bool may_switch_to_SLA_preset(const wxString &caption);
-    bool run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page = ConfigWizard::SP_WELCOME);
-    void show_desktop_integration_dialog();
-    void show_downloader_registration_dialog();
-    
+    void            open_web_page_localized(const std::string &http_address);
+    bool            may_switch_to_SLA_preset(const wxString& caption);
+    bool            run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page = ConfigWizard::SP_WELCOME,
+                    bool bypass_bundle_install = false);
+    void            show_desktop_integration_dialog();
+    void            show_downloader_registration_dialog();
+
     bool show_3d_navigator() const { return app_config->get_bool("show_3d_navigator"); }
     void toggle_show_3d_navigator() const { app_config->set("show_3d_navigator", !show_3d_navigator() ? "1" : "0"); }
 
@@ -463,18 +467,16 @@ private:
     void window_pos_sanitize(wxTopLevelWindow *window);
     bool select_language();
 
-    bool config_wizard_startup();
-    // Returns true if the configuration is fine.
-    // Returns true if the configuration is not compatible and the user decided to rather close the slicer instead of
-    // reconfiguring.
-
+    bool            config_wizard_startup();
     // App updater functions
-    bool check_updates(const bool verbose);
-    void on_version_read(wxCommandEvent &evt);
-    void app_updater(bool from_user);
-    bool m_check_for_application_update = false;
-
-    void app_version_check(bool from_user = false);
+    // Returns true if the configuration is fine. 
+    // Returns true if the configuration is not compatible and the user decided to rather close the slicer instead of reconfiguring.
+	bool            check_updates(const bool verbose, int nb_updates = 0);
+    void            on_version_read(wxCommandEvent& evt);
+    // if the data from version file are already downloaded, shows dialogs to start download of new version of app
+    void            app_updater(bool from_user);
+    // inititate read of version file online in separate thread
+    void            app_version_check(bool from_user);
 
     bool m_datadir_redefined{false};
     bool m_wifi_config_dialog_shown{false};
@@ -482,7 +484,8 @@ private:
 
 DECLARE_APP(GUI_App)
 
-} // namespace GUI
-} // namespace Slic3r
+wxDECLARE_EVENT(EVT_CONFIG_UPDATER_SHOW_DIALOG, wxCommandEvent);
+} // GUI
+} // Slic3r
 
 #endif // slic3r_GUI_App_hpp_

@@ -28,7 +28,7 @@ BuildVolume::BuildVolume(const std::vector<Vec2d> &bed_shape, const double max_p
     BoundingBoxf bboxf = get_extents(bed_shape);
     m_bboxf = BoundingBoxf3{ to_3d(bboxf.min, 0.), to_3d(bboxf.max, max_print_height) };
 
-    if (bed_shape.size() >= 4 && std::abs((m_area - double(m_bbox.size().x()) * double(m_bbox.size().y()))) < sqr(SCALED_EPSILON)) {
+    if (bed_shape.size() >= 4 && std::abs((m_area - double(m_bbox.size().x()) * double(m_bbox.size().y()))) < (SCALED_EPSILON*SCALED_EPSILON)) {
         // Square print bed, use the bounding box for collision detection.
         m_type = Type::Rectangle;
         m_circle.center = 0.5 * (m_bbox.min.cast<double>() + m_bbox.max.cast<double>());
@@ -67,7 +67,7 @@ BuildVolume::BuildVolume(const std::vector<Vec2d> &bed_shape, const double max_p
     if (bed_shape.size() >= 3 && m_type == Type::Invalid) {
         // Circle check is not used for Convex / Custom shapes, fill it with something reasonable.
         m_circle = Geometry::smallest_enclosing_circle_welzl(m_convex_hull.points);
-        m_type   = (m_convex_hull.area() - m_area) < sqr(SCALED_EPSILON) ? Type::Convex : Type::Custom;
+        m_type   = (m_convex_hull.area() - m_area) < (SCALED_EPSILON*SCALED_EPSILON) ? Type::Convex : Type::Custom;
         // Initialize the top / bottom decomposition for inside convex polygon check. Do it with two different epsilons applied.
         auto convex_decomposition = [](const Polygon &in, double epsilon) {
             Polygon src = expand(in, float(epsilon)).front();

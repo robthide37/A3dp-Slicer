@@ -986,7 +986,7 @@ void FreeCADDialog::create_geometry(wxCommandEvent& event_args) {
     Model& model = plat->model();
     if(cmb_add_replace->GetSelection() == 0)
         plat->new_project();
-    std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{ object_path.generic_string() }, true, false, false, false);
+    std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{ object_path.generic_string() }, LoadFileOption::LoadModel | LoadFileOption::DontUpdateDirs);
     if (objs_idx.empty()) return;
     //don't save in the temp directory: erase the link to it
     for (int idx : objs_idx)

@@ -488,8 +488,500 @@ TEST_CASE("Testing ", "[ClipperUtils]") {
 
 }
 
+// was next clip_clipper_polygon_with_subject_bbox_new, and called inside to check if the result is exactly the god one
+//Polygon ccw_src = src;
+//ccw_src.make_counter_clockwise();
+//Slic3r::Polygons polys = intersection(ccw_src, bbox.polygon());
+//if (src.is_clockwise() && !polys.empty()) {polys[0].reverse();}
+//if (polys.size() > 1) {
+//    bool has_ccw = false;
+//    bool has_cw = false;
+//    for (size_t i = 0, pi = out.size() - 1; i < out.size(); pi = i, ++i) {
+//        if (in_bbox(out[pi]) && in_bbox(out[i])) {
+//            if (is_good_move(out[pi], out[i])) {
+//                has_ccw = true;
+//            } else {
+//                has_cw = true;
+//            }
+//        }
+//    }
+//    release_assert(has_cw && has_ccw);
+//} else {
+//    release_assert(out.empty() ? polys.empty() : polys.size() == 1);
+//    almost_equals(src, polys.front(), Polygon(out), bbox);
+//}
+bool almost_equals(const Slic3r::Polygon &src, const Slic3r::Polygon &poly1, const Slic3r::Polygon &poly2, const BoundingBox &bbox) {
+    //poly1.assert_valid();
+    //poly2.assert_valid();
+    // no self-intersect with polygon algo
+    Point pt_temp;
+    Lines lines = poly1.lines();
+    for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
+        for (size_t line2_idx = line_idx + 2; line2_idx < lines.size() + (line_idx == 0 ? -1 : 0);
+                ++line2_idx) {
+            if (lines[line_idx].intersection(lines[line2_idx], &pt_temp)) {
+            }
+            release_assert(!lines[line_idx].intersection(lines[line2_idx], &pt_temp));
+        }
+    }
+    lines = poly2.lines();
+    for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
+        for (size_t line2_idx = line_idx + 2; line2_idx < lines.size() + (line_idx == 0 ? -1 : 0);
+                ++line2_idx) {
+            if (lines[line_idx].intersection(lines[line2_idx], &pt_temp)) {
+            }
+            release_assert(!lines[line_idx].intersection(lines[line2_idx], &pt_temp));
+        }
+    }
+    bool is_same = (poly1.size() == poly2.size());
+    if (is_same) {
+        size_t poly2_start = size_t(-1);
+        double min_dist = SCALED_EPSILON + 1;
+        for (size_t i = 0; i < poly2.size(); ++i) {
+            if (poly1[0].coincides_with_epsilon(poly2[i])) {
+                double dist = poly1[0].distance_to(poly2[i]);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    poly2_start = i;
+                }
+            }
+        }
+        is_same = (poly2_start != size_t(-1));
+        for (size_t i = 0, i2 = poly2_start; is_same && i < poly1.size(); ++i, ++i2) {
+            is_same = (poly2[i2 % poly2.size()].coincides_with_epsilon(poly1[i]));
+        }
+    }
+    if (!is_same) {
+        // to step debug
+        is_same = (poly1.size() == poly2.size());
+        if (is_same) {
+            size_t poly2_start = size_t(-1);
+            double min_dist = SCALED_EPSILON + 1;
+            for (size_t i = 0; i < poly2.size(); ++i) {
+                if (poly1[0].coincides_with_epsilon(poly2[i])) {
+                    double dist = poly1[0].distance_to(poly2[i]);
+                    if (dist < min_dist) {
+                        min_dist = dist;
+                        poly2_start = i;
+                    }
+                }
+            }
+            size_t src_start = size_t(-1);
+            for (size_t i = 0; i < src.size(); ++i) {
+                if (poly1[0].coincides_with_epsilon(src[i])) {
+                    src_start = i;
+                    break;
+                }
+            }
+            is_same = (poly2_start != size_t(-1));
+            for (size_t i = 0, i2 = poly2_start; is_same && i < poly1.size(); ++i, ++i2) {
+                is_same = (poly2[i2 % poly2.size()].coincides_with_epsilon(poly1[i]));
+            }
+        }
+    }
+    return is_same;
+}
+
+void test_valid(Slic3r::Polygon &simplified, Slic3r::Polygon &correct) {
+    simplified.assert_valid();
+    // no self-intersect with polygon algo
+    Lines good_lines = simplified.lines();
+    Point pt_temp;
+    for (size_t line_idx = 0; line_idx < good_lines.size(); ++line_idx) {
+        for (size_t line2_idx = line_idx + 2; line2_idx < good_lines.size() + (line_idx == 0 ? -1 : 0);
+                ++line2_idx) {
+            if (good_lines[line_idx].intersection(good_lines[line2_idx], &pt_temp)) {
+            }
+            REQUIRE(!good_lines[line_idx].intersection(good_lines[line2_idx], &pt_temp));
+        }
+    }
+    REQUIRE(simplified.size() == correct.size());
+    size_t simpl_i = size_t(-1);
+    for (size_t i = 0; i < simplified.size(); ++i) {
+        if (correct[0] == simplified[i]) {
+            simpl_i = i;
+            break;
+        }
+    }
+    REQUIRE(simpl_i != size_t(-1));
+    for (size_t i = 0; i < correct.size(); ++i) {
+        REQUIRE(simplified[simpl_i%simplified.size()] == correct[i]);
+        ++simpl_i;
+    }
+    REQUIRE(simplified.is_clockwise() == correct.is_clockwise());
+}
+
+TEST_CASE("test polygon diagonal intersections", "[Polygon]") {
+    SECTION("be sure it round correctly") {
+
+        Slic3r::Polygon polygon = BoundingBox(Points{Point{-177855358,-23347318},Point{177855360,46874507}}).polygon();
+        Line line({177855360, 38519852}, {172845343, 47155873});
+        Points intersections;
+        bool has_inter = polygon.intersections(line, &intersections);
+        REQUIRE(has_inter);
+        REQUIRE(intersections.size() == 2);
+        //REQUIRE(std::find(intersections.begin(), intersections.end(), Point{-5000, 10000}) != intersections.end());
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{177855360, 38519852}) !=
+                intersections.end());
+    }
+    SECTION("diagonal") {
+        Slic3r::Polygon polygon = BoundingBox(Points{Point{-10000, -10000}, Point{10000, 10000}}).polygon();
+        Line line({15000, -15000}, {-15000, 15000});
+        Points intersections;
+        bool has_inter = polygon.intersections(line, &intersections);
+        REQUIRE(has_inter);
+        REQUIRE(intersections.size() == 2);
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{10000, -10000}) != intersections.end());
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{-10000, 10000}) != intersections.end());
+
+        polygon.reverse();
+        intersections.clear();
+        has_inter = polygon.intersections(line, &intersections);
+        REQUIRE(has_inter);
+        REQUIRE(intersections.size() == 2);
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{10000, -10000}) != intersections.end());
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{-10000, 10000}) != intersections.end());
+    }
+    SECTION("over side") {
+        Slic3r::Polygon polygon = BoundingBox(Points{Point{-10000, -10000}, Point{10000, 10000}}).polygon();
+        Line line({-15000, 10000}, {15000, 10000});
+        Points intersections;
+        bool has_inter = polygon.intersections(line, &intersections);
+        REQUIRE(has_inter);
+        REQUIRE(intersections.size() == 2);
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{-10000, 10000}) != intersections.end());
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{10000, 10000}) != intersections.end());
+    }
+    SECTION("overlap side") {
+
+        Slic3r::Polygon polygon = BoundingBox(Points{Point{-10000, -10000}, Point{10000, 10000}}).polygon();
+        Line line({-5000, 10000}, {15000, 10000});
+        Points intersections;
+        bool has_inter = polygon.intersections(line, &intersections);
+        REQUIRE(has_inter);
+        REQUIRE(intersections.size() == 1);
+        //REQUIRE(std::find(intersections.begin(), intersections.end(), Point{-5000, 10000}) != intersections.end());
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{10000, 10000}) != intersections.end());
+        Line line2({-10000, 10000}, {10000, 10000});
+        Point intersection;
+        has_inter = line.intersection(line2, &intersection);
+        REQUIRE(!has_inter);
+    }
+}
 TEST_CASE("test clip_clipper_polygon_with_subject_bbox ", "[ClipperUtils]") {
-    
+    SECTION("test polygon intersections") {
+        Slic3r::Polygon polygon = BoundingBox(Points{Point{-10000, -10000}, Point{10000, 10000}}).polygon();
+        Line line({15000,-15000},{-15000,15000});
+        Points intersections;
+        bool has_inter = polygon.intersections(line, &intersections);
+        REQUIRE(has_inter);
+        REQUIRE(intersections.size() == 2);
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{10000,-10000}) != intersections.end());
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{-10000,10000}) != intersections.end());
+
+        polygon.reverse();
+        intersections.clear();
+        has_inter = polygon.intersections(line, &intersections);
+        REQUIRE(has_inter);
+        REQUIRE(intersections.size() == 2);
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{10000,-10000}) != intersections.end());
+        REQUIRE(std::find(intersections.begin(), intersections.end(), Point{-10000,10000}) != intersections.end());
+        
+    }
+    /* */
+    SECTION(" src has en edge over the boundary edge")
+    {
+        Slic3r::Polygon scr_poly({Point{177855360, -65431406}, Point{177855360, -15834840},
+                                  Point{172845342, -8749616}, Point{-177855358, -8749601},
+                                  Point{-177855358, -18668915}, Point{-173847350, -18668917},
+                                  Point{-173847350, -14417785}, Point{171185171, -14417798},
+                                  Point{173847352, -18182674}, Point{173847352, -65431407}});
+        BoundingBox bbox(Points{{-177855358, -65231006}, {177855360, -8549200}});
+        Slic3r::Polygon result({Point{172845342,-8749616},Point{-177855391,-8749601},Point{-177855391,-18668915},Point{-173847350,-18668917},Point{-173847350,-14417785},Point{171185171,-14417798},Point{173847352,-18182674},Point{173847352,-65231039},Point{177855393,-65231039},Point{177855393,-15834840}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        SVG svg("result_outside.svg");
+        svg.draw(bbox.polygon(), "grey");
+        svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.008));
+        svg.draw(simplified.split_at_first_point(), "green", scale_t(0.006));
+        svg.Close();
+        test_valid(simplified, result);
+
+        std::reverse(scr_poly.points.begin(), scr_poly.points.end());
+        std::reverse(result.points.begin(), result.points.end());
+        simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        svg=SVG("result_outside.svg");
+        svg.draw(bbox.polygon(), "grey");
+        svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.008));
+        svg.draw(simplified.split_at_first_point(), "green", scale_t(0.006));
+        svg.Close();
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("diagonal")
+    {
+        Slic3r::Polygon scr_poly({Point{5000,5000},Point{15000,-10000},Point{15000,-15000},Point{-15000,15000},Point{-10000,15000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        //Slic3r::Polygon result({Point{10000,-2500},Point{10000,-10000},Point{-10000,10000},Point{-2500,10000},Point{5000,5000}});
+        Slic3r::Polygon result({Point{10033,-2500},Point{10033,-10033},Point{-10033,10033},Point{-2500,10033},Point{5000,5000}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+
+        std::reverse(scr_poly.points.begin(), scr_poly.points.end());
+        std::reverse(result.points.begin(), result.points.end());
+        simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("all points outside, intersect")
+    {
+        Slic3r::Polygon scr_poly({Point{20000,-10000},Point{10000,-20000},Point{-20000,10000},Point{-10000,20000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        //Slic3r::Polygon result({Point{-10000,0},Point{-10000,10000},Point{0,10000},Point{10000,0},Point{10000,-10000},Point{0,-10000}});
+        Slic3r::Polygon result({Point{-10033,0},Point{-10033,10033},Point{0,10033},Point{10033,0},Point{10033,-10033},Point{0,-10033}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        //bbox.scale(100);
+        //scr_poly.scale(100);
+        //simplified.scale(100);
+        //result.scale(100);
+        //SVG svg("result_outside.svg");
+        //svg.draw(bbox.polygon(), "grey");
+        //svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.008));
+        //svg.draw(simplified.split_at_first_point(), "green", scale_t(0.004));
+        //svg.draw(result.split_at_first_point(), "blue", scale_t(0.002));
+        //svg.Close();
+        test_valid(simplified, result);
+    }
+    SECTION("all points outside, don't intersect")
+    {
+        Slic3r::Polygon scr_poly({Point{-15000,-15000},Point{-20000,0},Point{-15000,15000},Point{0,20000},Point{15000,15000},Point{20000,0},Point{15000,-15000},Point{0,-20000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{-10000,-10000},Point{-10000,10000},Point{10000,10000},Point{10000,-10000}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        test_valid(simplified, result);
+
+        std::reverse(scr_poly.points.begin(), scr_poly.points.end());
+        std::reverse(result.points.begin(), result.points.end());
+        simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("all points outside, intersect corners")
+    {
+        Slic3r::Polygon scr_poly({Point{20000,0},Point{0,20000},Point{-20000,0},Point{0,-20000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{-10000,-10000},Point{10000,-10000},Point{10000,10000},Point{-10000,10000}});
+        //Slic3r::Polygon result({Point{-10033,-10033},Point{10033,-10033},Point{10033,10033},Point{-10033,10033}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        SVG svg("result_outside.svg");
+        svg.draw(bbox.polygon(), "grey");
+        svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.008));
+        svg.draw(simplified.split_at_first_point(), "green", scale_t(0.006));
+        svg.Close();
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("all points outside, avoid bb")
+    {
+        Slic3r::Polygon scr_poly({Point{15000,15000},Point{20000,20000},Point{20000,-20000},Point{-20000,-20000},Point{-20000,20000},Point{-15000,15000},Point{-15000,-15000},Point{15000,-15000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(simplified.empty());
+    }
+    SECTION("peak at two sides")
+    {
+        Slic3r::Polygon scr_poly({Point{15000, 15000},Point{15000,5000},Point{5000,5000},Point{5000,-5000},Point{20000,-5000},Point{20000,20000},Point{-20000,20000},Point{-20000,-5000},Point{-5000,-5000},Point{-5000,5000},Point{-15000,5000},Point{-15000,15000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{5000,-5000},Point{10033,-5000},Point{10033,10033},Point{-10033,10033},Point{-10033,-5000},Point{-5000,-5000},Point{-5000,5000},Point{-10000,5000},Point{-10000,10000},Point{10000,10000},Point{10000,5000},Point{5000,5000}});
+        //Slic3r::Polygon result({Point{5000,-5000},Point{13000,-5000},Point{13000,13000},Point{-13000,13000},Point{-13000,-5000},Point{-5000,-5000},Point{-5000,5000},Point{-10000,5000},Point{-10000,10000},Point{10000,10000},Point{10000,5000},Point{5000,5000}});
+        //bbox.scale(100);
+        //scr_poly.scale(100);
+        //result.scale(100);
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        //SVG svg("result_double.svg");
+        //svg.draw(bbox.polygon(), "grey");
+        //svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.08));
+        //svg.draw(simplified.split_at_first_point(), "green", scale_t(0.06));
+        //svg.draw(result.split_at_first_point(), "blue", scale_t(0.02));
+        //svg.Close();
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+
+        std::reverse(scr_poly.points.begin(), scr_poly.points.end());
+        std::reverse(result.points.begin(), result.points.end());
+        simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("peak at two sides (bottom)")
+    {
+        Slic3r::Polygon scr_poly({Point{15000, -15000},Point{15000,-5000},Point{5000,-5000},Point{5000,5000},Point{20000,5000},Point{20000,-20000},Point{-20000,-20000},Point{-20000,5000},Point{-5000,5000},Point{-5000,-5000},Point{-15000,-5000},Point{-15000,-15000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{5000,5000},Point{10033,5000},Point{10033,-10033},Point{-10033,-10033},Point{-10033,5000},Point{-5000,5000},Point{-5000,-5000},Point{-10000,-5000},Point{-10000,-10000},Point{10000,-10000},Point{10000,-5000},Point{5000,-5000}});
+        //Slic3r::Polygon result({Point{5000,-5000},Point{13000,-5000},Point{13000,13000},Point{-13000,13000},Point{-13000,-5000},Point{-5000,-5000},Point{-5000,5000},Point{-10000,5000},Point{-10000,10000},Point{10000,10000},Point{10000,5000},Point{5000,5000}});
+        //bbox.scale(100);
+        //scr_poly.scale(100);
+        //result.scale(100);
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        SVG svg("result_double.svg");
+        svg.draw(bbox.polygon(), "grey");
+        svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.08));
+        svg.draw(simplified.split_at_first_point(), "green", scale_t(0.06));
+        svg.draw(result.split_at_first_point(), "blue", scale_t(0.02));
+        svg.Close();
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+
+        std::reverse(scr_poly.points.begin(), scr_poly.points.end());
+        std::reverse(result.points.begin(), result.points.end());
+        simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("peak two times on top")
+    {
+        Slic3r::Polygon scr_poly({Point{-7000,20000},Point{-7000,0},Point{-3000,0},Point{-3000,15000},Point{3000,15000},Point{3000,0},Point{7000,0},Point{7000,20000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{-3000,0},Point{-3000,10000},Point{3000,10000},Point{3000,0},Point{7000,0},Point{7000,10033},Point{-7000,10033},Point{-7000,0}});
+        //bbox.scale(100);
+        //scr_poly.scale(100);
+        //result.scale(100);
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        //SVG svg("result_doublararze.svg");
+        //svg.draw(bbox.polygon(), "grey");
+        //svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.08));
+        //svg.draw(simplified.split_at_first_point(), "green", scale_t(0.06));
+        //svg.draw(result.split_at_first_point(), "blue", scale_t(0.02));
+        //svg.Close();
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("peak on top and go around")
+    {
+        Slic3r::Polygon scr_poly({Point{3000,0},Point{7000,0},Point{7000,15000},
+            Point{15000,15000},Point{15000,-15000},Point{-15000,-15000},Point{-15000,15000},
+            Point{-7000,15000},Point{-7000,0},Point{-3000,0},Point{-3000,20000},
+            Point{-20000,20000},Point{-20000,-20000},Point{20000,-20000},Point{20000,20000},
+            Point{3000,20000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{3000,0},Point{7000,0},Point{7000,10000},
+            Point{10000,10000},Point{10000,-10000},Point{-10000,-10000},Point{-10000,10000},
+            Point{-7000,10000},Point{-7000,0},Point{-3000,0},Point{-3000,10033},
+            Point{-10033,10033},Point{-10033,-10033},Point{10033,-10033},Point{10033,10033},
+            Point{3000,10033}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+       test_valid(simplified, result);
+    }
+    SECTION("corner to opposite sides (and vice versa)")
+    {
+        Slic3r::Polygon scr_poly({Point{5000,5000},Point{5000,20000},Point{20000,20000},Point{9000,-20000},Point{-9000,-20000},Point{-20000,20000},Point{-5000,20000},Point{-5000,5000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{5000,10033},Point{10033,10033},Point{10033,-10033},Point{-10033,-10033},Point{-10033,10033},Point{-5000,10033},Point{-5000,5000},Point{5000,5000}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+
+        scr_poly = Slic3r::Polygon({Point{20000,20000},Point{9000,-20000},Point{5000,-20000},Point{5000,-5000},Point{-5000,-5000},Point{-5000,-20000},Point{-9000,-20000},Point{-20000,20000}});
+        bbox = BoundingBox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        result = Slic3r::Polygon({Point{-5000,-5000},Point{-5000,-10033},Point{-10033,-10033},Point{-10033,10033},Point{10033,10033},Point{10033,-10033},Point{5000,-10033},Point{5000,-5000}});
+        simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("follow border, but sometimes skip the corner.")
+    {
+        Slic3r::Polygon scr_poly({Point{5000,5000},Point{-5000,5000},Point{-5000,11000},Point{-10000,11000},Point{-10000,-10000},Point{9000,-10000},Point{10000,-9000},Point{10000,11000},Point{5000,11000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{5000,5000},Point{-5000,5000},Point{-5000,10033},Point{-10033,10033},Point{-10033,-10033},Point{9000,-10033},Point{10033,-9000},Point{10033,10033},Point{5000,10033}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("over the border, but one side, skip a corner.")
+    {
+        Slic3r::Polygon scr_poly({Point{10000,-11000},Point{10000,9000},Point{9000,11000},Point{-10000,11000},Point{-10000,-11000}});
+        BoundingBox bbox(Points{Point{-10000, -10000}, Point{10000, 10000}});
+        Slic3r::Polygon result({Point{10033,-10033},Point{10033,9000},Point{9500,10033},Point{-10033,10033},Point{-10033,-10033}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        //bbox.scale(100);
+        //scr_poly.scale(100);
+        //simplified.scale(100);
+        //result.scale(100);
+        //SVG svg("result_outside.svg");
+        //svg.draw(bbox.polygon(), "grey");
+        //svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.008));
+        //svg.draw(simplified.split_at_first_point(), "green", scale_t(0.004));
+        //svg.draw(result.split_at_first_point(), "blue", scale_t(0.002));
+        //svg.Close();
+        test_valid(simplified, result);
+    }
+    SECTION("other 1")
+    {
+        Slic3r::Polygon scr_poly({Point{177855360, -56212986}, Point{177855359, -6616421}, Point{173688466, -723553},
+                                  Point{172845343, 729783}, Point{94723442, 729787}, Point{94538898, 468804},
+                                  Point{-177855358, 468817}, Point{-177855358, -9450496}, Point{-173847350, -9450499},
+                                  Point{-173847350, -5199366}, Point{171185171, -5199378}, Point{173847352, -8964255},
+                                  Point{173847352, -56212987}});
+
+        BoundingBox bbox(Points{{-177855358, -56413389}, {177855360, 448416}});
+        //Slic3r::Polygon result({Point{177855359, -6616421}, Point{173688466, -723553}, Point{173008572, 448416},
+        //                        Point{-177855358, 448416}, Point{-177855358, -9450496}, Point{-173847350, -9450499},
+        //                        Point{-173847350, -5199366}, Point{171185171, -5199378}, Point{173847352, -8964255},
+        //                        Point{173847352, -56212987}, Point{177855360, -56212986}});
+        Slic3r::Polygon result({Point{177855359, -6616421}, Point{173688466, -723553}, Point{173008572, 448449},
+                                Point{-177855391, 448449}, Point{-177855391, -9450496}, Point{-173847350, -9450499},
+                                Point{-173847350, -5199366}, Point{171185171, -5199378}, Point{173847352, -8964255},
+                                Point{173847352, -56212987}, Point{177855360, -56212986}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("other 2")
+    {
+        Slic3r::Polygon scr_poly({Point{177855360,-66162759},Point{177855360,  -41886897},Point{172845341,-34801667},Point{-177855358,-34801652},Point{-177855358,-66162790}});
+        BoundingBox bbox(Points{Point{-177855358, -65962390}, Point{177855360, -35002053}});
+        //Slic3r::Polygon result({Point{177855360,-41886897},Point{177855360,-35002053},Point{-177855358,-35002053},Point{-177855358,-65962390},Point{177855360,-65962390}});
+        Slic3r::Polygon result({Point{177855393,-41886897}, Point{172987035,-35002020},Point{-177855391,-35002020},Point{-177855391,-65962423},Point{177855393,-65962423}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("other 3")
+    {
+        Slic3r::Polygon scr_poly({Point{84454971, 51215293}, Point{171218246, 51215293}, Point{173166590, 48459919},
+                                  Point{177791460, 48459917}, Point{177791460, 49714044}, Point{172812265, 56755679},
+                                  Point{-174796943, 56755632}, Point{-174796943, 48459935},
+                                  Point{-163039514, 48459919}, Point{-163039514, 51215270}, Point{73560749, 51215280},
+                                  Point{73560749, 48459927}, Point{84454971, 48459913}});
+        BoundingBox bbox(Points{Point{-173495281,49961989},Point{175880124,55253604}});
+        Slic3r::Polygon result({Point{171218246, 51215293}, Point{172104466, 49961956}, Point{175880157, 49961956},
+                                Point{175880157, 52417077}, Point{173874394, 55253637}, Point{-173495314, 55253637},
+                                Point{-173495314, 49961956}, Point{-163039514, 49961956}, Point{-163039514, 51215270},
+                                Point{73560749, 51215280}, Point{73560749, 49961956}, Point{84454971, 49961956},
+                                Point{84454971, 51215293}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        test_valid(simplified, result);
+    }
+    SECTION("other 4")
+    {
+        Slic3r::Polygon scr_poly({Point{85478871, 49389788}, Point{170688237, 49389788}, Point{171502945, 48237618},
+                                  Point{179522643, 48237622}, Point{173342273, 56977974}, Point{-175820843, 56977927},
+                                  Point{-175820843, 48237640}, Point{-162015614, 48237621},
+                                  Point{-162015614, 49389765}, Point{72536849, 49389774}, Point{72536849, 48237631},
+                                  Point{85478871, 48237615}});
+        BoundingBox bbox(Points{Point{-174400943,49457120},Point{177062922,55758472}});
+        Slic3r::Polygon result({Point{177062955,51716188},Point{174204592,55758505},Point{-174400976,55758505},Point{-174400976,49457087},Point{177062955,49457087}});
+        Slic3r::Polygon simplified = Slic3r::ClipperUtils::clip_clipper_polygon_with_subject_bbox(scr_poly, bbox);
+        REQUIRE(scr_poly.is_clockwise() == result.is_clockwise());
+        //SVG svg("result_okish.svg");
+        //svg.draw(bbox.polygon(), "grey");
+        //svg.draw(scr_poly.split_at_first_point(), "red", scale_t(0.008));
+        //svg.draw(simplified.split_at_first_point(), "green", scale_t(0.006));
+        //svg.Close();
+        test_valid(simplified, result);
+    }
     SECTION("complicated clip that can create self-intersect")
     {
         Slic3r::Polygon big_poly({Point{875431,-14923904},Point{957624,-14918301},Point{1339389,-14888220},Point{1463327,-14877498},Point{1547974,-14869452},Point{1722573,-14666759},Point{1711235,-14485113},Point{1721031,-14016670},
@@ -613,5 +1105,7 @@ TEST_CASE("test clip_clipper_polygon_with_subject_bbox ", "[ClipperUtils]") {
             }
         }
     }
+
 }
+
 

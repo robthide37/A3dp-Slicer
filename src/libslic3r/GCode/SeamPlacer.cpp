@@ -27,6 +27,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/ShortEdgeCollapse.hpp"
+#include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/TriangleSetSampling.hpp"
 #include "libslic3r/Utils.hpp"
 
@@ -1867,6 +1868,40 @@ std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer,
                     seam_mesh->mesh.transform(model_volume->get_transformation().get_matrix());
                     seam_mesh->mesh.transform(model_instance->get_matrix());
                     seam_mesh->bb_volume = seam_mesh->mesh.bounding_box();
+                    // if cylinder & rotated, then the bb isn't enough.
+                    if (model_volume->type() == ModelVolumeType::SEAM_POSITION_INSIDE ||
+                        (model_volume->type() == ModelVolumeType::SEAM_POSITION_CENTER_Z &&
+                         (model_volume->get_rotation().x() != 0 || model_volume->get_rotation().y() != 0 ||
+                          seam_mesh->bb_volume.size().x() != seam_mesh->bb_volume.size().y()))) {
+                        MeshSlicingParams slicing_params;
+                        // get zs
+                        seam_mesh->zs.clear();
+                        for (const Layer *layer : po->layers()) {
+                            seam_mesh->zs.push_back(float(layer->print_z));
+                        }
+                        std::vector<Polygons> layers = slice_mesh(seam_mesh->mesh.its, seam_mesh->zs, slicing_params);
+                        assert(seam_mesh->zs.size() == layers.size());
+                        for (Polygons &polygons : layers) {
+                            if (polygons.empty()) {
+                                seam_mesh->layers_bb.emplace_back();
+                                if (model_volume->type() == ModelVolumeType::SEAM_POSITION_INSIDE) {
+                                    seam_mesh->layers_contour.emplace_back();
+                                }
+                            } else {
+                                assert(polygons.size() == 1);
+                                seam_mesh->layers_bb.push_back(get_extents(polygons));
+                                if (model_volume->type() == ModelVolumeType::SEAM_POSITION_INSIDE) {
+                                    assert(polygons.size() <= 1); // currently, it only support convex simple shape
+                                                                  // (not becasue it's hard, just very inneficient)
+                                    seam_mesh->layers_contour.push_back(polygons.empty() ? Polygon{} :
+                                                                                           polygons.front());
+                                }
+                            }
+                        }
+                        assert(seam_mesh->zs.size() == seam_mesh->layers_bb.size());
+                        assert(model_volume->type() != ModelVolumeType::SEAM_POSITION_INSIDE ||
+                               seam_mesh->zs.size() == seam_mesh->layers_contour.size());
+                    }
                 }
 
                 double test_lambda_z = 0;
@@ -1878,10 +1913,65 @@ std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer,
                     double min_z = seam_mesh->bb_volume.min.z();
                     double max_z = seam_mesh->bb_volume.max.z();
                     assert(min_z < max_z);
-                    if (layer.print_z + EPSILON < min_z || layer.print_z > max_z + EPSILON) {
+                    if (layer.print_z + EPSILON < min_z || layer.print_z > max_z + EPSILON || seam_mesh->layers_bb.empty()) {
                         // out of z, don't take it into account
                         continue;
                     }
+                    // use slices to get the real center_pos
+                    // find nearest z
+                    size_t lidx = 0;
+                    for (; lidx < seam_mesh->layers_bb.size() && seam_mesh->zs[lidx] + EPSILON < layer.print_z ; ++lidx) {}
+                    if (!seam_mesh->layers_bb[lidx].empty()) {
+                        // set it
+                        Point pt = (seam_mesh->layers_bb[lidx].min + seam_mesh->layers_bb[lidx].max) / 2;
+                        center_pos.x() = unscaled(pt.x());
+                        center_pos.y() = unscaled(pt.y());
+                        sphere_radius = std::min(unscaled(seam_mesh->layers_bb[lidx].size().x()) / 2, unscaled(seam_mesh->layers_bb[lidx].size().y()) / 2);
+                    }
+                } else if(model_volume->type() == ModelVolumeType::SEAM_POSITION_INSIDE && !loop.paths.empty()) {
+                    double min_z = seam_mesh->bb_volume.min.z();
+                    double max_z = seam_mesh->bb_volume.max.z();
+                    if (layer.print_z + EPSILON < min_z || layer.print_z > max_z + EPSILON || seam_mesh->layers_contour.empty()) {
+                        // out of z, don't take it into account
+                        continue;
+                    }
+                    //get layer idx
+                    size_t lidx = 0;
+                    for (; lidx < seam_mesh->layers_contour.size() && seam_mesh->zs[lidx] + EPSILON < layer.print_z ; ++lidx) {}
+                    // TODO Grid optimisation
+                    Polyline loop_polyline = loop.as_polyline().to_polyline(scale_t(loop.paths.front().width()));
+                    //move the object's polyline to its plater position.
+                    loop_polyline.translate(po->instances()[print_object_instance_idx].shift);
+                    //first, check if cross bb
+                    if (!seam_mesh->layers_bb[lidx].cross(loop_polyline)) {
+                        //out of it, ignore this SEAM_POSITION_INSIDE
+                        continue;
+                    }
+                    //now check both polygons
+                        
+                    // get section of polyline inside the shape
+                    Polylines results = intersection_pl(loop_polyline, seam_mesh->layers_contour[lidx]);
+                    if (results.empty()) {
+                        //out of it, ignore this SEAM_POSITION_INSIDE
+                        continue;
+                    }
+                    // if multiple: use largest
+                    size_t best_polyline_idx = 0;
+                    distf_t best_length = results.size() == 1 ? 0 : results[0].length();
+                    for (size_t i = 1; i < results.size(); i++) {
+                        distf_t length = results[i].length();
+                        if (length > best_length) {
+                            best_polyline_idx = i;
+                            best_length = length;
+                        }
+                    }
+                    Polyline &seam_polyline = results[best_polyline_idx];
+
+                    // get center of polyline to use as attractor
+                    seam_polyline.clip_end(best_length/2);
+                    center_pos.x() = unscaled(seam_polyline.back().x());
+                    center_pos.y() = unscaled(seam_polyline.back().y());
+                    
                 }
                 // remove shift, as we used the transform. that way, we have a correct z vs the layer height, and same for the x and y vs polygon.
                 center_pos.x() -= unscaled(po->instances()[print_object_instance_idx].shift.x());

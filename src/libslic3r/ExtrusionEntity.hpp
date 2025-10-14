@@ -158,6 +158,10 @@ struct OverhangAttributes {
     float start_distance_from_prev_layer;
     float end_distance_from_prev_layer;
     float proximity_to_curled_lines; //value between 0 and 1
+    bool has_full_overhangs_flow = false;
+    bool has_full_overhangs_speed = false;
+    bool has_dynamic_overhangs_flow = false;
+    bool has_dynamic_overhangs_speed = false;
 };
 
 struct ExtrusionAttributes : ExtrusionFlow
@@ -688,6 +692,7 @@ struct HasThisRoleVisitor : public HasRoleVisitor{
 class ConfigOptionFloatOrPercent;
 class SimplifyVisitor : public ExtrusionVisitor{
     ArcFittingType                    m_use_arc_fitting;
+    bool                              m_ignore_holes;
     coordf_t                          m_scaled_resolution;
     const ConfigOptionFloatOrPercent* m_arc_fitting_tolearance;
     // when an entity is too small, this is set to true do the collection that is higher in the stack can merge & delete.
@@ -695,11 +700,11 @@ class SimplifyVisitor : public ExtrusionVisitor{
     bool                              m_last_deleted = false;
 public:
     using ExtrusionVisitor::use;
-    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance)
-        : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance)
+    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, bool ignore_holes, const ConfigOptionFloatOrPercent *arc_fitting_tolearance)
+        : m_scaled_resolution(scaled_resolution), m_ignore_holes(ignore_holes), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance)
     {}
-    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance, coord_t min_path_size)
-        : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance), m_min_path_size(min_path_size)
+    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, bool ignore_holes, const ConfigOptionFloatOrPercent *arc_fitting_tolearance, coord_t min_path_size)
+        : m_scaled_resolution(scaled_resolution), m_ignore_holes(ignore_holes), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance), m_min_path_size(min_path_size)
     {}
     
     virtual void use(ExtrusionPath& path) override;
@@ -768,31 +773,8 @@ struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
     LoopAssertVisitor() : m_check_length(true) {}
     LoopAssertVisitor(bool check_length) : m_check_length(check_length) {}
     virtual void default_use(const ExtrusionEntity& entity) override {};
-    virtual void use(const ExtrusionPath &path) override {
-        if (!m_check_length)
-            return;
-        release_assert(!path.empty());
-        release_assert(path.length() > SCALED_EPSILON);
-        for (size_t idx = 1; idx < path.size(); ++idx)
-            release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-    }
-    virtual void use(const ExtrusionLoop& loop) override {
-        release_assert(!loop.empty());
-        for (size_t idx_path = 1; idx_path < loop.paths.size(); ++idx_path) {
-            release_assert(loop.paths[idx_path-1].polyline.back() == loop.paths[idx_path].polyline.front());
-        }
-        Point last_pt = loop.last_point();
-        for (const ExtrusionPath &path : loop.paths) {
-            release_assert(path.polyline.size() >= 2);
-            release_assert(!m_check_length || path.length() >= SCALED_EPSILON);
-            release_assert(path.first_point() == last_pt);
-            if(m_check_length)
-                for (size_t idx = 1; idx < path.size(); ++idx)
-                    release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-            last_pt = path.last_point();
-        }
-        release_assert(loop.paths.front().first_point() == loop.paths.back().last_point());
-    }
+    virtual void use(const ExtrusionPath &path) override;
+    virtual void use(const ExtrusionLoop& loop) override;
 };
 #define DEBUGINFO_VISIT(ENTITY,VISITOR) (ENTITY).visit(VISITOR);
 #endif

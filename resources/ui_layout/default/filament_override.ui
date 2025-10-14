@@ -25,6 +25,7 @@ group:Travel lift
 	setting:id$0:filament_wipe_inside_end
 	setting:id$0:filament_wipe_inside_start
 	setting:id$0:filament_wipe_only_crossing
+	setting:id$0:filament_wipe_return
 	setting:id$0:filament_wipe_speed
 	setting:id$0:filament_wipe_lift
 group:Others

@@ -164,6 +164,8 @@ public:
 	void init() { m_initialized = true; }
 	// Push a prefabricated notification from basic_notifications (see the table at the end of this file).
 	void push_notification(const NotificationType type, int timestamp = 0);
+	// Push a prefabricated notification from basic_notifications (see the table at the end of this file).
+	void push_notification(const NotificationType type, const std::string& text, int timestamp = 0);
 	// Push a NotificationType::CustomNotification with NotificationLevel::RegularNotificationLevel and 10s fade out interval.
 	void push_notification(const std::string& text, int timestamp = 0);
 	// Push a NotificationType::CustomNotification with provided notification level and 10s for RegularNotificationLevel.
@@ -232,6 +234,7 @@ public:
 	// Download App progress
 	void push_download_progress_notification(const std::string& text, std::function<bool()>	cancel_callback);
 	void set_download_progress_percentage(float percentage);
+    void set_download_progress_text(const std::string& updated_text);
 	// Download URL progress notif
 	void push_download_URL_progress_notification(size_t id, const std::string& text, std::function<bool(DownloaderUserAction, int)> user_action_callback);
 	void set_download_URL_progress(size_t id, float percentage);

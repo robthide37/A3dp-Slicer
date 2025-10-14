@@ -43,6 +43,7 @@ struct TriangleMeshForSeam
     //std::vector<Vec3i32> face_edge_ids;
     std::vector<float> zs;
     std::vector<BoundingBox> layers_bb;
+    std::vector<Polygon> layers_contour;
 };
 
 class PolylineWithEnd : public Polyline {

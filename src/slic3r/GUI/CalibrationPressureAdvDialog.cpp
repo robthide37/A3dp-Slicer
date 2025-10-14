@@ -221,7 +221,7 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
     for (int i = 0; i < currentTestCount; i++) {
         items.emplace_back((boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_pressure" / "base_plate.3mf").string());
     }
-    std::vector<size_t> objs_idx = plat->load_files(items, true, false, false, false);
+    std::vector<size_t> objs_idx = plat->load_files(items, LoadFileOption::LoadModel | LoadFileOption::DontUpdateDirs);
     assert(objs_idx.size() == currentTestCount);
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
     const DynamicPrintConfig* filament_config = this->gui_app->get_tab(Preset::TYPE_FFF_FILAMENT)->get_config();
@@ -874,7 +874,8 @@ void CalibrationPressureAdvDialog::create_geometry(wxCommandEvent& event_args) {
         gcfNoExtrusion*/
 
         // config modifers for the base model
-        model.objects[objs_idx[id_item]]->config.set_key_value("bottom_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipMonotonicWGapFill));// ipConcentric or ipConcentricGapFill ?
+        model.objects[objs_idx[id_item]]->config.set_key_value("bottom_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipMonotonic));// ipConcentric or ipConcentricGapFill ?
+        model.objects[objs_idx[id_item]]->config.set_key_value("infill_filled_bottom", new ConfigOptionBool(true));
         model.objects[objs_idx[id_item]]->config.set_key_value("thin_walls", new ConfigOptionBool(true));
         model.objects[objs_idx[id_item]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(1));
         model.objects[objs_idx[id_item]]->config.set_key_value("brim_width", new ConfigOptionFloat(0));

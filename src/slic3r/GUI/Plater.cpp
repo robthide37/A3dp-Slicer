@@ -129,6 +129,7 @@
 #include "Jobs/NotificationProgressIndicator.hpp"
 #include "Jobs/PlaterWorker.hpp"
 #include "Jobs/BoostThreadWorker.hpp"
+#include "Jobs/OrientJob.hpp"
 #include "../Utils/ASCIIFolding.hpp"
 #include "../Utils/PrintHost.hpp"
 #include "../Utils/FixModelByWin10.hpp"
@@ -142,6 +143,7 @@
 #include "BulkExportDialog.hpp"
 #include "libslic3r/Format/HFP.hpp"
 #include "LoadStepDialog.hpp"
+#include "libslic3r/Format/HFP.hpp"
 
 #ifdef __APPLE__
 #include "Gizmos/GLGizmosManager.hpp"
@@ -2132,12 +2134,19 @@ struct Plater::priv
     void update_main_toolbar_tooltips();
 //   std::shared_ptr<ProgressStatusBar> statusbar();
     bool get_config_bool(const std::string &key) const;
-
-    std::vector<size_t> load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool update_dirs = true, bool used_inches = false);
+    
+    //std::vector<size_t> load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool update_dirs = true, bool used_inches = false);
+    std::vector<size_t> load_files(const std::vector<fs::path>& input_files, LoadFileOptions options);
     std::vector<size_t> load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z = false, bool call_selection_changed = true);
 
     fs::path get_export_file_path(GUI::FileType file_type);
-    wxString get_export_file(GUI::FileType file_type);
+    // return <filename, file filter index>
+    std::pair<wxString, int> get_export_file(GUI::FileType file_type, 
+        wxFileDialogBase::ExtraControlCreatorFunction extra_option_factory = nullptr,
+        std::function<void(wxWindow*)> extra_option_reader = nullptr);
+    std::pair<wxString, int> get_export_file(std::vector<GUI::FileType> file_types, 
+        wxFileDialogBase::ExtraControlCreatorFunction extra_option_factory = nullptr,
+        std::function<void(wxWindow*)> extra_option_reader = nullptr);
 
     const Selection& get_selection() const;
     Selection& get_selection();
@@ -2265,6 +2274,7 @@ struct Plater::priv
     bool can_split_to_objects() const;
     bool can_split_to_volumes() const;
     bool can_arrange() const;
+    bool can_orient() const;
     bool can_layers_editing() const;
     bool can_fix_through_winsdk() const;
     bool can_simplify() const;
@@ -2348,6 +2358,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "brim_separation",
         "complete_objects",
         "parallel_objects_step",
+        "parallel_objects_step_max_z",
         "complete_objects_sort",
         "complete_objects_one_skirt",
         "brim_per_object",
@@ -2559,7 +2570,13 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     if (wxGetApp().is_editor()) {
         this->q->Bind(EVT_EJECT_DRIVE_NOTIFICAION_CLICKED, [this](EjectDriveNotificationClickedEvent&) { this->q->eject_drive(); });
         this->q->Bind(EVT_EXPORT_GCODE_NOTIFICAION_CLICKED, [this](ExportGcodeNotificationClickedEvent&) { this->q->export_gcode(true); });
-        this->q->Bind(EVT_PRESET_UPDATE_AVAILABLE_CLICKED, [](PresetUpdateAvailableClickedEvent&) {  wxGetApp().get_preset_updater()->on_update_notification_confirm(); });
+        this->q->Bind(EVT_PRESET_UPDATE_AVAILABLE_CLICKED, [this](PresetUpdateAvailableClickedEvent &) {
+#ifdef USE_GTHUB_PRESET_UPDATE
+            wxGetApp().get_preset_updater()->show_synch_window(this->q, nullptr, _L("Managing vendor bundles:"), [](bool){});
+#else
+            wxGetApp().get_preset_updater()->on_update_notification_confirm();
+#endif
+        });
         this->q->Bind(EVT_REMOVABLE_DRIVE_EJECTED, [this, q](RemovableDriveEjectEvent &evt) {
 		    if (evt.data.second) {
 			    q->show_action_buttons();
@@ -2783,9 +2800,16 @@ void Plater::notify_about_installed_presets()
     }
 }
 
-std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool update_dirs/* = true*/, bool imperial_units/* = false*/)
+std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadFileOptions options)
+    //bool load_model, bool load_config, bool update_dirs/* = true*/, bool imperial_units/* = false*/)
 {
      if (input_files.empty()) { return std::vector<size_t>(); }
+
+     bool load_model = options & LoadFileOption::LoadModel;
+     bool load_config = options & LoadFileOption::LoadConfig;
+     bool update_dirs = !(options & LoadFileOption::DontUpdateDirs);
+     bool imperial_units = options & LoadFileOption::ImperialUnits;
+     bool unbake_trsf = options & LoadFileOption::UnbakeTransformation;
 
     auto *nozzle_dmrs = config->opt<ConfigOptionFloats>("nozzle_diameter");
 
@@ -2820,7 +2844,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     wxBusyCursor busy;
 
-    auto *new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
+    std::optional<Model> new_model;
+    if (load_model && !one_by_one) {
+        new_model = Slic3r::Model();
+    }
     std::vector<size_t> obj_idxs;
 
     int answer_convert_from_meters          = wxOK_DEFAULT;
@@ -2853,7 +2880,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const bool type_any_amf = !type_3mf && std::regex_match(path.string(), pattern_any_amf);
         const bool type_prusa = std::regex_match(path.string(), pattern_prusa);
         const bool type_step = std::regex_match(path.string(), pattern_step);
-        const bool type_hfp = std::regex_match(path.string(), pattern_hfp);
+
 
         if (type_step && !apply_step_import_parameters_to_all &&
             wxGetApp().app_config->get_bool("show_step_import_parameters")) {
@@ -2871,9 +2898,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             } else
                 continue;
         }
-        
-        
-        Slic3r::Model model;
+
+        Slic3r::Model loaded_model;
         bool is_project_file = type_prusa;
         try {
             if (type_3mf || type_zip_amf) {
@@ -2894,9 +2920,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 PrinterTechnology loaded_printer_technology{ptFFF};
                 {
                     DynamicPrintConfig config_loaded;
-                    ConfigSubstitutionContext config_substitutions{ForwardCompatibilitySubstitutionRule::Enable};
-                    model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions,
-                                                             only_if(load_config, Model::LoadAttribute::CheckVersion));
+                    ConfigSubstitutionContext config_substitutions{ ForwardCompatibilitySubstitutionRule::Enable };
+                    loaded_model = Slic3r::Model::read_from_archive(path.string(), &config_loaded, &config_substitutions,
+                                                             only_if(load_config, Model::LoadAttribute::CheckVersion) |
+                                                             only_if(unbake_trsf, Model::LoadAttribute::UnbakeTransformation));
                     if (load_config && !config_loaded.empty()) {
                         // loaded: allow to ask again for support_material_overhangs
                         wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->get_config_manipulation().initialize_support_material_overhangs_queried(false);
@@ -2930,8 +2957,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         show_substitutions_info(config_substitutions.get(), filename.string());
 
                     if (load_config) {
-                        this->model.get_custom_gcode_per_print_z_vector() = model.get_custom_gcode_per_print_z_vector();
-                        this->model.get_wipe_tower_vector() = model.get_wipe_tower_vector();
+                        this->model.get_custom_gcode_per_print_z_vector() = loaded_model.get_custom_gcode_per_print_z_vector();
+                        this->model.get_wipe_tower_vector() = loaded_model.get_wipe_tower_vector();
                     }
                 }
 
@@ -2965,9 +2992,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         preset_bundle->load_config_model(filename.string(), std::move(config));
                         q->notify_about_installed_presets();
 
-                        // if (loaded_printer_technology == ptFFF)
-                        //     CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z(),
-                        //     &preset_bundle->project_config);
+                        if (loaded_printer_technology == ptFFF)
+                            CustomGCode::update_custom_gcode_per_print_z_from_config(loaded_model.custom_gcode_per_print_z(), &preset_bundle->project_config);
 
                         // For exporting from the amf/3mf we shouldn't check printer_presets for the containing
                         // information about "Print Host upload"
@@ -2981,34 +3007,32 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     if (!in_temp && update_dirs)
                         wxGetApp().app_config->update_config_dir(path.parent_path().string());
                 }
-            } else if (type_hfp && this->model.objects.empty()) {
-                std::string message = GUI::format(
-                    _L("Cannot load HFP if there is no model loaded on the bed. Please load a model first."));
-                GUI::show_error(q, message);
-            } else if (type_hfp) {
-                q->add_model_modifier(path.string());
             } else {
                
                if (load_model) {
-                  if (type_step) {
-                  // Do not load config with STEP type
+                    if (type_step) {
+                        // Do not load config with STEP type
                         load_config = false;
-                        double linear_precision = string_to_double_decimal_point(wxGetApp().app_config->get("linear_precision"));
-                        double angle_precision = string_to_double_decimal_point(wxGetApp().app_config->get("angle_precision"));
-                        model = Slic3r::Model::read_from_file(path.string(),
-                                                                 nullptr,
-                                                                 nullptr,
-                                                                 only_if(load_config, Model::LoadAttribute::CheckVersion),
-                                                                 std::make_pair(linear_precision, angle_precision));
-                  } else {
-                        model = Slic3r::Model::read_from_file(path.string(),
-                                          nullptr,
-                                          nullptr,
-                                          only_if(load_config, Model::LoadAttribute::CheckVersion));
-                  }
-               }
+                        double linear_precision = string_to_double_decimal_point(
+                            wxGetApp().app_config->get("linear_precision"));
+                        double angle_precision = string_to_double_decimal_point(
+                            wxGetApp().app_config->get("angle_precision"));
+                        loaded_model =
+                            Slic3r::Model::read_from_file(path.string(), nullptr, nullptr,
+                                                          only_if(load_config, Model::LoadAttribute::CheckVersion) |
+                                                              only_if(unbake_trsf,
+                                                                      Model::LoadAttribute::UnbakeTransformation),
+                                                          std::make_pair(linear_precision, angle_precision));
+                    } else {
+                        loaded_model =
+                            Slic3r::Model::read_from_file(path.string(), nullptr, nullptr,
+                                                          only_if(load_config, Model::LoadAttribute::CheckVersion) |
+                                                              only_if(unbake_trsf,
+                                                                      Model::LoadAttribute::UnbakeTransformation));
+                    }
+                }
                
-                for (auto obj : model.objects) {
+                for (auto obj : loaded_model.objects) {
                     if (obj->name.empty()) {
                         obj->name = fs::path(obj->input_file).filename().string();
                     }
@@ -3025,16 +3049,19 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         }
 
         if (load_model) {
-            // The model should now be initialized
+            // The inner model should now be initialized
 
-            auto convert_from_imperial_units = [](Model& model, bool only_small_volumes) {
-                model.convert_from_imperial_units(only_small_volumes);
+            // copy extra fields
+            this->model.baked_transformation = loaded_model.baked_transformation;
+
+            auto convert_from_imperial_units = [](Model& model_to_convert, bool only_small_volumes) {
+                model_to_convert.convert_from_imperial_units(only_small_volumes);
 //                wxGetApp().app_config->set("use_inches", "1");
 //                wxGetApp().sidebar().update_ui_from_settings();
             };
 
             if (!is_project_file) {
-                if (int deleted_objects = model.removed_objects_with_zero_volume(); deleted_objects > 0) {
+                if (int deleted_objects = loaded_model.removed_objects_with_zero_volume(); deleted_objects > 0) {
                     MessageDialog(q, format_wxstr(_L_PLURAL(
                         "Object size from file %s appears to be zero.\n"
                         "This object has been removed from the model",
@@ -3044,53 +3071,53 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
                 if (imperial_units)
                     // Convert even if the object is big.
-                    convert_from_imperial_units(model, false);
-                else if (!type_3mf && model.looks_like_saved_in_meters()) {
-                    auto convert_model_if = [](Model& model, bool condition) {
+                    convert_from_imperial_units(loaded_model, false);
+                else if (!type_3mf && loaded_model.looks_like_saved_in_meters()) {
+                    auto convert_model_if = [](Model& model_to_convert, bool condition) {
                         if (condition)
                             //FIXME up-scale only the small parts?
-                            model.convert_from_meters(true);
+                            model_to_convert.convert_from_meters(true);
                     };
                     if (answer_convert_from_meters == wxOK_DEFAULT) {
                         RichMessageDialog dlg(q, format_wxstr(_L_PLURAL(
                             "The dimensions of the object from file %1% seem to be defined in meters.\n"
                             "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of the object?",
                             "The dimensions of some objects from file %1% seem to be defined in meters.\n"
-                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename), SLIC3R_APP_NAME) + "\n",
+                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of these objects?", loaded_model.objects.size()), from_path(filename), SLIC3R_APP_NAME) + "\n",
                             _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
                         dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
                         int answer = dlg.ShowModal();
                         if (dlg.IsCheckBoxChecked())
                             answer_convert_from_meters = answer;
                         else 
-                            convert_model_if(model, answer == wxID_YES);
+                            convert_model_if(loaded_model, answer == wxID_YES);
                     }
-                    convert_model_if(model, answer_convert_from_meters == wxID_YES);
+                    convert_model_if(loaded_model, answer_convert_from_meters == wxID_YES);
                 }
-                else if (!type_3mf && model.looks_like_imperial_units() && false) { // don't do that, as it can be annoying (but usa).
-                    auto convert_model_if = [convert_from_imperial_units](Model& model, bool condition) {
+                else if (!type_3mf && loaded_model.looks_like_imperial_units() && false) { // don't do that, as it can be annoying (but usa).
+                    auto convert_model_if = [convert_from_imperial_units](Model& model_to_convert, bool condition) {
                         if (condition)
                             //FIXME up-scale only the small parts?
-                            convert_from_imperial_units(model, true);
+                            convert_from_imperial_units(model_to_convert, true);
                     };
                     if (answer_convert_from_imperial_units == wxOK_DEFAULT) {
                         RichMessageDialog dlg(q, format_wxstr(_L_PLURAL(
                             "The dimensions of the object from file %1% seem to be defined in inches.\n"
                             "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of the object?",
                             "The dimensions of some objects from file %1% seem to be defined in inches.\n"
-                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of these objects?", model.objects.size()), from_path(filename), SLIC3R_APP_NAME) + "\n",
+                            "The internal unit of %2% is a millimeter. Do you want to recalculate the dimensions of these objects?", loaded_model.objects.size()), from_path(filename), SLIC3R_APP_NAME) + "\n",
                             _L("The object is too small"), wxICON_QUESTION | wxYES_NO);
                         dlg.ShowCheckBox(_L("Apply to all the remaining small objects being loaded."));
                         int answer = dlg.ShowModal();
                         if (dlg.IsCheckBoxChecked())
                             answer_convert_from_imperial_units = answer;
                         else 
-                            convert_model_if(model, answer == wxID_YES);
+                            convert_model_if(loaded_model, answer == wxID_YES);
                     }
-                    convert_model_if(model, answer_convert_from_imperial_units == wxID_YES);
+                    convert_model_if(loaded_model, answer_convert_from_imperial_units == wxID_YES);
                 }
 
-                if (model.looks_like_multipart_object()) {
+                if (loaded_model.looks_like_multipart_object()) {
                     if (answer_consider_as_multi_part_objects == wxOK_DEFAULT) {
                         RichMessageDialog dlg(q, _L(
                             "This file contains several objects positioned at multiple heights.\n"
@@ -3102,14 +3129,14 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         if (dlg.IsCheckBoxChecked())
                             answer_consider_as_multi_part_objects = answer;
                         if (answer == wxID_YES)
-                            model.convert_multipart_object(nozzle_dmrs->size());
+                            loaded_model.convert_multipart_object(nozzle_dmrs->size());
                     }
                     else if (answer_consider_as_multi_part_objects == wxID_YES)
-                        model.convert_multipart_object(nozzle_dmrs->size());
+                        loaded_model.convert_multipart_object(nozzle_dmrs->size());
                 }
             }
             if ((wxGetApp().get_mode() == comSimple && !get_app_config()->get_bool("objects_always_expert"))
-                && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
+                && (type_3mf || type_any_amf) && model_has_advanced_features(loaded_model)) {
                 MessageDialog msg_dlg(q, _L("This file cannot be loaded in a simple mode. Do you want to switch to an advanced mode?")+"\n",
                     _L("Detected advanced data"), wxICON_WARNING | wxOK | wxCANCEL);
                 if (msg_dlg.ShowModal() == wxID_OK) {
@@ -3120,7 +3147,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     return obj_idxs;
             }
 
-            for (ModelObject* model_object : model.objects) {
+            for (ModelObject* model_object : loaded_model.objects) {
                 if (!type_3mf && !type_zip_amf) {
                     model_object->center_around_origin(false);
                     if (type_any_amf && model_object->instances.empty()) {
@@ -3134,13 +3161,16 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
             if (one_by_one) {
                 if ((type_3mf && !is_project_file) || (type_any_amf && !type_zip_amf))
-                    model.center_instances_around_point(this->bed.build_volume().bed_center());
-                auto loaded_idxs = load_model_objects(model.objects, is_project_file);
+                    loaded_model.center_instances_around_point(this->bed.build_volume().bed_center());
+                auto loaded_idxs = load_model_objects(loaded_model.objects, is_project_file);
                 obj_idxs.insert(obj_idxs.end(), loaded_idxs.begin(), loaded_idxs.end());
             } else {
-                // This must be an .stl or .obj file, which may contain a maximum of one volume.
-                for (const ModelObject* model_object : model.objects) {
-                    new_model->add_object(*model_object);
+                assert(new_model);
+                if (new_model) {
+                    // This must be an .stl or .obj file, which may contain a maximum of one volume.
+                    for (const ModelObject *model_object : loaded_model.objects) {
+                        new_model->add_object(*model_object);
+                    }
                 }
             }
 
@@ -3149,7 +3179,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         }
     }
 
-    if (new_model != nullptr && new_model->objects.size() > 1) {
+    if (new_model && new_model->objects.size() > 1) {
         //wxMessageDialog msg_dlg(q, _L(
         MessageDialog msg_dlg(q, nozzle_dmrs->size() > 1 ? _L(
                 "Multiple objects were loaded for a multi-material printer.\n"
@@ -3275,7 +3305,7 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 
     std::pair<bool, GLCanvas3D::WipeTowerInfo> wti = view3D->get_canvas3d()->get_wipe_tower_info();
 
-    arr::find_new_position(model, new_instances, min_obj_distance, bed, wti);
+    arr::find_new_position(this->model, new_instances, min_obj_distance, bed, wti);
 
     // it remains to move the wipe tower:
     view3D->get_canvas3d()->arrange_wipe_tower(wti);
@@ -3316,7 +3346,7 @@ fs::path Plater::priv::get_export_file_path(GUI::FileType file_type)
     int obj_idx = selection.get_object_idx();
 
     fs::path output_file;
-    if (file_type == FT_3MF)
+    if (file_type == FT_3MF || file_type == FT_3MF_TRSF)
         // for 3mf take the path from the project filename, if any
         output_file = into_path(get_project_filename(".3mf"));
 
@@ -3341,27 +3371,37 @@ fs::path Plater::priv::get_export_file_path(GUI::FileType file_type)
     return output_file;
 }
 
-wxString Plater::priv::get_export_file(GUI::FileType file_type)
-{
+std::pair<wxString, int> Plater::priv::get_export_file(
+    GUI::FileType file_type,
+    wxFileDialogBase::ExtraControlCreatorFunction extra_option_factory,
+    std::function<void(wxWindow *)> extra_option_reader) {
+    return get_export_file(std::vector<GUI::FileType>{file_type}, extra_option_factory, extra_option_reader);
+}
+std::pair<wxString, int> Plater::priv::get_export_file(
+    std::vector<GUI::FileType> file_types,
+    wxFileDialogBase::ExtraControlCreatorFunction extra_option_factory,
+    std::function<void(wxWindow *)> extra_option_reader) {
     wxString wildcard;
-    switch (file_type) {
+    for (GUI::FileType file_type : file_types) {
+        if (!wildcard.empty()) {
+            wildcard += "|";
+        }
+        switch (file_type) {
         case FT_STL:
         case FT_AMF:
         case FT_3MF:
+        case FT_3MF_TRSF:
         case FT_GCODE:
         case FT_OBJ:
-        case FT_OBJECT:
-            wildcard = file_wildcards(file_type);
-        break;
-        default:
-            wildcard = file_wildcards(FT_MODEL);
-        break;
+        case FT_OBJECT: wildcard += file_wildcards(file_type); break;
+        default: wildcard += file_wildcards(FT_MODEL); break;
+        }
     }
 
-    fs::path output_file = get_export_file_path(file_type);
+    fs::path output_file = get_export_file_path(file_types.front());
 
     wxString dlg_title;
-    switch (file_type) {
+    switch (file_types.front()) {
         case FT_STL:
         {
             output_file.replace_extension("stl");
@@ -3376,6 +3416,7 @@ wxString Plater::priv::get_export_file(GUI::FileType file_type)
             break;
         }
         case FT_3MF:
+        case FT_3MF_TRSF:
         {
             output_file.replace_extension("3mf");
             dlg_title = _L("Save file as:");
@@ -3397,14 +3438,24 @@ wxString Plater::priv::get_export_file(GUI::FileType file_type)
         out_dir == temp_dir ? from_u8(wxGetApp().app_config->get("last_output_path"))  : (is_shapes_dir(out_dir) ? from_u8(wxGetApp().app_config->get_last_dir()) : from_path(output_file.parent_path())), from_path(output_file.filename()),
         wildcard, wxFD_SAVE |(get_app_config()->get_show_overwrite_dialog() ? wxFD_OVERWRITE_PROMPT : 0) );
 
+    if (extra_option_factory) {
+        dlg.SetExtraControlCreator(extra_option_factory);
+        wxGetApp().UpdateDarkUI(&dlg);
+    }
+
     if (dlg.ShowModal() != wxID_OK)
-        return wxEmptyString;
+        return {wxEmptyString, 0};
+
+    wxWindow* extra_option_result = nullptr;
+    if (extra_option_factory) {
+        extra_option_reader(dlg.GetExtraControl());
+    }
 
     wxString out_path = dlg.GetPath();
     fs::path path(into_path(out_path));
     wxGetApp().app_config->update_last_output_dir(path.parent_path().string());
 
-    return out_path;
+    return {out_path, dlg.GetCurrentlySelectedFilterIndex()};
 }
 
 const Selection& Plater::priv::get_selection() const
@@ -4087,7 +4138,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             if (this->preview->can_display_gcode())
                 main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
             else if (this->preview->can_display_volume() &&
-                     background_process.running()) // don't switch to plater3D if you modify a gcode settign and you
+                     background_process.running()) // don't switch to plater3D if you modify a gcode setting and you
                 // don't have background processing on
                 main_frame->select_tab(MainFrame::TabPosition::tpPlaterGCode, true);
         }
@@ -5320,6 +5371,15 @@ void Plater::priv::set_project_filename(const wxString& filename)
         wxGetApp().mainframe->add_to_recent_projects(filename);
 }
 
+void Plater::orient()
+{
+    auto &w = get_ui_job_worker();
+    if (w.is_idle()) {
+        p->take_snapshot(_u8L("Orient"));
+        replace_job(w, std::make_unique<OrientJob>());
+    }
+}
+
 void Plater::priv::init_notification_manager()
 {
     if (!notification_manager)
@@ -5659,6 +5719,12 @@ bool Plater::priv::can_split_to_volumes() const
 bool Plater::priv::can_arrange() const
 {
     if (model.objects.empty() || !m_worker.is_idle()) return false;
+    return q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Undefined;
+}
+
+bool Plater::priv::can_orient() const
+{
+    if (model.objects.empty() || !m_worker.is_idle() || get_selection().is_empty() || get_selection().is_wipe_tower()) return false;
     return q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Undefined;
 }
 
@@ -6100,12 +6166,12 @@ void Plater::load_project()
 
     // Ask user for a project file name.
     wxString input_file;
-    wxGetApp().load_project(this, input_file);
+    bool unbake_trsf = wxGetApp().load_project(this, input_file);
     // And finally load the new project.
-    load_project(input_file);
+    load_project(input_file, unbake_trsf);
 }
 
-void Plater::load_project(const wxString& filename)
+void Plater::load_project(const wxString& filename, bool unbake_trsf)
 {
     if (filename.empty())
         return;
@@ -6118,7 +6184,7 @@ void Plater::load_project(const wxString& filename)
     s_multiple_beds.set_loading_project_flag(true);
     ScopeGuard guard([](){ s_multiple_beds.set_loading_project_flag(false);});
     
-    if (!load_files({into_path(filename)}, true, true, true, false).empty()) {
+    if (!load_files({into_path(filename)}, LoadFileOption::LoadModel | LoadFileOption::LoadConfig | only_if(unbake_trsf, LoadFileOption::UnbakeTransformation)).empty()) {
         // At least one file was loaded.
         p->set_project_filename(filename);
         // Save the names of active presets and project specific config into ProjectDirtyStateManager.
@@ -6158,57 +6224,73 @@ void Plater::add_model(bool imperial_units/* = false*/)
     }
 
     Plater::TakeSnapshot snapshot(this, snapshot_label);
-    if (!load_files(paths, true, false, true, imperial_units).empty())
+    if (!load_files(paths, LoadFileOption::LoadModel | only_if(imperial_units, LoadFileOption::ImperialUnits)).empty())
         wxGetApp().mainframe->update_title();
 }
 
-void Plater::add_model_modifier(const std::string &path) {
-    wxString input_file;
-    bool result = false;
-    bool dragged = false;
+void Plater::load_model_hueforge(const std::string &path) {
+    boost::filesystem::path hfp_path(path);
 
     if (path.empty()) {
-        wxGetApp().import_model_modifier(this, input_file);
-    } else {
-        dragged = true;
-    }
-
-    if (p->model.objects.empty()) {
-            throw Slic3r::RuntimeError("No object loaded. Please load an object first.");
-        return;
-    }
-
-    if (boost::algorithm::iends_with(input_file.ToStdString().c_str(), ".hfp") ||
-        boost::algorithm::iends_with(path.c_str(), ".hfp")) {
-        HFP *hfp = new HFP();
-        p->hueforge = hfp;
-        DynamicPrintConfig print_config = wxGetApp().preset_bundle->fff_prints.get_selected_preset().config;
-
-        if (dragged)
-            { result = p->hueforge->load_hfp(path, print_config, p->model); }
-        else {
-            result = p->hueforge->load_hfp(input_file.ToStdString().c_str(), print_config, p->model);
+        wxString input_file;
+        wxGetApp().import_model_hueforge(this, input_file);
+        if (input_file.empty()) {
+            return;
         }
+        hfp_path = boost::filesystem::path(input_file.ToStdString());
+    }
 
-        if (result) {
-            DynamicPrintConfig new_print_config = print_config;
-            new_print_config.set_key_value("layer_height", new ConfigOptionFloat(*p->hueforge->get_layer_height()));
-            new_print_config.set_key_value("first_layer_height",
-                                           new ConfigOptionFloatOrPercent(*p->hueforge->get_base_layer_height(),
-                                                                          false));
+    if (hfp_path.extension() == ".hfp") {
+        HFP hueforge;
 
+         bool hfp_loaded = hueforge.load_hfp(hfp_path.string());
+
+        if (hfp_loaded) {
+            // is the stl already loaded?
+            bool model_found = false;
+            std::vector<size_t> objs_idx;
+            boost::filesystem::path stl_path(hueforge.get_stl_path());
+            for (size_t object_idx = 0; !model_found && object_idx < this->model().objects.size(); object_idx++) {
+                if (this->model().objects[object_idx]->name == stl_path.filename()) {
+                    objs_idx = {object_idx};
+                    model_found = true;
+                }
+            }
+            if (!model_found) {
+                // not loaded, create new project and load it.
+                if (!this->new_project(hfp_path.stem().string()))
+                    return;
+
+                objs_idx = this->load_files(std::vector<std::string>{hueforge.get_stl_path()},
+                                                                LoadFileOption::LoadModel | LoadFileOption::DontUpdateDirs);
+            }
+            DynamicPrintConfig new_print_config = *wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->get_config();
+
+            hueforge.update_config(new_print_config);
+            hueforge.set_custom_gcode_z(p->model);
+
+            // update everything
             wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->load_config(new_print_config);
+            this->on_config_change(new_print_config);
+            this->changed_objects(objs_idx);
+            ObjectList *obj = wxGetApp().obj_list();
+            obj->update_after_undo_redo();
             wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->reload_config();
+        } else {
+            {
+                MessageDialog(this, _L("Loading of a hpf file failed."),
+                              wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error while loading .hfp file"),
+                              wxOK | wxICON_WARNING | wxCENTRE)
+                    .ShowModal();
+            }
         }
     } else {
-        throw Slic3r::RuntimeError("Unknown file format. Input file must have .hfp extension.");
+        MessageDialog(this, _L("Unknown file format. Input file must have .hfp extension."),
+                      wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error while loading .hfp file"),
+                      wxOK | wxICON_WARNING | wxCENTRE)
+            .ShowModal();
     }
-
-    if (!result)
-        throw Slic3r::RuntimeError("Loading of a model file failed.");
 }
-
-
 
 void Plater::import_zip_archive()
 {
@@ -6237,7 +6319,7 @@ void Plater::extract_config_from_project()
     wxGetApp().load_project(this, input_file);
 
     if (! input_file.empty())
-        load_files({ into_path(input_file) }, false, true, true, false);
+        load_files({ into_path(input_file) }, LoadFileOption::LoadConfig);
 }
 
 void Plater::load_gcode()
@@ -6505,8 +6587,8 @@ void Plater::refresh_print()
     p->preview->refresh_print();
 }
 
-std::vector<size_t> Plater::load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool update_dirs /*= true*/, bool imperial_units /*= false*/) { 
-    return p->load_files(input_files, load_model, load_config, update_dirs, imperial_units);
+std::vector<size_t> Plater::load_files(const std::vector<fs::path>& input_files, LoadFileOptions options) { 
+    return p->load_files(input_files, options);
 }
 
 void Plater::object_list_changed()
@@ -6515,13 +6597,13 @@ void Plater::object_list_changed()
 }
 
 // To be called when providing a list of files to the GUI slic3r on command line.
-std::vector<size_t> Plater::load_files(const std::vector<std::string>& input_files, bool load_model, bool load_config, bool update_dirs, bool imperial_units)
+std::vector<size_t> Plater::load_files(const std::vector<std::string>& input_files, LoadFileOptions options)
 {
     std::vector<fs::path> paths;
     paths.reserve(input_files.size());
     for (const std::string& path : input_files)
         paths.emplace_back(path);
-    return p->load_files(paths, load_model, load_config, update_dirs, imperial_units);
+    return p->load_files(paths, options);
 }
 
 
@@ -6819,7 +6901,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
     // 1 model (or more and other instances are not allowed), 0 projects - open geometry
     if (project_paths.empty() && (non_project_paths.size() == 1 || wxGetApp().app_config->get_bool("single_instance")))
     {
-        load_files(non_project_paths, true, false);
+        load_files(non_project_paths, LoadFileOption::LoadModel);
         boost::system::error_code ec;
         fs::remove(non_project_paths.front(), ec);
         if (ec)
@@ -6835,8 +6917,8 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
         switch (option)
         {
         case LoadProjectsDialog::LoadProjectOption::AllGeometry: {
-            load_files(project_paths, true, false);
-            load_files(non_project_paths, true, false);
+            load_files(project_paths, LoadFileOption::LoadModel);
+            load_files(non_project_paths, LoadFileOption::LoadModel);
             break;
         }
         case LoadProjectsDialog::LoadProjectOption::AllNewWindow: {
@@ -6857,8 +6939,8 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
             if (wxGetApp().can_load_project())
                 load_project(from_path(project_paths[pos]));
             project_paths.erase(project_paths.begin() + pos);
-            load_files(project_paths, true, false);
-            load_files(non_project_paths, true, false);
+            load_files(project_paths, LoadFileOption::LoadModel);
+            load_files(non_project_paths, LoadFileOption::LoadModel);
             break;
         }
         case LoadProjectsDialog::LoadProjectOption::OneConfig: {
@@ -6866,10 +6948,10 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
             assert(pos >= 0 && pos < project_paths.size());
             std::vector<fs::path> aux;
             aux.push_back(project_paths[pos]);
-            load_files(aux, false, true);
+            load_files(aux, LoadFileOption::LoadConfig);
             project_paths.erase(project_paths.begin() + pos);
-            load_files(project_paths, true, false);
-            load_files(non_project_paths, true, false);
+            load_files(project_paths, LoadFileOption::LoadModel);
+            load_files(non_project_paths, LoadFileOption::LoadModel);
             break;
         }
         case LoadProjectsDialog::LoadProjectOption::Unknown:
@@ -6888,7 +6970,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
         wxArrayString aux;
         aux.Add(from_u8(project_paths.front().string()));
         bool loaded3mf = load_files(aux, true);
-        load_files(non_project_paths, /*load_model=*/true, /*load_config=*/false, /*update_dirs=*/true, /*imperial_unit=*/false);
+        load_files(non_project_paths, LoadFileOption::LoadModel);
         boost::system::error_code ec;
         if (loaded3mf) {
             fs::remove(project_paths.front(), ec);
@@ -6906,8 +6988,8 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
     }
 
     // load all projects and all models as geometry
-    load_files(project_paths, true, false, true, false);
-    load_files(non_project_paths, true, false, true, false);
+    load_files(project_paths, LoadFileOption::LoadModel);
+    load_files(non_project_paths, LoadFileOption::LoadModel);
 #endif // 0
    
 
@@ -7059,11 +7141,6 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
     // searches for project files
     for (std::vector<fs::path>::const_reverse_iterator it = paths.rbegin(); it != paths.rend(); ++it) {
         std::string filename = (*it).filename().string();
-        
-        if (boost::algorithm::iends_with(filename, ".hfp")) {
-           wxGetApp().plater_->add_model_modifier(it->string());
-            return true;
-        }
 
         bool handle_as_project = (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf"));
         if (boost::algorithm::iends_with(filename, ".zip") && (is_project_3mf(it->string()) || is_project_bambu_3mf(it->string()))) {
@@ -7102,11 +7179,11 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
             }
             case ProjectDropDialog::LoadType::LoadGeometry: {
 //                Plater::TakeSnapshot snapshot(this, _L("Import Object"));
-                load_files({ *it }, true, false, true, false);
+                load_files({ *it }, LoadFileOption::LoadModel);
                 break;
             }
             case ProjectDropDialog::LoadType::LoadConfig: {
-                load_files({ *it }, false, true, true, false);
+                load_files({ *it },  LoadFileOption::LoadConfig);
                 break;
             }
             case ProjectDropDialog::LoadType::OpenWindow: {
@@ -7123,7 +7200,6 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
             return true;
         } else if (boost::algorithm::iends_with(filename, ".zip")) {
             return preview_zip_archive(*it);
-            
         }
     }
 
@@ -7145,7 +7221,24 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
         }
     }
     Plater::TakeSnapshot snapshot(this, snapshot_label);
-    load_files(paths, true, true, true, false);
+    
+    // don't load hfp project as stl
+    std::vector<fs::path> model_modifiers;
+    for (auto it = paths.begin(); it != paths.end();) {
+        if ((*it).extension() == ".hfp") {
+            model_modifiers.push_back(*it);
+            it = paths.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    load_files(paths, LoadFileOption::LoadModel | LoadFileOption::LoadConfig);
+
+    // load hfp project (modify stl just loaded ?)
+    for (const fs::path &path : model_modifiers) {
+        this->load_model_hueforge(path.string());
+    }
 
     return true;
 }
@@ -7802,6 +7895,7 @@ public:
     bool only_selection() { return m_sel_only->GetValue(); }
     bool with_modifers() { return m_with_modifiers->GetValue(); }
     bool with_config() { return m_with_config->GetValue(); }
+    bool with_bake_transformation() { return m_bake_tranformation->GetValue(); }
 private:
 #ifndef __linux__
     void OnUpdateLabelUI(wxUpdateUIEvent& event)
@@ -7811,9 +7905,26 @@ private:
 
 
         const int filter = dialog->GetCurrentlySelectedFilterIndex();
-
-        m_with_modifiers->Enable(filter > 0);
-        m_with_config->Enable(filter == 1);
+        //0:stl
+        //1:obj
+        //2:3mf
+        //3:amf
+        m_with_modifiers->Enable(filter > 1);
+        if (m_with_config->IsEnabled()) {
+            saved_with_config = m_with_config->GetValue();
+            saved_m_bake_tranformation = m_bake_tranformation->GetValue();
+            if (filter != 2) {
+                saved_with_config = false;
+                saved_m_bake_tranformation = true;
+                m_with_config->Enable(false);
+                m_bake_tranformation->Enable(false);
+            }
+        } else if(filter == 2) {
+            m_with_config->SetValue(saved_with_config);
+            m_bake_tranformation->SetValue(saved_m_bake_tranformation);
+            m_with_config->Enable(true);
+            m_bake_tranformation->Enable(true);
+        }
     }
 #endif
 
@@ -7821,6 +7932,9 @@ private:
     wxCheckBox* m_sel_only;
     wxCheckBox* m_with_modifiers;
     wxCheckBox* m_with_config;
+    bool saved_with_config = true;
+    wxCheckBox* m_bake_tranformation;
+    bool saved_m_bake_tranformation = false;
 };
 
 OptionForExportPlatter::OptionForExportPlatter(wxWindow* parent)
@@ -7830,17 +7944,20 @@ OptionForExportPlatter::OptionForExportPlatter(wxWindow* parent)
     m_sel_only = new wxCheckBox(this, -1, _L("Only selected objects"));
     m_with_modifiers = new wxCheckBox(this, -1, _L("Include modifiers"));
     m_with_config = new wxCheckBox(this, -1, _L("Include presets"));
+    m_bake_tranformation = new wxCheckBox(this, -1, _L("Merge transformation"));
 
     m_with_supports->SetToolTip("Only for sla printers");
     m_sel_only->SetToolTip("Only when an object is selected");
     m_with_modifiers->SetToolTip("Only for 3mf and amf");
     m_with_config->SetToolTip("Only for 3mf");
+    m_bake_tranformation->SetToolTip("Store the transformed mesh (translation, rotation, scale), instead of keeping the transformation separately. Needed to export for PrusaSlicer. Only for 3mf");
 
     m_with_supports->Enable(OptionForExportPlatter_can_support);
     m_sel_only->Enable(OptionForExportPlatter_can_select);
 #ifndef __linux__
     m_with_modifiers->Enable(false);
     m_with_config->Enable(false);
+    m_bake_tranformation->Enable(true);
 
     this->Bind(wxEVT_UPDATE_UI, &OptionForExportPlatter::OnUpdateLabelUI, this);
 #endif
@@ -7849,6 +7966,8 @@ OptionForExportPlatter::OptionForExportPlatter(wxWindow* parent)
     sizerTop->Add(m_with_supports, wxSizerFlags().Centre().Border());
     sizerTop->AddSpacer(10);
     sizerTop->Add(m_sel_only, wxSizerFlags().Centre().Border());
+    sizerTop->AddSpacer(10);
+    sizerTop->Add(m_bake_tranformation, wxSizerFlags().Centre().Border());
     wxBoxSizer* sizerBot = new wxBoxSizer(wxHORIZONTAL);
     sizerBot->Add(m_with_config, wxSizerFlags().Centre().Border());
     sizerBot->AddSpacer(10);
@@ -7863,11 +7982,12 @@ OptionForExportPlatter::OptionForExportPlatter(wxWindow* parent)
 std::string Plater::get_export_path()
 {
     if (p->model.objects.empty()) { return ""; }
-    wxString path = p->get_export_file(FT_OBJECT); // FT_OBJECT = FT_STL & FT_OBJ
+    wxString path = p->get_export_file(FT_OBJECT).first; // FT_OBJECT = FT_STL & FT_OBJ
     if (path.empty()) { return ""; }
     return into_u8(path);
 }
 
+//TOOO: use the updated omre powerful get_export_file
 void Plater::export_platter()
 {
     if (p->model.objects.empty()) { return; }
@@ -7977,6 +8097,7 @@ void Plater::export_platter()
                 .set_thumbnail_data(&thumbnail_data)
                 .set_export_config(extra_options->with_config())
                 .set_export_modifiers(extra_options->with_modifers())
+                .set_bake_transformation_in_mesh(extra_options->with_bake_transformation())
             );
         } else if (dlg.GetFilterIndex() == 2) {
             //store amf
@@ -8284,7 +8405,7 @@ void Plater::export_amf()
 {
     if (p->model.objects.empty()) { return; }
 
-    wxString path = p->get_export_file(FT_AMF);
+    wxString path = p->get_export_file(FT_AMF).first;
     if (path.empty()) { return; }
     std::string path_u8 = into_u8(path);
 
@@ -8402,7 +8523,8 @@ void publish(Model &model) {
         svgfile->path_in_3mf = create_unique_3mf_filepath(filename, svgfiles);        
     }
 }
-}
+} // namespace
+
 
 bool Plater::export_3mf(const boost::filesystem::path& output_path)
 {
@@ -8413,12 +8535,19 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
     }
 
     wxString path;
+    bool merge_transformation = p->model.baked_transformation;
     if (output_path.empty()) {
-        path = p->get_export_file(FT_3MF);
-        if (path.empty()) { return false; }
-    }
-    else
+        std::pair<wxString, int> result = p->get_export_file(merge_transformation ?
+                                                                 std::vector<GUI::FileType>{FT_3MF, FT_3MF_TRSF} :
+                                                                 std::vector<GUI::FileType>{FT_3MF_TRSF, FT_3MF});
+        path = result.first;
+        merge_transformation = result.second == (merge_transformation ? 0 : 1);
+        if (path.empty()) {
+            return false;
+        }
+    } else {
         path = from_path(output_path);
+    }
 
     if (!path.Lower().EndsWith(".3mf"))
         return false;
@@ -8449,7 +8578,11 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
     bool ret = false;
     try
     {
-        ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, &cfg, OptionStore3mf{}.set_fullpath_sources(full_pathnames).set_thumbnail_data(&thumbnail_data));
+        ret = Slic3r::store_3mf(path_u8.c_str(), &p->model, &cfg,
+                                OptionStore3mf{}
+                                    .set_fullpath_sources(full_pathnames)
+                                    .set_thumbnail_data(&thumbnail_data)
+                                    .set_bake_transformation_in_mesh(merge_transformation));
     }
     catch (boost::filesystem::filesystem_error& e)
     {
@@ -8497,7 +8630,7 @@ void Plater::export_toolpaths_to_obj() const
     if ((printer_technology() != ptFFF) || !is_preview_loaded())
         return;
 
-    wxString path = p->get_export_file(FT_OBJ);
+    wxString path = p->get_export_file(FT_OBJ).first;
     if (path.empty()) 
         return;
     
@@ -9275,6 +9408,29 @@ void Plater::changed_object(int obj_idx)
     changed_object(*object);
 }
 
+void Plater::changed_all_objects() {
+    for (ModelObject *object : p->model.objects) {
+        if (object->min_z() >= SINKING_Z_THRESHOLD) {
+            // re - align to Z = 0
+            object->ensure_on_bed();
+        }
+    }
+    if (this->p->printer_technology == ptSLA) {
+        // Update the SLAPrint from the current Model, so that the reload_scene()
+        // pulls the correct data, update the 3D scene.
+        this->p->update_restart_background_process(true, false);
+    }
+    else {
+        p->view3D->reload_scene(false);
+        for (size_t obj_idx = 0; obj_idx < p->model.objects.size(); obj_idx++) {
+            p->view3D->get_canvas3d()->update_instance_printable_state_for_object(obj_idx);
+        }
+    }
+
+    // update print
+    this->p->schedule_background_process();
+}
+
 void Plater::changed_objects(const std::vector<size_t>& object_idxs)
 {
     if (object_idxs.empty())
@@ -9523,6 +9679,7 @@ bool Plater::can_simplify() const { return p->can_simplify(); }
 bool Plater::can_split_to_objects() const { return p->can_split_to_objects(); }
 bool Plater::can_split_to_volumes() const { return p->can_split_to_volumes(); }
 bool Plater::can_arrange() const { return p->can_arrange(); }
+bool Plater::can_orient() const { return p->can_orient(); }
 bool Plater::can_layers_editing() const { return p->can_layers_editing(); }
 bool Plater::can_paste_from_clipboard() const
 {

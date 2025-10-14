@@ -52,7 +52,8 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string(),
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string(),
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string(),
-            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string()}, /*load_model=*/true , false, false, false);
+            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "bed_leveling" / "patch.amf").string()},
+        LoadFileOption::LoadModel | LoadFileOption::DontUpdateDirs);
 
     assert(objs_idx.size() == 5);
     const DynamicPrintConfig* printConfig = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
@@ -127,7 +128,8 @@ void CalibrationBedDialog::create_geometry(wxCommandEvent& event_args) {
         model.objects[objs_idx[i]]->config.set_key_value("gap_fill_enabled", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value("first_layer_extrusion_width", new ConfigOptionFloatOrPercent(140, true));
         model.objects[objs_idx[i]]->config.set_key_value("first_layer_infill_extrusion_width", (new ConfigOptionFloatOrPercent(140, true))->set_can_be_disabled(true));
-        model.objects[objs_idx[i]]->config.set_key_value("bottom_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinearWGapFill));
+        model.objects[objs_idx[i]]->config.set_key_value("bottom_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+        model.objects[objs_idx[i]]->config.set_key_value("infill_filled_bottom", new ConfigOptionBool(true));
         //disable ironing post-process
         model.objects[objs_idx[i]]->config.set_key_value("ironing", new ConfigOptionBool(false));
     }

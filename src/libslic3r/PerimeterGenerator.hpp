@@ -15,7 +15,10 @@
 #include "Layer.hpp"
 #include "Polygon.hpp"
 #include "PrintConfig.hpp"
+#include "RegionSettings.hpp"
 #include "SurfaceCollection.hpp"
+
+//#define _DEBUG_OVERHANGS
 
 namespace Slic3r::Arachne {
 struct ExtrusionLine;
@@ -53,6 +56,8 @@ struct Parameters
     coord_t       get_ext_perimeter_spacing() const { return ext_perimeter_spacing; }
     coord_t       ext_perimeter_spacing2;
     coord_t       get_ext_perimeter_spacing2() const { return ext_perimeter_spacing2; }
+    const coord_t overhang_spacing;
+    coord_t       get_overhang_spacing() const { return overhang_spacing; }
     //const coord_t gap_fill_spacing;
     //coord_t       get_gap_fill_spacing() const { return gap_fill_spacing; }
     //const coord_t gap_fill_spacing_external;
@@ -67,23 +72,27 @@ struct Parameters
     coord_t       get_min_round_spacing() const { return min_round_spacing; }
 
     // cached parameters
-    Polygons lower_slices_bridge;
+    ExPolygons overhang_areas;
+    Polygons lower_slices_bridge_for_extra_overhangs;
     Polygons lower_slices_bridge_dynamic;
     Polygons lower_slices_bridge_speed_small;
     Polygons lower_slices_bridge_speed_big;
     Polygons lower_slices_bridge_flow_small;
     Polygons lower_slices_bridge_flow_big;
 
-    Parameters(Layer                   *layer,
-               Flow                     perimeter_flow,
-               Flow                     ext_perimeter_flow,
-               Flow                     overhang_flow,
-               Flow                     solid_infill_flow,
+    static const std::vector<t_config_option_keys> perimeter_keys;
+    RegionSettings region_setting;
+
+    Parameters(Layer *layer,
+               Flow perimeter_flow,
+               Flow ext_perimeter_flow,
+               Flow overhang_flow,
+               Flow solid_infill_flow,
                const PrintRegionConfig &config,
                const PrintObjectConfig &object_config,
-               const PrintConfig &      print_config,
-               const bool               spiral_vase,
-               const bool               arachne)
+               const PrintConfig &print_config,
+               const bool spiral_vase,
+               const bool arachne)
         : layer(layer)
         , perimeter_flow(perimeter_flow)
         , ext_perimeter_flow(ext_perimeter_flow)
@@ -94,7 +103,7 @@ struct Parameters
         , print_config(print_config)
         , spiral_vase(spiral_vase)
         , use_arachne(arachne)
-        ,
+        , region_setting(config, perimeter_keys),
         // other perimeters
         m_mm3_per_mm(perimeter_flow.mm3_per_mm()),
         perimeter_width(perimeter_flow.scaled_width()),
@@ -102,6 +111,7 @@ struct Parameters
         // external perimeters
         m_ext_mm3_per_mm(ext_perimeter_flow.mm3_per_mm()),
         ext_perimeter_width(ext_perimeter_flow.scaled_width()),
+        overhang_spacing(scale_t(config.overhangs_extrusion_spacing.get_abs_value(perimeter_flow.nozzle_diameter()))),
         //spacing between two external perimeter (where you don't have the space to add other loops)
         ext_perimeter_spacing(this->ext_perimeter_flow.scaled_spacing()),
         //spacing between external perimeter and the second
@@ -190,6 +200,8 @@ public:
     const ExPolygons            *lower_slices;
     const SurfaceCollection     *slices;
     const ExPolygons            *upper_slices;
+    //const Surface               *surface;
+    BoundingBox                 surface_bbox;
     Parameters             params;
     std::function<void()>        throw_if_canceled = []() {};
     // Outputs:
@@ -234,16 +246,34 @@ private:
     // the bbox is here to accelerate the diffs, loop_polygons is inside it.
     ExtrusionPaths create_overhangs_arachne(const Parameters &params,
         const ClipperLib_Z::Path& loop_polygons, const BoundingBox& bbox, ExtrusionRole role, bool is_external) const;
+
+    enum OverhangType : int{
+        NOT_OVERHANG = 0,
+        DYNAMIC_OVERHANG,
+        SMALL_SPEED_OVERHANG,
+        BIG_SPEED_OVERHANG,
+        SMALL_FLOW_OVERHANG,
+        BIG_FLOW_OVERHANG,
+    };
     struct Params_sort_overhangs
     {
         bool is_external;
         bool is_loop;
-        size_t layer_height_count;
+        bool has_dynamic;
+        //size_t layer_height_count;
         Point first_point;
         Point last_point;
+        std::vector<int> overhang_type_2_lh;
+#ifdef _DEBUG_OVERHANGS
+        std::vector<std::string> debug_colors;
+        int debug_i = 0;
+#endif
     };
+
     void _sort_overhangs(const Parameters &params,
-        ExtrusionPaths &paths, const ExtrusionRole role, const Params_sort_overhangs is_external) const;
+                         ExtrusionPaths &paths,
+                         const ExtrusionRole role,
+                         const Params_sort_overhangs &overhangs_params) const;
 
     // transform loops into ExtrusionEntityCollection, adding also thin walls into it.
     ExtrusionEntityCollection _traverse_loops_classic(const Parameters &params,
@@ -268,8 +298,12 @@ private:
                             ExPolygons &      top_fills,
                             ExPolygons &      non_top_polygons,
                             ExPolygons &      fill_clip,
-                            int nb_peri_to_print
+                            int nb_peri_to_print,
+                            coordf_t min_width,
+                            bool use_old_algorithm_for_min_width
     );
+    // for overhangs_speed_enforce
+    bool _enforce_speed_overhangs(ExtrusionPaths &paths, int count_since_overhang) const;
 
 };
 

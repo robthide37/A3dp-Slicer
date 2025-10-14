@@ -162,7 +162,8 @@ struct SurfaceFillParams : FillParams
         RETURN_COMPARE_NON_EQUAL(monotonic);
         RETURN_COMPARE_NON_EQUAL(max_sparse_infill_spacing);
         RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, connection);
-        RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, dont_adjust);
+        RETURN_COMPARE_NON_EQUAL(add_gap_fill);
+        RETURN_COMPARE_NON_EQUAL(dont_adjust);
 
         RETURN_COMPARE_NON_EQUAL(anchor_length);
         RETURN_COMPARE_NON_EQUAL(fill_exactly);
@@ -174,6 +175,7 @@ struct SurfaceFillParams : FillParams
         assert(rhs.config != nullptr);
         if (config != nullptr && rhs.config != nullptr) {
             RETURN_COMPARE_NON_EQUAL(config->infill_acceleration);
+            RETURN_COMPARE_NON_EQUAL(config->infill_extruder);
             RETURN_COMPARE_NON_EQUAL(config->infill_speed);
             RETURN_COMPARE_NON_EQUAL(config->solid_infill_acceleration);
             RETURN_COMPARE_NON_EQUAL(config->solid_infill_speed);
@@ -191,6 +193,8 @@ struct SurfaceFillParams : FillParams
             RETURN_COMPARE_NON_EQUAL(config->region_gcode.value)
             RETURN_COMPARE_NON_EQUAL(config->small_area_infill_flow_compensation_model.is_enabled())
             RETURN_COMPARE_NON_EQUAL(config->small_area_infill_flow_compensation_model.value);
+            RETURN_COMPARE_NON_EQUAL(config->solid_infill_extruder);
+            RETURN_COMPARE_NON_EQUAL(config->wipe_into_infill);
             // print modifier, because region are fused in gode wiew if not.
             RETURN_COMPARE_NON_EQUAL(config->print_extrusion_multiplier.value);
             RETURN_COMPARE_NON_EQUAL(config->print_first_layer_temperature.value);
@@ -222,6 +226,7 @@ struct SurfaceFillParams : FillParams
             return false;
         if(config != nullptr && (
             config->infill_acceleration != rhs.config->infill_acceleration
+            || config->infill_extruder != rhs.config->infill_extruder
             || config->infill_speed != rhs.config->infill_speed
             || config->solid_infill_acceleration != rhs.config->solid_infill_acceleration
             || config->solid_infill_speed != rhs.config->solid_infill_speed
@@ -239,6 +244,8 @@ struct SurfaceFillParams : FillParams
             || config->region_gcode != rhs.config->region_gcode
             || config->small_area_infill_flow_compensation_model.is_enabled() != rhs.config->small_area_infill_flow_compensation_model.is_enabled()
             || config->small_area_infill_flow_compensation_model != rhs.config->small_area_infill_flow_compensation_model
+            || config->solid_infill_extruder != rhs.config->solid_infill_extruder
+            || config->wipe_into_infill != rhs.config->wipe_into_infill
             // print modifier, because region are fused in gode wiew if not.
             || config->print_extrusion_multiplier        != rhs.config->print_extrusion_multiplier
             || config->print_first_layer_temperature     != rhs.config->print_first_layer_temperature
@@ -269,6 +276,7 @@ struct SurfaceFillParams : FillParams
                 this->density               == rhs.density          &&
                 this->monotonic             == rhs.monotonic        &&
                 this->connection            == rhs.connection       &&
+                this->add_gap_fill          == rhs.add_gap_fill     &&
                 this->dont_adjust           == rhs.dont_adjust      &&
                 this->anchor_length         == rhs.anchor_length    &&
                 this->anchor_length_max     == rhs.anchor_length_max&&
@@ -357,24 +365,25 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
                 if (surface.has_fill_solid()) {
                     params.density = 1.f;
-                    params.pattern = ipRectilinear;
+                    params.pattern = region_config.solid_fill_pattern.value;
                     params.connection = region_config.infill_connection_solid.value;
+                    params.add_gap_fill = region_config.infill_filled_solid.value;
                     if (surface.has_pos_top()) {
+                        params.pattern = region_config.top_fill_pattern.value;
                         params.connection = region_config.infill_connection_top.value;
+                        params.add_gap_fill = region_config.infill_filled_top.value;
                     }
                     if (surface.has_pos_bottom()) {
+                        params.pattern = region_config.bottom_fill_pattern.value;
                         params.connection = region_config.infill_connection_bottom.value;
+                        params.add_gap_fill = region_config.infill_filled_bottom.value;
                     }
                     //FIXME for non-thick bridges, shall we allow a bottom surface pattern?
                     if (is_bridge) {
                         params.pattern = region_config.bridge_fill_pattern.value;
                         params.connection = region_config.infill_connection_bridge.value;
+                        params.add_gap_fill = false;
                         params.bridge_type = region_config.bridge_type.value;
-                    }
-                    if (surface.has_pos_external() && !is_bridge) {
-                        params.pattern = surface.has_pos_top() ? region_config.top_fill_pattern.value : region_config.bottom_fill_pattern.value;
-                    } else if (!is_bridge) {
-                        params.pattern = region_config.solid_fill_pattern.value;
                     }
                 } else {
                     if (is_bridge) {
@@ -1301,12 +1310,10 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         case ipAdaptiveCubic:
         case ipSupportCubic:
         case ipRectilinear:
-        case ipRectilinearWGapFill:
         case ipRectiWithPerimeter:
         case ipSawtooth:
         case ipScatteredRectilinear:
         case ipMonotonic:
-        case ipMonotonicWGapFill:
         case ipMonotonicLines:
         case ipAlignedRectilinear:
         case ipGrid:
@@ -1315,7 +1322,6 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         case ipCubic:
         case ipLine:
         case ipConcentric:
-        case ipConcentricGapFill:
         case ipHoneycomb:
         case ip3DHoneycomb:
         case ipGyroid:

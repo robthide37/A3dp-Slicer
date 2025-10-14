@@ -256,11 +256,15 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(
     const ExtrusionEntityCollection                 *ecc,
     const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
     const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines,
-    const double max_width);
+    const double &nzl_diam);
 
 std::pair<float, float> calculate_overhang_speed(const ExtrusionAttributes &attributes,
-                                                 const FullPrintConfig     &config,
-                                                 size_t                     extruder_id);
+                                                 const FullPrintConfig &config,
+                                                 size_t extruder_id);
+void apply_overhang_flow(ExtrusionPath &path,
+                         const PrintConfig &print_config,
+                         const LayerRegion &region,
+                         size_t extruder_id);
 
 }} // namespace Slic3r::ExtrusionProcessor
 

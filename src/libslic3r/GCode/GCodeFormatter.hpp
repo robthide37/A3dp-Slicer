@@ -96,8 +96,7 @@ public:
             this->emit_axis('J', point.y(), m_gcode_precision_xyz);
     }
 
-    // return the de that isn't emmited as it's truncated
-    double emit_e(const std::string_view axis, double v);
+    void emit_e(const std::string_view axis, double v);
 
     void emit_f(double speed) { this->emit_axis('F', speed, m_gcode_precision_xyz); }
 

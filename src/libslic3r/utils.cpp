@@ -177,6 +177,18 @@ std::string var(const std::string &file_name)
     return file.string();
 }
 
+static boost::filesystem::path g_binary_file;
+
+void set_binary_file(const boost::filesystem::path &file)
+{
+    g_binary_file = file;
+}
+
+const boost::filesystem::path& binary_file()
+{
+    return g_binary_file;
+}
+
 static std::string g_resources_dir;
 
 void set_resources_dir(const std::string &dir)
@@ -239,9 +251,11 @@ void set_data_dir(const std::string &dir)
 
 const std::string& data_dir()
 {
+    assert(!g_data_dir.empty());
     return g_data_dir;
 }
 
+bool has_data_dir() { return !g_data_dir.empty(); }
 std::string custom_shapes_dir()
 {
     return (boost::filesystem::path(g_data_dir) / "shapes").string();

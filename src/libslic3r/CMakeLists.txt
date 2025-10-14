@@ -369,7 +369,10 @@ set(SLIC3R_SOURCES
     PNGReadWrite.cpp
     QuadricEdgeCollapse.cpp
     QuadricEdgeCollapse.hpp
+    RegionSettings.cpp
+    RegionSettings.hpp
     Semver.cpp
+    Semver.hpp
     ShortEdgeCollapse.cpp
     ShortEdgeCollapse.hpp
     ShortestPath.cpp
@@ -439,6 +442,8 @@ set(SLIC3R_SOURCES
     MTUtils.hpp
     Zipper.hpp
     Zipper.cpp
+    Orient.cpp
+    Orient.hpp
     MinAreaBoundingBox.hpp
     MinAreaBoundingBox.cpp
     miniz_extension.hpp

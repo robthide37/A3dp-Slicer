@@ -65,6 +65,7 @@ namespace Slic3r {
         const FillParams &params_init) const {
         
         FillParams params = params_init;
+        params.add_gap_fill = has_gap_fill[idx];
         std::unique_ptr<Fill> f2 = std::unique_ptr<Fill>(Fill::new_from_type(fillPattern[idx]));
         f2->bounding_box = this->bounding_box;
         f2->init_spacing(this->get_spacing(), params);

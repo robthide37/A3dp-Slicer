@@ -9,15 +9,18 @@
 #include <valarray> // valarray
 #include <vector> // vector
 
+
 #include <nlohmann/detail/macro_scope.hpp>
 #include <nlohmann/detail/iterators/iteration_proxy.hpp>
 #include <nlohmann/detail/meta/cpp_future.hpp>
 #include <nlohmann/detail/meta/type_traits.hpp>
 #include <nlohmann/detail/value_t.hpp>
 
-// #ifdef JSON_HAS_CPP_17
-    // #include <filesystem>
-// #endif
+#ifdef JSON_HAS_CPP_20
+    #include <filesystem>
+#else
+    #include <boost/filesystem.hpp>
+#endif
 
 namespace nlohmann
 {
@@ -394,6 +397,12 @@ void to_json(BasicJsonType& j, const T& t)
 #ifdef JSON_HAS_CPP_20
 template<typename BasicJsonType>
 void to_json(BasicJsonType& j, const std::filesystem::path& p)
+{
+    j = p.string();
+}
+#else
+template<typename BasicJsonType>
+void to_json(BasicJsonType& j, const boost::filesystem::path& p)
 {
     j = p.string();
 }

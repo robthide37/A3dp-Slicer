@@ -507,7 +507,8 @@ private:
         uint16_t last_extruder;
         coord_t diameter;
     }                                   m_layer_slices_offseted{ {},{},nullptr, 0};
-    double                              m_volumetric_speed;
+    // one per extruder
+    std::vector<double>                 m_volumetric_speed_mm3_per_s;
     // Support for the extrusion role markers. Which marker is active?
     GCodeExtrusionRole                  m_last_extrusion_role;
     // Not know the gapfill role for retract_lift_top
@@ -517,6 +518,8 @@ private:
     double                              m_last_layer_z{ 0.0 };
     double                              m_max_layer_z{ 0.0 };
     double                              m_last_width{ 0.0 };
+    // filament used since the beginning for each extruder, updated after the before_layer_gcode. in mm
+    std::vector<double>                 m_last_layer_used_filament;
     // to pass between before_xtrude and after_extrude.
     double                              m_overhang_fan_override{ -1.0 };
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -585,7 +588,7 @@ private:
     std::function<void()> m_throw_if_canceled = [](){};
 
     double                    _compute_e_per_mm(const ExtrusionPath &path);
-    std::string               _extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);
+    std::string               _extrude(ExtrusionPath &path, const std::string_view description, double speed = -1);
     void                      _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, ExtrusionRole role, coord_t delta_z=0);
     void                      _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string_view comment, Point& last_pos, const double path_width);
     std::string               _before_extrude(const ExtrusionPath &path, const std::string_view description, double speed = -1);

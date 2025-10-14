@@ -1799,7 +1799,7 @@ std::optional<Vec2d> Emboss::OrthoProject::unproject(const Vec3d &p, double *dep
 namespace {
 
 
-bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, const size_t &i, const Slic3r::Polygon &polygon, bool is_first, bool is_reverse = false)
+bool point_in_distance_sqr(const distsqrf_t &distance_sq, PolygonPoint &polygon_point, const size_t &i, const Slic3r::Polygon &polygon, bool is_first, bool is_reverse = false)
 {
     size_t s  = polygon.size();
     size_t ii = (i + polygon_point.index) % s;
@@ -1808,8 +1808,8 @@ bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, c
     const Point &p = polygon[ii];
     Point p_d = p - polygon_point.point;
 
-    P2 p_d2 = p_d.cast<Coord2>();
-    Coord2 p_distance_sq = p_d2.squaredNorm();
+    Vec2d p_d2 = p_d.cast<distsqrf_t>();
+    distsqrf_t p_distance_sq = p_d2.squaredNorm();
     if (p_distance_sq < distance_sq)
         return false;
 
@@ -1830,11 +1830,11 @@ bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, c
     const Point &p2 = polygon[ii2];
 
     Point line_dir  = p2 - p;
-    P2    line_dir2 = line_dir.cast<Coord2>();
+    Vec2d    line_dir2 = line_dir.cast<distsqrf_t>();
 
-    Coord2 a = line_dir2.dot(line_dir2);
-    Coord2 b = 2 * p_d2.dot(line_dir2);
-    Coord2 c = p_d2.dot(p_d2) - distance_sq;
+    distsqrf_t a = line_dir2.dot(line_dir2);
+    distsqrf_t b = 2 * p_d2.dot(line_dir2);
+    distsqrf_t c = p_d2.dot(p_d2) - distance_sq;
 
     double discriminant = b * b - 4 * a * c;
     if (discriminant < 0) {
@@ -1869,10 +1869,10 @@ bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, c
 
 void point_in_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
 {
-    Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
+    distsqrf_t distance_sq = coord_sqr(distance);
     bool is_first = true;
     for (size_t i = 1; i < polygon.size(); ++i) {
-        if (point_in_distance(distance_sq, p, i, polygon, is_first))
+        if (point_in_distance_sqr(distance_sq, p, i, polygon, is_first))
             return;
         is_first = false;
     }
@@ -1881,11 +1881,11 @@ void point_in_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon 
 
 void point_in_reverse_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
 {
-    Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
+    distsqrf_t distance_sq = coord_sqr(distance);
     bool is_first = true;
     bool is_reverse = true;
     for (size_t i = polygon.size(); i > 0; --i) {
-        if (point_in_distance(distance_sq, p, i, polygon, is_first, is_reverse))
+        if (point_in_distance_sqr(distance_sq, p, i, polygon, is_first, is_reverse))
             return;
         is_first = false;
     }

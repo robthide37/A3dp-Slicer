@@ -340,6 +340,11 @@ void Camera::debug_render() const
 }
 #endif // ENABLE_CAMERA_STATISTICS
 
+void Camera::render_axes()
+{
+    m_axes.render(Geometry::translation_transform(get_target()), 0.25f);
+}
+
 void Camera::rotate_on_sphere(double delta_azimut_rad, double delta_zenit_rad, bool apply_limits)
 {
     m_zenit += Geometry::rad2deg(delta_zenit_rad);

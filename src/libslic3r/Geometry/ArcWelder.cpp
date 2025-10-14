@@ -635,7 +635,7 @@ float arc_length(const Vec2f &start_pos, const Vec2f &end_pos, Vec2f &center_pos
 // returns the new end iterator.
 static inline Segments::iterator douglas_peucker_in_place(Segments::iterator begin, Segments::iterator end, const double tolerance)
 {
-    return douglas_peucker<int64_t>(begin, end, begin, tolerance, [](const Segment &s) { return s.point; });
+    return douglas_peucker_impl(begin, end, begin, tolerance, [](const Segment &s) { return s.point; });
 }
 
 Path fit_path(const Points &src_in, double tolerance, double fit_circle_percent_tolerance)

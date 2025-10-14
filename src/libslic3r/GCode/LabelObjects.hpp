@@ -13,6 +13,7 @@ enum GCodeFlavor : unsigned char;
 enum class LabelObjectsStyle;
 struct PrintInstance;
 class Print;
+class PrintObject;
 
 
 namespace GCode {
@@ -28,6 +29,12 @@ public:
     std::string all_objects_header(BoundingBoxf3 &global_bounding_box, coordf_t resolution = scale_d(0.05f)) const;
     std::string start_object(const PrintInstance& print_instance, IncludeName include_name) const;
     std::string stop_object(const PrintInstance& print_instance) const;
+    
+    int get_object_id(const PrintObject &object) const;
+    std::string get_object_name(const PrintObject &object) const;
+    int get_unique_id(const PrintInstance &instance) const;
+    int get_copy_id(const PrintInstance &instance) const;
+    std::string get_unique_name(const PrintInstance &instance) const;
 
 private:
     struct LabelData {

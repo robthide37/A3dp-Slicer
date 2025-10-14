@@ -76,6 +76,564 @@ namespace ClipperUtils {
     // Clip source polygon to be used as a clipping polygon with a bouding box around the source (to be clipped) polygon.
     // Useful as an optimization for expensive ClipperLib operations, for example when clipping source polygons one by one
     // with a set of polygons covering the whole layer below.
+    inline void clip_clipper_polygon_with_subject_bbox_new(const Polygon &src, BoundingBox bbox, Points &out)
+    {
+        // note: complexity in O(n), n = src.size()
+
+        out.clear();
+        const size_t cnt = src.size();
+        if (cnt < 3) {
+            return;
+        }
+
+        // to allow crossing at different position.
+        //bbox.offset(SCALED_EPSILON/3);
+
+        enum class Side : int {
+            Left   = 1,
+            Right  = 2,
+            Top    = 4,
+            Bottom = 8
+        };
+
+        // note: can/should be put out of this method in a static cache.
+        int side_sides[11];
+        side_sides[int(Side::Left)] = (int(Side::Bottom) + int(Side::Top));
+        side_sides[int(Side::Right)] = (int(Side::Bottom) + int(Side::Top));
+        side_sides[int(Side::Top)] = (int(Side::Left) + int(Side::Right));
+        side_sides[int(Side::Bottom)] = (int(Side::Left) + int(Side::Right));
+
+        std::function<Point(const BoundingBox &)> get_corner[11];
+        get_corner[int(Side::Left) + int(Side::Top)] = 
+            [](const BoundingBox &bb) { return Point(bb.min.x(), bb.max.y()); };
+        get_corner[int(Side::Left) + int(Side::Bottom)] =
+            [](const BoundingBox &bb) { return bb.min; };
+        get_corner[int(Side::Right) + int(Side::Top)] =
+            [](const BoundingBox &bb) { return bb.max; };
+        get_corner[int(Side::Right) + int(Side::Bottom)] =
+            [](const BoundingBox &bb) { return Point(bb.max.x(), bb.min.y()); };
+        
+        auto sides = [bbox](const Point &p) {
+            return  int(p.x() < bbox.min.x()) * int(Side::Left) +
+                    int(p.x() > bbox.max.x()) * int(Side::Right) +
+                    int(p.y() < bbox.min.y()) * int(Side::Bottom) +
+                    int(p.y() > bbox.max.y()) * int(Side::Top);
+        };
+        auto bb_sides = [bbox](const Point &p) {
+            return  int(p.x() <= bbox.min.x()) * int(Side::Left) +
+                    int(p.x() >= bbox.max.x()) * int(Side::Right) +
+                    int(p.y() <= bbox.min.y()) * int(Side::Bottom) +
+                    int(p.y() >= bbox.max.y()) * int(Side::Top);
+        };
+        auto nb_sides = [bbox](const Point &p) {
+            return  int(p.x() <= bbox.min.x()) +
+                    int(p.x() >= bbox.max.x()) +
+                    int(p.y() <= bbox.min.y()) +
+                    int(p.y() >= bbox.max.y());
+        };
+        auto count_sides = [bbox](const int sides) {
+            return  int((sides & int(Side::Left)) != 0) +
+                    int((sides & int(Side::Right)) != 0) +
+                    int((sides & int(Side::Top)) != 0) +
+                    int((sides & int(Side::Bottom)) != 0);
+        };
+        // more like "in bbox infinite lines"
+        // to be sure your are in the bbox border, you need 'in_bbox(pt) && sides(pt) == 0'
+        auto in_bbox = [bbox](const Point &p) {
+            return  int(p.x() == bbox.min.x()) +
+                    int(p.x() == bbox.max.x()) +
+                    int(p.y() == bbox.min.y()) +
+                    int(p.y() == bbox.max.y());
+        };
+        // move point in bbox border out of it. Makes evrything simplier.
+        auto get_good_src_pt = [bbox, &in_bbox](const Point &p) -> Point {
+            if (in_bbox(p)) {
+                Point pt = p;
+                if(pt.x() == bbox.min.x()) pt.x()--;
+                if(pt.x() == bbox.max.x()) pt.x()++;
+                if(pt.y() == bbox.min.y()) pt.y()--;
+                if(pt.y() == bbox.max.y()) pt.y()++;
+                return pt;
+            } else {
+                return p;
+            }
+        };
+
+        // precomputed bb polygon, to compute intersection with lines.
+        Polygon bb_polygon = bbox.polygon();
+        assert(bb_polygon.is_counter_clockwise());
+
+        // collection to follow the path around the bb
+        std::vector<int> bb_path;
+        int sides_this;
+        bool need_remove_duplicates = false;
+        Points intersections; // buffer
+        size_t prev_i = size_t(-1);
+        size_t i_end = size_t(-1);
+        int side_start = 0;
+        // find a good start point
+        for (size_t i = 0; i < cnt; ++i) {
+            if (bb_sides(src[i]) == 0) {
+                i_end = cnt + i + 1;
+                prev_i = i;
+                break;
+            }
+        }
+        if (i_end == size_t(-1)) {
+            // can't find a good point -> all points are outside
+            BoundingBox bb_src(src.points);
+                // bb_src.overlap(bbox) -> bbox can be inside src, or maybe not.
+            if (bb_src.overlap(bbox)) {
+                //find an intersection, add the point and start from here
+                for (size_t i = 0, pi = cnt - 1; i < cnt; pi = i, ++i) {
+                    assert(pi == cnt - 1 || pi == i-1);
+                    Point pt_temp;
+                    Point scr_i = get_good_src_pt(src[i]);
+                    Point scr_pi = get_good_src_pt(src[pi]);
+                    if (bb_polygon.intersection(Line(scr_pi,scr_i), &pt_temp)) {
+                        // go out of bb
+                        intersections.clear();
+                        bb_polygon.intersections(Line(Line(scr_pi,scr_i)), &intersections);
+                        if (intersections.size() == 1) {
+                            // hit a corner, not interested, continue to search real intersection.
+                            continue;
+                        }
+                        assert(intersections.size() == 2);
+                        if (scr_i.distance_to_square(intersections.front()) < scr_i.distance_to_square(intersections.back())) {
+                            // the order need to be src[prev_i] -> front -> back -> scr_i
+                            std::reverse(intersections.begin(), intersections.end());
+                        }
+                        //go back into bb
+                        out.push_back(intersections.front());
+                        bb_path.clear();
+                        side_start = bb_sides(intersections.front());
+                        //go out of bb
+                        out.push_back(intersections.back());
+                        bb_path.push_back(bb_sides(intersections.back()));
+                        // in unlucky, we are on a corner
+                        if (count_sides(bb_path.back()) == 2) {
+                            int front_side = bb_sides(intersections.front());
+                            if ((front_side & bb_path.back()) != 0) {
+                                bb_path.back() = bb_path.back() & (~front_side);
+                            } else if(count_sides(front_side) == 1){
+                                bb_path.back() = bb_path.back() & (~side_sides[front_side]);
+                            } else {
+                                // diagonal ...
+                                bb_path.back() = bb_path.back() & (int(Side::Top) | int(Side::Bottom));
+                            }
+                        }
+                        assert(count_sides(bb_path.back()) == 1);
+                        assert(intersections.size() == 2);
+                        i_end = cnt + i;
+                        // i instead of i-1, because we already took care of the first segment
+                        prev_i = i;
+                        break;
+                    }
+                }
+                if (i_end == size_t(-1)) {
+                    //check if the bb is inside or outside
+                    if (src.contains(bbox.min)) {
+                        // no intersection and still inside: it's the bb.
+                        out = std::move(bb_polygon.points);
+                        // costly but sadly, can't avoid.
+                        if (src.is_clockwise()) {
+                            std::reverse(out.begin(), out.end());
+                        }
+                        Polygon ccw_src = src;
+                        ccw_src.make_counter_clockwise();
+                        Slic3r::Polygons polys = intersection(ccw_src, bbox.polygon());
+                        if (src.is_clockwise() && !polys.empty()) {
+                            polys[0].reverse();
+                        }
+                        assert(polys.size() == 1);
+                    } else {
+                        // snake around
+                        Polygon ccw_src = src;
+                        ccw_src.make_counter_clockwise();
+                        Slic3r::Polygons polys = intersection(ccw_src, bbox.polygon());
+                        assert(polys.empty());
+                        // separate entities
+                        out.clear();
+                    }
+                    return;
+                }
+            } else {
+                Polygon ccw_src = src;
+                ccw_src.make_counter_clockwise();
+                Slic3r::Polygons polys = intersection(ccw_src, bbox.polygon());
+                assert(polys.empty());
+                // separate entities
+                assert(out.empty());
+                return;
+            }
+        }
+        // ensure it's well initialized
+        assert(sides(src[prev_i]) == 0 || (bb_path.size() == 1 && count_sides(bb_path.back()) == 1));
+        // method to call when you switch side, it add/remove a corner
+        auto add_corner = [&out, &src, &bb_path](const Point &pt_corner, int new_side) {
+            if (!out.empty() && pt_corner == out.back()) {
+                // same corner as previous -> we turn back (180°)
+                if (bb_path.size() > 1 && bb_path[bb_path.size() - 2] == new_side) {
+                    assert(bb_path.size() > 1);
+                    assert(bb_path[bb_path.size() - 2] == new_side);
+                    if (bb_path.size() > 1) {
+                        // so remove it
+                        out.pop_back();
+                        bb_path.pop_back();
+                    }
+                } else {
+                    // from/to corners
+                    if (bb_path.size() == 1) {
+                        // set the corner to our current side.
+                        bb_path.clear();
+                    }
+                    bb_path.push_back(new_side);
+                }
+            } else {
+                // change side
+                assert(out.empty() || out.back() != pt_corner);
+                out.push_back(pt_corner);
+                bb_path.push_back(new_side);
+            }
+        };
+        // main loop
+        Point scr_prev_i = get_good_src_pt(src[prev_i]);
+        for (size_t i_rollover = prev_i + 1; i_rollover < i_end; ++ i_rollover) {
+            size_t i = i_rollover % cnt;
+            Point scr_i = get_good_src_pt(src[i]);
+            sides_this = sides(scr_i);
+            if (sides_this == 0) {
+                // point is in, it will be added
+                if (!bb_path.empty()) {
+                    // first, finish the trip outside the bb
+                    assert(sides(scr_prev_i) != 0);
+                    if (sides(scr_prev_i) != 0) {
+                        Point pt_in_bb;
+                        bool is_intersect = false;
+                        if (in_bbox(scr_i)) {
+                            assert(false);
+                            out = src.points;
+                            return;
+                        }
+                        is_intersect = bb_polygon.intersection(Line(scr_prev_i, scr_i), &pt_in_bb);
+                        assert(is_intersect);
+                        if (is_intersect) {
+                            // check if went back over last/next corner
+                            int intersect_side = bb_sides(pt_in_bb);
+                            // if this intersection side isn't the same as the current one, we need to add the corner.
+                            // note: if unlucky , we can hit a corner with the intersection
+                            // (count_sides(intersect_side) > 1)
+                            //   in this case, we don't  need to add an extra corner.
+                            if (intersect_side != bb_path.back() && count_sides(intersect_side) == 1) {
+                                // we need only one corner to go to intersect_side
+                                assert((side_sides[bb_path.back()] & intersect_side) != 0);
+                                if ((side_sides[bb_path.back()] & intersect_side) == 0) {
+                                    out = src.points;
+                                    return;
+                                }
+                                if ((side_sides[bb_path.back()] & intersect_side) != 0) {
+                                    Point pt_corner = get_corner[intersect_side + bb_path.back()](bbox);
+                                    if (!get_corner[intersect_side + bb_path.back()]) {
+                                        out = src.points;
+                                        return;
+                                    }
+                                    if (!out.empty() && pt_corner == out.back()) {
+                                        out.pop_back();
+                                    } else {
+                                        assert(out.empty() || out.back() != pt_corner);
+                                        out.push_back(pt_corner);
+                                    }
+                                }
+                            }
+                            // go in bb
+                            if (out.empty() || out.back() != pt_in_bb) {
+                                out.push_back(pt_in_bb);
+                            } else {
+                                // going back into the bbox by the same point, ignore it.
+                            }
+                            bb_path.clear();
+                        } else {
+                            bb_path.clear();
+                        }
+                    }
+                }
+                // add the current point
+                assert(out.empty() || out.back() != scr_i);
+                out.push_back(scr_i);
+            } else {
+                // point is out, it won't be added
+                if (bb_path.empty()) {
+                    assert(sides(scr_prev_i) == 0);
+                    // start the trip outside the bb, add the point in the boundary
+                    intersections.clear();
+                    bool is_intersect = bb_polygon.intersections(Line(scr_prev_i, scr_i), &intersections);
+                    assert(is_intersect);
+                    if (intersections.size() == 1) {
+                        assert((intersections.front() != scr_i));
+                        if (in_bbox(scr_prev_i)) {
+                            assert(false);
+                            out = src.points;
+                            return;
+                        }
+                        // intersection between a point inside and me outside
+                        assert(bb_sides(scr_prev_i) == 0);
+                        assert(out.empty() || out.back() != intersections.front());
+                        out.push_back(intersections.front());
+                        bb_path.push_back(sides_this & bb_sides(intersections.front()));
+                        if (count_sides(bb_path.back()) == 2) {
+                            // passing through the corner, unlucky
+                            assert(bb_polygon.find_point(intersections.front()) != int(-1));
+                            bb_path.back() = bb_path.back() & (int(Side::Bottom) | int(Side::Top));
+                        }
+                    } else {
+                        assert(false);
+                        //assert(intersections.size() == 2);
+                        out = src.points;
+                        return;
+                    }
+                    assert(count_sides(bb_path.back()) == 1);
+                } else {
+                    // continue the trip outside the bb.
+                    // Check if we are going to another side, if so we to add the corner
+                    if ((sides_this & bb_path.back()) != 0) {
+                        // ~same side, don't do anything.
+                    } else {
+                        //be sure it doesn't cross the bb
+                        Point pt_in_bb;
+                        bool is_intersect = bb_polygon.intersection(Line(scr_prev_i, scr_i), &pt_in_bb);
+                        if (is_intersect) {
+                            // get both points
+                            intersections.clear();
+                            bb_polygon.intersections(Line(scr_prev_i, scr_i), &intersections);
+                            if (intersections.size() == 1) {
+                                // hit a corner, unlucky
+                                assert(bb_polygon.find_point(pt_in_bb) >= 0);
+                                intersections.push_back(intersections.front());
+                            }
+                            assert(intersections.size() == 2);
+                            if (scr_i.distance_to_square(intersections.front()) < scr_i.distance_to_square(intersections.back())) {
+                                // the order need to be scr_prev_i -> front -> back -> scr_i
+                                std::reverse(intersections.begin(), intersections.end());
+                            }
+                            const int previous_side = bb_path.back();
+                            const int front_intersect_sides = bb_sides(intersections.front());
+                            // add another corner?
+                            if ((bb_path.back() & front_intersect_sides) == 0) {
+                                // basically, from a corner (count_sides=2) hit another side than the current one
+                                assert(count_sides(front_intersect_sides) == 1);
+                                Point pt_corner = get_corner[front_intersect_sides | bb_path.back()](bbox);
+                                add_corner(pt_corner, front_intersect_sides);
+                            }
+                            //go back into bb (if not by the same ponit already used)
+                            if (out.empty() || out.back() != intersections.front()) {
+                                out.push_back(intersections.front());
+                            }
+                            bb_path.clear();
+                            //go out of bb
+                            if (out.back() != intersections.back()) {
+                                out.push_back(intersections.back());
+                            }
+                            bb_path.push_back(bb_sides(intersections.back()));
+                            // in unlucky, we are on a corner
+                            if (count_sides(bb_path.back()) == 2) {
+                                int front_side = bb_sides(intersections.front());
+                                if (count_sides(front_side) != 2) {
+                                    // only one corner
+                                    if ((front_side & bb_path.back()) != 0) {
+                                        bb_path.back() = bb_path.back() & (~front_side);
+                                    } else if (count_sides(front_side) == 1) {
+                                        bb_path.back() = bb_path.back() & (~side_sides[front_side]);
+                                    } else {
+                                        // diagonal
+                                        bb_path.back() = 15 & (~(previous_side | side_sides[previous_side]));
+                                    }
+                                } else {
+                                    // both corner
+                                    // choose one
+                                    if ((previous_side & (int(Side::Left) | int(Side::Right))) == 0) {
+                                        bb_path.back() = bb_path.back() & (int(Side::Left) | int(Side::Right));
+                                    } else {
+                                        bb_path.back() = bb_path.back() & (int(Side::Top) | int(Side::Bottom));
+                                    }
+                                }
+                            }
+                            assert(count_sides(bb_path.back()) == 1);
+                        } else {
+                            // switch side by going over the corner -> need to add the corner
+
+                            // filter sides_this to only have one side, next to sides.back()
+                            int this_single_side = sides_this & side_sides[bb_path.back()];
+                            if (this_single_side == 0) {
+                                // this line just goes from a corner to the opposite side, bypassing the intermediate side, and without intersecting the bbox
+                                assert(count_sides(sides(scr_prev_i)) == 2);
+                                assert(count_sides(sides_this) == 1);
+                                // prevent old crash doesn't happen anymore.
+                                assert(get_corner[sides(scr_prev_i)] != 0);
+                                if (!get_corner[sides(scr_prev_i)]) {
+                                    // this line goes from a side to the opposite, 
+                                    // from a point in the periemter to a point in the perimeter.
+                                    assert(false);
+                                    out = src.points;
+                                    return;
+                                }
+                                //add the first corner
+                                Point pt_corner = get_corner[sides(scr_prev_i)](bbox);
+                                int first_single_side = sides(scr_prev_i) & side_sides[sides_this];
+                                assert(count_sides(first_single_side) == 1);
+                                assert((side_sides[bb_path.back()] & first_single_side) != 0);
+                                add_corner(pt_corner, first_single_side);
+                                assert(count_sides(bb_path.back()) == 1);
+                                // set the right side for the second one
+                                this_single_side = sides_this;
+                            }
+                            // select corner to add
+                            assert(count_sides(this_single_side) == 1);
+                            assert((side_sides[bb_path.back()] & this_single_side) != 0);
+                            Point pt_corner = get_corner[this_single_side | bb_path.back()](bbox);
+                            add_corner(pt_corner, this_single_side);
+                            assert(count_sides(bb_path.back()) == 1);
+                        }
+                    }
+                }
+            }
+            assert(bb_path.empty() || count_sides(bb_path.back()) == 1);
+            // update prev_i
+            prev_i = i;
+            scr_prev_i = scr_i;
+        }
+
+        if (side_start > 0) {
+            // if end not on the same side as start, add a corner
+            if ((bb_path.back() & side_start) == 0) {
+                // basically, from a corner (count_sides=2) hit another side than the current one
+                assert(count_sides(side_start) == 1);
+                Point pt_corner = get_corner[side_start | bb_path.back()](bbox);
+                add_corner(pt_corner, side_start);
+            }
+        }
+
+        if (!out.empty() && out.front() == out.back()) {
+            out.pop_back();
+        }
+        
+        if (out.size() < 3) {
+            out.clear();
+            return;
+        }
+
+        //if ccw, then boundaries in CCW need to be moved a bit farther, so CW boundary won't be at the same pos.
+        // can't avoid that. at least it's on 'out' and not on 'src'
+        bool is_ccw = ClipperLib::Orientation(out);
+        // test for an edge direction if on boundary
+        auto is_good_move = [&bbox, &bb_sides, &count_sides, &in_bbox, is_ccw](const Point &pt1, Point &pt2) {
+            assert(in_bbox(pt1));
+            assert(in_bbox(pt2));
+            int side = bb_sides(pt1) & bb_sides(pt2);
+            assert(count_sides(side) <= 1);
+            if (side == 0) {
+                // intersect inside the bb, not a boundary
+                return false;
+            }else if (side == int(Side::Top)) {
+                assert(pt1.x() != pt2.x());
+                return is_ccw == (pt1.x() > pt2.x());
+            } else if (side == int(Side::Bottom)) {
+                assert(pt1.x() != pt2.x());
+                return is_ccw == (pt1.x() < pt2.x());
+            } else if (side == int(Side::Left)) {
+                assert(pt1.y() != pt2.y());
+                return is_ccw == (pt1.y() > pt2.y());
+            } else {
+                assert(side == int(Side::Right));
+                assert(pt1.y() != pt2.y());
+                return is_ccw == (pt1.y() < pt2.y());
+            }
+        };
+        // to move out a point outside the boundary
+        auto move_out = [&bbox, &bb_sides, &in_bbox](Point &pt, coord_t dist) {
+            assert(in_bbox(pt));
+            int pt_sides = bb_sides(pt);
+            if ((pt_sides & int(Side::Top)) != 0) {
+                // note: instead, you can also create a new point a bit farther away, that way the path isn't skwed at all.
+                // it's also possible to offset the bbox at the very start, and move the other points inward, as they are less frequent.
+                pt.y() += dist;
+            }
+            if ((pt_sides & int(Side::Bottom)) != 0) {
+                pt.y() -= dist;
+            }
+            if ((pt_sides & int(Side::Left)) != 0) {
+                pt.x() -= dist;
+            }
+            if ((pt_sides & int(Side::Right)) != 0) {
+                pt.x() += dist;
+            }
+        };
+        std::vector<size_t> start_stop_boundary;
+        bool prev_bbox = false;
+        bool also_move_prev = false;
+        Point prev_pt_before_move;
+        Point pt_first = out.front();
+        out.push_back(out.front());
+        // loop to move the point out of the boundary if they are in the right direction
+        for (size_t i = 0, pi = out.size() - 1; i < out.size(); pi = i, ++i) {
+            if (in_bbox(out[i])) {
+                if (prev_bbox) {
+                    if (is_good_move(prev_pt_before_move, out[i])) {
+                        prev_pt_before_move = out[i];
+                        //move out
+                        move_out(out[i], SCALED_EPSILON / 3);
+                        if (also_move_prev) {
+                            move_out(out[pi], SCALED_EPSILON / 3);
+                            also_move_prev = false;
+                        }
+                    } else {
+                        also_move_prev = true;
+                        prev_pt_before_move = out[i];
+                    }
+                } else {
+                    prev_bbox = true;
+                    also_move_prev = true;
+                    prev_pt_before_move = out[i];
+                }
+            } else {
+                prev_bbox = false;
+            }
+        }
+        if (pt_first != out.back()) {
+            out.front() = out.back();
+        }
+        out.pop_back();
+
+        // clean a little
+        // note: maybe shouldn't be done here, as most of the geometry transformation don't do that and let the caller do it.
+        const distsqrf_t max_dist = SCALED_EPSILON * SCALED_EPSILON;
+        for (size_t i = 0, pi = out.size() - 1; i < out.size(); pi = std::min(i, out.size() - 1), ++i) {
+            if ((out[pi] - out[i]).squaredNorm() < max_dist) {
+                if (in_bbox(out[i])) {
+                    out.erase(out.begin() + pi);
+                    if (pi < i) {
+                        --i;
+                    }
+                } else {
+                    out.erase(out.begin() + i);
+                    --i;
+                }
+            }
+        }
+
+        // hack bugfix https://github.com/prusa3d/PrusaSlicer/issues/13356
+        if (out.size() < 3) {
+            out.clear();
+            return;
+        }
+
+#ifdef _DEBUG
+        Polygon pout(out);
+        pout.assert_valid();
+        assert(out.size() > 2 || out.empty());
+#endif
+    }
+    
+    // old version that can self-intersect, restricted now to polyline (don't use it if possible).
     template<typename PointsType>
     inline void clip_clipper_polyline_with_subject_bbox_templ(const PointsType &src, const BoundingBox &bbox, PointsType &out)
     {
@@ -154,15 +712,22 @@ namespace ClipperUtils {
     [[nodiscard]] ZPoints clip_clipper_polyline_with_subject_bbox(const ZPoints &src, const BoundingBox &bbox)
         { return clip_clipper_polyline_with_subject_bbox_templ(src, bbox); }
 
+    inline void clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox, Points &out) {
+        Polygon simpl = src;
+        if (ensure_valid(simpl)) {
+            clip_clipper_polygon_with_subject_bbox_new(simpl, bbox, out);
+        }
+    }
+
     void clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox, Polygon &out)
     {
-        clip_clipper_polyline_with_subject_bbox_templ(src.points, bbox, out.points);
+        clip_clipper_polygon_with_subject_bbox(src, bbox, out.points);
     }
 
     [[nodiscard]] Polygon clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox)
     {
         Polygon out;
-        clip_clipper_polyline_with_subject_bbox_templ(src.points, bbox, out.points);
+        clip_clipper_polygon_with_subject_bbox(src, bbox, out.points);
         return out;
     }
 
@@ -876,6 +1441,8 @@ Slic3r::Polygons intersection_clipped(const Slic3r::Polygons &subject, const Sli
     { return intersection(subject, ClipperUtils::clip_clipper_polygons_with_subject_bbox(clip, get_extents(subject).inflated(SCALED_EPSILON)), do_safety_offset); }
 Slic3r::Polygons intersection(const Slic3r::Polygons &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
+Slic3r::Polygons intersection(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::Polygons intersection(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::Polygons intersection(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
@@ -896,6 +1463,10 @@ Slic3r::Polygons union_(const Slic3r::ExPolygons &subject)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::EmptyPathsProvider(), ApplySafetyOffset::No); }
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygons &subject2)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(subject2), ApplySafetyOffset::No); }
+Slic3r::Polygons union_(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygons &subject2)
+    { return _clipper(ClipperLib::ctUnion, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(subject2), ApplySafetyOffset::No); }
+Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &subject2)
+    { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(subject2), ApplySafetyOffset::No); }
 Slic3r::Polygons union_(Slic3r::Polygons &&subject, const Slic3r::Polygons &subject2) { 
     if (subject.empty())
         return subject2;
@@ -910,32 +1481,34 @@ template <typename TSubject, typename TClip>
 static ExPolygons _clipper_ex(ClipperLib::ClipType clipType, TSubject &&subject,  TClip &&clip, ApplySafetyOffset do_safety_offset, ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero)
     { return PolyTreeToExPolygons(clipper_do_polytree(clipType, std::forward<TSubject>(subject), std::forward<TClip>(clip), fill_type, do_safety_offset)); }
 
-Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
-    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
-Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset)
-    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Polygon &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygon &subject, const Slic3r::Polygon &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::SinglePathProvider(clip.points), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygon &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
-Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
-    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
-Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset)
-    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
@@ -945,16 +1518,18 @@ Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::ExP
 
 Slic3r::ExPolygons intersection_ex(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
-Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygon &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
-    { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
-Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
-    { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygon &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons intersection_ex(const Slic3r::Surfaces &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
@@ -1411,18 +1986,20 @@ Slic3r::Polylines diff_pl(const Slic3r::Polylines &subject, const Slic3r::ExPoly
     { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::PolylinesProvider(subject), ClipperUtils::ExPolygonsProvider(clip)); }
 Slic3r::Polylines diff_pl(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip)
     { return _clipper_pl_closed(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip)); }
-Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::Polygon &clip)
-    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::SinglePathProvider(clip.points)); }
-Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip)
-    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonProvider(clip)); }
-Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygon &clip)
-    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::ExPolygonProvider(clip)); }
+Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::Polygon &clip)
+    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::SinglePathProvider(clip.points)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::Polygons &clip)
     { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::PolygonsProvider(clip)); }
+Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip)
+    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonProvider(clip)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygons &clip)
     { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonsProvider(clip)); }
+Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::Polygon &clip)
+    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::SinglePathProvider(clip.points)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::Polygons &clip)
     { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::PolygonsProvider(clip)); }
+Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygon &clip)
+    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::ExPolygonProvider(clip)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygons &clip)
     { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::ExPolygonsProvider(clip)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip)

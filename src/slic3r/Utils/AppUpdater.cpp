@@ -19,6 +19,8 @@
 #include <boost/property_tree/ptree.hpp> 
 #include <curl/curl.h>
 
+#include "libslic3r/miniz_extension.hpp"
+
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
@@ -109,8 +111,10 @@ namespace {
 wxDEFINE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS, wxCommandEvent);
+wxDEFINE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_NAME, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_FAILED, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SLIC3R_APP_OPEN_FAILED, wxCommandEvent);
+wxDEFINE_EVENT(EVT_SLIC3R_APP_REPLACE_SUCCESS, wxCommandEvent);
 
 // priv handles all operations in separate thread
 // 1) download version file and parse it.
@@ -221,6 +225,10 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 		return boost::filesystem::path();
 	}
 
+    if (!dest_path.parent_path().empty() && !boost::filesystem::exists(dest_path.parent_path())) {
+        boost::filesystem::create_directories(dest_path.parent_path());
+    }
+
 	boost::filesystem::path tmp_path = dest_path;
 	tmp_path += format(".%1%%2%", std::to_string(GUI::GLCanvas3D::timestamp_now()), ".download");
 	FILE* file;
@@ -277,12 +285,20 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 				error_message = GUI::format(_u8L("Can't create file at %1%"), tmp_path.string());
 				return false;
 			}
-			try
-			{
-				fwrite(body.c_str(), 1, body.size(), file);
-				fclose(file);
-				boost::filesystem::rename(tmp_path, dest_path);
-			}
+            try {
+                fwrite(body.c_str(), 1, body.size(), file);
+                fclose(file);
+                try {
+                    boost::filesystem::rename(tmp_path, dest_path);
+                    if (boost::filesystem::exists(tmp_path)) {
+                        boost::filesystem::remove(tmp_path);
+                    }
+                } catch (std::exception) {
+                    if (boost::filesystem::exists(tmp_path)) {
+                        boost::filesystem::remove(tmp_path);
+                    }
+                }
+            }
 			catch (const std::exception& e)
 			{
 				error_message = GUI::format(_u8L("Failed to write to file or to move %1% to %2%:\n%3%"), tmp_path, dest_path, e.what());
@@ -325,8 +341,8 @@ void AppUpdater::priv::version_check(const std::string& version_check_url)
 {
 	assert(!version_check_url.empty());
 	std::string error_message;
-    // 02/09/2025: for superslcier, it's currently at 9k char in the string body. 32kio should be plenty.
-	bool res = http_get_file(version_check_url, 32 * 1024
+    // 02/09/2025: for superslcier, it's currently at 500k char in the string body. 1mio should be plenty.
+	bool res = http_get_file(version_check_url, 1024 * 1024
 		// on_progress
 		, [](Http::Progress progress) { return true; }
 		// on_complete
@@ -372,56 +388,77 @@ Semver get_version(const std::string &str, const std::regex &regexp) {
 	return Semver::invalid();
 }
 
-void AppUpdater::priv::parse_version_string(const std::string& constbody)
-{
-	boost::property_tree::ptree root;
-	std::stringstream json_stream(constbody);
-	boost::property_tree::read_json(json_stream, root);
-	bool i_am_pre = false;
-	//at least two number, use '.' as separator. can be followed by -Az23 for prereleased and +Az42 for metadata
-	std::regex matcher("[0-9]+\\.[0-9]+(\\.[0-9]+)*(-[A-Za-z0-9]+)?(\\+[A-Za-z0-9]+)?");
+void AppUpdater::priv::parse_version_string(const std::string &constbody) {
+    boost::property_tree::ptree root;
+    std::stringstream json_stream(constbody);
+    boost::property_tree::read_json(json_stream, root);
+    bool i_am_pre = false;
+    // at least two number, use '.' as separator. can be followed by -Az23 for prereleased and +Az42 for metadata
+    std::regex matcher("[0-9]+\\.[0-9]+(\\.[0-9]+)*(-[A-Za-z0-9]+)?(\\+[A-Za-z0-9]+)?");
 
-	Semver current_version(SLIC3R_VERSION_FULL);
-	Semver best_pre(1,0,0,0);
-	Semver best_release(1, 0, 0, 0);
-	std::string best_pre_url;
-	std::string best_release_url;
-	const std::regex reg_num("([0-9]+)");
-	for (auto json_version : root) {
-		std::string tag = json_version.second.get<std::string>("tag_name");
-		for (std::regex_iterator it = std::sregex_iterator(tag.begin(), tag.end(), reg_num); it != std::sregex_iterator(); ++it) {
+    Semver current_version(SLIC3R_VERSION_FULL);
+    Semver best_pre(1, 0, 0, 0);
+    Semver best_release(1, 0, 0, 0);
+    std::string best_pre_url;
+    std::string best_pre_assets_url;
+    std::string best_release_url;
+    std::string best_release_assets_url;
+    const std::regex reg_num("([0-9]+)");
+    bool not_found = true;
+    for (auto json_version : root) {
+        std::string tag = json_version.second.get<std::string>("tag_name");
+        for (std::regex_iterator it = std::sregex_iterator(tag.begin(), tag.end(), reg_num);
+             it != std::sregex_iterator(); ++it) {}
+        Semver tag_version = get_version(tag, matcher);
+        if (current_version == tag_version) {
+            not_found = false;
+            i_am_pre = json_version.second.get<bool>("prerelease");
+        }
+        if (json_version.second.get<bool>("prerelease")) {
+            if (best_pre < tag_version) {
+                best_pre = tag_version;
+                best_pre_assets_url = json_version.second.get<std::string>("assets_url");
+                best_pre_url = json_version.second.get<std::string>("html_url");
+            }
+        } else {
+            if (best_release < tag_version) {
+                best_release = tag_version;
+                best_release_assets_url = json_version.second.get<std::string>("assets_url");
+                best_release_url = json_version.second.get<std::string>("html_url");
+            }
+        }
+    }
+    // for testing:
+    //best_release = Semver { 3, 0, 0, 0 };
+    // if release is more recent than beta, use release anyway
+    if (best_pre < best_release) {
+        best_pre = best_release;
+        best_pre_url = best_release_url;
+    } else if (not_found && best_pre > best_release) {
+        // I am not found, so I should be an experimental / nightly build.
+        i_am_pre = true;
+    }
+    // if we're the most recent, don't do anything
+    if ((i_am_pre ? best_pre : best_release) <= current_version)
+        return;
 
-		}
-		Semver tag_version = get_version(tag, matcher);
-		if (current_version == tag_version)
-			i_am_pre = json_version.second.get<bool>("prerelease");
-		if (json_version.second.get<bool>("prerelease")) {
-			if (best_pre < tag_version) {
-				best_pre = tag_version;
-				best_pre_url = json_version.second.get<std::string>("html_url");
-			}
-		} else {
-			if (best_release < tag_version) {
-				best_release = tag_version;
-				best_release_url = json_version.second.get<std::string>("html_url");
-			}
-		}
-	}
+    BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME,
+                                      i_am_pre ? best_pre : best_release);
 
-	//if release is more recent than beta, use release anyway
-	if (best_pre < best_release) {
-		best_pre = best_release;
-		best_pre_url = best_release_url;
-	}
-	//if we're the most recent, don't do anything
-	if ((i_am_pre ? best_pre : best_release) <= current_version)
-		return;
+    DownloadAppData new_data;
+    new_data.version = (i_am_pre ? best_pre : best_release);
+    new_data.url = (i_am_pre ? best_pre_url : best_release_url);
+    new_data.asset_url = (i_am_pre ? best_pre_assets_url : best_release_assets_url);
+    new_data.target_path = m_default_dest_folder / SLIC3R_APP_KEY ".zip";
 
-	BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME, i_am_pre? best_pre:best_release);
-
-	wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
-	evt->SetString((i_am_pre ? best_pre : best_release).to_string());
-	GUI::wxGetApp().QueueEvent(evt);
+    // save
+    set_app_data(new_data);
+    // send
+    BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME,
+                                      new_data.version->to_string());
+    wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
+    evt->SetString(new_data.version->to_string());
+    GUI::wxGetApp().QueueEvent(evt);
 }
 #endif
 // PRUSASLICER version
@@ -628,6 +665,145 @@ void AppUpdater::priv::set_app_data(DownloadAppData data)
 	m_online_version_data = data;
 }
 
+// windows-only
+bool replace_me(DownloadAppData input_data, const boost::filesystem::path &archive_path) {
+#ifdef _WIN32
+    try {
+        // get our directory
+        boost::filesystem::path my_dir = binary_file().parent_path();
+
+        boost::filesystem::path temp_dir = my_dir / SLIC3R_VERSION_FULL ".old";
+        if (boost::filesystem::exists(temp_dir)) {
+            boost::filesystem::remove_all(temp_dir);
+        }
+
+        if (!boost::filesystem::exists(my_dir)) {
+            std::string message = "Can't find the current program location to upgrade it.";
+            BOOST_LOG_TRIVIAL(error) << message;
+            wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+            evt->SetString(message);
+            GUI::wxGetApp().QueueEvent(evt);
+            assert(false);
+            return false;
+        }
+        // remove all old dll & exe
+        for (const boost::filesystem::directory_entry &file : boost::filesystem::directory_iterator(my_dir)) {
+            if (file.path().extension() == ".old") {
+                if (file.status().type() == boost::filesystem::file_type::directory_file) {
+                    boost::filesystem::remove_all(file);
+                } else {
+                    boost::filesystem::remove(file);
+                }
+            }
+        }
+        // create old directory
+        boost::filesystem::create_directory(temp_dir);
+        // rename all dll & exe
+        for (const boost::filesystem::directory_entry &file : boost::filesystem::directory_iterator(my_dir)) {
+            if (file.status().type() == boost::filesystem::file_type::regular_file &&
+                (file.path().extension() == ".dll" || file.path().extension() == ".exe")) {
+                boost::filesystem::path new_name = file;
+                new_name += ".old"; // no "+" operator...
+                // copy just in case
+                boost::filesystem::copy_file(file, temp_dir / file.path().lexically_relative(my_dir));
+                boost::filesystem::rename(file, new_name);
+            }
+        }
+        boost::filesystem::rename(my_dir / "resources", temp_dir / "resources");
+    } catch (std::exception) {
+        std::string message = "Fail to rename / move current app. Maybe a file is opened and can't be removed.";
+        BOOST_LOG_TRIVIAL(error) << message;
+        wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+        evt->SetString(message);
+        GUI::wxGetApp().QueueEvent(evt);
+        return false;
+    }
+
+    // unzip
+    // zip reader takes care of opening & closing
+    ZipReader zip(archive_path.string());
+    //mz_zip_archive archive;
+    //mz_zip_zero_struct(&archive);
+
+    if (!zip.success()/*open_zip_reader(&archive, archive_path.string())*/) {
+        std::string message = "Unable to open the new version of the slicer. Maybe the download is corrupted.";
+        BOOST_LOG_TRIVIAL(error) << message;
+        wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+        evt->SetString(message);
+        GUI::wxGetApp().QueueEvent(evt);
+        return false;
+    }
+
+    try {
+        mz_uint num_entries = mz_zip_reader_get_num_files(&zip.archive);
+
+        mz_zip_archive_file_stat file_stat;
+
+        std::string archive_name = archive_path.stem().string();
+
+        // we first loop the entries to read from the archive the .model file only, in order to extract the version from it
+        bool found_model = false;
+        for (mz_uint i = 0; i < num_entries; ++i) {
+            if (mz_zip_reader_file_stat(&zip.archive, i, &file_stat)) {
+                boost::filesystem::path name(file_stat.m_filename);
+                boost::filesystem::path out = name.lexically_relative(archive_path.stem());
+                if (file_stat.m_is_directory) {
+                    boost::filesystem::create_directories(out);
+                } else {
+                    size_t uncompressed_size = file_stat.m_uncomp_size;
+                    void *p = mz_zip_reader_extract_file_to_heap(&zip.archive, file_stat.m_filename, &uncompressed_size,
+                                                                 0);
+                    if (!p) {
+                        return false;
+                    }
+                    FILE *file_to_write = fopen(out.string().c_str(), "wb");
+                    if (file_to_write == nullptr) {
+                        std::string message = "Fail to upgrade current app by the content of the downloaded zip.";
+                        BOOST_LOG_TRIVIAL(error) << message;
+                        wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+                        evt->SetString(message);
+                        GUI::wxGetApp().QueueEvent(evt);
+                        return false;
+                    }
+                    fwrite((const char *) p, 1, uncompressed_size, file_to_write);
+                    fclose(file_to_write);
+                    mz_free(p);
+                }
+            }
+        }
+    } catch (std::exception) {
+        std::string message = "Fail to upgrade current app by the content of the downloaded zip.";
+        BOOST_LOG_TRIVIAL(error) << message;
+        wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+        evt->SetString(message);
+        GUI::wxGetApp().QueueEvent(evt);
+        return false;
+    }
+
+    return true;
+#else
+    return false;
+#endif
+}
+
+void fix_replace_me() {
+    //get our directory
+    boost::filesystem::path my_dir = binary_file().parent_path();
+    boost::filesystem::path temp_dir = my_dir / SLIC3R_VERSION_FULL ".old";
+    // rename back all dll & exe
+    for (const boost::filesystem::directory_entry& file_entry : boost::filesystem::directory_iterator(my_dir)) {
+        if (file_entry.status().type() == boost::filesystem::file_type::regular_file
+                && file_entry.path().extension() == ".old") {
+            boost::filesystem::path new_name = file_entry.path().has_parent_path() ? file_entry.path().parent_path() / file_entry.path().stem() : file_entry.path().stem();
+            boost::filesystem::rename(file_entry.path(), new_name);
+        }
+    }
+    if (boost::filesystem::exists(temp_dir / "resources")) {
+        boost::filesystem::rename(temp_dir / "resources", my_dir / "resources");
+    }
+
+}
+
 AppUpdater::AppUpdater()
 	:p(new priv())
 {
@@ -641,6 +817,7 @@ AppUpdater::~AppUpdater()
 		p->m_thread.join();
 	}
 }
+
 void AppUpdater::sync_download()
 {
 	assert(p);
@@ -656,6 +833,117 @@ void AppUpdater::sync_download()
 	DownloadAppData input_data = p->get_app_data();
 	assert(!input_data.url.empty());
 
+#if VERSION_FROM_GITHUB
+    assert(!input_data.asset_url.empty());
+    if (input_data.asset_url.empty())
+        return;
+    //download assets and choose the best one or us
+    std::string error_message;
+    bool res = p->http_get_file(
+        input_data.asset_url,
+        1024 * 1024
+        // on_progress
+        ,
+        [](Http::Progress progress) { return true; }
+        // on_complete
+        ,
+        [&](std::string body, std::string &error_message) {
+            boost::trim(body);
+
+            boost::property_tree::ptree root;
+            std::stringstream json_stream(body);
+            boost::property_tree::read_json(json_stream, root);
+            for (auto json_asset : root) {
+                std::string name = json_asset.second.get<std::string>("name");
+#ifdef _WIN32
+                //windows
+                if (name.find("win") != std::string::npos && 
+                    (input_data.replace_current ? name.find("zip") != std::string::npos : name.find("msi") != std::string::npos))
+#elif __APPLE__
+                //macos
+#if defined(__arm__) || defined(_M_ARM)
+                if (name.find("macos") != std::string::npos && name.find("arm") != std::string::npos && name.find("dmg") != std::string::npos)
+#else
+                if (name.find("macos") != std::string::npos && name.find("arm") == std::string::npos && name.find("dmg") != std::string::npos)
+#endif
+#else
+                //linux
+                if (name.find("ubuntu") != std::string::npos ||
+                    name.find("linux") != std::string::npos && name.find("appimage") != std::string::npos)
+#endif
+                {
+                    input_data.url = json_asset.second.get<std::string>("browser_download_url");
+                    input_data.asset_name = name;
+                    input_data.target_path = input_data.target_path.parent_path() / name;
+                    input_data.size =  json_asset.second.get<size_t>("size");
+                    set_app_data(input_data);
+
+                    //update download ame
+                    wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_NAME);
+                    evt->SetString(GUI::format(_L("Downloading %1%"), name));
+                    GUI::wxGetApp().QueueEvent(evt);
+
+
+                    //download
+                    p->m_thread = std::thread([this, input_data]() {
+                        p->m_download_ongoing = true;
+                        if (boost::filesystem::path dest_path = p->download_file(input_data);
+                            boost::filesystem::exists(dest_path)) {
+                            if (input_data.replace_current) {
+                                // replace in-place
+                                if (!replace_me(input_data, dest_path)) {
+                                    // an error occur, revert
+                                    fix_replace_me();
+                                } else {
+                                    //clean the downloaded zip
+                                    try {
+                                        assert(boost::filesystem::exists(dest_path));
+                                        if (boost::filesystem::exists(dest_path)) {
+                                            boost::filesystem::remove(dest_path);
+                                        }
+                                    } catch (std::exception) {
+                                    
+                                        if (boost::filesystem::exists(dest_path)) {
+                                            boost::filesystem::remove(dest_path);
+                                        }
+                                    }
+                                    // ask for restart
+                                    wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_REPLACE_SUCCESS);
+                                    GUI::wxGetApp().QueueEvent(evt);
+                                }
+                            } else {
+                                if (input_data.start_after) {
+                                    p->run_downloaded_file(std::move(dest_path));
+                                } else {
+                                    GUI::desktop_open_folder(dest_path.parent_path());
+                                }
+                            }
+                        }
+                        p->m_download_ongoing = false;
+                    });
+                }
+            }
+            return true;
+        },
+        error_message);
+    // lm:In case the internet is not available, it will report no updates if run by user.
+    // We might save a flag that we don't know or try to run the version_check again, reporting
+    // the failure.
+    // dk: changed to download version every time. Dialog will show if m_triggered_by_user.
+    if (!res) {
+        std::string message = GUI::format("Downloading %1% assets file has failed:\n%2%", SLIC3R_APP_NAME,
+                                          error_message);
+        BOOST_LOG_TRIVIAL(error) << message;
+        if (p->m_triggered_by_user) {
+            wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+            evt->SetString(message);
+            GUI::wxGetApp().QueueEvent(evt);
+        }
+    }
+
+#endif
+
+#if VERSION_FROM_PRUSA
  	p->m_thread = std::thread(
 		[this, input_data]() {
 			p->m_download_ongoing = true;
@@ -668,6 +956,7 @@ void AppUpdater::sync_download()
 			}
 			p->m_download_ongoing = false;
 		});
+#endif
 }
 
 void AppUpdater::sync_version(const std::string& version_check_url, bool from_user)

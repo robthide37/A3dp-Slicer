@@ -308,14 +308,14 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
 struct GLGizmoEmboss::Facenames: public ::Facenames{};
 struct GLGizmoEmboss::GuiCfg: public ::GuiCfg{};
 
-GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
-    : GLGizmoBase(parent, M_ICON_FILENAME, -2)
+GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
+    : GLGizmoBase(parent, icon_filename, sprite_id)
     , m_gui_cfg(nullptr)
     , m_style_manager(m_imgui->get_glyph_ranges(), create_default_styles)
     , m_face_names(std::make_unique<Facenames>())
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
 {
-    m_rotate_gizmo.set_group_id(0);
+   // m_rotate_gizmo.set_group_id(0);
     m_rotate_gizmo.set_force_local_coordinate(true);
     // to use https://fontawesome.com/ (copy & paste) unicode symbols from web
     // paste HEX unicode into notepad move cursor after unicode press [alt] + [x]
@@ -347,18 +347,18 @@ bool GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 
 void GLGizmoEmboss::on_shortcut_key() {
     set_volume_by_selection();
-    if (m_volume == nullptr) {
-        // No volume to select from selection so create volume.
-        // NOTE: After finish job for creation emboss Text volume,
-        // GLGizmoEmboss will be opened
-        create_volume(ModelVolumeType::MODEL_PART);
-    }
-    else {
+    //if (m_volume == nullptr) {
+    //    // No volume to select from selection so create volume.
+    //    // NOTE: After finish job for creation emboss Text volume,
+    //    // GLGizmoEmboss will be opened
+    //    create_volume(ModelVolumeType::MODEL_PART);
+    //}
+    //else {
         // shortcut is pressed when text is selected soo start edit it.
         auto& mng = m_parent.get_gizmos_manager();
         if (mng.get_current_type() != GLGizmosManager::Emboss)
-            mng.open_gizmo(GLGizmosManager::Emboss);
-    }
+            mng.open_gizmo(GLGizmosManager::Emboss, true);
+    //}
 }
 
 bool GLGizmoEmboss::re_emboss(const ModelVolume &text_volume, std::shared_ptr<std::atomic<bool>> job_cancel)
@@ -478,11 +478,6 @@ bool GLGizmoEmboss::init_create(ModelVolumeType volume_type)
     // check valid volume type
     if (!check(volume_type)){    
         BOOST_LOG_TRIVIAL(error) << "Can't create embossed volume with this type: " << (int) volume_type;
-        return false;
-    }
-
-    if (!is_activable()) {
-        BOOST_LOG_TRIVIAL(error) << "Can't create text. Gizmo is not activabled.";
         return false;
     }
 
@@ -1154,6 +1149,36 @@ void GLGizmoEmboss::reinit_text_lines(unsigned count_lines) {
     init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, count_lines);
 }
 
+
+bool GLGizmoEmboss::on_is_selectable() const {
+    return wxGetApp().get_mode() != comSimple || get_app_config()->get_bool("objects_always_expert");
+}
+
+bool GLGizmoEmboss::on_is_activable() const {
+    const Selection& selection = m_parent.get_selection();
+    return on_is_actionable() || (!selection.is_empty() && selection.is_single_text() );
+}
+
+bool GLGizmoEmboss::on_is_actionable() const {
+    const Selection& selection = m_parent.get_selection();
+    const GLVolume  *gl_volume = get_selected_gl_volume(selection);
+    if (gl_volume == nullptr) return true;
+    const ModelObjectPtrs &objects = m_parent.get_model()->objects;
+    ModelVolume *volume = get_model_volume(*gl_volume, objects);
+    return (volume == nullptr || selection.is_single_full_instance()) && !selection.is_single_text();
+}
+
+void GLGizmoEmboss::trigger_action() {
+    const Selection& selection = m_parent.get_selection();
+    const GLVolume  *gl_volume = get_selected_gl_volume(selection);
+    if (gl_volume) {
+        const ModelObjectPtrs &objects = m_parent.get_model()->objects;
+        ModelVolume *volume = get_model_volume(*gl_volume, objects);
+        assert((volume == nullptr || selection.is_single_full_instance()) && !selection.is_single_text());
+    }
+    create_volume(ModelVolumeType::MODEL_PART);
+}
+
 void GLGizmoEmboss::set_volume_by_selection()
 {
     const Selection &selection = m_parent.get_selection();
@@ -1363,7 +1388,7 @@ void GLGizmoEmboss::close()
     // close gizmo == open it again
     auto& mng = m_parent.get_gizmos_manager();
     if (mng.get_current_type() == GLGizmosManager::Emboss)
-        mng.open_gizmo(GLGizmosManager::Emboss);
+        mng.open_gizmo(GLGizmosManager::Emboss, false);
 }
 
 void GLGizmoEmboss::draw_window()
@@ -1917,7 +1942,7 @@ void GLGizmoEmboss::draw_model_type()
         // which discard m_volume pointer and set it to nullptr also selection is cleared so gizmo is automaticaly closed
         auto &mng = m_parent.get_gizmos_manager();
         if (mng.get_current_type() != GLGizmosManager::Emboss)
-            mng.open_gizmo(GLGizmosManager::Emboss);
+            mng.open_gizmo(GLGizmosManager::Emboss, false);
         // TODO: select volume back - Ask @Sasa
     }
 }

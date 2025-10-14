@@ -14,9 +14,12 @@
 #endif
 
 #include <atomic>
+#include <codecvt>
 #include <condition_variable>
+#include <locale>
 #include <mutex>
 #include <random>
+#include <string>
 #include <thread>
 #include <time.h>
 #include <chrono>
@@ -132,6 +135,29 @@ std::optional<std::string> get_current_thread_name()
 	wchar_t *ptr = nullptr;
 	s_fnGetThreadDescription(::GetCurrentThread(), &ptr);
 	return (ptr == nullptr) ? std::string() : boost::nowide::narrow(ptr);
+}
+
+
+void win_exec(const std::string &command) {
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    std::wstring wide = converter.from_bytes(command);
+
+    //system(command.c_str());
+    STARTUPINFO StartupInfo;
+    PROCESS_INFORMATION ProcessInfo;
+
+    ZeroMemory( &StartupInfo, sizeof( StartupInfo ) );
+    StartupInfo.cb = sizeof( StartupInfo );
+    ZeroMemory( &ProcessInfo, sizeof( ProcessInfo ) );
+
+    CreateProcess( wide.c_str(),
+                   NULL, NULL, NULL,
+                   NULL, NULL, NULL, NULL,
+                   &StartupInfo,
+                   &ProcessInfo
+                   );
+
+    return;
 }
 
 #else // _WIN32

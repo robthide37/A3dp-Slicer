@@ -670,6 +670,11 @@ void SimplifyVisitor::use(ExtrusionMultiPath3D &multipath3D)
 }
 void SimplifyVisitor::use(ExtrusionLoop &loop)
 {
+    // ignore holes?
+    if (m_ignore_holes && (loop.loop_role() & elrHole) != 0) {
+        return;
+    }
+    // simplify
     for (size_t i = 0;i<loop.paths.size() ;++i) {
         ExtrusionPath *path = &loop.paths[i];
         //if (min_path_size > 0 && path.length() < min_path_size) {
@@ -713,6 +718,35 @@ void SimplifyVisitor::use(ExtrusionEntityCollection &collection)
         }
     }
 }
+
+#ifdef _DEBUGINFO
+void LoopAssertVisitor::use(const ExtrusionPath &path) {
+    if (!m_check_length)
+        return;
+    release_assert(!path.empty());
+    release_assert(path.mm3_per_mm() > 0.000001 || path.role() == ExtrusionRole::ThinWall);
+    release_assert(path.length() > SCALED_EPSILON);
+    for (size_t idx = 1; idx < path.size(); ++idx)
+        release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+}
+void LoopAssertVisitor::use(const ExtrusionLoop& loop) {
+    release_assert(!loop.empty());
+    for (size_t idx_path = 1; idx_path < loop.paths.size(); ++idx_path) {
+        release_assert(loop.paths[idx_path-1].polyline.back() == loop.paths[idx_path].polyline.front());
+    }
+    Point last_pt = loop.last_point();
+    for (const ExtrusionPath &path : loop.paths) {
+        release_assert(path.polyline.size() >= 2);
+        release_assert(!m_check_length || path.length() >= SCALED_EPSILON);
+        release_assert(path.first_point() == last_pt);
+        if(m_check_length)
+            for (size_t idx = 1; idx < path.size(); ++idx)
+                release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+        last_pt = path.last_point();
+    }
+    release_assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+}
+#endif
 
 //class ExtrusionTreeVisitor : ExtrusionVisitor {
 //public:

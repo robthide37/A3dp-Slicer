@@ -74,6 +74,10 @@ Model& Model::assign_copy(const Model &rhs)
     this->custom_gcode_per_print_z_vector = rhs.custom_gcode_per_print_z_vector;
     this->wipe_tower_vector = rhs.wipe_tower_vector;
 
+
+    // copy extra properties
+    this->baked_transformation = rhs.baked_transformation;
+
     return *this;
 }
 
@@ -96,6 +100,10 @@ Model& Model::assign_copy(Model &&rhs)
     // copy custom code per height
     this->custom_gcode_per_print_z_vector = std::move(rhs.custom_gcode_per_print_z_vector);
     this->wipe_tower_vector = rhs.wipe_tower_vector;
+
+
+    // copy extra properties
+    this->baked_transformation = rhs.baked_transformation;
 
     return *this;
 }
@@ -143,6 +151,11 @@ bool Model::equals(const Model& rhs) const {
     // copy custom code per height
    if (this->custom_gcode_per_print_z() != rhs.custom_gcode_per_print_z())
             return false;
+
+    // copy extra properties
+    if(this->baked_transformation != rhs.baked_transformation)
+        return false;
+
     return true;
 }
 
@@ -203,8 +216,7 @@ Model Model::read_from_file(const std::string& input_file,
     else if (boost::algorithm::iends_with(input_file, ".amf") || boost::algorithm::iends_with(input_file, ".amf.xml"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
     else if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
-        //FIXME options & LoadAttribute::CheckVersion ? 
-        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, false);
+        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion, options & LoadAttribute::UnbakeTransformation);
     else if (boost::algorithm::iends_with(input_file, ".svg"))
         result = load_svg(input_file, model);
     else
@@ -247,7 +259,7 @@ Model Model::read_from_archive(const std::string& input_file,
     bool result = false;
     if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
         result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model,
-                          options & LoadAttribute::CheckVersion);
+                          options & LoadAttribute::CheckVersion, options & LoadAttribute::UnbakeTransformation);
     else if (boost::algorithm::iends_with(input_file, ".zip.amf"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model,
                           options & LoadAttribute::CheckVersion);

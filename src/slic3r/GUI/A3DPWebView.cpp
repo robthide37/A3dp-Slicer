@@ -382,7 +382,7 @@ bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
         }, NULL);
         return true;
 #endif
-    } catch (const std::exception &e) {
+    } catch (const std::exception&) {
         return false;
     }
 }

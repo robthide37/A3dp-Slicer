@@ -2254,14 +2254,18 @@ Polygons project_mesh(
     const int step = 10;
     for (Polygons *storage : {&top.front(), &bottom.back()}) {
         if (storage->size() > 1000) {
-            int i;
-            for (i = step; i < storage->size(); i += step) {
-                p_union.insert(p_union.begin(), storage->begin() + i - step, storage->begin() + i);
-                p_union = union_(p_union);
+            int i_start, i_end;
+            for (i_start = 0, i_end = step; i_end < storage->size(); i_start = i_end, i_end += step) {
+                // don't cut before a hole, it may mess evrything.
+                while ((*storage)[i_end].is_clockwise() && i_end < storage->size()) {
+                    i_end++;
+                }
+                Polygons p2(storage->begin() + i_start, storage->begin() + i_end);
+                p_union = union_(p_union, p2);
             }
-            assert(i > p_union.size() && i - step >= 0);
-            p_union.insert(p_union.begin(), storage->begin() + i - step, storage->end());
-            p_union = union_(p_union);
+            assert(i_start < storage->size() && i_end >= storage->size());
+            Polygons p2(storage->begin() + i_start, storage->end());
+            p_union = union_(p_union, p2);
         } else {
             p_union = union_(p_union, *storage);
         }

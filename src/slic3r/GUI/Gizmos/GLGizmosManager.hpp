@@ -77,12 +77,12 @@ public:
         Flatten,
         Cut,
         Hollow,
+        Emboss,
         SlaSupports,
         FdmSupports,
         Seam,
         MmuSegmentation,
         Measure,
-        Emboss,
         Svg,
         Simplify,
         Undefined
@@ -183,7 +183,7 @@ public:
 
     void refresh_on_off_state();
     void reset_all_states();
-    bool open_gizmo(EType type);
+    bool open_gizmo(EType type, bool action);
     bool check_gizmos_closed_except(EType) const;
 
     void set_hover_id(int id);

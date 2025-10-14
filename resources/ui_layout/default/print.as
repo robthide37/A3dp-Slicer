@@ -2,12 +2,10 @@
 
 int s_overhangs_get()
 {
-	if (is_enabled("overhangs_width")) {
-		float width = get_float("overhangs_width");
-		bool percent = is_percent("overhangs_width");
-		if((percent && width > 50.f) || ((!percent) && width > 0.2f)) return 1;
-	}
-	if (!is_enabled("overhangs_width_speed") || get_float("overhangs_width_speed") == 0) {
+	if (is_enabled("overhangs_flow_ratio")) {
+		if (is_enabled("overhangs_speed")) {
+			return 1;
+		}
 		return 0;
 	}
 	return -1;
@@ -15,26 +13,8 @@ int s_overhangs_get()
 
 void s_overhangs_set(bool is_set)
 {
-	if (is_set) {
-		if (!is_enabled("overhangs_width")) {
-			set_enabled("overhangs_width", true);
-		}
-		if (!is_enabled("overhangs_width_speed")) {
-			set_enabled("overhangs_width_speed", true);
-		}
-		if (get_float("overhangs_width") == 0) {
-			float width = get_float("overhangs_width");
-			bool percent = is_percent("overhangs_width");
-			if((percent && width < 50.f) || ((!percent) && width < 0.2f))
-				set_percent("overhangs_width", 75.f);
-		}
-		if (get_float("overhangs_width_speed") == 0) {
-			set_percent("overhangs_width_speed", 55.f);
-		}
-	} else {
-		set_enabled("overhangs_width", false);
-		set_enabled("overhangs_width_speed", false);
-	}
+	set_enabled("overhangs_flow_ratio", true);
+	set_enabled("overhangs_speed", true);
 }
 
 // "not thick bridge" like in prusaslicer

@@ -410,8 +410,8 @@ void OptionsGroup::activate_line(Line& line)
 
     // If we have a single option with no sidetext just add it directly to the grid sizer
     if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
-        option_set.front().side_widget == nullptr && line.get_extra_widgets().size() == 0 &&
-        !option_set.front().opt.can_be_disabled) {
+        option_set.front().opt.label.size() == 0 && option_set.front().side_widget == nullptr &&
+        line.get_extra_widgets().size() == 0 && !option_set.front().opt.can_be_disabled) {
         const auto& option = option_set.front();
         const auto& field = build_field(option);
 

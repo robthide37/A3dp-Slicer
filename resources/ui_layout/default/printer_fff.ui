@@ -42,6 +42,9 @@ group:silent_mode_event:filename_format_event:Firmware
 	end_line
 	line:G2/G3 generation
 		setting:arc_fitting
+		setting:arc_fitting_ignore_holes
+	end_line
+	line:G2/G3 Resolution
 		setting:arc_fitting_resolution
 		setting:arc_fitting_tolerance
 	end_line
@@ -94,6 +97,9 @@ group:no_title:edit_gcode:validate_gcode:After layer change G-code
 group:no_title:edit_gcode:validate_gcode:Tool change G-code
 	setting:is_gcode:full_width:height$9:toolchange_gcode
 group:no_title:edit_gcode:validate_gcode:Between objects G-code (for sequential printing)
+	line:
+		setting:between_objects_gcode_before_move
+	end_line
 	setting:is_gcode:full_width:height$9:between_objects_gcode
 group:no_title:edit_gcode:validate_gcode:Between extrusion role change G-code
 	setting:is_gcode:full_width:height$9:feature_gcode

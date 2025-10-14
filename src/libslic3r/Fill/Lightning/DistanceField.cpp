@@ -40,7 +40,7 @@ DistanceField::DistanceField(const coord_t& radius, const Polygons& current_outl
     m_supporting_radius(radius),
     m_unsupported_points_bbox(current_outlines_bbox)
 {
-    m_supporting_radius2 = Slic3r::sqr(int64_t(radius));
+    m_supporting_radius_sqr = Slic3r::coord_int_sqr(radius);
     // Sample source polygons with a regular grid sampling pattern.
     const BoundingBox overhang_bbox = get_extents(current_overhang);
     for (const ExPolygon &expoly : union_ex(current_overhang)) {
@@ -124,7 +124,7 @@ void DistanceField::update(const Point& to_node, const Point& added_leaf)
         for (grid_addr.x() = grid.min.x(); grid_addr.x() <= grid.max.x(); ++grid_addr.x()) {
             grid_loc = this->from_grid_point(grid_addr);
             // Test inside a circle at the new leaf.
-            if ((grid_loc - added_leaf).cast<int64_t>().squaredNorm() > m_supporting_radius2) {
+            if (squared_int_norm(grid_loc - added_leaf) > m_supporting_radius_sqr) {
                 // Not inside a circle at the end of the new leaf.
                 // Test inside a rotated rectangle.
                 Vec2d  vx = (grid_loc - to_node).cast<double>();
@@ -140,7 +140,7 @@ void DistanceField::update(const Point& to_node, const Point& added_leaf)
             // Remove unsupported leafs at this grid location.
             if (const size_t cell_idx = m_unsupported_points_grid.find_cell_idx(grid_addr); cell_idx != std::numeric_limits<size_t>::max()) {
                 const UnsupportedCell &cell = m_unsupported_points[cell_idx];
-                if ((cell.loc - added_leaf).cast<int64_t>().squaredNorm() <= m_supporting_radius2) {
+                if (squared_int_norm(cell.loc - added_leaf) <= m_supporting_radius_sqr) {
                     m_unsupported_points_erased[cell_idx] = true;
                     m_unsupported_points_grid.mark_erased(grid_addr);
                 }
@@ -160,7 +160,7 @@ void DistanceField::update(const Point &to_node, const Point &added_leaf)
             if (auto it = m_unsupported_points_grid.find({grid_x, grid_y}); it != m_unsupported_points_grid.end()) {
                 std::list<UnsupportedCell>::iterator &list_it = it->second;
                 UnsupportedCell                      &cell    = *list_it;
-                if ((cell.loc - added_leaf).cast<int64_t>().squaredNorm() <= m_supporting_radius2) {
+                if (squared_int_norm(cell.loc - added_leaf) <= m_supporting_radius_sqr) {
                     m_unsupported_points.erase(list_it);
                     m_unsupported_points_grid.erase(it);
                 }

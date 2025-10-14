@@ -12,7 +12,6 @@
 
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/Utils/Http.hpp"
-#include "slic3r/Utils/PresetUpdater.hpp"
 
 #include "GUI_App.hpp"
 #include "GUI_Utils.hpp"

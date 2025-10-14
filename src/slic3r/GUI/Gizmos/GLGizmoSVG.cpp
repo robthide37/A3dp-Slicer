@@ -1304,7 +1304,7 @@ void GLGizmoSVG::close()
     // close gizmo == open it again
     auto &mng = m_parent.get_gizmos_manager();
     if (mng.get_current_type() == GLGizmosManager::Svg)
-        mng.open_gizmo(GLGizmosManager::Svg);
+        mng.open_gizmo(GLGizmosManager::Svg, false);
     reset_volume();
 }
 
@@ -2042,7 +2042,7 @@ void GLGizmoSVG::draw_model_type()
         // which discard m_volume pointer and set it to nullptr also selection is cleared so gizmo is automaticaly closed
         auto &mng = m_parent.get_gizmos_manager();
         if (mng.get_current_type() != GLGizmosManager::Svg)
-            mng.open_gizmo(GLGizmosManager::Svg);
+            mng.open_gizmo(GLGizmosManager::Svg, false);
         // TODO: select volume back - Ask @Sasa
     }
 }

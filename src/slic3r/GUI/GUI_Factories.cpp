@@ -187,10 +187,10 @@ static const constexpr std::array<std::pair<const char *, const char *>, 11> ADD
     {L("Add modifier"),          "add_modifier"},        // ~ModelVolumeType::PARAMETER_MODIFIER
     {L("Add support blocker"),   "support_blocker"},     // ~ModelVolumeType::SUPPORT_BLOCKER
     {L("Add support enforcer"),  "support_enforcer"},    // ~ModelVolumeType::SUPPORT_ENFORCER
-    {L("Add seam position (sphere)"),     "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_CENTER
-    {L("Add seam position (cylinder)"),   "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_CENTER_Z
-    {L("Add seam position"), "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_INSIDE_CENTER
-    {L("Add seam position"),     "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_INSIDE
+    {L("Add seam attractor (sphere)"),     "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_CENTER
+    {L("Add seam attractor (cylinder)"),   "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_CENTER_Z
+    {L("Enforce seam position (sphere)"), "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_INSIDE_CENTER
+    {L("Enforce seam position"),     "add_seam"},            // ~ModelVolumeType::SEAM_POSITION_INSIDE
     {L("Add brim patch"),        "add_brim_patch"},      // ~ModelVolumeType::BRIM_PATCH
     {L("Add brim negative"),     "add_brim_negative"},   // ~ModelVolumeType::BRIM_NEGATIVE
 }};
@@ -576,10 +576,10 @@ void MenuFactory::append_submenu_add_generic(wxMenu* menu_parent, wxMenu* sub_me
     assert(type != ModelVolumeType::SEAM_POSITION_CENTER);
     assert(type != ModelVolumeType::SEAM_POSITION_CENTER_Z);
     assert(type != ModelVolumeType::SEAM_POSITION_INSIDE_CENTER);
-    assert(type != ModelVolumeType::SEAM_POSITION_INSIDE);
+    //assert(type != ModelVolumeType::SEAM_POSITION_INSIDE);
     const ConfigOptionMode mode = wxGetApp().get_mode();
 
-    if (type != ModelVolumeType::INVALID && (mode > comSimple || get_app_config()->get_bool("objects_always_expert"))) {
+    if (type != ModelVolumeType::INVALID && type != ModelVolumeType::SEAM_POSITION_INSIDE && (mode > comSimple || get_app_config()->get_bool("objects_always_expert"))) {
         append_menu_item(sub_menu, wxID_ANY, _L("Load") + " " + dots, "",
             [type](wxCommandEvent&) { obj_list()->load_subobject(type); }, "", menu_parent);
         sub_menu->AppendSeparator();
@@ -603,7 +603,7 @@ void MenuFactory::append_submenu_add_generic(wxMenu* menu_parent, wxMenu* sub_me
         append_menu_item_add_svg(sub_menu, type);
     }
 
-    if (mode >= comAdvanced || get_app_config()->get_bool("objects_always_expert")) {
+    if (type != ModelVolumeType::SEAM_POSITION_INSIDE && (mode >= comAdvanced || get_app_config()->get_bool("objects_always_expert"))) {
         sub_menu->AppendSeparator();
         append_menu_item(sub_menu, wxID_ANY, _L("Gallery"), "",
             [type](wxCommandEvent&) { obj_list()->load_subobject(type, true); }, "", menu_parent);
@@ -767,7 +767,11 @@ void MenuFactory::append_menu_items_add_volume(MenuType menu_type)
         append_menu_item(sub_menu_both, wxID_ANY, _L("Seam cylinder attractor (from top to bottom)"), "",
                 [this](wxCommandEvent&) { obj_list()->load_generic_subobject(L("SmallCylinder"), ModelVolumeType::SEAM_POSITION_CENTER_Z); },
                 item_cylinder.second, nullptr, selected_func, m_parent);
-        append_submenu(menu, sub_menu_both, wxID_ANY, combined_seam_str, "", "add_brim", selected_func, m_parent);
+        // seam inside
+        wxMenu* sub_menu_patch = new wxMenu;
+        append_submenu_add_generic(sub_menu_both, sub_menu_patch, ModelVolumeType::SEAM_POSITION_INSIDE);
+        append_submenu(sub_menu_both, sub_menu_patch, wxID_ANY, _L("Seam enforcer (inside volume)"), "", "", selected_func, m_parent);
+        append_submenu(menu, sub_menu_both, wxID_ANY, combined_seam_str, "", "add_seam", selected_func, m_parent);
     }
     if (menu_type != mtObjectSLA) {
         // Brim: patch or blocker
@@ -1231,8 +1235,8 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
     auto open_emboss = [](const wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
         if (mng.get_current_type() == GLGizmosManager::Emboss)
-            mng.open_gizmo(GLGizmosManager::Emboss); // close() and reopen - move to be visible
-        mng.open_gizmo(GLGizmosManager::Emboss);
+            mng.open_gizmo(GLGizmosManager::Emboss, false); // close() and reopen - move to be visible
+        mng.open_gizmo(GLGizmosManager::Emboss, true);
     };
     append_menu_item(menu, wxID_ANY, name, description, open_emboss, icon, nullptr, can_edit_text, m_parent);
 }
@@ -1268,8 +1272,8 @@ void MenuFactory::append_menu_item_edit_svg(wxMenu *menu)
     auto open_svg = [](const wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
         if (mng.get_current_type() == GLGizmosManager::Svg)
-            mng.open_gizmo(GLGizmosManager::Svg); // close() and reopen - move to be visible
-        mng.open_gizmo(GLGizmosManager::Svg);
+            mng.open_gizmo(GLGizmosManager::Svg, false); // close() and reopen - move to be visible
+        mng.open_gizmo(GLGizmosManager::Svg, true);
     };
     append_menu_item(menu, wxID_ANY, name, description, open_svg, icon, nullptr, can_edit_svg, m_parent);
 }

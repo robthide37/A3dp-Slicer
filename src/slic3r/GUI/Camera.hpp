@@ -7,6 +7,7 @@
 
 #include "libslic3r/BoundingBox.hpp"
 #include "3DScene.hpp"
+#include "CoordAxes.hpp"
 #include <array>
 
 namespace Slic3r {
@@ -54,6 +55,7 @@ private:
     double m_scene_box_scale_factor{ SingleBedSceneBoxScaleFactor };
 
     BoundingBoxf3 m_scene_box;
+    CoordAxes m_axes;
 
 public:
     Camera() { set_default_orientation(); }
@@ -125,6 +127,7 @@ public:
 #if ENABLE_CAMERA_STATISTICS
     void debug_render() const;
 #endif // ENABLE_CAMERA_STATISTICS
+    void render_axes();
 
     // translate the camera in world space
     void translate_world(const Vec3d& displacement) { set_target(m_target + displacement); }
@@ -153,11 +156,11 @@ public:
 
     bool is_target_valid() const;
 
+    double calc_zoom_to_bounding_box_factor(const BoundingBoxf3& box, double margin_factor = DefaultZoomToBoxMarginFactor) const;
 private:
     // returns tight values for nearZ and farZ plane around the given bounding box
     // the camera MUST be outside of the bounding box in eye coordinate of the given box
     std::pair<double, double> calc_tight_frustrum_zs_around(const BoundingBoxf3& box);
-    double calc_zoom_to_bounding_box_factor(const BoundingBoxf3& box, double margin_factor = DefaultZoomToBoxMarginFactor) const;
     double calc_zoom_to_volumes_factor(const std::vector<GLVolume*>& volumes, Vec3d& center, double margin_factor = DefaultZoomToVolumesMarginFactor) const;
     void set_distance(double distance);
 

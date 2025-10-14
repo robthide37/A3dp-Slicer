@@ -86,11 +86,11 @@ public:
     const Point& leftmost_point() const;
     Lines lines() const;
 
-    void clip_end(coordf_t distance);
-    void clip_start(coordf_t distance);
-    void extend_end(coordf_t distance);
-    void extend_start(coordf_t distance);
-    Points equally_spaced_points(coordf_t distance) const;
+    void clip_end(distf_t distance);
+    void clip_start(distf_t distance);
+    void extend_end(distf_t distance);
+    void extend_start(distf_t distance);
+    Points equally_spaced_points(distf_t distance) const;
     void simplify(coordf_t tolerance);
 //    template <class T> void simplify_by_visibility(const T &area);
     void split_at(const Point &point, Polyline* p1, Polyline* p2) const;

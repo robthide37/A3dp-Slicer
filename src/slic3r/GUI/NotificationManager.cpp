@@ -2127,6 +2127,15 @@ void NotificationManager::push_notification(const NotificationType type, int tim
 	if (it != std::end(basic_notifications))
 		push_notification_data(*it, timestamp);
 }
+
+void NotificationManager::push_notification(const NotificationType type, const std::string& text, int timestamp) {
+    auto it = std::find_if(std::begin(basic_notifications), std::end(basic_notifications),
+                           boost::bind(&NotificationData::type, boost::placeholders::_1) == type);
+    assert(it != std::end(basic_notifications));
+    if (it != std::end(basic_notifications)) {
+        push_notification_data(NotificationData{it->type, it->level, it->duration, text, it->hypertext, it->callback, it->text2}, timestamp);
+    }
+}
 void NotificationManager::push_notification(const std::string& text, int timestamp)
 {
 	push_notification_data({ NotificationType::CustomNotification, NotificationLevel::RegularNotificationLevel, 10, text }, timestamp);
@@ -2137,7 +2146,7 @@ void NotificationManager::push_notification(NotificationType type,
                                             const std::string& text,
                                             const std::string& hypertext,
                                             std::function<bool(wxEvtHandler*)> callback,
-											const std::string& text_after,
+                                            const std::string &text_after,
                                             int timestamp)
 {
 	int duration = get_standard_duration(level);
@@ -2500,6 +2509,22 @@ void NotificationManager::set_download_progress_percentage(float percentage)
 			return;
 		}
 	}
+}
+void NotificationManager::set_download_progress_text(const std::string &updated_text) {
+    for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {
+        if (notification->get_type() == NotificationType::AppDownload) {
+            ProgressBarWithCancelNotification *pbwcn = dynamic_cast<ProgressBarWithCancelNotification *>(
+                notification.get());
+            auto percentage = pbwcn->get_percentage();
+            if (!updated_text.empty()) {
+                pbwcn->update(NotificationData{NotificationType::AppDownload,
+                                               NotificationLevel::ProgressBarNotificationLevel, 10, updated_text});
+            }
+            pbwcn->set_percentage(percentage);
+            wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+            return;
+        }
+    }
 }
 
 void NotificationManager::push_download_URL_progress_notification(size_t id, const std::string& text, std::function<bool(DownloaderUserAction, int)> user_action_callback)

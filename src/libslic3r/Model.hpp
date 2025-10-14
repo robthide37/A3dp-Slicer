@@ -1170,6 +1170,12 @@ public:
     void set_rotation(const Vec3d& rotation) { m_transformation.set_rotation(rotation); }
     void set_rotation(Axis axis, double rotation) { m_transformation.set_rotation(axis, rotation); }
 
+    void rotate(Matrix3d rotation_matrix) {
+        auto rotation = m_transformation.get_rotation_matrix();
+        rotation      = rotation_matrix * rotation;
+        set_rotation(Geometry::Transformation(rotation).get_rotation());
+    }
+    
     Vec3d get_scaling_factor() const { return m_transformation.get_scaling_factor(); }
     double get_scaling_factor(Axis axis) const { return m_transformation.get_scaling_factor(axis); }
 
@@ -1289,6 +1295,10 @@ private:
     std::vector<CustomGCode::Info> custom_gcode_per_print_z_vector = std::vector<CustomGCode::Info>(MAX_NUMBER_OF_BEDS);
 
 public:
+
+    // Properties from loading, can be used to save.
+    bool baked_transformation = true;
+
     // Default constructor assigns a new ID to the model.
     Model() { assert(this->id().valid()); }
     ~Model() { this->clear_objects(); this->clear_materials(); }
@@ -1304,7 +1314,8 @@ public:
 
     enum class LoadAttribute : int {
         AddDefaultInstances,
-        CheckVersion
+        CheckVersion,
+        UnbakeTransformation
     };
     using LoadAttributes = enum_bitmask<LoadAttribute>;
 

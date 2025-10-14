@@ -1346,7 +1346,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
 
     const VendorProfile *vendor_profile = nullptr;
     if (flags.has(LoadConfigBundleAttribute::LoadSystem) || flags.has(LoadConfigBundleAttribute::LoadVendorOnly)) {
-        VendorProfile vp = VendorProfile::from_ini(tree, path);
+        VendorProfile vp = VendorProfile::from_ini(tree, boost::filesystem::path(path).stem().string());
         if (vp.models.size() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer model defined.") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);

@@ -959,8 +959,8 @@ static inline std::vector<std::vector<ExPolygons>> mm_segmentation_top_and_botto
     };
 
     // Filter out polygons less than 0.1mm^2, because they are unprintable and causing dimples on outer primers (#7104)
-    filter_out_small_polygons(top_raw, Slic3r::sqr(scale_(0.1f)));
-    filter_out_small_polygons(bottom_raw, Slic3r::sqr(scale_(0.1f)));
+    filter_out_small_polygons(top_raw, Slic3r::sqr(scale_d(0.1f)));
+    filter_out_small_polygons(bottom_raw, Slic3r::sqr(scale_d(0.1f)));
 
 #ifdef MM_SEGMENTATION_DEBUG_TOP_BOTTOM
     {
@@ -1269,7 +1269,7 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
             // to ensure that very close polygons will be merged.
             ex_polygons = union_ex(ex_polygons);
             // Remove all expolygons and holes with an area less than 0.1mm^2
-            remove_small_and_small_holes(ex_polygons, Slic3r::sqr(scale_(0.1f)));
+            remove_small_and_small_holes(ex_polygons, Slic3r::sqr(scale_d(0.1f)));
             // Occasionally, some input polygons contained self-intersections that caused problems with Voronoi diagrams
             // and consequently with the extraction of colored segments by function extract_colored_segments.
             // Calling simplify_polygons removes these self-intersections.

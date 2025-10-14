@@ -127,17 +127,17 @@ BoundingBoxf get_extents(const std::vector<Vec2d> &pts)
 
 int nearest_point_index(const Points &points, const Point &pt)
 {
-    int64_t distance = std::numeric_limits<int64_t>::max();
+    lengthsqr_t distance = std::numeric_limits<lengthsqr_t>::max();
     int     idx      = -1;
 
     for (const Point &pt2 : points) {
         // If the X distance of the candidate is > than the total distance of the
         // best previous candidate, we know we don't want it.
-        int64_t d = sqr<int64_t>(pt2.x() - pt.x());
+        lengthsqr_t d = coord_int_sqr(pt2.x() - pt.x());
         if (d < distance) {
             // If the Y distance of the candidate is > than the total distance of the
             // best previous candidate, we know we don't want it.
-            d += sqr<int64_t>(pt2.y() - pt.y());
+            d += coord_int_sqr(pt2.y() - pt.y());
             if (d < distance) {
                 idx      = &pt2 - points.data();
                 distance = d;
@@ -166,7 +166,7 @@ Point Point::projection_onto(const Point &line_a, const Point &line_b) const
     double lx    = (double) (line_b(0) - line_a(0));
     double ly    = (double) (line_b(1) - line_a(1));
     double theta = ((double) (line_b(0) - (*this) (0)) * lx + (double) (line_b(1) - (*this) (1)) * ly) /
-                   (sqr<double>(lx) + sqr<double>(ly));
+                   (sqr(lx) + sqr(ly));
 
     if (0.0 <= theta && theta <= 1.0) {
         Vec2d float_vec = theta * line_a.cast<coordf_t>() + (1.0 - theta) * line_b.cast<coordf_t>();

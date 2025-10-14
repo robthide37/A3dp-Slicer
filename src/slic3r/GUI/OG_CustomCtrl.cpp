@@ -77,6 +77,9 @@ OG_CustomCtrl::OG_CustomCtrl(   wxWindow*            parent,
 
 void OG_CustomCtrl::init_ctrl_lines()
 {
+    if (opt_group->title == "Between objects G-code (for sequential printing)") {
+        std::cout << "aofuhazfon\n";
+    }
     const std::vector<Line>& og_lines = opt_group->get_lines();
     for (const Line& line : og_lines)
     {
@@ -110,7 +113,7 @@ void OG_CustomCtrl::init_ctrl_lines()
         else
         {
             height = m_bmp_blinking_sz.GetHeight() + m_v_gap;
-            ctrl_lines.emplace_back(CtrlLine(height, this, line, opt_group->no_title, opt_group->staticbox));
+            ctrl_lines.emplace_back(CtrlLine(height, this, line, opt_group->no_title && !line.label.empty(), opt_group->staticbox));
         }
     }
 }
@@ -184,7 +187,8 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
             // If we have a single option with no sidetext
             const std::vector<Option>& option_set = line.get_options();
             if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
-                option_set.front().side_widget == nullptr && line.get_extra_widgets().size() == 0)
+                option_set.front().opt.label.size() == 0 && option_set.front().side_widget == nullptr &&
+                line.get_extra_widgets().size() == 0)
             {
                 Field *field = opt_group->get_field(
                     OptionKeyIdx{option_set.front().opt_key, option_set.front().opt_idx});
@@ -765,7 +769,8 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
 
     // If we have a single option with no sidetext just add it directly to the grid sizer
     if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
-        option_set.front().side_widget == nullptr && og_line.get_extra_widgets().size() == 0)
+        option_set.front().opt.label.size() == 0 && option_set.front().side_widget == nullptr &&
+        og_line.get_extra_widgets().size() == 0)
     {
         if (front_field) {
             if (front_field && front_field->has_undo_ui())

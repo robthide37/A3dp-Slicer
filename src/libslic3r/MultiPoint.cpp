@@ -270,6 +270,137 @@ Points MultiPoint::visivalingam(const Points &pts, const double tolerance)
     return results;
 }
 
+inline lengthsqr_t dist_squared(const Point &p1, const Point &p2) {
+    // note: minimum can be 2 if both x and y are negative (negative shifting to 0 still produce 1 as -1 is full of 1).
+    // as we're computing the norm, we can use abs 
+    lengthsqr_t x = std::abs(p1.x() - p2.x()) >> SQUARE_BIT_REDUCTION;
+    lengthsqr_t y = std::abs(p1.y() - p2.y()) >> SQUARE_BIT_REDUCTION;
+    // x2 = x*x don't overflow
+    assert(x < std::numeric_limits<uint32_t>::max());
+    // y2 = y*y don't overflow
+    assert(y < std::numeric_limits<uint32_t>::max());
+    // x2 + y2 don't overflow
+    assert((x * x) / 2 + (y * y) / 2 < std::numeric_limits<uint64_t>::max() / 2);
+    return x * x + y * y;
+}
+
+inline lengthsqr_t compute_deviation_for_simplify_quick(const Point &a, const Point &b, const Point &c) {
+    const Vec2crd vec_ac = c - a;
+    const Vec2crd vec_ab = b - a;
+    const lengthsqr_t length_ac_squared = squared_int_norm(vec_ac);
+    // not possible to have point already check with less than epsilon distance.
+    assert(length_ac_squared > 0);
+    const int64_t dot_acab = dot_int(vec_ab, vec_ac);
+    if (dot_acab <= 0.0) {
+        // beyond a
+        return squared_int_norm(vec_ab);
+    } else if (dot_acab >= int64_t(length_ac_squared)) {
+        // beyond c
+        return squared_int_norm(b - c);
+    } else {
+        // (((dot_acab / length_ac_squared) * vec_ac) - vec_ab).squaredNorm()
+        return squared_int_norm(Vec2crd((dot_acab * vec_ac.x()) / length_ac_squared - vec_ab.x(),
+                                        (dot_acab * vec_ac.y()) / length_ac_squared - vec_ab.y()));
+    }
+}
+
+void simplify_quick(Polyline &polyline, const coord_t tolerance) {
+    Points &pts = polyline.points;
+    const lengthsqr_t tolerance_sq = Slic3r::coord_int_sqr(tolerance);
+
+    if (pts.size() > 3)
+        return;
+
+    if (pts.size() == 3) {
+        if (dist_squared(pts[0], pts[1]) < tolerance_sq || dist_squared(pts[1], pts[2]) < tolerance_sq) {
+            pts[1] = pts[2];
+            pts.resize(2);
+        }
+        return;
+    }
+
+    // when a dist is < tolerance_sq, delete the point (from a and b) that is nearer to its neighbors
+    lengthsqr_t previous = dist_squared(pts[0], pts[1]);
+
+    // check last line, don't touch last point.
+    // done fis
+    while (pts.size() > 2 && dist_squared(pts.back(), pts[pts.size() - 2]) < tolerance_sq) {
+        pts[pts.size() - 2] = pts.back();
+        pts.resize(pts.size() - 1);
+    }
+
+    size_t next_idx = 1;
+    // check firstline, don't touch first point.
+    while (pts.size() > 2 && dist_squared(pts[0], pts[next_idx]) < tolerance_sq) {
+        pts[1] = pts[next_idx + 1];
+        next_idx++;
+    }
+
+    if (pts.size() <= 3) {
+        // only continue if there is at least a third (unchecked) line.
+        return;
+    }
+
+    // go to third point
+    next_idx++;
+
+    // check other lines
+    // set current line to the second one.
+    size_t current_line = 1;
+    assert(next_idx > current_line);
+    const size_t max_line = pts.size() - 2;
+    size_t deleted = 0;
+    while (current_line < max_line) {
+        assert(next_idx < pts.size() - 1);
+        assert(current_line < next_idx);
+        // compute dist with next point
+        lengthsqr_t lsqr = dist_squared(pts[current_line], pts[next_idx]);
+        if (lsqr >= tolerance_sq) {
+            // ok, advance to next point & copy it
+            current_line++;
+            // I guess it's faster to just copy a value into itself, as it's already in cache instead of doing a if
+            pts[current_line] = pts[next_idx];
+            next_idx++;
+        } else {
+            deleted++;
+            // too short, choose the point to remove
+            if (lsqr <= 1) {
+                // epsilon, just merge them in the middle
+                pts[current_line].x() = (pts[next_idx].x() + pts[current_line].x()) / 2;
+                pts[current_line].y() = (pts[next_idx].y() + pts[current_line].y()) / 2;
+                next_idx++;
+            }
+            // check if the next segment is also too short
+            if (dist_squared(pts[next_idx], pts[next_idx + 1]) < tolerance_sq) {
+                next_idx++;
+            } else {
+                // compute both deviation abc & bcd
+                const lengthsqr_t dist_sqr_b = compute_deviation_for_simplify_quick(pts[current_line - 1],
+                                                                                   pts[current_line],
+                                                                                   pts[next_idx]);
+                const lengthsqr_t dist_sqr_c = compute_deviation_for_simplify_quick(pts[current_line], pts[next_idx],
+                                                                                   pts[next_idx + 1]);
+                if (dist_sqr_b <= dist_sqr_c) {
+                    // erase b
+                    pts[current_line] = pts[next_idx];
+                    next_idx++;
+                } else {
+                    // erase c
+                    next_idx++;
+                }
+            }
+        }
+    }
+
+    // copy last point
+    current_line++;
+    pts[current_line] = pts[next_idx];
+    assert(pts.back() == pts[current_line]);
+
+    assert(current_line + deleted == pts.size() - 1);
+    pts.resize(current_line + 1);
+}
+
 /// <summary>
 /// douglas_peucker will keep only points that are more than 'tolerance' out of the current polygon.
 /// But when we want to ensure we don't have a segment less than min_length, it's not very usable.

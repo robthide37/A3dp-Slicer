@@ -922,28 +922,6 @@ void TextField::get_value_by_opt_type(wxString &str, const bool check_value /* =
     default: break;
     }
 
-    if (!Field::warn_zero_gapfillspeed && ("max_volumetric_speed" == m_opt_key_idx.key || "gap_fill_speed" == m_opt_key_idx.key)) {
-        bool                      show_warning = false;
-        const DynamicPrintConfig &print_config = wxGetApp().preset_bundle->fff_prints.get_edited_preset().config;
-        if ("max_volumetric_speed" == m_opt_key_idx.key && val > 0)
-            show_warning = print_config.option<ConfigOptionFloatOrPercent>("gap_fill_speed")->value == 0;
-        if ("gap_fill_speed" == m_opt_key_idx.key && val == 0)
-            show_warning = true;
-        if (show_warning) {
-            const wxString msg_text = from_u8(
-                _u8L("Auto Speed will try to maintain a constant flow rate accross all print moves."
-                     "\nIt is not recommended to include gap moves to the Auto Speed calculation(by setting this "
-                     "value to 0)."
-                     "\nVery thin gap extrusions will often not max out the flow rate of your printer."
-                     "\nAs a result, this will cause Auto Speed to lower the speeds of all other print moves to "
-                     "match the low flow rate of these thin gaps."));
-            wxMessageDialog dialog(m_parent, msg_text, _L("Parameter validation") + ": " + m_opt_key_idx.key,
-                                   wxICON_WARNING | wxOK);
-            dialog.ShowModal();
-            Field::warn_zero_gapfillspeed = true;
-        }
-    }
-
     if (need_update) {
         wxString new_str = any_to_wxstring(m_value, m_opt, m_opt_key_idx.idx);
         set_text_value(new_str.ToStdString());

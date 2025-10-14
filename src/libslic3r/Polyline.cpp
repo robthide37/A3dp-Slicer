@@ -53,7 +53,7 @@ Lines Polyline::lines() const
 }
 
 // removes the given distance from the end of the polyline
-void Polyline::clip_end(coordf_t distance)
+void Polyline::clip_end(distf_t distance)
 {
     while (distance > 0) {
         Vec2d  last_point = this->last_point().cast<coordf_t>();
@@ -61,7 +61,7 @@ void Polyline::clip_end(coordf_t distance)
         if (this->points.empty())
             break;
         Vec2d  v    = this->last_point().cast<coordf_t>() - last_point;
-        coordf_t lsqr = v.squaredNorm();
+        distsqrf_t lsqr = v.squaredNorm();
         if (lsqr > distance * distance) {
             this->points.push_back(Point::round(last_point + v * (distance / sqrt(lsqr))));
             return;
@@ -71,7 +71,7 @@ void Polyline::clip_end(coordf_t distance)
 }
 
 // removes the given distance from the start of the polyline
-void Polyline::clip_start(coordf_t distance)
+void Polyline::clip_start(distf_t distance)
 {
     this->reverse();
     this->clip_end(distance);
@@ -79,14 +79,14 @@ void Polyline::clip_start(coordf_t distance)
         this->reverse();
 }
 
-void Polyline::extend_end(coordf_t distance)
+void Polyline::extend_end(distf_t distance)
 {
     // relocate last point by extending the last segment by the specified length
     Vec2d v = (this->points.back() - *(this->points.end() - 2)).cast<coordf_t>().normalized();
     this->points.back() += Point::round(v * distance);
 }
 
-void Polyline::extend_start(coordf_t distance)
+void Polyline::extend_start(distf_t distance)
 {
     // relocate first point by extending the first segment by the specified length
     Vec2d v = (this->points.front() - this->points[1]).cast<coordf_t>().normalized();
@@ -95,7 +95,7 @@ void Polyline::extend_start(coordf_t distance)
 
 /* this method returns a collection of points picked on the polygon contour
    so that they are evenly spaced according to the input distance */
-Points Polyline::equally_spaced_points(coordf_t distance) const
+Points Polyline::equally_spaced_points(distf_t distance) const
 {
     Points points;
     points.emplace_back(this->first_point());
@@ -1246,7 +1246,7 @@ Point ArcPolyline::get_point_from_begin(distf_t distance) const {
             // Linear segment
             Vec2d  v    = (current.point - last.point).cast<double>();
             double lsqr = v.squaredNorm();
-            if (lsqr >= sqr(distance)) {
+            if (lsqr >= coord_sqr(distance)) {
                 // Length to go is zero.
                 return last.point + Point::round(v * (distance / sqrt(lsqr)));
             }
@@ -1281,7 +1281,7 @@ Point ArcPolyline::get_point_from_end(distf_t distance) const {
             // Linear segment
             Vec2d  v    = (current.point - last.point).cast<double>();
             double lsqr = v.squaredNorm();
-            if (lsqr >= sqr(distance)) {
+            if (lsqr >= coord_sqr(distance)) {
                 // Length to go is zero.
                 return last.point + Point::round(v * (distance / sqrt(lsqr)));
             }
@@ -1854,7 +1854,7 @@ void ArcPolyline::make_arc(ArcFittingType with_fitting_arc, coordf_t tolerance, 
         this->m_only_strait = not_arc(*this);
         assert(is_valid());
     } else {
-        auto it_end = douglas_peucker<double>(this->m_path.begin(), this->m_path.end(), this->m_path.begin(), tolerance,
+        auto it_end = douglas_peucker_impl(this->m_path.begin(), this->m_path.end(), this->m_path.begin(), tolerance,
                                         [](const Geometry::ArcWelder::Segment &s) { return s.point; });
         if (it_end != this->m_path.end()) {
             size_t new_size = size_t(it_end-this->m_path.begin());

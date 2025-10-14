@@ -76,17 +76,36 @@ public:
 		Tag(std::string name, std::string description, ConfigOptionMode tag, std::string color_hash) : name(name), description(description), tag(tag), color_hash(color_hash) {}
 	};
 
+    struct ConfigurationEntry
+    {
+        std::string installed_name;
+        Semver      version;
+        boost::filesystem::path config_path;
+        boost::filesystem::path exe_path;
+        std::map<std::string, std::string> other_keys;
+        boost::filesystem::path get_config_path(const std::string &data_dir_root) const;
+    };
+
 	explicit AppConfig(EAppMode mode) :
 		m_mode(mode)
 	{
 		this->reset();
 	}
 
-	// Clear and reset to defaults.
-	void 			   	reset();
-	// Override missing or keys with their defaults.
-	void 			   	set_defaults();
-	void				init_ui_layout();
+    // Clear and reset to defaults.
+    void                reset();
+    // Override missing or keys with their defaults.
+    void                set_defaults();
+    void                init_ui_layout();
+    ConfigurationEntry  get_installation() { return m_data_dir; }
+    boost::filesystem::path data_dir() { return m_data_dir.config_path; }
+    // return false if already init
+    bool                init_root_data_dir(const std::string &default_app_data_path);
+    std::string         get_root_data_dir() { return m_data_dir_root; }
+    void                load_installed_repo(const boost::filesystem::path &filename);
+    void                save_installed_repo();
+    const std::vector<ConfigurationEntry> &get_all_slicer_installed() const { return m_all_slic3r_installed; }
+    void                set_new_installation(ConfigurationEntry new_install);
 
 	// Load the slic3r.ini from a user profile directory (or a datadir, if configured).
 	// return error string or empty strinf
@@ -301,6 +320,11 @@ private:
 	std::pair<std::string,std::string>                          m_default_splashscreen;
 	// hardware type
 	HardwareType												m_hardware;
+    // our installation. can be empty if data_dir() is set by command line
+    ConfigurationEntry                                          m_data_dir;
+    // directory of all configurations for all "installed" version.
+    std::string                                                 m_data_dir_root;
+    std::vector<ConfigurationEntry>                             m_all_slic3r_installed;
 };
 
 } // namespace Slic3r

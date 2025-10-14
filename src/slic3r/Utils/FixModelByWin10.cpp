@@ -394,7 +394,7 @@ bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, wxPro
 				on_progress(L("Loading repaired model"), 80);
 				DynamicPrintConfig config;
 				ConfigSubstitutionContext config_substitutions{ ForwardCompatibilitySubstitutionRule::EnableSilent };
-				bool loaded = Slic3r::load_3mf(path_dst.string().c_str(), config, config_substitutions, &model, false);
+				bool loaded = Slic3r::load_3mf(path_dst.string().c_str(), config, config_substitutions, &model, false, false);
 			    boost::filesystem::remove(path_dst);
 				if (! loaded)
 	 				throw Slic3r::RuntimeError("Import of the repaired 3mf file failed");

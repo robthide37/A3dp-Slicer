@@ -69,7 +69,8 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     
     std::unique_ptr<wxWindowUpdateLocker> freeze_gui = std::make_unique<wxWindowUpdateLocker>(this);
     std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{
-            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / "Smart_compact_temperature_calibration_item.amf").string()}, true, false, false, false);
+            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "filament_temp" / "Smart_compact_temperature_calibration_item.amf").string()},
+        LoadFileOption::LoadModel | LoadFileOption::DontUpdateDirs);
 
     assert(objs_idx.size() == 1);
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
@@ -184,8 +185,10 @@ void CalibrationTempDialog::create_geometry(wxCommandEvent& event_args) {
     model.objects[objs_idx[0]]->config.set_key_value("thin_perimeters", new ConfigOptionPercent(100));
     model.objects[objs_idx[0]]->config.set_key_value("layer_height", new ConfigOptionFloat(nozzle_diameter / 2));
     model.objects[objs_idx[0]]->config.set_key_value("fill_density", new ConfigOptionPercent(7));
-    model.objects[objs_idx[0]]->config.set_key_value("solid_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinearWGapFill));
-    model.objects[objs_idx[0]]->config.set_key_value("top_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinearWGapFill));
+    model.objects[objs_idx[0]]->config.set_key_value("solid_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+    model.objects[objs_idx[0]]->config.set_key_value("infill_filled_solid", new ConfigOptionBool(true));
+    model.objects[objs_idx[0]]->config.set_key_value("top_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
+    model.objects[objs_idx[0]]->config.set_key_value("infill_filled_bottom", new ConfigOptionBool(true));
     //disable ironing post-process, it only slow down things
     model.objects[objs_idx[0]]->config.set_key_value("ironing", new ConfigOptionBool(false));
 

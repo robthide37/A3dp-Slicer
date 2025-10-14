@@ -18,6 +18,7 @@
 #include "GalleryDialog.hpp"
 #include "MainFrame.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
+#include "Gizmos/GLGizmosManager.hpp"
 #include "Gizmos/GLGizmoCut.hpp"
 #include "Gizmos/GLGizmoScale.hpp"
 
@@ -1649,7 +1650,12 @@ void ObjectList::load_from_files(const wxArrayString& input_files, ModelObject& 
 
 static TriangleMesh create_mesh(const std::string& type_name, const BoundingBoxf3& bb)
 {
-    const double side = wxGetApp().plater()->canvas3D()->get_size_proportional_to_max_bed_size(0.1);
+    const double side_from_bed = wxGetApp().plater()->canvas3D()->get_size_proportional_to_max_bed_size(0.2);
+
+    BoundingBoxf3 side_bb(Vec3d(0,0,0), Vec3d(10,10,10));
+    const double side_zoom = wxGetApp().plater()->get_camera().calc_zoom_to_bounding_box_factor(side_bb);
+    const double side_from_zoom = 3 * (side_zoom / wxGetApp().plater()->get_camera().get_zoom());
+    const double side = std::min(side_from_zoom, side_from_bed);
 
     indexed_triangle_set mesh;
     if (type_name == "Box")
@@ -1729,8 +1735,23 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
         offset = Vec3d(inst_center.x(), inst_center.y(), 0.5 * mesh_bb.size().z() + instance_bb.min.z() - v->get_instance_offset().z());
     }
     else {
-        // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
-        offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - v->get_instance_offset();
+        // if the center of view (camera target) is more or less near the object, use it.
+        const Vec3d &camera_target = wxGetApp().plater()->get_camera().get_target();
+        BoundingBoxf3 big_mesh_bb = selection.get_unscaled_instance_bounding_box();
+        Vec3d bb_size = big_mesh_bb.max - big_mesh_bb.min;
+        big_mesh_bb.min -= bb_size/2;
+        big_mesh_bb.max += bb_size/2;
+        big_mesh_bb.min.z() = -999999999;
+        big_mesh_bb.max.z() = 999999999;
+        big_mesh_bb.offset(wxGetApp().plater()->canvas3D()->get_size_proportional_to_max_bed_size(0.02));
+        if (big_mesh_bb.contains(camera_target)) {
+            offset = camera_target - v->get_instance_offset();//Vec3d(instance_bb.max.x(), instance_bb.min.y(), 0);
+        } else {
+            // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding
+            // box, lift to print bed.
+            offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() -
+                v->get_instance_offset();
+        }
     }
     new_volume->set_offset(v->get_instance_transformation().get_matrix_no_offset().inverse() * offset);
 
@@ -1812,7 +1833,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         snapshot_label += ", " + wxString::FromUTF8(paths[i].filename().string().c_str());
 
     take_snapshot(snapshot_label);
-    if (! wxGetApp().plater()->load_files(paths, true, false, true, false).empty())
+    if (! wxGetApp().plater()->load_files(paths, LoadFileOption::LoadModel).empty())
         wxGetApp().mainframe->update_title();
 }
 
@@ -2779,7 +2800,7 @@ void ObjectList::part_selection_changed()
                                                             info_type == InfoItemType::CustomSeam       ? GLGizmosManager::EType::Seam :
                                                             GLGizmosManager::EType::MmuSegmentation;
                         if (gizmos_mgr.get_current_type() != gizmo_type)
-                            gizmos_mgr.open_gizmo(gizmo_type);
+                            gizmos_mgr.open_gizmo(gizmo_type, false);
                         break;
                     }
                     case InfoItemType::Sinking:
@@ -4360,8 +4381,8 @@ void ObjectList::change_part_type()
         types.emplace_back(ModelVolumeType::SEAM_POSITION_CENTER_Z);
         //names.Add(_L("Seam Position (inside)"));
         //types.emplace_back(ModelVolumeType::SEAM_POSITION_INSIDE_CENTER);
-        //names.Add(_L("Seam Position (inside shape)"));
-        //types.emplace_back(ModelVolumeType::SEAM_POSITION_INSIDE);
+        names.Add(_L("Seam Position (inside shape)"));
+        types.emplace_back(ModelVolumeType::SEAM_POSITION_INSIDE);
         names.Add(_L("Brim Patch"));
         types.emplace_back(ModelVolumeType::BRIM_PATCH);
         names.Add(_L("Brim Blocker"));
@@ -4776,9 +4797,9 @@ void ObjectList::simplify()
 
     if (gizmos_mgr.get_current_type() == GLGizmosManager::Simplify) {
         // close first
-        gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
+        gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify, false);
     }
-    gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
+    gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify, true);
 }
 
 void ObjectList::update_item_error_icon(const int obj_idx, const int vol_idx) const 

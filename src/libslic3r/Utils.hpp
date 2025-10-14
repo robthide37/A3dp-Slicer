@@ -43,6 +43,11 @@ const std::string& var_dir();
 // Return a full resource path for a file_name.
 std::string var(const std::string &file_name);
 
+// Set the path of the binary that execute this code
+void set_binary_file(const boost::filesystem::path &path);
+// Return a full path to the binary directory.
+const boost::filesystem::path& binary_file();
+
 // Set a path with various static definition data (for example the initial config bundles).
 void set_resources_dir(const std::string &path);
 // Return a full path to the resources directory.
@@ -70,6 +75,7 @@ const std::string& custom_gcodes_dir();
 void set_data_dir(const std::string &path);
 // Return a full path to the GUI resource files.
 const std::string& data_dir();
+bool has_data_dir();
 
 // Format an output path for debugging purposes.
 // Writes out the output path prefix to the console for the first time the function is called,

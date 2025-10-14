@@ -110,6 +110,7 @@ public:
 	void create(const Polygons &polygons, const Polylines &polylines, coord_t resolution);
 
 	// Fill in the grid with closed contours.
+	void create(const Polygon &polygon, coord_t resolution);
 	void create(const Polygons &polygons, coord_t resolution);
 	void create(const std::vector<const Polygon*> &polygons, coord_t resolution);
 	void create(const std::vector<Points> &polygons, coord_t resolution) { this->create(polygons, resolution, false); }
@@ -150,7 +151,7 @@ public:
 
 		bool valid() const { return contour_idx != size_t(-1); }
 	};
-	ClosestPointResult closest_point_signed_distance(const Point &pt, coord_t search_radius) const;
+	ClosestPointResult closest_point_signed_distance(const Point &pt, coord_t search_radius, size_t only_this_contour = size_t(-1)) const;
 
 	// Only call this function for closed contours!
 	bool signed_distance_edges(const Point &pt, coord_t search_radius, coordf_t &result_min_dist, bool *pon_segment = nullptr) const;
@@ -190,10 +191,10 @@ public:
 		assert(p2.x() >= 0 && p2.x() < coord_t(m_cols) * m_resolution);
 		assert(p2.y() >= 0 && p2.y() < coord_t(m_rows) * m_resolution);
 		// Get the cells of the end points.
-		coord_t ix = p1(0) / m_resolution;
-		coord_t iy = p1(1) / m_resolution;
-		coord_t ixb = p2(0) / m_resolution;
-		coord_t iyb = p2(1) / m_resolution;
+		int64_t ix = p1(0) / m_resolution;
+		int64_t iy = p1(1) / m_resolution;
+		int64_t ixb = p2(0) / m_resolution;
+		int64_t iyb = p2(1) / m_resolution;
 		assert(ix >= 0 && size_t(ix) < m_cols);
 		assert(iy >= 0 && size_t(iy) < m_rows);
 		assert(ixb >= 0 && size_t(ixb) < m_cols);
@@ -342,13 +343,36 @@ public:
 					return;
 	}
 
-    std::pair<std::vector<std::pair<size_t, size_t>>::const_iterator, std::vector<std::pair<size_t, size_t>>::const_iterator> cell_data_range(coord_t row, coord_t col) const
+	BoundingBox get_cells_intersecting_box(BoundingBox bbox) const
+	{
+		// End points of the line segment.
+		bbox.min -= m_bbox.min;
+		bbox.max -= m_bbox.min + Point(1, 1);
+		// Get the cells of the end points.
+		bbox.min /= m_resolution;
+		bbox.max /= m_resolution;
+		// Trim with the cells.
+		bbox.min.x() = std::max<coord_t>(bbox.min.x(), 0);
+		bbox.min.y() = std::max<coord_t>(bbox.min.y(), 0);
+		bbox.max.x() = std::min<coord_t>(bbox.max.x(), (coord_t)m_cols - 1);
+		bbox.max.y() = std::min<coord_t>(bbox.max.y(), (coord_t)m_rows - 1);
+		return bbox;
+	}
+
+    std::pair<std::vector<std::pair<size_t, size_t>>::const_iterator, std::vector<std::pair<size_t, size_t>>::const_iterator> cell_data_range(int64_t row, int64_t col) const
 	{
         assert(row >= 0 && size_t(row) < m_rows);
         assert(col >= 0 && size_t(col) < m_cols);
 		const EdgeGrid::Grid::Cell &cell = m_cells[row * m_cols + col];
 		return std::make_pair(m_cell_data.begin() + cell.begin, m_cell_data.begin() + cell.end);
 	}
+    bool cell_has_data(coord_t row, coord_t col) const
+    {
+        assert(row >= 0 && size_t(row) < m_rows);
+        assert(col >= 0 && size_t(col) < m_cols);
+        const EdgeGrid::Grid::Cell &cell = m_cells[row * m_cols + col];
+        return cell.begin != cell.end;
+    }
 
 	std::pair<const Slic3r::Point&, const Slic3r::Point&> segment(const std::pair<size_t, size_t> &contour_and_segment_idx) const
 	{
@@ -409,6 +433,9 @@ protected:
 	// Distance field derived from the edge grid, seed filled by the Danielsson chamfer metric.
 	// May be empty.
 	std::vector<float>							m_signed_distance_field;
+#ifdef _DEBUG
+    bool m_signed_distance_field_computed = false;
+#endif
 };
 
 // Debugging utility. Save the signed distance field.

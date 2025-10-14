@@ -7,6 +7,7 @@
 #include "BridgeDetector.hpp"
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
+#include "Geometry/ConvexHull.hpp"
 #include <algorithm>
 
 namespace Slic3r {
@@ -579,8 +580,8 @@ Polygons BridgeDetector::coverage(double angle) const
         // Get anchors, convert them to Polygons and rotate them.
         ExPolygons anchors = this->_anchor_regions;
         expolygons_rotate(anchors, PI / 2.0 - angle);
-
-        for (ExPolygon unsupported : this->expolygons) {
+        ExPolygons unsupported_expolygons = this->expolygons;
+        for (ExPolygon &unsupported : unsupported_expolygons) {
             // Clone our expolygon and rotate it so that we work with vertical lines.
             unsupported.rotate(PI / 2.0 - angle);
             // Outset the bridge expolygon by half the amount we used for detecting anchors;
@@ -613,27 +614,31 @@ Polygons BridgeDetector::coverage(double angle) const
                 std::vector<Line> support_lines;
                 get_lines(unsupported_bigger.front(), support_lines, this->precision, layer_id, anchors);
                 std::vector<Lines> lines_checked;
+                ExPolygons big_anchors = offset_ex(anchors, SCALED_EPSILON);
+                ExPolygons small_anchors = offset_ex(anchors, -SCALED_EPSILON * 10);
                 for (Line &line : support_lines) {
                     lines_checked.emplace_back();
                     // intersection to have the printable lines
-                    Polylines pls = intersection_pl({Polyline{line.a, line.b}}, unsupported_bigger);
+                    Polylines pls = intersection_pl(Polyline{line.a, line.b}, unsupported_bigger);
+                    pls = diff_pl(pls, small_anchors);
                     for (Polyline &pl : pls) {
                         // you can't add point with a cut
                         assert(pl.size() == 2);
                         // check if the line is anchored
                         bool has_a = false, has_b = false;
-                        for (ExPolygon anchor : anchors) {
+                        for (ExPolygon anchor : big_anchors) {
                             has_a = has_a || anchor.contains(pl.front());
                             has_b = has_b || anchor.contains(pl.back());
                         }
+                        // a good line need to be on the anchor on both sides, and to cover an unsupported area
+                        bool bad_line = !has_a || !has_b || intersection_pl(pl, anchors).size() <= 1;
                         // not both in anchor: bad. discard.
-                        if (!has_a || !has_b)
-                            continue;
-                        lines_checked.back().emplace_back(pl.front(), pl.back());
+                        if (!bad_line) {
+                            lines_checked.back().emplace_back(pl.front(), pl.back());
+                        }
                     }
                 }
                 assert(lines_checked.size() == support_lines.size());
-
                 // create polygons inflated by covered_offset from good lines
                 for (Lines &lines : lines_checked) {
                     Polygon p;
@@ -648,11 +653,8 @@ Polygons BridgeDetector::coverage(double angle) const
         }
 
         // Unite the polygons created from lines
-        covered = union_(covered);
-        // unoffset the polygons, so it doesn't expand into un-printable areas
-        covered = offset(covered, -covered_offset);
-
         // Intersect trapezoids with actual bridge area to remove extra margins and append it to result.
+        covered = intersection(union_(covered), unsupported_expolygons);
         polygons_rotate(covered, -(PI / 2.0 - angle));
     }
     return covered;

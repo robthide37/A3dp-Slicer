@@ -800,6 +800,7 @@ bool CLI::setup(int argc, char **argv)
     boost::filesystem::path path_resources = boost::filesystem::canonical(path_to_binary).parent_path() / "../resources";
 #endif
 
+    set_binary_file(path_to_binary);
     set_resources_dir(path_resources.string());
     set_var_dir((path_resources / "icons").string());
     set_local_dir((path_resources / "localization").string());

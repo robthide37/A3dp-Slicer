@@ -72,7 +72,7 @@ public:
     bool no_sort() const override { return true; }
 };
 
-class FillMonotonicLines : public FillRectilinear
+class FillMonotonicLines : public FillMonotonic
 {
 public:
     Fill* clone() const override { return new FillMonotonicLines(*this); }
@@ -166,33 +166,6 @@ public:
     ~FillRectilinearSawtooth() override = default;
     void fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out) const override;
 
-};
-
-class FillRectilinearWGapFill : public FillRectilinear
-{
-public:
-    FillRectilinearWGapFill() : FillRectilinear() { can_fill_surface_single = false; }
-    Fill* clone() const override { return new FillRectilinearWGapFill(*this); };
-    ~FillRectilinearWGapFill() override = default;
-    Polylines fill_surface(const Surface *surface, const FillParams &params) const override {
-        BOOST_LOG_TRIVIAL(error)<<"Error, the fill isn't implemented";
-        assert(false);
-        return {};
-    };
-    void fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out) const override;
-    static void split_polygon_gap_fill(const Surface& surface, const FillParams& params, ExPolygons& rectilinear, ExPolygons& gapfill);
-protected:
-    virtual bool is_monotonic() const { return false;  }
-};
-
-class FillMonotonicWGapFill : public FillRectilinearWGapFill
-{
-public:
-
-    Fill* clone() const override { return new FillMonotonicWGapFill(*this); };
-    ~FillMonotonicWGapFill() override = default;
-protected:
-    virtual bool is_monotonic() const override { return true; }
 };
 
 Points sample_grid_pattern(const ExPolygon &expolygon, coord_t spacing, const BoundingBox &global_bounding_box);

@@ -49,11 +49,20 @@
 #ifndef COORD_64B
     // Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
 using coord_t = int32_t;
-using coor2 = int64_t;
+//using coor2 = int64_t;
+using coordf_t = double;
+using distf_t = double;
+using distsqrf_t = double;
+// to optimise computation by staying in int
+using lengthsqr_t = int64_t;
 #else
     //FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
 using coord_t = int64_t;
-using Coord2 = double;
+//using Coord2 = double;
+using coordf_t = double;
+using distf_t = double;
+using distsqrf_t = double;
+using lengthsqr_t = uint64_t;
 #endif
 
 
@@ -62,9 +71,6 @@ inline uint16_t operator "" _u(unsigned long long value)
     return static_cast<uint16_t>(value);
 }
 
-using coordf_t = double;
-using distf_t = double;
-using distsqrf_t = double;
 
 // Scaling factor for a conversion from coord_t to coordf_t: 10e-6
 // This scaling generates a following fixed point representation with for a 32bit integer:
@@ -123,8 +129,24 @@ constexpr double   unscaled(coordf_t v) { return v * SCALING_FACTOR; }
 constexpr coord_t  scale_t(double v) { return coord_t(v * UNSCALING_FACTOR); }
 constexpr coordf_t scale_d(double v) { return coordf_t(v * UNSCALING_FACTOR); }
 
-inline coordf_t coord_sqr(coord_t length) { return coordf_t(length) * coordf_t(length); }
+inline distsqrf_t coord_sqr(coord_t length) { return distf_t(length) * distf_t(length); }
 constexpr size_t MAX_NUMBER_OF_BEDS = 9;
+
+// lossy square (works only for 2^38 length), by dividing by 128 to remove epsilon (and a bit more)
+#ifndef COORD_64B
+inline lengthsqr_t coord_int_sqr(coord_t length) { 
+    return lengthsqr_t(length) * lengthsqr_t(length);
+}
+#else
+static constexpr uint8_t SQUARE_BIT_REDUCTION  = 7;
+inline lengthsqr_t coord_int_sqr(coord_t length) { 
+    assert(length < std::pow(2,38));
+    // remove epsilon (/128)
+    // as we're computing the norm, we can use abs 
+    lengthsqr_t temp = std::abs(length) >> SQUARE_BIT_REDUCTION;
+    return temp * temp;
+}
+#endif
 
 enum Axis { 
 	X=0,
@@ -294,8 +316,13 @@ template<typename ContainerType, typename ValueType> inline bool one_of(const Va
 template<typename T> inline bool one_of(const T& v, const std::initializer_list<T>& il)
     { return contains(il, v); }
 
-template<typename T>
-constexpr inline T sqr(T x)
+//template<typename T>
+//constexpr inline T sqr(T x)
+constexpr inline double sqr(double x)
+{
+    return x * x;
+}
+constexpr inline float sqr(float x)
 {
     return x * x;
 }

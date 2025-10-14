@@ -70,10 +70,13 @@ Flow LayerRegion::bridging_flow(FlowRole role, BridgeType force_type) const
     const PrintRegion       &region         = this->region();
     const PrintRegionConfig &region_config  = region.config();
     const PrintObject       &print_object   = *this->layer()->object();
+    const bool is_perimeter = role == frExternalPerimeter || role == frPerimeter;
     // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
-    float nozzle_diameter = float(print_object.print()->config().nozzle_diameter.get_at(region.extruder(role, *this->layer()->object()) - 1));
+    const float nozzle_diameter = float(print_object.print()->config().nozzle_diameter.get_at(region.extruder(role, *this->layer()->object()) - 1));
     double diameter = 0;
-    BridgeType bridge_type = force_type == BridgeType::btNone ? region_config.bridge_type : force_type;
+    BridgeType bridge_type = force_type == BridgeType::btNone ?
+        (is_perimeter ? region_config.overhangs_type : region_config.bridge_type) :
+        force_type;
     if (bridge_type == BridgeType::btFromFlow ) {
         Flow reference_flow = flow(role);
         diameter = sqrt(4 * reference_flow.mm3_per_mm() / PI);
@@ -85,7 +88,13 @@ Flow LayerRegion::bridging_flow(FlowRole role, BridgeType force_type) const
         // Applies default bridge spacing.
         diameter =  nozzle_diameter;
     }
-    return Flow::bridging_flow(float(sqrt(force_type == BridgeType::btNone ? region_config.bridge_flow_ratio.get_abs_value(1.) : 0.95f) * diameter) , nozzle_diameter);
+    assert(!is_perimeter || (region_config.overhangs.get_bool() && region_config.overhangs_flow_ratio.is_enabled()));
+    return Flow::bridging_flow(float(sqrt(force_type == BridgeType::btNone ?
+                                              (is_perimeter ? region_config.overhangs_flow_ratio.get_abs_value(1.) :
+                                                              region_config.bridge_flow_ratio.get_abs_value(1.)) :
+                                              0.95f) *
+                                     diameter),
+                               nozzle_diameter);
     /* else {
         // The same way as other slicers: Use normal extrusions. Apply bridge_flow_ratio while maintaining the original spacing.
         return this->flow(role).with_flow_ratio(region_config.bridge_flow_ratio, overlap_percent);
@@ -118,6 +127,8 @@ void LayerRegion::slices_to_fill_surfaces_clipped(coord_t opening_offset)
 void LayerRegion::make_perimeters(
     // Input slices for which the perimeters, gap fills and fill expolygons are to be generated.
     const SurfaceCollection                                &slices,
+    // can be used to apply some configurations only on specific areas.
+    const std::set<LayerRegion*>                           &lregions,
     // Ranges of perimeter extrusions and gap fill extrusions per suface, referencing
     // newly created extrusions stored at this LayerRegion.
     std::vector<std::pair<ExtrusionRange, ExtrusionRange>> &perimeter_and_gapfill_ranges,
@@ -126,8 +137,10 @@ void LayerRegion::make_perimeters(
     // Ranges of fill areas above per input slice.
     std::vector<ExPolygonRange>                            &fill_expolygons_ranges)
 {
-    m_perimeters.clear();
-    m_thin_fills.clear();
+    this->m_perimeters.clear();
+    this->m_thin_fills.clear();
+    this->m_perimeters_regions = lregions;
+    assert(this->m_perimeters_regions.empty() || this->m_perimeters_regions.find(this) != this->m_perimeters_regions.end());
 
     perimeter_and_gapfill_ranges.reserve(perimeter_and_gapfill_ranges.size() + slices.size());
     // There may be more expolygons produced per slice, thus this reserve is conservative.
@@ -142,12 +155,15 @@ void LayerRegion::make_perimeters(
         (this->layer()->id() >= size_t(region_config.bottom_solid_layers.value) &&
          this->layer()->print_z >= region_config.bottom_solid_min_thickness - EPSILON);
 
+    Flow bridging_flow = (region_config.overhangs.get_bool() && region_config.overhangs_flow_ratio.is_enabled()) ?
+        this->bridging_flow(frExternalPerimeter) :
+        this->flow(frPerimeter);
     //this is a factory, the content will be copied into the PerimeterGenerator
     PerimeterGenerator::Parameters params(
         this->layer(),
         this->flow(frPerimeter),
         this->flow(frExternalPerimeter),
-        this->bridging_flow(frPerimeter),
+        bridging_flow,
         this->flow(frSolidInfill),
         region_config,
         this->layer()->object()->config(),
@@ -155,7 +171,6 @@ void LayerRegion::make_perimeters(
         spiral_vase,
         (region_config.perimeter_generator.value == PerimeterGeneratorType::Arachne) //use_arachne
     );
-    
 
     // perimeter bonding set.
     if (params.perimeter_flow.spacing_ratio() == 1
@@ -168,17 +183,49 @@ void LayerRegion::make_perimeters(
 
     const ExPolygons *lower_slices = this->layer()->lower_layer ? &this->layer()->lower_layer->lslices() : nullptr;
     const ExPolygons *upper_slices = this->layer()->upper_layer ? &this->layer()->upper_layer->lslices() : nullptr;
-    
+    std::vector<BoundingBox> lower_bbox;
+    std::vector<BoundingBox> upper_bbox;
+    if (lower_slices != nullptr) {
+        for (const ExPolygon &lowerp : *lower_slices) {
+            lower_bbox.emplace_back(lowerp.contour.points);
+        }
+    }
+    if (upper_slices != nullptr) {
+        for (const ExPolygon &upperp : *upper_slices) {
+            upper_bbox.emplace_back(upperp.contour.points);
+        }
+    }
+    assert((lower_slices == nullptr && lower_bbox.empty()) || (lower_slices->size() == lower_bbox.size()));
+    assert((upper_slices == nullptr && upper_bbox.empty()) || (upper_slices->size() == upper_bbox.size()));
+
     for (const Surface &surface : slices) {
         size_t perimeters_begin = m_perimeters.size();
         size_t gap_fills_begin = m_thin_fills.size();
         size_t fill_expolygons_begin = fill_expolygons.size();
 
+        params.region_setting.segregate_regions(surface.expolygon, this->m_perimeters_regions);
+
         PerimeterGenerator::PerimeterGenerator g{params};
         g.throw_if_canceled = [this]() { this->layer()->object()->print()->throw_if_canceled(); };
+
+        // only send lower & upper slcies that are overlapping the surfaces bb
+        BoundingBox surface_bbox(surface.expolygon.contour.points);
+        ExPolygons lower_slices_srf;
+        for (size_t i = 0; i < lower_bbox.size(); ++i) {
+            if (lower_bbox[i].overlap(surface_bbox)) {
+                lower_slices_srf.push_back((*lower_slices)[i]);
+            }
+        }
+        ExPolygons upper_slices_srf;
+        for (size_t i = 0; i < upper_bbox.size(); ++i) {
+            if (upper_bbox[i].overlap(surface_bbox)) {
+                upper_slices_srf.push_back((*upper_slices)[i]);
+            }
+        }
+
         g.process(
             // input:
-            surface, lower_slices, slices, upper_slices,
+            surface, &lower_slices_srf, slices, &upper_slices_srf,
             // output:
                 // Loops with the external thin walls
             &m_perimeters,
@@ -1367,7 +1414,11 @@ void LayerRegion::simplify_extrusion_entity()
 
 	//Ligne 652:     SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance)
     //call simplify for all paths
-    Slic3r::SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting, &print_config.arc_fitting_tolerance, enable_arc_fitting != ArcFittingType::Disabled ? SCALED_EPSILON * 2 : SCALED_EPSILON };
+    Slic3r::SimplifyVisitor visitor{scaled_resolution, enable_arc_fitting,
+                                    print_config.arc_fitting_ignore_holes,
+                                   &print_config.arc_fitting_tolerance,
+                                    enable_arc_fitting != ArcFittingType::Disabled ? SCALED_EPSILON * 2 :
+                                                                                     SCALED_EPSILON};
     this->m_perimeters.visit(visitor);
     this->m_fills.visit(visitor);
     this->m_ironings.visit(visitor);

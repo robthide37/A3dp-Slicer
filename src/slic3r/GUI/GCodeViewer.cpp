@@ -3091,8 +3091,7 @@ void GCodeViewer::load_wipetower_shell(const Print& print)
         // adds wipe tower's volume
         const double max_z = print.objects()[0]->model_object()->get_model()->max_z();
         const PrintConfig& config = print.config();
-        const size_t extruders_count = config.nozzle_diameter.size();
-        if (extruders_count > 1 && config.wipe_tower && !config.complete_objects && config.parallel_objects_step.value == 0) {
+        if (print.has_wipe_tower()) {
             const WipeTowerData& wipe_tower_data = print.wipe_tower_data();
             const float depth = wipe_tower_data.depth;
             const std::vector<std::pair<float, float>> z_and_depth_pairs = wipe_tower_data.z_and_depth_pairs;

@@ -200,6 +200,14 @@ public:
 	//Semver operator-(const Counter& b) const { Semver res(*this); return res -= b; }
 	//Semver operator-(const Patch& b) const { Semver res(*this); return res -= b; }
 
+    Semver no_patch() const{
+        Semver no_patch_ver = *this;
+        no_patch_ver.set_patch(0);
+        no_patch_ver.set_prerelease(std::nullopt);
+        no_patch_ver.set_metadata(std::nullopt);
+        return no_patch_ver;
+    }
+
 	// Stream output
 	friend std::ostream& operator<<(std::ostream& os, const Semver &self) {
 		os << self.to_string();

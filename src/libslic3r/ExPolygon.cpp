@@ -231,6 +231,7 @@ void ExPolygon::douglas_peucker(coord_t tolerance) {
     assert_valid();
 }
 
+//FIXME: dangerous, please not use it (polygons may be not ordered correctly).
 void
 ExPolygon::simplify_p(coord_t tolerance, Polygons &polygons) const
 {
@@ -279,6 +280,7 @@ ExPolygon::simplify_p(coord_t tolerance) const
         Polygon oldp = polygon;
         assert(oldp.is_clockwise());
         polygon.douglas_peucker(tolerance);
+#ifdef _DEBUG
         if (polygon.size() > 2 && polygon.is_counter_clockwise()) {
             static int aodfjiaqsdz = 0;
             std::stringstream stri;
@@ -297,6 +299,7 @@ ExPolygon::simplify_p(coord_t tolerance) const
             svg.Close();
             assert(false);
         }
+#endif
         // if polygon began to be counnter-clockwise, then it means that the fucked up part of the
         //   hourglass is the only part / dominant part left
         if (polygon.size() > 2 && polygon.is_clockwise()) {
@@ -362,27 +365,15 @@ ExPolygon::simplify(coord_t tolerance, ExPolygons &expolygons) const
 
 /// remove point that are at SCALED_EPSILON * 2 distance.
 //simplier than simplify
-void
-ExPolygon::remove_point_too_near(const coord_t tolerance) {
-    const double tolerance_sq = tolerance * (double)tolerance;
-    size_t id = 1;
-    while (id < this->contour.points.size() - 1) {
-        coord_t newdist = (coord_t)std::min(this->contour.points[id].distance_to_square(this->contour.points[id - 1])
-            , this->contour.points[id].distance_to_square(this->contour.points[id + 1]));
-        if (newdist < tolerance_sq) {
-            this->contour.points.erase(this->contour.points.begin() + id);
-            newdist = (coord_t)this->contour.points[id].distance_to_square(this->contour.points[id - 1]);
-        }
-        //go to next one
-        //if you removed a point, it check if the next one isn't too near from the previous one.
-        // if not, it byepass it.
-        if (newdist >= tolerance_sq) {
-            ++id;
-        }
+void ExPolygon::remove_point_too_close(const coord_t tolerance) {
+    this->contour.remove_point_too_close(tolerance);
+    if (contour.empty()) {
+        this->holes.clear();
     }
-    if (this->contour.points.front().distance_to_square(this->contour.points.back()) < tolerance_sq) {
-        this->contour.points.erase(this->contour.points.end() -1);
+    for (Polygon &hole : this->holes) {
+        hole.remove_point_too_close(tolerance);
     }
+    //note: may need a union_ex(), as contour may now cross a hole.
 }
 
 void ExPolygon::medial_axis(double min_width, double max_width, ThickPolylines &polylines) const
@@ -563,24 +554,29 @@ void ensure_valid(ExPolygons &expolygons, coord_t resolution /*= SCALED_EPSILON*
     expolygons_simplify(expolygons, resolution);
 }
 
-void expolygons_simplify(ExPolygons &expolygons, coord_t resolution)
-{
-    for (ExPolygon &poly : expolygons) for(auto &hole :poly.holes) assert(hole.is_clockwise());
+
+void expolygons_simplify(ExPolygons &expolygons, coord_t resolution) {
+    for (ExPolygon &poly : expolygons)
+        for (auto &hole : poly.holes)
+            assert(hole.is_clockwise());
     bool need_union = false;
     for (size_t i = 0; i < expolygons.size(); ++i) {
         assert(expolygons[i].contour.size() < 3 || expolygons[i].contour.is_counter_clockwise());
-        for(auto &hole :expolygons[i].holes) assert(hole.is_clockwise());
+        for (auto &hole : expolygons[i].holes)
+            assert(hole.is_clockwise());
         expolygons[i].contour.douglas_peucker(resolution);
-        for(auto &hole :expolygons[i].holes) assert(hole.is_clockwise());
+        for (auto &hole : expolygons[i].holes)
+            assert(hole.is_clockwise());
         if (expolygons[i].contour.size() < 3) {
-            expolygons.erase(expolygons.begin() + i);   
+            expolygons.erase(expolygons.begin() + i);
             --i;
         } else {
             if (!expolygons[i].contour.is_counter_clockwise()) {
                 expolygons[i].contour.reverse();
                 need_union = true;
             }
-            for(auto &hole :expolygons[i].holes) assert(hole.is_clockwise());
+            for (auto &hole : expolygons[i].holes)
+                assert(hole.is_clockwise());
             for (size_t i_hole = 0; i_hole < expolygons[i].holes.size(); ++i_hole) {
                 assert(expolygons[i].holes[i_hole].size() < 3 || expolygons[i].holes[i_hole].is_clockwise());
                 expolygons[i].holes[i_hole].douglas_peucker(resolution);
@@ -595,9 +591,23 @@ void expolygons_simplify(ExPolygons &expolygons, coord_t resolution)
                 }
             }
         }
-        // do we need to do an union_ex() here? -> it's possible that the new holes cut into the new perimeter, so yes... even if unlikely
+        // do we need to do an union_ex() here? -> it's possible that the new holes cut into the new perimeter, so
+        // yes... even if unlikely
     }
-    assert_valid(expolygons);
+    // assert_valid(expolygons);
+    for (size_t i = 0; i < expolygons.size(); ++i) {
+        for (size_t i_pt = 1; i_pt < expolygons[i].contour.size(); ++i_pt) {
+            if (expolygons[i].contour.points[i_pt - 1].coincides_with_epsilon(expolygons[i].contour.points[i_pt])) {
+                expolygons[i].contour.douglas_peucker(resolution);
+                //auto it_end = douglas_peucker_old<coord_t>(expolygons[i].contour.points.begin(),
+                //                                                   expolygons[i].contour.points.end(),
+                //                                                   expolygons[i].contour.points.begin(),
+                //                                                   double(resolution),
+                //                                           [](const Point &p) { return p; });
+                //expolygons[i].contour.points.resize(std::distance(expolygons[i].contour.points.begin(), it_end));
+            }
+        }
+    }
     if (need_union) {
         expolygons = union_ex(expolygons);
         ensure_valid(expolygons, resolution);
@@ -611,8 +621,26 @@ ExPolygons ensure_valid(ExPolygons &&expolygons, coord_t resolution /*= SCALED_E
     return std::move(expolygons);
 }
 
+
+
 ExPolygons ensure_valid(coord_t resolution, ExPolygons &&expolygons) {
     return ensure_valid(std::move(expolygons), resolution);
+}
+
+void remove_point_too_close(ExPolygons &expolygons, coord_t resolution) {
+    for (ExPolygon &expoly : expolygons) {
+        expoly.remove_point_too_close(resolution);
+    }
+}
+
+//note: test if a ExPolygons remove_point_too_close(ExPolygons expolygons) isn't more efficient, if the copy elision can be performed.
+// ie test if b = remove_point_too_close(offset(a, 1)) (by rvalue and by value) copies more/less than
+// b = offset(a, 1); remove_point_too_close(b)
+ExPolygons remove_point_too_close(ExPolygons &&expolygons, coord_t resolution) {
+    for (ExPolygon &expoly : expolygons) {
+        expoly.remove_point_too_close(resolution);
+    }
+    return std::move(expolygons);
 }
 
 #ifdef _DEBUGINFO

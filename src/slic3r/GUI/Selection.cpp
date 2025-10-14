@@ -580,14 +580,14 @@ bool Selection::is_sla_compliant() const
 
 bool Selection::is_single_text() const
 {
-    if (!is_single_volume_or_modifier())
-      return false;
+    //if (!is_single_volume_or_modifier())
+    //  return false;
 
 
     const GLVolume* gl_volume = this->get_first_volume();
     if (gl_volume == nullptr || m_model->objects.size() <= gl_volume->object_idx() ||
         m_model->objects[gl_volume->object_idx()]->volumes.size() <= gl_volume->volume_idx()) {
-        assert(false); // shouldn't happen
+        // assert(false); // shouldn't happen // can happen on the wipetower
         return false;
     }
     const ModelVolume* model_volume = m_model->objects[gl_volume->object_idx()]->volumes[gl_volume->volume_idx()];

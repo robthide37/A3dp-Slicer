@@ -869,7 +869,7 @@ void Tab::update_changed_ui()
     if (type() == Preset::TYPE_FFF_FILAMENT) {
         // compatible_print[er]s isn't added with "#0" by the presetcollection;
         for (const std::string special_key : {"compatible_print", "compatible_prints_condition", "compatible_printers",
-                                    "compatible_printers_condition", "inherits"}) {
+                                    "compatible_printers_condition", "inherits", "filament_vendor"}) {
             auto found = dirty_options.find(OptionKeyIdx::scalar(special_key));
             if (found != dirty_options.end()) {
                 dirty_options.emplace(OptionKeyIdx{special_key, 0}, found->second);
@@ -2062,7 +2062,7 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                 if ("no_search" == params[i])
                     no_search = true;
             }
-            
+
             current_group = current_page->new_optgroup(_(params.back()), no_title, !no_search, type_override);
             for (int i = 1; i < params.size() - 1; i++) {
                 if (boost::starts_with(params[i], "title_width$")) {
@@ -3544,15 +3544,13 @@ void TabFilament::toggle_options()
         toggle_option("overhangs_fan_speed", !m_config->is_enabled("overhangs_dynamic_fan_speed", 0), 0);
     }
 
-
-    float filament_default_pa = m_config->opt_float("filament_default_pa", 0);
-    bool use_pa = filament_default_pa > 0;
+    bool use_pa = m_config->option("filament_pressure_advance")->is_enabled(0);
     for (std::string field_name : {"filament_perimeter_pa", "filament_external_perimeter_pa", "filament_solid_infill_pa", "filament_infill_pa",
         "filament_top_solid_infill_pa", "filament_support_material_pa", "filament_support_material_interface_pa",
         "filament_brim_pa", "filament_bridge_pa", "filament_bridge_internal_pa", "filament_overhangs_pa",
         "filament_gap_fill_pa", "filament_thin_walls_pa", "filament_ironing_pa", "filament_travel_pa",
         "filament_first_layer_pa", "filament_first_layer_pa_over_raft"}) {
-        toggle_option(field_name, use_pa);
+        toggle_option(field_name, use_pa, 0);
     }
 
     //if (m_active_page->title() == "Advanced")

@@ -276,6 +276,19 @@ AboutDialog::AboutDialog()
         version->SetFont(version_font);
         vsizer->Add(version, 0, wxALIGN_LEFT | wxBOTTOM, 10);
     }
+    // id
+    {
+        auto version_string = _L("Slicer ID")+ " '" + std::string(SLIC3R_APP_KEY) + "'";
+        wxStaticText* version = new wxStaticText(this, wxID_ANY, version_string.c_str(), wxDefaultPosition, wxDefaultSize);
+        wxFont version_font = GetFont();
+        #ifdef __WXMSW__
+        version_font.SetPointSize(version_font.GetPointSize()-1);
+        #else
+            version_font.SetPointSize(11);
+        #endif
+        version->SetFont(version_font);
+        vsizer->Add(version, 0, wxALIGN_LEFT | wxBOTTOM, 10);
+    }
     
     // text
     m_html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO/*NEVER*/);

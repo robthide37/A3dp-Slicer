@@ -65,6 +65,17 @@ namespace UndoRedo {
     struct Snapshot;
 }
 
+// for Plater::load_files
+enum class LoadFileOption : int {
+    LoadModel,
+    LoadConfig,
+    DontUpdateDirs,
+    ImperialUnits,
+    UnbakeTransformation
+};
+using LoadFileOptions = enum_bitmask<LoadFileOption>;
+ENABLE_ENUM_BITMASK_OPERATORS(LoadFileOption);
+
 namespace GUI {
 
 wxDECLARE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
@@ -168,6 +179,7 @@ private:
     std::unique_ptr<priv> p;
 };
 
+
 class Plater: public wxPanel
 {
 public:
@@ -211,10 +223,9 @@ public:
 
    // void new_project();
     void load_project();
-    void load_project(const wxString& filename);
+    void load_project(const wxString& filename, bool unbake_trsf = false);
     void add_model(bool imperial_units = false);
-    void add_model_modifier(const std::string &path = "");
-
+    void load_model_hueforge(const std::string& path = "");
     void import_zip_archive();
     void import_sl1_archive();
     void extract_config_from_project();
@@ -231,8 +242,8 @@ public:
     //std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model = true, bool load_config = true, bool update_dirs = true, bool imperial_units = false);
     // To be called when providing a list of files to the GUI slic3r on command line.
     //std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool update_dirs = true, bool imperial_units = false);
-    std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model, bool load_config, bool update_dirs, bool imperial_units);
-    std::vector<size_t> load_files(const std::vector<std::string>& input_files,             bool load_model, bool load_config, bool update_dirs, bool imperial_units);
+    std::vector<size_t> load_files(const std::vector<boost::filesystem::path> &input_files, LoadFileOptions options);
+    std::vector<size_t> load_files(const std::vector<std::string> &input_files, LoadFileOptions options);
     // to be called on drag and drop
     bool load_files(const wxArrayString& filenames, bool delete_after_load = false);
     void notify_about_installed_presets();
@@ -346,6 +357,7 @@ public:
     void changed_object(ModelObject &object);
     void changed_object(int obj_idx);
     void changed_objects(const std::vector<size_t>& object_idxs);
+    void changed_all_objects();
     void schedule_background_process(bool schedule = true);
     bool is_background_process_update_scheduled() const;
     void suppress_background_process(const bool stop_background_process) ;
@@ -411,6 +423,7 @@ public:
     void render_sliders(GLCanvas3D& canvas);
 
     void arrange();
+    void orient();
     void arrange_current_bed();
     void arrange(Worker &w, const ArrangeSelectionMode &selected);
 
@@ -439,6 +452,7 @@ public:
     bool can_split_to_objects() const;
     bool can_split_to_volumes() const;
     bool can_arrange() const;
+    bool can_orient() const;
     bool can_layers_editing() const;
     bool can_paste_from_clipboard() const;
     bool can_copy_to_clipboard() const;

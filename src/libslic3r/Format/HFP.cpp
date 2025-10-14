@@ -1,10 +1,24 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Pavel Mikuš @Godrak, Lukáš Hejl @hejllukas, Filip Sykala @Jony01, Enrico Turri @enricoturri1966, David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/ Copyright (c) 2019 Thomas Moore
+///|/ Copyright (c) 2016 Chow Loong Jin @hyperair
+///|/ Copyright (c) Slic3r 2014 - 2015 Alessandro Ranellucci @alranel
+///|/
+///|/ ported from lib/Slic3r/GCode.pm:
+///|/ Copyright (c) Slic3r 2011 - 2015 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2013 Robert Giseburt
+///|/ Copyright (c) 2012 Mark Hindess
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "HFP.hpp"
 #include <fstream>
 #include <iostream>
-#include "../MultipleBeds.hpp"
 #include "../libslic3r.h"
 #include "../Exception.hpp"
 #include "../Model.hpp"
+#include "../MultipleBeds.hpp"
 #include "../Utils.hpp"
 #include "../LocalesUtils.hpp"
 #include "../GCode.hpp"
@@ -12,31 +26,11 @@
 
 namespace Slic3r {
 
+HFP::HFP() : m_base_layer_height(0.0), m_layer_height(0.0) {}
 
-HFP::HFP() {
-    m_base_layer_height = new double(0.0);
-    m_layer_height = new double(0.0);
-}
+bool HFP::valid_hfp() const { return m_json_data.is_object(); }
 
-
-bool HFP::valid_hfp() const {
-    return json_data.is_object();
-}
-
-
-HFP::~HFP() {
-    if (m_base_layer_height) {
-        delete m_base_layer_height;
-        m_base_layer_height = nullptr;
-    }
-    if (m_layer_height) {
-        delete m_layer_height;
-        m_layer_height = nullptr;
-    }
-}
-
-
-bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &config, Model &model) {
+bool HFP::load_hfp(const std::string &input_file) {
     std::ifstream file(input_file);
 
     if (!file.is_open()) {
@@ -51,32 +45,40 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
     Filament filament;
     BOOST_LOG_TRIVIAL(info) << "Processing HFP file: " << input_file;
 
+    // reset
+    m_filament_set.clear();
+    m_json_data.clear();
+    m_slider_values.clear();
+    m_base_layer_height = 0.0;
+    m_layer_height = 0.0;
+
     try {
         // Check if content is JSON format
         if (file_content.find("{") != std::string::npos) {
             BOOST_LOG_TRIVIAL(info) << "Detected JSON format.";
-            json_data = nlohmann::json::parse(file_content);
+            m_json_data = nlohmann::json::parse(file_content);
+
+            // Load stl path
+            m_stl_path = m_json_data.value("stl", "");
 
             // Load Base Layer Height
-            if (json_data.contains("base_layer_height")) {
-                double base_layer_height = json_data.value("base_layer_height", 0.0);
-                m_base_layer_height = new double(base_layer_height);
-                BOOST_LOG_TRIVIAL(info) << "Base Layer Height: " << *m_base_layer_height;
+            if (m_json_data.contains("base_layer_height")) {
+                m_base_layer_height = m_json_data.value("base_layer_height", 0.0);
+                BOOST_LOG_TRIVIAL(info) << "Base Layer Height: " << m_base_layer_height;
             }
 
             // Load Layer Height
-            if (json_data.contains("layer_height")) {
-                double layer_height = json_data.value("layer_height", 0.0);
-                m_layer_height = new double(layer_height);
-                BOOST_LOG_TRIVIAL(info) << "Layer Height: " << *m_layer_height;
+            if (m_json_data.contains("layer_height")) {
+                m_layer_height = m_json_data.value("layer_height", 0.0);
+                BOOST_LOG_TRIVIAL(info) << "Layer Height: " << m_layer_height;
             }
 
             // Load Filament Set
-            if (json_data.contains("filament_set") && json_data["filament_set"].is_array()) {
+            if (m_json_data.contains("filament_set") && m_json_data["filament_set"].is_array()) {
                 BOOST_LOG_TRIVIAL(info) << "Loading filament set from JSON...";
                 m_filament_set.clear();
 
-                for (const auto &filament_json : json_data["filament_set"]) {
+                for (const auto &filament_json : m_json_data["filament_set"]) {
                     Filament filament;
                     filament.Brand = filament_json.value("Brand", "");
                     filament.Color = filament_json.value("Color", "");
@@ -89,23 +91,16 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
                     m_filament_set.push_back(filament);
                     BOOST_LOG_TRIVIAL(info) << "Loaded filament: " << filament.Brand << " (" << filament.Name << ")";
                 }
-
-                // Reverse the filament set if "reverse_litho" is true
-                if (json_data.value("reverse_litho", false)) {
-                    std::reverse(m_filament_set.begin(), m_filament_set.end());
-                    BOOST_LOG_TRIVIAL(info) << "'reverse_litho' is true. Reversed filament set.";
-                }
-
             } else {
                 BOOST_LOG_TRIVIAL(warning) << "No 'filament_set' found in JSON.";
             }
 
             // Load Slider Values
-            if (json_data.contains("slider_values") && json_data["slider_values"].is_array()) {
+            if (m_json_data.contains("slider_values") && m_json_data["slider_values"].is_array()) {
                 BOOST_LOG_TRIVIAL(info) << "Loading slider values...";
                 m_slider_values.clear();
 
-                for (const auto &value : json_data["slider_values"]) {
+                for (const auto &value : m_json_data["slider_values"]) {
                     int slider_value = value.get<int>() + 1; // Always increase by 1
                     m_slider_values.push_back(slider_value);
                 }
@@ -138,11 +133,11 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
 
                     // Process each key dynamically
                     if (key == "base_layer_height") {
-                        m_base_layer_height = new double(std::stof(value));
-                        BOOST_LOG_TRIVIAL(info) << "Base Layer Height: " << *m_base_layer_height;
+                        m_base_layer_height = std::stof(value);
+                        BOOST_LOG_TRIVIAL(info) << "Base Layer Height: " << m_base_layer_height;
                     } else if (key == "layer_height") {
-                        m_layer_height = new double(std::stof(value));
-                        BOOST_LOG_TRIVIAL(info) << "Layer Height: " << *m_layer_height;
+                        m_layer_height = std::stof(value);
+                        BOOST_LOG_TRIVIAL(info) << "Layer Height: " << m_layer_height;
                     } else if (key == "slider_values") {
                         std::istringstream value_stream(value);
                         int slider_value;
@@ -165,7 +160,10 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
         BOOST_LOG_TRIVIAL(error) << "Error processing HFP file: " << e.what();
         return false;
     }
+    return true;
+}
 
+void HFP::set_custom_gcode_z(Model &model) const {
     for (CustomGCode::Info &info : model.get_custom_gcode_per_print_z_vector())
         info.gcodes.clear();
 
@@ -173,49 +171,22 @@ bool HFP::load_hfp(const std::string &input_file, const DynamicPrintConfig &conf
     CustomGCode::Type type = CustomGCode::ColorChange;
     std::string extra;
 
-    if (!m_filament_set.empty() && !m_slider_values.empty()) {
+    if (!m_filament_set.empty()) {
         auto &gcode_vector = model.get_custom_gcode_per_print_z_vector()[s_multiple_beds.get_active_bed()];
-
-        // First color before the first slider value
-        gcode_vector.gcodes.push_back(CustomGCode::Item{0.0, // Beginning of print
-                                                        type, extruder, m_filament_set.front().Color, extra});
-
-        // Color changes at each slider-defined height
-        for (int i = 0; i < m_slider_values.size(); i++) {
-            double z_height = *m_layer_height * m_slider_values[i];
-            gcode_vector.gcodes.push_back(CustomGCode::Item{z_height, type, extruder, m_filament_set[i].Color, extra});
+        for (int i = 0; i < m_filament_set.size(); i++) {
+            gcode_vector.gcodes.push_back(CustomGCode::Item{m_layer_height * m_slider_values[i],
+                                                                              type, extruder, m_filament_set[i].Color,
+                                                                              extra});
         }
-
-        // Last color after the last slider value (use a large value to ensure it's at the end)
-        double final_z = *m_layer_height * (m_slider_values.back() + 1); // or max Z height if known
-        gcode_vector.gcodes.push_back(CustomGCode::Item{final_z, type, extruder, m_filament_set.back().Color, extra});
     }
-
-    return true;
+    return;
 }
 
-const std::vector<HFP::Filament> &HFP::get_filament_set() const { return m_filament_set; }
-
-const std::vector<int> &HFP::get_slider_values() const { return m_slider_values; }
-
- double *HFP::get_base_layer_height() { return m_base_layer_height; }
-
- double *HFP::get_layer_height() { return m_layer_height; }
-
-bool HFP::apply_to_config() {
-    if (!cfg) {
-        BOOST_LOG_TRIVIAL(error) << "DynamicPrintConfig is null!";
-        return false;
-    }
-
-    if (!valid_hfp()) {
-        BOOST_LOG_TRIVIAL(error) << "Invalid HFP file structure!";
-        return false;
-    }
-
-
-
-    return true;
+void HFP::update_config(DynamicPrintConfig &fff_print_config) const {
+    fff_print_config.set_key_value("layer_height", new ConfigOptionFloat(this->get_layer_height()));
+    fff_print_config.set_key_value("first_layer_height",
+                                   new ConfigOptionFloatOrPercent(this->get_base_layer_height(), false));
 }
+
 
 } // namespace Slic3r

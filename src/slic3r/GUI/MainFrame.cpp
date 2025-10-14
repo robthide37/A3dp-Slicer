@@ -1773,21 +1773,21 @@ void MainFrame::init_menubar_as_editor()
             [this](wxCommandEvent&) { if (m_plater) m_plater->add_model(); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr; }, this);
 
-        append_menu_item(import_menu, wxID_ANY, _L("Import HFP") + dots + "\tCtrl+P", _L("Load a .hfp file to your model."),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->add_model_modifier(); }, "import_plater", nullptr,
-            [this](){return m_plater != nullptr; }, this);
-        
         append_menu_item(import_menu, wxID_ANY, _L("Import STL (Imperial Units)"), _L("Load an model saved with imperial units"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->add_model(true); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr; }, this);
-        
+
         append_menu_item(import_menu, wxID_ANY, _L("Import SLA Archive") + dots, _L("Load an SLA archive"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_sl1_archive(); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr && m_plater->get_ui_job_worker().is_idle(); }, this);
-    
+
         append_menu_item(import_menu, wxID_ANY, _L("Import ZIP Archive") + dots, _L("Load a ZIP archive"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_zip_archive(); }, "import_plater", nullptr,
             [this]() {return m_plater != nullptr; }, this);
+
+        append_menu_item(import_menu, wxID_ANY, _L("Import HFP") + dots + "\tCtrl+P", _L("Load a .hfp file to your model."),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->load_model_hueforge(); }, "import_plater", nullptr,
+            [this](){return m_plater != nullptr; }, this);
 
         import_menu->AppendSeparator();
         append_menu_item(import_menu, wxID_ANY, _L("Import &Config") + dots + "\tCtrl+L", _L("Load exported configuration file"),

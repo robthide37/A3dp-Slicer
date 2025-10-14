@@ -29,6 +29,16 @@
 
 namespace Slic3r {
 
+void EdgeGrid::Grid::create(const Polygon &polygon, coord_t resolution)
+{
+	// Collect the contours.
+	m_contours.clear();
+	if (! polygon.empty())
+		m_contours.emplace_back(polygon.points, false);
+
+	create_from_m_contours(resolution);
+}
+
 void EdgeGrid::Grid::create(const Polygons &polygons, coord_t resolution)
 {
 	// Collect the contours.
@@ -677,6 +687,9 @@ void EdgeGrid::Grid::calculate_sdf()
 	static int iRun = 0;
 	++ iRun;
 #endif
+#ifdef _DEBUG
+    m_signed_distance_field_computed = true;
+#endif
 
 	// 1) Initialize a signum and an unsigned vector to a zero iso surface.
 	size_t nrows = m_rows + 1;
@@ -983,6 +996,9 @@ void EdgeGrid::Grid::calculate_sdf()
 
 float EdgeGrid::Grid::signed_distance_bilinear(const Point &pt) const
 {
+#ifdef _DEBUG
+    assert(m_signed_distance_field_computed);
+#endif
 	coord_t x = pt(0) - m_bbox.min(0);
 	coord_t y = pt(1) - m_bbox.min(1);
 	coord_t w = m_resolution * m_cols;
@@ -1046,8 +1062,8 @@ float EdgeGrid::Grid::signed_distance_bilinear(const Point &pt) const
 	return f;
 }
 
-EdgeGrid::Grid::ClosestPointResult EdgeGrid::Grid::closest_point_signed_distance(const Point &pt, coord_t search_radius) const 
-{
+EdgeGrid::Grid::ClosestPointResult EdgeGrid::Grid::closest_point_signed_distance(
+    const Point &pt, coord_t search_radius, size_t only_this_contour /* = size_t(-1)*/) const {
 	BoundingBox bbox;
 	bbox.min = bbox.max = Point(pt(0) - m_bbox.min(0), pt(1) - m_bbox.min(1));
 	bbox.defined = true;
@@ -1086,6 +1102,8 @@ EdgeGrid::Grid::ClosestPointResult EdgeGrid::Grid::closest_point_signed_distance
 			const Cell &cell = m_cells[r * m_cols + c];
 			for (size_t i = cell.begin; i < cell.end; ++ i) {
 				const size_t   contour_idx = m_cell_data[i].first;
+                if (only_this_contour != size_t(-1) && only_this_contour != contour_idx)
+                    continue;
 				const Contour &contour     = m_contours[contour_idx];
 				assert(contour.closed());
 				size_t ipt = m_cell_data[i].second;
@@ -1274,6 +1292,9 @@ bool EdgeGrid::Grid::signed_distance_edges(const Point &pt, coord_t search_radiu
 
 bool EdgeGrid::Grid::signed_distance(const Point &pt, coord_t search_radius, coordf_t &result_min_dist) const
 {
+#ifdef _DEBUG
+    assert(m_signed_distance_field_computed);
+#endif
 	if (signed_distance_edges(pt, search_radius, result_min_dist))
 		return true;
 	if (m_signed_distance_field.empty())

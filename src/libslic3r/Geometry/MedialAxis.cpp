@@ -1951,7 +1951,7 @@ MedialAxis::simplify_polygon_frontier()
     }
 
     if (!this->m_expolygon.contour.points.empty())
-        this->m_expolygon.remove_point_too_near(this->m_resolution);
+        this->m_expolygon.remove_point_too_close(this->m_resolution);
 }
 
 /// Grow the extrusion to at least nozzle_diameter*1.05 (lowest safe extrusion width)

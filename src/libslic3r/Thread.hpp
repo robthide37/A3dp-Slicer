@@ -73,6 +73,10 @@ template<class Fn> inline boost::thread create_thread(Fn &&fn)
     return create_thread(attrs, std::forward<Fn>(fn));    
 }
 
+#ifdef _WIN32
+void win_exec(const std::string &command);
+#endif
+
 #ifdef _DEBUGINFO
 // TODO: sort items idx by difficulty, so we can process the most difficult first.
 // for now, only used to swi

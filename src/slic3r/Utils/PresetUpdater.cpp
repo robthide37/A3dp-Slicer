@@ -1,14 +1,13 @@
-///|/ Copyright (c) Prusa Research 2018 - 2023 Vojtěch Bubník @bubnikv, David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
-///|/ Copyright (c) 2020 Ondřej Nový @onovy
+///|/ Copyright (c) Superslicer 2025 Durand remi @supermerill
 ///|/
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PresetUpdater.hpp"
 
 #include <algorithm>
-#include <thread>
 #include <unordered_map>
 #include <ostream>
+#include <regex>
 #include <utility>
 #include <stdexcept>
 #include <boost/algorithm/string.hpp>
@@ -26,20 +25,21 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/format.hpp"
+#include "libslic3r/miniz_extension.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/PresetBundle.hpp"
-#include "libslic3r/miniz_extension.hpp"
-#include "slic3r/GUI/GUI.hpp"
-#include "slic3r/GUI/I18N.hpp"
-#include "slic3r/GUI/UpdateDialogs.hpp"
-#include "slic3r/GUI/ConfigWizard.hpp"
-#include "slic3r/GUI/GUI_App.hpp"
-#include "slic3r/GUI/Plater.hpp"
-#include "slic3r/GUI/format.hpp"
-#include "slic3r/GUI/NotificationManager.hpp"
-#include "slic3r/Utils/Http.hpp"
-#include "slic3r/Config/Version.hpp"
 #include "slic3r/Config/Snapshot.hpp"
+#include "slic3r/Config/Version.hpp"
+#include "slic3r/GUI/ConfigWizard.hpp"
+#include "slic3r/GUI/GUI.hpp"
+#include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/format.hpp"
+#include "slic3r/GUI/I18N.hpp"
+#include "slic3r/GUI/MsgDialog.hpp"
+#include "slic3r/GUI/NotificationManager.hpp"
+#include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/UpdateDialogs.hpp"
+#include "slic3r/Utils/Http.hpp"
 
 namespace fs = boost::filesystem;
 using Slic3r::GUI::Config::Index;
@@ -47,1532 +47,1178 @@ using Slic3r::GUI::Config::Version;
 using Slic3r::GUI::Config::Snapshot;
 using Slic3r::GUI::Config::SnapshotDB;
 
-
-
-// FIXME: Incompat bundle resolution doesn't deal with inherited user presets
-
-
 namespace Slic3r {
-
-
-//static const char *INDEX_FILENAME = "index.idx";
-static const char *TMP_EXTENSION = ".download";
-
-namespace {
-void copy_file_fix(const fs::path &source, const fs::path &target)
-{
-	BOOST_LOG_TRIVIAL(debug) << format("PresetUpdater: Copying %1% -> %2%", source, target);
-	std::string error_message;
-	CopyFileResult cfr = copy_file(source.string(), target.string(), error_message, false);
-	if (cfr != CopyFileResult::SUCCESS) {
-		BOOST_LOG_TRIVIAL(error) << "Copying failed(" << cfr << "): " << error_message;
-		throw Slic3r::CriticalException(GUI::format(
-				_L("Copying of file %1% to %2% failed: %3%"),
-				source, target, error_message));
-	}
-	// Permissions should be copied from the source file by copy_file(). We are not sure about the source
-	// permissions, let's rewrite them with 644.
-	static constexpr const auto perms = fs::owner_read | fs::owner_write | fs::group_read | fs::others_read;
-	fs::permissions(target, perms);
-}
-std::string escape_string_url(const std::string& unescaped)
-{
-	std::string ret_val;
-	CURL* curl = curl_easy_init();
-	if (curl) {
-		char* decoded = curl_easy_escape(curl, unescaped.c_str(), unescaped.size());
-		if (decoded) {
-			ret_val = std::string(decoded);
-			curl_free(decoded);
-		}
-		curl_easy_cleanup(curl);
-	}
-	return ret_val;
-}
-}
 
 wxDEFINE_EVENT(EVT_CONFIG_UPDATER_SYNC_DONE, wxCommandEvent);
 
-struct Update
-{
-	fs::path source;
-	fs::path target;
+#define ERROR_MSG_UNABLE_SNAPSHOT "Error: fail to take a snapshot"
+#define ERROR_MSG_UNABLE_COPY_CONFIG "Unable to copy the vendor bundle into the configuration directory."
 
-	Version version;
-	std::string vendor;
-	std::string changelog_url;
+PresetUpdater::PresetUpdater() {}
 
-	bool forced_update;
-	std::vector<std::string> new_printers;
-
-	Update() {}
-	Update(fs::path &&source, fs::path &&target, const Version &version, std::string vendor, std::string changelog_url, bool forced = false, std::vector<std::string> new_printers = {})
-		: source(std::move(source))
-		, target(std::move(target))
-		, version(version)
-		, vendor(std::move(vendor))
-		, changelog_url(std::move(changelog_url))
-		, forced_update(forced)
-		, new_printers(std::move(new_printers))
-	{}
-
-	void install() const
-	{
-		copy_file_fix(source, target);
-	}
-
-	friend std::ostream& operator<<(std::ostream& os, const Update &self)
-	{
-		os << "Update(" << self.source.string() << " -> " << self.target.string() << ')';
-		return os;
-	}
-};
-
-struct Incompat
-{
-	fs::path bundle;
-	Version version;
-	std::string vendor;
-
-	Incompat(fs::path &&bundle, const Version &version, std::string vendor)
-		: bundle(std::move(bundle))
-		, version(version)
-		, vendor(std::move(vendor))
-	{}
-
-	void remove() {
-		// Remove the bundle file
-		fs::remove(bundle);
-
-		// Look for an installed index and remove it too if any
-		const fs::path installed_idx = bundle.replace_extension("idx");
-		if (fs::exists(installed_idx)) {
-			fs::remove(installed_idx);
-		}
-	}
-
-	friend std::ostream& operator<<(std::ostream& os , const Incompat &self) {
-		os << "Incompat(" << self.bundle.string() << ')';
-		return os;
-	}
-};
-
-struct Updates
-{
-	std::vector<Incompat> incompats;
-	std::vector<Update> updates;
-};
-
-struct PresetUpdater::priv
-{
-	std::vector<Index> index_db;
-
-	bool enabled_version_check;
-	bool enabled_config_update;
-	std::string version_check_url;
-
-	fs::path cache_path;
-	fs::path cache_vendor_path;
-	fs::path rsrc_path;
-	fs::path vendor_path;
-
-	bool cancel;
-	std::thread thread;
-
-	bool has_waiting_updates { false };
-	Updates waiting_updates;
-
-	priv();
-
-	void set_download_prefs(const AppConfig *app_config);
-	bool get_file(const std::string &url, const fs::path &target_path) const;
-	void prune_tmps() const;
-	void sync_config(const VendorMap vendors, const std::string& index_archive_url);
-
-	void check_install_indices() const;
-	Updates get_config_updates(const Semver& old_slic3r_version) const;
-	bool perform_updates(Updates &&updates, bool snapshot = true) const;
-	void set_waiting_updates(Updates u);
-	// checks existence and downloads resource to cache
-	void get_missing_resource(const std::string& vendor, const std::string& filename, const std::string& url) const; 
-	// checks existence and downloads resource to vendor or copy from cache to vendor
-	void get_or_copy_missing_resource(const std::string& vendor, const std::string& filename, const std::string& url) const;
-	void update_index_db();
-};
-
-PresetUpdater::priv::priv()
-	: cache_path(fs::path(Slic3r::data_dir()) / "cache")
-	, cache_vendor_path(cache_path / "vendor")
-	, rsrc_path(fs::path(resources_dir()) / "profiles")
-	, vendor_path(fs::path(Slic3r::data_dir()) / "vendor")
-	, cancel(false)
-{
-	set_download_prefs(GUI::wxGetApp().app_config.get());
-	// Install indicies from resources. Only installs those that are either missing or older than in resources.
-	check_install_indices();
-	// Load indices from the cache directory.
-	index_db = Index::load_db();
+PresetUpdater::~PresetUpdater() {
+    if (thread.joinable()) {
+        // This will stop transfers being done by the thread, if any.
+        // Cancelling takes some time, but should complete soon enough.
+        cancel = true;
+        thread.join();
+    }
 }
 
-void PresetUpdater::priv::update_index_db()
-{
-	index_db = Index::load_db();
-}
-
-// Pull relevant preferences from AppConfig
-void PresetUpdater::priv::set_download_prefs(const AppConfig *app_config)
-{
-	enabled_version_check = app_config->get("notify_release") != "none";
-	version_check_url = app_config->version_check_url();
-	enabled_config_update = app_config->get_bool("preset_update") && !app_config->legacy_datadir();
-}
-
-// Downloads a file (http get operation). Cancels if the Updater is being destroyed.
-bool PresetUpdater::priv::get_file(const std::string &url, const fs::path &target_path) const
-{
-	bool res = false;
-	fs::path tmp_path = target_path;
-	tmp_path += format(".%1%%2%", get_current_pid(), TMP_EXTENSION);
-
-	BOOST_LOG_TRIVIAL(info) << format("Get: `%1%`\n\t-> `%2%`\n\tvia tmp path `%3%`",
-		url,
-		target_path.string(),
-		tmp_path.string());
-
-	Http::get(url)
-        .on_progress([](Http::Progress, bool &cancel) {
-			if (cancel) { cancel = true; }
-		})
-		.on_error([&](std::string body, std::string error, unsigned http_status) {
-			(void)body;
-			BOOST_LOG_TRIVIAL(error) << format("Error getting: `%1%`: HTTP %2%, %3%",
-				url,
-				http_status,
-				error);
-		})
-		.on_complete([&](std::string body, unsigned /* http_status */) {
-			fs::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
-			file.write(body.c_str(), body.size());
-			file.close();
-			fs::rename(tmp_path, target_path);
-			res = true;
-		})
-		.perform_sync();
-
-	return res;
-}
-
-// Remove leftover paritally downloaded files, if any.
-void PresetUpdater::priv::prune_tmps() const
-{
-    for (auto &dir_entry : boost::filesystem::directory_iterator(cache_path))
-		if (is_plain_file(dir_entry) && dir_entry.path().extension() == TMP_EXTENSION) {
-			BOOST_LOG_TRIVIAL(debug) << "Cache prune: " << dir_entry.path().string();
-			fs::remove(dir_entry.path());
-		}
-}
-
-void PresetUpdater::priv::get_missing_resource(const std::string& vendor, const std::string& filename, const std::string& url) const
-{
-	if (filename.empty() || vendor.empty())
-		return;
-
-	if (!boost::starts_with(url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
-		!boost::starts_with(url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
-	{
-		throw Slic3r::CriticalException(GUI::format("URL outside prusa3d.com network: %1%", url));
-	}
-
-	std::string escaped_filename = escape_string_url(filename);
-	const fs::path file_in_vendor(vendor_path / (vendor + "/" + filename));
-	const fs::path file_in_rsrc(rsrc_path / (vendor + "/" + filename));
-	const fs::path file_in_cache(cache_path / (vendor + "/" + filename));
-
-	if (fs::exists(file_in_vendor)) { // Already in vendor. No need to do anything.
-		BOOST_LOG_TRIVIAL(info) << "Resource " << vendor << " / " << filename << " found in vendor folder. No need to download.";
-		return;
-	}
-	if (fs::exists(file_in_rsrc)) { // In resources dir since installation. No need to do anything.
-		BOOST_LOG_TRIVIAL(info) << "Resource " << vendor << " / " << filename << " found in resources folder. No need to download.";
-		return;
-	}
-	if (fs::exists(file_in_cache)) { // In cache/venodr_name/ dir. No need to do anything.
-		BOOST_LOG_TRIVIAL(info) << "Resource " << vendor << " / " << filename << " found in cache folder. No need to download.";
-		return;
-	}
-
-	BOOST_LOG_TRIVIAL(info) << "Resources check could not find " << vendor << " / " << filename << " bed texture. Downloading.";
-
-	const auto resource_url = format("%1%%2%%3%", url, url.back() == '/' ? "" : "/", escaped_filename); // vendor should already be in url 
-
-	if (!fs::exists(file_in_cache.parent_path()))
-		fs::create_directory(file_in_cache.parent_path());
-
-	get_file(resource_url, file_in_cache);
-	return;
-}
-
-void PresetUpdater::priv::get_or_copy_missing_resource(const std::string& vendor, const std::string& filename, const std::string& url) const
-{
-	if (filename.empty() || vendor.empty())
-		return;
-
-	std::string escaped_filename = escape_string_url(filename);
-	const fs::path file_in_vendor(vendor_path / (vendor + "/" + filename));
-	const fs::path file_in_rsrc(rsrc_path / (vendor + "/" + filename));
-	const fs::path file_in_cache(cache_path / (vendor + "/" + filename));
-
-	if (fs::exists(file_in_vendor)) { // Already in vendor. No need to do anything.
-		BOOST_LOG_TRIVIAL(info) << "Resource " << vendor << " / " << filename << " found in vendor folder. No need to download.";
-		return;
-	}
-	if (fs::exists(file_in_rsrc)) { // In resources dir since installation. No need to do anything.
-		BOOST_LOG_TRIVIAL(info) << "Resource " << vendor << " / " << filename << " found in resources folder. No need to download.";
-				return;
-			}
-	if (!fs::exists(file_in_cache)) { // No file to copy. Download it to straight to the vendor dir.
-		/*if (!boost::starts_with(url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
-			!boost::starts_with(url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
-		{
-			throw Slic3r::CriticalException(GUI::format("URL outside prusa3d.com network: %1%", url));
-		}*/
-        if (url.size() > 10 && boost::starts_with(url, "http")) {
-            BOOST_LOG_TRIVIAL(info) << "Downloading resources missing in cache directory: " << vendor << " / "
-                                    << filename;
-
-            const auto resource_url = format("%1%%2%%3%", url, url.back() == '/' ? "" : "/",
-                                             escaped_filename); // vendor should already be in url
-
-            if (!fs::exists(file_in_vendor.parent_path()))
-                fs::create_directory(file_in_vendor.parent_path());
-
-            get_file(resource_url, file_in_vendor);
+void PresetUpdater::set_installed_vendors(const PresetBundle *preset_bundle) {
+    std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+    for (const auto& [id, installed_vendor] : preset_bundle->vendors) {
+        auto it = all_vendors.find(installed_vendor.id);
+        if (it == all_vendors.end()) {
+            this->all_vendors[installed_vendor.id] = (VendorSync{installed_vendor, true});
+            if (!installed_vendor.config_update_rest.empty()) {
+                is_synch = false;
+            }
+        } else {
+            it->second.reset(installed_vendor, true);
         }
-		return;
-	}
-
-	if (!fs::exists(file_in_vendor.parent_path())) // create vendor_name dir in vendor 
-		fs::create_directory(file_in_vendor.parent_path());
-
-	BOOST_LOG_TRIVIAL(debug) << "Copiing: " << file_in_cache << " to " << file_in_vendor;
-	copy_file_fix(file_in_cache, file_in_vendor);
+    }
 }
 
-// Download vendor indices. Also download new bundles if an index indicates there's a new one available.
-// Both are saved in cache.
-void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string& index_archive_url)
-{
-	BOOST_LOG_TRIVIAL(info) << "Syncing configuration cache";
-
-	if (!enabled_config_update) { return; }
-
-	// Download profiles archive zip
-	// dk: Do we want to return here on error? Or skip archive dwnld and unzip and work with previous run state cache / vendor? I think return.
-	// Any error here also doesnt show any info in UI. Do we want maybe notification?
-	fs::path archive_path(cache_path / "vendor_indices.zip");
-	if (index_archive_url.empty()) {
-		BOOST_LOG_TRIVIAL(error) << "Downloading profile archive failed - url has no value.";
-		return;
-	}
-	BOOST_LOG_TRIVIAL(info) << "Downloading vedor profiles archive zip from " << index_archive_url;
-	//check if idx_url is leading to our site 
-	//if (!boost::starts_with(index_archive_url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
-	//	!boost::starts_with(index_archive_url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
-	//{
-	//	BOOST_LOG_TRIVIAL(error) << "Unsafe url path for vedor profiles archive zip. Download is rejected.";
-	//	return;
-	//}
-	if (!get_file(index_archive_url, archive_path)) {
-		BOOST_LOG_TRIVIAL(error) << "Download of vendor profiles archive zip failed.";
-		return;
-	}
-	if (cancel) { 
-		return; 
-	}
-
-	enum class VendorStatus
-	{
-		IN_ARCHIVE,
-		IN_CACHE,
-		NEW_VERSION,
-		INSTALLED
-	};
-
-	std::vector<std::pair<std::string, VendorStatus>> vendors_with_status;
-	// Unzip archive to cache / vendor
-	mz_zip_archive archive;
-	mz_zip_zero_struct(&archive);
-	if (!open_zip_reader(&archive, archive_path.string())) {
-		BOOST_LOG_TRIVIAL(error) << "Couldn't open zipped bundle.";
-		return;
-	} else {
-		mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
-		// loop the entries 
-		mz_zip_archive_file_stat stat;
-		for (mz_uint i = 0; i < num_entries; ++i) {
-			if (mz_zip_reader_file_stat(&archive, i, &stat)) {
-				std::string name(stat.m_filename);
-				if (stat.m_uncomp_size > 0) {
-					std::string buffer((size_t)stat.m_uncomp_size, 0);
-					mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
-					if (res == 0) {
-						BOOST_LOG_TRIVIAL(error) << "Failed to unzip " << stat.m_filename;
-						continue;
-					}
-					// create file from buffer
-					fs::path tmp_path(cache_vendor_path / (name + ".tmp"));
-					if (!fs::exists(tmp_path.parent_path())) {
-						BOOST_LOG_TRIVIAL(error) << "Failed to unzip file " << name << ". Directories are not supported. Skipping file.";
-						continue;
-					}
-					fs::path target_path(cache_vendor_path / name);
-					fs::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
-					file.write(buffer.c_str(), buffer.size());
-					file.close();
-					boost::system::error_code ec;
-					bool exists = fs::exists(tmp_path, ec);
-					if(!exists || ec) {
-						BOOST_LOG_TRIVIAL(error) << "Failed to find unzipped file at " << tmp_path << ". Terminating Preset updater synchorinzation." ;
-						close_zip_reader(&archive);
-						return;
-					}
-					fs::rename(tmp_path, target_path, ec);
-					if (ec) {
-						BOOST_LOG_TRIVIAL(error) << "Failed to rename unzipped file at " << tmp_path << ". Terminating Preset updater synchorinzation. Error message: " << ec.message();
-						close_zip_reader(&archive);
-						return;
-					}
-					// TODO: what if unexpected happens here (folder inside zip) - crash! 
-
-					if (name.substr(name.size() - 3) == "idx")
-						vendors_with_status.emplace_back(name.substr(0, name.size() - 4), VendorStatus::IN_ARCHIVE); // asume for now its only in archive - if not, it will change later.
-				}
-			}
-		}
-		close_zip_reader(&archive);
-	}
-
-	// Update vendor preset bundles if in Vendor
-	// Over all indices from the cache directory:
-	for (auto &index : index_db) {
-		if (cancel) { 
-			return; 
-		}
-		auto archive_it = std::find_if(vendors_with_status.begin(), vendors_with_status.end(),
-			[&index](const std::pair<std::string, VendorStatus>& element) { return element.first == index.vendor(); });
-		//assert(archive_it != vendors_with_status.end()); // this would mean there is a index for vendor that is missing in recently downloaded archive
-
-		const auto vendor_it = vendors.find(index.vendor());
-		if (vendor_it == vendors.end()) {
-			// Not installed vendor yet we need to check missing thumbnails (of new printers)
-			BOOST_LOG_TRIVIAL(debug) << "No such vendor: " << index.vendor();
-			if (archive_it != vendors_with_status.end())
-				archive_it->second = VendorStatus::IN_CACHE;
-			continue;
-		}
-
-		if (archive_it != vendors_with_status.end())
-			archive_it->second = VendorStatus::INSTALLED;
-
-		const VendorProfile &vendor = vendor_it->second;
-		const std::string idx_path = (cache_path / (vendor.id + ".idx")).string();
-		const std::string idx_path_temp = (cache_vendor_path / (vendor.id + ".idx")).string();
-		
-		// Load the fresh index up
-		{
-			Index new_index;
-			try {
-				new_index.load(idx_path_temp);
-			} catch (const std::exception & /* err */) {
-				BOOST_LOG_TRIVIAL(error) << format("Could not load downloaded index %1% for vendor %2%: invalid index?", idx_path_temp, vendor.name);
-				continue;
-			}
-			if (new_index.version() < index.version()) {
-				BOOST_LOG_TRIVIAL(info) << format("The downloaded index %1% for vendor %2% is older than the active one. Ignoring the downloaded index.", idx_path_temp, vendor.name);
-				continue;
-			}
-			copy_file_fix(idx_path_temp, idx_path);
-			
-			//if we rename path we need to change it in Index object too or create the object again
-			//index = std::move(new_index);
-			try {
-				index.load(idx_path);
-			}
-			catch (const std::exception& /* err */) {
-				BOOST_LOG_TRIVIAL(error) << format("Could not load downloaded index %1% for vendor %2%: invalid index?", idx_path, vendor.name);
-				continue;
-			}
-			if (cancel)
-				return;
-		}
-
-		// See if a there's a new version to download
-		const auto recommended_it = index.recommended();
-		if (recommended_it == index.end()) {
-			BOOST_LOG_TRIVIAL(error) << format("No recommended version for vendor: %1%, invalid index?", vendor.name);
-			continue;
-		}
-
-		const auto recommended = recommended_it->config_version;
-
-		BOOST_LOG_TRIVIAL(debug) << format("Got index for vendor: %1%: current version: %2%, recommended version: %3%",
-			vendor.name,
-			vendor.config_version.to_string(),
-			recommended.to_string());
-
-		if (vendor.config_version >= recommended) { continue; }
-
-		// vendors that are checked here, doesnt need to be checked again later
-		if (archive_it != vendors_with_status.end())
-			archive_it->second = VendorStatus::NEW_VERSION;
-
-		// Download recomended ini to cache
-		const auto path_in_cache = cache_path / (vendor.id + ".ini");
-		BOOST_LOG_TRIVIAL(info) << "Downloading new bundle for vendor: " << vendor.name;
-		const std::string bundle_url = format("%1%/%2%.ini", vendor.config_update_url, recommended.to_string());
-		const fs::path bundle_path = cache_path / (vendor.id + ".ini");
-		if (!get_file(bundle_url, bundle_path))
-			continue;
-		if (cancel)
-			return;
-		// vp is fully loaded to get all resources
-		VendorProfile vp;
-		try {
-			vp = VendorProfile::from_ini(bundle_path, true);
-		} catch (const std::exception& e) {
-			BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", vendor.id, bundle_path, e.what());
-			continue;
-	}
-		// check the fresh bundle for missing resources
-		// for that, the ini file must be parsed (done above)
-		for (const auto& model : vp.models) {
-			for (const std::string& res : { model.bed_texture, model.bed_model, model.thumbnail/*id +"_thumbnail.png"*/} ) {
-				if (! res.empty()) {
-					try
-					{
-						get_missing_resource(vp.id, res, vendor.config_update_url);
-					}
-					catch (const std::exception& e)
-					{
-						BOOST_LOG_TRIVIAL(error) << "Failed to get " << res << " for " << vp.id << " " << model.id << ": " << e.what();
-					}
-					
-				}
-				if (cancel)
-			    	return;
-			}
-		}
-	}
-	// Download missing thumbnails for not-installed vendors.
-	//for (const std::string& vendor : vendors_only_in_archive)	
-	for (const std::pair<std::string, VendorStatus >& vendor :  vendors_with_status) {
-		if (vendor.second == VendorStatus::IN_ARCHIVE) {
-			// index in archive and not in cache and not installed vendor
-			
-			const auto idx_path_in_archive = cache_vendor_path / (vendor.first + ".idx");
-			const auto ini_path_in_archive = cache_vendor_path / (vendor.first + ".ini");
-			if (!fs::exists(idx_path_in_archive))
-				continue;
-			Index index;
-			try {
-				index.load(idx_path_in_archive);
-			}
-			catch (const std::exception& /* err */) {
-				BOOST_LOG_TRIVIAL(error) << format("Could not load downloaded index %1% for vendor %2%: invalid index?", idx_path_in_archive, vendor.first);
-				continue;
-			}
-			const auto recommended_it = index.recommended();
-			if (recommended_it == index.end()) {
-				BOOST_LOG_TRIVIAL(error) << format("No recommended version for vendor: %1%, invalid index? (%2%)", vendor.first, idx_path_in_archive);
-				continue;
-			}
-			const auto recommended = recommended_it->config_version;
-			if (!fs::exists(ini_path_in_archive)){
-				// Download recommneded to vendor - we do not have any existing ini file so we have to use hardcoded url.
-				const std::string fixed_url = GUI::wxGetApp().app_config->profile_folder_url();
-				const auto bundle_url = format("%1%/%2%/%3%.ini", fixed_url, vendor.first, recommended.to_string());
-				if (!get_file(bundle_url, ini_path_in_archive))
-					continue;
-			} else {
-				// check existing ini version
-				// then download recommneded to vendor if needed
-				VendorProfile vp;
-				try {
-					vp = VendorProfile::from_ini(ini_path_in_archive, true);
-				} catch (const std::exception& e) {
-					BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", vendor.first, ini_path_in_archive, e.what());
-					continue;
-				}
-				if (vp.config_version != recommended) {
-					const std::string fixed_url = GUI::wxGetApp().app_config->profile_folder_url();
-					const auto bundle_url = format("%1%/%2%/%3%.ini", fixed_url, vendor.first, recommended.to_string());
-					if (!get_file(bundle_url, ini_path_in_archive))
-						continue;
-				}
-			}
-			// check missing thumbnails
-			VendorProfile vp;
-			try {
-				vp = VendorProfile::from_ini(ini_path_in_archive, true);
-			}
-			catch (const std::exception& e) {
-				BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", vendor.first, ini_path_in_archive, e.what());
-				continue;
-			}
-			for (const auto& model : vp.models) {
-				if (!model.thumbnail.empty()) {
-					try
-					{
-						get_missing_resource(vp.id, model.thumbnail, vp.config_update_url);
-					}
-					catch (const std::exception& e)
-					{
-						BOOST_LOG_TRIVIAL(error) << "Failed to get " << model.thumbnail << " for " << vp.id << " " << model.id << ": " << e.what();
-					}
-				}
-				if (cancel)
-					return;
-			}
-		} else if (vendor.second == VendorStatus::IN_CACHE) {
-			// find those where archive index recommends other version than index in cache and get it if not present
-			const auto idx_path_in_archive = cache_vendor_path / (vendor.first + ".idx");
-			const auto ini_path_in_archive = cache_vendor_path / (vendor.first + ".ini");
-			const auto idx_path_in_cache = cache_path / (vendor.first + ".idx");
-
-			if (!fs::exists(idx_path_in_archive) || !fs::exists(idx_path_in_cache))
-					continue;
-
-			// Compare index in cache and recetly downloaded one as part of zip archive
-			Index index_cache;
-			try {
-				index_cache.load(idx_path_in_cache);
-			}
-			catch (const std::exception& /* err */) {
-				BOOST_LOG_TRIVIAL(error) << format("Could not load downloaded index %1% for vendor %2%: invalid index?", idx_path_in_cache, vendor.first);
-				continue;
-			}
-			const auto recommended_it_cache = index_cache.recommended();
-			if (recommended_it_cache == index_cache.end()) {
-				BOOST_LOG_TRIVIAL(error) << format("No recommended version for vendor: %1%, invalid index? (%2%)", vendor.first, idx_path_in_cache);
-				continue;
-			}
-			const auto recommended_cache = recommended_it_cache->config_version;
-
-			Index index_archive;
-			try {
-				index_archive.load(idx_path_in_archive);
-			}
-			catch (const std::exception& /* err */) {
-				BOOST_LOG_TRIVIAL(error) << format("Could not load downloaded index %1% for vendor %2%: invalid index?", idx_path_in_archive, vendor.first);
-				continue;
-			}
-			const auto recommended_it_archive = index_archive.recommended();
-			if (recommended_it_archive == index_archive.end()) {
-				BOOST_LOG_TRIVIAL(error) << format("No recommended version for vendor: %1%, invalid index? (%2%)", vendor.first, idx_path_in_archive);
-				continue;
-			}
-			const auto recommended_archive = recommended_it_archive->config_version;
-			
-			if (recommended_archive <= recommended_cache) {
-				// There isn't  more recent recomended version online. This vendor is also not istalled.
-				// Thus only .ini is in resources and came with installation.
-				// And we expect all resources are present.
-				continue;
-			}
-			
-			// Download new .ini if needed. So next time user runs Wizard, most recent profiles are shown & installed.
-			if (!fs::exists(ini_path_in_archive) || fs::is_empty(ini_path_in_archive)) {
-				// download recommneded to vendor 
-				const fs::path ini_path_in_rsrc = rsrc_path / (vendor.first + ".ini");
-				if (!fs::exists(ini_path_in_rsrc)) {
-					// THIS SHOULD NOT HAPPEN
-					continue;
-				}
-				// Get download path from existing ini.
-				VendorProfile vp;
-				try {
-					vp = VendorProfile::from_ini(ini_path_in_rsrc, false);
-				}
-				catch (const std::exception& e) {
-					BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", vendor.first, ini_path_in_rsrc, e.what());
-					continue;
-				}
-				const auto bundle_url = format("%1%/%2%.ini", vp.config_update_url, recommended_archive.to_string());
-				if (!get_file(bundle_url, ini_path_in_archive)) {
-					BOOST_LOG_TRIVIAL(error) << format("Failed to open vendor .ini file when checking missing resources: %1%", ini_path_in_rsrc);
-					continue;
-				}
-			} else {
-				// Check existing ini version.
-				// Then download recommneded to vendor if needed.
-				VendorProfile vp;
-				try {
-					vp = VendorProfile::from_ini(ini_path_in_archive, false);
-				}
-				catch (const std::exception& e) {
-					BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", vendor.first, ini_path_in_archive, e.what());
-					continue;
-				}
-				if (vp.config_version != recommended_archive) {
-					const auto bundle_url = format("%1%/%2%.ini", vp.config_update_url, recommended_archive.to_string());
-					if (!get_file(bundle_url, ini_path_in_archive)) {
-						BOOST_LOG_TRIVIAL(error) << format("Failed to open vendor .ini file when checking missing resources: %1%", ini_path_in_archive);
-						continue;
-					}
-				}
-			}
-
-			if (!fs::exists(ini_path_in_archive)) {
-				BOOST_LOG_TRIVIAL(error) << "Resources check failed to find ini file for vendor: " << vendor.first;
-				continue;
-			}
-			// check missing thumbnails
-			VendorProfile vp;
-			try {
-				vp = VendorProfile::from_ini(ini_path_in_archive, true);
-			}
-			catch (const std::exception& e) {
-				BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", vendor.first, ini_path_in_archive, e.what());
-				continue;
-			}
-			for (const auto& model : vp.models) {
-				if (!model.thumbnail.empty()) {
-					try
-					{
-						get_missing_resource(vp.id, model.thumbnail, vp.config_update_url);
-					}
-					catch (const std::exception& e)
-					{
-						BOOST_LOG_TRIVIAL(error) << "Failed to get " << model.thumbnail << " for " << vp.id << " " << model.id << ": " << e.what();
-					}
-				}
-				if (cancel)
-					return;
-			}
-		} else if (vendor.second == VendorStatus::INSTALLED || vendor.second == VendorStatus::NEW_VERSION) {
-			// Installed vendors need to check that no resource is missing. Do this only for files in vendor folder (not in resorces)
-			// VendorStatus::NEW_VERSION might seem like a mistake here since files are downloaded when preparing update higher in this function. 
-			// But this is a check for ini file in vendor where resources might be still missing since last update.
-			const auto path_in_vendor = vendor_path / (vendor.first + ".ini");
-			if(!fs::exists(path_in_vendor))
-				continue;
-			VendorProfile vp;
-			try {
-				vp = VendorProfile::from_ini(path_in_vendor, true);
-			}
-			catch (const std::exception& e) {
-				BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", vendor.first, path_in_vendor, e.what());
-				continue;
-			}
-			for (const auto& model : vp.models) {
-				for (const std::string& res : { model.bed_texture, model.bed_model, model.thumbnail }) {
-					if (!model.thumbnail.empty()) {
-						try
-						{
-							get_or_copy_missing_resource(vp.id, res, vp.config_update_url);
-						}
-						catch (const std::exception& e)
-						{
-							BOOST_LOG_TRIVIAL(error) << "Failed to get " << model.thumbnail << " for " << vp.id << " " << model.id << ": " << e.what();
-						}
-					}
-					if (cancel)
-						return;
-				}
-			}
-		}
-	}
+void PresetUpdater::load_unused_vendors(std::set<std::string> &vendors_id, const boost::filesystem::path vendor_dir, bool is_installed) {
+    std::vector<boost::filesystem::path> vendors;
+    if (boost::filesystem::exists(vendor_dir)) {
+        for (const boost::filesystem::directory_entry &prg_dir : boost::filesystem::directory_iterator(vendor_dir)) {
+            if (prg_dir.status().type() == boost::filesystem::file_type::regular_file) {
+                boost::filesystem::path file_path = prg_dir.path();
+                //assert(file_path.extension() == ".ini");
+                if (file_path.extension() != ".ini") {
+                    continue;
+                }
+                if (vendors_id.find(file_path.stem().string()) == vendors_id.end()) {
+                    vendors.push_back(file_path);
+                }
+            }
+        }
+    }
+    // read them
+    std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+    for (boost::filesystem::path &path : vendors) {
+        VendorProfile vp = VendorProfile::from_ini(path, false);
+        auto it = all_vendors.find(vp.id);
+        if (it == all_vendors.end() || it->second.available_profiles.empty()) {
+            if (!vp.config_update_rest.empty()) {
+                is_synch = false;
+            }
+            this->all_vendors[vp.id] = VendorSync{vp, false};
+            this->all_vendors[vp.id].is_installed = is_installed;
+            if (vp.config_version != Semver()) {
+                // this vendor spec has a version
+                this->all_vendors[vp.id].available_profiles.emplace_back(
+                    VendorAvailable{vp.config_version, vp.slicer_version, path.string(), "", "", "",
+                                    /*tag = */vp.config_version.to_string() + "=" + vp.slicer_version.to_string(), ""});
+            }
+            vendors_id.insert(vp.id);
+            // now order by version
+            this->all_vendors[vp.id].sort_available();
+        } else {
+            it->second.reset(vp, is_installed);
+        }
+    }
 }
 
-// Install indicies from resources. Only installs those that are either missing or older than in resources.
-void PresetUpdater::priv::check_install_indices() const
-{
-	BOOST_LOG_TRIVIAL(info) << "Checking if indices need to be installed from resources...";
-	if (!fs::exists(rsrc_path))
-		return;
-	for (auto& dir_entry : boost::filesystem::directory_iterator(rsrc_path)) {
-		if (is_idx_file(dir_entry)) {
-			const auto& path = dir_entry.path();
-			const auto path_in_cache = cache_path / path.filename();
+void PresetUpdater::reload_all_vendors() {
+    //this->unused_vendors.clear();
+    std::set<std::string> vendors_id;
 
-			if (!fs::exists(path_in_cache)) {
-				BOOST_LOG_TRIVIAL(info) << "Install index from resources: " << path.filename();
-				copy_file_fix(path, path_in_cache);
-			} else {
-				Index idx_rsrc, idx_cache;
-				idx_rsrc.load(path);
-				idx_cache.load(path_in_cache);
-				fs::path bundle_path = vendor_path / (idx_cache.vendor() + ".ini");
-
-				//test if the cache file is bad and the resource one is good.
-				if (fs::exists(bundle_path)) {
-					Semver version = VendorProfile::from_ini(bundle_path, false).config_version;
-					const auto ver_from_cache = idx_cache.find(version);
-					const auto ver_from_resource = idx_rsrc.find(version);
-					if (ver_from_resource != idx_rsrc.end()) {
-						if (idx_cache.version() < idx_rsrc.version()) {
-							BOOST_LOG_TRIVIAL(info) << "Update index from resources (new version): " << path.filename();
-							copy_file_fix(path, path_in_cache);
-						} else if (ver_from_cache == idx_cache.end()) {
-							BOOST_LOG_TRIVIAL(info) << "Update index from resources (only way to have a consistent idx): " << path.filename();
-							copy_file_fix(path, path_in_cache);
-                        } else {
-                            // don't update the idx, as the resources one is from an older version.
-                            BOOST_LOG_TRIVIAL(info) << "No Update index from resources (current version is more recent) : " << path.filename();
-                        }
-                    } else {
-                        // the resource idx doesn't have our version, maybe it was a prerelease? check if we have the next one.
-                        if (version < idx_rsrc.version()) {
-                            BOOST_LOG_TRIVIAL(info) << "Update index from resources (installed version don't exist in this idx but no biggy): " << path.filename();
-                            copy_file_fix(path, path_in_cache);
-                        } else {
-                            // don't update the idx, as the resources one is from an older version.
-                            BOOST_LOG_TRIVIAL(info) << "No Update index from resources (current unknown version is more recent) : " << path.filename();
-                        }
-                    }
-				} else if (idx_cache.version() < idx_rsrc.version() || idx_cache.configs().back().max_slic3r_version < idx_rsrc.configs().back().max_slic3r_version) {
-					//not installed, force update the .idx from resource
-					BOOST_LOG_TRIVIAL(info) << "Update index from resources (uninstalled & more up-to-date): " << path.filename();
-					copy_file_fix(path, path_in_cache);
-				}
-			}
-		}
-	}
-}
-
-// Generates a list of bundle updates that are to be performed.
-// Version of slic3r that was running the last time and which was read out from PrusaSlicer.ini is provided
-// as a parameter.
-Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version) const
-{
-	Updates updates;
-
-	BOOST_LOG_TRIVIAL(info) << "Checking for cached configuration updates...";
-
-	// Over all indices from the cache directory:
-    for (const Index& idx : index_db) {
-		auto bundle_path = vendor_path / (idx.vendor() + ".ini");
-		auto bundle_path_idx = vendor_path / idx.path().filename();
-
-		if (! fs::exists(bundle_path)) {
-			BOOST_LOG_TRIVIAL(info) << format("Confing bundle not installed for vendor %1%, skipping: ", idx.vendor());
-			continue;
-		}
-
-		// Perform a basic load and check the version of the installed preset bundle.
-		VendorProfile vp;
-		try {
-			vp = VendorProfile::from_ini(bundle_path, false);
-		}
-		catch (const std::exception& e) {
-			BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1% at %2%, message: %3%", idx.vendor(), bundle_path, e.what());
-			continue;
-		}
-		// Getting a recommended version from the latest index, wich may have been downloaded
-		// from the internet, or installed / updated from the installation resources.
-		auto recommended = idx.recommended();
-		if (recommended == idx.end()) {
-			BOOST_LOG_TRIVIAL(error) << format("No recommended version for vendor: %1%, invalid index? Giving up.", idx.vendor());
-			// XXX: what should be done here?
-			continue;
-		}
-
-		const auto ver_current = idx.find(vp.config_version);
-		const bool ver_current_found = ver_current != idx.end();
-
-		BOOST_LOG_TRIVIAL(debug) << format("Vendor: %1%, version installed: %2%%3%, version cached: %4%",
-			vp.name,
-			vp.config_version.to_string(),
-			(ver_current_found ? "" : " (not found in index!)"),
-			recommended->config_version.to_string());
-
-		if (! ver_current_found) {
-			// Config bundle inside the resources directory.
-			fs::path path_in_rsrc = rsrc_path / (idx.vendor() + ".ini");
-			fs::path path_idx_in_rsrc = rsrc_path / (idx.vendor() + ".idx");
-			if (fs::exists(path_idx_in_rsrc)) {
-				Index rsrc_idx;
-				rsrc_idx.load(path_idx_in_rsrc);
-			
-				// Any published config shall be always found in the latest config index.
-				std::string message = format("Preset bundle `%1%` version not found in index: %2%, do we force the update to the version %3%? ", idx.vendor(), vp.config_version.to_string(), rsrc_idx.version().to_string());
-				wxMessageDialog msg_wingow(nullptr, message, wxString(SLIC3R_APP_NAME " - ") + (_L("Notice")), wxYES | wxNO | wxICON_INFORMATION);
-				if (msg_wingow.ShowModal() == wxID_YES) {
-					//copy idx
-					copy_file_fix(path_idx_in_rsrc, idx.path());
-					//copy profile
-					copy_file_fix(path_in_rsrc, bundle_path);
-				}
-				continue;
-			} else {
-				// Any published config shall be always found in the latest config index.
-				std::string message = format("Preset bundle `%1%` version not found in index: %2%", idx.vendor(), vp.config_version.to_string());
-				BOOST_LOG_TRIVIAL(error) << message;
-				GUI::show_error(nullptr, message);
-			}
-			continue;
-		}
-
-		bool current_not_supported = false; //if slcr is incompatible but situation is not downgrade, we do forced updated and this bool is information to do it 
-
-		if (ver_current_found && !ver_current->is_current_slic3r_supported()){
-			if (ver_current->is_current_slic3r_downgrade()) {
-				// "Reconfigure" situation.
-				BOOST_LOG_TRIVIAL(warning) << "Current Slic3r incompatible with installed bundle: " << bundle_path.string();
-				updates.incompats.emplace_back(std::move(bundle_path), *ver_current, vp.name);
-				continue;
-			}
-			current_not_supported = true;
-		}
-
-		if (recommended->config_version < vp.config_version) {
-			BOOST_LOG_TRIVIAL(warning) << format("Recommended config version for the currently running %1% is older than the currently installed config for vendor %2%. This should not happen.", SLIC3R_APP_NAME, idx.vendor());
-			continue;
-		}
-
-		if (recommended->config_version == vp.config_version) {
-			// The recommended config bundle is already installed.
-			continue;
-		}
-
-		// Config bundle update situation. The recommended config bundle version for this PrusaSlicer version from the index from the cache is newer
-		// than the version of the currently installed config bundle.
-
-		// The config index inside the cache directory (given by idx.path()) is one of the following:
-		// 1) The last config index downloaded by any previously running PrusaSlicer instance
-		// 2) The last config index installed by any previously running PrusaSlicer instance (older or newer) from its resources.
-		// 3) The last config index installed by the currently running PrusaSlicer instance from its resources.
-		// The config index is always the newest one (given by its newest config bundle referenced), and older config indices shall fully contain
-		// the content of the older config indices.
-
-		// Config bundle inside the cache directory.
-		fs::path path_in_cache 		= cache_path / (idx.vendor() + ".ini");
-		// Config bundle inside the resources directory.
-		fs::path path_in_rsrc 		= rsrc_path  / (idx.vendor() + ".ini");
-		// Config index inside the resources directory.
-		fs::path path_idx_in_rsrc 	= rsrc_path  / (idx.vendor() + ".idx");
-
-		// Search for a valid config bundle in the cache directory.
-		bool 		found = false;
-		Update    	new_update;
-		fs::path 	bundle_path_idx_to_install;
-		if (fs::exists(path_in_cache)) {
-			try {
-				VendorProfile new_vp = VendorProfile::from_ini(path_in_cache, true);
-				VendorProfile old_vp = VendorProfile::from_ini(bundle_path, true);
-				if (new_vp.config_version == recommended->config_version) {
-					// The config bundle from the cache directory matches the recommended version of the index from the cache directory.
-					// This is the newest known recommended config. Use it.
-					if (!PresetUtils::vendor_profile_has_all_resources(new_vp)) {
-						BOOST_LOG_TRIVIAL(warning) << "Some resources are missing for update of vedor " << new_vp.id;
-					}
-					std::vector<std::string> new_printers;
-					PresetUtils::compare_vendor_profile_printers(old_vp, new_vp, new_printers);
-					new_update = Update(std::move(path_in_cache), std::move(bundle_path), *recommended, vp.name, vp.changelog_url, current_not_supported, std::move(new_printers));
-					// and install the config index from the cache into vendor's directory.
-					bundle_path_idx_to_install = idx.path();
-					found = true;
-				}
-			} catch (const std::exception &ex) {
-				BOOST_LOG_TRIVIAL(info) << format("Failed to load the config bundle `%1%`: %2%", path_in_cache.string(), ex.what());
-			}
-		}
-
-		// Keep the rsrc_idx outside of the next block, as we will reference the "recommended" version by an iterator.
-		Index rsrc_idx;
-		if (! found && fs::exists(path_in_rsrc) && fs::exists(path_idx_in_rsrc)) {
-			// Trying the config bundle from resources (from the installation).
-			// In that case, the recommended version number has to be compared against the recommended version reported by the config index from resources as well, 
-			// as the config index in the cache directory may already be newer, recommending a newer config bundle than available in cache or resources.
-			VendorProfile rsrc_vp;
-			try {
-				rsrc_vp = VendorProfile::from_ini(path_in_rsrc, false);
-			} catch (const std::exception &ex) {
-				BOOST_LOG_TRIVIAL(info) << format("Cannot load the config bundle at `%1%`: %2%", path_in_rsrc.string(), ex.what());
-			}
-			if (rsrc_vp.valid()) {
-				try {
-					rsrc_idx.load(path_idx_in_rsrc);
-				} catch (const std::exception &ex) {
-					BOOST_LOG_TRIVIAL(info) << format("Cannot load the config index at `%1%`: %2%", path_idx_in_rsrc.string(), ex.what());
-				}
-				recommended = rsrc_idx.recommended();
-				if (recommended != rsrc_idx.end() && recommended->config_version == rsrc_vp.config_version && recommended->config_version > vp.config_version) {
-					new_update = Update(std::move(path_in_rsrc), std::move(bundle_path), *recommended, vp.name, vp.changelog_url, current_not_supported);
-					bundle_path_idx_to_install = path_idx_in_rsrc;
-					found = true;
-				} else {
-					BOOST_LOG_TRIVIAL(warning) << format("The recommended config version for vendor `%1%` in resources does not match the recommended\n"
-			                                             " config version for this version of `%2%`. Corrupted installation?", idx.vendor(), SLIC3R_APP_NAME);
-				}
-			}
-		}
-
-		if (found) {
-			// Load 'installed' idx, if any.
-			// 'Installed' indices are kept alongside the bundle in the `vendor` subdir
-			// for bookkeeping to remember a cancelled update and not offer it again.
-			if (fs::exists(bundle_path_idx)) {
-				Index existing_idx;
-				try {
-					existing_idx.load(bundle_path_idx);
-					// Find a recommended config bundle version for the slic3r version last executed. This makes sure that a config bundle update will not be missed
-					// when upgrading an application. On the other side, the user will be bugged every time he will switch between slic3r versions.
-                    /*const auto existing_recommended = existing_idx.recommended(old_slic3r_version);
-                    if (existing_recommended != existing_idx.end() && recommended->config_version == existing_recommended->config_version) {
-						// The user has already seen (and presumably rejected) this update
-						BOOST_LOG_TRIVIAL(info) << format("Downloaded index for `%1%` is the same as installed one, not offering an update.",idx.vendor());
-						continue;
-					}*/
-				} catch (const std::exception &err) {
-					BOOST_LOG_TRIVIAL(error) << format("Cannot load the installed index at `%1%`: %2%", bundle_path_idx, err.what());
-				}
-			}
-#if 0
-			// Check if the update is already present in a snapshot
-			if(!current_not_supported)
-			{
-				const auto recommended_snap = SnapshotDB::singleton().snapshot_with_vendor_preset(vp.name, recommended->config_version);
-				if (recommended_snap != SnapshotDB::singleton().end()) {
-					BOOST_LOG_TRIVIAL(info) << format("Bundle update %1% %2% already found in snapshot %3%, skipping...",
-						vp.name,
-						recommended->config_version.to_string(),
-						recommended_snap->id);
-					continue;
-				}
-			}
-#endif // 0
-			updates.updates.emplace_back(std::move(new_update));
-			// 'Install' the index in the vendor directory. This is used to memorize
-			// offered updates and to not offer the same update again if it was cancelled by the user.
-			copy_file_fix(bundle_path_idx_to_install, bundle_path_idx);
-		} else {
-			BOOST_LOG_TRIVIAL(warning) << format("Index for vendor %1% indicates update (%2%) but the new bundle was found neither in cache nor resources",
-				idx.vendor(),
-				recommended->config_version.to_string());
-		}
-	}
-
-	return updates;
-}
-
-bool PresetUpdater::priv::perform_updates(Updates &&updates, bool snapshot) const
-{
-	if (updates.incompats.size() > 0) {
-		if (snapshot) {
-			BOOST_LOG_TRIVIAL(info) << "Taking a snapshot...";
-			if (! GUI::Config::take_config_snapshot_cancel_on_error(*GUI::wxGetApp().app_config, Snapshot::SNAPSHOT_DOWNGRADE, "",
-				_u8L("Continue and install configuration updates?")))
-				return false;
-		}
-		
-		BOOST_LOG_TRIVIAL(info) << format("Deleting %1% incompatible bundles", updates.incompats.size());
-
-		for (auto &incompat : updates.incompats) {
-			BOOST_LOG_TRIVIAL(info) << '\t' << incompat;
-			incompat.remove();
-		}
-
-		
-	} else if (updates.updates.size() > 0) {
-		
-		if (snapshot) {
-			BOOST_LOG_TRIVIAL(info) << "Taking a snapshot...";
-			if (! GUI::Config::take_config_snapshot_cancel_on_error(*GUI::wxGetApp().app_config, Snapshot::SNAPSHOT_UPGRADE, "",
-				_u8L("Continue and install configuration updates?")))
-				return false;
-		}
-
-		BOOST_LOG_TRIVIAL(info) << format("Performing %1% updates", updates.updates.size());
-
-		wxProgressDialog progress_dialog(_L("Installing profiles"), _L("Installing profiles") , 100, nullptr, wxPD_AUTO_HIDE);
-		progress_dialog.Pulse();
-		
-		for (const auto &update : updates.updates) {
-			BOOST_LOG_TRIVIAL(info) << '\t' << update;
-
-			update.install();
-
-			PresetBundle bundle;
-			// Throw when parsing invalid configuration. Only valid configuration is supposed to be provided over the air.
-			bundle.load_configbundle(update.source.string(), PresetBundle::LoadConfigBundleAttribute::LoadSystem, ForwardCompatibilitySubstitutionRule::Disable);
-
-			BOOST_LOG_TRIVIAL(info) << format("Deleting %1% conflicting presets", bundle.fff_prints.size() + bundle.filaments.size() + bundle.printers.size());
-
-			auto preset_remover = [](const Preset &preset) {
-				BOOST_LOG_TRIVIAL(info) << '\t' << preset.file;
-				fs::remove(preset.file);
-			};
-
-			for (const auto &preset : bundle.fff_prints){ preset_remover(preset); }
-			for (const auto &preset : bundle.filaments) { preset_remover(preset); }
-			for (const auto &preset : bundle.printers)  { preset_remover(preset); }
-
-			// Also apply the `obsolete_presets` property, removing obsolete ini files
-
-			BOOST_LOG_TRIVIAL(info) << format("Deleting %1% obsolete presets",
-				bundle.obsolete_presets.fff_prints.size() + bundle.obsolete_presets.filaments.size() + bundle.obsolete_presets.printers.size());
-
-			auto obsolete_remover = [](const char *subdir, const std::string &preset) {
-				auto path = fs::path(Slic3r::data_dir()) / subdir / preset;
-				path += ".ini";
-				BOOST_LOG_TRIVIAL(info) << '\t' << path.string();
-				fs::remove(path);
-			};
-
-			for (const auto &name : bundle.obsolete_presets.fff_prints)    { obsolete_remover("print", name); }
-			for (const auto &name : bundle.obsolete_presets.filaments) { obsolete_remover("filament", name); }
-			for (const auto &name : bundle.obsolete_presets.sla_prints) { obsolete_remover("sla_print", name); } 
-			for (const auto &name : bundle.obsolete_presets.sla_materials/*filaments*/) { obsolete_remover("sla_material", name); } 
-			for (const auto &name : bundle.obsolete_presets.printers)  { obsolete_remover("printer", name); }
-			
-			// check if any resorces of installed bundle are missing. If so, new ones should be already downloaded at cache/vendor_id/
-			VendorProfile vp;
-			try {
-				vp = VendorProfile::from_ini(update.target, true);
-		}
-			catch (const std::exception& e) {
-				BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1%, message: %2%", update.target, e.what());
-				continue;
-	}
-			progress_dialog.Update(1, GUI::format_wxstr(_L("Downloading resources for %1%."),vp.id));
-			progress_dialog.Pulse();
-			for (const auto& model : vp.models) {
-				for (const std::string& resource : { model.bed_texture, model.bed_model, model.thumbnail }) {
-					if (resource.empty())
-						continue;
-					try
-					{
-						get_or_copy_missing_resource(vp.id, resource, vp.config_update_url);
-					}
-					catch (const std::exception& e)
-					{
-						BOOST_LOG_TRIVIAL(error) << "Failed to prepare " << resource << " for " << vp.id << " " << model.id << ": " << e.what();
-					}
-				}
-			}	
-		}
-
-		progress_dialog.Destroy();
-	}
-
-	return true;
-}
- 
-void PresetUpdater::priv::set_waiting_updates(Updates u)
-{
-	waiting_updates = u;
-	has_waiting_updates = true;
-}
-
-PresetUpdater::PresetUpdater() :
-	p(new priv())
-{}
+    boost::filesystem::path configuration_path(Slic3r::data_dir());
+    boost::filesystem::path resources_path(Slic3r::resources_dir());
 
 
-// Public
+    // read all vendor from configuration
+    load_unused_vendors(vendors_id, configuration_path / "vendor", /*is_installed=*/ true);
 
-PresetUpdater::~PresetUpdater()
-{
-	if (p && p->thread.joinable()) {
-		// This will stop transfers being done by the thread, if any.
-		// Cancelling takes some time, but should complete soon enough.
-		p->cancel = true;
-		p->thread.join();
-	}
-}
-
-void PresetUpdater::sync(const PresetBundle *preset_bundle, wxEvtHandler* evt_handler)
-{
-	p->set_download_prefs(GUI::wxGetApp().app_config.get());
-	if (!p->enabled_version_check && !p->enabled_config_update) { return; }
-
-	// Copy the whole vendors data for use in the background thread
-	// Unfortunatelly as of C++11, it needs to be copied again
-	// into the closure (but perhaps the compiler can elide this).
-	VendorMap vendors = preset_bundle->vendors;
-	std::string index_archive_url = GUI::wxGetApp().app_config->index_archive_url();
-
-    p->thread = std::thread([this, vendors, index_archive_url, evt_handler]() {
-		this->p->prune_tmps();
-		this->p->sync_config(std::move(vendors), index_archive_url);
-		wxCommandEvent* evt = new wxCommandEvent(EVT_CONFIG_UPDATER_SYNC_DONE);
-		evt_handler->QueueEvent(evt);
-    });
-}
-
-void PresetUpdater::cancel_sync()
-{
-	if (p && p->thread.joinable()) {
-		// This will stop transfers being done by the thread, if any.
-		// Cancelling takes some time, but should complete soon enough.
-		p->cancel = true;
-		p->thread.join();
-	}
-}
-
-void PresetUpdater::slic3r_update_notify()
-{
-	if (! p->enabled_version_check)
-		return;
-	auto* app_config = GUI::wxGetApp().app_config.get();
-	const auto ver_online_str = app_config->get("version_online");
-	const auto ver_online = Semver::parse(ver_online_str);
-	const auto ver_online_seen = Semver::parse(app_config->get("version_online_seen"));
-
-	if (ver_online) {
-		// Only display the notification if the version available online is newer AND if we haven't seen it before
-		if (*ver_online > Slic3r::SEMVER && (! ver_online_seen || *ver_online_seen < *ver_online)) {
-			GUI::MsgUpdateSlic3r notification(Slic3r::SEMVER, *ver_online);
-			notification.ShowModal();
-			if (notification.disable_version_check()) {
-				app_config->set("notify_release", "none");
-				p->enabled_version_check = false;
-			}
-		}
-
-		app_config->set("version_online_seen", ver_online_str);
-	}
-}
-
-static bool reload_configs_update_gui()
-{
-	wxString header = _L("Configuration Update will cause the preset modification to be lost.\n"
-						 "So, check unsaved changes and save them if necessary.");
-	if (!GUI::wxGetApp().check_and_save_current_preset_changes(_L("Updating"), header, false ))
-		return false;
-
-	// Reload global configuration
-	auto* app_config = GUI::wxGetApp().app_config.get();
-	// System profiles should not trigger any substitutions, user profiles may trigger substitutions, but these substitutions
-	// were already presented to the user on application start up. Just do substitutions now and keep quiet about it.
-	// However throw on substitutions in system profiles, those shall never happen with system profiles installed over the air.
-	GUI::wxGetApp().preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
-	GUI::wxGetApp().load_current_presets();
-	GUI::wxGetApp().plater()->set_bed_shape();
-
-	return true;
-}
-
-PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3r_version, UpdateParams params) const
-{
-    if (!p->enabled_config_update) {
-        return R_NOOP;
+    {
+        std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+        for (const auto &[id, vendor_synch] : this->all_vendors) {
+            if (vendor_synch.is_installed) {
+                vendors_id.insert(vendor_synch.profile.id);
+            }
+        }
+    }
+    // if the ini is in the root instead of its dir, fix the issue.
+    for (const boost::filesystem::directory_entry &vendor_entry :
+         boost::filesystem::directory_iterator(configuration_path / "cache" / "vendor")) {
+        if (vendor_entry.status().type() == boost::filesystem::file_type::regular_file) {
+            if (vendor_entry.path().extension() == ".ini") {
+                boost::filesystem::path vendor_dir = vendor_entry.path().parent_path();
+                if (boost::filesystem::exists(vendor_dir / vendor_entry.path().stem()) &&
+                    boost::filesystem::is_directory(vendor_dir / vendor_entry.path().stem())) {
+                    // rename for simplier copy
+                    boost::filesystem::rename(vendor_dir / vendor_entry.path().stem(),
+                                              vendor_dir / (vendor_entry.path().stem().string() + ".temp"));
+                    boost::filesystem::create_directory(vendor_dir / vendor_entry.path().stem());
+                    // move
+                    boost::filesystem::rename(vendor_dir / (vendor_entry.path().stem().string() + ".temp"),
+                                              vendor_dir / vendor_entry.path().stem() / vendor_entry.path().stem());
+                } else {
+                    boost::filesystem::create_directory(vendor_dir / vendor_entry.path().stem());
+                }
+                boost::filesystem::rename(vendor_entry.path(),
+                                            vendor_dir / vendor_entry.path().stem() / vendor_entry.path().filename());
+            }
+        }
+    }
+    // read all vendor from cache (added but not installed)
+    for (const boost::filesystem::directory_entry &vendor_entry : boost::filesystem::directory_iterator(configuration_path / "cache" / "vendor")) {
+        if (vendor_entry.status().type() == boost::filesystem::file_type::directory_file) {
+            load_unused_vendors(vendors_id, vendor_entry.path(), /*is_installed=*/false);
+        }
     }
 
-    Updates updates = p->get_config_updates(old_slic3r_version);
-    if (updates.incompats.size() > 0) {
-        BOOST_LOG_TRIVIAL(info) << format("%1% bundles incompatible. Asking for action...", updates.incompats.size());
+    // get our vendors from resources;
+    assert(boost::filesystem::exists(resources_path / "profiles"));
+    load_unused_vendors(vendors_id, resources_path / "profiles", /*is_installed=*/ false);
 
-        std::unordered_map<std::string, wxString> incompats_map;
-        for (const auto &incompat : updates.incompats) {
-            const auto min_slic3r = incompat.version.min_slic3r_version;
-            const auto max_slic3r = incompat.version.max_slic3r_version;
-            wxString restrictions;
-            if (min_slic3r != Semver::zero() && max_slic3r != Semver::inf()) {
-                restrictions = GUI::format_wxstr(_L("requires min. %s and max. %s"), min_slic3r.to_string(),
-                                                 max_slic3r.to_string());
-            } else if (min_slic3r != Semver::zero()) {
-                restrictions = GUI::format_wxstr(_L("requires min. %s"), min_slic3r.to_string());
-                BOOST_LOG_TRIVIAL(debug)
-                    << "Bundle is not downgrade, user will now have to do whole wizard. This should not happen.";
+}
+
+void PresetUpdater::download_logs(const std::string &vendor_id, std::function<void(bool)> callback_result, bool force) {
+    bool result = true;
+    {
+        std::lock_guard<std::recursive_mutex> guard_vendors(this->all_vendors_mutex);
+        auto it_mutable_vendor = all_vendors.find(vendor_id);
+        if (it_mutable_vendor == all_vendors.end()) {
+            assert(false);
+            result = false;
+            goto callback_after_unlock;
+            //note: you can use guard.unlock();[guard_vendors.unlock()]callback_result(result);return; instead of the goto.
+        }
+        assert(vendor_id == it_mutable_vendor->second.profile.id);
+        VendorSync &vendor = it_mutable_vendor->second;
+        // note: all_vendors shoudln't change since vendor was stored somewhere elese.
+        std::lock_guard<std::mutex> guard(this->callback_update_changelog_mutex);
+        changelog_synch = vendor.available_profiles.size();
+        boost::filesystem::path cache_path = GUI::into_path(data_dir()) / "cache" / "vendor" / vendor.profile.usable_id() / "logs";
+        boost::filesystem::create_directories(cache_path);
+        // for each tag
+        for (size_t available_idx = 0; available_idx < vendor.available_profiles.size(); available_idx++) {
+            VendorAvailable &version = vendor.available_profiles[available_idx];
+            if (version.commit_url.empty()) {
+                if (--changelog_synch == 0) {
+                    assert(available_idx + 1 == vendor.available_profiles.size());
+                    goto callback_after_unlock;
+                }
+                continue;
+            }
+            Semver slicer_major_ver = version.slicer_version.no_patch();
+            // is there older versions with same slicer major version?
+            Semver best_previous_version = Semver::zero();
+            size_t best_idx = 0;
+            for (size_t i_prev = 0; i_prev < vendor.available_profiles.size(); i_prev++) {
+                if (!vendor.available_profiles[i_prev].commit_sha.empty() &&
+                    vendor.available_profiles[i_prev].config_version < version.config_version) {
+                    if (best_previous_version < vendor.available_profiles[i_prev].config_version) {
+                        if (vendor.available_profiles[i_prev].slicer_version.no_patch() == slicer_major_ver) {
+                            best_idx = i_prev;
+                            best_previous_version = vendor.available_profiles[i_prev].config_version;
+                        }
+                    }
+                }
+            }
+            if (best_idx == 0) {
+                assert(best_previous_version == Semver::zero());
+                // can't find a previous version with same slicer version, choose best one
+                // find the previous available profile (if any)
+                for (size_t i_prev = 0; i_prev < vendor.available_profiles.size(); i_prev++) {
+                    if (!vendor.available_profiles[i_prev].commit_sha.empty() &&
+                        vendor.available_profiles[i_prev].config_version < version.config_version) {
+                        if (best_previous_version < vendor.available_profiles[i_prev].config_version) {
+                            if (vendor.available_profiles[i_prev].slicer_version.no_patch() <= slicer_major_ver) {
+                                best_idx = i_prev;
+                                best_previous_version = vendor.available_profiles[i_prev].config_version;
+                            }
+                        }
+                    }
+                }
+            }
+            if (best_idx == 0) {
+                boost::filesystem::path file_cache_path = cache_path / (version.tag + ".json");
+                if (boost::filesystem::exists(file_cache_path) && !force) {
+                    // reuse the cache file
+                    boost::nowide::ifstream file(file_cache_path.string());
+                    std::string body{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+                    boost::property_tree::ptree root;
+                    std::stringstream json_stream(body);
+                    boost::property_tree::read_json(json_stream, root);
+                    version.notes = root.get<std::string>("commit.message");
+                    if (--changelog_synch == 0) {
+                        goto callback_after_unlock;
+                    }
+                } else if (has_api_request_slot(version.commit_url)) {
+                    // root
+                    Http::get(version.commit_url)
+                        .size_limit(1024 * 64 /*64kio, 100tags should use 27ko*/)
+                        .on_error([this, &version, callback_result](std::string body, std::string error,
+                                                                    unsigned http_status) {
+                            if (--changelog_synch == 0) {
+                                callback_result(false);
+                            }
+                        })
+                        .on_complete([this, &version, file_cache_path, callback_result](std::string body,
+                                                                                        unsigned /* http_status */) {
+                            // store
+                            FILE *fp = boost::nowide::fopen(file_cache_path.string().c_str(), "w");
+                            if (fp == nullptr) {
+                                BOOST_LOG_TRIVIAL(error) << "PresetUpdater::download_logs: Couldn't open "
+                                                         << file_cache_path.string().c_str() << " for writing";
+                            } else {
+                                fprintf(fp, body.c_str());
+                                fclose(fp);
+                            }
+                            // parse it
+                            boost::property_tree::ptree root;
+                            std::stringstream json_stream(body);
+                            boost::property_tree::read_json(json_stream, root);
+                            version.notes = root.get<std::string>("commit.message");
+                            if (--changelog_synch == 0) {
+                                callback_result(true);
+                            }
+                        })
+                        .perform();
+                }
             } else {
-                restrictions = GUI::format_wxstr(_L("requires max. %s"), max_slic3r.to_string());
-            }
-
-            incompats_map.emplace(std::make_pair(incompat.vendor, std::move(restrictions)));
-        }
-
-/* annoying.
-	//	GUI::MsgDataIncompatible dlg(std::move(incompats_map));
-	//	const auto res = dlg.ShowModal();
-		if (res == wxID_REPLACE) {
-//			BOOST_LOG_TRIVIAL(info) << "User wants to re-configure...";
-
-			// This effectively removes the incompatible bundles:
-			// (snapshot is taken beforehand)
-			if (! p->perform_updates(std::move(updates)) ||
-				! GUI::wxGetApp().run_wizard(GUI::ConfigWizard::RR_DATA_INCOMPAT))
-				return R_INCOMPAT_EXIT;
-
-			return R_INCOMPAT_CONFIGURED;
-		}
-		else {
-			BOOST_LOG_TRIVIAL(info) << "User wants to exit Slic3r, bye...";
-			return R_INCOMPAT_EXIT;
-		}
-*/
-
-	} else if (updates.updates.size() > 0) {
-
-		bool incompatible_version = false;
-		for (const auto& update : updates.updates) {
-			incompatible_version = (update.forced_update ? true : incompatible_version);
-			//td::cout << update.forced_update << std::endl;
-			//BOOST_LOG_TRIVIAL(info) << format("Update requires higher version.");
-		}
-
-		//forced update
-        if (incompatible_version) {
-            assert(updates.incompats.empty());
-            BOOST_LOG_TRIVIAL(info) << format(
-                "Update of %1% bundles available. At least one requires higher version of Slicer.",
-                updates.updates.size());
-
-            std::vector<GUI::MsgUpdateForced::Update> updates_msg;
-            for (const auto &update : updates.updates) {
-                std::string changelog_url = update.version.config_version.prerelease() == nullptr ?
-                    update.changelog_url :
-                    std::string();
-                std::string printers;
-                for (size_t i = 0; i < update.new_printers.size(); i++) {
-                    if (i > 0)
-                        printers += ", ";
-                    printers += update.new_printers[i];
-                }
-                updates_msg.emplace_back(update.vendor, update.version.config_version, update.version.comment,
-                                         std::move(changelog_url), std::move(printers));
-            }
-
-            GUI::MsgUpdateForced dlg(updates_msg);
-
-            const auto res = dlg.ShowModal();
-            if (res == wxID_OK) {
-                BOOST_LOG_TRIVIAL(info) << "User wants to update...";
-                if (!p->perform_updates(std::move(updates)) || !reload_configs_update_gui())
-                    return R_INCOMPAT_EXIT;
-                return R_UPDATE_INSTALLED;
-            } else if (res == wxID_NO) {
-                return R_UPDATE_REJECT;
-            } else if (res == wxID_EDIT) {
-                bool one_not_installed = false;
-                Updates new_updates;
-                //new_updates.updates = updates.updates;
-                for (size_t idx = 0; idx < updates.updates.size(); ++idx) {
-                    GUI::MsgUpdateForced dlg_one({updates_msg[idx]});
-                    const auto res_one = dlg_one.ShowModal();
-                    if (res_one == wxID_OK) {
-                        new_updates.updates.push_back(updates.updates[idx]);
-                    } else if (res_one == wxID_NO) {
-                        one_not_installed = true;
-                    } else { // wxID_EXIT
-                        BOOST_LOG_TRIVIAL(info) << "User wants to exit Slic3r, bye...";
-                        return R_INCOMPAT_EXIT;
+                boost::filesystem::path file_cache_path = cache_path /
+                    (vendor.available_profiles[best_idx].tag + "..." + version.tag + ".json");
+                if (boost::filesystem::exists(file_cache_path) && !force) {
+                    // reuse the cache file
+                    boost::nowide::ifstream file(file_cache_path.string());
+                    std::string body{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+                    boost::property_tree::ptree root;
+                    std::stringstream json_stream(body);
+                    boost::property_tree::read_json(json_stream, root);
+                    version.notes.clear();
+                    for (boost::property_tree::ptree::value_type &kv : root.get_child("commits")) {
+                        if (version.notes.empty()) {
+                            version.notes += kv.second.get<std::string>("commit.message");
+                        } else {
+                            version.notes = kv.second.get<std::string>("commit.message") + "\n" + version.notes;
+                        }
                     }
-                }
-                if (!new_updates.updates.empty()) {
-                    BOOST_LOG_TRIVIAL(info) << "User wants to update...";
-                    if (!p->perform_updates(std::move(new_updates)) || !reload_configs_update_gui()) {
-                        one_not_installed = true;
+                    if (--changelog_synch == 0) {
+                        goto callback_after_unlock;
                     }
+                } else if (std::string base_url = VendorProfile::get_http_url_rest(vendor.profile.config_update_rest);
+                           has_api_request_slot(base_url)) {
+                    std::string url(base_url + "/compare/" + vendor.available_profiles[best_idx].tag + "..." +
+                                    version.tag);
+                    Http::get(url)
+                        .size_limit(1024 * 64 /*64kio, 100tags should use 27ko*/)
+                        .on_error([this, &version, callback_result](std::string body, std::string error,
+                                                                    unsigned http_status) {
+                            if (--changelog_synch == 0) {
+                                callback_result(false);
+                            }
+                        })
+                        .on_complete([this, &version, file_cache_path, callback_result](std::string body,
+                                                                                        unsigned /* http_status */) {
+                            // store
+                            FILE *fp = boost::nowide::fopen(file_cache_path.string().c_str(), "w");
+                            if (fp == nullptr) {
+                                BOOST_LOG_TRIVIAL(error) << "PresetUpdater::download_logs: Couldn't open "
+                                                         << file_cache_path.string().c_str() << " for writing";
+                            } else {
+                                fprintf(fp, body.c_str());
+                                fclose(fp);
+                            }
+                            // parse it
+                            boost::property_tree::ptree root;
+                            std::stringstream json_stream(body);
+                            boost::property_tree::read_json(json_stream, root);
+                            version.notes.clear();
+                            for (boost::property_tree::ptree::value_type &kv : root.get_child("commits")) {
+                                if (version.notes.empty()) {
+                                    version.notes += kv.second.get<std::string>("commit.message");
+                                } else {
+                                    version.notes = kv.second.get<std::string>("commit.message") + "\n" +
+                                        version.notes;
+                                }
+                            }
+                            if (--changelog_synch == 0) {
+                                callback_result(true);
+                            }
+                        })
+                        .perform();
                 }
-                return one_not_installed ? R_UPDATE_REJECT : R_UPDATE_INSTALLED;
-            } else { // wxID_EXIT
-                BOOST_LOG_TRIVIAL(info) << "User wants to exit Slic3r, bye...";
-                return R_INCOMPAT_EXIT;
             }
         }
-
-		// regular update
-		if (params == UpdateParams::SHOW_NOTIFICATION) {
-			p->set_waiting_updates(updates);
-			bool new_printer = false;
-			for (const Update& updt : updates.updates) {
-				if(updt.new_printers.size() > 0) {
-					new_printer = true;
-					break;
-		}
-			}
-			GUI::wxGetApp().plater()->get_notification_manager()->push_notification(new_printer? GUI::NotificationType::PresetUpdateAvailableNewPrinter : GUI::NotificationType::PresetUpdateAvailable);
-		}
-		else {
-			BOOST_LOG_TRIVIAL(info) << format("Update of %1% bundles available. Asking for confirmation ...", p->waiting_updates.updates.size());
-
-			std::vector<GUI::MsgUpdateConfig::Update> updates_msg;
-			for (const auto& update : updates.updates) {
-				std::string changelog_url = update.version.config_version.prerelease() == nullptr ? update.changelog_url : std::string();
-				std::string printers;
-				for (size_t i = 0; i < update.new_printers.size(); i++) {
-					if (i > 0)
-						printers += ", ";
-					printers += update.new_printers[i];
-			}
-				updates_msg.emplace_back(update.vendor, update.version.config_version, update.version.comment, std::move(changelog_url), std::move(printers));
-			}
-
-			GUI::MsgUpdateConfig dlg(updates_msg, params == UpdateParams::FORCED_BEFORE_WIZARD);
-
-			const auto res = dlg.ShowModal();
-			if (res == wxID_OK) {
-				BOOST_LOG_TRIVIAL(debug) << "User agreed to perform the update";
-				if (! p->perform_updates(std::move(updates)) ||
-					! reload_configs_update_gui())
-					return R_ALL_CANCELED;
-				return R_UPDATE_INSTALLED;
-			}
-			else {
-				BOOST_LOG_TRIVIAL(info) << "User refused the update";
-				if (params == UpdateParams::FORCED_BEFORE_WIZARD && res == wxID_CANCEL)
-					return R_ALL_CANCELED;
-				return R_UPDATE_REJECT;
-			}
-		}
-		
-		// MsgUpdateConfig will show after the notificaation is clicked
-	} else {
-		BOOST_LOG_TRIVIAL(info) << "No configuration updates available.";
-	}
-
-	return R_NOOP;
+    }
+    return;
+callback_after_unlock:
+    callback_result(result);
 }
 
-bool PresetUpdater::install_bundles_rsrc_or_cache_vendor(std::vector<std::string> bundles, bool snapshot) const
-{
-	Updates updates;
-
-	BOOST_LOG_TRIVIAL(info) << format("Installing %1% bundles from resources ...", bundles.size());
-
-	for (const auto &bundle : bundles) {
-		auto path_in_rsrc = (p->rsrc_path / bundle).replace_extension(".ini");
-		auto path_in_cache_vendor = (p->cache_vendor_path / bundle).replace_extension(".ini");
-		auto path_in_vendors = (p->vendor_path / bundle).replace_extension(".ini");
-
-		bool is_in_rsrc = fs::exists(path_in_rsrc);
-		bool is_in_cache_vendor = fs::exists(path_in_cache_vendor) && !fs::is_empty(path_in_cache_vendor);
-
-		// Find if in cache vendor is newer version than in resources.
-		// But we also need to mind too new versions - have to read index.
-
-		// Fresh index should be in archive_dir, otherwise look for it in cache 
-		fs::path idx_path (path_in_cache_vendor);
-		idx_path.replace_extension(".idx");
-		if (!boost::filesystem::exists(idx_path)) {
-			BOOST_LOG_TRIVIAL(error) << GUI::format("Couldn't locate idx file %1% when performing updates.", idx_path.string());
-			idx_path = fs::path(p->cache_path / idx_path.filename());
-		}
-		if (!boost::filesystem::exists(idx_path)) {
-			std::string msg = GUI::format(_L("Couldn't locate index file for vendor %1% when performing updates. The profile will not be installed."), bundle);
-			BOOST_LOG_TRIVIAL(error) << msg;
-			GUI::show_error(nullptr, msg);
-			continue;
-		}
-		Slic3r::GUI::Config::Index index;
-		try {
-			index.load(idx_path);
-		}
-		catch (const std::exception& /* err */) {
-			std::string msg = GUI::format(_L("Couldn't load index file for vendor %1% when performing updates. The profile will not be installed. Reason: Corrupted index file %2%."), bundle, idx_path.string());
-			BOOST_LOG_TRIVIAL(error) << msg;
-			GUI::show_error(nullptr, msg);
-			continue;
-		}
-		const auto recommended_it = index.recommended();
-		const auto recommended = recommended_it->config_version;
-
-		if (is_in_cache_vendor) {
-			Semver version_cache = Semver::zero();
-			try {
-				auto vp_cache = VendorProfile::from_ini(path_in_cache_vendor, false);
-				version_cache = vp_cache.config_version;
-			}
-			catch (const std::exception& e) {
-				BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1%, message: %2%", path_in_cache_vendor, e.what());
-				version_cache = Semver::zero();
-			}
-			if (version_cache > recommended)
-				version_cache = Semver::zero();
-
-			Semver version_rsrc = Semver::zero();
-			try {
-				if (is_in_rsrc) {
-					auto vp = VendorProfile::from_ini(path_in_rsrc, false);
-					version_rsrc = vp.config_version;
-				}
-			}
-			catch (const std::exception& e) {
-				BOOST_LOG_TRIVIAL(error) << format("Corrupted profile file for vendor %1%, message: %2%", path_in_rsrc, e.what());
-				//continue;
-				version_rsrc = Semver::zero();
-			}
-			// Should not happen!
-			if (version_rsrc > recommended)
-				version_rsrc = Semver::zero();
-
-			if (version_cache == Semver::zero() && version_rsrc == Semver::zero()) {
-				std::string msg = GUI::format(_L("Couldn't open profile file for vendor %1% when performing updates. The profile will not be installed. This installation might be corrupted."), bundle);
-				BOOST_LOG_TRIVIAL(error) << msg;
-				GUI::show_error(nullptr, msg);
-				continue;
-			} else if (version_cache == Semver::zero()) {
-				// cache vendor cannot be used, use resources
-		updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
-			} else if (version_rsrc == Semver::zero()) {
-				// resources cannto be used, use cache vendor
-				updates.updates.emplace_back(std::move(path_in_cache_vendor), std::move(path_in_vendors), Version(), "", "");
-			} else if (version_cache > version_rsrc) {
-				// in case we are installing from cache / vendor. we should also copy index to cache
-				// This needs to be done now bcs the current one would be missing this version on the next start 
-				auto  path_idx_cache = (p->cache_path / bundle).replace_extension(".idx");
-				if (idx_path != path_idx_cache)
-					copy_file_fix(idx_path, path_idx_cache);
-				updates.updates.emplace_back(std::move(path_in_cache_vendor), std::move(path_in_vendors), Version(), "", "");
-			} else {
-				updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
-	}
-		} else {
-			if (! is_in_rsrc) {
-				// This should not happen. Instead of an assert, make it crash in Release mode too.
-				BOOST_LOG_TRIVIAL(error) << "Internal error in PresetUpdater! Terminating the application.";
-				std::terminate();
-			}
-			updates.updates.emplace_back(std::move(path_in_rsrc), std::move(path_in_vendors), Version(), "", "");
-		}
-	}
-
-	return p->perform_updates(std::move(updates), snapshot);
+void PresetUpdater::sync_async(std::function<void(int)> callback_update_preset, bool force) {
+    if (this->all_vendors.empty()) {
+        callback_update_preset(get_profile_count_to_update());
+        // already done
+        return;
+    }
+    bool error = false;
+    {
+        std::lock_guard<std::mutex> guard(this->callback_update_preset_mutex);
+        bool already_in_synch = synch_process_ongoing.exchange(true); // atomic isn't necessary if behind lock
+        if (already_in_synch) {
+            // shouldn't be happening, please caller, test it beforehand.
+            assert(false);
+            error= true;
+        } else {
+            this->callback_update_preset = callback_update_preset;
+        }
+    }
+    if (error) {
+        callback_update_preset(get_profile_count_to_update());
+        return;
+    }
+    std::lock_guard<std::recursive_mutex> vendors_guard(this->all_vendors_mutex);
+    profiles_synch = this->all_vendors.size();
+    for (auto& [id, vendor_synch] : this->all_vendors) {
+        this->update_vendor(vendor_synch, force);
+    }
 }
 
-void PresetUpdater::on_update_notification_confirm()
-{
-	if (!p->has_waiting_updates)
-		return;
-	BOOST_LOG_TRIVIAL(info) << format("Update of %1% bundles available. Asking for confirmation ...", p->waiting_updates.updates.size());
+void PresetUpdater::update_vendor(VendorSync &vendor, bool force) {
+    // reuse
+    boost::filesystem::path cache_path = GUI::into_path(data_dir()) / "cache" / "vendor" / vendor.profile.usable_id() / (vendor.profile.usable_id() + "_tags.json");
+    if (boost::filesystem::exists(cache_path) && !force) {
+        std::time_t last_mod  = boost::filesystem::last_write_time(cache_path);
+        std::time_t now = std::time(nullptr);
+        // wait a day before checking again
+        if (last_mod + 24 * 3600 > now) {
+            // reuse the cache file
+            boost::nowide::ifstream file(cache_path.string());
+            std::string body { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
+            vendor.parse_tags(body);
+            // end it
+            vendor.synch_in_progress = false;
+            end_updating();
+            return;
+        }
+    }
+    vendor.synch_in_progress = true;
+    if (VendorProfile::get_http_url_rest(vendor.profile.config_update_rest).empty()) {
+        //not correct config_update_github
+        vendor.synch_failed = true;
+        vendor.synch_in_progress = false;
+        end_updating();
+        return;
+    }
+    // create url to get tags from github
+    std::string url(VendorProfile::get_http_url_rest(vendor.profile.config_update_rest) + "/tags?per_page=100;page=1");
+    if (has_api_request_slot(url)) {
+        Http::get(url)
+            .size_limit(1024 * 64 /*64kio, 100tags should use 27ko*/)
+            .on_error([&](std::string body, std::string error, unsigned http_status) {
+                vendor.synch_failed = true;
+                vendor.synch_in_progress = false;
 
-	std::vector<GUI::MsgUpdateConfig::Update> updates_msg;
-	for (const auto& update : p->waiting_updates.updates) {
-		std::string changelog_url = update.version.config_version.prerelease() == nullptr ? update.changelog_url : std::string();
-		std::string printers;
-		for (size_t i = 0; i < update.new_printers.size(); i++) {
-			if (i > 0)
-				printers += ", ";
-			printers += update.new_printers[i];
-	}
-		updates_msg.emplace_back(update.vendor, update.version.config_version, update.version.comment, std::move(changelog_url), std::move(printers));
-	}
+                end_updating();
+            })
+            .on_complete([this, cache_path, &vendor](std::string body, unsigned /* http_status */) {
+                // store it
+                FILE *fp = boost::nowide::fopen(cache_path.string().c_str(), "w");
+                if (fp == nullptr) {
+                    BOOST_LOG_TRIVIAL(error) << "PresetUpdater::install_new_repo: Couldn't open "
+                                             << cache_path.string().c_str() << " for writing";
+                } else {
+                    fprintf(fp, body.c_str());
+                    fclose(fp);
+                }
+                // parse it
+                vendor.parse_tags(body);
 
-	GUI::MsgUpdateConfig dlg(updates_msg);
-
-	const auto res = dlg.ShowModal();
-	if (res == wxID_OK) {
-		BOOST_LOG_TRIVIAL(debug) << "User agreed to perform the update";
-		if (p->perform_updates(std::move(p->waiting_updates)) &&
-			reload_configs_update_gui()) {
-			p->has_waiting_updates = false;
-		}
-	}
-	else {
-		BOOST_LOG_TRIVIAL(info) << "User refused the update";
-	}	
+                // end it
+                vendor.synch_in_progress = false;
+                end_updating();
+            })
+            .perform();
+    } else {
+        vendor.synch_failed = true;
+        vendor.synch_in_progress = false;
+        end_updating();
+    }
 }
 
-bool PresetUpdater::version_check_enabled() const
-{
-	return p->enabled_version_check;
+void VendorSync::reset(const VendorProfile &vprofile, bool installed) {
+    this->is_installed = installed;
+    this->synch_in_progress = false;
+    this->synch_failed = false;
+    //available_profiles = {};
+    this->profile = vprofile;
+    this->can_upgrade = !available_profiles.empty() && available_profiles.front().config_version > profile.config_version;
 }
 
-void PresetUpdater::update_index_db()
-{
-	p->update_index_db();
+bool VendorSync::parse_tags(const std::string &json) {
+    boost::property_tree::ptree root;
+    std::stringstream json_stream(json);
+    boost::property_tree::read_json(json_stream, root);
+
+    std::map<std::string, size_t> versions_here;
+    for (size_t idx = 0; idx < available_profiles.size(); ++idx) {
+        VendorAvailable &version = available_profiles[idx];
+        versions_here[version.config_version.to_string()+"="+version.slicer_version.to_string()] = idx;
+    }
+
+    Semver current_version(SLIC3R_VERSION_FULL);
+    const std::regex reg_num("([0-9]+)");
+    for (auto json_version : root) {
+        const std::string tag = json_version.second.get<std::string>("name");
+        size_t equal_pos = tag.find('=');
+        assert(equal_pos != std::string::npos);
+        if (equal_pos == std::string::npos) {
+            continue;
+        }
+        std::optional<Semver> config_version = Semver::parse(tag.substr(0, equal_pos));
+        std::optional<Semver> slicer_version = Semver::parse(tag.substr(equal_pos+1));
+        if (!config_version || !slicer_version) {
+            assert(false);
+            continue;
+        }
+        // check if slicer_version is okay
+        std::string str_ver = slicer_version->to_string();
+        std::string str_curr_ver = SLIC3R_VERSION_FULL;
+        //if (slicer_version > *Semver::parse(SLIC3R_VERSION_FULL) || versions_here.find(config_version->to_string()) != versions_here.end()) {
+        bool already_here = false;
+        const boost::property_tree::ptree& commit_node = json_version.second.get_child("commit");
+        if(versions_here.find(tag) != versions_here.end()) {
+            assert(versions_here[tag] < available_profiles.size());
+            //update the tag infos if not present
+            VendorAvailable &to_update = available_profiles[versions_here[tag]];
+            assert(!to_update.url_zip.empty());
+            if (to_update.tag.empty()) {
+                to_update.tag = tag;
+                to_update.url_zip = json_version.second.get<std::string>("zipball_url");
+                to_update.commit_sha = commit_node.get<std::string>("sha");
+                to_update.commit_url = commit_node.get<std::string>("url");
+            }
+        } else {
+            // okay, add it
+            versions_here[tag] = available_profiles.size();
+            available_profiles.emplace_back(VendorAvailable{*config_version, *slicer_version,
+                                                            /*local_file=*/std::string(),
+                                                            json_version.second.get<std::string>("zipball_url"),
+                                                            commit_node.get<std::string>("sha"),
+                                                            commit_node.get<std::string>("url"), tag, std::string()});
+        }
+    }
+
+    // now order by version
+    sort_available();
+
+    this->can_upgrade = !available_profiles.empty() && available_profiles.front().config_version > profile.config_version;
+    this->is_synch = true;
+    return this->can_upgrade;
 }
 
+void VendorSync::sort_available() {
+    std::sort(available_profiles.begin(), available_profiles.end(),
+              [](const VendorAvailable &e1, const VendorAvailable &e2) {
+        if (e1.slicer_version == e2.slicer_version) {
+            return e1.config_version > e2.config_version;
+        } else {
+            return e1.slicer_version > e2.slicer_version;
+        }
+    });
+    // choose best (ie first with compatible slicer)
+    Semver current_slicer_version = *Semver::parse(SLIC3R_VERSION_FULL);
+    for (VendorAvailable &version : available_profiles) {
+        if (version.slicer_version <= current_slicer_version) {
+            best = &version;
+            return;
+        }
+    }
 }
+
+void PresetUpdater::end_updating() {
+    int value = --profiles_synch;
+    assert(value >= 0);
+    if (value == 0) {
+        std::lock_guard<std::mutex> guard(this->callback_update_preset_mutex);
+        // nobody increase it and the min is 0 so no race condition here.
+        // end of synhc, emit callback
+        this->callback_update_preset(int(get_profile_count_to_update()));
+        //wxCommandEvent *evt = new wxCommandEvent(EVT_CONFIG_UPDATER_SYNC_DONE);
+        //evt->SetInt(profiles_to_update);
+        //evt_handler->QueueEvent(evt);
+        is_synch = true;
+        synch_process_ongoing = false;
+    }
+}
+
+int PresetUpdater::get_profile_count_to_update() {
+    int count = 0;
+    std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+    for (const auto &[id, vendor_synch] : this->all_vendors) {
+        if (vendor_synch.can_upgrade) {
+            count++;
+        }
+    }
+    return count;
+}
+
+void PresetUpdater::uninstall_vendor(const std::string &vendor_id, std::function<void(bool)> callback_result) {
+    // get vendor from map to remove "const"
+    std::unique_lock<std::recursive_mutex> guard(this->all_vendors_mutex);
+    auto it_mutable_vendor = all_vendors.find(vendor_id);
+    if (it_mutable_vendor == all_vendors.end()) {
+        assert(false);
+        guard.unlock();
+        callback_result(false);
+        return;
+    }
+    assert(vendor_id == it_mutable_vendor->second.profile.id);
+    const GUI::Config::Snapshot* snapshot = take_config_snapshot_report_error(*GUI::wxGetApp().app_config, GUI::Config::Snapshot::SNAPSHOT_DOWNGRADE,
+        format(_u8L("Before removing vendor bundle '%1%'"), it_mutable_vendor->second.profile.full_name));
+    if (!snapshot) {
+        // fail to snapshot, cancel
+        BOOST_LOG_TRIVIAL(error) << "Error: can't take snapshot, cancle preset removal.";
+        guard.unlock();
+        callback_result(false);
+        return;
+    }
+    bool result = it_mutable_vendor->second.uninstall_vendor_config();
+    if (result) {
+        // unregister from appconfig
+        auto vmap = GUI::wxGetApp().app_config->vendors();
+        vmap.erase(vendor_id);
+        GUI::wxGetApp().app_config->set_vendors(vmap);
+        GUI::wxGetApp().app_config->save();
+        // unregister from current slicer app
+        GUI::wxGetApp().preset_bundle->load_installed_printers(*GUI::wxGetApp().app_config);
+        GUI::wxGetApp().preset_bundle->load_presets(*GUI::wxGetApp().app_config, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+        // update tabs
+        GUI::wxGetApp().load_current_presets();
+        reload_all_vendors();
+        sync_async([callback_result](int nbupdates) { callback_result(true); });
+    } else {
+        guard.unlock();
+        callback_result(false);
+    }
+}
+
+void PresetUpdater::install_vendor(const std::string &vendor_id,
+                                   const VendorAvailable &version,
+                                   std::function<void(const std::string &)> callback_result) {
+    // get vendor from map to remove "const"
+    std::unique_lock<std::recursive_mutex> guard(this->all_vendors_mutex);
+    auto it_mutable_vendor = all_vendors.find(vendor_id);
+    if (it_mutable_vendor == all_vendors.end()) {
+        assert(false);
+        guard.unlock();
+        callback_result(_u8L("Unable to find the select vendor in the cache. Something went wrong with the software.")); 
+        return;
+    }
+    assert(vendor_id == it_mutable_vendor->second.profile.id);
+    const GUI::Config::Snapshot* snapshot = take_config_snapshot_report_error(*GUI::wxGetApp().app_config, GUI::Config::Snapshot::SNAPSHOT_UPGRADE,
+        format(_u8L("Before installing vendor bundle '%1%' version %2%"), it_mutable_vendor->second.profile.full_name, version.config_version.to_string()));
+    if (!snapshot) {
+        // fail to snapshot, cancel
+        BOOST_LOG_TRIVIAL(error) << "Error: can't take snapshot, cancle preset installation.";
+        guard.unlock();
+        callback_result(_u8L(ERROR_MSG_UNABLE_SNAPSHOT)); 
+        return;
+    }
+    VendorSync &vendor = it_mutable_vendor->second;
+    std::string result = vendor.install_vendor_config(version, *this);
+    auto vmap = GUI::wxGetApp().app_config->vendors();
+    if (result.empty() && vmap.find(vendor.profile.id) != vmap.end()) {
+        // the vendor is already in use, update the slicer
+        // read it with models
+        if (vendor.profile.models.empty()) {
+            assert(vendor.is_installed);
+            vendor.profile = VendorProfile::from_ini(GUI::into_path(data_dir()) / "vendor" / (vendor.profile.id + ".ini"), true);
+            assert(!vendor.profile.models.empty());
+        }
+        // update appconfig : remove unfindable printers
+        for (auto printer_it = vmap[vendor.profile.id].begin(); printer_it != vmap[vendor.profile.id].end();) {
+            // search for PrinterModel
+            const VendorProfile::PrinterModel *printer_model = nullptr;
+            for (const VendorProfile::PrinterModel &pm : vendor.profile.models) {
+                if (pm.id == printer_it->first) {
+                    printer_model = &pm;
+                    break;
+                }
+            }
+            if (printer_model == nullptr) {
+                printer_it = vmap[vendor.profile.id].erase(printer_it);
+            } else {
+                // same for variant
+                for (auto it_variant = printer_it->second.begin(); it_variant != printer_it->second.end();) {
+                    bool found_name = false;
+                    for (const VendorProfile::PrinterVariant &variant : printer_model->variants) {
+                        if (variant.name == *it_variant) {
+                            found_name = true;
+                            break;
+                        }
+                    }
+                    if (!found_name) {
+                        it_variant = printer_it->second.erase(it_variant);
+                    } else {
+                        it_variant++;
+                    }
+                }
+                // erase if no variant anymore
+                if (printer_it->second.empty()) {
+                    printer_it = vmap[vendor.profile.id].erase(printer_it);
+                } else {
+                    // next elt
+                    ++printer_it;
+                }
+            }
+        }
+        GUI::wxGetApp().app_config->set_vendors(vmap);
+        GUI::wxGetApp().app_config->save();
+        // reload slicer app
+        GUI::wxGetApp().preset_bundle->load_installed_printers(*GUI::wxGetApp().app_config);
+        GUI::wxGetApp().preset_bundle->load_presets(*GUI::wxGetApp().app_config,
+                                                    ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+        // update tabs
+        GUI::wxGetApp().load_current_presets();
+    }
+    guard.unlock();
+    callback_result(result); 
+}
+
+bool copy_file_and_icons(boost::filesystem::path dir_in, boost::filesystem::path dir_out, std::string vendor_id, bool copy = true) {
+
+    // copy the file & icons
+    assert(boost::filesystem::exists(dir_in));
+    if (boost::filesystem::exists(dir_in)) {
+        boost::filesystem::path vendor_profile_file_in = dir_in / (vendor_id + ".ini");
+        boost::filesystem::path vendor_profile_file_out = dir_out / (vendor_id + ".ini");
+        assert(boost::filesystem::exists(vendor_profile_file_in));
+        if (!boost::filesystem::exists(vendor_profile_file_in)) {
+            return false;
+        }
+        if (copy) {
+            // need to copy to a temp file and then rename to have a safe overwrite.
+            boost::filesystem::copy(vendor_profile_file_in, dir_out / (vendor_id + ".new.ini"));
+            boost::filesystem::rename(dir_out / (vendor_id + ".new.ini"), vendor_profile_file_out);
+        } else {
+            boost::filesystem::rename(vendor_profile_file_in, vendor_profile_file_out);
+        }
+        // now copy icons
+        boost::filesystem::path icon_dir_in = dir_in / vendor_id;
+        boost::filesystem::path icon_dir_out = dir_out / vendor_id;
+        if (boost::filesystem::exists(icon_dir_in)) {
+            // remove all
+            if (boost::filesystem::exists(icon_dir_out)) {
+                for (const boost::filesystem::directory_entry &path_entry :
+                        boost::filesystem::directory_iterator(icon_dir_out)) {
+                    boost::filesystem::remove_all(path_entry.path());
+                }
+            }
+            boost::filesystem::create_directories(icon_dir_out);
+            // copy all
+            for (const boost::filesystem::directory_entry &path_entry :
+                    boost::filesystem::directory_iterator(icon_dir_in)) {
+                assert(path_entry.status().type() == boost::filesystem::file_type::regular_file);
+                if (copy) {
+                    boost::filesystem::path out_path = icon_dir_out / path_entry.path().lexically_relative(icon_dir_in);
+                    boost::filesystem::path out_dir_path = out_path.parent_path();
+
+                    boost::filesystem::copy(path_entry.path(), out_dir_path / "file.temp");
+                    boost::filesystem::rename(out_dir_path / "file.temp", out_path);
+                } else {
+                    boost::filesystem::rename(path_entry.path(),
+                                              icon_dir_out / path_entry.path().lexically_relative(icon_dir_in));
+                }
+            }
+            if (!copy) {
+                boost::filesystem::remove_all(icon_dir_in);
+            }
+        }
+    }
+    return true;
+
+}
+
+std::string VendorSync::install_vendor_config(const VendorAvailable &to_install, PresetUpdater& api_slot) {
+    // rename current venddor file (if any)
+    boost::filesystem::path vendor_file = GUI::into_path(data_dir()) / "vendor" / (this->profile.id + ".ini");
+    assert(!this->is_installed || boost::filesystem::exists(vendor_file));
+    // get new file
+    if (!to_install.local_file.empty() && boost::filesystem::exists(to_install.local_file)) {
+        // file in resource directory
+        boost::filesystem::path new_vendor_file(to_install.local_file);
+        assert(new_vendor_file.stem() == profile.id);
+        bool copy_okay = copy_file_and_icons(new_vendor_file.parent_path(), GUI::into_path(data_dir()) / "vendor", new_vendor_file.stem().string(), true);
+        if (!copy_okay) {
+            return _u8L(ERROR_MSG_UNABLE_COPY_CONFIG);
+        }
+    } else {
+        assert(!to_install.tag.empty());
+        //test if already dowloaded
+        std::string directory_name = profile.id+"-"+to_install.tag;
+        directory_name = std::regex_replace(directory_name, std::regex("[^0-9a-zA-Z_\\-.]"), "-");
+        // download zip
+        boost::filesystem::path temp_dir = GUI::into_path(data_dir()) / "cache" / "vendor" / this->profile.usable_id();
+        boost::filesystem::path root_dir = temp_dir / directory_name;
+        if (!boost::filesystem::exists(root_dir)) {
+            boost::filesystem::create_directories(temp_dir);
+            boost::filesystem::path download_zip_file(data_dir());
+            download_zip_file = download_zip_file / "cache" / "vendor" / this->profile.usable_id() / (this->profile.usable_id() + ".zip");
+            if (boost::filesystem::exists(download_zip_file)) {
+                boost::filesystem::remove(download_zip_file);
+            }
+            std::string error_message;
+            std::atomic_bool cancel = false;
+            bool done = false;
+            bool res = false;
+            if (!api_slot.has_api_request_slot(to_install.url_zip)) {
+                return _u8L("Too many requests to github, please try again in an hour");
+            }
+            Http::get(to_install.url_zip)
+                // max 100 mega
+                .size_limit(130 * 1024 * 1024)
+                .on_error([&](std::string body, std::string error, unsigned http_status) {
+                    error_message = GUI::format("Error getting: `%1%`: HTTP %2%, %3%", to_install.url_zip, http_status,
+                                                error);
+                    BOOST_LOG_TRIVIAL(error) << error_message;
+                })
+                .on_complete([&](std::string body, unsigned /* http_status */) {
+                    FILE *file = boost::nowide::fopen(download_zip_file.string().c_str(), "wb");
+                    assert(file != nullptr);
+                    if (file == nullptr) {
+                        error_message = GUI::format(_u8L("Can't create file at %1%"), download_zip_file.string());
+                        res = false;
+                        done = true;
+                        return;
+                    }
+                    try {
+                        fwrite(body.c_str(), 1, body.size(), file);
+                    } catch (const std::exception &e) {
+                        error_message = GUI::format(_u8L("Failed to write to file %1% :\n%3%"), download_zip_file,
+                                                    e.what());
+                        if (file != nullptr) {
+                            fclose(file);
+                        }
+                        res = false;
+                        done = true;
+                        return;
+                    }
+                    fclose(file);
+                    res = true;
+                    done = true;
+                })
+                // do it here, so we wait the result
+                .perform_sync();
+            assert(done);
+            bool got_root_dir = false;
+            root_dir = temp_dir / directory_name;
+            if (!res) {
+                return error_message;
+            } else {
+                // unzip
+                // zip reader takes care of opening & closing
+                ZipReader zip(download_zip_file.string());
+                if (!zip.success()) {
+                    BOOST_LOG_TRIVIAL(error) << "Unable to open the preset zip. Maybe the download is corrupted.";
+                    return "Unable to open the preset zip. Maybe the download is corrupted.";
+                }
+                try {
+                    mz_uint num_entries = mz_zip_reader_get_num_files(&zip.archive);
+                    mz_zip_archive_file_stat file_stat;
+                    // we first loop the entries to read from the archive the .model file only, in order to extract
+                    // the version from it
+                    bool found_model = false;
+                    boost::filesystem::path zip_root_dir;
+                    for (mz_uint i = 0; i < num_entries; ++i) {
+                        if (mz_zip_reader_file_stat(&zip.archive, i, &file_stat)) {
+                            boost::filesystem::path zip_path = file_stat.m_filename;
+                            assert(zip_path.is_relative());
+                            if (!got_root_dir) {
+                                assert(file_stat.m_is_directory);
+                                if (boost::filesystem::exists(root_dir)) {
+                                    for (const boost::filesystem::directory_entry &path_entry :
+                                         boost::filesystem::directory_iterator(root_dir)) {
+                                        boost::filesystem::remove_all(path_entry.path());
+                                    }
+                                }
+                                zip_root_dir = zip_path.lexically_normal();
+                                got_root_dir = true;
+                                boost::filesystem::create_directories(root_dir);
+                            } else {
+                                boost::filesystem::path out_path = root_dir / zip_path.lexically_relative(zip_root_dir);
+                                if (file_stat.m_is_directory) {
+                                    boost::filesystem::create_directories(out_path);
+                                } else {
+                                    size_t uncompressed_size = file_stat.m_uncomp_size;
+                                    void *p = mz_zip_reader_extract_file_to_heap(&zip.archive, file_stat.m_filename,
+                                                                                 &uncompressed_size, 0);
+                                    if (!p) {
+                                        return _u8L("Unable to open the preset zip. Maybe the download is corrupted");
+                                    }
+                                    FILE *file_to_write = fopen(out_path.string().c_str(), "wb");
+                                    if (file_to_write == nullptr) {
+                                        BOOST_LOG_TRIVIAL(error) << "Fail to unzip downloaded config zip.";
+                                        return _u8L("Unable to write into the hard disk drive.");
+                                    }
+                                    fwrite((const char *) p, 1, uncompressed_size, file_to_write);
+                                    fclose(file_to_write);
+                                    mz_free(p);
+                                }
+                            }
+                        }
+                    }
+                } catch (const std::exception &) {
+                    BOOST_LOG_TRIVIAL(error) << "Fail to upgrade current app by the content of the downloaded zip.";
+                    return _u8L("Error while extracting the downloaded zip of the vendor bundle.");
+                }
+                // copy the file & icons
+                assert(boost::filesystem::exists(root_dir));
+                bool copy_okay = copy_file_and_icons(root_dir / "profiles", GUI::into_path(data_dir()) / "vendor",
+                                                     this->profile.id, true);
+                if (!copy_okay) {
+                    return _u8L(ERROR_MSG_UNABLE_COPY_CONFIG);
+                }
+            }
+        } else {
+            //already downloaded
+            // copy the file & icons
+            assert(boost::filesystem::exists(root_dir));
+            bool copy_okay = copy_file_and_icons(root_dir / "profiles", GUI::into_path(data_dir()) / "vendor",
+                                                    this->profile.id, true);
+            if (!copy_okay) {
+                return _u8L(ERROR_MSG_UNABLE_COPY_CONFIG);
+            }
+        }
+    }
+    // refresh this
+    VendorProfile vp = VendorProfile::from_ini(GUI::into_path(data_dir()) / "vendor" / (this->profile.id + ".ini"), true);
+    this->is_installed = true;
+    this->profile = vp;
+    this->can_upgrade = !available_profiles.empty() && available_profiles.front().config_version > profile.config_version;
+    return "";
+}
+
+bool VendorSync::uninstall_vendor_config() {
+    // move from vendor to cache
+    bool move_okay = copy_file_and_icons(GUI::into_path(data_dir()) / "vendor", GUI::into_path(data_dir()) / "cache" / "vendor" / this->profile.usable_id(), this->profile.usable_id(), false);
+    if (!move_okay) {
+        return false;
+    }
+    // unregister from us
+    this->is_installed = false;
+    this->is_synch = false;
+    this->can_upgrade = false;
+    this->available_profiles = {};
+    return true;
+}
+
+void PresetUpdater::show_synch_window(wxWindow *parent,
+                                      const PresetBundle *preset_bundle,
+                                      const wxString &message,
+                                      std::function<void(bool)> callback_dialog_closed) {
+    GUI::UpdateConfigDialog * dialog = new GUI::UpdateConfigDialog(parent, *this, message);
+    int res = dialog->ShowModal();
+
+    if (callback_dialog_closed) {
+        callback_dialog_closed(res == wxID_OK);
+    }
+}
+
+size_t PresetUpdater::count_installed() {
+    size_t count = 0;
+    std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+    for (const auto& [id, vendor] : this->all_vendors) {
+        if (vendor.is_installed) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void PresetUpdater::download_new_repo(const std::string &rest_url, std::function<void(bool)> callback_result) {
+
+    if (rest_url.find("https://api.github.com/repos/") != std::string::npos) {
+        std::string github_org_repo = rest_url.substr(strlen("https://api.github.com/repos/"));
+        assert(github_org_repo.find('/') != std::string::npos);
+        if (github_org_repo.find('/') == std::string::npos) {
+            assert(false);
+            callback_result(false);
+            return;
+        }
+        Http::get(std::string("https://raw.githubusercontent.com/")+github_org_repo+"/refs/heads/main/description.ini")
+            .size_limit(1024 * 64 /*64kio, 100tags should use 27ko*/)
+            .on_error([callback_result](std::string body, std::string error, unsigned http_status) {
+                callback_result(false);
+            })
+            .on_complete([this, github_org_repo, callback_result](std::string body, unsigned /* http_status */) {
+                try {
+                    //extract an temp id (it won't be used, there should be one in the description)
+                    std::string id = github_org_repo.substr(github_org_repo.find_last_of('/') + 1);
+                    // parse it to get id (should be at the end of github_org_repo)
+                    boost::property_tree::ptree root;
+                    std::stringstream body_stream(body);
+                    boost::property_tree::read_ini(body_stream, root);
+                    VendorProfile vp = VendorProfile::from_ini(root, id, false);
+                    // save it
+                    boost::filesystem::create_directories(GUI::into_path(data_dir()) / "cache" / "vendor" / vp.usable_id());
+                    boost::filesystem::path file_path = GUI::into_path(data_dir()) / "cache" / "vendor" / vp.usable_id() / (vp.usable_id() + ".ini");
+                    FILE *fp = boost::nowide::fopen(file_path.string().c_str(), "w");
+                    if (fp == nullptr) {
+                        BOOST_LOG_TRIVIAL(error)
+                            << "PresetUpdater::install_new_repo: Couldn't open " << file_path.c_str() << " for writing";
+                        callback_result(false);
+                        return;
+                    }
+                    fprintf(fp, body.c_str());
+                    fclose(fp);
+
+                    callback_result(true);
+                } catch (const std::exception &) {
+                    callback_result(false);
+                    return;
+                }
+
+            })
+            .perform();
+    } else {
+        //3rd-party rest api: ask for description
+        Http::get(std::string(rest_url+"/description"))
+            .size_limit(1024 * 64 /*64kio, 100tags should use 27ko*/)
+            .on_error([callback_result](std::string body, std::string error, unsigned http_status) {
+                callback_result(false);
+            })
+            .on_complete([this, rest_url, callback_result](std::string body, unsigned /* http_status */) {
+                try {
+                    if (body.empty()) {
+                        callback_result(false);
+                        return;
+                    }
+                    // ini or json?
+                    bool is_json = body[0] == '{';
+                    //extract an temp id (it won't be used, there should be one in the description)
+                    std::string id = rest_url.substr(rest_url.find_last_of('/') + 1);
+                    // parse it to get id (should be at the end of rest_url)
+                    boost::property_tree::ptree root;
+                    std::stringstream body_stream(body);
+                    VendorProfile vp;
+                    if (is_json) {
+                        boost::property_tree::read_json(body_stream, root);
+                        // from ini should parse the json as well as the ini. (todo: test)
+                        vp = VendorProfile::from_ini(root, id, false);
+                    } else {
+                        boost::property_tree::read_ini(body_stream, root);
+                        vp = VendorProfile::from_ini(root, id, false);
+                    }
+                    // save it
+                    boost::filesystem::create_directories(GUI::into_path(data_dir()) / "cache" / "vendor" / vp.usable_id());
+                    boost::filesystem::path file_path = GUI::into_path(data_dir()) / "cache" / "vendor" / vp.usable_id() / (vp.usable_id() + ".ini");
+                    FILE *fp = boost::nowide::fopen(file_path.string().c_str(), "w");
+                    if (fp == nullptr) {
+                        BOOST_LOG_TRIVIAL(error)
+                            << "PresetUpdater::install_new_repo: Couldn't open " << file_path.c_str() << " for writing";
+                        callback_result(false);
+                        return;
+                    }
+                    if (is_json) {
+                        try{
+                            //transform into ini
+                            fprintf(fp, "[vendor]\n");
+                            for (boost::property_tree::ptree::value_type &kv : root.get_child("vendor")) {
+                                fprintf(fp, kv.first.c_str());
+                                fprintf(fp, " = ");
+                                fprintf(fp, kv.second.data().c_str());
+                                fprintf(fp, "\n");
+                            }
+                            fprintf(fp, "\n");
+                        } catch (const std::exception &) {
+                            assert(false);
+                        }
+                    } else {
+                        fprintf(fp, body.c_str());
+                    }
+                    fclose(fp);
+
+                    callback_result(true);
+                } catch (const std::exception &) {
+                    callback_result(false);
+                    return;
+                }
+
+            })
+            .perform();
+    }
+}
+
+void PresetUpdater::uninstall_all_vendors(std::function<void(bool)> callback_result) {
+    const GUI::Config::Snapshot* snapshot = take_config_snapshot_report_error(*GUI::wxGetApp().app_config, GUI::Config::Snapshot::SNAPSHOT_UPGRADE,
+        _u8L("Before removing all vendor bundles"));
+    if (!snapshot) {
+        // fail to snapshot, cancel
+        BOOST_LOG_TRIVIAL(error) << "Error: can't take snapshot, cancle preset removal.";
+        callback_result(false);
+        return;
+    }
+    std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+    bool at_leat_a_delete = false;
+    auto vmap = GUI::wxGetApp().app_config->vendors();
+    for (auto& [id, vendor] : this->all_vendors) {
+        if (vendor.is_installed) {
+            bool res = vendor.uninstall_vendor_config();
+            if (res) {
+                at_leat_a_delete = true;
+                vmap.erase(vendor.profile.id);
+            }
+        }
+    }
+    if (at_leat_a_delete) {
+        // unregister from appconfig
+        GUI::wxGetApp().app_config->set_vendors(vmap);
+        GUI::wxGetApp().app_config->save();
+        // unregister from current slicer app
+        GUI::wxGetApp().preset_bundle->load_installed_printers(*GUI::wxGetApp().app_config);
+        GUI::wxGetApp().preset_bundle->load_presets(*GUI::wxGetApp().app_config,
+                                                    ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+        // update tabs
+        GUI::wxGetApp().load_current_presets();
+        reload_all_vendors();
+        sync_async([callback_result](int nbupdates) { callback_result(true); });
+    } else {
+        callback_result(true);
+    }
+}
+
+bool PresetUpdater::has_api_request_slot(const std::string &url) {
+    // only limit calls to github api urls, don't limit others
+    if (url.find("api.github.com") == std::string::npos) {
+        return true;
+    }
+    if (next_time_slot + 3600 < std::time(nullptr)) {
+        next_time_slot = std::time(nullptr);
+        max_request = 25;
+    }
+    std::cout<<"api call ("<<(25-max_request)<<")\n";
+    return (--max_request) > 0;
+
+}
+
+void PresetUpdater::install_all_vendors(std::function<void(const std::string &)> callback_result) {
+    const GUI::Config::Snapshot* snapshot = take_config_snapshot_report_error(*GUI::wxGetApp().app_config, GUI::Config::Snapshot::SNAPSHOT_DOWNGRADE,
+        _u8L("Before installing all vendor bundles"));
+    if (!snapshot) {
+        // fail to snapshot, cancel
+        BOOST_LOG_TRIVIAL(error) << "Error: can't take snapshot, cancle preset removal.";
+        callback_result(_u8L(ERROR_MSG_UNABLE_SNAPSHOT));
+        return;
+    }
+    std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+    bool at_leat_an_install = false;
+    auto vmap = GUI::wxGetApp().app_config->vendors();
+    std::string errors;
+    for (auto& [id, vendor] : this->all_vendors) {
+        if (!vendor.is_installed && !vendor.available_profiles.empty()) {
+            assert(vendor.best);
+            std::string res = vendor.install_vendor_config(*vendor.best, *this);
+            at_leat_an_install = at_leat_an_install || res.empty();
+            errors += errors.empty() ? res : (std::string("\n") + errors);
+        }
+    }
+    if (at_leat_an_install) {
+        // the vendor is already in use, update the slicer
+        // reload slicer app
+        GUI::wxGetApp().preset_bundle->load_installed_printers(*GUI::wxGetApp().app_config);
+        GUI::wxGetApp().preset_bundle->load_presets(*GUI::wxGetApp().app_config,
+                                                    ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+        // update tabs
+        GUI::wxGetApp().load_current_presets();
+        reload_all_vendors();
+        sync_async([callback_result, errors](int nbupdates) { callback_result(errors); });
+    } else {
+        callback_result(errors);
+    }
+}
+
+void PresetUpdater::upgrade_all_installed_vendors(std::function<void(const std::string &)> callback_result) {
+    const GUI::Config::Snapshot* snapshot = take_config_snapshot_report_error(*GUI::wxGetApp().app_config, GUI::Config::Snapshot::SNAPSHOT_UPGRADE,
+        _u8L("Before upgrading all intalled vendor bundles"));
+    if (!snapshot) {
+        // fail to snapshot, cancel
+        BOOST_LOG_TRIVIAL(error) << "Error: can't take snapshot, cancle preset removal.";
+        callback_result(_u8L(ERROR_MSG_UNABLE_SNAPSHOT));
+        return;
+    }
+    std::lock_guard<std::recursive_mutex> guard(this->all_vendors_mutex);
+    bool at_leat_an_upgrade = false;
+    auto vmap = GUI::wxGetApp().app_config->vendors();
+    std::string errors;
+    for (auto& [id, vendor] : this->all_vendors) {
+        if (vendor.is_installed && vendor.can_upgrade) {
+            assert(!vendor.available_profiles.empty());
+            assert(vendor.best);
+            std::string res = vendor.install_vendor_config(*vendor.best, *this);
+            if (res.empty()) {
+                at_leat_an_upgrade = true;
+                // read it with models
+                if (vendor.profile.models.empty()) {
+                    assert(vendor.is_installed);
+                    vendor.profile = VendorProfile::from_ini(GUI::into_path(data_dir()) / "vendor" / (vendor.profile.id + ".ini"), true);
+                    assert(!vendor.profile.models.empty());
+                }
+                // update appconfig : remove unfindable printers
+                for (auto printer_it = vmap[vendor.profile.id].begin(); printer_it != vmap[vendor.profile.id].end();) {
+                    // search for PrinterModel
+                    const VendorProfile::PrinterModel *printer_model = nullptr;
+                    for (const VendorProfile::PrinterModel &pm : vendor.profile.models) {
+                        if (pm.id == printer_it->first) {
+                            printer_model = &pm;
+                            break;
+                        }
+                    }
+                    if (printer_model == nullptr) {
+                        printer_it = vmap[vendor.profile.id].erase(printer_it);
+                    } else {
+                        // same for variant
+                        for (auto it_variant = printer_it->second.begin(); it_variant != printer_it->second.end();) {
+                            bool found_name = false;
+                            for (const VendorProfile::PrinterVariant &variant : printer_model->variants) {
+                                if (variant.name == *it_variant) {
+                                    found_name = true;
+                                    break;
+                                }
+                            }
+                            if (!found_name) {
+                                it_variant = printer_it->second.erase(it_variant);
+                            } else {
+                                it_variant++;
+                            }
+                        }
+                        // erase if no variant anymore
+                        if (printer_it->second.empty()) {
+                            printer_it = vmap[vendor.profile.id].erase(printer_it);
+                        } else {
+                            // next elt
+                            ++printer_it;
+                        }
+                    }
+                }
+            } else {
+                errors += errors.empty() ? res : (std::string("\n") + res);
+            }
+        }
+    }
+    if (at_leat_an_upgrade) {
+        // the vendor is already in use, update the slicer
+        GUI::wxGetApp().app_config->set_vendors(vmap);
+        GUI::wxGetApp().app_config->save();
+        // reload slicer app
+        GUI::wxGetApp().preset_bundle->load_installed_printers(*GUI::wxGetApp().app_config);
+        GUI::wxGetApp().preset_bundle->load_presets(*GUI::wxGetApp().app_config,
+                                                    ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+        // update tabs
+        GUI::wxGetApp().load_current_presets();
+        reload_all_vendors();
+        sync_async([callback_result, errors](int nbupdates) { callback_result(errors); });
+    } else {
+        callback_result(errors);
+    }
+
+}
+
+} // namespace Slic3r

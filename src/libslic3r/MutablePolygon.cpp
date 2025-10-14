@@ -47,7 +47,7 @@ void remove_duplicates(MutablePolygon &polygon, double eps)
 void remove_duplicates(MutablePolygon &polygon, coord_t scaled_eps, const double max_angle)
 {
     if (polygon.size() >= 3) {
-        auto cos_max_angle_2 = Slic3r::sqr<double>(cos(max_angle));
+        auto cos_max_angle_2 = Slic3r::sqr(cos(max_angle));
         coordf_t scaled_eps_sqr  = Slic3r::sqr(coordf_t(scaled_eps));
         auto begin           = polygon.begin();
         auto it              = begin;
@@ -61,7 +61,7 @@ void remove_duplicates(MutablePolygon &polygon, coord_t scaled_eps, const double
             if (v1_sqr_norm < scaled_eps_sqr) {
                 //if (Vec2i64 v2 = (*next - *prev).cast<int64_t>();
                 if (Vec2crd v2 = (*next - *prev);
-                    Slic3r::sqr<double>(double(v1.dot(v2))) > cos_max_angle_2 * v1_sqr_norm * squared_norm(v2)) {
+                    Slic3r::sqr(dot_double(v1,v2)) > cos_max_angle_2 * v1_sqr_norm * squared_norm(v2)) {
                     it = it.remove();
                     continue;
                 }
@@ -299,7 +299,7 @@ void smooth_outward(MutablePolygon &polygon, coord_t clip_dist_scaled)
 
     const distsqrf_t clip_dist_scaled2    = sqr(distf_t(clip_dist_scaled));
     const distsqrf_t clip_dist_scaled2eps = sqr(distf_t(clip_dist_scaled) + distf_t(SCALED_EPSILON));
-    const distsqrf_t foot_dist_min2       = distsqrf_t(sqr(SCALED_EPSILON));
+    const distsqrf_t foot_dist_min2       = distsqrf_t((SCALED_EPSILON*SCALED_EPSILON));
 
     // Each source point will be visited exactly once.
     MutablePolygon::range unprocessed_range(polygon);

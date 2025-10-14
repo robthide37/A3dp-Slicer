@@ -35,10 +35,12 @@ public:
     std::string tool_change(GCodeGenerator &gcodegen, int extruder_id, bool finish_layer);
     std::string finalize(GCodeGenerator &gcodegen);
     std::vector<float> used_filament_length() const;
+    int get_current_layer_idx() const { return m_layer_idx; }
+    double get_last_wipe_tower_print_z() const { return m_last_wipe_tower_print_z; }
 
 private:
     WipeTowerIntegration& operator=(const WipeTowerIntegration&);
-    std::string append_tcr(GCodeGenerator &gcodegen, const WipeTower::ToolChangeResult &tcr, int new_extruder_id, double z = -1.) const;
+    std::string append_tcr(GCodeGenerator &gcodegen, const WipeTower::ToolChangeResult &tcr, int new_extruder_id, double z = -1., bool need_ensure_z = true) const;
 
     // Postprocesses gcode: rotates and moves G1 extrusions and returns result
     std::string post_process_wipe_tower_moves(const WipeTower::ToolChangeResult &tcr,

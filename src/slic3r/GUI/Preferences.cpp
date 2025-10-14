@@ -805,6 +805,18 @@ void PreferencesDialog::build()
 		L("If enabled, use free camera. If not enabled, use constrained camera."),
 		app_config->get_bool("use_free_camera"));
 
+	append_bool_option(m_tabid_2_optgroups.back().back(), "3D_mouse_drag",
+		L("Right mouse drag pan in 3D"),
+		L("If enabled, when you use the right mouse button to drag the view, it drag in the camera plane."
+            "\nIf disabled, the pan works like for moving an object: you drag the view by locking the bed point to your mouse in the x/y plane. To move in the z direction, you need to press 'Shift' at the same time."),
+		app_config->get_bool("3D_mouse_drag"));
+
+	append_bool_option(m_tabid_2_optgroups.back().back(), "mouse_middle_target",
+		L("Use the mouse middle button to set the camera position"),
+		L("If enabled, clicking on the middle mouse button set the focus on the bed's point. You can then drag to set the Z coordinate."
+        "\nIf disabled, the middle button as the same behavior as the right button (pan on drag)."),
+		app_config->get_bool("mouse_middle_target"));
+
 	append_bool_option(m_tabid_2_optgroups.back().back(), "reverse_mouse_wheel_zoom",
 		L("Reverse direction of zoom with mouse wheel"),
 		L("If enabled, reverses the direction of zoom with mouse wheel"),

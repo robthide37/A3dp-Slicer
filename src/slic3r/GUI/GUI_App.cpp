@@ -7,12 +7,14 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "libslic3r/Technologies.hpp"
+#include "libslic3r/Thread.hpp"
 #include "GUI_App.hpp"
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_Factories.hpp"
 #include "format.hpp"
+#include "InstanceCheck.hpp" 
 
 // Localization headers: include libslic3r version first so everything in this file
 // uses the slic3r/GUI version (the macros will take precedence over the functions).
@@ -140,6 +142,8 @@ using namespace std::literals;
 
 namespace Slic3r {
 namespace GUI {
+
+wxDEFINE_EVENT(EVT_CONFIG_UPDATER_SHOW_DIALOG, wxCommandEvent);
 
 class MainFrame;
 
@@ -506,8 +510,6 @@ bool static check_old_linux_datadir(const wxString& app_name) {
     // To be precise, the datadir should exist, it is created when single instance
     // lock happens. Instead of checking for existence, check the contents.
 
-    namespace fs = boost::filesystem;
-
     std::string new_path = Slic3r::data_dir();
 
     wxString dir;
@@ -521,16 +523,16 @@ bool static check_old_linux_datadir(const wxString& app_name) {
         return true;
     }
 
-    fs::path data_dir = fs::path(new_path);
-    if (! fs::is_directory(data_dir))
+    boost::filesystem::path data_dir = boost::filesystem::path(new_path);
+    if (! boost::filesystem::is_directory(data_dir))
         return true; // This should not happen.
 
-    int file_count = std::distance(fs::directory_iterator(data_dir), fs::directory_iterator());
+    int file_count = std::distance(boost::filesystem::directory_iterator(data_dir), boost::filesystem::directory_iterator());
 
     if (file_count <= 1) { // just cache dir with an instance lock
         std::string old_path = wxStandardPaths::Get().GetUserDataDir().ToUTF8().data();
 
-        if (fs::is_directory(old_path)) {
+        if (boost::filesystem::is_directory(old_path)) {
             wxString msg = from_u8((boost::format(_u8L("Starting with %1% 2.3, configuration "
                 "directory on Linux has changed (according to XDG Base Directory Specification) to \n%2%.\n\n"
                 "This directory did not exist yet (maybe you run the new version for the first time).\nHowever, "
@@ -582,12 +584,14 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_STEP */    { "STEP files"sv,      { ".stp"sv, ".step"sv } },    
     /* FT_AMF */     { "AMF files"sv,       { ".amf"sv, ".zip.amf"sv, ".xml"sv } },
     /* FT_3MF */     { "3MF files"sv,       { ".3mf"sv } },
+    /* FT_3MF_TRSF */{ "3MF files for SuperSlicer only (no transformation baked into the mesh)"sv, { ".3mf"sv } },
+    /* FT_3MF_UNKBAKE */{ "3MF files (unbake the transformation into the mesh) "sv, { ".3mf"sv } },
     /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".gco"sv, ".bgcode"sv, ".bgc"sv, ".g"sv, ".ngc"sv } },
     /* FT_MODEL */   { "Known files"sv,     { ".stl"sv, ".obj"sv, ".3mf"sv, ".amf"sv, ".zip.amf"sv, ".xml"sv, ".step"sv, ".stp"sv, ".svg"sv } },
     /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".amf"sv, ".zip.amf"sv } },
     /* FT_FONTS */   { "Font files"sv,      { ".ttc"sv, ".ttf"sv } },
     /* FT_GALLERY */ { "Known files"sv,     { ".stl"sv, ".obj"sv } },
-    /* FT_HFP     */ { "Modifier files"sv,  { ".hfp"sv } },
+    /* FT_HFP     */ { "HueForge files"sv,  { ".hfp"sv } },
 
     /* FT_INI */     { "INI files"sv,       { ".ini"sv } },
     /* FT_SVG */     { "SVG files"sv,       { ".svg"sv } },
@@ -654,7 +658,7 @@ static wxString file_wildcards(const FileWildcards &wildcards, const std::string
             add_single(wildcards.title, ext);
         }
 
-    return GUI::format_wxstr("%s (%s)|%s", wildcards.title, title, mask) + out_one_by_one;
+    return GUI::format_wxstr("%s (%s)|%s", wildcards.title, title, mask) /*+ out_one_by_one*/;
 }
 
 wxString file_wildcards(FileType file_type, const std::string &custom_extension)
@@ -929,8 +933,14 @@ void GUI_App::post_init()
         CallAfter([this] {
             // preset_updater->sync downloads profile updates on background so it must begin after config wizard finished.
             bool cw_showed = this->config_wizard_startup();
+#ifndef USE_GTHUB_PRESET_UPDATE
+    ///////////////////////// -supermerill: old prusa code for the old way to update profiles /////////////////////////
+    ///////////////////////// not used anymore 
             this->preset_updater->sync(preset_bundle.get(), this);
+#endif
             if (! cw_showed) {
+                this->preset_updater->set_installed_vendors(preset_bundle.get());
+                this->preset_updater->sync_async([this](int nb_updates) {this->check_updates(true, nb_updates);});
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
                 // sees something else than "we want something" on the first start.
@@ -962,12 +972,7 @@ GUI_App::GUI_App(EAppMode mode)
 	, m_other_instance_message_handler(std::make_unique<OtherInstanceMessageHandler>())
     , m_downloader(std::make_unique<Downloader>())
 {
-	//app config initializes early becasuse it is used in instance checking in PrusaSlicer.cpp
-	this->init_app_config();
-    //ImGuiWrapper need the app config to get the colors
-    m_imgui.reset(new ImGuiWrapper{});
-    // init app downloader after path to datadir is set
-    m_app_updater = std::make_unique<AppUpdater>();
+    // all initailisation is reported into GUI_App::OnInit() to be able to have the gui set up and be abel to display messages.
 }
 
 // If formatted for github, plaintext with OpenGL extensions enclosed into <details>.
@@ -1041,6 +1046,162 @@ static std::optional<Semver> parse_semver_from_ini(std::string path)
     return Semver::parse(body);
 }
 
+void choose_app_dir(GUI_App &app) {
+    assert(app.app_config->data_dir().empty());
+
+    // find ourself inside m_all_slic3r_installed
+    std::vector<const AppConfig::ConfigurationEntry*> same_exe_path;
+    std::vector<const AppConfig::ConfigurationEntry*> old_versions;
+    std::vector<const AppConfig::ConfigurationEntry*> same_version;
+    std::set<std::string> already_used_name;
+    for (const AppConfig::ConfigurationEntry &installed : app.app_config->get_all_slicer_installed()) {
+        already_used_name.insert(installed.installed_name);
+        if (installed.version == Semver(SLIC3R_VERSION_FULL)) {
+            same_version.push_back(&installed);
+        } else {
+            old_versions.push_back(&installed);
+            if (boost::filesystem::exists(installed.exe_path) && boost::filesystem::equivalent(binary_file().parent_path(), installed.exe_path)) {
+                same_exe_path.push_back(&installed);
+            }
+        }
+    }
+
+    std::sort(old_versions.begin(), old_versions.end(), [](const AppConfig::ConfigurationEntry *a, const AppConfig::ConfigurationEntry *b) { return a->version < b->version; });
+
+    int choice = 0;
+    //if no installation: start a new one.
+    if (same_version.size() + old_versions.size() == 0) {
+        choice = 0;
+    } else {
+        //need fonts for MessageDialog
+        app.init_fonts();
+        // else, reuse by default
+        MessageDialog first_dialog(nullptr,
+                                   _L("This is the first detected launch of this version. Would you like to copy the "
+                                      "existing configuration for reuse?"),
+                                   _L("First launch"), wxICON_QUESTION | wxYES_NO | wxCANCEL);
+
+        first_dialog.SetButtonLabel(wxID_NO, _L("Let me choose"));
+
+        int result = first_dialog.ShowModal();
+        if (result == wxID_CANCEL) {
+            // cancel: dont run
+            std::exit(EXIT_FAILURE);
+        } else if (result == wxID_YES) {
+            choice = same_version.size() + 1;
+        } else {
+            if (same_version.size() > 0 || old_versions.size() > 0) {
+                wxArrayString choices;
+                choices.Add(_L("New configuration"));
+                for (const AppConfig::ConfigurationEntry *samev : same_version) {
+                    choices.Add(format_wxstr(_L("Use same configuration as %1% ; path: (%2%)"), samev->installed_name,
+                                             samev->config_path));
+                }
+                for (const AppConfig::ConfigurationEntry *samev : same_version) {
+                    choices.Add(format_wxstr(_L("Copy configuration %1% ; path: (%2%)"), samev->installed_name,
+                                             samev->config_path));
+                }
+                for (const AppConfig::ConfigurationEntry *oldv : old_versions) {
+                    choices.Add(format_wxstr(_L("Copy old configuration %1% ; path: (%2%)"), oldv->installed_name,
+                                             oldv->config_path));
+                }
+                // reuse existing one?
+                wxSingleChoiceDialog dialog(
+                    nullptr,
+                    _L("This is the first time you're running this version of the slicer from this location."
+                       "\nWould you like to reuse a configuration that already exists on this computer?"
+                       "\nYou can either create a new empty configuration, use the same configuration as another "
+                       "installation, or copy an existing one."),
+                    _L("New configuration directory"), choices);
+                dialog.SetSelection(0);
+                int res = dialog.ShowModal();
+                if (res == wxID_CANCEL) {
+                    // cancel: dont run
+                    std::exit(EXIT_FAILURE);
+                }
+                choice = dialog.GetSelection();
+            }
+        }
+    }
+    // ask for the name & location
+    //TODO
+
+    AppConfig::ConfigurationEntry my_default_installation;
+    my_default_installation.installed_name = SLIC3R_BUILD_ID;
+    for (int i = 1; already_used_name.find(my_default_installation.installed_name) != already_used_name.end(); ++i) {
+        my_default_installation.installed_name = format("%1%_(%2%)", SLIC3R_BUILD_ID, i);
+    }
+    my_default_installation.exe_path = binary_file().parent_path();
+    my_default_installation.other_keys["exe_path_relative"] = "0";
+    my_default_installation.config_path = my_default_installation.installed_name;
+    my_default_installation.other_keys["config_path_relative"] = "1";
+    assert(!boost::filesystem::exists(my_default_installation.get_config_path(app.app_config->get_root_data_dir())));
+    my_default_installation.version = Semver(SLIC3R_VERSION_FULL);
+    
+    AppConfig::ConfigurationEntry my_new_installation = my_default_installation;
+    if (choice > 0) {
+        choice--;
+        if (choice < same_version.size()) {
+            my_new_installation = *same_version[choice];
+            my_new_installation.installed_name = my_default_installation.installed_name;
+            my_new_installation.exe_path = my_default_installation.exe_path;
+            //dir already created & in use
+        } else if (choice < same_version.size() * 2) {
+            choice -=  same_version.size();
+            // create dir & copy
+            boost::filesystem::path path = my_default_installation.get_config_path(app.app_config->get_root_data_dir());
+            boost::filesystem::create_directories(path);
+            boost::filesystem::copy(same_version[choice]->get_config_path(app.app_config->get_root_data_dir()), path,
+                                  boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+        } else {
+            assert(choice < same_version.size() * 2 + old_versions.size());
+            choice -= same_version.size() * 2;
+            assert(choice < old_versions.size());
+            boost::filesystem::path path = my_default_installation.get_config_path(app.app_config->get_root_data_dir());
+            boost::filesystem::create_directories(path);
+            auto it_is_legacy = old_versions[choice]->other_keys.find("legacy");
+            if (it_is_legacy != old_versions[choice]->other_keys.end() && it_is_legacy->second == "1") {
+                boost::filesystem::path dir(app.app_config->get_root_data_dir());
+                assert(dir == old_versions[choice]->get_config_path(app.app_config->get_root_data_dir()));
+                boost::filesystem::copy(dir / (SLIC3R_APP_KEY ".ini"), path / (SLIC3R_APP_KEY ".ini"),
+                                      boost::filesystem::copy_options::update_existing);
+                boost::filesystem::copy(dir / "cache", path / "cache",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "filament", path / "filament",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "physical_printer", path / "physical_printer",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "print", path / "print",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "printer", path / "printer",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "shapes", path / "shapes",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "sla_material", path / "sla_material",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "sla_print", path / "sla_print",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "snapshots", path / "snapshots",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "ui_layout", path / "ui_layout",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                boost::filesystem::copy(dir / "vendor", path / "vendor",
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+            } else {
+                boost::filesystem::copy(old_versions[choice]->get_config_path(app.app_config->get_root_data_dir()), path,
+                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+            }
+        }
+    }
+    my_new_installation.other_keys["installed_name"] = my_new_installation.installed_name;
+    my_new_installation.other_keys["exe_path"] = my_new_installation.exe_path.string();
+    my_new_installation.other_keys["config_path"] = my_new_installation.config_path.string();
+    my_new_installation.other_keys["version"] = my_new_installation.version.to_string();
+
+    app.app_config->set_new_installation(my_new_installation);
+
+}
+
 void GUI_App::init_app_config()
 {
     #ifdef SLIC3R_ALPHA
@@ -1053,38 +1214,6 @@ void GUI_App::init_app_config()
 
 //	SetAppDisplayName(SLIC3R_APP_NAME);
 
-	// Set the Slic3r data directory at the Slic3r XS module.
-	// Unix: ~/ .Slic3rP
-	// Windows : "C:\Users\username\AppData\Roaming\Slic3r" or "C:\Documents and Settings\username\Application Data\Slic3r"
-	// Mac : "~/Library/Application Support/Slic3r"
-
-    if (data_dir().empty()) {
-        //check if there is a "configuration" directory
-#ifdef __APPLE__
-        //... next to the app bundle on MacOs
-        if (boost::filesystem::exists(boost::filesystem::path{ resources_dir() } / ".." / ".." / ".." / "configuration")) {
-            set_data_dir((boost::filesystem::path{ resources_dir() } / ".." / ".." / ".." / "configuration").string());
-        } else
-#endif
-        //... next to the resources directory
-        if (boost::filesystem::exists(boost::filesystem::path{ resources_dir() } / ".." / "configuration")) {
-            set_data_dir((boost::filesystem::path{ resources_dir() } / ".." / "configuration").string());
-        } else {
-#ifndef __linux__
-            set_data_dir(wxStandardPaths::Get().GetUserDataDir().ToUTF8().data());
-        }
-#else
-            // Since version 2.3, config dir on Linux is in ${XDG_CONFIG_HOME}.
-            // https://github.com/prusa3d/PrusaSlicer/issues/2911
-            wxString dir;
-            if (!wxGetEnv(wxS("XDG_CONFIG_HOME"), &dir) || dir.empty())
-                dir = wxFileName::GetHomeDir() + wxS("/.config");
-            set_data_dir((dir + "/" + GetAppName()).ToUTF8().data());
-        }
-#endif
-    } else {
-        m_datadir_redefined = true;
-    }
 
 	if (!app_config) {
         app_config.reset(new AppConfig(is_editor() ? AppConfig::EAppMode::Editor : AppConfig::EAppMode::GCodeViewer));
@@ -1107,9 +1236,29 @@ void GUI_App::init_app_config()
         //can't know the gpu before the openg init, so it's delayed. until it
 #endif
     }
-	// load settings
-	m_app_conf_exists = app_config->exists();
-	if (m_app_conf_exists) {
+
+    //init appconfig (find configuration folder)
+    std::string appdata_path;
+#ifndef __linux__
+        appdata_path = wxStandardPaths::Get().GetUserDataDir().ToUTF8().data();
+#else
+        // Since version 2.3, config dir on Linux is in ${XDG_CONFIG_HOME}.
+        // https://github.com/prusa3d/PrusaSlicer/issues/2911
+        wxString dir;
+        if (!wxGetEnv(wxS("XDG_CONFIG_HOME"), &dir) || dir.empty())
+            dir = wxFileName::GetHomeDir() + wxS("/.config");
+        appdata_path = (dir + "/" + GetAppName()).ToUTF8().data();
+#endif
+    m_datadir_redefined = !app_config->init_root_data_dir(appdata_path);
+    if (!has_data_dir()) {
+        choose_app_dir(*this);
+    }
+
+    app_config->init_ui_layout();
+
+    // load settings
+    m_app_conf_exists = app_config->exists();
+    if (m_app_conf_exists) {
         std::string error = app_config->load();
         if (!error.empty()) {
             // Error while parsing config file. We'll customize the error message and rethrow to be displayed.
@@ -1241,6 +1390,20 @@ void GUI_App::init_single_instance_checker(const std::string &name, const std::s
 bool GUI_App::OnInit()
 {
     try {
+        //app config initializes early becasuse it is used in instance checking in PrusaSlicer.cpp
+        this->init_app_config();
+        //ImGuiWrapper need the app config to get the colors
+        m_imgui.reset(new ImGuiWrapper{});
+        // init app downloader after path to datadir is set
+        m_app_updater = std::make_unique<AppUpdater>();
+        if (this->get_app_mode() != GUI::GUI_App::EAppMode::GCodeViewer) {
+            // G-code viewer is currently not performing instance check, a new G-code viewer is started every time.
+            bool gui_single_instance_setting = this->app_config->get_bool("single_instance");
+            if (Slic3r::instance_check(this->init_params->argc, this->init_params->argv, gui_single_instance_setting)) {
+                //TODO: do we have delete gui and other stuff?
+                std::exit(EXIT_FAILURE);
+            }
+        }
         return on_init_inner();
     } catch (const std::exception&) {
         generic_exception_handle();
@@ -1493,13 +1656,18 @@ bool GUI_App::on_init_inner()
                         , _u8L("See Releases page.")
                         , [](wxEvtHandler* evnthndlr) {wxGetApp().open_browser_with_warning_dialog("https://github.com/" SLIC3R_GITHUB "/releases"); return true; }
                     );
-    }
+                }
             }
             });
         Bind(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS, [this](const wxCommandEvent& evt) {
             //lm:This does not force a render. The progress bar only updateswhen the mouse is moved.
             if (this->plater_ != nullptr)
                 this->plater_->get_notification_manager()->set_download_progress_percentage((float)std::stoi(into_u8(evt.GetString())) / 100.f );
+        });
+        Bind(EVT_SLIC3R_APP_DOWNLOAD_NAME, [this](const wxCommandEvent& evt) {
+            //lm:This does not force a render. The progress bar only updateswhen the mouse is moved.
+            if (this->plater_ != nullptr)
+                this->plater_->get_notification_manager()->set_download_progress_text(into_u8(evt.GetString()));
         });
 
         Bind(EVT_SLIC3R_APP_DOWNLOAD_FAILED, [this](const wxCommandEvent& evt) {
@@ -1513,9 +1681,57 @@ bool GUI_App::on_init_inner()
             show_error(nullptr, evt.GetString());
         }); 
 
+        Bind(EVT_SLIC3R_APP_REPLACE_SUCCESS, [this](const wxCommandEvent& evt) {
+                wxString title = wxString(SLIC3R_APP_NAME);
+                title += " - " + _L("upgrade to newer version");
+                // wxMessageDialog becasue we may not have the icons anymore.
+                wxMessageDialog dialog(nullptr,
+                    _L("The new version is installed, do you want to restart now?"),
+                    title,
+                    wxICON_QUESTION | wxOK | wxCANCEL);
+                if (dialog.ShowModal() == wxID_OK) {
+#ifdef _WIN32
+                    //this current work
+                    int saved_project = wxID_NO;
+                    if (this->plater_) {
+                        int saved_project = this->plater_->save_project_if_dirty(
+                            format_wxstr(_L("Closing %1%. Current project is modified."), SLIC3R_APP_NAME));
+                        if (saved_project == wxID_CANCEL) {
+                            return;
+                        }
+                        if (saved_project == wxID_NO && this->plater_->is_presets_dirty()) {
+                            if (!this->check_and_save_current_preset_changes(
+                                    format_wxstr(_L("%1% is closing"), SLIC3R_APP_NAME),
+                                    format_wxstr(_L("Closing %1% while some presets are modified."),
+                                                 SLIC3R_APP_NAME))) {
+                                //cancel
+                                return;
+                            }
+                        }
+                    }
+                    // "restart"
+                    Slic3r::win_exec(binary_file().string());
+                    //FIXME: call Close (or another gentler way to close)
+                    //std::exit(EXIT_FAILURE);
+                    if(this->mainframe)
+                        this->mainframe->Close(true);
+#else
+                    assert(false);
+#endif
+                }
+        }); 
+        
+#ifndef USE_GTHUB_PRESET_UPDATE
+    ///////////////////////// -supermerill: old prusa code for the old way to update profiles /////////////////////////
+    ///////////////////////// not used anymore 
         Bind(EVT_CONFIG_UPDATER_SYNC_DONE, [this](const wxCommandEvent& evt) {
-            this->check_updates(false);
+            check_updates(true);
         });
+#else
+        Bind(EVT_CONFIG_UPDATER_SHOW_DIALOG, [this](const wxCommandEvent& evt) {
+            this->preset_updater->show_synch_window(this->plater(), preset_bundle.get(), _L("Managing vendor bundles:"), [](bool){});
+        }); 
+#endif
 
     }
     else {
@@ -2569,16 +2785,20 @@ void GUI_App::persist_window_geometry(wxTopLevelWindow *window, bool default_max
     });
 }
 
-void GUI_App::load_project(wxWindow *parent, wxString& input_file) const
+bool GUI_App::load_project(wxWindow *parent, wxString& input_file) const
 {
     input_file.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
         _L("Choose one file (3MF/AMF):"),
         app_config->get_last_dir(), "",
-        file_wildcards(FT_PROJECT), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        file_wildcards(FT_PROJECT)+ "|" + file_wildcards(FT_3MF_UNKBAKE), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
-    if (dialog.ShowModal() == wxID_OK)
+    bool unbake_trsf = false;
+    if (dialog.ShowModal() == wxID_OK) {
         input_file = dialog.GetPath();
+        unbake_trsf = dialog.GetCurrentlySelectedFilterIndex() == 1;
+    }
+    return unbake_trsf;
 }
 
 void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
@@ -2593,7 +2813,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
         dialog.GetPaths(input_files);
 }
 
-void GUI_App::import_model_modifier(wxWindow *parent, wxString& input_file) const {
+void GUI_App::import_model_hueforge(wxWindow *parent, wxString& input_file) const {
 
     // Clear the input file before importing
     input_file.Clear();
@@ -2603,10 +2823,9 @@ void GUI_App::import_model_modifier(wxWindow *parent, wxString& input_file) cons
             _L("Choose your modifier file (HFP):"),
             from_u8(app_config->get_last_dir()), "",
             file_wildcards(FT_HFP), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-            
+
        if (dialog.ShowModal() == wxID_OK)
            input_file = dialog.GetPath();
-       std::cout << dialog.GetPath() << std::endl;
 }
 
 void GUI_App::import_zip(wxWindow* parent, wxString& input_file) const
@@ -3095,9 +3314,53 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         case ConfigMenuWizard:
             run_wizard(ConfigWizard::RR_USER);
             break;
-		case ConfigMenuUpdateConf:
-			check_updates(true);
-			break;
+        case ConfigMenuUpdateConf:
+#ifndef USE_GTHUB_PRESET_UPDATE
+    ///////////////////////// -supermerill: old prusa code for the old way to update profiles /////////////////////////
+    ///////////////////////// not used anymore 
+            check_updates(true);
+#else
+            assert(this->preset_updater);
+            if (this->preset_updater) {
+                bool is_in_synch = this->preset_updater->synch_process_ongoing;
+                if (is_in_synch) {
+                    std::lock_guard<std::mutex> guard(this->preset_updater->callback_update_preset_mutex);
+                    //test again, to avoid issues
+                    if (this->preset_updater->synch_process_ongoing) {
+                        auto old_callback_update_preset = this->preset_updater->callback_update_preset;
+                        this->preset_updater->sync_async([this, old_callback_update_preset](int nb_updates) {
+                            old_callback_update_preset(nb_updates);
+                            this->preset_updater->set_installed_vendors(preset_bundle.get());
+                            this->preset_updater->reload_all_vendors();
+                            this->preset_updater->sync_async([this](int update_count) {
+                                // end of waiting dialog (yes, it has to be called without any exception)
+                                this->wait_dialog.reset();
+                                // call show_synch_window once this call is returned.
+                                // can't call it here as there is still things to celan up before
+                                wxCommandEvent* evt = new wxCommandEvent(EVT_CONFIG_UPDATER_SHOW_DIALOG);
+                                this->QueueEvent(evt);
+                            });
+                        });
+                        this->wait_dialog.reset(new wxBusyInfo("Updating the presets, please wait"));
+                        return;
+                    } else {
+                        // the mutex lock makes us wait enough time.
+                    }
+                }
+                this->wait_dialog.reset(new wxBusyInfo("Updating the presets, please wait"));
+                this->preset_updater->set_installed_vendors(preset_bundle.get());
+                this->preset_updater->reload_all_vendors();
+                this->preset_updater->sync_async([this](int update_count) {
+                    // end of waiting dialog (yes, it has to be called without any exception)
+                    this->wait_dialog.reset();
+                    // call show_synch_window once this call is returned.
+                    // can't call it here as there is still things to celan up before
+                    wxCommandEvent* evt = new wxCommandEvent(EVT_CONFIG_UPDATER_SHOW_DIALOG);
+                    this->QueueEvent(evt);
+                });
+            }
+#endif
+            break;
         case ConfigMenuUpdateApp:
             app_version_check(true);
             break;
@@ -3725,10 +3988,13 @@ bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
     return true;
 }
 
-bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page)
+bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page, bool bypass_bundle_install /*= false*/)
 {
     wxCHECK_MSG(mainframe != nullptr, false, "Internal error: Main frame not created / null");
-
+    
+#ifndef USE_GTHUB_PRESET_UPDATE
+    ///////////////////////// -supermerill: old prusa code for the old way to update profiles /////////////////////////
+    ///////////////////////// not used anymore 
     if (reason == ConfigWizard::RR_USER) {
         // Cancel sync before starting wizard to prevent two downloads at same time
         preset_updater->cancel_sync();
@@ -3736,8 +4002,19 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
         if (preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD) == PresetUpdater::R_ALL_CANCELED)
             return false;
     }
+#endif
+    // if nothing installed, show the installatino dialog first
+    bool is_synch = this->preset_updater->is_synch;
+    if (bypass_bundle_install || !is_synch || this->preset_updater->count_installed() == 0) {
+        this->preset_updater->show_synch_window(
+            this->mainframe, preset_bundle.get(),
+            _L("You don't have any vendor configuration bundles intalled yet. You need to choose the vendor that are "
+            "useful for you. If you want to install a prusa printer, you should install a prusa bundle so you can "
+            "choose inside prusa printer presets."),
+            [&](bool is_ok) { if (is_ok) run_wizard(reason, start_page, true); });
+        return false;
+    }
 
-    
     ConfigWizard *wizard = nullptr;
     {
         wxBusyCursor wait;
@@ -3955,7 +4232,10 @@ bool GUI_App::config_wizard_startup()
     return false;
 }
 
-bool GUI_App::check_updates(const bool verbose)
+#ifndef USE_GTHUB_PRESET_UPDATE
+    ///////////////////////// -supermerill: old prusa code for the old way to update profiles /////////////////////////
+    ///////////////////////// not used anymore 
+bool GUI_App::check_updates(const bool verbose, int nb_updates)
 {	
 	PresetUpdater::UpdateResult updater_result;
 	try {
@@ -3979,6 +4259,18 @@ bool GUI_App::check_updates(const bool verbose)
     // Applicaiton will continue.
     return true;
 }
+#else
+bool GUI_App::check_updates(const bool verbose, int nb_updates) {
+    if (nb_updates > 0) {
+        // Show notification
+        GUI::wxGetApp().plater()->get_notification_manager()
+            ->push_notification(GUI::NotificationType::PresetUpdateAvailable,
+                                Slic3r::format(_u8L("%1% configurations update are available."), nb_updates));
+    }
+    // Applicaiton will continue.
+    return true;
+}
+#endif
 
 bool GUI_App::open_browser_with_warning_dialog(const wxString& url,  wxWindow* parent/* = nullptr*/, bool allow_remember_choice/* = true*/, int flags/* = 0*/)
 {
@@ -4075,19 +4367,22 @@ void GUI_App::associate_bgcode_files()
 void GUI_App::on_version_read(wxCommandEvent& evt)
 {
     app_config->set("version_online", into_u8(evt.GetString()));
+    std::optional<Slic3r::Semver> version_online = Semver::parse(into_u8(evt.GetString()));
     std::string opt = app_config->get("notify_release");
-    if (this->plater_ == nullptr || (!m_app_updater->get_triggered_by_user() && opt != "all" && opt != "release")) {
+    if (!version_online || this->plater_ == nullptr) {
+        return;
+    } else if (!m_app_updater->get_triggered_by_user() && opt != "all" && (opt != "release" || version_online->prerelease() == nullptr)) {
         BOOST_LOG_TRIVIAL(info) << "Version online: " << evt.GetString() << ". User does not wish to be notified.";
         return;
     }
-    if (*Semver::parse(SLIC3R_VERSION_FULL) >= *Semver::parse(into_u8(evt.GetString()))) {
+    if (*Semver::parse(SLIC3R_VERSION_FULL) >= *version_online) {
         if (m_app_updater->get_triggered_by_user())
         {
-            std::string text = (*Semver::parse(into_u8(evt.GetString())) == Semver()) 
+            std::string text = (*version_online == Semver()) 
                 ? _u8L("Check for application update has failed.")
                 : Slic3r::format(_u8L("You are currently running the latest released version %1%."), evt.GetString());
 
-            if (*Semver::parse(SLIC3R_VERSION) > *Semver::parse(into_u8(evt.GetString())))
+            if (*Semver::parse(SLIC3R_VERSION) > *version_online)
                 text = Slic3r::format(_u8L("There are no new released versions online. The latest release version is %1%."), evt.GetString());
 
             this->plater_->get_notification_manager()->push_version_notification(NotificationType::NoNewReleaseAvailable
@@ -4147,10 +4442,11 @@ void GUI_App::app_updater(bool from_user)
     if (dialog_result != wxID_OK) {
         return;
     }
-    app_data.target_path =dwnld_dlg.get_download_path();
+    app_data.target_path = dwnld_dlg.get_download_path();
     // start download
     this->plater_->get_notification_manager()->push_download_progress_notification(GUI::format(_L("Downloading %1%"), app_data.target_path.filename().string()), std::bind(&AppUpdater::cancel_callback, this->m_app_updater.get()));
     app_data.start_after = dwnld_dlg.run_after_download();
+    app_data.replace_current = dwnld_dlg.replace_current_after_download();
     m_app_updater->set_app_data(std::move(app_data));
     m_app_updater->sync_download();
 }

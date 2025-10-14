@@ -161,8 +161,8 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
         auto insert_layer = [&layer_storage, smooth_supports, closing_distance, smoothing_distance, minimum_island_radius, &support_params](
                 SupportGeneratorLayer &intermediate_layer, Polygons &bottom, Polygons &&top, SupportGeneratorLayer *top_interface_layer, 
                 const Polygons *subtract, SupporLayerType type) -> SupportGeneratorLayer* {
-            assert_valid(bottom);
-            assert_valid(top);
+            ensure_valid(bottom);
+            ensure_valid(top);
             bool has_top_interface = top_interface_layer && ! top_interface_layer->polygons.empty();
             assert(! bottom.empty() || ! top.empty() || has_top_interface);
             // Merge top into bottom, unite them with a safety offset.
@@ -497,8 +497,8 @@ SupportGeneratorLayersPtr generate_raft_base(
                 raft = diff(raft, trimming);
             if (! interface_polygons.empty())
                 columns_base->polygons = ensure_valid(diff(columns_base->polygons, interface_polygons), support_params.resolution);
-            assert_valid(raft);
-            assert_valid(columns_base->polygons);
+            ensure_valid(raft);
+            ensure_valid(columns_base->polygons);
         }
         if (! brim.empty()) {
             assert_valid(brim);

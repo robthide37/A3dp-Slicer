@@ -576,7 +576,7 @@ bool GLGizmoRotate3D::on_is_activable() const
 
     // not activable if volume selected is a seam modifier
     ModelVolume* volume = get_selected_volume(selection);
-    if (volume && volume->is_seam_position()) {
+    if (volume && volume->type() == ModelVolumeType::SEAM_POSITION_CENTER) {
         return false;
     }
 

@@ -606,6 +606,17 @@ Flow support_material_flow(const PrintObject* object, float layer_height)
             extruder_id = object->default_region_config(object->print()->default_region_config()).infill_extruder - 1;
         }
     }
+    if (extruder_id < 0) {
+        // get biggest used for the print.
+        double biggest_nzl= 0 ;
+        for (uint16_t extr_id : object->object_extruders()) {
+            double new_nzl = object->print()->config().nozzle_diameter.get_at(extr_id);
+            if (new_nzl > biggest_nzl) {
+                extruder_id = extr_id;
+                biggest_nzl = new_nzl;
+            }
+        }
+    }
     double nzd = object->print()->config().nozzle_diameter.get_at(extruder_id);
     const ConfigOptionFloatOrPercent& width = (object->config().support_material_extrusion_width.value > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_width;
     const ConfigOptionFloatOrPercent& spacing = (object->config().support_material_extrusion_width.value > 0) ? object->config().support_material_extrusion_width : object->config().extrusion_spacing;

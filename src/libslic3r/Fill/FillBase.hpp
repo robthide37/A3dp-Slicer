@@ -64,6 +64,10 @@ struct FillParams
     // Don't connect the fill lines around the inner perimeter.
     InfillConnection connection{ icConnected };
 
+    // If full_infill(), the empty space can be filled with a gapfill pass.
+    //TODO: save the region areas where it needs to be added, to avoid splitting infill.
+    bool add_gap_fill = false;
+
     // Length of an infill anchor along the perimeter.
     // 1000mm is roughly the maximum length line that fits into a 32bit coord_t.
     float       anchor_length   { 1000.f };
@@ -171,7 +175,8 @@ public:
 
     // This method have to fill the ExtrusionEntityCollection. It call fill_surface by default
     virtual void fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const;
-    
+    // called & use fill_surface_extrusion and put gap fill after in empty spaces.
+    void fill_surface_extrusion_with_gap_fill(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const;
     // Perform the fill.
     virtual Polylines fill_surface(const Surface *surface, const FillParams &params) const;
     virtual ThickPolylines fill_surface_arachne(const Surface *surface, const FillParams &params) const;

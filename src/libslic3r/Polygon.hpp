@@ -77,14 +77,14 @@ public:
     const Point& last_point() const { return this->points.front(); }
     virtual bool is_loop() const { return true; }
 
-    double length() const;
+    distf_t length() const;
     Lines lines() const;
     Polyline split_at_vertex(const Point &point) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_index(size_t index) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_first_point() const { return this->split_at_index(0); }
-    Points   equally_spaced_points(double distance) const { return this->split_at_first_point().equally_spaced_points(distance); }
+    Points   equally_spaced_points(distf_t distance) const { return this->split_at_first_point().equally_spaced_points(distance); }
 
     static double area(const Points &pts);
     double area() const;
@@ -102,7 +102,7 @@ public:
         { return (this->point_projection(point).first - point).cast<double>().squaredNorm() < eps * eps; }
 
     // Works on CCW polygons only, CW contour will be reoriented to CCW by Clipper's simplify_polygons()!
-    Polygons simplify(double tolerance) const;
+    Polygons simplify(distf_t tolerance) const;
     void densify(float min_length, std::vector<float>* lengths = nullptr);
     void triangulate_convex(Polygons* polygons) const;
     Point centroid() const;
@@ -126,6 +126,7 @@ public:
     /// return number of point removed
     size_t remove_collinear(coord_t max_offset);
     size_t remove_collinear_angle(double angle);
+    void remove_point_too_close(const coord_t tolerance);
 
 #ifdef _DEBUGINFO
     void assert_valid() const override;
@@ -165,14 +166,16 @@ Polygons ensure_valid(Polygons &&polygons, coord_t resolution = SCALED_EPSILON);
 Polygons ensure_valid(coord_t resolution, Polygons &&polygons);
 // return false if the polygon isn't valid and need to be removed.
 bool ensure_valid(Polygon &polygon, coord_t resolution = SCALED_EPSILON);
+// like ensure_valid but you're sure it won't remove colinear points.
+void remove_point_too_close(Polygons &polygons, coord_t resolution = SCALED_EPSILON);
 #ifdef _DEBUGINFO
 void assert_valid(const Polygons &polygons);
 #else
 inline void assert_valid(const Polygons &polygons) {}
 #endif
 
-inline double total_length(const Polygons &polylines) {
-    double total = 0;
+inline distf_t total_length(const Polygons &polylines) {
+    distf_t total = 0;
     for (Polygons::const_iterator it = polylines.begin(); it != polylines.end(); ++it)
         total += it->length();
     return total;
@@ -211,8 +214,8 @@ inline void polygons_append(Polygons &dst, Polygons &&src)
     }
 }
 
-Polygons polygons_simplify(Polygons &&polys, double tolerance, bool strictly_simple = true);
-Polygons polygons_simplify(const Polygons &polys, double tolerance, bool strictly_simple = true);
+Polygons polygons_simplify(Polygons &&polys, distf_t tolerance, bool strictly_simple = true);
+Polygons polygons_simplify(const Polygons &polys, distf_t tolerance, bool strictly_simple = true);
 
 inline void polygons_rotate(Polygons &polys, double angle)
 {
@@ -353,8 +356,8 @@ inline Polygons to_polygons(VecOfPoints &&paths)
 // however their contours may be rotated.
 bool polygons_match(const Polygon &l, const Polygon &r);
 
-Polygon make_circle(double radius, double error);
-Polygon make_circle_num_segments(double radius, size_t num_segments);
+Polygon make_circle(distf_t radius, distf_t error);
+Polygon make_circle_num_segments(distf_t radius, size_t num_segments);
 
 /// <summary>
 /// Define point laying on polygon

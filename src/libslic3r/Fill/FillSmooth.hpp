@@ -16,9 +16,12 @@ public:
         anglePass[0] = 0;
         anglePass[1] = float(M_PI/2);
         anglePass[2] = 0;
-        fillPattern[0] = InfillPattern::ipMonotonicWGapFill;//ipRectilinearWGapFill;
+        fillPattern[0] = InfillPattern::ipMonotonic;//ipRectilinearWGapFill;
+        has_gap_fill[0] = true;
         fillPattern[1] = InfillPattern::ipRectilinear;
+        has_gap_fill[1] = false;
         fillPattern[2] = InfillPattern::ipRectilinear;
+        has_gap_fill[2] = false;
         rolePass[0] = ExtrusionRole::None;// ExtrusionRole::TopSolidInfill;
         rolePass[1] = ExtrusionRole::Ironing;
         rolePass[2] = ExtrusionRole::Ironing;
@@ -49,6 +52,8 @@ protected:
     double percentFlow[3];
     //angle to add to base angle
     float anglePass[3];
+    // gapfill?
+    bool has_gap_fill[3];
     //if false, it won't overlap inside the perimeters
     bool has_overlap[3];
     // profile for base width, speed, etc.
@@ -72,8 +77,11 @@ public:
         anglePass[1] = float(M_PI / 2);
         anglePass[2] = float(M_PI / 12); //align with nothing
         fillPattern[0] = InfillPattern::ipHilbertCurve; //ipRectilinear
+        has_gap_fill[0] = false;
         fillPattern[1] = InfillPattern::ipConcentric;
+        has_gap_fill[1] = false;
         fillPattern[2] = InfillPattern::ipRectilinear;
+        has_gap_fill[2] = false;
         rolePass[0] = ExtrusionRole::SolidInfill;//erSolidInfill
         rolePass[1] = ExtrusionRole::TopSolidInfill;
         rolePass[2] = ExtrusionRole::Ironing;
@@ -105,8 +113,11 @@ public:
         anglePass[1] = float(M_PI / 4);
         anglePass[2] = float(M_PI / 4);
         fillPattern[0] = InfillPattern::ipHilbertCurve; //ipHilbertCurve
+        has_gap_fill[0] = false;
         fillPattern[1] = InfillPattern::ipHilbertCurve;
+        has_gap_fill[1] = false;
         fillPattern[2] = InfillPattern::ipRectilinear;
+        has_gap_fill[2] = false;
         rolePass[0] = ExtrusionRole::TopSolidInfill;
         rolePass[1] = ExtrusionRole::Ironing;
         rolePass[2] = ExtrusionRole::Ironing;

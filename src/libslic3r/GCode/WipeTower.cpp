@@ -1641,7 +1641,11 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         const double spacing = brim_flow.spacing();
         // How many perimeters shall the brim have?
         size_t loops_num = (m_config->wipe_tower_brim_width.get_abs_value(m_nozzle_diameter) + spacing / 2) / spacing;
-        
+        // ensure the loops_num is within bounds
+        if (m_config->wipe_tower_brim_width.get_abs_value(m_nozzle_diameter) <= 0) {
+            loops_num = 0;
+        }
+        assert(loops_num < 999);
 
         writer.set_extrusion_flow(brim_flow.mm3_per_mm() / filament_area())
           .set_z(m_z_pos + m_config->z_offset.value) // Let the writer know the current Z position as a base for Z-hop.

@@ -78,7 +78,7 @@ protected:
      * branch of a tree.
      */
     coord_t m_supporting_radius;
-    int64_t m_supporting_radius2;
+    lengthsqr_t m_supporting_radius_sqr;
 
     /*!
      * Represents a small discrete area of infill that needs to be supported.

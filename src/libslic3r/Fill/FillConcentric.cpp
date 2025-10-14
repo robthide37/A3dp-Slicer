@@ -103,10 +103,16 @@ void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRo
 }
 
 void
-FillConcentricWGapFill::fill_surface_extrusion(
+FillConcentric::fill_surface_extrusion(
     const Surface *surface, 
     const FillParams &params,
     ExtrusionEntitiesPtr &out) const {
+
+    //with or without gapfill?
+    if (!params.add_gap_fill) {
+        //without gapfill, use the normal function
+        return Fill::fill_surface_extrusion(surface, params, out);
+    }
 
     ExtrusionEntitiesPtr out_to_check;
 

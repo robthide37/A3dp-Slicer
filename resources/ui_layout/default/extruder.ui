@@ -45,6 +45,7 @@ group:Retraction wipe
 	setting:idx:wipe_speed
 	setting:idx:retract_before_wipe
 	setting:idx:wipe_only_crossing
+	setting:idx:wipe_return
 group:General wipe
 	line:Wipe inside
 		setting:idx:label$At start:wipe_inside_start

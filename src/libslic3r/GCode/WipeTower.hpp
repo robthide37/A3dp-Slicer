@@ -405,6 +405,7 @@ private:
 
     // Stores information about used filament length per extruder:
     std::vector<float> m_used_filament_length;
+    // vector of layer -> {printz, vector of extruders -> used_filament }
 	std::vector<std::pair<float, std::vector<float>>> m_used_filament_length_until_layer;
 
     // Return index of first toolchange that switches to non-soluble extruder

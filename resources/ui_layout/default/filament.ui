@@ -26,38 +26,39 @@ group:Filament properties
 	setting:id$0:filament_soluble
 	setting:id$0:filament_shrink
 	setting:id$0:filament_max_overlap
-	setting:id$0:filament_pressure_advance
+
+page:Speed & Pressure advance:time
 group:Print speed override
 	setting:id$0:filament_max_speed
 	setting:id$0:filament_max_volumetric_speed
 	volumetric_speed_description
 group:Pressure/Linear advance
 	line:Default
-		setting:width$4:filament_default_pa
+		setting:id$0:width$4:filament_pressure_advance
 	line:Perimeter pa
-		setting:width$4:filament_perimeter_pa
-		setting:width$4:filament_external_perimeter_pa
+		setting:id$0:width$4:filament_perimeter_pa
+		setting:id$0:width$4:filament_external_perimeter_pa
 	line:Infill pa
-		setting:width$4:filament_solid_infill_pa
-		setting:width$4:filament_infill_pa
-		setting:width$4:filament_top_solid_infill_pa
+		setting:id$0:width$4:filament_solid_infill_pa
+		setting:id$0:width$4:filament_infill_pa
+		setting:id$0:width$4:filament_top_solid_infill_pa
 	line:Support pa
-		setting:width$4:filament_support_material_pa
-		setting:width$4:filament_support_material_interface_pa
-		setting:width$4:filament_brim_pa
+		setting:id$0:width$4:filament_support_material_pa
+		setting:id$0:width$4:filament_support_material_interface_pa
+		setting:id$0:width$4:filament_brim_pa
 	line:Bridge pa
-		setting:width$4:filament_bridge_pa
-		setting:width$4:filament_bridge_internal_pa
-		setting:width$4:filament_overhangs_pa
+		setting:id$0:width$4:filament_bridge_pa
+		setting:id$0:width$4:filament_bridge_internal_pa
+		setting:id$0:width$4:filament_overhangs_pa
 	line:Other extrusions pa
-		setting:width$4:filament_gap_fill_pa
-		setting:width$4:filament_thin_walls_pa
-		setting:width$4:filament_ironing_pa
+		setting:id$0:width$4:filament_gap_fill_pa
+		setting:id$0:width$4:filament_thin_walls_pa
+		setting:id$0:width$4:filament_ironing_pa
 	line:Travel pa
-		setting:width$4:filament_travel_pa
+		setting:id$0:width$4:filament_travel_pa
 	line:First layer pa
-		setting:width$4:filament_first_layer_pa
-		setting:label_width$35:width$4:filament_first_layer_pa_over_raft
+		setting:id$0:width$4:filament_first_layer_pa
+		setting:id$0:label_width$35:width$4:filament_first_layer_pa_over_raft
 	end_line
 
 page:Cooling:time

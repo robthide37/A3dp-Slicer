@@ -41,7 +41,7 @@ std::string WipeTowerIntegration::toolchange_gcode_from_wipe_tower_generator(GCo
     return toolchange_gcode_str;
 }
 
-std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const WipeTower::ToolChangeResult& tcr, int new_extruder_id, double z) const
+std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const WipeTower::ToolChangeResult& tcr, int new_extruder_id, double z, bool need_ensure_z) const
 {
     // has previous pos, or it's first layer.
     assert(gcodegen.last_pos_defined() || gcodegen.layer() == nullptr || gcodegen.layer()->lower_layer == nullptr);
@@ -137,7 +137,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
     // A phony move to the end position at the wipe tower.
     gcodegen.writer().travel_to_xy(end_pos.cast<double>());
     gcodegen.set_last_pos(wipe_tower_point_to_object_point(gcodegen, end_pos));
-    if (!is_approx(z, current_z)) {
+    if (!is_approx(z, current_z) && need_ensure_z) {
         gcode += gcodegen.writer().retract();
         gcode += gcodegen.writer().travel_to_z(current_z, "Travel back up to the topmost object layer.");
         // gcode += gcodegen.writer().unretract(); //why? it's done automatically later, where needed!
@@ -248,8 +248,6 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
                 line = oss.str() + line;
                 old_pos = transformed_pos;
             }
-            line += "; raw: ";
-            line += raw_line;
         } else if (boost::starts_with(line, "[toolchange_gcode_from_wipe_tower_generator]")) {
             assert(new_extruder_id == tcr.new_tool);
             const bool needs_toolchange = gcodegen.writer().need_toolchange(new_extruder_id);
@@ -285,8 +283,8 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
                 line = "";
             }
         } else if (boost::starts_with(line, "[toolchange_gcode_enable_linear_advance]")) {
-            if (gcodegen.config().filament_default_pa.is_enabled(new_extruder_id)) {
-                line = gcodegen.writer().write_pressure_advance(gcodegen.config().filament_default_pa.get_at(gcodegen.writer().tool()->id()));
+            if (gcodegen.config().filament_pressure_advance.is_enabled(new_extruder_id)) {
+                line = gcodegen.writer().write_pressure_advance(gcodegen.config().filament_pressure_advance.get_at(gcodegen.writer().tool()->id()));
             } else {
                 line = "";
             }
@@ -321,16 +319,21 @@ std::string WipeTowerIntegration::tool_change(GCodeGenerator &gcodegen, int extr
             // resulting in a wipe tower with sparse layers.
             double wipe_tower_z = -1;
             bool ignore_sparse = false;
+            bool ensure_z  = true;
             if (gcodegen.config().wipe_tower_no_sparse_layers.value) {
                 wipe_tower_z = m_last_wipe_tower_print_z;
                 ignore_sparse = (m_tool_changes[m_layer_idx].size() == 1 && m_tool_changes[m_layer_idx].front().initial_tool == m_tool_changes[m_layer_idx].front().new_tool && m_layer_idx != 0);
                 if (m_tool_change_idx == 0 && !ignore_sparse)
                     wipe_tower_z = m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height;
+            } else if(!is_approx(m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height, gcodegen.writer().get_unlifted_position().z(), EPSILON)){
+                // missing layer, this can happen with parallel_objects_step_max_z
+                wipe_tower_z = m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height;
+                ensure_z = false;
             }
 
             if (!ignore_sparse) {
-                gcode += append_tcr(gcodegen, m_tool_changes[m_layer_idx][m_tool_change_idx++], extruder_id, wipe_tower_z);
-                m_last_wipe_tower_print_z = wipe_tower_z;
+                gcode += append_tcr(gcodegen, m_tool_changes[m_layer_idx][m_tool_change_idx++], extruder_id, wipe_tower_z, ensure_z);
+                m_last_wipe_tower_print_z = m_tool_changes[m_layer_idx].front().print_z;
             }
         }
     }

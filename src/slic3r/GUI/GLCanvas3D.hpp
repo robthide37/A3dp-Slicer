@@ -474,6 +474,14 @@ class GLCanvas3D
     };
 
 public:
+
+    struct OrientSettings
+    {
+        float overhang_angle = 60.f;
+        bool  enable_rotation = false;
+        bool  min_area = true;
+    };
+
     enum ECursorType : unsigned char
     {
         Standard,
@@ -495,6 +503,8 @@ public:
         int   strategy = 0;
     };
 */
+
+
 
     enum class ESLAViewType
     {
@@ -538,6 +548,7 @@ private:
 
     GCodeViewer m_gcode_viewer;
 
+    bool still_mouse_down = false;
     RenderTimer m_render_timer;
 
     Selection m_selection;
@@ -561,6 +572,9 @@ private:
     bool m_picking_enabled;
     bool m_moving_enabled;
     bool m_dynamic_background_enabled;
+    bool m_show_position_axle = false;
+    bool m_show_z_axle = false;
+    bool m_show_xy_plane = false;
     bool m_multisample_allowed;
     bool m_moving;
     bool m_tab_down;
@@ -591,6 +605,8 @@ private:
     Tooltip m_tooltip;
     bool m_tooltip_enabled{ true };
     Slope m_slope;
+
+    OrientSettings m_orient_settings_fff;
 
     class SLAView
     {
@@ -711,6 +727,9 @@ private:
     GLModel m_target_validation_box;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     GLModel m_background;
+    GLModel m_z_axle;
+    double m_z_axle_length;
+    GLModel m_xy_plane;
 
 public:
     GLCanvas3D(wxGLCanvas* canvas, Bed3D& bed);
@@ -791,6 +810,15 @@ public:
     GLGizmosManager& get_gizmos_manager() { return m_gizmos; }
 
     void bed_shape_changed();
+
+    OrientSettings& get_orient_settings()
+    {
+        PrinterTechnology ptech = this->current_printer_technology();
+
+        auto* ptr = &this->m_orient_settings_fff;
+
+        return *ptr;
+    }
 
     void set_clipping_plane(unsigned int id, const ClippingPlane& plane) {
         if (id < 2) {
@@ -1116,6 +1144,7 @@ private:
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
     bool _render_search_list(float pos_x);
     bool _render_arrange_menu(float pos_x, bool current_bed);
+    bool _render_orient_menu(float left, float right, float bottom, float top, bool current_bed);
     void _render_thumbnail_internal(ThumbnailData& thumbnail_data, const ThumbnailsParams& thumbnail_params, const GLVolumeCollection& volumes, Camera::EType camera_type);
     // render thumbnail using an off-screen framebuffer
     void _render_thumbnail_framebuffer(ThumbnailData& thumbnail_data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, const GLVolumeCollection& volumes, Camera::EType camera_type);

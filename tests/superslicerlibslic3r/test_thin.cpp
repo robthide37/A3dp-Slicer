@@ -16,7 +16,7 @@ class ExtrusionVolumeVisitor : public ExtrusionVisitorConst {
     double volume = 0;
 public:
     virtual void use(const ExtrusionPath &path) override { 
-        for (int i = 0; i < path.polyline.size() - 1; i++) volume += unscaled(path.polyline.get_points()[i].distance_to(path.polyline.get_points()[i + 1])) * path.mm3_per_mm;
+        for (int i = 0; i < path.polyline.size() - 1; i++) volume += unscaled(path.polyline.get_point(i).distance_to(path.polyline.get_point(i + 1))) * path.mm3_per_mm();
     };
     virtual void use(const ExtrusionPath3D &path3D) override { std::cout << "error, not supported"; };
     virtual void use(const ExtrusionMultiPath &multipath) override {
@@ -35,6 +35,26 @@ public:
     }
 };
 
+TEST_CASE("douglas_peucker", "[MultiPoint]") {
+    Points pt_in{Point{-15395527,-2111143},Point{-13895526,-2111143},Point{-13895526,2888857},Point{-13895526,7888857},Point{-15395527,7888857},Point{-16895527,7888857},Point{-16895527,2888857},Point{-16895527,-2111143},Point{-15395527,-2111143}};
+    Points pt_check{Point{-15395527,-2111143},Point{-13895526,-2111143},Point{-13895526,7888857},Point{-16895527,7888857},Point{-16895527,-2111143},Point{-15395527,-2111143}};
+    Points pt_out;
+    douglas_peucker_impl(pt_in.begin(), pt_in.end(), std::back_inserter(pt_out), 3125, [](const Point &p) { return p; });
+    CHECK(pt_check == pt_out);
+
+    
+    pt_out.clear();
+    pt_in    = Points{Point{-12055802,13394988},Point{-12073465,13512709},Point{-12537037,16602872},Point{-12564871,16770093},Point{-12868331,17841241},Point{-12965150,17972859},Point{-13810604,19219296},Point{-13841058,19256391}};
+    pt_check = Points{Point{-12055802,13394988},                          Point{-12537037,16602872},Point{-12564871,16770093},Point{-12868331,17841241},Point{-12965150,17972859},Point{-13810604,19219296},Point{-13841058,19256391}};
+    douglas_peucker_impl(pt_in.begin(), pt_in.end(), std::back_inserter(pt_out), 100, [](const Point &p) { return p; });
+    CHECK(pt_check == pt_out);
+
+    pt_out.clear();
+    pt_in=Points{Point{-13841058,19256391},Point{-16000605,20783293},Point{-16125238,20872985},Point{-16200187,20900789},Point{-16848438,21137523},Point{-16900761,21143283},Point{-20054251,21284769},Point{-20181919,21288860},Point{-22576808,21101056},Point{-22669127,21077143},Point{-23918502,20818838},Point{-23999359,20778152},Point{-24039299,20754670},Point{-24814754,20341965},Point{-26807135,17890308},Point{-26929421,17731916},Point{-28132887,15992835},Point{-28198624,15895792},Point{-28218950,15797058},Point{-28476498,14658550},Point{-28439905,10501406},Point{-28436363,10295169},Point{-28435384,10189629},Point{-28353671,9898192},Point{-28116197,9136826},Point{-27949451,8952986},Point{-26789518,7630590},Point{-26286455,7182547},Point{-24378165,5644312},Point{-23925947,5307730},Point{-23772395,5206406},Point{-22031513,4577830},Point{-21858188,4541972},Point{-21578146,4543156},Point{-18363941,4558289},Point{-18218501,4564749},Point{-16175540,5253855},Point{-15971945,5344493},Point{-15901961,5376200},Point{-13909135,7342791},Point{-13800744,7449583},Point{-13698773,7556534},Point{-12126110,9174894},Point{-12066534,9285833},Point{-11740302,10223276},Point{-11736740,10333731},Point{-12055802,13394988},Point{-12073465,13512709},Point{-12537037,16602872},Point{-12564871,16770093},Point{-12868331,17841241},Point{-12965150,17972859},Point{-13810604,19219296},Point{-13841058,19256391}};
+    pt_check=Points{Point{-13841058,19256391},Point{-16000605,20783293},Point{-16125238,20872985},Point{-16200187,20900789},Point{-16848438,21137523},Point{-16900761,21143283},Point{-20054251,21284769},Point{-20181919,21288860},Point{-22576808,21101056},Point{-22669127,21077143},Point{-23918502,20818838},Point{-23999359,20778152},Point{-24039299,20754670},Point{-24814754,20341965},Point{-26807135,17890308},Point{-26929421,17731916},Point{-28132887,15992835},Point{-28198624,15895792},Point{-28218950,15797058},Point{-28476498,14658550},Point{-28439905,10501406},Point{-28436363,10295169},Point{-28435384,10189629},Point{-28353671,9898192},Point{-28116197,9136826},Point{-27949451,8952986},Point{-26789518,7630590},Point{-26286455,7182547},Point{-24378165,5644312},Point{-23925947,5307730},Point{-23772395,5206406},Point{-22031513,4577830},Point{-21858188,4541972},Point{-21578146,4543156},Point{-18363941,4558289},Point{-18218501,4564749},Point{-16175540,5253855},Point{-15971945,5344493},Point{-15901961,5376200},Point{-13909135,7342791},Point{-13800744,7449583},Point{-13698773,7556534},Point{-12126110,9174894},Point{-12066534,9285833},Point{-11740302,10223276},Point{-11736740,10333731},Point{-12055802,13394988},Point{-12537037,16602872},Point{-12564871,16770093},Point{-12868331,17841241},Point{-12965150,17972859},Point{-13810604,19219296},Point{-13841058,19256391}};
+    douglas_peucker_impl(pt_in.begin(), pt_in.end(), std::back_inserter(pt_out), 100, [](const Point &p) { return p; });
+    CHECK(pt_check == pt_out);
+}
 
 SCENARIO("extrude_thinwalls") {
     GIVEN("ThickLine") {
@@ -49,7 +69,7 @@ SCENARIO("extrude_thinwalls") {
         MedialAxis{ expolygon, scale_t(1.1), scale_t(0.5), scale_t(0.2) }.build(res);
         Flow periflow = Flow::new_from_width(1.1f, 0.4f, 0.2f, 1.f, false);
         ExtrusionEntityCollection gap_fill;
-        gap_fill.append(thin_variable_width(res, erGapFill, periflow, SCALED_EPSILON*2, true));
+        gap_fill.append(thin_variable_width(res, ExtrusionRole::GapFill, periflow, SCALED_EPSILON*2, true));
         
         //Flow gapfill_max_flow = Flow::new_from_spacing(1.f, 0.4f, 0.2f, 1.f, false);
 
@@ -82,14 +102,14 @@ SCENARIO("thin walls: ")
         expolygon.contour = Slic3r::Polygon{ square };
         expolygon.holes = Slic3r::Polygons{ hole_in_square };
         WHEN("creating the medial axis"){
-            Polylines res;
-            expolygon.medial_axis(scale_(40), scale_(0.5), &res);
+            ThickPolylines res;
+            expolygon.medial_axis(scale_d(40), scale_d(0.5), res);
 
             THEN("medial axis of a square shape is a single path"){
                 REQUIRE(res.size() == 1);
             }
             THEN("polyline forms a closed loop"){
-                REQUIRE(res[0].first_point().coincides_with(res[0].last_point()) == true);
+                REQUIRE(res[0].points.front().coincides_with(res[0].points.back()) == true);
             }
             THEN("medial axis loop has reasonable length"){
                 REQUIRE(res[0].length() > expolygon.holes[0].length());
@@ -105,8 +125,8 @@ SCENARIO("thin walls: ")
             Point::new_scale(120, 100),
             Point::new_scale(120, 200),
             Point::new_scale(100, 200) } };
-        Polylines res;
-        expolygon.medial_axis(scale_(20), scale_(0.5), &res);
+        ThickPolylines res;
+        expolygon.medial_axis(scale_(20), scale_(0.5), res);
 
         ExPolygon expolygon2;
         expolygon2.contour = Slic3r::Polygon{ Points{
@@ -115,8 +135,8 @@ SCENARIO("thin walls: ")
             Point::new_scale(120, 200),
             Point::new_scale(105, 200), // extra point in the short side
             Point::new_scale(100, 200) } };
-        Polylines res2;
-        expolygon.medial_axis(scale_(20), scale_(0.5), &res2);
+        ThickPolylines res2;
+        expolygon.medial_axis(scale_(20), scale_(0.5), res2);
         WHEN("creating the medial axis") {
 
             THEN("medial axis of a narrow rectangle is a single line") {
@@ -152,19 +172,20 @@ SCENARIO("thin walls: ")
         } };
 
         WHEN("creating the medial axis") {
-            Polylines res;
-            expolygon.medial_axis(scale_(1.324888), scale_(0.25), &res);
+            ThickPolylines res;
+            expolygon.medial_axis(scale_(1.324888), scale_(0.25), res);
 
             THEN("medial axis of a semicircumference is a single line") {
                 REQUIRE(res.size() == 1);
             }
             THEN("all medial axis segments of a semicircumference have the same orientation (but the 2 end points)") {
-                Lines lines = res[0].lines();
+                //Lines lines = res[0].lines();
                 double min_angle = PI*4, max_angle = -PI*4;
                 //std::cout << "first angle=" << lines[0].ccw(lines[1].b) << "\n";
-                for (int idx = 1; idx < lines.size() - 1; idx++) {
-                    assert(lines[idx].a== lines[idx - 1].b);
-                    double angle = lines[idx].a.ccw_angle(lines[idx - 1].a, lines[idx].b);
+                for (int idx = 1; idx < res[0].size() - 2; idx++) {
+                    //assert(lines[idx].a== lines[idx - 1].b);
+                    Line line(res[0].points[idx], res[0].points[idx + 1]);
+                    double angle = ccw_angle_old_test(res[0].points[idx], res[0].points[idx - 1], res[0].points[idx + 1]);
                     if (std::abs(angle) - EPSILON < 0) angle = 0;
                     //if (angle < 0) std::cout << unscale_(lines[idx - 1].a.x()) << ":" << unscale_(lines[idx - 1].a.y()) << " -> " << unscale_(lines[idx - 1].b.x()) << ":" << unscale_(lines[idx - 1].b.y()) << " -> " << unscale_(lines[idx].b.x()) << ":" << unscale_(lines[idx].b.y()) << "\n";
                     std::cout << "angle=" << 180*angle/PI <<  "\n";
@@ -194,8 +215,8 @@ SCENARIO("thin walls: ")
             } });
 
         WHEN("creating the medial axis"){
-            Polylines res;
-            expolygon.medial_axis(scale_(2.5), scale_(0.5), &res);
+            ThickPolylines res;
+            expolygon.medial_axis(scale_(2.5), scale_(0.5), res);
 
            THEN("medial axis of it is two line"){
                 REQUIRE(res.size() == 2);
@@ -213,8 +234,8 @@ SCENARIO("thin walls: ")
         expolygon.contour.make_counter_clockwise();
 
         WHEN("creating the medial axis"){
-            Polylines res;
-            expolygon.medial_axis(scale_(0.55), scale_(0.25), &res);
+            ThickPolylines res;
+            expolygon.medial_axis(scale_(0.55), scale_(0.25), res);
 
             THEN("medial axis of a (bit too narrow) french cross is two lines"){
                 REQUIRE(res.size() == 2);
@@ -225,10 +246,10 @@ SCENARIO("thin walls: ")
             }
 
             THEN("medial axis of a (bit too narrow) french cross is two lines has only strait lines (first line)"){
-                Lines lines = res[0].lines();
                 double min_angle = 1, max_angle = -1;
-                for (int idx = 1; idx < lines.size(); idx++){
-                    double angle = lines[idx - 1].ccw(lines[idx].b);
+                for (int idx = 1; idx < res[0].size() - 1; idx++){
+                    //double angle = lines[idx - 1].ccw(lines[idx].b);
+                    double angle = ccw_angle_old_test(res[0].points[idx], res[0].points[idx - 1], res[0].points[idx + 1]);
                     min_angle = std::min(min_angle, angle);
                     max_angle = std::max(max_angle, angle);
                 }
@@ -236,10 +257,10 @@ SCENARIO("thin walls: ")
                 REQUIRE(min_angle == 0);
             }
             THEN("medial axis of a (bit too narrow) french cross is two lines has only strait lines (second line)"){
-                Lines lines = res[1].lines();
                 double min_angle = 1, max_angle = -1;
-                for (int idx = 1; idx < lines.size(); idx++){
-                    double angle = lines[idx - 1].ccw(lines[idx].b);
+                for (int idx = 1; idx < res[1].size() - 1; idx++){
+                    //double angle = lines[idx - 1].ccw(lines[idx].b);
+                    double angle = ccw_angle_old_test(res[1].points[idx], res[1].points[idx - 1], res[1].points[idx + 1]);
                     min_angle = std::min(min_angle, angle);
                     max_angle = std::max(max_angle, angle);
                 }
@@ -327,10 +348,10 @@ SCENARIO("thin walls: ")
                 THEN("medial axis has good tapers length") {
                     int l1 = 0;
                     for (size_t idx = 0; idx < res[0].points_width.size() - 1 && res[0].points_width[idx] - nozzle_diam < SCALED_EPSILON; ++idx)
-                        l1 += res[0].lines()[idx].length();
+                        l1 += Line(res[0].points[idx], res[0].points[idx + 1]).length();
                     int l2 = 0;
                     for (size_t idx = res[0].points_width.size() - 1; idx > 0 && res[0].points_width[idx] - nozzle_diam < SCALED_EPSILON; --idx)
-                        l2 += res[0].lines()[idx - 1].length();
+                        l2 += Line(res[0].points[idx - 1], res[0].points[idx]).length();
                     REQUIRE(std::abs(l1 - l2) < SCALED_EPSILON);
                     REQUIRE(std::abs(l1 - scale_(0.25 - 0.1)) < SCALED_EPSILON);
                 }
@@ -364,10 +385,10 @@ SCENARIO("thin walls: ")
                 THEN("medial axis has a 45� taper and a shorter one") {
                     coord_t l1 = 0;
                     for (size_t idx = 0; idx < res[0].points_width.size() - 1 && res[0].points_width[idx] - scale_(1.2) < SCALED_EPSILON; ++idx)
-                        l1 += coord_t(res[0].lines()[idx].length());
+                        l1 += coord_t(Line(res[0].points[idx], res[0].points[idx + 1]).length());
                     coord_t l2 = 0;
                     for (size_t idx = res[0].points_width.size() - 1; idx > 0 && res[0].points_width[idx] - scale_(1.2) < SCALED_EPSILON; --idx)
-                        l2 += coord_t(res[0].lines()[idx - 1].length());
+                        l2 += coord_t(Line(res[0].points[idx - 1], res[0].points[idx]).length());
                     //here the taper is limited by the 0-width spacing
                     double min_width = Flow::new_from_spacing(float(unscaled(nozzle_diam)), float(unscaled(nozzle_diam)), 0.6f, 1.f, false).scaled_width();
                     REQUIRE(std::abs(l1 - l2) < SCALED_EPSILON);
@@ -394,8 +415,8 @@ SCENARIO("thin walls: ")
             Point::new_scale(108, 200)
         } };
         WHEN("creating the medial axis"){
-            Polylines res;
-            expolygon.medial_axis(scale_(20), scale_(0.5), &res);
+            ThickPolylines res;
+            expolygon.medial_axis(scale_(20), scale_(0.5), res);
             THEN("medial axis of a narrow trapezoid is a single line"){
                 REQUIRE(res.size() == 1);
                 THEN("medial axis has reasonable length") {
@@ -417,8 +438,8 @@ SCENARIO("thin walls: ")
             Point::new_scale(100, 200)
         } };
         WHEN("creating the medial axis"){
-            Polylines res;
-            expolygon.medial_axis(scale_(20), scale_(0.5), &res);
+            ThickPolylines res;
+            expolygon.medial_axis(scale_(20), scale_(0.5), res);
             THEN("medial axis of a L shape is a single line"){
                 REQUIRE(res.size() == 1);
                 THEN("medial axis has reasonable length") {
@@ -438,12 +459,12 @@ SCENARIO("thin walls: ")
             Point{ -220815482, -37738966 }, Point{ -221117540, -37738966 }, Point{ -221117540, -51762024 }, Point{ -203064906, -51762024 },
         } };
         WHEN("creating the medial axis"){
-            Polylines polylines;
-            expolygon.medial_axis(819998, 102499.75, &polylines);
+            ThickPolylines polylines;
+            expolygon.medial_axis(819998, 102499.75, polylines);
             double perimeter_len = expolygon.contour.split_at_first_point().length();
             THEN("medial axis has reasonable length"){
                 double polyline_length = 0;
-                for (Slic3r::Polyline &poly : polylines) polyline_length += poly.length();
+                for (Slic3r::ThickPolyline &poly : polylines) polyline_length += poly.length();
                 REQUIRE(polyline_length > perimeter_len * 3. / 8. - SCALED_EPSILON);
             }
         }
@@ -459,8 +480,8 @@ SCENARIO("thin walls: ")
         } };
 
         WHEN("creating the medial axis"){
-            Polylines res;
-            expolygon.medial_axis(scale_(4), scale_(0.5), &res);
+            ThickPolylines res;
+            expolygon.medial_axis(scale_(4), scale_(0.5), res);
             THEN("medial axis of a narrow triangle is a single line"){
                 REQUIRE(res.size() == 1);
                 THEN("medial axis has reasonable length") {
@@ -482,25 +503,27 @@ SCENARIO("thin walls: ")
             Point{91294454, 29967808}
         } };
         WHEN("creating the medial axis") {
-            Polylines res;
-            expolygon.medial_axis(1871238, 500000, &res);
+            ThickPolylines res;
+            expolygon.medial_axis(1871238, 500000, res);
             THEN("medial axis is a single polyline") {
                 REQUIRE(res.size() == 1);
-                Slic3r::Polyline polyline = res[0];
+                Slic3r::ThickPolyline polyline = res[0];
                 THEN("medial axis is horizontal and is centered") {
                     double sum = 0;
-                    for (Line &l : polyline.lines()) sum += std::abs(l.b.y() - l.a.y());
+                    //for (Line &l : polyline.lines()) sum += std::abs(l.b.y() - l.a.y());
+                    for (size_t idx = 1; idx < polyline.size(); ++idx)
+                        sum += std::abs(polyline.points[idx].y() - polyline.points[idx - 1].y());
                     coord_t expected_y = expolygon.contour.bounding_box().center().y();
                     REQUIRE((sum / polyline.size()) - expected_y < SCALED_EPSILON);
                 }
 
                 // order polyline from left to right
-                if (polyline.first_point().x() > polyline.last_point().x()) polyline.reverse();
+                if (polyline.points.front().x() > polyline.points.back().x()) polyline.reverse();
 
                 THEN("expected x_min & x_max") {
-                    BoundingBox polyline_bb = polyline.bounding_box();
-                    REQUIRE(polyline.first_point().x() == polyline_bb.min.x());
-                    REQUIRE(polyline.last_point().x() == polyline_bb.max.x());
+                    BoundingBox polyline_bb(polyline.points);
+                    REQUIRE(polyline.points.front().x() == polyline_bb.min.x());
+                    REQUIRE(polyline.points.back().x() == polyline_bb.max.x());
                 }
 
                 THEN("medial axis is not self-overlapping") {

@@ -41,12 +41,18 @@ public:
     struct Boundary {
         // Collection of boundaries used for detection of crossing perimeters for travels
         Polygons                        boundaries;
+        // this is empty if m_use_external_mp, or the size of boundaries if not.
+        // each entry is the boundary's island id. the island id is the boundary index of the contour.
+        std::vector<size_t>             islands;
         // Bounding box of boundaries
         BoundingBoxf                    bbox;
+        std::vector<BoundingBox>        bboxes;
         // Precomputed distances of all points in boundaries
         std::vector<std::vector<float>> boundaries_params;
         // Used for detection of intersection between line and any polygon from boundaries
         EdgeGrid::Grid                  grid;
+        // grid for searching in the contour of one island. the id of the island is the idx of the contour in boundaries
+        std::map<int, EdgeGrid::Grid>   island_to_grid;
         //used to move the point inside the boundary
         std::vector<std::pair<ExPolygon, ExPolygon>> boundary_growth;
         // area (top) where you don't want to travel, even more so than over voids.
@@ -57,9 +63,15 @@ public:
         void clear()
         {
             boundaries.clear();
+            islands.clear();
+            bbox = BoundingBoxf();
+            bboxes.clear();
             boundaries_params.clear();
+            grid = EdgeGrid::Grid();
+            island_to_grid.clear();
             boundary_growth.clear();
             to_avoid.clear();
+            to_avoid_grid = EdgeGrid::Grid();
         }
     };
 
