@@ -1636,19 +1636,20 @@ void Layer::make_ironing()
             }
             if (! polylines.empty()) {
                 // Save into layer.
-				uint32_t ironing_begin = uint32_t(ironing_params.layerm->ironings().size());
-				ExtrusionEntityCollection *eec = nullptr;
-		        ironing_params.layerm->set_ironings().set_entities().push_back(eec = new ExtrusionEntityCollection());
+                uint32_t ironing_begin = uint32_t(ironing_params.layerm->ironings().size());
+                ExtrusionEntityCollection *eec = nullptr;
+                ironing_params.layerm->set_ironings().set_entities().push_back(eec = new ExtrusionEntityCollection());
                 // Don't sort the ironing infill lines as they are monotonicly ordered.
                 eec->set_can_sort_reverse(false, false);
                 extrusion_entities_append_paths(
                     *eec, std::move(polylines),
-					ExtrusionAttributes{ ExtrusionRole::Ironing,
-                        //TODO check FLOW, decide if it's good for an ironing?
-						ExtrusionFlow{ flow_mm3_per_mm, extrusion_width, float(extrusion_height) }
-					});
+                    ExtrusionAttributes{ExtrusionRole::Ironing,
+                                        // TODO check FLOW, decide if it's good for an ironing?
+                                        ExtrusionFlow{flow_mm3_per_mm, extrusion_width, float(extrusion_height)}},
+                    false);
                 // set the ironing indexes into the island tree, but it may doesn't belong to a region anyway...
-				insert_ironings_into_islands(*this, ironing_params.layer_region_id, ironing_begin, uint32_t(ironing_params.layerm->ironings().size()));
+                insert_ironings_into_islands(*this, ironing_params.layer_region_id, ironing_begin,
+                                             uint32_t(ironing_params.layerm->ironings().size()));
             }
         }
         // Regions up to j were processed.

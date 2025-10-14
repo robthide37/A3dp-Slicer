@@ -1350,7 +1350,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
         m_tree->model->AddPreset(type, from_u8(presets->get_edited_preset().name), old_pt, from_u8(new_selected_preset));
 
         // Collect dirty options.
-        std::map<OptionKeyIdx, uint16_t> dirty_options = presets->dirty_options(&presets->get_edited_preset(), &presets->get_selected_preset());
+        std::map<OptionKeyIdx, uint16_t> dirty_options = presets->dirty_options(&presets->get_edited_preset(), &presets->get_selected_preset(), false /*ignore/also with phony*/);
 
         // process changes of extruders count
         if (type == Preset::TYPE_PRINTER && old_pt == ptFFF &&
@@ -1894,11 +1894,10 @@ void DiffPresetDialog::update_tree()
         }
 
         // Collect dirty options.
-        const bool deep_compare = type != Preset::TYPE_FFF_FILAMENT;
         auto dirty_options = type == Preset::TYPE_PRINTER && left_pt == ptFFF &&
                              left_config.opt<ConfigOptionStrings>("extruder_colour")->size() < right_congig.opt<ConfigOptionStrings>("extruder_colour")->size() ?
-                             presets->dirty_options(right_preset, left_preset, deep_compare) :
-                             presets->dirty_options(left_preset, right_preset, deep_compare);
+                             presets->dirty_options(right_preset, left_preset, false /*ignore/also with phony*/) :
+                             presets->dirty_options(left_preset, right_preset, false /*ignore/also with phony*/);
 
         if (dirty_options.empty()) {
             bottom_info = _L("Presets are the same");
@@ -1923,7 +1922,7 @@ void DiffPresetDialog::update_tree()
             wxString left_val = from_u8((boost::format("%1%") % left_config.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
             wxString right_val = from_u8((boost::format("%1%") % right_congig.opt<ConfigOptionStrings>("extruder_colour")->size()).str());
 
-            m_tree->Append(OptionKeyIdx::scalar("extruders_count"), type, _L("General"), _L("Capabilities"), local_label, left_val, right_val, "", category_icon_map.at("General"));
+            m_tree->Append(OptionKeyIdx::scalar("extruders_count"), type, _L("General"), _L("Capabilities"), local_label, left_val, right_val, "", "printer");
         }
 
         for (auto &[opt_key_id, flag] : dirty_options) {

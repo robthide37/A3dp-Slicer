@@ -11,6 +11,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: New cmake
+      run: cmake --version
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: "3.31.x"
+    - name: Use cmake
+      run: cmake --version
     - name: Install Autoconf
       run: |
         brew update
@@ -19,13 +27,15 @@ jobs:
       run: autoconf --version
     - name: update automake for mpfr
       run: |
-        curl -O -L http://ftpmirror.gnu.org/automake/automake-1.16.5.tar.gz
+        curl -O -L https://github.com/supermerill/SuperSlicer_deps/releases/download/automake/automake-1.16.5.tar.gz
         tar -xzf automake-1.16.5.tar.gz
         cd automake-*
         ./configure
         make
         sudo make install
         automake --version
+    - name: Install makeinfo
+      run: brew install texinfo
     - name: mkdir in deps
       run: mkdir deps/build
     - name: dep cache
@@ -44,6 +54,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: New cmake
+      run: cmake --version
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: "3.31.x"
+    - name: Use cmake
+      run: cmake --version
     - name: check autoconf version
       run: autoconf --version
     - name: update automake for mpfr
@@ -55,6 +73,8 @@ jobs:
         make
         sudo make install
         automake --version
+    - name: Install makeinfo
+      run: brew install texinfo
     - name: dep cache
       id: cache-action
       uses: actions/cache@v3

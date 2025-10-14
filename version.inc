@@ -9,11 +9,13 @@ set(SLIC3R_APP_KEY "A3dp-Slicer")
 set(SLIC3R_APP_CMD "a3dp-slicer")
 # id for windows registry ([a-z] [A-Z] [0-9] '_' and '.' only)
 set(SLIC3R_APP_PROG_ID "Slic3r.1")
+# windows guid to identify the app, can begenerated via powershell running [guid]::NewGuid()
+set(SLIC3R_GUID "de991ba1-8f56-4fa6-a813-658c7f0ab4ef")
 # versions
 set(SLIC3R_VERSION "2.7-beta+UNKNOWN")
-set(SLIC3R_VERSION_FULL "2.7.61.9")
+set(SLIC3R_VERSION_FULL "2.7.61.10")
 set(SLIC3R_BUILD_ID "${SLIC3R_APP_KEY}_${SLIC3R_VERSION_FULL}+UNKNOWN")
-set(SLIC3R_RC_VERSION "2,7,61,9")
+set(SLIC3R_RC_VERSION "2,7,61,10")
 set(SLIC3R_RC_VERSION_DOTS "${SLIC3R_VERSION_FULL}")
 
 # Same as the slicer name but for gcodeviewer

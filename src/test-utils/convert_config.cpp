@@ -61,6 +61,7 @@ struct Prst {
     bool                                        has_all_values;
     // you need to write all values, even the ones that are the same as the current default
     bool                                        write_defaults;
+    bool                                        convert_from_prusa;
     // set it to true if it's useless or wrong.
     bool                                        deleted = false;
     // Link to the presets, for which this preset is a direct parent.
@@ -130,7 +131,10 @@ void load_preset(const VendorProfile &vendor_profile, PrstPtr preset_to_load)
     //std::string section_name, boost::property_tree::ptree section_data
 
     std::string path = vendor_profile.name;
-    PresetBundle::LoadConfigBundleAttributes flags = PresetBundle::LoadConfigBundleAttribute::LoadSystem | PresetBundle::LoadConfigBundleAttribute::ConvertFromPrusa;
+    PresetBundle::LoadConfigBundleAttributes flags = preset_to_load->convert_from_prusa ?
+        PresetBundle::LoadConfigBundleAttribute::LoadSystem |
+            PresetBundle::LoadConfigBundleAttribute::ConvertFromPrusa :
+        PresetBundle::LoadConfigBundleAttribute::LoadSystem;
     PresetCollection         *presets = nullptr;
     PresetBundle default_bundle; //bundle with only default presets
     PhysicalPrinterCollection *ph_printers = nullptr;
@@ -318,7 +322,7 @@ void load_preset(const VendorProfile &vendor_profile, PrstPtr preset_to_load)
         preset_to_load->config_before_prusa = preset_to_load->config;
 
         //prusa: first try the unkown keys
-        {
+        if (preset_to_load->convert_from_prusa) {
             std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt_from_prusa;
             std::set<t_config_option_key> not_deleted_anymore;
             for (auto &[key, value] : opts_deleted) {
@@ -377,7 +381,9 @@ void load_preset(const VendorProfile &vendor_profile, PrstPtr preset_to_load)
     } catch (const ConfigurationError &e) {
         throw ConfigurationError(format("Invalid configuration bundle \"%1%\", section [%2%]: ", path, preset_to_load->section_name + ":"s + preset_to_load->name) + e.what());
     }
-    Preset::normalize(preset_to_load->config);
+    if (is_printer) {
+        Preset::normalize(preset_to_load->config);
+    }
     //Preset::normalize(preset_to_load->config_no_prusa_convert);
     // Report configuration fields, which are misplaced into a wrong group.
     std::string incorrect_keys = Preset::remove_invalid_keys(preset_to_load->config, default_config);
@@ -739,10 +745,10 @@ void update_preset(const VendorProfile &vendor_profile, PrstPtr preset_to_update
     // now we have the parent config
     // use it to parse our config
     load_preset(vendor_profile, preset_to_update);
-    
+
 }
 
-void add_common_deps(std::vector<PrstPtr> &ordered_presets) {
+void add_common_deps(std::vector<PrstPtr> &ordered_presets, bool convert_from_prusa) {
     std::vector<PrstPtr> commons;
     std::vector<PrstPtr> combined;
     // update roots
@@ -754,15 +760,18 @@ void add_common_deps(std::vector<PrstPtr> &ordered_presets) {
                 commons.push_back(prstptr);
                 prstptr->write_defaults = true;
                 prstptr->has_all_values = true;
+                prstptr->convert_from_prusa = convert_from_prusa;
             } else {
                 combined.push_back(prstptr);
                 prstptr->write_defaults = false;
                 prstptr->has_all_values = false;
+                prstptr->convert_from_prusa = convert_from_prusa;
             }
         } else {
             // unless inherit , really set in next loop
             prstptr->write_defaults = false;
             prstptr->has_all_values = false;
+            prstptr->convert_from_prusa = convert_from_prusa;
         }
     }
 update_write_defaults:;
@@ -894,6 +903,7 @@ std::pair<VendorProfile, std::vector<PrstPtr>> load_sections(const std::string &
         }
     }
 
+
     VendorProfile vp = VendorProfile::from_ini(tree, path);
     if (vp.models.size() == 0 && !vp.templates_profile) {
         BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer model defined.") % path;
@@ -941,35 +951,50 @@ std::pair<VendorProfile, std::vector<PrstPtr>> load_sections(const std::string &
         }
         cout<<"]\n";
     }
-    
 
     std::vector<PrstPtr> ordered_presets_print = get_configbundle_hierarchy(tree, "print");
+
+    // check if it's a prusaslcier config or not
+    // by detecteing ps-only keywords
+    bool prusa_slicer_convertion = false;
+    // TODO: also for sla-only
+    for (PrstPtr &prst : ordered_presets_print) {
+        for (auto &kvp : *prst->node) {
+            if (kvp.first == "thick_bridge") {
+                prusa_slicer_convertion = true;
+                // mega break
+                goto end_find_prusa;
+            }
+        }
+    }
+    end_find_prusa:;
+
     // also try to use a common config as common even if it's not said. (like when we combine 0.2 nozzle always with common)
-    add_common_deps(ordered_presets_print);
+    add_common_deps(ordered_presets_print, prusa_slicer_convertion);
     // Apply the dependencies in their topological ordering.
     for (PrstPtr &prst : ordered_presets_print) {
         update_preset(vp, prst);
     }
     std::vector<PrstPtr> ordered_presets_sla_print = get_configbundle_hierarchy(tree, "sla_print");
-    add_common_deps(ordered_presets_sla_print);
+    add_common_deps(ordered_presets_sla_print, prusa_slicer_convertion);
     // Apply the dependencies in their topological ordering.
     for (PrstPtr &prst : ordered_presets_sla_print) {
         update_preset(vp, prst);
     }
     std::vector<PrstPtr> ordered_presets_printer = get_configbundle_hierarchy(tree, "printer");
-    add_common_deps(ordered_presets_printer);
+    add_common_deps(ordered_presets_printer, prusa_slicer_convertion);
     // Apply the dependencies in their topological ordering.
     for (PrstPtr &prst : ordered_presets_printer) {
         update_preset(vp, prst);
     }
     std::vector<PrstPtr> ordered_presets_filament = get_configbundle_hierarchy(tree, "filament");
-    add_common_deps(ordered_presets_filament);
+    add_common_deps(ordered_presets_filament, prusa_slicer_convertion);
     // Apply the dependencies in their topological ordering.
     for (PrstPtr &prst : ordered_presets_filament) {
         update_preset(vp, prst);
     }
     std::vector<PrstPtr> ordered_presets_material = get_configbundle_hierarchy(tree, "sla_material");
-    add_common_deps(ordered_presets_material);
+    add_common_deps(ordered_presets_material, prusa_slicer_convertion);
     // Apply the dependencies in their topological ordering.
     for (PrstPtr &prst : ordered_presets_material) {
         update_preset(vp, prst);
@@ -1000,7 +1025,11 @@ void save(boost::nowide::ofstream &c, VendorProfile &vp, std::vector<PrstPtr> &p
     c << "name = " << vp.name << "\n";
     c << "full_name = " << vp.full_name << "\n";
     c << "config_version = " << ver_susi << "\n";
-    c << "config_update_url = \n# " << vp.config_update_url << "\n";
+    if (vp.config_update_url.empty()) {
+        c << "config_update_url = \n";
+    } else {
+        c << "config_update_url = \n# " << vp.config_update_url << "\n";
+    }
     c << "changelog_url = " << vp.changelog_url << "\n";
     c << "technologies = ";
     for (PrinterTechnology &tech : vp.technologies) {
@@ -1060,14 +1089,26 @@ void save(boost::nowide::ofstream &c, VendorProfile &vp, std::vector<PrstPtr> &p
         return true;
     };
 
+    std::set<std::string> already_seen;
+
     // config presets sections
     for (PrstPtr preset : presets) {
-        bool check_preset_debug = false;
-        if (preset->name.find("0.05mm 0.25nozzle V2") != std::string::npos) {
-            check_preset_debug = true;
-        }
         if (preset->deleted) {
             continue;
+        }
+        if (already_seen.find(preset->section_name) == already_seen.end()) {
+            already_seen.insert(preset->section_name);
+            c << "\n\n######";
+            for (size_t i = 0; i < preset->section_name.size(); i++) {
+                c << "#";
+            }
+            c << "\n## ";
+            c << preset->section_name;
+            c << " ##\n######";
+            for (size_t i = 0; i < preset->section_name.size(); i++) {
+                c << "#";
+            }
+            c << "\n";
         }
         c << "\n";
         if (!preset->name_with_template.empty()) {

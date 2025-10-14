@@ -3572,7 +3572,7 @@ FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const Fi
         extrusion_entities_append_paths(
             *eec, std::move(polylines_rectilinear),
                     ExtrusionAttributes{good_role, params.flow},
-                    true);
+                    !is_monotonic());
 
         coll_nosort->append(ExtrusionEntitiesPtr{ eec });
 

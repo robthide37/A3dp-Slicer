@@ -162,10 +162,19 @@ jobs:
       shell: powershell
       run: |
         $fullVersion = (Get-Content version.inc | Select-String -Pattern 'set\(SLIC3R_VERSION_FULL \"(.*?)\"\)' | ForEach-Object { $_.Matches.Groups[1].Value })
-        $env:InstallerVersion = "$fullVersion" -replace '\.0\.', '.'
+        $env:InstallerVersion = "$fullVersion" -replace '\.0', '.'
         echo "InstallerVersion=$env:InstallerVersion" >> $env:GITHUB_ENV
         $env:ReleaseSuffix = ""
         echo "ReleaseSuffix=$env:ReleaseSuffix" >> $env:GITHUB_ENV
+    - name: Check version number is not empty
+      shell: powershell
+      run: |
+        if ([string]::IsNullOrWhiteSpace($env:InstallerVersion)) {
+          Write-Warning "InstallerVersion is empty or null. Setting default version to 0.0.0.0"
+          $env:InstallerVersion = "0.0.0.0"
+          echo "InstallerVersion=$env:InstallerVersion" >> $env:GITHUB_ENV
+        }
+        Write-Host "Version validation passed: $env:InstallerVersion"
     - name: Build MSI installer
       shell: cmd
       working-directory: ./build

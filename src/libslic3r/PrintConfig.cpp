@@ -842,7 +842,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->can_be_disabled = true;
     def->mode = comAdvancedE | comPrusa;
-    def->set_default_value(enable_default_option(new ConfigOptionFloat(0.)));
+    def->set_default_value(disable_default_option(new ConfigOptionFloat(0.)));
 
     def = this->add("bridged_infill_margin", coFloatOrPercent);
     def->label = L("Bridged");
@@ -9798,13 +9798,33 @@ std::map<std::string,std::string> PrintConfigDef::from_prusa(t_config_option_key
         }
     }
     if ("max_layer_height" == opt_key) {
-        double dbl_val = std::atof(value.c_str());
         double min = 10;
-        if (all_conf.has("nozzle_diameter")) {
-            min = all_conf.option("nozzle_diameter")->get_float();
+        bool changed = false;
+        std::vector<std::string> value_array;
+        boost::split(value_array, value, boost::is_any_of(","), boost::token_compress_off);
+        for (size_t i = 0; i < value_array.size(); ++i) {
+            std::string &val = value_array[i];
+            double dbl_val = std::atof(value.c_str());
+            if (all_conf.has("nozzle_diameter")) {
+                min = all_conf.option("nozzle_diameter")->get_float(i);
+            }
+            if (dbl_val > min) {
+                if (dbl_val > 10) {
+                    val += "%";
+                    changed = true;
+                } else {
+                    val = to_string_nozero(min, 5);
+                }
+            }
         }
-        if (dbl_val > min) {
-            value += "%";
+        if (changed) {
+            value = "";
+            for (const std::string &val : value_array) {
+                if (!value.empty()) {
+                    value += ",";
+                }
+                value += val;
+            }
         }
     }
     if ("resolution" == opt_key && value == "0") {
@@ -11098,7 +11118,6 @@ void  handle_legacy_sla(DynamicPrintConfig& config)
 
 void DynamicPrintConfig::set_num_extruders(unsigned int num_extruders)
 {
-    const auto &defaults = FullPrintConfig::defaults();
     for (const std::string &key : print_config_def.extruder_option_keys()) {
         if (key == "default_filament_profile")
             // Don't resize this field, as it is presented to the user at the "Dependencies" page of the Printer profile and we don't want to present
@@ -11106,20 +11125,25 @@ void DynamicPrintConfig::set_num_extruders(unsigned int num_extruders)
             continue;
         auto *opt = this->option(key, false);
         assert(opt != nullptr && opt->is_vector());
-        if (opt != nullptr && opt->is_vector())
-            static_cast<ConfigOptionVectorBase*>(opt)->resize(num_extruders, defaults.option(key));
+        if (opt != nullptr && opt->is_vector()) {
+            auto default_opt_it = print_config_def.options.find(key);
+            assert(default_opt_it != print_config_def.options.end());
+            static_cast<ConfigOptionVectorBase *>(opt)->resize(num_extruders, default_opt_it->second.default_value.get());
+        }
     }
 }
 
 void DynamicPrintConfig::set_num_milling(unsigned int num_milling)
 {
-    const auto& defaults = FullPrintConfig::defaults();
     for (const std::string& key : print_config_def.milling_option_keys()) {
         auto* opt = this->option(key, false);
         assert(opt != nullptr);
         assert(opt->is_vector());
-        if (opt != nullptr && opt->is_vector())
-            static_cast<ConfigOptionVectorBase*>(opt)->resize(num_milling, defaults.option(key));
+        if (opt != nullptr && opt->is_vector()) {
+            auto default_opt_it = print_config_def.options.find(key);
+            assert(default_opt_it != print_config_def.options.end());
+            static_cast<ConfigOptionVectorBase *>(opt)->resize(num_milling, default_opt_it->second.default_value.get());
+        }
     }
 }
 

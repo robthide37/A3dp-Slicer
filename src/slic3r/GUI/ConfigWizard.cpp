@@ -1694,11 +1694,11 @@ PageMode::PageMode(ConfigWizard *parent)
     radio_advanced = new wxRadioButton(this, wxID_ANY, _L("Advanced mode"));
     radio_expert = new wxRadioButton(this, wxID_ANY, _L("Expert mode"));
 
-    std::string mode { "simple" };
+    std::string mode { "Simple" };
     wxGetApp().app_config->get("", "view_mode", mode);
 
-    if (mode == "advanced") { radio_advanced->SetValue(true); }
-    else if (mode == "expert") { radio_expert->SetValue(true); }
+    if (mode == "Advanced") { radio_advanced->SetValue(true); }
+    else if (mode == "Expert") { radio_expert->SetValue(true); }
     else { radio_simple->SetValue(true); }
 
     append(radio_simple);
@@ -1717,9 +1717,9 @@ void PageMode::serialize_mode(AppConfig *app_config) const
 {
     std::string mode = "";
 
-    if (radio_simple->GetValue()) { mode = "simple"; }
-    if (radio_advanced->GetValue()) { mode = "advanced"; }
-    if (radio_expert->GetValue()) { mode = "expert"; }
+    if (radio_simple->GetValue()) { mode = "Simple"; }
+    if (radio_advanced->GetValue()) { mode = "Advanced"; }
+    if (radio_expert->GetValue()) { mode = "Expert"; }
 
     app_config->set("view_mode", mode);
     app_config->set("use_inches", check_inch->GetValue() ? "1" : "0");

@@ -318,7 +318,7 @@ public:
     void append(const Point &point) { m_path.emplace_back(/*Geometry::ArcWelder::Segment{*/point, 0.f, Geometry::ArcWelder::Orientation::Unknown/*}*/); }
     void append_before(const Point &point) { m_path.insert(m_path.begin(), Geometry::ArcWelder::Segment{point, 0.f, Geometry::ArcWelder::Orientation::Unknown}); }
     // Only use this append if and only if you're sure that the previous point is the same as one from another good ArcPolyline. First point need to be added via append(Point).
-    void append(const Geometry::ArcWelder::Segment &to_copy_arc) { m_path.push_back(to_copy_arc); assert(is_valid());}
+    void append(const Geometry::ArcWelder::Segment &to_copy_arc);
     void append(const Points &src);
     void append(Points &&src);
     void append(const Points::const_iterator &begin, const Points::const_iterator &end);
@@ -357,18 +357,18 @@ public:
 
 
     // Works on points & arc
-    coordf_t              length() const { return Geometry::ArcWelder::path_length<coordf_t>(m_path); }
-    bool                  at_least_length(coordf_t length) const;
+    distf_t              length() const { return Geometry::ArcWelder::path_length<distf_t>(m_path); }
+    bool                  at_least_length(distf_t length) const;
     std::pair<int, Point> foot_pt(const Point &pt) const;
     void                  split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const;
-    void                  split_at(coordf_t distance, ArcPolyline &p1, ArcPolyline &p2) const;
-    void                  clip_start(coordf_t dist);
-    void                  clip_end(coordf_t dist);
+    void                  split_at(distf_t distance, ArcPolyline &p1, ArcPolyline &p2) const;
+    void                  clip_start(distf_t dist);
+    void                  clip_end(distf_t dist);
     Polyline              to_polyline(coord_t deviation = 0) const;
     void                  translate(const Vector &vector);
     void                  rotate(double angle); // to test for arc, but should be okay
-    Point                 get_point_from_begin(coord_t distance) const;
-    Point                 get_point_from_end(coord_t distance) const;
+    Point                 get_point_from_begin(distf_t distance) const;
+    Point                 get_point_from_end(distf_t distance) const;
 
     // douglas_peuker and create arc if with_fitting_arc (don't touch the current arcs, only try in-between)
     void make_arc(ArcFittingType with_fitting_arc, coordf_t tolerance, double fit_percent_tolerance);

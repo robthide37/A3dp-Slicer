@@ -919,7 +919,12 @@ void reverse(Path &path)
         assert(prev->orientation == Orientation::Unknown);
         for (auto it = std::next(prev); it != path.end(); ++ it) {
             prev->radius      = it->radius;
-            prev->orientation = it->orientation == Orientation::CCW ? Orientation::CW : Orientation::CCW;
+            if (prev->radius == 0) {
+                assert(it->orientation == Orientation::Unknown);
+                prev->orientation = Orientation::Unknown;
+            } else {
+                prev->orientation = it->orientation == Orientation::CCW ? Orientation::CW : Orientation::CCW;
+            }
 #ifdef _DEBUG
             prev->length = it->length;
             prev->center = it->center;

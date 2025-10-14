@@ -353,7 +353,8 @@ Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, flo
         config_width.set(*print_config.option("extrusion_width"));
         config_spacing.set(*print_config.option("extrusion_spacing"));
     } else {
-        assert(config_spacing.value > 0);
+        // phony values need to be set by value_changed before this is called
+        assert(config_spacing.value > 0 && config_width.value > 0);
     }
 
     // Get the configured nozzle_diameter for the extruder associated to the flow role requested.
