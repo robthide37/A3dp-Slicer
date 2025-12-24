@@ -430,6 +430,8 @@ static bool verify_traversal_order(
         Vec3d cntr = to_world * (cube->center_octree + (child_centers[j] * (context.cubes_properties[depth].edge_length / 4.)));
         assert(!cube->children[j] || cube->children[j]->center.isApprox(cntr));
         c[i] = cntr;
+        if (i > 0)
+            assert(c[i] != c[i - 1]);
     }
     std::array<Vec3d, 10> dirs = {
         c[1] - c[0], c[2] - c[0], c[3] - c[1], c[3] - c[2], c[3] - c[0],
