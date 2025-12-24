@@ -187,6 +187,7 @@ public:
 	bool                set_vendors(const AppConfig &from) { return this->set_vendors(from.vendors()); }
 	bool 				set_vendors(const VendorMap &vendors);
 	bool 				set_vendors(VendorMap &&vendors);
+    // vendor map, need lock for thread safety
 	const VendorMap&    vendors() const { return m_vendors; }
 
 	// return recent/skein_directory or recent/config_directory or empty string.
@@ -217,8 +218,11 @@ public:
     LayoutEntry              get_ui_layout();
     std::vector<LayoutEntry> get_ui_layouts() { return m_ui_layout; }
 
-    // Tags
-    std::vector<Tag>         tags() { return m_tags; }
+    // Tags, need lock for thread safety
+    const std::vector<Tag>& tags() { return m_tags; }
+
+    // mutex lock, to access data or modify them. prevent problematic behavior while iterating on vectors (so mostly for tags(), vendors(), 
+    mutable std::recursive_mutex config_lock;
 
     // splashscreen
     std::string              splashscreen(bool is_editor);

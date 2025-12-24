@@ -41,7 +41,7 @@ std::string WipeTowerIntegration::toolchange_gcode_from_wipe_tower_generator(GCo
     return toolchange_gcode_str;
 }
 
-std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const WipeTower::ToolChangeResult& tcr, int new_extruder_id, double z, bool need_ensure_z) const
+std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const WipeTower::ToolChangeResult& tcr, int new_extruder_id, double wipe_tower_z, bool need_ensure_z) const
 {
     // has previous pos, or it's first layer.
     assert(gcodegen.last_pos_defined() || gcodegen.layer() == nullptr || gcodegen.layer()->lower_layer == nullptr);
@@ -87,11 +87,11 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
 
     double current_z = gcodegen.writer().get_unlifted_position().z();
 
-    if (z == -1.) // in case no specific z was provided, print at current_z pos
-        z = current_z;
+    if (wipe_tower_z == -1.) // in case no specific z was provided, print at current_z pos
+        wipe_tower_z = current_z;
 
     const bool needs_toolchange = gcodegen.writer().need_toolchange(new_extruder_id);
-    const bool will_go_down = ! is_approx(z, current_z);
+    bool will_go_down = ! is_approx((wipe_tower_z == -1.) ? current_z : wipe_tower_z, current_z, 0.001);
     const bool is_ramming = (gcodegen.config().single_extruder_multi_material)
                          || (! gcodegen.config().single_extruder_multi_material && gcodegen.config().filament_multitool_ramming.get_at(tcr.initial_tool));
     const bool should_travel_to_tower = ! tcr.priming
@@ -99,25 +99,37 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
                                          || ! needs_toolchange   // this is just finishing the tower with no toolchange
                                          || is_ramming
                                          || will_go_down);       // don't dig into the print
-    if (should_travel_to_tower) {
+    if (should_travel_to_tower || m_has_force_travel) {
         const Point xy_point = wipe_tower_point_to_object_point(gcodegen, start_pos);
-        gcode += gcodegen.retract_and_wipe();
-        gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
+        if (should_travel_to_tower) {
+            gcode += gcodegen.retract_and_wipe();
+            gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
+            need_unretract = true;
+        }
         const std::string comment{"Travel to a Wipe Tower"};
         Polyline travel_path = gcodegen.travel_to(gcode, xy_point, ExtrusionRole::Mixed);
         gcodegen.write_travel_to(gcode, travel_path, comment);
-        need_unretract = true;
+        // if delayed z move, the current z may have changed.
+        current_z = gcodegen.writer().get_unlifted_position().z();
+        if (wipe_tower_z == -1.) {
+            will_go_down = current_z;
+        }
     } else {
         // When this is multiextruder printer without any ramming, we can just change
         // the tool without travelling to the tower.
     }
+    assert(is_approx(current_z, gcodegen.writer().get_unlifted_position().z()));
 
     if (will_go_down) {
-        if (!need_unretract)
+        if (!need_unretract) {
             gcode += gcodegen.writer().retract();
-        gcode += gcodegen.writer().travel_to_z(z, "Travel down to the last wipe tower layer.");
+        }
+        gcode += gcodegen.writer().travel_to_z((wipe_tower_z == -1.) ? current_z : wipe_tower_z, "Travel down to the last wipe tower layer.");
         need_unretract = true;
+    } else {
+        gcode += std::string("; current z: ") + std::to_string(gcodegen.writer().get_unlifted_position().z()) +" ; with lift: " + std::to_string(gcodegen.writer().get_position().z()) + "\n";
     }
+    assert(is_approx(current_z, gcodegen.writer().get_unlifted_position().z()));
     //now that we traveld and are ready to unretract, unlift.
     gcode += gcodegen.writer().unlift();
     // only unretract when travel is finished
@@ -137,7 +149,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
     // A phony move to the end position at the wipe tower.
     gcodegen.writer().travel_to_xy(end_pos.cast<double>());
     gcodegen.set_last_pos(wipe_tower_point_to_object_point(gcodegen, end_pos));
-    if (!is_approx(z, current_z) && need_ensure_z) {
+    if (will_go_down && need_ensure_z) {
         gcode += gcodegen.writer().retract();
         gcode += gcodegen.writer().travel_to_z(current_z, "Travel back up to the topmost object layer.");
         // gcode += gcodegen.writer().unretract(); //why? it's done automatically later, where needed!
@@ -325,7 +337,7 @@ std::string WipeTowerIntegration::tool_change(GCodeGenerator &gcodegen, int extr
                 ignore_sparse = (m_tool_changes[m_layer_idx].size() == 1 && m_tool_changes[m_layer_idx].front().initial_tool == m_tool_changes[m_layer_idx].front().new_tool && m_layer_idx != 0);
                 if (m_tool_change_idx == 0 && !ignore_sparse)
                     wipe_tower_z = m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height;
-            } else if(!is_approx(m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height, gcodegen.writer().get_unlifted_position().z(), EPSILON)){
+            } else if(m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height + EPSILON < gcodegen.writer().get_unlifted_position().z()){
                 // missing layer, this can happen with parallel_objects_step_max_z
                 wipe_tower_z = m_last_wipe_tower_print_z + m_tool_changes[m_layer_idx].front().layer_height;
                 ensure_z = false;

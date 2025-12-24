@@ -20,6 +20,7 @@ static tm time_point_to_tm(const std::chrono::time_point<std::chrono::system_clo
 #ifdef _MSC_VER
 	gmtime_s(&local, &t);
 #else
+	// TODO: gmtime is not threadsafe
 	local = *gmtime(&t);
 #endif
 	return local;
@@ -33,22 +34,14 @@ static bool tm_to_time_point(const tm &_tm, std::chrono::time_point<std::chrono:
 	// Do not rely on timezone, as it is not portable
 	// ref: https://stackoverflow.com/questions/38298261/why-there-is-no-inverse-function-for-gmtime-in-libc
 	// ref: https://stackoverflow.com/questions/8558919/mktime-and-tm-isdst
-	localTm.tm_isdst = -1; // Always use current settings, so mktime doesn't modify the time for daylight savings
+	// TODO: mktime is not threadsafe
 	time_t t = mktime(&localTm);
 	if (t == -1)
 		return false;
 	
 	// Adjust the time_t since epoch with the difference of the local timezone to the universal timezone
+	// TODO: localtime, gmtime, and mktime are not threadsafe
 	t += (mktime(localtime(&t)) - mktime(gmtime(&t)));
-
-	// Verify if the members were modified, indicating an out-of-range value in input
-	if (localTm.tm_year != _tm.tm_year ||
-		localTm.tm_mon != _tm.tm_mon ||
-		localTm.tm_mday != _tm.tm_mday ||
-		localTm.tm_hour != _tm.tm_hour ||
-		localTm.tm_min != _tm.tm_min ||
-		localTm.tm_sec != _tm.tm_sec)
-		return false;
 
 	tp = system_clock::from_time_t(t);
 	return true;
@@ -104,6 +97,12 @@ asUINT CDateTime::getSecond() const
 	return local.tm_sec;
 }
 
+asUINT CDateTime::getWeekDay() const
+{
+	tm local = time_point_to_tm(tp);
+	return local.tm_wday;
+}
+
 bool CDateTime::setDate(asUINT year, asUINT month, asUINT day)
 {
 	tm local = time_point_to_tm(tp);
@@ -111,7 +110,20 @@ bool CDateTime::setDate(asUINT year, asUINT month, asUINT day)
 	local.tm_mon = month - 1;
 	local.tm_mday = day;
 
-	return tm_to_time_point(local, tp);
+	std::chrono::time_point<std::chrono::system_clock> newTp;
+	if (!tm_to_time_point(local, newTp))
+		return false;
+	
+	// Check if the date was actually valid
+	tm local2 = time_point_to_tm(newTp);
+
+	if (local.tm_year != local2.tm_year ||
+		local.tm_mon != local2.tm_mon ||
+		local.tm_mday != local2.tm_mday)
+		return false;
+
+	tp = newTp;
+	return true;
 }
 
 bool CDateTime::setTime(asUINT hour, asUINT minute, asUINT second)
@@ -121,7 +133,20 @@ bool CDateTime::setTime(asUINT hour, asUINT minute, asUINT second)
 	local.tm_min = minute;
 	local.tm_sec = second;
 
-	return tm_to_time_point(local, tp);
+	std::chrono::time_point<std::chrono::system_clock> newTp;
+	if (!tm_to_time_point(local, newTp))
+		return false;
+
+	// Check if the time was actually valid
+	tm local2 = time_point_to_tm(newTp);
+
+	if (local.tm_hour != local2.tm_hour ||
+		local.tm_min != local2.tm_min ||
+		local.tm_sec != local2.tm_sec)
+		return false;
+
+	tp = newTp;
+	return true;
 }
 
 CDateTime::CDateTime(asUINT year, asUINT month, asUINT day, asUINT hour, asUINT minute, asUINT second)
@@ -229,6 +254,7 @@ void RegisterScriptDateTime(asIScriptEngine *engine)
 		r = engine->RegisterObjectMethod("datetime", "uint get_hour() const property", asMETHOD(CDateTime, getHour), asCALL_THISCALL); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "uint get_minute() const property", asMETHOD(CDateTime, getMinute), asCALL_THISCALL); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "uint get_second() const property", asMETHOD(CDateTime, getSecond), asCALL_THISCALL); assert(r >= 0);
+		r = engine->RegisterObjectMethod("datetime", "uint get_weekDay() const property", asMETHOD(CDateTime, getWeekDay), asCALL_THISCALL); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "bool setDate(uint year, uint month, uint day)", asMETHOD(CDateTime, setDate), asCALL_THISCALL); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "bool setTime(uint hour, uint minute, uint second)", asMETHOD(CDateTime, setTime), asCALL_THISCALL); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "int64 opSub(const datetime &in) const", asMETHODPR(CDateTime, operator-, (const CDateTime &other) const, asINT64), asCALL_THISCALL); assert(r >= 0);
@@ -253,6 +279,7 @@ void RegisterScriptDateTime(asIScriptEngine *engine)
 		r = engine->RegisterObjectMethod("datetime", "uint get_hour() const property", WRAP_MFN(CDateTime, getHour), asCALL_GENERIC); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "uint get_minute() const property", WRAP_MFN(CDateTime, getMinute), asCALL_GENERIC); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "uint get_second() const property", WRAP_MFN(CDateTime, getSecond), asCALL_GENERIC); assert(r >= 0);
+		r = engine->RegisterObjectMethod("datetime", "uint get_weekDay() const property", WRAP_MFN(CDateTime, getWeekDay), asCALL_GENERIC); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "bool setDate(uint year, uint month, uint day)", WRAP_MFN(CDateTime, setDate), asCALL_GENERIC); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "bool setTime(uint hour, uint minute, uint second)", WRAP_MFN(CDateTime, setTime), asCALL_GENERIC); assert(r >= 0);
 		r = engine->RegisterObjectMethod("datetime", "int64 opSub(const datetime &in) const", WRAP_MFN_PR(CDateTime, operator-, (const CDateTime &other) const, asINT64), asCALL_GENERIC); assert(r >= 0);

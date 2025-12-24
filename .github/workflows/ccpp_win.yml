@@ -109,6 +109,11 @@ jobs:
       working-directory: ./build
       shell: cmd
       run: xcopy /RCYIE ..\resources package\resources
+    - name: copy profiles from registered github repositories
+      working-directory: ./build
+      shell: cmd
+      run: |
+        python ..\src\platform\download_vendor_bundles.py package/resources
     - name: copy dll & exe
       working-directory: ./build
       shell: cmd
@@ -158,9 +163,9 @@ jobs:
     - name: Generate installer version
       shell: powershell
       run: |
-        $fullVersion = (Get-Content version.inc | Select-String -Pattern 'set\(SLIC3R_VERSION_FULL \"(.*?)\"\)' | ForEach-Object { $_.Matches.Groups[1].Value })
+        $fullVersion = (Get-Content version.inc | Select-String -Pattern 'set\(SLIC3R_RC_VERSION_DOTS \"(.*?)\"\)' | ForEach-Object { $_.Matches.Groups[1].Value })
         $dateSuffix = (Get-Date -Format 'yyMMdd')
-        $env:InstallerVersion = "$fullVersion$dateSuffix" -replace '\.0', '.'
+        $env:InstallerVersion = "$fullVersion$dateSuffix" -replace '\.[0-9]([+-].+)?', '.0'
         echo "InstallerVersion=$env:InstallerVersion" >> $env:GITHUB_ENV
         $env:ReleaseSuffix = "-Beta-Nightly"
         echo "ReleaseSuffix=$env:ReleaseSuffix" >> $env:GITHUB_ENV

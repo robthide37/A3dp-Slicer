@@ -144,6 +144,7 @@ namespace Slic3r {
 namespace GUI {
 
 wxDEFINE_EVENT(EVT_CONFIG_UPDATER_SHOW_DIALOG, wxCommandEvent);
+wxDEFINE_EVENT(EVT_WIZARD_SHOW_DIALOG, wxCommandEvent);
 
 class MainFrame;
 
@@ -940,6 +941,7 @@ void GUI_App::post_init()
 #endif
             if (! cw_showed) {
                 this->preset_updater->set_installed_vendors(preset_bundle.get());
+                this->preset_updater->reload_all_vendors();
                 this->preset_updater->sync_async([this](int nb_updates) {this->check_updates(true, nb_updates);});
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
@@ -1060,7 +1062,7 @@ void choose_app_dir(GUI_App &app) {
             same_version.push_back(&installed);
         } else {
             old_versions.push_back(&installed);
-            if (boost::filesystem::exists(installed.exe_path) && boost::filesystem::equivalent(binary_file().parent_path(), installed.exe_path)) {
+            if (boost::filesystem::exists(installed.exe_path) && boost::filesystem::equivalent(install_path(), installed.exe_path)) {
                 same_exe_path.push_back(&installed);
             }
         }
@@ -1131,7 +1133,7 @@ void choose_app_dir(GUI_App &app) {
     for (int i = 1; already_used_name.find(my_default_installation.installed_name) != already_used_name.end(); ++i) {
         my_default_installation.installed_name = format("%1%_(%2%)", SLIC3R_BUILD_ID, i);
     }
-    my_default_installation.exe_path = binary_file().parent_path();
+    my_default_installation.exe_path = install_path();
     my_default_installation.other_keys["exe_path_relative"] = "0";
     my_default_installation.config_path = my_default_installation.installed_name;
     my_default_installation.other_keys["config_path_relative"] = "1";
@@ -1163,30 +1165,28 @@ void choose_app_dir(GUI_App &app) {
             if (it_is_legacy != old_versions[choice]->other_keys.end() && it_is_legacy->second == "1") {
                 boost::filesystem::path dir(app.app_config->get_root_data_dir());
                 assert(dir == old_versions[choice]->get_config_path(app.app_config->get_root_data_dir()));
+                auto copy_or_create =
+                    [&dir, &path](std::string_view dir_name) {
+                    if (boost::filesystem::exists(dir / dir_name))
+                        boost::filesystem::copy(dir / dir_name, path / dir_name,
+                                                boost::filesystem::copy_options::update_existing |
+                                                    boost::filesystem::copy_options::recursive);
+                    else
+                        boost::filesystem::create_directory(path / dir_name);
+                    };
                 boost::filesystem::copy(dir / (SLIC3R_APP_KEY ".ini"), path / (SLIC3R_APP_KEY ".ini"),
                                       boost::filesystem::copy_options::update_existing);
-                boost::filesystem::copy(dir / "cache", path / "cache",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "filament", path / "filament",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "physical_printer", path / "physical_printer",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "print", path / "print",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "printer", path / "printer",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "shapes", path / "shapes",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "sla_material", path / "sla_material",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "sla_print", path / "sla_print",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "snapshots", path / "snapshots",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "ui_layout", path / "ui_layout",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
-                boost::filesystem::copy(dir / "vendor", path / "vendor",
-                                      boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
+                copy_or_create("cache");
+                copy_or_create("filament");
+                copy_or_create("physical_printer");
+                copy_or_create("print");
+                copy_or_create("printer");
+                copy_or_create("shapes");
+                copy_or_create("sla_material");
+                copy_or_create("sla_print");
+                copy_or_create("snapshots");
+                copy_or_create("ui_layout");
+                copy_or_create("vendor");
             } else {
                 boost::filesystem::copy(old_versions[choice]->get_config_path(app.app_config->get_root_data_dir()), path,
                                       boost::filesystem::copy_options::update_existing | boost::filesystem::copy_options::recursive);
@@ -1643,7 +1643,7 @@ bool GUI_App::on_init_inner()
             associate_stl_files();
 #endif // __WXMSW__
 
-        preset_updater.reset(new PresetUpdater());
+        preset_updater.reset(new PresetUpdater(this));
         Bind(EVT_SLIC3R_VERSION_ONLINE, &GUI_App::on_version_read, this);
         Bind(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
             if (this->plater_ != nullptr && (m_app_updater->get_triggered_by_user() || app_config->get("notify_release") == "all")) {
@@ -1729,9 +1729,30 @@ bool GUI_App::on_init_inner()
         });
 #else
         Bind(EVT_CONFIG_UPDATER_SHOW_DIALOG, [this](const wxCommandEvent& evt) {
-            this->preset_updater->show_synch_window(this->plater(), preset_bundle.get(), _L("Managing vendor bundles:"), [](bool){});
+            this->preset_updater->show_synch_window(this->plater(), _L("Managing vendor bundles (hover for more information):"), [](bool){});
         }); 
 #endif
+        Bind(EVT_WIZARD_SHOW_DIALOG, [this](const wxCommandEvent& evt) {
+            int args = evt.GetInt();
+            int rr_arg = args % 8;
+            ConfigWizard::RunReason reason = ConfigWizard::RunReason::RR_USER;
+            if (rr_arg == int(ConfigWizard::RunReason::RR_DATA_EMPTY)) {
+                reason = ConfigWizard::RunReason::RR_DATA_EMPTY;
+            } else if (rr_arg == int(ConfigWizard::RunReason::RR_DATA_LEGACY)) {
+                reason = ConfigWizard::RunReason::RR_DATA_LEGACY;
+            } else if (rr_arg == int(ConfigWizard::RunReason::RR_DATA_INCOMPAT)) {
+                reason = ConfigWizard::RunReason::RR_DATA_INCOMPAT;
+            }
+            int rvbm_arg = args % 8;
+            RunVendorBundleManage bypass_bundle_install = RunVendorBundleManage::RVBM_IF_EMPTY;
+            if (rr_arg == int(RunVendorBundleManage::RVBM_NEVER)) {
+                bypass_bundle_install = RunVendorBundleManage::RVBM_NEVER;
+            } else if (rr_arg == int(RunVendorBundleManage::RVBM_ALWAYS)) {
+                bypass_bundle_install = RunVendorBundleManage::RVBM_ALWAYS;
+            }
+
+            this->run_wizard(reason, ConfigWizard::SP_WELCOME, bypass_bundle_install);
+        }); 
 
     }
     else {
@@ -1963,6 +1984,7 @@ std::map<ConfigOptionMode, std::string> GUI_App::get_mode_default_palette()
     tag_color_map[ConfigOptionMode::comAdvanced] = "#FFDC00";
     tag_color_map[ConfigOptionMode::comExpert] = "#E70000";
     //get from color.ini
+    std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
     for (Tag app_config->tags()) {
         tag_color_map[tag] = color_hash
     }
@@ -2390,7 +2412,7 @@ const std::string GUI_App::get_html_bg_color(wxWindow* html_parent)
 std::string GUI_App::get_first_mode_btn_color(ConfigOptionMode mode_id) const
 {
     assert(0 <= size_t(mode_id));
-                           
+    std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
     for (const AppConfig::Tag& tag : get_app_config()->tags()) {
         // get the first good tag.
         if ((tag.tag & mode_id) == tag.tag) {
@@ -2403,9 +2425,11 @@ std::string GUI_App::get_first_mode_btn_color(ConfigOptionMode mode_id) const
 std::string GUI_App::get_last_mode_btn_color(ConfigOptionMode mode_id) const
 {
     assert(0 <= size_t(mode_id));
-    assert(size_t(mode_id)< get_app_config()->tags().size());
-    for (size_t idx_p1 = get_app_config()->tags().size(); idx_p1 > 0; --idx_p1) {
-        const AppConfig::Tag& tag = get_app_config()->tags()[idx_p1-1];
+    std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
+    const std::vector<AppConfig::Tag> &tags = get_app_config()->tags();
+    assert(size_t(mode_id) < tags.size());
+    for (size_t idx_p1 = tags.size() - 1; idx_p1 < tags.size(); --idx_p1) {
+        const AppConfig::Tag& tag = tags[idx_p1];
         // get the first good tag.
         if ((tag.tag & mode_id) == tag.tag) {
             // store the pointer so we can return a valid reference.
@@ -2420,6 +2444,7 @@ std::map<ConfigOptionMode, wxColour> GUI_App::get_mode_palette() const
 {
     std::map<ConfigOptionMode, wxColour> ret_map;
     //if(size_t(mode_id) < m_mode_palette.size()
+    std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
     for (const AppConfig::Tag& tag : get_app_config()->tags()) {
         ret_map[tag.tag] = wxColor(tag.color_hash);
     }
@@ -3252,17 +3277,19 @@ void GUI_App::update_mode()
 void GUI_App::add_config_menu(wxMenuBar *menu)
 {
     auto local_menu = new wxMenu();
-    wxWindowID config_id_base = wxWindow::NewControlId(int(ConfigMenuCnt + Slic3r::GUI::get_app_config()->tags().size()*2));
+    wxWindowID config_id_base = wxWindow::NewControlId(int(ConfigMenuCnt + Slic3r::GUI::get_app_config()->tags().size() * 2));
 
     const wxString config_wizard_name = _(ConfigWizard::name(true));
     const wxString config_wizard_tooltip = from_u8((boost::format(_u8L("Run %s")) % config_wizard_name).str());
     // Cmd+, is standard on OS X - what about other operating systems?
     if (is_editor()) {
+        local_menu->Append(
+            config_id_base + ConfigMenuUpdateConf, _L("Install and upgrade &Vendor bundles") + dots,
+            _L("Check for vendor bundle updates, and choose which version is installed and available in the wizard"));
         local_menu->Append(config_id_base + ConfigMenuWizard, config_wizard_name + dots, config_wizard_tooltip);
         local_menu->Append(config_id_base + ConfigMenuSnapshots, _L("&Configuration Snapshots") + dots, _L("Inspect / activate configuration snapshots"));
         local_menu->Append(config_id_base + ConfigMenuTakeSnapshot, _L("Take Configuration &Snapshot"), _L("Capture a configuration snapshot"));
-        local_menu->Append(config_id_base + ConfigMenuUpdateConf, _L("Check for Configuration Updates"), _L("Check for configuration updates"));
-        local_menu->Append(config_id_base + ConfigMenuUpdateApp, _L("Check for Application Updates"), _L("Check for new version of application"));
+        local_menu->Append(config_id_base + ConfigMenuUpdateApp, _L("Check for &Application Updates"), _L("Check for new version of application"));
 #if defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION) 
         //if (DesktopIntegrationDialog::integration_possible())
         local_menu->Append(config_id_base + ConfigMenuDesktopIntegration, _L("Desktop Integration"), _L("Desktop Integration"));    
@@ -3282,6 +3309,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         local_menu->AppendSeparator();
         mode_menu = new wxMenu();
         int config_menu_idx = 0;
+        std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
         for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
             mode_menu->AppendCheckItem(config_id_base + ConfigMenuCnt + config_menu_idx, _(tag.name), _(tag.description));
             Bind(wxEVT_UPDATE_UI, [this, tag](wxUpdateUIEvent& evt) { evt.Check((get_mode() & tag.tag) == tag.tag); }, config_id_base + ConfigMenuCnt + config_menu_idx);
@@ -3471,6 +3499,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     using std::placeholders::_1;
 
     if (mode_menu != nullptr) {
+        std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
         auto modefn = [this](ConfigOptionMode mode, wxCommandEvent&) { if (get_mode() != mode) save_mode(mode); };
         int config_menu_idx = 0;
         for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
@@ -3988,7 +4017,7 @@ bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
     return true;
 }
 
-bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page, bool bypass_bundle_install /*= false*/)
+bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page, RunVendorBundleManage bypass_bundle_install /*= RVBM_IF_EMPTY*/)
 {
     wxCHECK_MSG(mainframe != nullptr, false, "Internal error: Main frame not created / null");
     
@@ -4005,13 +4034,15 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
 #endif
     // if nothing installed, show the installatino dialog first
     bool is_synch = this->preset_updater->is_synch;
-    if (bypass_bundle_install || !is_synch || this->preset_updater->count_installed() == 0) {
+    if (bypass_bundle_install == RVBM_ALWAYS ||
+        (bypass_bundle_install == RVBM_IF_EMPTY && this->preset_updater->count_installed() == 0)) {
         this->preset_updater->show_synch_window(
-            this->mainframe, preset_bundle.get(),
-            _L("You don't have any vendor configuration bundles intalled yet. You need to choose the vendor that are "
-            "useful for you. If you want to install a prusa printer, you should install a prusa bundle so you can "
-            "choose inside prusa printer presets."),
-            [&](bool is_ok) { if (is_ok) run_wizard(reason, start_page, true); });
+            this->mainframe,
+            (this->preset_updater->count_installed() ? _L("You don't have any vendor configuration bundles installed yet.") : wxString()) +
+            _L("\nOnly installed bundles will appear in the wizard. "
+               "\nTo use the vendor bundles that are useful to you, install them first in this dialog. "
+               "\nHover over this text for more information."),
+            [&](bool is_ok) { if (is_ok) run_wizard(reason, start_page, RunVendorBundleManage::RVBM_NEVER); });
         return false;
     }
 

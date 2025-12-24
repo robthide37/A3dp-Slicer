@@ -74,6 +74,9 @@ then
     find package/resources/localization -name "*.txt" -type f -delete
     find package/resources/localization -name "*database*" -type f -delete
     find package/resources/localization -name "Slic3r.mo" -type f -delete
+    
+    #copy distant profiles
+    python ../src/platform/download_vendor_bundles.py package/resources
 
     # copy occtwrapper
     cp src/OCCTWrapper.so package/bin/OCCTWrapper.so

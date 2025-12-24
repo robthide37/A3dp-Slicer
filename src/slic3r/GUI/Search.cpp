@@ -371,7 +371,8 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
             std::string label = into_u8(get_label(opt));
             if (view_params.all_mode && (opt.tags & current_tags) == 0) {
                 label += " " + into_u8(_L("tags")) + ":{";
-                for (AppConfig::Tag& t : Slic3r::GUI::get_app_config()->tags()) {
+                std::lock_guard<std::recursive_mutex> lk(Slic3r::GUI::get_app_config()->config_lock);
+                for (const AppConfig::Tag& t : Slic3r::GUI::get_app_config()->tags()) {
                     if ((opt.tags & t.tag) == t.tag)
                         label += " " + into_u8(_(t.name));
                 }
@@ -440,7 +441,8 @@ bool OptionsSearcher::search(const std::string& search,  bool force/* = false*/)
             label += L"  [" + std::to_wstring(score) + L"]";// add score value
             if (view_params.all_mode && (opt.tags & current_tags) == 0) {
                 label += L" " + _L("tags") + L":{";
-                for (AppConfig::Tag& t : Slic3r::GUI::get_app_config()->tags()) {
+                std::lock_guard<std::recursive_mutex> lk(Slic3r::GUI::get_app_config()->config_lock);
+                for (const AppConfig::Tag& t : Slic3r::GUI::get_app_config()->tags()) {
                     if ((opt.tags & t.tag) == t.tag)
                         label +=  " " + _(t.name);
                 }

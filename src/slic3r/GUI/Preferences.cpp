@@ -1786,15 +1786,18 @@ void PreferencesDialog::create_settings_mode_color_widget(wxWindow* tab, std::sh
     // Mode color markers description
 	//check if we have enough colour picker
 	std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color;
-    for (AppConfig::Tag &tag : get_app_config()->tags()) {
-		//create nullptr if not present yet
-		if(m_tag_color.find(tag.tag) == m_tag_color.end())
-			m_tag_color[tag.tag] = nullptr;
-	}
-	//now tags is fixed for the end of this method
-    for (AppConfig::Tag &tag : get_app_config()->tags()) {
-		clr_pickers_2_color.emplace_back(&m_tag_color[tag.tag], tag);
-	}
+    {
+        std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
+        for (const AppConfig::Tag &tag : get_app_config()->tags()) {
+            //create nullptr if not present yet
+            if(m_tag_color.find(tag.tag) == m_tag_color.end())
+                m_tag_color[tag.tag] = nullptr;
+        }
+        //now tags is fixed for the end of this method
+        for (const AppConfig::Tag &tag : get_app_config()->tags()) {
+            clr_pickers_2_color.emplace_back(&m_tag_color[tag.tag], tag);
+        }
+    }
 	stb_sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	GUI_Descriptions::FillSizerWithModeColorDescriptions(stb_sizer, parent, clr_pickers_2_color);
 	

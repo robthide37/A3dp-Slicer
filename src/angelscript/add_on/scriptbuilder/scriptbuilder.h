@@ -39,42 +39,6 @@
 
 BEGIN_AS_NAMESPACE
 
-template<class T>
-class PtrRelease
-{
-private:
-	T* ptr = nullptr;
-public:
-	PtrRelease() {}
-	PtrRelease(const PtrRelease&) = delete;
-	PtrRelease& operator=(PtrRelease const&) = delete;
-	~PtrRelease() { if (nullptr != ptr) ptr->Release(); }
-
-	/// @brief this reset release its ownership and re-acquire another one
-	void reset(T* p) noexcept
-	{
-		assert((nullptr == p) || (ptr != p)); // auto-reset not allowed
-		if (nullptr != ptr) ptr->Release();
-		ptr = p;
-	}
-	// underlying pointer operations :
-	inline T& operator*()  const noexcept
-	{
-		assert(nullptr != ptr);
-		return *ptr;
-	}
-	inline T* operator->() const noexcept
-	{
-		assert(nullptr != ptr);
-		return ptr;
-	}
-	inline T* get()  const noexcept
-	{
-		// no assert, can return nullptr
-		return ptr;
-	}
-};
-
 class CScriptBuilder;
 
 // This callback will be called for each #include directive encountered by the
@@ -199,8 +163,9 @@ protected:
 		std::string              nameSpace;
 	};
 	std::vector<SMetadataDecl> foundDeclarations;
-	std::string currentClass;
-	std::string currentNamespace;
+	std::string                currentClass;
+	std::string                currentNamespace;
+	std::vector<int>           currentNamespaceStack;
 
 	// Storage of metadata for global declarations
 	std::map<int, std::vector<std::string> > typeMetadataMap;

@@ -134,9 +134,7 @@ struct AMFParserContext
     static const char* get_not_null_attribute(const char** atts, const char* id) {
         const char* str = get_attribute(atts, id);
         if (str == nullptr) {
-            char error_buf[1024];
-            ::sprintf(error_buf, "Error, missing tag %s", id);
-            throw Slic3r::FileIOError(error_buf);
+            throw Slic3r::FileIOError("Error, missing tag " + std::string(id));
         }
         return str;
     }
@@ -1011,9 +1009,10 @@ bool extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_fi
             CallbackData* data = (CallbackData*)pOpaque;
             if (!XML_Parse(data->parser, (const char*)pBuf, (int)n, (file_ofs + n == data->stat.m_uncomp_size) ? 1 : 0) || data->ctx.error())
             {
-                char error_buf[1024];
-                ::sprintf(error_buf, "Error (%s) while parsing '%s' at line %d", data->ctx.error_message(), data->stat.m_filename, (int)XML_GetCurrentLineNumber(data->parser));
-                throw Slic3r::FileIOError(error_buf);
+                std::string error_msg = "Error (" + std::string(data->ctx.error_message()) + 
+                                       ") while parsing '" + std::string(data->stat.m_filename) + 
+                                       "' at line " + std::to_string((int)XML_GetCurrentLineNumber(data->parser));
+                throw Slic3r::FileIOError(error_msg);
             }
 
             return n;

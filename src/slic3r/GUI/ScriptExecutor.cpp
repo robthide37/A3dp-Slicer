@@ -1,3 +1,7 @@
+///|/ Copyright (c) SuperSlicer 2023-2025 Remi Durand @supermerill
+///|/ 
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ScriptExecutor.hpp"
 
 #include "libslic3r/PresetBundle.hpp"

@@ -23,6 +23,7 @@ class AppConfig;
 class PresetBundle;
 class Semver;
 class PresetUpdater;
+class PresetBundle;
 
 #define USE_GTHUB_PRESET_UPDATE 1
 
@@ -41,6 +42,7 @@ struct VendorSync
 {
     VendorProfile profile;
     bool is_installed = false;
+    bool has_cache = false;
     bool is_synch = false;
     bool synch_in_progress = false;
     bool synch_failed = false;
@@ -55,7 +57,8 @@ struct VendorSync
     // reurn error message (empty if install succeed)
     std::string install_vendor_config(const VendorAvailable &to_install, PresetUpdater& api_slot);
     bool uninstall_vendor_config();
-    void reset(const VendorProfile &profile, bool installed);
+    bool clear_cache();
+    void reset(const VendorProfile &profile, bool installed, bool has_cache);
 };
 class PresetUpdater
 {
@@ -84,7 +87,7 @@ public:
     std::mutex callback_update_changelog_mutex;
     std::atomic_int changelog_synch = 0;
 
-    PresetUpdater();
+    PresetUpdater(wxEvtHandler* evt_handler);
     PresetUpdater(PresetUpdater &&) = delete;
     PresetUpdater(const PresetUpdater &) = delete;
     PresetUpdater &operator=(PresetUpdater &&) = delete;
@@ -98,6 +101,7 @@ public:
     };
     
     int get_profile_count_to_update();
+    size_t count_available();
     size_t count_installed();
     VendorSync *get_vendor(std::string id) {
         auto it = all_vendors.find(id);
@@ -115,27 +119,42 @@ public:
     void download_logs(const std::string &vendor_id, std::function<void(bool)> callback_result, bool force = false);
 
     // Show the window to select what to download
-    // emit a EVT_CONFIG_UPDATER_SYNC_DONE into evt_handler when done (if not null)
+    // It's only emitting the gui event, this can be called evrywhere and return immediatly.
+    // call callback_dialog_closed when done (in the gui thread)
     void show_synch_window(wxWindow *parent,
-                           const PresetBundle *preset_bundle,
                            const wxString &message,
                            std::function<void(bool)> callback_dialog_closed);
 
     void download_new_repo(const std::string &github_org_repo, std::function<void(bool)> callback_result);
     void uninstall_vendor(const std::string &vendor_id, std::function<void(bool)> callback_result);
     void install_vendor(const std::string &vendor_id, const VendorAvailable &version, std::function<void(const std::string &)> callback_result);
+    void clear_cache_vendor(const std::string &vendor_id, std::function<void(bool)> callback_result);
 
     void uninstall_all_vendors(std::function<void(bool)> callback_result);
     void install_all_vendors(std::function<void(const std::string &)> callback_result);
     void upgrade_all_installed_vendors(std::function<void(const std::string &)> callback_result);
 protected:
-    void load_unused_vendors(std::set<std::string> &vendors_id, const boost::filesystem::path vendor_dir, bool is_installed);
+    void load_unused_vendors(std::set<std::string> &vendors_id,
+                             const boost::filesystem::path vendor_dir,
+                             bool is_installed);
 
     void update_vendor(VendorSync &vendor, bool force = false);
     // must be call by each update_vendor call at some point.
     void end_updating();
+
+    std::mutex args_for_dialog_mutex;
+    struct ShowDialogArgs {
+        wxWindow *parent;
+        wxString message;
+        std::function<void(bool)> callback_dialog_closed;
+    } args_for_dialog;
+    void _show_synch_window_internal();
+
+    wxEvtHandler* evt_handler;
 };
 
 wxDECLARE_EVENT(EVT_CONFIG_UPDATER_SYNC_DONE, wxCommandEvent);
+// to create the window in the gui thread.
+wxDECLARE_EVENT(EVT_CONFIG_UPDATER_SHOW_DIALOG, wxCommandEvent);
 }
 #endif

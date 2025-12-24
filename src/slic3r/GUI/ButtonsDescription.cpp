@@ -257,15 +257,18 @@ Dialog::Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries) :
 #endif
 	//check if we have enough colour picker
 	std::vector<std::pair<wxColourPickerCtrl**, AppConfig::Tag>> clr_pickers_2_color;
-    for (AppConfig::Tag &tag : get_app_config()->tags()) {
-		//create nullptr if not present yet
-		if(tags.find(tag.tag) == tags.end())
-			tags[tag.tag] = nullptr;
-	}
-	//now tags is fixed for the end of this method
-    for (AppConfig::Tag &tag : get_app_config()->tags()) {
-		clr_pickers_2_color.emplace_back(&tags[tag.tag], tag);
-	}
+    {
+        std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
+        for (const AppConfig::Tag &tag : get_app_config()->tags()) {
+            //create nullptr if not present yet
+            if(tags.find(tag.tag) == tags.end())
+                tags[tag.tag] = nullptr;
+        }
+        //now tags is fixed for the end of this method
+        for (const AppConfig::Tag &tag : get_app_config()->tags()) {
+            clr_pickers_2_color.emplace_back(&tags[tag.tag], tag);
+        }
+    }
 
 	wxSizer* mode_sizer = new wxBoxSizer(wxVERTICAL);
 	GUI_Descriptions::FillSizerWithModeColorDescriptions(mode_sizer, this, clr_pickers_2_color);

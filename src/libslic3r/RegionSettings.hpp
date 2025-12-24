@@ -29,6 +29,7 @@ public:
         ExPolygons intersections(const ExPolygons &to_clip) const;
         ExPolygons intersections(coord_t offset, const ExPolygons &to_clip) const;
         void clear();
+        bool is_accept_all() const { return expolys.empty(); }
     };
     // encoded value of a setting or of a group of them.
     struct SettingsValue

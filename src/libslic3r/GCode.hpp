@@ -398,6 +398,10 @@ private:
     // Cache for custom seam enforcers/blockers for each layer.
     SeamPlacer                          m_seam_placer;
     bool                                m_seam_perimeters = false;
+    // area unpraticable for the nozzle ot move on on this layer if Z lower than print_z.
+    bool                                m_need_layer_collision_already_printed = false;
+    std::vector<std::pair<ArcPolylines, coord_t>>  m_layer_collision_already_printed_2_width;
+    void init_layer_for_collision_check(const Layer *object_layer);
     public:
     /* Origin of print coordinates expressed in unscaled G-code coordinates.
        This affects the input arguments supplied to the extrude*() and travel_to()

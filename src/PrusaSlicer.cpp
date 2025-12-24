@@ -778,6 +778,7 @@ bool CLI::setup(int argc, char **argv)
     // See Invoking prusa-slicer from $PATH environment variable crashes #5542
     // boost::filesystem::path path_to_binary = boost::filesystem::system_complete(argv[0]);
     boost::filesystem::path path_to_binary = boost::dll::program_location();
+    boost::filesystem::path install_path = path_to_binary.parent_path();
 
     // Path from the Slic3r binary to its resources.
 #ifdef __APPLE__
@@ -799,7 +800,22 @@ bool CLI::setup(int argc, char **argv)
     // Path from Slic3r binary to resources:
     boost::filesystem::path path_resources = boost::filesystem::canonical(path_to_binary).parent_path() / "../resources";
 #endif
+#if !defined(_WIN32) && !defined(__APPLE__)
+    //test if launched from appiamge
+    const char* appimage_env = std::getenv("APPIMAGE");
+    if (appimage_env != nullptr && appimage_env[0] != '\0') {
+        try {
+            boost::filesystem::path appimage_path = boost::filesystem::canonical(boost::filesystem::path(appimage_env));
+            if (boost::filesystem::exists(appimage_path)) {
+                BOOST_LOG_TRIVIAL(trace) << "appimage detected, change install path from '" << install_path
+                                         << "' to '" << appimage_env << "\n";
+                install_path = appimage_path;
+            }
+        } catch (std::exception &) {}
+    }
+#endif
 
+    set_install_path(install_path);
     set_binary_file(path_to_binary);
     set_resources_dir(path_resources.string());
     set_var_dir((path_resources / "icons").string());

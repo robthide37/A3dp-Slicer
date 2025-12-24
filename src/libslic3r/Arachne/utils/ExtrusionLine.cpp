@@ -219,12 +219,19 @@ int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A,
      * */
     const int64_t ab_length = (B.p - A.p).cast<int64_t>().norm();
     const int64_t bc_length = (C.p - B.p).cast<int64_t>().norm();
+    const int64_t total_length = ab_length + bc_length;
+    assert(ab_length > 0 && bc_length > 0);
+
     if (const coord_t width_diff = std::max(std::abs(B.w - A.w), std::abs(C.w - B.w)); width_diff > 1) {
+        // Handle degenerate case where all points are at same location
+        if (total_length == 0) {
+            return 0;
+        }
         // Adjust the width only if there is a difference, or else the rounding errors may produce the wrong
         // weighted average value.
         const int64_t ab_weight = (A.w + B.w) / 2;
         const int64_t bc_weight = (B.w + C.w) / 2;
-        const int64_t weighted_average_width = (ab_length * ab_weight + bc_length * bc_weight) / (ab_length + bc_length);
+        const int64_t weighted_average_width = (ab_length * ab_weight + bc_length * bc_weight) / total_length;
         const int64_t ac_length              = (C.p - A.p).cast<int64_t>().norm();
         return std::abs((ab_weight * ab_length + bc_weight * bc_length) - (weighted_average_width * ac_length));
     } else {

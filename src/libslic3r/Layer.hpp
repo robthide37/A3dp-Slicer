@@ -234,6 +234,7 @@ public:
     // divided by type top/bottom/internal
     SurfaceCollection           m_slices;
 
+    ExPolygons                  m_perimeter_slices;
 private:
     // Unspecified fill polygons, used for overhang detection ("ensure vertical wall thickness feature")
     // and for re-starting of infills.

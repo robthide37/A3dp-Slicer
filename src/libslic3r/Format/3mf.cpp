@@ -1228,9 +1228,10 @@ bool _3MF_Importer::_load_model_from_file(const std::string& filename, Model& mo
             res = mz_zip_reader_extract_to_callback(&archive, stat.m_file_index, [](void* pOpaque, mz_uint64 file_ofs, const void* pBuf, size_t n)->size_t {
                 CallbackData* data = (CallbackData*)pOpaque;
                 if (!XML_Parse(data->parser, (const char*)pBuf, (int)n, (file_ofs + n == data->stat.m_uncomp_size) ? 1 : 0) || data->importer.parse_error()) {
-                    char error_buf[1024];
-                    ::sprintf(error_buf, "Error (%s) while parsing '%s' at line %d", data->importer.parse_error_message(), data->stat.m_filename, (int)XML_GetCurrentLineNumber(data->parser));
-                    throw Slic3r::FileIOError(error_buf);
+                    std::string error_msg = std::string("Error (") + std::string(data->importer.parse_error_message()) +
+                                           std::string(") while parsing '") + std::string(data->stat.m_filename) +
+                                           std::string("' at line ") + std::to_string((int)XML_GetCurrentLineNumber(data->parser));
+                    throw Slic3r::FileIOError(error_msg);
                 }
 
                 return n;
@@ -1780,9 +1781,9 @@ void _3MF_Importer::_extract_wipe_tower_information_from_archive_legacy(::mz_zip
         }
 
         if (!XML_ParseBuffer(m_xml_parser, (int)stat.m_uncomp_size, 1)) {
-            char error_buf[1024];
-            ::sprintf(error_buf, "Error (%s) while parsing xml file at line %d", XML_ErrorString(XML_GetErrorCode(m_xml_parser)), (int)XML_GetCurrentLineNumber(m_xml_parser));
-            add_error(error_buf);
+            std::string error_msg = std::string("Error (") + std::string(XML_ErrorString(XML_GetErrorCode(m_xml_parser))) +
+                                   std::string(") while parsing xml file at line ") + std::to_string((int)XML_GetCurrentLineNumber(m_xml_parser));
+            add_error(error_msg);
             return false;
         }
 
@@ -3591,20 +3592,18 @@ void _3MF_Importer::_extract_wipe_tower_information_from_archive_legacy(::mz_zip
     {
         assert(is_decimal_separator_point());
         std::string out = "";
-        char buffer[1024];
 
         unsigned int count = 0;
         for (const ModelObject* object : model.objects) {
             ++count;
             const std::vector<double>& layer_height_profile = object->layer_height_profile.get();
             if (layer_height_profile.size() >= 4 && layer_height_profile.size() % 2 == 0) {
-                sprintf(buffer, "object_id=%d|", count);
-                out += buffer;
+                out += "object_id=" + std::to_string(count) + "|";
 
                 // Store the layer height profile as a single semicolon separated list.
                 for (size_t i = 0; i < layer_height_profile.size(); ++i) {
-                    sprintf(buffer, (i == 0) ? "%f" : ";%f", layer_height_profile[i]);
-                    out += buffer;
+                    if (i > 0) out += ";";
+                    out += std::to_string(layer_height_profile[i]);
                 }
                 
                 out += "\n";

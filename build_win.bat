@@ -3,6 +3,7 @@
 @REM /|/
 @REM /|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 @REM /|/
+@ECHO WARNING: this script was made for PrusaSlicer but was never adapted to Slic3r/SuperSlicer. It may not work as expected.
 @setlocal disableDelayedExpansion enableExtensions
 @IF "%PS_ECHO_ON%" NEQ "" (echo on) ELSE (echo off)
 @GOTO :MAIN

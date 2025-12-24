@@ -177,6 +177,7 @@ public:
     std::vector<LayerTools>& layer_tools() { return m_layer_tools; }
     bool 				has_wipe_tower() const { return ! m_layer_tools.empty() && m_first_printing_extruder != (uint16_t)-1 && m_layer_tools.front().wipe_tower_partitions > 0; }
     int                 toolchanges_count() const;
+    const std::vector<const PrintObject*> &objects() const { return m_objects; }
 
 private:
     void				initialize_layers(std::vector<double> &zs);
@@ -196,6 +197,8 @@ private:
     std::vector<uint16_t>       m_all_printing_extruders;
 
     const PrintConfig*          m_print_config_ptr = nullptr;
+
+    std::vector<const PrintObject*> m_objects;
 };
 
 } // namespace SLic3r

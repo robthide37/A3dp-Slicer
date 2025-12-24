@@ -10,7 +10,7 @@ on:
 
 jobs:
   build_dep:
-    runs-on: macos-13
+    runs-on: macos-15-intel
 
     steps:
     - uses: actions/checkout@v3
@@ -52,7 +52,7 @@ jobs:
       run: ./BuildMacOS.sh -d
 
   build:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     needs: build_dep
 
     steps:
@@ -65,6 +65,10 @@ jobs:
         cmake-version: "3.31.x"
     - name: Use cmake
       run: cmake --version
+    - name: Install Autoconf
+      run: |
+        brew update
+        brew install autoconf
     - name: check autoconf version
       run: autoconf --version
     - name: update automake for mpfr

@@ -205,6 +205,8 @@ public:
     Parameters             params;
     std::function<void()>        throw_if_canceled = []() {};
     // Outputs:
+    // mask for "inside" perimeter (to remove un-periemter-able areas)
+    ExPolygons perimeter_boundary;
     
     PerimeterGenerator(const Parameters &params) : params(params) {}
 

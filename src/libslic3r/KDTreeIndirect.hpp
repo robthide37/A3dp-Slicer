@@ -64,10 +64,10 @@ public:
     }
 
     template<typename CoordType>
-    unsigned int descent_mask(const CoordType &point_coord, const CoordType &search_radius, size_t idx, size_t dimension) const
+    unsigned int descent_mask(const CoordType &point_coord, const double &search_radius, size_t idx, size_t dimension) const
     {
         CoordType dist = point_coord - this->coordinate(idx, dimension);
-        return (dist * dist < search_radius + CoordType(EPSILON)) ?
+        return (double(dist) * dist < search_radius + double(std::is_floating_point<CoordType>::value ? EPSILON : SCALED_EPSILON)) ?
                                                                     // The plane intersects a hypersphere centered at point_coord of search_radius.
                    ((unsigned int)(VisitorReturnMask::CONTINUE_LEFT) | (unsigned int)(VisitorReturnMask::CONTINUE_RIGHT)) :
                    // The plane does not intersect the hypersphere.
@@ -291,20 +291,20 @@ std::vector<size_t> find_nearby_points(const KDTreeIndirectType &kdtree, const P
     struct Visitor {
         const KDTreeIndirectType &kdtree;
         const PointType center;
-        const CoordType max_distance_squared;
+        const double max_distance_squared;
         const FilterFn filter;
         std::vector<size_t> result;
 
         Visitor(const KDTreeIndirectType &kdtree, const PointType& center, const CoordType &max_distance,
                 FilterFn filter) :
-            kdtree(kdtree), center(center), max_distance_squared(max_distance*max_distance), filter(filter) {
+            kdtree(kdtree), center(center), max_distance_squared(double(max_distance)*max_distance), filter(filter) {
         }
         unsigned int operator()(size_t idx, size_t dimension) {
             if (this->filter(idx)) {
-                auto dist = CoordType(0);
+                double dist = 0.;
                 for (size_t i = 0; i < KDTreeIndirectType::NumDimensions; ++i) {
                     CoordType d = center[i] - kdtree.coordinate(idx, i);
-                    dist += d * d;
+                    dist += double(d) * d;
                 }
                 if (dist < max_distance_squared) {
                     result.push_back(idx);

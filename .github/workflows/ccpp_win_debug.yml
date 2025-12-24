@@ -153,6 +153,11 @@ jobs:
       working-directory: ./build
       shell: cmd
       run: xcopy /RCYIE ..\resources package\resources
+    - name: copy profiles from registered github repositories
+      working-directory: ./build
+      shell: cmd
+      run: |
+        python ..\src\platform\download_vendor_bundles.py package/resources
     - name: copy dll & exe
       working-directory: ./build
       shell: cmd

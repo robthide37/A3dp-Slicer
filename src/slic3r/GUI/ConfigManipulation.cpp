@@ -383,8 +383,9 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool have_perimeter_loop = config->opt_bool("perimeter_loop") && !have_arachne;
 
     bool has_external_peri_not_loop = config->opt_bool("external_perimeters_first") && !have_perimeter_loop;
-    toggle_field("external_perimeters_vase", has_external_peri_not_loop);
-    toggle_field("external_perimeters_vase_min_height", has_external_peri_not_loop && config->opt_bool("external_perimeters_vase"));
+    toggle_field("seam_slope_type", has_external_peri_not_loop);
+    for (auto el : { "seam_slope_min_height", "seam_slope_max_length"})
+        toggle_field(el, has_external_peri_not_loop && config->opt_enum<SeamScarfType>("seam_slope_type") != SeamScarfType::None);
     toggle_field("external_perimeters_first_force", has_external_peri_not_loop && !have_arachne );
     bool is_ext_forced = config->opt_bool("external_perimeters_first_force");
     for (auto el : { "external_perimeters_nothole", "external_perimeters_hole"})

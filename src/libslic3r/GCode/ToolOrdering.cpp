@@ -99,6 +99,9 @@ static double calc_max_layer_height(const PrintConfig &config, double max_object
 // (print.config().complete_objects is true).
 ToolOrdering::ToolOrdering(const PrintObject &object, uint16_t first_extruder, bool prime_multi_material)
 {
+    m_objects.clear();
+    m_objects.push_back(&object);
+
     if (object.layers().empty())
         return;
 
@@ -136,6 +139,9 @@ ToolOrdering::ToolOrdering(const PrintObject &object, uint16_t first_extruder, b
 // (print.config().complete_objects is true).
 ToolOrdering::ToolOrdering(const PrintObject &object, const GCode::ObjectsLayerToPrint &layers, uint16_t first_extruder, bool prime_multi_material)
 {
+    m_objects.clear();
+    m_objects.push_back(&object);
+
     if (object.layers().empty() || layers.empty())
         return;
 
@@ -180,6 +186,7 @@ ToolOrdering::ToolOrdering(const PrintObject &object, const GCode::ObjectsLayerT
 // (print.config().complete_objects is false).
 ToolOrdering::ToolOrdering(const Print &print, uint16_t first_extruder, bool prime_multi_material)
 {
+    m_objects.clear();
     m_print_config_ptr = &print.config();
 
     // Initialize the print layers for all objects and all layers.
@@ -188,6 +195,7 @@ ToolOrdering::ToolOrdering(const Print &print, uint16_t first_extruder, bool pri
     {
         std::vector<double> zs;
         for (const PrintObject *object : print.objects()) {
+            m_objects.push_back(object);
             zs.reserve(zs.size() + object->layers().size() + object->support_layers().size());
             for (auto layer : object->layers()) {
                 if (layer->has_extrusions()) {

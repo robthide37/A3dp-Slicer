@@ -2327,9 +2327,10 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
         m_slicing_params->max_suport_layer_height :
         std::min(m_slicing_params->max_suport_layer_height, std::max(0.,// m_slicing_params->min_suport_layer_height,
             m_object_config->support_material_interface_layer_height.get_abs_value(m_support_params.support_material_interface_flow.nozzle_diameter())));
-    if (extremes.front()->height > 0 ||
-        (m_slicing_params->raft_interface_top_z > 0 && !extremes.empty() &&
-         std::abs(extremes.front()->extreme_z() - m_slicing_params->raft_interface_top_z) < EPSILON)) {
+    if (!extremes.empty() &&
+        (extremes.front()->height > 0 ||
+         (m_slicing_params->raft_interface_top_z > 0 &&
+          std::abs(extremes.front()->extreme_z() - m_slicing_params->raft_interface_top_z) < EPSILON))) {
         // This is a raft contact layer, its height has been decided in this->top_contact_layers().
         // Ignore this layer when calculating the intermediate support layers.
         assert(extremes.front()->layer_type == SupporLayerType::TopContact);

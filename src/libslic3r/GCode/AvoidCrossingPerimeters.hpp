@@ -85,6 +85,8 @@ private:
 
     bool m_init{ false };
 
+    // for assert, to see if we are correctly initialized
+    const Layer             *m_init_to;
     // Lslices offseted by half an external perimeter width. Used for detection if line or polyline is inside of any polygon.
     ExPolygons               m_lslices_offset;
     std::vector<BoundingBox> m_lslices_offset_bboxes;

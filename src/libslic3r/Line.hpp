@@ -244,6 +244,8 @@ public:
     // Closest point (and returned squared distance to this point) could be beyond the 'a' and 'b' ends of the segment.
     static inline double distance_to_infinite_squared(const Point &point, const Point &a, const Point &b) { return line_alg::distance_to_infinite_squared(Line{a, b}, Vec<2, coord_t>{point}); }
     static coordf_t distance_to_infinite(const Point &point, const Point &a, const Point &b) { return sqrt(distance_to_infinite_squared(point, a, b)); }
+    // version optimized to work on int-4 Points, to reduce cast & to avoid precision issues.
+    static double distance_to_squared_abp(const Point &a, const Point &b, const Point &point, Point *nearest_point = nullptr);
 
     Point a;
     Point b;

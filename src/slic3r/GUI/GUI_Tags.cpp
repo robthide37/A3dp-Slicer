@@ -121,10 +121,13 @@ void ModeButton::update_bitmap()
 {
     //get color
     std::string color_hash;
-    for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
-        if (tag.name == m_mode_name) {
-            color_hash = tag.color_hash;
-            break;
+    {
+        std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
+        for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
+            if (tag.name == m_mode_name) {
+                color_hash = tag.color_hash;
+                break;
+            }
         }
     }
     assert(!color_hash.empty());
@@ -197,9 +200,12 @@ ModeSizer::ModeSizer(wxWindow *parent, int hgap, int max_col) :
 
     std::vector<std::pair<std::string, std::string>> name_2_color;
     // load colors from ui file
-    for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
-        name_2_color.emplace_back(tag.name, tag.color_hash);
-        m_bt_mode.push_back(tag.tag);
+    {
+        std::lock_guard<std::recursive_mutex> lk(get_app_config()->config_lock);
+        for (const AppConfig::Tag& tag : Slic3r::GUI::get_app_config()->tags()) {
+            name_2_color.emplace_back(tag.name, tag.color_hash);
+            m_bt_mode.push_back(tag.tag);
+        }
     }
 
     auto modebtnfn = [this](wxCommandEvent &event, int mode_idx) {

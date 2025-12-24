@@ -1589,6 +1589,17 @@ void EdgeGrid::save_png(const EdgeGrid::Grid &grid, const BoundingBox &bbox, coo
 	png::write_rgb_to_file_scaled(path, w, h, pixels, scale);
 }
 
+Polylines EdgeGrid::Grid::get_contours() const {
+    Polylines polylines;
+    for (const EdgeGrid::Contour &contour : m_contours) {
+        polylines.emplace_back();
+        for  (const Slic3r::Point &pt : contour) {
+            polylines.back().points.push_back(pt);
+        }
+    }
+    return polylines;
+}
+
 // Find all pairs of intersectiong edges from the set of polygons.
 std::vector<std::pair<EdgeGrid::Grid::ContourEdge, EdgeGrid::Grid::ContourEdge>> intersecting_edges(const Polygons &polygons)
 {

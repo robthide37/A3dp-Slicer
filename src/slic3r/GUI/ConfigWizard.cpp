@@ -619,14 +619,26 @@ PageWelcome::PageWelcome(ConfigWizard *parent)
     , cbox_integrate(append(
         new wxCheckBox(this, wxID_ANY, _L("Perform desktop integration (Sets this binary to be searchable by the system)."))
     ))
+    , bt_new_vendor(append(
+        new wxButton(this, wxID_ANY, _L("Add more vendors"))))
+    , run_reason(ConfigWizard::RunReason::RR_USER)
 {
     welcome_text->Hide();
-    cbox_reset->Hide();
-    cbox_integrate->Hide();    
+    bt_new_vendor->Hide();
+    cbox_integrate->Hide();
+    bt_new_vendor->Bind(wxEVT_BUTTON, [this, parent](wxCommandEvent &) {
+        ConfigWizard::RunReason rr = this->run_reason;
+        parent->EndModal(wxID_CANCEL);
+        wxCommandEvent *evt = new wxCommandEvent(EVT_WIZARD_SHOW_DIALOG);
+        // set args for GUI_App::run_wizard
+        evt->SetInt(int(rr) + 8*(GUI_App::RunVendorBundleManage::RVBM_ALWAYS));
+        GUI::wxGetApp().QueueEvent(evt);
+    });
 }
 
 void PageWelcome::set_run_reason(ConfigWizard::RunReason run_reason)
 {
+    this->run_reason = run_reason;
     const bool data_empty = run_reason == ConfigWizard::RR_DATA_EMPTY;
     welcome_text->Show(data_empty);
     cbox_reset->Show(!data_empty);
@@ -1776,8 +1788,12 @@ PageVendors::PageVendors(ConfigWizard *parent)
             wizard_p()->on_3rdparty_install(vendor, cbox->IsChecked());
         });
 
-        const auto &acvendors = appconfig.vendors();
-        const bool enabled = acvendors.find(vendor->id) != acvendors.end();
+        /*const*/ bool enabled;
+        {
+            std::lock_guard<std::recursive_mutex> lk(appconfig.config_lock);
+            const AppConfig::VendorMap &acvendors = appconfig.vendors();
+            enabled = acvendors.find(vendor->id) != acvendors.end();
+        }
         if (enabled) {
             cbox->SetValue(true);
 
@@ -3078,8 +3094,16 @@ static std::string get_first_added_preset(const std::map<std::string, std::strin
 bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes)
 {
     wxString header, caption = _L("Configuration is edited in ConfigWizard");
-    const auto enabled_vendors = appconfig_new.vendors();
-    const auto enabled_vendors_old = app_config->vendors();
+    /*const*/ AppConfig::VendorMap enabled_vendors;
+    /*const*/ AppConfig::VendorMap enabled_vendors_old;
+    {
+        std::lock_guard<std::recursive_mutex> lk(appconfig_new.config_lock);
+        enabled_vendors = appconfig_new.vendors();
+    }
+    {
+        std::lock_guard<std::recursive_mutex> lk(app_config->config_lock);
+        enabled_vendors_old = app_config->vendors();
+    }
 
     bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;

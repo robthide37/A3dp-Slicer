@@ -8,8 +8,6 @@
 #ifndef slic3r_GUI_App_hpp_
 #define slic3r_GUI_App_hpp_
 
-#include <angelscript/include/angelscript.h>
-#include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
 #include <memory>
 #include <string>
 #include "ImGuiWrapper.hpp"
@@ -172,8 +170,6 @@ private:
 
     OpenGLManager m_opengl_mgr;
 
-    // AngelScript::PtrRelease<AngelScript::asIScriptEngine> m_script_engine;
-
     std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
 
     std::unique_ptr<ImGuiWrapper> m_imgui;
@@ -196,8 +192,6 @@ public:
     bool is_gcode_viewer() const { return m_app_mode == EAppMode::GCodeViewer; }
     bool is_recreating_gui() const { return m_is_recreating_gui; }
     std::string logo_name() const { return is_editor() ? SLIC3R_APP_KEY : GCODEVIEWER_APP_KEY; }
-
-    // AngelScript::asIScriptEngine* get_script_engine() const { return m_script_engine.get(); }
 
     // To be called after the GUI is fully built up.
     // Process command line parameters cached in this->init_params,
@@ -415,8 +409,15 @@ public:
 
     void            open_web_page_localized(const std::string &http_address);
     bool            may_switch_to_SLA_preset(const wxString& caption);
-    bool            run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page = ConfigWizard::SP_WELCOME,
-                    bool bypass_bundle_install = false);
+
+    enum RunVendorBundleManage {
+        RVBM_NEVER,
+        RVBM_IF_EMPTY,
+        RVBM_ALWAYS,
+    };
+    bool run_wizard(ConfigWizard::RunReason reason,
+                    ConfigWizard::StartPage start_page = ConfigWizard::SP_WELCOME,
+                    RunVendorBundleManage bypass_bundle_install = RVBM_IF_EMPTY);
     void            show_desktop_integration_dialog();
     void            show_downloader_registration_dialog();
 
@@ -485,6 +486,7 @@ private:
 DECLARE_APP(GUI_App)
 
 wxDECLARE_EVENT(EVT_CONFIG_UPDATER_SHOW_DIALOG, wxCommandEvent);
+wxDECLARE_EVENT(EVT_WIZARD_SHOW_DIALOG, wxCommandEvent);
 } // GUI
 } // Slic3r
 

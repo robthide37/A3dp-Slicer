@@ -174,6 +174,9 @@ struct PageWelcome: ConfigWizardPage
     wxStaticText *welcome_text;
     wxCheckBox *cbox_reset;
     wxCheckBox *cbox_integrate;
+    wxButton   *bt_new_vendor;
+
+    ConfigWizard::RunReason run_reason;
 
     PageWelcome(ConfigWizard *parent);
 

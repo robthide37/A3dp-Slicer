@@ -388,6 +388,8 @@ public:
 		return Line(contour.segment_start(iseg), contour.segment_end(iseg));
 	}
 
+    Polylines get_contours() const;
+
 protected:
 	struct Cell {
 		Cell() : begin(0), end(0) {}

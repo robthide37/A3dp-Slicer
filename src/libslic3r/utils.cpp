@@ -189,6 +189,19 @@ const boost::filesystem::path& binary_file()
     return g_binary_file;
 }
 
+
+static boost::filesystem::path g_install_path;
+
+void set_install_path(const boost::filesystem::path &file)
+{
+    g_install_path = file;
+}
+
+const boost::filesystem::path& install_path()
+{
+    return g_install_path;
+}
+
 static std::string g_resources_dir;
 
 void set_resources_dir(const std::string &dir)
@@ -273,7 +286,7 @@ std::string debug_out_path(const char *name, ...)
     char buffer[2048];
     va_list args;
     va_start(args, name);
-    std::vsprintf(buffer, name, args);
+    std::vsnprintf(buffer, 2048, name, args);
     va_end(args);
     return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
 }
@@ -298,7 +311,7 @@ std::string debug_out_path_uniqueid(std::string name, ...) {
     va_list args;
     va_start(args, name);
     //name = debug_out_path(name.c_str(), args);
-    std::vsprintf(buffer, name.c_str(), args);
+    std::vsnprintf(buffer, 2048, name.c_str(), args);
     va_end(args);
     return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
 }

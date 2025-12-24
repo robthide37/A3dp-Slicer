@@ -736,12 +736,10 @@ void PrintObject::slice()
 
 // modify the polygon so it doesn't have any concave angle spiker than 90°
 // used by _max_overhang_threshold
-void only_convex_or_gt90deg(Polygon &poly) {
-    static int only_convex_or_gt90deg_i = 0;
-    only_convex_or_gt90deg_i++;
-    Polygon srcp = poly;
+// note: don't work well for min_angle != 90°
+void only_convex_or_gt(Polygon &poly, double min_angle = PI/2) {
     const bool ccw = poly.is_counter_clockwise();
-    std::vector<size_t> concave = ccw ? poly.concave_points_idx(0, PI / 2 - 0.001) : poly.convex_points_idx(0, PI / 2 - 0.001);
+    std::vector<size_t> concave = ccw ? poly.concave_points_idx(0, min_angle - 0.001) : poly.convex_points_idx(0, min_angle - 0.001);
     size_t iter = 0;
     while (!concave.empty()) {
         assert(std::is_sorted(concave.begin(), concave.end()));
@@ -754,7 +752,7 @@ void only_convex_or_gt90deg(Polygon &poly) {
                 previous_modified = false;
             } else {
                 previous_modified = true;
-                // concave: create new points to have a 90° angle
+                // concave: create new points to have a min_angle angle
                 // get smallest side
                 Point small_side_point = idx == 0 ? poly.back() : poly[idx - 1];
                 Point big_side_point   = idx == poly.size() - 1 ? poly.front() : poly[idx + 1];
@@ -769,10 +767,10 @@ void only_convex_or_gt90deg(Polygon &poly) {
                 assert(is_approx(ccw_angle_old_test(poly[idx], previous_point, next_point), abs_angle(angle_ccw(previous_point - poly[idx], next_point - poly[idx])), 0.00000001));
 #endif
                 double angle = abs_angle(angle_ccw(previous_point - poly[idx], next_point - poly[idx]));
-                if (angle < PI / 2 + 0.001 && angle > PI / 2) {
-                    angle = PI / 2;
+                if (angle < min_angle + 0.001 && angle > min_angle) {
+                    angle = min_angle;
                 }
-                assert(angle <= PI / 2 + EPSILON && angle >= 0);
+                assert(angle <= min_angle + EPSILON && angle >= 0);
                 coordf_t dist_to_move = std::cos(angle) * poly[idx].distance_to(small_side_point) + SCALED_EPSILON / 2;
                 // increase dist if big number of iteration (means it's too slow to pull 2 points one after another)
                 dist_to_move *= (0.95 + ((iter + 2) * (iter + 1) / 40)); // 0->1; 1->1.1; 3->1.45; 5->2; 10->4.2; 20->12.5
@@ -787,13 +785,82 @@ void only_convex_or_gt90deg(Polygon &poly) {
             }
         };
         poly.points = new_pts;
-        concave = ccw ? poly.concave_points_idx(0, PI / 2 - 0.001) : poly.convex_points_idx(0, PI / 2 - 0.001);
+        concave = ccw ? poly.concave_points_idx(0, min_angle - 0.001) : poly.convex_points_idx(0, min_angle - 0.001);
 
         if (iter > 20) {
             // abord where we are.
             return;
         }
         iter++;
+    }
+}
+
+// try to remove zig-zags
+void smoothen(Polygon &poly, distf_t max_length = scale_d(1), double threshold = PI / 2) {
+    // for each short-enough segment
+    distsqrf_t max_d2 = max_length * max_length;
+    distsqrf_t min_d2 = (max_length / 20) * (max_length / 20);
+    bool previous_culled = false;
+    bool prev_angle_culled = 0;
+    for (size_t i = 0; i < poly.size(); i++) {
+        //remove too small sections
+        size_t im1 = std::min(i - 1, poly.size() - 1);
+        distsqrf_t my_d2 = poly[im1].distance_to_square(poly[i]);
+        if (min_d2 > my_d2) {
+            poly[im1] = Line(poly[im1], poly[i]).midpoint();
+            poly.points.erase(poly.points.begin() + i);
+            i--;
+        }
+    }
+    min_d2 = (max_length / 5) * (max_length / 5);
+    for (size_t i = 0; i < poly.size(); i++) {
+        bool next_culled = false;
+        if (poly.size() <= 3) {
+            // polygon too small
+            return;
+        }
+        size_t im1 = std::min(i - 1, poly.size() - 1);
+        distsqrf_t my_d2 = poly[im1].distance_to_square(poly[i]);
+        if (max_d2 > my_d2) {
+            bool too_short = min_d2 > my_d2;
+            // if previous angle is sharp convex/concave
+            size_t im2 = std::min(i - 2, poly.size() - 2);
+            double prev_angle = previous_culled ? prev_angle_culled:
+                angle_ccw(poly[im2] - poly[im1], poly[i] - poly[im1]);
+            // if next angle is sharp concave/convex
+            size_t ip1 = ((i + 1) < poly.size() ? i + 1 : 0);
+            double next_angle = angle_ccw(poly[im1] - poly[i], poly[ip1] - poly[i]);
+            //if (poly[im2].distance_to_square(poly[im1]) > max_d2 || poly[i].distance_to_square(poly[ip1]) > max_d2) {
+            //    //if previous or next is very long, don't delete its point.
+            //    continue;
+            //}
+            if ((prev_angle < 0 && next_angle > 0) || (prev_angle > 0 && next_angle < 0)) {
+                // then merge the segment into a point
+                if (too_short || (std::abs(prev_angle) < threshold && std::abs(next_angle) < threshold)) {
+                    Point midpoint = Line(poly[im1], poly[i]).midpoint();
+                    // smoothen
+                    if (poly[im2].distance_to_square(poly[im1]) > max_d2) {
+                        poly[im1] = Line(poly[im1], poly[im2]).point_at(max_length);
+                        if (poly[i].distance_to_square(poly[ip1]) > max_d2) {
+                            poly[i] = Line(poly[i], poly[ip1]).point_at(max_length);
+                        } else {
+                            poly[i] = midpoint;
+                        }
+                    } else {
+                        poly[im1] = midpoint;
+                        if (poly[i].distance_to_square(poly[ip1]) > max_d2) {
+                            poly[i] = Line(poly[i], poly[ip1]).point_at(max_length);
+                        } else {
+                            poly.points.erase(poly.points.begin() + i);
+                            i--;
+                        }
+                    }
+                     next_culled = true;
+                     prev_angle_culled = next_angle;
+                }
+            }
+        }
+        prev_angle_culled = next_culled;
     }
 }
 
@@ -949,50 +1016,48 @@ void PrintObject::_max_overhang_threshold() {
                 ExPolygons enlarged_support = offset_ex(supported_area, double(enlargement));
                 if (!bridged_other_layers_areas.empty()) {
                     bridged_other_layers_areas = union_ex(bridged_other_layers_areas);
-                    bool has_a_diff = false;
                     // only remove  expolygons that are not enclosed inside enlarged_support, because else there's no point.
-                    ExPolygons checked_bridged_other_layers_areas;
                     for (ExPolygon &bridged_other_layers_area : bridged_other_layers_areas) {
                         ExPolygons check = diff_ex(bridged_other_layers_area, enlarged_support);
                         if (!check.empty() && (check.size() > 1 || check.front() != bridged_other_layers_area)) {
                             enlarged_support = diff_ex(enlarged_support, bridged_other_layers_area);
-                            checked_bridged_other_layers_areas.push_back(bridged_other_layers_area);
-                            has_a_diff = true;
                         }
                     }
-                    if (has_a_diff) {
-                        // if assert is false sometimes: this union_ex is useful.
-                        // if this comment is till here after 2025, then it's useless and can be deleted.
-                        assert(diff_ex(supported_area, enlarged_support).empty());
-                        enlarged_support = union_ex(enlarged_support, supported_area);
-                    }
                 }
-                append(enlarged_support, supported_area);
+                enlarged_support = union_safety_offset_ex(enlarged_support);
+                ExPolygons max_enlarged_support = offset_ex(enlarged_support, double(enlargement * 0.5));
+                ExPolygons min_enlarged_support = union_ex(supported_area,
+                                                           offset_ex(enlarged_support, double(-enlargement * 0.5)));
+                
                 // put bridgeable into supported area (bridges are not enlarged)
-                append(enlarged_support, bridged_area);
-                const ExPolygons new_enlarged_support_bef = union_safety_offset_ex(enlarged_support);
-                ExPolygons new_enlarged_support = union_safety_offset_ex(enlarged_support);
+                max_enlarged_support = union_ex(max_enlarged_support, bridged_area);
+                min_enlarged_support = union_ex(min_enlarged_support, bridged_area);
+
                 // if possible, be sure to not have concave points in unsupported area
-                for (ExPolygon &expoly : new_enlarged_support) {
+                for (ExPolygon &expoly : enlarged_support) {
                     assert(expoly.contour.is_counter_clockwise());
-                    only_convex_or_gt90deg(expoly.contour);
-                    //same with holes (concave as they are in reverse order, this is taken care inside only_convex_or_90deg)
+                    smoothen(expoly.contour, std::max(double(enlargement) * 2, double(max_nz_diam * 2)),
+                             PI * 5. / 6.);
+                    // same with holes (concave as they are in reverse order, this is taken care inside only_convex_or_90deg)
                     for (Polygon &hole : expoly.holes) {
                         assert(hole.is_clockwise());
-                        only_convex_or_gt90deg(hole);
+                        smoothen(expoly.contour, std::max(double(enlargement) * 2, double(max_nz_diam * 2)),
+                                 PI * 5. / 6.);
                     }
                 }
-
-                enlarged_support = intersection_ex(new_enlarged_support, enlarged_support);
+                enlarged_support = intersection_ex(enlarged_support, max_enlarged_support);
+                enlarged_support = union_ex(enlarged_support, min_enlarged_support);
                 // modify geometry
                 Surfaces to_add;
                 Surfaces &my_surfaces = lregion->m_slices.surfaces;
+                ExPolygons expolys_final;
                 for (size_t surf_idx = 0; surf_idx < my_surfaces.size(); surf_idx++) {
                     ExPolygons expolys = intersection_ex(enlarged_support, my_surfaces[surf_idx].expolygon);
                     // if bridge, smooth enlargment so there won't be spikes near bridges.
                     if (!bridged_other_layers_areas.empty()) {
                         expolys = offset2_ex(expolys, double(-enlargement / 2), double(enlargement / 2));
                     }
+                    expolys_final = union_ex(expolys_final, expolys);
                     if (expolys.empty()) {
                         my_surfaces.erase(my_surfaces.begin() + surf_idx);
                         surf_idx--;

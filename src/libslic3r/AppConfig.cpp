@@ -565,7 +565,7 @@ bool AppConfig::init_root_data_dir(const std::string &default_app_data_path) {
         m_data_dir.other_keys["installed_name"] = m_data_dir.installed_name = "command_line";
         m_data_dir.other_keys["config_path"] = (m_data_dir.config_path = data_dir()).string();
         m_data_dir.other_keys["config_path_relative"] = "0";
-        m_data_dir.other_keys["exe_path"] = (m_data_dir.exe_path = binary_file().parent_path()).string();
+        m_data_dir.other_keys["exe_path"] = (m_data_dir.exe_path = install_path()).string();
         m_data_dir.other_keys["exe_path_relative"] = "0";
         m_data_dir.other_keys["version"] = (m_data_dir.version = Semver(SLIC3R_VERSION_FULL)).to_string();
         return false;
@@ -607,7 +607,7 @@ bool AppConfig::init_root_data_dir(const std::string &default_app_data_path) {
     }
     m_data_dir.config_path.clear();
     for (ConfigurationEntry *installed : same_version) {
-        if (boost::filesystem::exists(installed->exe_path) && boost::filesystem::equivalent(binary_file().parent_path(), installed->exe_path)) {
+        if (boost::filesystem::exists(installed->exe_path) && boost::filesystem::equivalent(install_path(), installed->exe_path)) {
             m_data_dir = *installed;
             set_data_dir(m_data_dir.get_config_path(this->get_root_data_dir()).string());
         }
@@ -714,11 +714,11 @@ void AppConfig::init_ui_layout() {
     //get default color from the ini file
 
     //try to load colors from ui file
-    m_tags.clear();
     std::map<std::string, std::string> key2color = { {"Gui_color_dark", "cabe39"}, {"Gui_color", "eddc21"}, {"Gui_color_light", "ffee38"} };
     boost::property_tree::ptree tree_colors;
     boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
     try {
+        std::vector<Tag> new_tags;
         boost::nowide::ifstream ifs;
         ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
         ifs.open(path_colors.string());
@@ -748,16 +748,18 @@ void AppConfig::init_ui_layout() {
                         ConfigOptionDef::names_2_tag_mode[tag] = (ConfigOptionMode)(((uint64_t)1) << ConfigOptionDef::names_2_tag_mode.size());
                         it = ConfigOptionDef::names_2_tag_mode.find(tag);
                     }
-                    m_tags.emplace_back(tag, tag, it->second, color_code);
+                    new_tags.emplace_back(tag, tag, it->second, color_code);
                     if (tag == "Simple")
-                        m_tags.back().description = L("Simple View Mode");
+                        new_tags.back().description = L("Simple View Mode");
                     if (tag == "Advanced")
-                        m_tags.back().description = L("Advanced View Mode");
+                        new_tags.back().description = L("Advanced View Mode");
                     if (tag == "Expert")
-                        m_tags.back().description = L("Expert View Mode");
+                        new_tags.back().description = L("Expert View Mode");
                 }
             }
         }
+        std::lock_guard<std::recursive_mutex> lk(config_lock);
+        m_tags = new_tags;
     }
     catch (const std::ifstream::failure& err) {
         BOOST_LOG_TRIVIAL(error) << "The color file cannot be loaded. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
@@ -1123,6 +1125,7 @@ bool AppConfig::clear_section(const std::string &section)
 
 bool AppConfig::get_variant(const std::string &vendor, const std::string &model, const std::string &variant) const
 {
+    std::lock_guard<std::recursive_mutex> lk(config_lock);
     const auto it_v = m_vendors.find(vendor);
     if (it_v == m_vendors.end()) { return false; }
     const auto it_m = it_v->second.find(model);
@@ -1131,6 +1134,7 @@ bool AppConfig::get_variant(const std::string &vendor, const std::string &model,
 
 bool AppConfig::set_variant(const std::string &vendor, const std::string &model, const std::string &variant, bool enable)
 {
+    std::lock_guard<std::recursive_mutex> lk(config_lock);
     if (enable) {
         if (get_variant(vendor, model, variant))
             return false;
@@ -1155,6 +1159,7 @@ bool AppConfig::set_variant(const std::string &vendor, const std::string &model,
 bool AppConfig::set_vendors(const VendorMap &vendors)
 {
     if (m_vendors != vendors) {
+        std::lock_guard<std::recursive_mutex> lk(config_lock);
         m_vendors = vendors;
         m_dirty = true;
         return true;
@@ -1165,6 +1170,7 @@ bool AppConfig::set_vendors(const VendorMap &vendors)
 bool AppConfig::set_vendors(VendorMap &&vendors)
 {
     if (m_vendors != vendors) {
+        std::lock_guard<std::recursive_mutex> lk(config_lock);
         m_vendors = std::move(vendors);
         m_dirty = true;
         return true;

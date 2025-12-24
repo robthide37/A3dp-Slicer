@@ -48,6 +48,12 @@ void set_binary_file(const boost::filesystem::path &path);
 // Return a full path to the binary directory.
 const boost::filesystem::path& binary_file();
 
+// Set the path of the installation of this binary.
+// appimage execute from temporary location, this ensure that even in appimage the instalaltion directory is unique for an installation.
+void set_install_path(const boost::filesystem::path &path);
+// Return a full path to the installation path-key
+const boost::filesystem::path& install_path();
+
 // Set a path with various static definition data (for example the initial config bundles).
 void set_resources_dir(const std::string &path);
 // Return a full path to the resources directory.

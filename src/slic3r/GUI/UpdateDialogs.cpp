@@ -601,11 +601,13 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
     if (vendor.is_installed) {
         assert(vendor.profile.config_version != Semver::zero());
         bt_version_msg = vendor.profile.config_version.to_string();
+    } else if(vendor.available_profiles.size() > 1) {
+        bt_version_msg = _L("Choose version");
     } else {
         bt_version_msg = _L("Not installed");
     }
     wxButton *bt_version = new wxButton(parent, wxID_ANY, bt_version_msg);
-    if (!vendor.is_installed || vendor.available_profiles.size() <= 1) {
+    if ((!vendor.is_installed && vendor.available_profiles.size() <= 1)  || vendor.available_profiles.size() < 1 || vendor.profile.config_update_rest.empty()) {
         bt_version->Enable(false);
     } else {
         bt_version->Bind(wxEVT_BUTTON, ([this, vendor_id](wxCommandEvent &e) {
@@ -616,7 +618,7 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
             });
         }));
     }
-    bt_version->SetToolTip(_L("Click on this button to choose another version that the one that is installed."));
+    bt_version->SetToolTip(_L("Click this button to choose a different version from the one currently installed."));
     versions_sizer->Add(bt_version, wxGBPosition(line_num, 2), wxGBSpan(1, 1), wxEXPAND, 2);
 
     ////// upgrade //////
@@ -626,11 +628,12 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
             wxString config_version_str = vendor.best->config_version.to_string();
             wxString msg = format(_L("Install %1% (local)"), config_version_str);
             wxButton *bt_upgrade = new wxButton(parent, wxID_ANY, msg);
-            bt_upgrade->SetToolTip(_L("Click on this button to create a snapshot and install this vendor bundle to "
-                                      "the locally available version bundle with the slicer, or copied by a user. To "
-                                      "upgrade it, as it doesn't have a repository online, you need to paste the new "
-                                      "vendorini file in your configuration/cache/vendor directory. A new verison of "
-                                      "the slicer may also come bundled with a new verison of the profile."));
+            bt_upgrade->SetToolTip(
+                _L("Click this button to create a snapshot and install this vendor bundle to the locally available "
+                   "version bundled with the slicer, or copied by a user. "
+                   "\nTo upgrade it, since it doesn't have an online repository, you need to paste the new vendor "
+                   ".ini file in your configuration/cache/vendor directory. "
+                   "\nA new version of the slicer may also come bundled with a new version of the profile."));
             versions_sizer->Add(bt_upgrade, wxGBPosition(line_num, 3), wxGBSpan(1, 1), wxEXPAND, 2);
             bt_upgrade->Bind(wxEVT_BUTTON, ([this, vendor_id, best_version](wxCommandEvent &e) {
                 this->wait_dialog.reset(new wxBusyInfo(_L("Installing the local preset, please wait")));
@@ -643,14 +646,15 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
             }));
         } else {
             msg_synch = new wxStaticText(parent, wxID_ANY, _L("Local bundle"));
-            msg_synch->SetToolTip(_L("This printer vendor bundle don't have a repository, and so cannot be updated."
-                                     " \nA future new slicer version may come with an updated static profile."));
+            msg_synch->SetToolTip(
+                _L("This printer vendor bundle doesn't have a repository and therefore cannot be updated. "
+                   "\nA future slicer version may include an updated static profile."));
         }
     } else if (vendor.is_synch) {
         if (vendor.available_profiles.empty()) {
             // weird
-            msg_synch = new wxStaticText(parent, wxID_ANY, _L("No Profile available"));
-            msg_synch->SetToolTip(_L("This printer vendor don't have any available preset for this slicer."));
+            msg_synch = new wxStaticText(parent, wxID_ANY, _L("No profile available"));
+            msg_synch->SetToolTip(_L("This printer vendor doesn't have any available presets for this slicer."));
         } else if (!vendor.is_installed || vendor.can_upgrade) {
             assert(!vendor.is_installed || vendor.best->config_version > vendor.profile.config_version);
             wxString config_version_str = vendor.best->config_version.to_string();
@@ -660,8 +664,8 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
             if (vendor.is_installed) {
                 bts_green_color.push_back(bt_upgrade);
             }
-            bt_upgrade->SetToolTip(_L("Click on this button to create a snapshot and upgrade this vendor bundle to "
-                                    "the latest compatible version."));
+            bt_upgrade->SetToolTip(_L("Click this button to create a snapshot and upgrade this vendor bundle to the "
+                                      "latest compatible version."));
             versions_sizer->Add(bt_upgrade, wxGBPosition(line_num, 3), wxGBSpan(1, 1), wxEXPAND, 2);
             bt_upgrade->Bind(wxEVT_BUTTON, ([this, vendor_id, best_version](wxCommandEvent &e) {
                 this->wait_dialog.reset(new wxBusyInfo(_L("Upgrading the preset, please wait")));
@@ -682,11 +686,11 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
         
         }
         msg_synch = new wxStaticText(parent, wxID_ANY, _L("Download failed"));
-        msg_synch->SetToolTip(_L("The slicer failed to access to the github repository."));
+        msg_synch->SetToolTip(_L("The slicer failed to access the GitHub repository."));
     } else {
         msg_synch = new wxStaticText(parent, wxID_ANY, _L("Unchecked"));
-        msg_synch->SetToolTip(_L("This printer vendor bundle may has a new preset available online, click on the 'Check for "
-                                 "updates' button to check."));
+        msg_synch->SetToolTip(_L("This printer vendor bundle may have a new preset available online. Click the "
+                                 "'Check for updates' button to check."));
     }
     if (msg_synch) {
         versions_sizer->Add(msg_synch, wxGBPosition(line_num, 3), wxGBSpan(1, 1), wxALIGN_RIGHT, 2);
@@ -697,30 +701,46 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
     if (vendor.is_installed) {
         assert(vendor.profile.config_version != Semver::zero());
         bt_uninstall_msg = _L("Uninstall");
+    } else if (vendor.has_cache) {
+        bt_uninstall_msg = _L("Clear cache");
     } else {
         bt_uninstall_msg = _L("Not installed");
     }
     wxButton *bt_uninstall = new wxButton(parent, wxID_ANY, bt_uninstall_msg);
-    if (!vendor.is_installed) {
+    if (!vendor.is_installed && !vendor.has_cache) {
         bt_uninstall->Enable(false);
     } else {
-        bt_uninstall->Bind(wxEVT_BUTTON, ([this, vendor_id, vendor_full_name = vendor.profile.full_name](wxCommandEvent &e) {
-            bool apply_keeped_changes_useless;
-            if (!wxGetApp().check_and_keep_current_preset_changes(_L("Uninstalling a vendor bundle"), _L("Uninstalling a vendor bundle"), ActionButtons::SAVE, &apply_keeped_changes_useless)){
-                return;
-            }
-            MessageDialog msg_dlg(this,
-                format(_L("Are you sure to uninstall this vendor bundle:\n%1%"), vendor_full_name),
-                _L("Uninstall vendor bundle"), wxICON_WARNING | wxOK |wxCANCEL);
-            if (msg_dlg.ShowModal() == wxID_OK) {
-                this->m_data.uninstall_vendor(vendor_id, [this](bool success) { this->request_rebuild_ui(); });
-            }
+        bt_uninstall->Bind(wxEVT_BUTTON, ([this, vendor_id, vendor_is_installed = vendor.is_installed, vendor_has_cache = vendor.has_cache, vendor_full_name = vendor.profile.full_name](wxCommandEvent &e) {
+                if (vendor_is_installed) {
+                    bool apply_keeped_changes_useless;
+                    if (!wxGetApp().check_and_keep_current_preset_changes(_L("Uninstalling a vendor bundle"),
+                                                                          _L("Uninstalling a vendor bundle"),
+                                                                          ActionButtons::SAVE,
+                                                                          &apply_keeped_changes_useless)) {
+                        return;
+                    }
+                    MessageDialog msg_dlg(this,
+                                          format(_L("Are you sure you want to uninstall this vendor bundle:\n%1%?"),
+                                                 vendor_full_name),
+                                          _L("Uninstall vendor bundle"), wxICON_WARNING | wxOK | wxCANCEL);
+                    if (msg_dlg.ShowModal() == wxID_OK) {
+                        this->m_data.uninstall_vendor(vendor_id, [this](bool success) { this->request_rebuild_ui(); });
+                    }
+                } else if (vendor_has_cache) {
+                    MessageDialog msg_dlg(this,
+                                          format(_L("Are you sure you want to remove all cache files about this vendor bundle :\n%1%?"),
+                                                 vendor_full_name),
+                                          _L("Clear vendor bundle cache"), wxICON_WARNING | wxOK | wxCANCEL);
+                    if (msg_dlg.ShowModal() == wxID_OK) {
+                        this->m_data.clear_cache_vendor(vendor_id, [this](bool success) { this->request_rebuild_ui(); });
+                    }
+                }
         }));
     }
     bt_uninstall->SetToolTip(_L(
-        "Click on the button to uninstall the vendor bundle. The printer won't be abel to be selected in the wizard "
-        "and the slicer. \nThis installed bundle will be saved in a cache to be sure you'll be able to reinstall it "
-        "whenever you want. Note that if a user profile depends on a profile from this bundle, it may broke. Please detach them beforehand."));
+        "Click the button to uninstall the vendor bundle. The printer(s) will no longer be selectable in the wizard or the slicer. "
+        "\nThe uninstalled bundle will be saved in a cache so you can reinstall it at any time. "
+        "\nNote: If a user profile depends on a profile from this bundle, it may break. Please detach them beforehand."));
     versions_sizer->Add(bt_uninstall, wxGBPosition(line_num, 4), wxGBSpan(1, 1), wxEXPAND, 2);
 }
 
@@ -731,13 +751,17 @@ void UpdateConfigDialog::build_ui() {
         wxStaticText *lbl_message = new wxStaticText(this, wxID_ANY, m_message);
         lbl_message->SetToolTip(
             "This dialog allows you to manage the different preset bundles that can be installed for this slicer."
-            " \nYou need to install a bundle (this copies the bundle files into your configuration) so the wizard can access it, allowing it to appear in the slicer's user interface."
-            " \nA snapshot is created before any installation or removal, so you can always revert to a previous state if you make a mistake."
-            " \nYou can choose a specific version by clicking the button in the second column of an installed bundle."
-            " \nTo add new bundles that are not yet known to the slicer, you can either provide the GitHub repository URL or load a vendor .ini file (these start with a [vendor] section)."
-            " \nYou can install all vendor bundles, but doing so may significantly increase the time it takes to open the wizard.");
+            "\nYou need to install a bundle (this copies the bundle files into your configuration) so the wizard can access it, allowing it to appear in the slicer's user interface."
+            "\nA snapshot is created before any installation or removal, so you can always revert to a previous state if you make a mistake."
+            "\nYou can choose a specific version by clicking the button in the second column of an installed bundle."
+            "\nTo add new bundles that are not yet known to the slicer, you can either provide the GitHub repository URL or load a vendor .ini file (these start with a [vendor] section)."
+            "\nYou can install all vendor bundles, but doing so may significantly increase the time it takes to open the wizard."
+        );
+        wxBoxSizer *message_sizer = new wxBoxSizer(wxHORIZONTAL);
+        message_sizer->AddSpacer(5);
+        message_sizer->Add(lbl_message);
         main_sizer->AddSpacer(5);
-        main_sizer->Add(lbl_message);
+        main_sizer->Add(message_sizer);
     }
 
     // button to synch
@@ -767,7 +791,10 @@ void UpdateConfigDialog::build_ui() {
         rest_url = VendorProfile::get_http_url_rest(rest_url);
         this->m_data.download_new_repo(rest_url, [this, rest_url](bool result) {
             if (result) {
-                this->request_rebuild_ui();
+                this->m_data.reload_all_vendors();
+                this->m_data.sync_async([this](int){
+                    this->request_rebuild_ui();
+                });
             } else {
                 if (rest_url.find("https://api.github.com/repos/") != std::string::npos) {
                     std::string org_repo_part = rest_url.substr(strlen("https://api.github.com/repos/"));
@@ -839,7 +866,7 @@ void UpdateConfigDialog::build_ui() {
     github_add_sizer->Add(txt_new_repo);
     github_add_sizer->AddSpacer(5);
     github_add_sizer->Add(bt_add);
-    github_add_sizer->AddSpacer(30);
+    github_add_sizer->AddSpacer(5);
     github_add_sizer->Add(bt_load);
     github_add_sizer->AddSpacer(15);
     main_sizer->AddSpacer(5);
@@ -901,7 +928,7 @@ void UpdateConfigDialog::build_ui() {
             });
         }
     }));
-    
+
     std::vector<VendorSync*> ordered_vendors;
     {
         std::lock_guard<std::recursive_mutex> guard(m_data.all_vendors_mutex);
@@ -924,6 +951,18 @@ void UpdateConfigDialog::build_ui() {
         add_vendor_in_list(hscroll, *vendor_synch, versions_sizer, ++row_idx);
     }
 
+    //if no bundle, then deactivate the button and add a text.
+    if (m_data.count_available() == 0) {
+        bt_install_all->Enable(false);
+        bt_upgrade_all->Enable(false);
+        bt_uninstall_all->Enable(false);
+        ++row_idx;
+        wxStaticText *msg_name = new wxStaticText(hscroll, wxID_ANY, _L("No vendor bundle available. Please add one manually or by adding a repository."));
+        msg_name->SetToolTip(_L("There is no vendor bundle included with this version of the slicer. You can add a vendor bundle file using the 'Load Vendor INI File' button, "
+            "or you can add a vendor repository (for example, SuperSlicer-org/Voron-Profile) by entering the URL in the text field and then clicking the 'Add' button."));
+        versions_sizer->Add(msg_name, wxGBPosition(row_idx, 1), wxGBSpan(1, 1), wxALIGN_RIGHT, 2);
+    }
+
     // scrollling: only vertical, by 30 pixels at a time.
     hscroll->SetScrollRate(30, 30);
     hscroll->EnableScrolling(false, true); // does nothing
@@ -938,7 +977,6 @@ void UpdateConfigDialog::build_ui() {
 
     hscrollsizer->FitInside(hscroll);
     hscroll->SetVirtualSize(wxSize(hscroll->GetVirtualSize().GetWidth()+15, hscroll->GetVirtualSize().GetHeight()));
-    hscroll->SetMinSize(wxSize(hscroll->GetVirtualSize().GetWidth(), std::min(500, hscroll->GetVirtualSize().GetHeight())));
     hscroll->SetMinSize(wxSize(hscroll->GetVirtualSize().GetWidth(), std::min(500, hscroll->GetVirtualSize().GetHeight())));
     main_sizer->Add(hscroll, 1, wxEXPAND | wxALL);
 
@@ -980,13 +1018,14 @@ UpdateConfigDialog::UpdateConfigDialog(wxWindow *parent, PresetUpdater &data, co
 
     main_sizer = new wxBoxSizer(wxVERTICAL);
     build_ui();
-    SetMaxSize(wxSize(std::max(400, parent->GetSize().GetWidth()), std::max(600, parent->GetSize().GetHeight())));
+    SetMaxSize(wxSize(std::max(400, int(parent->GetSize().GetWidth() * 0.8)),
+                      std::max(600, int(parent->GetSize().GetHeight() * 0.8))));
     SetSizer(main_sizer);
     //SetSizeHints();
     main_sizer->SetSizeHints(this);
     FitInside();
 
-    // add size for scroll bar ans size for the bottom buttons
+    // add size for scroll bar and size for the bottom buttons
     // i don't know why it's need and I don't want to lost another day on it.
     SetMinSize(wxSize(GetMinSize().GetWidth() +20, GetMinSize().GetHeight() + 60));
     //set size if preferred not too big
@@ -1045,7 +1084,7 @@ ChooseVendorVersionDialog::ChooseVendorVersionDialog(wxWindow *parent, PresetUpd
     , m_vendor(vendor)
     , wxDialog(parent,
                wxID_ANY,
-               format(_L("Available version for %1% vendor "), vendor.profile.full_name),
+               format(_L("Available versions for the %1% vendor bundle."), vendor.profile.full_name),
                wxDefaultPosition,
                wxDefaultSize,
                wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER) {
@@ -1060,16 +1099,17 @@ ChooseVendorVersionDialog::ChooseVendorVersionDialog(wxWindow *parent, PresetUpd
     });
 
     build_ui();
-    SetMaxSize(wxSize(std::max(400, parent->GetSize().GetWidth()), std::max(600, parent->GetSize().GetHeight())));
+    //SetMaxSize(wxSize(std::max(400, int(parent->GetSize().GetWidth() * 0.8)),
+                      //std::max(600, int(parent->GetSize().GetHeight() * 0.8))));
     SetSizer(main_sizer);
     //SetSizeHints();
     main_sizer->SetSizeHints(this);
     FitInside();
 
-    // add size for scroll bar ans size for the bottom buttons
-    // i don't know why it's need and I don't want to lost another day on it.
-    SetMinSize(wxSize(GetMinSize().GetWidth() +20, GetMinSize().GetHeight() + 60));
-    //set size if preferred not too big
+    //// add size for scroll bar ans size for the bottom buttons
+    //// i don't know why it's need and I don't want to lost another day on it.
+    SetMinSize(wxSize(GetMinSize().GetWidth() + 20, GetMinSize().GetHeight() + 60));
+    ////set size if preferred not too big
     SetSize(GetMinSize().GetWidth(),
             std::min(GetMaxSize().GetHeight(),
                      std::max(GetBestVirtualSize().GetHeight(),
@@ -1119,10 +1159,9 @@ void ChooseVendorVersionDialog::build_ui() {
     red_foreground_color.clear();
     main_sizer = new wxBoxSizer(wxVERTICAL);
 
-    wxStaticText *lbl_message =
-        new wxStaticText(this, wxID_ANY,
-                            _L("This dialog allows you to choose which version of the vendor bundle you want to "
-                            "install from the available options."));
+    wxStaticText *lbl_message = new wxStaticText(this, wxID_ANY,
+                                                 _L("This dialog allows you to choose which version of the vendor "
+                                                    "bundle you want to install from the available options."));
     main_sizer->AddSpacer(5);
     main_sizer->Add(lbl_message);
 
@@ -1135,12 +1174,12 @@ void ChooseVendorVersionDialog::build_ui() {
     // [version number] [slicer version] [changelog]
 
     int row_idx = 1;
-    wxStaticText *msg_vendor_version = new wxStaticText(hscroll, wxID_ANY, _L("Vendor bundle version"));
+    wxStaticText *msg_vendor_version = new wxStaticText(this, wxID_ANY, _L("Vendor bundle version"));
     versions_sizer->Add(msg_vendor_version, wxGBPosition(row_idx, 1), wxGBSpan(1, 1), wxALIGN_RIGHT, 2);
-    wxStaticText *msg_slicer_version = new wxStaticText(hscroll, wxID_ANY, _L("Minimum slicer version"));
+    wxStaticText *msg_slicer_version = new wxStaticText(this, wxID_ANY, _L("Minimum slicer version"));
     msg_slicer_version->SetToolTip(format(_L("Our slicer version: %1%"), SLIC3R_VERSION_FULL));
     versions_sizer->Add(msg_slicer_version, wxGBPosition(row_idx, 2), wxGBSpan(1, 1), wxALIGN_RIGHT, 2);
-    wxStaticText *msg_changelog = new wxStaticText(hscroll, wxID_ANY, _L("Changelog"));
+    wxStaticText *msg_changelog = new wxStaticText(this, wxID_ANY, _L("Changelog"));
     versions_sizer->Add(msg_changelog, wxGBPosition(row_idx, 3), wxGBSpan(1, 1), wxALIGN_LEFT, 2);
 
     for (const VendorAvailable &available : m_vendor.available_profiles) {
@@ -1150,24 +1189,14 @@ void ChooseVendorVersionDialog::build_ui() {
     // scrollling: only vertical, by 30 pixels at a time.
     hscroll->SetScrollRate(30, 30);
     hscroll->EnableScrolling(false, true); // does nothing
-    //hscroll->ShowScrollbars(wxSHOW_SB_NEVER, wxSHOW_SB_DEFAULT wxSHOW_SB_ALWAYS);
     hscroll->ShowScrollbars(wxSHOW_SB_NEVER, wxSHOW_SB_DEFAULT);
-    //wxBoxSizer *hscrollsizer = new wxBoxSizer(wxHORIZONTAL);
-    //hscrollsizer->AddSpacer(5);
-    //hscrollsizer->Add(versions_sizer);
-    //hscrollsizer->AddSpacer(5);
-    hscroll->SetSizer(versions_sizer);
-    //hscrollsizer->Layout();
 
-    //hscrollsizer->FitInside(hscroll);
+    hscroll->SetSizer(versions_sizer);
+    versions_sizer->FitInside(hscroll);
     hscroll->SetVirtualSize(wxSize(hscroll->GetVirtualSize().GetWidth()+15, hscroll->GetVirtualSize().GetHeight()));
-    hscroll->SetMinSize(wxSize(hscroll->GetVirtualSize().GetWidth(), std::min(500, hscroll->GetVirtualSize().GetHeight())));
     hscroll->SetMinSize(wxSize(hscroll->GetVirtualSize().GetWidth(), std::min(500, hscroll->GetVirtualSize().GetHeight())));
     main_sizer->Add(hscroll, 1, wxEXPAND | wxALL);
 
-    
-    //add_button(wxID_OK, true, "OK");
-    //add_button(wxID_CANCEL);
     wxStdDialogButtonSizer* btSizer = CreateStdDialogButtonSizer(wxOK);
     main_sizer->Add(btSizer, 0, wxALL);
     main_sizer->AddSpacer(5);
@@ -1177,10 +1206,9 @@ void ChooseVendorVersionDialog::add_version_in_list(wxWindow *parent,
                                                     const VendorAvailable &version,
                                                     wxGridBagSizer *versions_sizer,
                                                     const int line_num) {
-    assert(m_vendor.is_installed);
 
     ////// version selector button //////
-    if (m_vendor.profile.config_version == version.config_version &&
+    if (m_vendor.is_installed && m_vendor.profile.config_version == version.config_version &&
         (m_vendor.profile.slicer_version == Semver::zero() || m_vendor.profile.slicer_version == version.slicer_version)) {
         wxStaticText *msg_version = new wxStaticText(parent, wxID_ANY, version.config_version.to_string());
         msg_version->SetToolTip(_L("This is the version currently installed."));
@@ -1188,7 +1216,7 @@ void ChooseVendorVersionDialog::add_version_in_list(wxWindow *parent,
     } else {
         wxButton *bt_version = new wxButton(parent, wxID_ANY, version.config_version.to_string());
         bt_version->Bind(wxEVT_BUTTON, ([this, &version](wxCommandEvent &e) {
-            this->wait_dialog.reset(new wxBusyInfo(_L("Installing the local preset, please wait")));
+            this->wait_dialog.reset(new wxBusyInfo(_L("Installing the local preset. Please wait.")));
             // install_vendor can work with copies passed as parameter, no worry.
             this->m_data.install_vendor(m_vendor.profile.id, version, [this](std::string error_msg) {
                 this->wait_dialog.reset();
@@ -1202,7 +1230,7 @@ void ChooseVendorVersionDialog::add_version_in_list(wxWindow *parent,
 
     ////// slicer version //////
     wxStaticText *msg_slicer_version = new wxStaticText(parent, wxID_ANY, version.slicer_version.to_string());
-    msg_slicer_version->SetToolTip(format(_L("This is the slicer version this bundle version was built for. Current version: %1%"), SLIC3R_VERSION_FULL));
+    msg_slicer_version->SetToolTip(format(_L("This is the slicer version for which this bundle was built. Current version: %1%"), SLIC3R_VERSION_FULL));
     versions_sizer->Add(msg_slicer_version, wxGBPosition(line_num, 2), wxGBSpan(1, 1), wxEXPAND, 2);
     Semver major_current = Semver::parse(SLIC3R_VERSION_FULL)->no_patch();
     Semver major_version = version.slicer_version.no_patch();
@@ -1218,7 +1246,7 @@ void ChooseVendorVersionDialog::add_version_in_list(wxWindow *parent,
 
     ////// log //////
     wxStaticText *msg_changelog = new wxStaticText(parent, wxID_ANY, version.notes);
-    msg_changelog->SetToolTip(_L("This message contains the GitHub commit logs between the previous version and this one."));
+    msg_changelog->SetToolTip(_L("This message includes the GitHub commit logs between the previous version and the current one."));
     versions_sizer->Add(msg_changelog, wxGBPosition(line_num, 3), wxGBSpan(1, 1), wxEXPAND, 2);
 
 }

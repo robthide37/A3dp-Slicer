@@ -664,6 +664,9 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
             // Limiting the offset step so that unioning the shrunk latest_avoidance with the current layer collisions
             // will not create gaps in the resulting avoidance region letting a tree support branch tunneling through an object wall.
             float move_step      = 1.9 * std::max(task.radius, m_current_min_xy_dist);
+            // Threshold must be >= 0.5 to prevent division by zero when move_step is cast to int in round_up_divide
+            // Note: Early return skips cache insertion (line 709), causing getAvoidance() to recalculate on every access
+            if (move_step < 0.5f) return;
             int   move_steps     = round_up_divide<int>(max_move, move_step);
             assert(move_steps > 0);
             float last_move_step = max_move - (move_steps - 1) * move_step;

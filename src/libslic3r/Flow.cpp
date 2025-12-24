@@ -310,7 +310,7 @@ Flow Flow::new_from_config(FlowRole role, const DynamicConfig& print_config, flo
         config_width.set(*print_config.option("external_perimeter_extrusion_width"));
         config_spacing.set(*print_config.option("external_perimeter_extrusion_spacing"));
         // external peri spacing is only half spacing -> transform it into a full spacing
-        if (!config_spacing.is_phony() && !config_spacing.value == 0) {
+        if (!config_spacing.is_phony() && config_spacing.value != 0) {
             double raw_spacing = config_spacing.get_abs_value(nozzle_diameter);
             config_spacing.percent = false;
             config_spacing.value = rounded_rectangle_extrusion_spacing(

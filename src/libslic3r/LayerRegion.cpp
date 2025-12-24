@@ -243,7 +243,9 @@ void LayerRegion::make_perimeters(
             ExtrusionRange{ uint32_t(perimeters_begin), uint32_t(m_perimeters.size()) }, 
             ExtrusionRange{ uint32_t(gap_fills_begin),  uint32_t(m_thin_fills.size()) });
         fill_expolygons_ranges.emplace_back(ExtrusionRange{ uint32_t(fill_expolygons_begin), uint32_t(fill_expolygons.size()) });
+        append(m_perimeter_slices, g.perimeter_boundary);
     }
+    m_perimeter_slices = union_ex(m_perimeter_slices);
 }
 
 void LayerRegion::make_milling_post_process(const SurfaceCollection& slices) {

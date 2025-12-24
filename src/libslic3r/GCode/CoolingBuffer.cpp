@@ -189,7 +189,8 @@ struct PerExtruderAdjustments
                 line.slowdown = true;
                 line.time     = line.time_max;
                 assert(line.time > 0);
-                line.feedrate = line.length / line.time;
+                if (line.time > 0.f)
+                    line.feedrate = line.length / line.time;
             }
             time_total += line.time;
         }
@@ -205,7 +206,8 @@ struct PerExtruderAdjustments
                 line.slowdown = true;
                 line.time     = std::min(line.time_max, line.time * factor);
                 assert(line.time > 0);
-                line.feedrate = line.length / line.time;
+                if (line.time > 0.f)
+                    line.feedrate = line.length / line.time;
             }
             time_total += line.time;
         }
@@ -255,10 +257,13 @@ struct PerExtruderAdjustments
                 assert(min_feedrate > 0);
                 line.time *= std::max(1.f, line.feedrate / min_feedrate);
                 line.feedrate = min_feedrate;
+                assert(line.time_max > 0);
                 //test to never go over max_time
                 if (line.time > line.time_max) {
                     line.time = line.time_max;
-                    line.feedrate = line.length / line.time;
+                    assert(line.time > 0);
+                    if (line.time > 0.f)
+                        line.feedrate = line.length / line.time;
                 }
                 line.slowdown = true;
             }
@@ -725,7 +730,11 @@ static inline float extruder_range_slow_down_proportional(
         // The following step is a linear programming task due to the minimum movement speeds of the print moves.
         // Run maximum 5 iterations until a good enough approximation is reached.
         for (size_t iter = 0; iter < 5; ++ iter) {
-            float factor = (slowdown_below_layer_time - non_adjustable_time) / (total_after_slowdown - non_adjustable_time);
+            float denom = total_after_slowdown - non_adjustable_time;
+            assert(denom > 0.f);
+            if (denom <= 0.f)
+                break;
+            float factor = (slowdown_below_layer_time - non_adjustable_time) / denom;
             assert(factor > 1.f);
             total_after_slowdown = elapsed_time_total0;
             for (auto it = it_begin; it != it_end; ++ it)
@@ -742,7 +751,11 @@ static inline float extruder_range_slow_down_proportional(
         for (auto it = it_begin; it != it_end; ++ it)
             non_adjustable_time += (*it)->non_adjustable_time(true);
         for (size_t iter = 0; iter < 5; ++ iter) {
-            float factor = (slowdown_below_layer_time - non_adjustable_time) / (total_after_slowdown - non_adjustable_time);
+            float denom = total_after_slowdown - non_adjustable_time;
+            assert(denom > 0.f);
+            if (denom <= 0.f)
+                break;
+            float factor = (slowdown_below_layer_time - non_adjustable_time) / denom;
             assert(factor > 1.f);
             total_after_slowdown = elapsed_time_total0;
             for (auto it = it_begin; it != it_end; ++ it)
@@ -802,6 +815,8 @@ static inline void extruder_range_slow_down_non_proportional(
                 for (auto it = adj; it != by_min_print_speed.end(); ++ it)
                     time_adjustable += (*it)->adjustable_time(true);
                 assert(time_adjustable > 0);
+                if (time_adjustable <= 0.f)
+                    return;
                 float rate = (time_adjustable + time_stretch) / time_adjustable;
                 for (auto it = adj; it != by_min_print_speed.end(); ++ it)
                     (*it)->slow_down_proportional(rate, true);
@@ -1258,22 +1273,44 @@ std::string CoolingBuffer::apply_layer_cooldown(
             }
             // Process the rest of the line.
             if (end < line_end) {
-                if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_ADJUSTABLE_MAYBE | CoolingLine::TYPE_WIPE)) {
+                if (line->type &
+                    (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY |
+                     CoolingLine::TYPE_ADJUSTABLE_MAYBE | CoolingLine::TYPE_WIPE)) {
                     // Process comments, remove ";_EXTRUDE_SET_SPEED", ";_EXTRUDE_SET_SPEED_MAYBE", ";_WIPE"
                     std::string comment(end, line_end);
                     if (line->type & (CoolingLine::TYPE_ADJUSTABLE_MAYBE)) {
-                        boost::replace_all(comment, ";_EXTRUDE_SET_SPEED_MAYBE", "");
+                        if (comment == ";_EXTRUDE_SET_SPEED_MAYBE") {
+                            comment.clear();
+                        } else {
+                            boost::replace_all(comment, "_EXTRUDE_SET_SPEED_MAYBE", "");
+                        }
+                    } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE_EMPTY)) {
+                        if (comment == ";_EXTRUDE_SET_SPEED_MAYBE") {
+                            comment.clear();
+                        } else {
+                            boost::replace_all(comment, "_EXTRUDE_SET_SPEED_MAYBE", "");
+                            boost::replace_all(comment, "_EXTRUDE_SET_SPEED", "");
+                        }
                     } else {
-                        boost::replace_all(comment, ";_EXTRUDE_SET_SPEED", "");
+                        if (comment == ";_EXTRUDE_SET_SPEED") {
+                            comment.clear();
+                        } else {
+                            boost::replace_all(comment, "_EXTRUDE_SET_SPEED", "");
+                        }
                     }
-                    if (line->type & CoolingLine::TYPE_WIPE)
-                        boost::replace_all(comment, ";_WIPE", "");
+                    if (line->type & CoolingLine::TYPE_WIPE) {
+                        if (comment == ";_WIPE") {
+                            comment.clear();
+                        } else {
+                            boost::replace_all(comment, "_WIPE", "");
+                        }
+                    }
                     assert((comment.empty() && new_gcode.back() == '\n') ||
                            (!comment.empty() && comment.back() == '\n' && new_gcode.back() != '\n'));
                     new_gcode += comment;
                 } else {
                     assert((new_gcode.back() == '\n' && line_end == end) ||
-                           (new_gcode.back() != '\n' && (*(line_end-1)) == '\n'));
+                           (new_gcode.back() != '\n' && (*(line_end - 1)) == '\n'));
                     // Just attach the rest of the source line.
                     new_gcode.append(end, line_end - end);
                 }

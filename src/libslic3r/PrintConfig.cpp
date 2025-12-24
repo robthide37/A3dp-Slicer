@@ -255,6 +255,14 @@ static const t_config_enum_values s_keys_map_SeamPosition {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SeamPosition);
 
+// Orca
+static t_config_enum_values s_keys_map_SeamScarfType{
+    { "none",           int(SeamScarfType::None) },
+    { "external",       int(SeamScarfType::External) },
+    { "all",            int(SeamScarfType::All) },
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SeamScarfType)
+
 static const t_config_enum_values s_keys_map_DenseInfillAlgo{
         { "automatic", dfaAutomatic },
         { "autonotfull", dfaAutoNotFull },
@@ -1732,25 +1740,43 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def = this->add("external_perimeters_vase", coBool);
-    def->label = L("In vase mode (scarf seam)");
-    def->full_label = L("External perimeters in vase mode");
+    def = this->add("seam_slope_type", coEnum);
+    def->label = L("Scarf seam (In vase mode)");
+    def->full_label = L("Scarf seam: activation");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Print contour perimeters in two circles, in a continuous way, like for a vase mode. It needs the external_perimeters_first parameter to work."
         "\nDoesn't work for the first layer, as it may damage the bed overwise."
         "\nIt does two loop instead of one, the first one growing and the second one shrinking the height.");
-    def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionBool(false));
+    def->set_enum<SeamScarfType>({
+        { "none", L("None") },
+        { "external",  L("Contours")  },
+        { "all",  L("Contours and holes")  },
+    });
+    def->mode = comAdvancedE;
+    def->set_default_value(new ConfigOptionEnum<SeamScarfType>(SeamScarfType::None));
 
-    def = this->add("external_perimeters_vase_min_height", coFloatOrPercent);
+    def = this->add("seam_slope_min_height", coFloatOrPercent);
     def->label = L("Minimum extrusion height");
+    def->full_label = L("Scarf seam: Minimum extrusion height");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("When using the 'external_perimeters_vase' (scarf seam) setting, it will use this setting to compute the base height (it doesn't start at 0)"
+    def->tooltip = L("When using the scarf seam ('seam_slope_type'), it will use this setting to compute the base height (it doesn't start at 0)"
         ", so be sure to put here the lowest value your extruder can handle whithout clogging (or 0 if it works)."
-        "\nCan't be more than a third of the current layer height."
+        "\n The hight is clamped to a third of the current layer height, you can't go higher or you won't be able to do a scarf at all."
         "\nCan be a percentage of the current nozzle diameter.");
-    def->mode = comExpert | comSuSi;
+    def->mode = comExpert;
+    def->aliases = {"external_perimeters_vase_min_height"};
     def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
+
+    def = this->add("seam_slope_max_length", coFloatOrPercent);
+    def->label = L("Maximum length");
+    def->full_label = L("Scarf seam: Maximum length");
+    def->tooltip = L("Length of the scarf seam. Disable to make the scarf the entire loop."
+        "\nCan be a percentage of the current nozzle diameter.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->can_be_disabled = true;
+    def->mode = comAdvancedE;
+    def->set_default_value(enable_default_option(new ConfigOptionFloatOrPercent(20, false)));
 
     def = this->add("external_perimeters_nothole", coBool);
     def->label = L("Only for contours");
@@ -9705,6 +9731,15 @@ void _handle_legacy(std::unordered_map<t_config_option_key, std::pair<t_config_o
             value() = "disabled";
     }
 
+    if (has(dict, "external_perimeters_vase")) {
+        opt_key() = "seam_slope_type"s;
+        if (value() == "1") {
+            value() = "all";
+        } else {
+            value() = "none";
+        }
+    }
+
     // it's not needed to check aliases, because they are taken care of in deserialize().
     // still need as some things check for def and emit a ConfigSubstitutionContext
     for (auto it = dict.begin(); it != dict.end(); ++it) {
@@ -10473,15 +10508,15 @@ void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::stri
             const t_config_option_key &opt_key = key;
             const std::string &opt_value = pair.second;
             if (!pair.first.empty()) {
-                if (!def->has(opt_key) ||
-                    (check_prusa && prusa_import_to_review_keys.find(opt_key) != prusa_import_to_review_keys.end())) {
+                if (!def->has(pair.first) ||
+                    (check_prusa && prusa_import_to_review_keys.find(pair.first) != prusa_import_to_review_keys.end())) {
                     unknown_keys[key] = {key, opt_value/*should be old value, before handle_legacy*/}; 
                 } else {
-                    config.set_deserialize(opt_key, opt_value, config_substitutions);
+                    config.set_deserialize(pair.first, opt_value, config_substitutions);
                     if (auto it = settings.find(key); config_substitutions.rule == ForwardCompatibilitySubstitutionRule::Enable && it != settings.end() && it->second != opt_value) {
-                        const ConfigOptionDef *optdef = def->get(opt_key);
+                        const ConfigOptionDef *optdef = def->get(pair.first);
                         if (optdef != nullptr) {
-                            ConfigSubstitution substitution(optdef, settings.at(key), ConfigOptionUniquePtr(config.option(opt_key)->clone()));
+                            ConfigSubstitution substitution(optdef, settings.at(key), ConfigOptionUniquePtr(config.option(pair.first)->clone()));
                             substitution.old_name = key;
                             config_substitutions.add(std::move(substitution));
                         } else {
@@ -10553,7 +10588,7 @@ void _deserialize_maybe_from_prusa(const std::map<t_config_option_key, std::stri
                         }
                     }
                 }
-            } else if (def != nullptr && !config_substitutions.rule == ForwardCompatibilitySubstitutionRule::Disable) {
+            } else if (def != nullptr && config_substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable) {
                 const ConfigOptionDef *optdef = def->get(key);
                 if (optdef != nullptr) {
                     config_substitutions.emplace(optdef, std::string(pair.second), ConfigOptionUniquePtr(optdef->default_value->clone()));
@@ -10674,8 +10709,9 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "external_perimeters_first_force",
 "external_perimeters_hole",
 "external_perimeters_nothole",
-"external_perimeters_vase",
-"external_perimeters_vase_min_height",
+"seam_slope_type",
+"seam_slope_min_height",
+"seam_slope_max_length",
 "extra_perimeters_below_area",
 "extra_perimeters_count",
 "extra_perimeters_odd_layers",
