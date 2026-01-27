@@ -4658,6 +4658,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 }
                 m_dirty = true;
             }
+
+            m_mouse.drag.start_position_2D = pos;
         } else if (evt.MiddleIsDown() && wxGetApp().app_config->get_bool("mouse_middle_target")) {
             // If dragging over blank area with middle button, pan z.
             if (m_mouse.is_start_position_2D_defined()) {
