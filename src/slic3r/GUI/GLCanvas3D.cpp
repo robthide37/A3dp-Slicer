@@ -4889,7 +4889,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
 
     std::set<std::pair<int, int>> done;  // keeps track of modified instances
     bool object_moved = false;
-    std::vector<Vec3d> wipe_tower_origin = std::vector<Vec3d>(s_multiple_beds.get_max_beds(), Vec3d::Zero());
+    Vec3d wipe_tower_origin = Vec3d::Zero();
 
     Selection::EMode selection_mode = m_selection.get_mode();
     int vol_id = -1;
@@ -4923,11 +4923,8 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
         }
         else if (m_selection.is_wipe_tower() && v->is_wipe_tower() && m_selection.contains_volume(vol_id)) {
             // Move a wipe tower proxy.
-            for (size_t bed_idx = 0; bed_idx < s_multiple_beds.get_max_beds(); ++bed_idx) {
-                if (v->geometry_id.second == wipe_tower_instance_id(bed_idx).id) {
-                    wipe_tower_origin[bed_idx] = v->get_volume_offset();
-                    break;
-                }
+            if (v->geometry_id.second == wipe_tower_instance_id(s_multiple_beds.get_active_bed()).id) {
+                wipe_tower_origin = v->get_volume_offset();
             }
         }
     }
@@ -4956,11 +4953,14 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
     if (object_moved)
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_MOVED));
 
-    if (auto it = std::find_if(wipe_tower_origin.begin(), wipe_tower_origin.end(), [](const Vec3d& pos) { return pos != Vec3d::Zero(); }); it != wipe_tower_origin.end()) {
-        size_t bed_idx = it - wipe_tower_origin.begin();
-        m_model->get_wipe_tower_vector()[bed_idx].position = Vec2d((*it)[0] - s_multiple_beds.get_bed_translation(bed_idx).x(), (*it)[1] - s_multiple_beds.get_bed_translation(bed_idx).y());
-        post_event(SimpleEvent(EVT_GLCANVAS_WIPETOWER_TOUCHED));
-    }
+    if (wipe_tower_origin != Vec3d::Zero())
+        post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_MOVED, std::move(wipe_tower_origin)));
+
+    //if (auto it = std::find_if(wipe_tower_origin.begin(), wipe_tower_origin.end(), [](const Vec3d& pos) { return pos != Vec3d::Zero(); }); it != wipe_tower_origin.end()) {
+    //    size_t bed_idx = it - wipe_tower_origin.begin();
+    //    m_model->get_wipe_tower_vector()[bed_idx].position = Vec2d((*it)[0] - s_multiple_beds.get_bed_translation(bed_idx).x(), (*it)[1] - s_multiple_beds.get_bed_translation(bed_idx).y());
+    //    post_event(SimpleEvent(EVT_GLCANVAS_WIPETOWER_TOUCHED));
+    //}
 
     if (_is_sequential_print_enabled()) {
         update_sequential_clearance(true);

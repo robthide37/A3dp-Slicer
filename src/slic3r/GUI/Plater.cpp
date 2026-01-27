@@ -5295,13 +5295,22 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
 
 void Plater::priv::on_wipetower_moved(Vec3dEvent &evt)
 {
-    model.wipe_tower().position = Vec2d(evt.data[0], evt.data[1]);
+    //model.wipe_tower().position = Vec2d(evt.data[0], evt.data[1]);
+    DynamicPrintConfig cfg;
+    cfg.opt<ConfigOptionFloat>("wipe_tower_x", true)->value = evt.data(0);
+    cfg.opt<ConfigOptionFloat>("wipe_tower_y", true)->value = evt.data(1);
+    wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->load_config(cfg);
 }
 
 void Plater::priv::on_wipetower_rotated(Vec3dEvent& evt)
 {
-    model.wipe_tower().position = Vec2d(evt.data[0], evt.data[1]);
-    model.wipe_tower().rotation = Geometry::rad2deg(evt.data(2));
+    //model.wipe_tower().position = Vec2d(evt.data[0], evt.data[1]);
+    //model.wipe_tower().rotation = Geometry::rad2deg(evt.data(2));
+    DynamicPrintConfig cfg;
+    cfg.opt<ConfigOptionFloat>("wipe_tower_x", true)->value = evt.data(0);
+    cfg.opt<ConfigOptionFloat>("wipe_tower_y", true)->value = evt.data(1);
+    cfg.opt<ConfigOptionFloat>("wipe_tower_rotation_angle", true)->value = Geometry::rad2deg(evt.data(2));
+    wxGetApp().get_tab(Preset::TYPE_FFF_PRINT)->load_config(cfg);
 }
 
 void Plater::priv::on_update_geometry(Vec3dsEvent<2>&)
