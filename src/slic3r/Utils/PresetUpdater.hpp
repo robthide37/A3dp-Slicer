@@ -26,6 +26,8 @@ class PresetUpdater;
 class PresetBundle;
 
 #define USE_GTHUB_PRESET_UPDATE 1
+// used when config wizard has a MAIN_VENDOR
+#define MANDATORY_VENDOR "A3dp"
 
 struct VendorAvailable
 {

@@ -4034,6 +4034,10 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
 #endif
     // if nothing installed, show the installatino dialog first
     bool is_synch = this->preset_updater->is_synch;
+    if (!is_synch) {
+        this->preset_updater->reload_all_vendors();
+        this->preset_updater->sync_async([&](int nb_updates) {});
+    }
     if (bypass_bundle_install == RVBM_ALWAYS ||
         (bypass_bundle_install == RVBM_IF_EMPTY && this->preset_updater->count_installed() == 0)) {
         this->preset_updater->show_synch_window(

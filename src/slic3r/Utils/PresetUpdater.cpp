@@ -55,6 +55,60 @@ wxDEFINE_EVENT(EVT_CONFIG_UPDATER_SHOW_DIALOG, wxCommandEvent);
 #define ERROR_MSG_UNABLE_SNAPSHOT "Error: fail to take a snapshot"
 #define ERROR_MSG_UNABLE_COPY_CONFIG "Unable to copy the vendor bundle into the configuration directory."
 
+bool copy_file_and_icons(boost::filesystem::path dir_in, boost::filesystem::path dir_out, std::string vendor_id, bool copy = true) {
+
+    // copy the file & icons
+    assert(boost::filesystem::exists(dir_in));
+    if (boost::filesystem::exists(dir_in)) {
+        boost::filesystem::path vendor_profile_file_in = dir_in / (vendor_id + ".ini");
+        boost::filesystem::path vendor_profile_file_out = dir_out / (vendor_id + ".ini");
+        assert(boost::filesystem::exists(vendor_profile_file_in));
+        if (!boost::filesystem::exists(vendor_profile_file_in)) {
+            return false;
+        }
+        if (copy) {
+            // need to copy to a temp file and then rename to have a safe overwrite.
+            boost::filesystem::copy(vendor_profile_file_in, dir_out / (vendor_id + ".new.ini"));
+            boost::filesystem::rename(dir_out / (vendor_id + ".new.ini"), vendor_profile_file_out);
+        } else {
+            boost::filesystem::rename(vendor_profile_file_in, vendor_profile_file_out);
+        }
+        // now copy icons
+        boost::filesystem::path icon_dir_in = dir_in / vendor_id;
+        boost::filesystem::path icon_dir_out = dir_out / vendor_id;
+        if (boost::filesystem::exists(icon_dir_in)) {
+            // remove all
+            if (boost::filesystem::exists(icon_dir_out)) {
+                for (const boost::filesystem::directory_entry &path_entry :
+                        boost::filesystem::directory_iterator(icon_dir_out)) {
+                    boost::filesystem::remove_all(path_entry.path());
+                }
+            }
+            boost::filesystem::create_directories(icon_dir_out);
+            // copy all
+            for (const boost::filesystem::directory_entry &path_entry :
+                    boost::filesystem::directory_iterator(icon_dir_in)) {
+                assert(path_entry.status().type() == boost::filesystem::file_type::regular_file);
+                if (copy) {
+                    boost::filesystem::path out_path = icon_dir_out / path_entry.path().lexically_relative(icon_dir_in);
+                    boost::filesystem::path out_dir_path = out_path.parent_path();
+
+                    boost::filesystem::copy(path_entry.path(), out_dir_path / "file.temp");
+                    boost::filesystem::rename(out_dir_path / "file.temp", out_path);
+                } else {
+                    boost::filesystem::rename(path_entry.path(),
+                                              icon_dir_out / path_entry.path().lexically_relative(icon_dir_in));
+                }
+            }
+            if (!copy) {
+                boost::filesystem::remove_all(icon_dir_in);
+            }
+        }
+    }
+    return true;
+
+}
+
 PresetUpdater::PresetUpdater(wxEvtHandler* event_handler) : evt_handler(event_handler){
 
     evt_handler->Bind(EVT_CONFIG_UPDATER_SHOW_DIALOG, [this](const wxCommandEvent& evt) {
@@ -62,7 +116,16 @@ PresetUpdater::PresetUpdater(wxEvtHandler* event_handler) : evt_handler(event_ha
     });
 
     args_for_dialog.parent = nullptr;
-
+#ifdef MANDATORY_VENDOR
+    // ensure MANDATORY_VENDOR is installed
+    boost::filesystem::path vendor_file = GUI::into_path(data_dir()) / "vendor" / (MANDATORY_VENDOR ".ini");
+    if (!boost::filesystem::exists(vendor_file)) {
+        boost::filesystem::path default_vendor_file = GUI::into_path(resources_dir()) / "profiles" / (MANDATORY_VENDOR ".ini");
+        bool copy_okay = copy_file_and_icons(default_vendor_file.parent_path(), GUI::into_path(data_dir()) / "vendor", MANDATORY_VENDOR, true);
+        assert(copy_okay);
+    }
+    assert(boost::filesystem::exists(vendor_file));
+#endif
 }
 
 PresetUpdater::~PresetUpdater() {
@@ -614,6 +677,10 @@ int PresetUpdater::get_profile_count_to_update() {
 }
 
 void PresetUpdater::uninstall_vendor(const std::string &vendor_id, std::function<void(bool)> callback_result) {
+#ifdef MANDATORY_VENDOR
+    // can't uninstall MANDATORY_VENDOR
+    if(MANDATORY_VENDOR == vendor_id) return;
+#endif
     // get vendor from map to remove "const"
     std::unique_lock<std::recursive_mutex> guard(this->all_vendors_mutex);
     auto it_mutable_vendor = all_vendors.find(vendor_id);
@@ -762,60 +829,6 @@ void PresetUpdater::install_vendor(const std::string &vendor_id,
     }
     guard.unlock();
     callback_result(result); 
-}
-
-bool copy_file_and_icons(boost::filesystem::path dir_in, boost::filesystem::path dir_out, std::string vendor_id, bool copy = true) {
-
-    // copy the file & icons
-    assert(boost::filesystem::exists(dir_in));
-    if (boost::filesystem::exists(dir_in)) {
-        boost::filesystem::path vendor_profile_file_in = dir_in / (vendor_id + ".ini");
-        boost::filesystem::path vendor_profile_file_out = dir_out / (vendor_id + ".ini");
-        assert(boost::filesystem::exists(vendor_profile_file_in));
-        if (!boost::filesystem::exists(vendor_profile_file_in)) {
-            return false;
-        }
-        if (copy) {
-            // need to copy to a temp file and then rename to have a safe overwrite.
-            boost::filesystem::copy(vendor_profile_file_in, dir_out / (vendor_id + ".new.ini"));
-            boost::filesystem::rename(dir_out / (vendor_id + ".new.ini"), vendor_profile_file_out);
-        } else {
-            boost::filesystem::rename(vendor_profile_file_in, vendor_profile_file_out);
-        }
-        // now copy icons
-        boost::filesystem::path icon_dir_in = dir_in / vendor_id;
-        boost::filesystem::path icon_dir_out = dir_out / vendor_id;
-        if (boost::filesystem::exists(icon_dir_in)) {
-            // remove all
-            if (boost::filesystem::exists(icon_dir_out)) {
-                for (const boost::filesystem::directory_entry &path_entry :
-                        boost::filesystem::directory_iterator(icon_dir_out)) {
-                    boost::filesystem::remove_all(path_entry.path());
-                }
-            }
-            boost::filesystem::create_directories(icon_dir_out);
-            // copy all
-            for (const boost::filesystem::directory_entry &path_entry :
-                    boost::filesystem::directory_iterator(icon_dir_in)) {
-                assert(path_entry.status().type() == boost::filesystem::file_type::regular_file);
-                if (copy) {
-                    boost::filesystem::path out_path = icon_dir_out / path_entry.path().lexically_relative(icon_dir_in);
-                    boost::filesystem::path out_dir_path = out_path.parent_path();
-
-                    boost::filesystem::copy(path_entry.path(), out_dir_path / "file.temp");
-                    boost::filesystem::rename(out_dir_path / "file.temp", out_path);
-                } else {
-                    boost::filesystem::rename(path_entry.path(),
-                                              icon_dir_out / path_entry.path().lexically_relative(icon_dir_in));
-                }
-            }
-            if (!copy) {
-                boost::filesystem::remove_all(icon_dir_in);
-            }
-        }
-    }
-    return true;
-
 }
 
 std::string VendorSync::install_vendor_config(const VendorAvailable &to_install, PresetUpdater& api_slot) {
@@ -978,6 +991,12 @@ std::string VendorSync::install_vendor_config(const VendorAvailable &to_install,
 }
 
 bool VendorSync::uninstall_vendor_config() {
+#ifdef MANDATORY_VENDOR
+    // can't uninstall MANDATORY_VENDOR
+    if (MANDATORY_VENDOR == this->profile.usable_id()) {
+        return false;
+    }
+#endif
     // move from vendor to cache
     bool move_okay = copy_file_and_icons(GUI::into_path(data_dir()) / "vendor", GUI::into_path(data_dir()) / "cache" / "vendor" / this->profile.usable_id(), this->profile.usable_id(), false);
     if (!move_okay) {

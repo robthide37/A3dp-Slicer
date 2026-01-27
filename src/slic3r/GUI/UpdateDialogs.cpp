@@ -697,6 +697,11 @@ void UpdateConfigDialog::add_vendor_in_list(wxWindow *parent, VendorSync &vendor
     }
 
     ////// Uninstall button //////
+#ifdef MANDATORY_VENDOR
+    if (MANDATORY_VENDOR == vendor.profile.id) {
+        return;
+    }
+#endif
     wxString bt_uninstall_msg;
     if (vendor.is_installed) {
         assert(vendor.profile.config_version != Semver::zero());

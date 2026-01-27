@@ -631,7 +631,7 @@ struct ConfigWizard::priv
     PageFilesAssociation* page_files_association = nullptr;
 #endif // _WIN32
     PageMode         *page_mode = nullptr;
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     PagePrinters     *page_fff = nullptr;
     PagePrinters     *page_msla = nullptr;
     PageVendors      *page_vendors = nullptr;
@@ -664,7 +664,7 @@ struct ConfigWizard::priv
     void add_page(ConfigWizardPage *page);
     void enable_next(bool enable);
     void set_start_page(ConfigWizard::StartPage start_page);
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     void create_3rdparty_pages();
 #endif
     void set_run_reason(RunReason run_reason);
@@ -674,7 +674,7 @@ struct ConfigWizard::priv
     void on_printer_pick(PagePrinters *page, const PrinterPickerEvent &evt);
     void select_default_materials_for_printer_model(const VendorProfile::PrinterModel &printer_model, Technology technology);
     void select_default_materials_for_printer_models(Technology technology, const std::set<const VendorProfile::PrinterModel*> &printer_models);
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     void on_3rdparty_install(const VendorProfile *vendor, bool install);
 #endif
 
