@@ -6,16 +6,20 @@ import sys
 
 # list of repositories to download for each release.
 all_repositories= [
+	"https://github.com/SuperSlicer-org/Voron-Profile.git",
+	"https://github.com/SuperSlicer-org/Creality-Profile.git",
+	"https://github.com/SuperSlicer-org/PrusaResearch-Profile.git",
+	"https://github.com/robthide37/A3dp-Profile.git",
 ]
 
 if len(sys.argv) < 2:
-    print("Usage: python download_vendor_bundles.py out_dir_name")
-    sys.exit(1)
+	print("Usage: python download_vendor_bundles.py out_dir_name")
+	sys.exit(1)
 
 out_resources = "./"+sys.argv[1]
 if not os.path.exists(out_resources):
-    print("error, the path "+out_resources+" doesn't exists")
-    sys.exit(1)
+	print("error, the path "+out_resources+" doesn't exists")
+	sys.exit(1)
 
 for url in all_repositories:
 	print(f"Cloning {url}...")
