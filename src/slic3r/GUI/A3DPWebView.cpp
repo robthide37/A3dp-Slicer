@@ -12,6 +12,8 @@
     #include <wx/osx/webview_webkit.h>
 #elif defined(__WXGTK__)
     #include <wx/gtk/webview_webkit.h>
+#else
+    struct WebKitWebView;
 #endif
 #include <wx/uri.h>
 #if defined(__WIN32__) || defined(__WXMAC__)
@@ -25,7 +27,6 @@
 #elif defined __linux__
 #include <gtk/gtk.h>
 #define WEBKIT_API
-struct WebKitWebView;
 struct WebKitJavascriptResult;
 extern "C" {
 WEBKIT_API void

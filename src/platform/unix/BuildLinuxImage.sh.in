@@ -22,6 +22,7 @@ export ROOT=`pwd`
 export NCORES=`nproc`
 
 VERSION_NUMBER=""
+GTK_VERSION=3
 while getopts ":iagvhg:" opt; do
   case ${opt} in
     i )
@@ -31,7 +32,7 @@ while getopts ":iagvhg:" opt; do
         export BUILD_APP="1"
         ;;
     g )
-        GTK_VERSION=$OPTARG
+        GTK_VERSION=2
         ;;
     v )
         export VERSION_NUMBER="-@SLIC3R_VERSION_FULL@"
@@ -96,8 +97,11 @@ then
     pushd package > /dev/null
     if [[ "$GTK_VERSION" == 2 ]]
     then
+       echo -e "\ntaring for gtk2..."
        tar -czvf ../@SLIC3R_APP_KEY@${VERSION_NUMBER}-linux-x64-GTK2.tgz .  &>/dev/null
     elif [[ "$GTK_VERSION" == 3 ]]
+    then
+       echo -e "\ntaring for gtk3..."
        tar -czvf ../@SLIC3R_APP_KEY@${VERSION_NUMBER}-linux-x64-GTK3.tgz .  &>/dev/null
     else
         echo -e "\nError, only GTK2 and GTK3 verison are supported. Asked GTK version: '$GTK_VERSION'\n"
@@ -116,11 +120,14 @@ then
     popd  > /dev/null
     if [[ "$GTK_VERSION" == 2 ]]
     then
+        echo -e "\npackaging gtk2..."
         mv package/"@SLIC3R_APP_KEY@_ubu64.AppImage" "@SLIC3R_APP_KEY@${VERSION_NUMBER}-linux-x64-GTK2.AppImage"
     elif [[ "$GTK_VERSION" == 3 ]]
+    then
+        echo -e "\npackaging gtk3..."
         mv package/"@SLIC3R_APP_KEY@_ubu64.AppImage" "@SLIC3R_APP_KEY@${VERSION_NUMBER}-linux-x64-GTK3.AppImage"
     else
-        echo -e "\nError, only GTK2 and GTK3 verison are supported. Asked GTK version: 
+        echo -e "\nError, only GTK2 and GTK3 verison are supported. Asked GTK version: '$GTK_VERSION'\n"
     fi
     echo -e "\n... done\n"
 fi

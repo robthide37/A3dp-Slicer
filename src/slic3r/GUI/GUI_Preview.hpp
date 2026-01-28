@@ -103,8 +103,13 @@ class Preview : public wxTitledPanel
     DynamicPrintConfig* m_config;
     BackgroundSlicingProcess& m_process;
     std::vector<GCodeProcessorResult>* m_gcode_results;
-
     GCodeProcessorResult* active_gcode_result();
+
+#ifdef __linux__
+    // We are getting mysterious crashes on Linux in gtk due to OpenGL context activation GH #1874 #1955.
+    // So we are applying a workaround here.
+    bool m_volumes_cleanup_required { false };
+#endif /* __linux__ */
 
     // Calling this function object forces Plater::schedule_background_process.
     std::function<void()> m_schedule_background_process;

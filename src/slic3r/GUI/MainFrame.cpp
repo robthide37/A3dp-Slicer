@@ -786,10 +786,12 @@ void MainFrame::update_layout()
         break;
     }
     }
+    
 
+#ifdef _USE_CUSTOM_NOTEBOOK
     // Sizer with buttons for mode changing
     m_plater->sidebar().show_mode_sizer(wxGetApp().tabs_as_menu() || ( m_layout != ESettingsLayout::Old && m_layout != ESettingsLayout::Tabs));
-
+#endif
 
 #ifdef __WXMSW__
     if (update_scaling_state != State::noUpdate)

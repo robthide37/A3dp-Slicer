@@ -276,7 +276,7 @@ then
     # mkdir build
     if [ ! -d "build" ]
     then
-    mkdir build
+        mkdir build
     fi
 
     BUILD_ARGS=""
@@ -327,7 +327,7 @@ then
     ls -al $ROOT
     echo "> ls ROOT/build"
     ls -al $ROOT/build
-    mkdir $ROOT/build/bin
+    mkdir -p $ROOT/build/bin
     echo "> ls -al ROOT/build/bin"
     ls -al $ROOT/build/bin
     echo "> ls -al ROOT/build/src"
