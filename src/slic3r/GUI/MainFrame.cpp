@@ -1641,16 +1641,12 @@ static void init_macos_application_menu(wxMenuBar* menu_bar, MainFrame* main_fra
 static wxMenu* generate_help_menu()
 {
     wxMenu* helpMenu = new wxMenu();
-    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s website"), SLIC3R_APP_NAME), _L("Open the Slic3r website in your browser"),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://www.superslicer.org/"); });
+        append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Website"), SLIC3R_APP_NAME), _L("Open the A3DP Slicer website in your browser"),
+        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://advanced3dprinting.com/"); });
+
     append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Releases"), SLIC3R_APP_NAME), wxString::Format(_L("Open the %s releases page in your browser"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog(SLIC3R_DOWNLOAD, nullptr, false); });
-
-    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Website"), SLIC3R_APP_NAME), _L("Open the SliCR-3D website in your browser"),
-        [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://www.cr3d.de"); });
         
-    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s Shop"), "CR-3D"), _L("Open our shop in your browser "),
-            [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://www.cr3d.de/kategorie/empfohlen/"); });
 
     helpMenu->AppendSeparator();
         
