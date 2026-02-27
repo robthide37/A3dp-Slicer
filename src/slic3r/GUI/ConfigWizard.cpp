@@ -2450,7 +2450,6 @@ void ConfigWizard::priv::load_pages()
     if (page_msla)
         index->add_page(page_msla);
     if (!only_sla_mode) {
-        index->add_page(page_vendors);
 
         // Copy pages names from map to vector, so we can sort it without case sensitivity
         std::vector<std::pair<std::wstring, std::string>> sorted_vendors;
@@ -3572,7 +3571,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     if (!p->only_sla_mode) {
         // Pages for 3rd party vendors
         p->create_3rdparty_pages();   // Needs to be done _before_ creating PageVendors
-        p->add_page(p->page_vendors = new PageVendors(this));
+        //p->add_page(p->page_vendors = new PageVendors(this));
         p->add_page(p->page_custom = new PageCustom(this));
         p->custom_printer_selected = p->page_custom->custom_wanted();
     }
