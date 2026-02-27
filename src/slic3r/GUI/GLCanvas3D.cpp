@@ -99,11 +99,11 @@ static const Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f
 
  const ImVec4 COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };
  const ImVec4 COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
- const ImVec4 COL_ORANGE_DARK       = { 0.67f, 0.36f, 0.19f, 1.0f };
- const ImVec4 COL_ORANGE_LIGHT      = { 0.923f, 0.504f, 0.264f, 1.0f };
+ const ImVec4 COL_BLUE_DARK       = { 39.0f/255.0f, 92.0f/255.0f, 173.0f/255.0f, 1.0f };
+ const ImVec4 COL_BLUE_LIGHT      = { 62.0f/255.0f, 113.0f/255.0f, 194.0f/255.0f, 1.0f };
  const ImVec4 COL_WINDOW_BACKGROUND = { 0.13f, 0.13f, 0.13f, 0.8f };
- const ImVec4 COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
- const ImVec4 COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
+ const ImVec4 COL_BUTTON_BACKGROUND = COL_BLUE_DARK;
+ const ImVec4 COL_BUTTON_HOVERED    = COL_BLUE_LIGHT;
  const ImVec4 COL_BUTTON_ACTIVE     = COL_BUTTON_HOVERED;
 
 
@@ -2247,7 +2247,7 @@ float project_overview_table(float scale) {
             }
         }
 
-        ImGui::PushStyleColor(ImGuiCol_Text, COL_ORANGE_LIGHT);
+        ImGui::PushStyleColor(ImGuiCol_Text, COL_BLUE_LIGHT);
 
         const StatisticsSum statistics_sum{get_statistics_sum()};
         ImGui::TableNextRow();
@@ -2341,7 +2341,7 @@ void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, cons
             ImGui::Text("%s", wxString::Format("%.2f", statistics.filament_length).ToStdString().c_str());
         }
 
-       ImGui::PushStyleColor(ImGuiCol_Text, COL_ORANGE_LIGHT);
+       ImGui::PushStyleColor(ImGuiCol_Text, COL_BLUE_LIGHT);
 
         const ExtruderStatistics extruder_statistics_sum{sum_extruder_statistics(extruder_statistics)};
         ImGui::TableNextRow();
@@ -7543,8 +7543,8 @@ bool button_with_icon(const wchar_t icon, const std::string& tooltip, bool is_ac
     bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, flags);
 
     // Render
-    const ImU32 col = ImGui::GetColorU32((held && hovered) ? COL_ORANGE_DARK :
-                                             hovered       ? COL_ORANGE_DARK :
+    const ImU32 col = ImGui::GetColorU32((held && hovered) ? COL_BLUE_DARK :
+                                             hovered       ? COL_BLUE_DARK :
                                                              COL_GREY_DARK);
     ImGui::RenderNavHighlight(bb, id);
     ImGui::PushStyleColor(ImGuiCol_Border, is_active ? COL_BUTTON_ACTIVE : COL_GREY_DARK);
