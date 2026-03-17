@@ -80,7 +80,11 @@ public:
     // Return true if the bed shape changed, so the calee will update the UI.
     //FIXME if the build volume max print height is updated, this function still returns zero
     // as this class does not use it, thus there is no need to update the UI.
-    bool set_shape(const Pointfs& bed_shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false);
+    bool set_shape(const Pointfs& bed_shape,
+                   const double max_print_height,
+                   const std::string& custom_texture,
+                   const std::string& custom_model,
+                   bool force_as_custom = false);
 
     // Build volume geometry for various collision detection tasks.
     const BuildVolume& build_volume() const { return m_build_volume; }
@@ -117,13 +121,17 @@ private:
     void init_internal_model_from_file();
     static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
     void render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
-        bool show_texture, bool picking, double show_camera_grid, bool active);
-    void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, double show_camera_grid, bool is_active);
+        bool show_texture, bool picking, bool active);
+    
+    void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool is_active);
+    
     void render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool is_active);
-    void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
-    void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking, double show_camera_grid, bool is_active);
+    
+    void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool is_active);
+    
+    void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking, bool is_active);
+    
     void render_default(bool bottom, bool picking, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix);
-    void render_camera_grid(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, double camera_z);
     void render_contour(const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_grid(bool bottom, bool has_model);
     
