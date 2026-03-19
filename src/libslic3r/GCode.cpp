@@ -8292,7 +8292,7 @@ std::string GCodeGenerator::generate_travel_gcode(
 
     // generate G-code for the travel move
     // use G1 because we rely on paths being straight (G0 may make round paths)
-    this->m_writer.set_travel_acceleration(acceleration);
+    this->m_writer.set_travel_acceleration(travel_acceleration);
 
     Vec3d previous_point{this->point_to_gcode(travel.front())};
     for (const Vec3crd& point : travel) {
@@ -8307,7 +8307,7 @@ std::string GCodeGenerator::generate_travel_gcode(
     if (! GCodeWriter::supports_separate_travel_acceleration(config().gcode_flavor)) {
         // In case that this flavor does not support separate print and travel acceleration,
         // reset acceleration to default.
-        this->m_writer.set_travel_acceleration(acceleration);
+        this->m_writer.set_travel_acceleration(travel_acceleration);
     }
 
     return gcode;

@@ -7,9 +7,12 @@ group:Name and Size
 	end_line
 	setting:idx:nozzle_diameter
 	update_nozzle_diameter
+
+
 group:Layer height limits
 	setting:idx:min_layer_height
 	setting:idx:max_layer_height
+	
 group:Offsets (for multi-extruder printers)
 	setting:idx:extruder_offset
 	setting:idx:extruder_temperature_offset
