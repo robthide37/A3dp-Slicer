@@ -215,7 +215,7 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
         if (max_fan_speed > 0 && max_fan_speed > min_fan_speed && fan_below_layer_time > slowdown_below_layer_time) {
             out += " ";
             out += format_wxstr(_L("fan will run by default to %1%%%"), max_fan_speed);
-
+            
             if (disable_fan_first_layers > 1) {
                 out += " (";
                 out += format_wxstr(_L("except for the first %1% layers where the fan is disabled"), disable_fan_first_layers);
@@ -229,7 +229,7 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
                 out += ")";
             out += " and";
         }
-
+        
         out += " ";
         out += format_wxstr(_L("print speed will be reduced so that no less than %1%s are spent on that layer"), slowdown_below_layer_time);
         if (min_print_speed > 0) {
@@ -241,15 +241,17 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
                 out += format_wxstr(_L("(however, speed will never be reduced below %1%mm/s)"), min_print_speed);
             }
         }
-        if (fan_below_layer_time > 0
-            && slowdown_below_layer_time > 0
-            && fan_below_layer_time < slowdown_below_layer_time
-            && max_fan_speed > min_fan_speed) {
         
-            out += format_wxstr(_L("\n\nIf estimated layer time is below ~%1%s, even after the slowdown, "
-                "fan will run at least at %4%%%"),
-                fan_below_layer_time, max_fan_speed);
+        if (fan_below_layer_time > 0
+            && fan_below_layer_time > slowdown_below_layer_time
+            && max_fan_speed > min_fan_speed) {
+            
+            out += format_wxstr(_L("\n\nIf estimated layer time is below ~%1%s, but still greater than ~%2%s, "
+                                   "fan will run at a proportionally increasing speed between %3%%% and %4%%%"),
+                                fan_below_layer_time, slowdown_below_layer_time, min_fan_speed, max_fan_speed);
             out += ".\n";
+            out += format_wxstr(_L("If the fan speed is set, it will proportionally increasing speed between this value and %1%%%."), max_fan_speed);
+            out += "\n";
             out += format_wxstr(_L("If the fan speed is set and is higher than %1%%%, it won't be changed."), max_fan_speed);
             out += "\n";
             out += format_wxstr(_L("Also, the fan speed over %1% won't be touched by this feature."), format_wxstr("%1%, %2%, %3%, %4%", _L("Top surfaces"), _L("Ironings"), _L("Bridges"), _L("Internal bridges")));
