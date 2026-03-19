@@ -7,7 +7,7 @@ on:
       - nightly_dev
       - nightly_master
       - debug_win
-
+      - 2.7.62
 jobs:
   build_dep:
     runs-on: windows-2022

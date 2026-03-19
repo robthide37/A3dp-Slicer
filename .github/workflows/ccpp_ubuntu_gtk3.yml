@@ -8,7 +8,7 @@ on:
       - nightly_master
       - debug_ubuntu
       - debug_gtk3
-
+      - 2.7.62
 jobs:
   build:
 

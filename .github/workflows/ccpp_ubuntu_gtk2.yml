@@ -7,7 +7,7 @@ on:
       - nightly_dev
       - nightly_master
       - debug_ubuntu
-
+      - 2.7.62
 jobs:
   build:
 
