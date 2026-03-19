@@ -8284,7 +8284,7 @@ std::string GCodeGenerator::generate_travel_gcode(
 ) {
     std::string gcode;
 
-    const unsigned acceleration =(unsigned)(m_config.travel_acceleration.value + 0.5);
+    const unsigned travel_acceleration =(unsigned)(get_travel_acceleration(m_config) + 0.5);
 
     if (travel.empty()) {
         return "";
