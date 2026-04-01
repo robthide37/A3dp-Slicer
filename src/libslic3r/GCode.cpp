@@ -1084,13 +1084,17 @@ namespace DoExport {
                         }
                     }
                     for (auto layer : object->support_layers()) {
+                        if (!layer->has_extrusions())
+                            continue;
                         const LayerTools *layer_tools = tool_ordering.tools_for_layer(layer->print_z);
+                        if (layer_tools == nullptr || layer_tools->extruders.empty())
+                            continue;
                         // Soluble?
                         bool soluble = print.config().filament_soluble.get_at(extruder_id);
                         uint16_t support_extruder = object->config().support_material_extruder;
                         support_extruder = support_extruder == 0 ? soluble ? -1 : layer_tools->extruders.front() :
                                                                    (support_extruder - 1);
-                        uint16_t interface_extruder = object->config().support_material_extruder;
+                        uint16_t interface_extruder = object->config().support_material_interface_extruder;
                         interface_extruder = interface_extruder == 0 ? soluble ? -1 : layer_tools->extruders.front() :
                                                                    (interface_extruder - 1);
                         if (support_extruder == extruder_id &&
