@@ -673,8 +673,9 @@ void ObjectList::update_extruder_in_config(const wxDataViewItem& item)
     const int extruder = m_objects_model->GetExtruderNumber(item);
     m_config->set_key_value("extruder", new ConfigOptionInt(extruder));
 
-    // update scene
-    wxGetApp().plater()->update();
+    // Refresh the print state before reloading the scene so wipe tower preview
+    // reacts immediately to extruder changes from the object list.
+    wxGetApp().plater()->update((unsigned int)Plater::UpdateParams::FORCE_BACKGROUND_PROCESSING_UPDATE);
 }
 
 static wxString get_item_name(const std::string& name, const bool is_text_volume)
@@ -4929,8 +4930,9 @@ void ObjectList::set_extruder_for_selected_items(const int extruder) const
         wxGetApp().plater()->canvas3D()->ensure_on_bed(obj_idx, printer_technology() != ptSLA);
     }
 
-    // update scene
-    wxGetApp().plater()->update();
+    // Refresh the print state before reloading the scene so wipe tower preview
+    // reacts immediately to extruder changes from the object list.
+    wxGetApp().plater()->update((unsigned int)Plater::UpdateParams::FORCE_BACKGROUND_PROCESSING_UPDATE);
 }
 
 wxDataViewItemArray ObjectList::reorder_volumes_and_get_selection(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection/* = nullptr*/)
