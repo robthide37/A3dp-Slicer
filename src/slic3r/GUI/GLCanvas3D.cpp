@@ -7932,19 +7932,28 @@ void GLCanvas3D::_render_gizmos_overlay()
 
 void GLCanvas3D::_render_fit_camera_toolbar()
 {
-    float  font_size        = ImGui::GetFontSize();
-    ImVec2 button_icon_size = ImVec2(font_size * 0.8, font_size * 0.8);
-
     ImGuiWrapper &imgui         = *wxGetApp().imgui();
-    float         window_width  = button_icon_size.x + imgui.scaled(2.0f);
-    float         window_height = button_icon_size.y + imgui.scaled(2.0f);
-
     Size cnv_size              = get_canvas_size();
-    m_fit_camera_button_pos[0] = cnv_size.get_width() - window_width - 110 * m_sc;
-    m_fit_camera_button_pos[1] = cnv_size.get_height() - button_icon_size[1] - 60 * m_sc;
-    imgui.set_next_window_pos(m_fit_camera_button_pos[0], m_fit_camera_button_pos[1], ImGuiCond_Always, 0, 0);
-    
-#ifdef __WINDOWS__
+    m_fit_camera_button_pos[0] = cnv_size.get_width();
+    float font_size = ImGui::GetFontSize();
+    ImVec2 button_icon_size = ImVec2(font_size * 1.3f, font_size * 1.3f);
+
+    float window_width  = button_icon_size.x + imgui.scaled(1.8f);
+    float window_height = button_icon_size.y + imgui.scaled(1.8f);
+
+    float margin = 20.0f * m_sc;
+    float right_ui_offset = 90.0f * m_sc; // adjust to your sidebar
+
+    m_fit_camera_button_pos[0] = cnv_size.get_width() - margin - right_ui_offset;
+    m_fit_camera_button_pos[1] = cnv_size.get_height() - margin;
+
+    imgui.set_next_window_pos(
+        m_fit_camera_button_pos[0],
+        m_fit_camera_button_pos[1],
+        ImGuiCond_Always,
+        1.0f, 1.0f
+    );
+#ifdef __WINDOWS__DD
     imgui.set_next_window_size(window_width, window_height, ImGuiCond_Always);
 #endif
 
@@ -7975,7 +7984,7 @@ void GLCanvas3D::_render_fit_camera_toolbar()
     ImGui::PopStyleVar(2);
     imgui.end();
 
-}
+} 
 
 
 void GLCanvas3D::_render_main_toolbar()
