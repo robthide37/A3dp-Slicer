@@ -3229,6 +3229,13 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             s_multiple_beds.update_shown_beds(model, q->build_volume());
          });
     update();
+    
+    if (!obj_idxs.empty()) {
+        q->canvas3D()->update_instance_printable_state_for_objects(obj_idxs);
+        update_restart_background_process(false, false);
+        object_list_changed();
+    }
+
 
     return obj_idxs;
 }
