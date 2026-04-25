@@ -2271,12 +2271,9 @@ void Print::_make_wipe_tower()
     }
     this->throw_if_canceled();
 
-    // Initialize the Wipe Tower.
-    WipeTower wipe_tower(m_config,
-                         m_default_object_config,
-                         m_default_region_config,
-                         wipe_volumes,
-                         m_wipe_tower_data.tool_ordering.first_extruder());
+    // Initialize the wipe tower.
+    WipeTower wipe_tower(model().wipe_tower().position.cast<float>(), m_config, m_default_object_config,
+                         m_default_region_config, wipe_volumes, m_wipe_tower_data.tool_ordering.first_extruder());
 
     // Set the extruder & material properties at the wipe tower object.
     for (size_t i = 0; i < m_config.nozzle_diameter.size(); ++ i)

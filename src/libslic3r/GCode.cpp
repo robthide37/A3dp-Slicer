@@ -2030,43 +2030,18 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
             }
             set_extra_lift(m_last_layer_z, prev_object->layers().back()->id(), print.config(), m_writer, initial_extruder_id /* osef, it's only for the lift_min */);
         } else {
-            if (print.config().parallel_objects_step > 0) {
             /////////////////////////////////////////////// begin parallel_objects_step
-                //print wipe tower (if here) for the first layer
-                std::unique_ptr<GCode::WipeTowerIntegration> wipe_tower;
-                ToolOrdering parallel_ordering;
-                std::vector<std::pair<coordf_t, ObjectsLayerToPrint>> parallel_layers_to_print;
-                if (has_wipe_tower) {
-                    parallel_layers_to_print = collect_layers_to_print(print, status_monitor);
-                    parallel_ordering = print.tool_ordering();
-                    assert(!parallel_layers_to_print.empty());
-                    assert(print.config().parallel_objects_step > 0);
-                     wipe_tower = std::make_unique<GCode::WipeTowerIntegration>(print.config(),
-                                                                        *print.wipe_tower_data().priming.get(),
-                                                                        print.wipe_tower_data().tool_changes,
-                                                                        *print.wipe_tower_data().final_purge.get());
-                    //can't prime both
-                    //preamble_to_put_start_layer.append(m_wipe_tower->prime(*this));
-                    //TODO prime if  1nozzlemmu
-                    // parallel tool ordering to prime correctly the wipe tower
-                    //tool_ordering = print.tool_ordering();
-                    // Print first wipe tower layer
-                    this->m_layer = parallel_layers_to_print[0].second.back().layer();
-                    wipe_tower->next_layer();
-                    file.write(wipe_tower->tool_change(*this, tool_ordering.first_extruder(), true));
-                }
+            if (print.config().parallel_objects_step > 0 && !has_wipe_tower) {
                 double range = std::min(print.config().parallel_objects_step, print.config().extruder_clearance_height) + EPSILON;
                 if (print.config().complete_objects_sort.value == cosNearest) {
                     print_object_instances_ordering = chain_print_object_instances(print);
                 }
                 bool first_layers = true;
                 final_extruder_id = initial_extruder_id;
+
                 coordf_t z_start = 0, z_end = range;
                 bool is_layers = true;
-                while (is_layers && (print.config().parallel_objects_step_max_z.value == 0 || z_start + EPSILON < print.config().parallel_objects_step_max_z.value)) {
-                    if (print.config().parallel_objects_step_max_z.value > 0) {
-                        z_end = std::min(z_end, print.config().parallel_objects_step_max_z.value);
-                    }
+                while (is_layers) {
                     is_layers = false;
                     for (auto it_print_object_instance = print_object_instances_ordering.begin();
                          it_print_object_instance != print_object_instances_ordering.end();
@@ -2088,7 +2063,6 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
 
                         // complete the tool ordering for this sequence.
                         tool_ordering = ToolOrdering(object, layers_to_print_range, final_extruder_id);
-                        m_volumetric_speed_mm3_per_s = DoExport::autospeed_volumetric_limit(print, tool_ordering);
 
                         if (!layers_to_print_range.empty() && tool_ordering.first_extruder() != uint16_t(-1)) {
                             this->set_origin(unscale((*it_print_object_instance)->shift));
@@ -2116,37 +2090,6 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                         z_end += range;
                     }
                 }
-                if (is_layers) {
-                    assert(print.config().parallel_objects_step_max_z.value > 0);
-                    if (wipe_tower) {
-                        m_wipe_tower = std::move(wipe_tower);
-                    }
-                    // Return to normal printing
-                    // skip all layer below print.config().parallel_objects_step_max_z.value
-                    size_t idx;
-                    for (idx = 0; idx < parallel_layers_to_print.size() && parallel_layers_to_print[idx].first + EPSILON < print.config().parallel_objects_step_max_z.value; idx++) {
-                        //print wipe tower (if here) up to the z
-                        if (m_wipe_tower && idx > 0) {
-                            uint16_t extruder_id = tool_ordering.first_extruder();
-
-                            assert (parallel_ordering
-                                       .layer_tools()[m_wipe_tower->get_current_layer_idx() + 1]
-                                       .print_z < print.config().parallel_objects_step_max_z.value - EPSILON);
-                                m_wipe_tower->next_layer();
-                                this->m_layer = parallel_layers_to_print[idx].second.back().layer();
-                                file.write(m_wipe_tower->tool_change(*this, extruder_id, true));
-                            
-                        }
-                    }
-                    parallel_layers_to_print = {parallel_layers_to_print.begin() + idx, parallel_layers_to_print.end()};
-                    // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
-                    // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
-                    // and export G-code into file.
-                    this->process_layers(print, status_monitor, parallel_ordering, print_object_instances_ordering, parallel_layers_to_print, preamble_to_put_start_layer, file);
-                    if (m_wipe_tower)
-                        // Purge the extruder, pull out the active filament.
-                        file.write(m_wipe_tower->finalize(*this));
-                }
                 /////////////////////////////////////////////// end parallel_objects_step
             } else {
                 // Sort layers by Z.
@@ -2156,7 +2099,7 @@ void GCodeGenerator::_do_export(Print& print_mod, GCodeOutputStream &file, Thumb
                 if (has_wipe_tower && !layers_to_print.empty()) {
                 //            m_wipe_tower = std::make_unique<GCode::WipeTowerIntegration>(print.model().wipe_tower().position.cast<float>(), print.model().wipe_tower().rotation, print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get());
 
-                    m_wipe_tower = std::make_unique<GCode::WipeTowerIntegration>(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get());
+                    m_wipe_tower = std::make_unique<GCode::WipeTowerIntegration>(print.model().wipe_tower().position.cast<float>(), print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get());
 
                     // Set position for wipe tower generation.
                     preamble_to_put_start_layer.append(this->writer().travel_to_z(first_layer_height, "Move to first z, for wipe tower"));
@@ -3722,15 +3665,11 @@ LayerResult GCodeGenerator::process_layer(
     }
 
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
-    for (const uint16_t extruder_id : layer_tools.extruders)
-    {
-        // set extruder
-        if (layer_tools.has_wipe_tower && m_wipe_tower) {
-            m_wipe_tower->set_force_travel(m_new_z_target.has_value());
-            gcode += m_wipe_tower->tool_change(*this, extruder_id, extruder_id == layer_tools.extruders.back());
-        } else {
-            gcode += this->set_extruder(extruder_id, print_z);
-        }
+    for (const uint16_t extruder_id : layer_tools.extruders) {
+        gcode += (layer_tools.has_wipe_tower && m_wipe_tower) ?
+            m_wipe_tower->tool_change(*this, extruder_id, extruder_id == layer_tools.extruders.back()) :
+            this->set_extruder(extruder_id, print_z);
+
         // let analyzer tag generator aware of a role type change
         if (layer_tools.has_wipe_tower && m_wipe_tower)
             m_last_processor_extrusion_role = GCodeExtrusionRole::WipeTower;

@@ -372,7 +372,7 @@ public:
         }
         //sprintf(all, "M109 S%d ;SKINNYDIP TOOLCHANGE WAIT FOR TEMP %s\n", tc_temp, fast ? "FAST MODE":"NORMAL MODE");
         //this->append(all);
-        set_extruder_temp(tc_temp, this->m_current_tool, true, std::string(";SKINNYDIP TOOLCHANGE WAIT FOR TEMP ") + (fast ? "FAST MODE" : "NORMAL MODE"));
+        set_extruder_temp(tc_temp, this->m_current_tool, true, ";SKINNYDIP TOOLCHANGE WAIT FOR TEMP " + fast ? "FAST MODE" : "NORMAL MODE");
         if (fan_on == true){
             set_fan(m_last_fan_speed, " ;restore cooling");
         }
@@ -385,7 +385,7 @@ public:
         //char tdbuf[128];
         //sprintf(tdbuf, "M104 S%d  ;SKINNYDIP BEGIN TOOLCHANGE TEMP %s\n", tc_temp, fast ? "FAST MODE":"NORMAL MODE");
         //m_gcode += tdbuf;
-        set_extruder_temp(tc_temp, this->m_current_tool, false, std::string(";SKINNYDIP BEGIN TOOLCHANGE TEMP ") + (fast ? "FAST MODE" : "NORMAL MODE"));
+        set_extruder_temp(tc_temp, this->m_current_tool, false, ";SKINNYDIP BEGIN TOOLCHANGE TEMP " + fast ? "FAST MODE" : "NORMAL MODE");
         return *this;
     }
 
@@ -395,7 +395,7 @@ public:
         //char tdbuf[128];
         //sprintf(tdbuf, "M104 S%d  ;RESTORE PRE-TOOLCHANGE TEMP %s\n", tc_temp, fast ? "FAST MODE":"NORMAL MODE");
         //m_gcode += tdbuf;
-        set_extruder_temp(tc_temp, this->m_current_tool , false, std::string(";RESTORE PRE-TOOLCHANGE TEMP ") + (fast ? "FAST MODE" : "NORMAL MODE"));
+        set_extruder_temp(tc_temp, this->m_current_tool , false, ";RESTORE PRE-TOOLCHANGE TEMP " + fast ? "FAST MODE" : "NORMAL MODE");
         return *this;
     }
 
@@ -459,26 +459,20 @@ public:
 	// Set speed factor override percentage.
 	WipeTowerWriter& speed_override(int speed)
 	{
-        m_gcode += "M220 S" + std::to_string(speed) + "\n";
+        //m_gcode += "M220 S" + std::to_string(speed) + "\n";
 		return *this;
     }
 
 	// Let the firmware back up the active speed override value.
 	WipeTowerWriter& speed_override_backup()
     {
-        // This is only supported by Prusa at this point (https://github.com/prusa3d/PrusaSlicer/issues/3114)
-        if (m_gcode_flavor == gcfMarlinLegacy || m_gcode_flavor == gcfMarlinFirmware)
-            m_gcode += "M220 B\n";
+
 		return *this;
     }
 
 	// Let the firmware restore the active speed override value.
 	WipeTowerWriter& speed_override_restore()
 	{
-        if (m_gcode_flavor == gcfMarlinLegacy || m_gcode_flavor == gcfMarlinFirmware)
-            m_gcode += "M220 R\n";
-        else
-            m_gcode += "M220 S100\n";
 		return *this;
     }
 
@@ -497,7 +491,7 @@ public:
 
 	WipeTowerWriter& flush_planner_queue()
 	{ 
-		m_gcode += "G4 S0\n"; 
+	   // m_gcode += "G4 S0\n"; 
 		return *this;
 	}
 
@@ -637,16 +631,18 @@ WipeTower::ToolChangeResult WipeTower::construct_tcr(WipeTowerWriter& writer,
 
 
 
-WipeTower::WipeTower(const PrintConfig& config,
-                     const PrintObjectConfig& default_object_config,
-                     const PrintRegionConfig& default_region_config,
-                     const std::vector<std::vector<float>>& wiping_matrix,
-                     size_t initial_tool) :
+WipeTower::WipeTower(const Vec2f& pos,
+                    const PrintConfig& config,
+                    const PrintObjectConfig& default_object_config,
+                    const PrintRegionConfig& default_region_config, 
+                    const std::vector<std::vector<float>>& wiping_matrix,
+                    size_t initial_tool) 
+    : 
+    m_wipe_tower_pos(pos),
     m_config(&config),
     m_object_config(&default_object_config),
     m_region_config(&default_region_config),
-    m_semm(config.single_extruder_multi_material.value),
-    m_wipe_tower_pos(config.wipe_tower_x, config.wipe_tower_y),
+    m_semm(config.single_extruder_multi_material.value), 
     m_wipe_tower_width(float(config.wipe_tower_width)),
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
     m_speed(float(config.wipe_tower_speed)),
@@ -1641,11 +1637,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         const double spacing = brim_flow.spacing();
         // How many perimeters shall the brim have?
         size_t loops_num = (m_config->wipe_tower_brim_width.get_abs_value(m_nozzle_diameter) + spacing / 2) / spacing;
-        // ensure the loops_num is within bounds
-        if (m_config->wipe_tower_brim_width.get_abs_value(m_nozzle_diameter) <= 0) {
-            loops_num = 0;
-        }
-        assert(loops_num < 999);
+        
 
         writer.set_extrusion_flow(brim_flow.mm3_per_mm() / filament_area())
           .set_z(m_z_pos + m_config->z_offset.value) // Let the writer know the current Z position as a base for Z-hop.
