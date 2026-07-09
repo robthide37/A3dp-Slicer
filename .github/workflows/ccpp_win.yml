@@ -20,7 +20,7 @@ jobs:
     - name: cmake and make deps
       working-directory: ./deps/build
       run: |
-        cmake .. -G "Visual Studio 16 2019" -A x64
+        cmake .. -G "Visual Studio 17 2022" -A x64
         msbuild /m ALL_BUILD.vcxproj
     - name: Upload artifact
       uses: actions/upload-artifact@v4.0.0
@@ -67,7 +67,7 @@ jobs:
     - run: mkdir build
     - name: cmake
       working-directory: ./build
-      run: cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="d:\a\${{ github.event.repository.name }}\${{ github.event.repository.name }}\deps\destdir\usr\local"
+      run: cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="d:\a\${{ github.event.repository.name }}\${{ github.event.repository.name }}\deps\destdir\usr\local"
     - name: make
       working-directory: ./build
       run: msbuild /m /P:Configuration=RelWithDebInfo INSTALL.vcxproj
