@@ -12,7 +12,7 @@ on:
 jobs:
   build:
 
-    runs-on: macos-12
+    runs-on: macos-14
 
     steps:
     - uses: actions/checkout@v4
@@ -30,12 +30,12 @@ jobs:
     - name: build deps & slicer
       run: ./BuildMacOS.sh -dsi
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ github.event.repository.name }}_patch_01.app
         path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ github.event.repository.name }}_patch_01.dmg
         path: ${{ github.event.repository.name }}.dmg

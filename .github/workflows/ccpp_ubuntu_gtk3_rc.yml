@@ -8,12 +8,12 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     env:
       EXEC_NAME: "${{ github.event.repository.name }}"
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: 'rc'
     - name: Setup cmake

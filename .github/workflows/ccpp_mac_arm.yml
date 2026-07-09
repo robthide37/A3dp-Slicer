@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - patch-1
-      - Nigthly
+      - Nightly
       - nightly_dev
       - nightly_master
       - debug_win
@@ -33,12 +33,12 @@ jobs:
     - name: build deps & slicer
       run: ./BuildMacOS.sh -adsi
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ github.event.repository.name }}_macos_arm.app
         path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ github.event.repository.name }}_macos_arm.dmg
         path: ${{ github.event.repository.name }}.dmg

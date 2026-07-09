@@ -8,10 +8,10 @@ on:
 jobs:
   build:
 
-    runs-on: macos-12
+    runs-on: macos-14
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: 'debug_macos'
     - name: build deps & slicer
@@ -20,12 +20,12 @@ jobs:
       working-directory: ./build
       run: ls
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: nightly_macos_debug.dmg
         path: build/${{ github.event.repository.name }}.dmg
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: nightly_macos.tar
         path: ${{ github.event.repository.name }}.tar
