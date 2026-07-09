@@ -34,6 +34,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: ilammy/msvc-dev-cmd@v1
+    - name: install 7-Zip
+      run: choco install 7zip --yes
     - name: update submodule profiles
       working-directory: ./resources/profiles
       run: git submodule update --init
