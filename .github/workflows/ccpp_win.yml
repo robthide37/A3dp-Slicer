@@ -22,11 +22,16 @@ jobs:
       run: |
         cmake .. -G "Visual Studio 17 2022" -A x64
         msbuild /m ALL_BUILD.vcxproj
+    - name: compress deps for upload
+      working-directory: ./deps/build
+      run: |
+        cd destdir
+        7z a -tzip ../deps_win.zip .
     - name: Upload artifact
-      uses: actions/upload-artifact@v4.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: deps_win
-        path: ./deps/build/destdir/
+        path: ./deps/build/deps_win.zip
 
   build:
     runs-on: windows-2022
@@ -48,7 +53,12 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: deps_win
-        path: deps/destdir
+        path: deps/destdir.zip
+    - name: extract deps
+      working-directory: deps
+      run: |
+        mkdir destdir
+        7z x destdir.zip -odestdir
     - name: echo dir deps
       run: dir deps
     - name: echo dir deps destdir
