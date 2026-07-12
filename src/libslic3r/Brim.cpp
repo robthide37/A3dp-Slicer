@@ -3,12 +3,15 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "clipper/clipper_z.hpp"
+#include "Brim.hpp"
 
+#include "clipper/clipper_z.hpp"
 #include "ClipperUtils.hpp"
 #include "EdgeGrid.hpp"
-#include "Print.hpp"
+#include "ExtrusionEntityCollection.hpp"
+#include "Flow.hpp"
 #include "Layer.hpp"
+#include "Print.hpp"
 #include "PrintConfig.hpp"
 #include "ShortestPath.hpp"
 #include "libslic3r.h"
@@ -18,7 +21,7 @@
 #include <unordered_set>
 #include <mutex>
 
-#include <tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_for.h>
 #include <boost/thread/lock_guard.hpp>
 
 #ifndef NDEBUG
@@ -729,6 +732,9 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
     if (loops.empty())
         return;
 
+    bool extrude_cw = print.default_region_config().perimeter_direction.value == pdCW_CCW ||
+                print.default_region_config().perimeter_direction.value == pdCW_CW;
+
     // nest contour loops (same as in perimetergenerator)
     for (int d = loops.size() - 1; d >= 1; --d) {
         std::vector<BrimLoop>& contours_d = loops[d];
@@ -824,7 +830,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
     float height = float(print.get_min_first_layer_height());
     int nextIdx = 0;
     std::function<void(BrimLoop&, ExtrusionEntityCollection*)>* extrude_ptr;
-    std::function<void(BrimLoop&, ExtrusionEntityCollection*) > extrude = [&mm3_per_mm, &width, &height, &extrude_ptr, &nextIdx](BrimLoop& to_cut, ExtrusionEntityCollection* parent) {
+    std::function<void(BrimLoop&, ExtrusionEntityCollection*) > extrude = [&mm3_per_mm, &width, &height, &extrude_ptr, &nextIdx, extrude_cw](BrimLoop& to_cut, ExtrusionEntityCollection* parent) {
         DEBUG_VISIT(*parent, LoopAssertVisitor())
         int idx = nextIdx++;
         //bool i_have_line = !to_cut.line.points.empty() && to_cut.line.is_valid();
@@ -836,6 +842,9 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             for (Polyline& pline : to_cut.lines) {
                 pline.assert_valid();
                 assert(pline.size() > 0);
+                if (extrude_cw) {
+                    pline.reverse();
+                }
                 if (pline.back() == pline.front()) {
                     ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     path.polyline = pline;
@@ -876,6 +885,9 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             for (Polyline& pline : to_cut.lines) {
                 assert(pline.size() > 0);
                 pline.assert_valid();
+                if (extrude_cw) {
+                    pline.reverse();
+                }
                 if (pline.back() == pline.front()) {
                     ExtrusionPath path({ExtrusionRole::Skirt, {mm3_per_mm, width, height}}, false);
                     path.polyline = pline;
@@ -895,6 +907,7 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                 //children->no_sort = true;
                 for (BrimLoop& child : to_cut.children)
                     (*extrude_ptr)(child, children);
+                DEBUG_VISIT(*children, LoopAssertVisitor())
                 //remove un-needed collection if possible
                 if (children->entities().size() == 1) {
                     print_me_first->append(*children->entities().front());
@@ -904,7 +917,6 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
                 } else {
                     print_me_first->append(ExtrusionEntitiesPtr{ children });
                 }
-                DEBUG_VISIT(*children, LoopAssertVisitor())
             }
             assert(print_me_first->entities().size() > 0);
         }
@@ -1237,7 +1249,8 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
                         decimated_polygon.points = MultiPoint::douglas_peucker(poly.contour.points, SCALED_EPSILON);
                     }
                 }
-                for (const Point& p : decimated_polygon.convex_points(brim_config.brim_ears_max_angle.value* PI / 180.0)) {
+                Points pts = decimated_polygon.convex_points(0, brim_config.brim_ears_max_angle.value * PI / 180.0);
+                for (const Point& p : pts) {
                     pt_ears.push_back(p);
                     pt_ears.back() += (copy_pt.shift);
                 }
@@ -1270,6 +1283,7 @@ void make_brim_ears(const Print& print, const Flow& flow, const PrintObjectPtrs&
 
     //get brim resolution (low resolution if no arc fitting)
     coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    scaled_resolution_brim = std::max(scaled_resolution_brim, coordf_t(SCALED_EPSILON * 10));
     if (brim_config.brim_ears_pattern.value == InfillPattern::ipConcentric) {
 
         //create loops (same as standard brim)
@@ -1369,6 +1383,7 @@ void make_brim_patch(const Print &print,
                      ExtrusionEntityCollection &out)
 {
     coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    scaled_resolution_brim = std::max(scaled_resolution_brim, coordf_t(SCALED_EPSILON * 10));
     for (const Polygon &contour : patches) {
         contour.simplify(scaled_resolution_brim);
         if (contour.empty()) {
@@ -1377,16 +1392,18 @@ void make_brim_patch(const Print &print,
         // remove unbrimable area
         ExPolygons next = diff_ex({ExPolygon(contour)}, unbrimmable_areas);
         ensure_valid(next, scaled_resolution_brim);
-        
+
         // create polygons
         std::vector<std::vector<BrimLoop>> loops;
+        loops.emplace_back();
         next = offset2_ex(next, -flow.scaled_width() / 2 - flow.scaled_spacing() / 4, flow.scaled_spacing() / 4, jtSquare);
         while (!next.empty()) {
-            loops.emplace_back();
             for (ExPolygon &expoly : next) {
                 loops.back().emplace_back(expoly.contour);
                 for (Polygon &poly : expoly.holes) {
+                    poly.reverse();
                     loops.back().emplace_back(poly);
+                    poly.reverse();
                 }
             }
             next = ensure_valid(offset2_ex(next, - (flow.scaled_spacing() * 5) / 4, flow.scaled_spacing() / 4, jtSquare), scaled_resolution_brim);
@@ -1394,7 +1411,7 @@ void make_brim_patch(const Print &print,
 
         // create extrusions
         extrude_brim_from_tree(print, loops, {Polygon(contour)}, flow, out, true);
-        
+
         unbrimmable_areas.push_back(ExPolygon(contour));
         union_ex(unbrimmable_areas);
     }
@@ -1464,6 +1481,7 @@ void make_brim_interior(const Print& print, const Flow& flow, const PrintObjectP
     //now get all holes, use them to create loops
     //get brim resolution (low resolution if no arc fitting)
     coordf_t scaled_resolution_brim = (print.config().arc_fitting.value != ArcFittingType::Disabled) ? scale_d(print.config().resolution) : scale_d(print.config().resolution_internal) / 10;
+    scaled_resolution_brim = std::max(scaled_resolution_brim, coordf_t(SCALED_EPSILON * 10));
     std::vector<std::vector<BrimLoop>> loops;
     for (size_t i = 0; i < num_loops; ++i) {
         print.throw_if_canceled();

@@ -14,6 +14,8 @@
 #include <libslic3r/BuildVolume.hpp> // create object
 #include <libslic3r/SLA/ReprojectPointsOnMesh.hpp>
 
+#include "libslic3r/MultipleBeds.hpp"
+
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -373,6 +375,7 @@ void CreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
         // set transformation
         Slic3r::Geometry::Transformation tr(m_transformation);
         new_object->instances.front()->set_transformation(tr);
+        new_object->instances.front()->set_offset(new_object->instances.front()->get_offset() + s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
         new_object->ensure_on_bed();
 
         // Actualize right panel and set inside of selection
@@ -388,7 +391,7 @@ void CreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
     GLCanvas3D      *canvas  = plater->canvas3D();
     GLGizmosManager &manager = canvas->get_gizmos_manager();
     if (manager.get_current_type() != m_input.gizmo)
-        manager.open_gizmo(m_input.gizmo);
+        manager.open_gizmo(m_input.gizmo, false);
 
     // redraw scene
     canvas->reload_scene(true);
@@ -835,9 +838,6 @@ std::vector<BoundingBoxes> create_line_bounds(const ExPolygonsWithIds &shapes, s
 
 template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc was_canceled)
 {
-    // method use square of coord stored into int64_t
-    static_assert( (std::is_same<Point::coord_type, int32_t>() && std::is_same<Coord2, int64_t>())
-        || (std::is_same<Point::coord_type, int64_t>() && std::is_same<Coord2, double>()));
     const EmbossShape &shape = input.create_shape();
     if (shape.shapes_with_ids.empty())
         return {};
@@ -1155,7 +1155,7 @@ void create_volume(TriangleMesh                    &&mesh,
     // Now is valid text volume selected open emboss gizmo
     GLGizmosManager &manager = canvas->get_gizmos_manager();
     if (manager.get_current_type() != gizmo)
-        manager.open_gizmo(gizmo);
+        manager.open_gizmo(gizmo, false);
 
     // update model and redraw scene
     //canvas->reload_scene(true);

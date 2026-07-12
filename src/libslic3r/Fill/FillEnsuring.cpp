@@ -304,7 +304,7 @@ ThickPolylines FillEnsuring::make_fill_polylines(
             Arachne::WallToolPaths wall_tool_paths(polygons, 
                 scaled_spacing, scaled_spacing, scaled_spacing, scaled_spacing, 
                 loops_count, 0, 
-                params.layer_height, *this->print_object_config, *this->print_config);
+                params.layer_height, *params.config, *this->print_config);
             /*
             *     WallToolPaths(const Polygons& outline,
         coord_t bead_spacing_0,

@@ -49,6 +49,7 @@ Polyline Polygon::split_at_vertex(const Point &point) const
 Polyline
 Polygon::split_at_index(size_t index) const
 {
+    assert(index < this->points.size());
     Polyline polyline;
     polyline.points.reserve(this->points.size() + 1);
     for (Points::const_iterator it = this->points.begin() + index; it != this->points.end(); ++it)
@@ -60,6 +61,7 @@ Polygon::split_at_index(size_t index) const
 
 double Polygon::area(const Points &points)
 {
+    // Better than ClipperLib::Area(this->points); ?
     double a = 0.;
     if (points.size() >= 3) {
         Vec2d p1 = points.back().cast<double>();
@@ -69,6 +71,7 @@ double Polygon::area(const Points &points)
             p1 = p2;
         }
     }
+    assert(is_approx(ClipperLib::Area(points), 0.5 * a, SCALED_EPSILON * SCALED_EPSILON * 1.));
     return 0.5 * a;
 }
 
@@ -112,7 +115,7 @@ void Polygon::douglas_peucker(coord_t tolerance)
     this->points.push_back(this->points.front());
     MultiPoint::douglas_peucker(tolerance);
     assert(this->points.size() > 1);
-    if (points.size() == 2) {
+    if (points.size() < 3) {
         // not a good polygon : too small. clear it
         points.clear();
     } else {
@@ -226,8 +229,16 @@ bool Polygon::intersections(const Line &line, Points *intersections) const
     for (size_t i = 0; i < this->points.size(); ++ i) {
         l.b = this->points[i];
         Point intersection;
-        if (l.intersection(line, &intersection))
-            intersections->emplace_back(std::move(intersection));
+        if (l.intersection(line, &intersection)) {
+            if (intersection == l.b || intersection == l.a) {
+                // if on a corner, only keep one intersection
+                if (std::find(intersections->begin(), intersections->end(), intersection) == intersections->end()) {
+                    intersections->emplace_back(std::move(intersection));
+                }
+            } else {
+                intersections->emplace_back(std::move(intersection));
+            }
+        }
         l.a = l.b;
     }
     return intersections->size() > intersections_size;
@@ -239,8 +250,7 @@ bool Polygon::intersections(const Line &line, Points *intersections) const
 // v2: next_point - this_point
 // and returns true if the point is to be copied to the output.
 template<typename FilterFn>
-Points filter_points_by_vectors(const Points &poly, FilterFn filter)
-{
+Points filter_points_by_vectors(const Points &poly, FilterFn filter) {
     // Last point is the first point visited.
     Point p1 = poly.back();
     // Previous vector to p1.
@@ -251,43 +261,55 @@ Points filter_points_by_vectors(const Points &poly, FilterFn filter)
         // p2 is next point to the currently visited point p1.
         Vec2d v2 = (p2 - p1).cast<double>();
         if (filter(v1, v2))
-            out.emplace_back(p2);
+            out.emplace_back(p1);
         v1 = v2;
         p1 = p2;
     }
-    
+
     return out;
 }
 
 template<typename ConvexConcaveFilterFn>
-Points filter_convex_concave_points_by_angle_threshold(const Points &poly, double angle_threshold, ConvexConcaveFilterFn convex_concave_filter)
-{
-    assert(angle_threshold >= 0.);
-    if (angle_threshold < EPSILON) {
-        double cos_angle  = cos(angle_threshold);
-        return filter_points_by_vectors(poly, [convex_concave_filter, cos_angle](const Vec2d &v1, const Vec2d &v2){
-            return convex_concave_filter(v1, v2) && v1.normalized().dot(v2.normalized()) < cos_angle;
-        });
+Points filter_convex_concave_points_by_angle_threshold(const Points &poly,
+                                                       double min_angle,
+                                                       double max_angle,
+                                                       ConvexConcaveFilterFn convex_concave_filter) {
+    assert(min_angle >= 0.);
+    assert(max_angle >= 0.);
+    assert(max_angle <= PI);
+    if (min_angle > EPSILON || max_angle < PI - EPSILON) {
+        double min_dot = -cos(min_angle);
+        double max_dot = -cos(max_angle);
+        return filter_points_by_vectors(poly,
+                                        [convex_concave_filter, min_dot, max_dot](const Vec2d &v1, const Vec2d &v2) {
+                                            //first, check if it's the right kind of angle.
+                                            bool is_convex = convex_concave_filter(v1, v2);
+                                            if (!is_convex)
+                                                return false;
+                                            double dot = v1.normalized().dot(v2.normalized());
+                                            return (min_dot <= dot) && (dot <= max_dot);
+                                        });
     } else {
-        return filter_points_by_vectors(poly, [convex_concave_filter](const Vec2d &v1, const Vec2d &v2){
+        return filter_points_by_vectors(poly, [convex_concave_filter](const Vec2d &v1, const Vec2d &v2) {
             return convex_concave_filter(v1, v2);
         });
     }
 }
 
-Points Polygon::convex_points(double angle_threshold) const
+Points Polygon::convex_points(double min_angle, double max_angle) const
 {
-    return filter_convex_concave_points_by_angle_threshold(this->points, angle_threshold, [](const Vec2d &v1, const Vec2d &v2){ return cross2(v1, v2) > 0.; });
+    assert(size() > 2);
+    return filter_convex_concave_points_by_angle_threshold(this->points, min_angle, max_angle, [](const Vec2d &v1, const Vec2d &v2){ return (cross2(v1, v2) >= 0.); });
 }
 
-Points Polygon::concave_points(double angle_threshold) const
+Points Polygon::concave_points(double min_angle, double max_angle) const
 {
-    return filter_convex_concave_points_by_angle_threshold(this->points, angle_threshold, [](const Vec2d &v1, const Vec2d &v2){ return cross2(v1, v2) < 0.; });
+    assert(size() > 2);
+    return filter_convex_concave_points_by_angle_threshold(this->points, min_angle, max_angle, [](const Vec2d &v1, const Vec2d &v2){ return (cross2(v1, v2) <= 0.); });
 }
 
 template<typename FilterFn>
-std::vector<size_t> filter_points_idx_by_vectors(const Points &poly, FilterFn filter)
-{
+std::vector<size_t> filter_points_idx_by_vectors(const Points &poly, FilterFn filter) {
     assert(poly.size() > 2);
     if (poly.size() < 3)
         return {};
@@ -303,7 +325,7 @@ std::vector<size_t> filter_points_idx_by_vectors(const Points &poly, FilterFn fi
         // p2 is next point to the currently visited point p1.
         Vec2d v2 = (p2 - p1).cast<double>();
         if (filter(v1, v2))
-            out.push_back(idx-1);
+            out.push_back(idx - 1);
         v1 = v2;
         p1 = p2;
     }
@@ -316,36 +338,46 @@ std::vector<size_t> filter_points_idx_by_vectors(const Points &poly, FilterFn fi
         if (filter(v1, v2))
             out.push_back(poly.size() - 1);
     }
-    
     return out;
 }
 
 template<typename ConvexConcaveFilterFn>
-std::vector<size_t> filter_convex_concave_points_idx_by_angle_threshold(const Points &poly, double angle_threshold, ConvexConcaveFilterFn convex_concave_filter)
-{
-    assert(angle_threshold >= 0.);
-    if (angle_threshold > EPSILON) {
-        const double cos_angle  = cos(angle_threshold);
-        return filter_points_idx_by_vectors(poly, [convex_concave_filter, cos_angle](const Vec2d &v1, const Vec2d &v2){
-            // if v1 and v2 has same direction = flat angle.
-            // if v1.dot(v2) is negative -> sharp angle
-            return convex_concave_filter(v1, v2) && v1.normalized().dot(v2.normalized()) < -cos_angle;
-        });
+std::vector<size_t> filter_convex_concave_points_idx_by_angle_threshold(const Points &poly,
+                                                                        double min_angle,
+                                                                        double max_angle,
+                                                                        ConvexConcaveFilterFn convex_concave_filter) {
+    assert(min_angle >= 0.);
+    assert(max_angle >= 0.);
+    assert(max_angle <= PI);
+    if (min_angle > EPSILON || max_angle < PI - EPSILON) {
+        double min_dot = -cos(min_angle);
+        double max_dot = -cos(max_angle);
+        return filter_points_idx_by_vectors(poly,
+                                            [convex_concave_filter, min_dot, max_dot](const Vec2d &v1, const Vec2d &v2) {
+                                                //first, check if it's the right kind of angle.
+                                                bool is_convex = convex_concave_filter(v1, v2);
+                                                if (!is_convex)
+                                                    return false;
+                                                double dot = v1.normalized().dot(v2.normalized());
+                                                // if v1 and v2 has same direction = flat angle.
+                                                // if v1.dot(v2) is negative -> sharp angle
+                                                return (min_dot <= dot) && (dot <= max_dot);
+                                            });
     } else {
-        return filter_points_idx_by_vectors(poly, [convex_concave_filter](const Vec2d &v1, const Vec2d &v2){
+        return filter_points_idx_by_vectors(poly, [convex_concave_filter](const Vec2d &v1, const Vec2d &v2) {
             return convex_concave_filter(v1, v2);
         });
     }
 }
 
-std::vector<size_t> Polygon::convex_points_idx(double angle_threshold) const
+std::vector<size_t> Polygon::convex_points_idx(double min_angle, double max_angle) const
 {
-    return filter_convex_concave_points_idx_by_angle_threshold(this->points, angle_threshold, [](const Vec2d &v1, const Vec2d &v2){ return cross2(v1, v2) > 0.; });
+    return filter_convex_concave_points_idx_by_angle_threshold(this->points, min_angle, max_angle, [](const Vec2d &v1, const Vec2d &v2){ return (cross2(v1, v2) > 0.); });
 }
 
-std::vector<size_t> Polygon::concave_points_idx(double angle_threshold) const
+std::vector<size_t> Polygon::concave_points_idx(double min_angle, double max_angle) const
 {
-    return filter_convex_concave_points_idx_by_angle_threshold(this->points, angle_threshold, [](const Vec2d &v1, const Vec2d &v2){ return cross2(v1, v2) < 0.; });
+    return filter_convex_concave_points_idx_by_angle_threshold(this->points, min_angle, max_angle, [](const Vec2d &v1, const Vec2d &v2){ return (cross2(v1, v2) < 0.); });
 }
 
 // Projection of a point onto the polygon. Return {Point, pt_idx}
@@ -496,6 +528,17 @@ size_t Polygon::remove_collinear_angle(double angle_radian) {
     return nb_del;
 }
 
+#ifdef _DEBUGINFO
+void Polygon::assert_valid() const {
+    assert(size() > 2);
+    for (size_t i_pt = 1; i_pt < size(); ++i_pt)
+        release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
+    release_assert(!points.front().coincides_with_epsilon(points.back()));
+}
+#else
+void Polygon::assert_valid() const {}
+#endif
+
 BoundingBox get_extents(const Polygon &poly) 
 { 
     return poly.bounding_box();
@@ -632,10 +675,23 @@ bool remove_same_neighbor(Polygons &polygons)
     return exist;
 }
 
+// note: prefer using ExPolygons.
 void ensure_valid(Polygons &polygons, coord_t resolution /*= SCALED_EPSILON*/) {
     for (size_t i = 0; i < polygons.size(); ++i) {
+        bool ccw = polygons[i].is_counter_clockwise();
         polygons[i].douglas_peucker(resolution);
         if (polygons[i].size() < 3) {
+            // if erase contour, also erase its holes.
+            if (ccw) {
+                for (size_t hole_idx = i + 1; hole_idx < polygons.size(); ++hole_idx) {
+                    if (polygons[i].is_clockwise()) {
+                        polygons.erase(polygons.begin() + hole_idx);
+                        --hole_idx;
+                    } else {
+                        break;
+                    }
+                }
+            }
             polygons.erase(polygons.begin() + i);
             --i;
         }
@@ -651,6 +707,61 @@ Polygons ensure_valid(Polygons &&polygons, coord_t resolution /*= SCALED_EPSILON
 Polygons ensure_valid(coord_t resolution, Polygons &&polygons) {
     return ensure_valid(std::move(polygons), resolution);
 }
+
+// unsafe, can delete a contour withotu its holes (ie, only call it if you work only on contour)
+bool ensure_valid(Polygon &polygon, coord_t resolution) {
+    polygon.douglas_peucker(resolution);
+    if (polygon.size() < 3) {
+        polygon.clear();
+        return false;
+    }
+    return true;
+}
+
+void Polygon::remove_point_too_close(coord_t tolerance) {
+    const double tolerance_sq = tolerance * (double)tolerance;
+    size_t id = 1;
+    while (id < this->points.size() - 1) {
+        coord_t d_prev = this->points[id].distance_to_square(this->points[id - 1]);
+        coord_t d_next = this->points[id].distance_to_square(this->points[id + 1]);
+        if (d_prev < tolerance_sq && d_next < tolerance_sq) {
+            this->points.erase(this->points.begin() + id);
+            continue;
+        } else if (d_prev < tolerance_sq) {
+            this->points[id-1] += this->points[id];
+            this->points[id-1] /= 2;
+            this->points.erase(this->points.begin() + id);
+            continue;
+        } else if (d_next < tolerance_sq) {
+            this->points[id + 1] += this->points[id];
+            this->points[id + 1] /= 2;
+            this->points.erase(this->points.begin() + id);
+            continue;
+        }
+
+        //go to next one
+        ++id;
+    }
+    if (this->points.front().distance_to_square(this->points.back()) < tolerance_sq) {
+        this->points.erase(this->points.end() -1);
+    }
+
+    if (this->points.size() < 3) {
+        points.clear();
+    }
+}
+
+void remove_point_too_close(Polygons &polygons, coord_t resolution) {
+    for (auto it = polygons.begin(); it != polygons.end();) {
+        it->remove_point_too_close(resolution);
+        if (it->empty()) {
+            it = polygons.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 
 #ifdef _DEBUGINFO
 void assert_valid(const Polygons &polygons) {
@@ -849,14 +960,14 @@ bool contains(const Polygons &polygons, const Point &p, bool border_result)
     return (poly_count_inside % 2) == 1;
 }
 
-Polygon make_circle(double radius, double error)
+Polygon make_circle(distf_t radius, distf_t error)
 {
     double angle = 2. * acos(1. - error / radius);
     size_t num_segments = size_t(ceil(2. * M_PI / angle));
     return make_circle_num_segments(radius, num_segments);
 }
 
-Polygon make_circle_num_segments(double radius, size_t num_segments)
+Polygon make_circle_num_segments(distf_t radius, size_t num_segments)
 {
     Polygon out;
     out.points.reserve(num_segments);

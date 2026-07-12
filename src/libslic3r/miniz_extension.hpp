@@ -15,6 +15,28 @@ bool open_zip_writer(mz_zip_archive *zip, const std::string &fname_utf8);
 bool close_zip_reader(mz_zip_archive *zip);
 bool close_zip_writer(mz_zip_archive *zip);
 
+/***
+* RAII wrapper for open_zip_reader & close_zip_reader
+*/
+class ZipReader
+{
+    /*const*/ bool m_success;
+public:
+    mz_zip_archive archive;
+
+    ZipReader(const std::string &fname_utf8) {
+        mz_zip_zero_struct(&archive);
+        m_success = open_zip_reader(&archive, fname_utf8);
+    }
+    ~ZipReader() {
+        if (m_success) {
+            close_zip_reader(&archive);
+        }
+    }
+
+    bool success() { return m_success; }
+};
+
 class MZ_Archive {
 public:
     mz_zip_archive arch;

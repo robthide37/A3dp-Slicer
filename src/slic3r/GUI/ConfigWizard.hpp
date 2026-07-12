@@ -25,8 +25,9 @@ class PresetUpdater;
 
 namespace GUI {
 
-#define ALLOW_PRUSA_FIRST "A3dp"
-//#define MAIN_VENDOR "A3dp"
+// note: if defined, you also need to define MANDATORY_VENDOR in presetUpdater (or be sure it's installed)
+#define MAIN_VENDOR "A3dp"
+
 namespace DownloaderUtils {
     class Worker : public wxBoxSizer
     {

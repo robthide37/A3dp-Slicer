@@ -141,6 +141,7 @@ public:
     // ordered collection of extrusion paths/loops to build all perimeters
     // (this collection contains only ExtrusionEntityCollection objects)
     [[nodiscard]] const ExtrusionEntityCollection&  perimeters() const { return m_perimeters; }
+    [[nodiscard]] const std::set<LayerRegion *> &perimeters_regions() const { return m_perimeters_regions; }
 
     // collection of expolygons representing the milling path of the first milling cutter
     [[nodiscard]] const ExtrusionEntityCollection&  millings() const { return m_millings; }
@@ -166,6 +167,9 @@ public:
     void    make_perimeters(
         // Input slices for which the perimeters, gap fills and fill expolygons are to be generated.
         const SurfaceCollection                                &slices,
+        // all regions merged into us for creating perimeters.
+        // can be used to apply some configurations only on specific areas.
+        const std::set<LayerRegion*>                           &regions,
         // Ranges of perimeter extrusions and gap fill extrusions per suface, referencing
         // newly created extrusions stored at this LayerRegion.
         std::vector<std::pair<ExtrusionRange, ExtrusionRange>> &perimeter_and_gapfill_ranges,
@@ -175,6 +179,7 @@ public:
         std::vector<ExPolygonRange>                            &fill_expolygons_ranges);
     void    make_milling_post_process(const SurfaceCollection& slices);
     void    process_external_surfaces(const Layer *lower_layer, const Polygons *lower_layer_covered);
+    void    process_external_surfaces_old(const Layer *lower_layer, const Polygons *lower_layer_covered);
     double  infill_area_threshold() const;
     // Trim surfaces by trimming polygons. Used by the elephant foot compensation at the 1st layer.
     void    trim_surfaces(const Polygons &trimming_polygons);
@@ -193,6 +198,9 @@ public:
                                      || !this->ironings().empty() || !this->thin_fills().empty(); }
 
     void    simplify_extrusion_entity();
+
+    const ExPolygons &get_cached_slices() const { return m_raw_slices; }
+
 protected:
     friend class Layer;
     friend class PrintObject;
@@ -217,6 +225,7 @@ private:
     // Backed up slices before they are split into top/bottom/internal.
     // Only backed up for multi-region layers or layers with elephant foot compensation.
     //FIXME Review whether not to simplify the code by keeping the raw_slices all the time.
+    // superslicer -> layer_needs_raw_backup is now true, so evryone has their cache here.
     ExPolygons                  m_raw_slices;
 
 //FIXME make m_slices public for unit tests
@@ -225,6 +234,7 @@ public:
     // divided by type top/bottom/internal
     SurfaceCollection           m_slices;
 
+    ExPolygons                  m_perimeter_slices;
 private:
     // Unspecified fill polygons, used for overhang detection ("ensure vertical wall thickness feature")
     // and for re-starting of infills.
@@ -254,6 +264,8 @@ private:
     // ordered collection of extrusion paths/loops to build all perimeters
     // (this collection contains only ExtrusionEntityCollection objects)
     ExtrusionEntityCollection   m_perimeters;
+    // regions where the perimeters can be.
+    std::set<LayerRegion *>     m_perimeters_regions;
 
     // collection of expolygons representing the milling path of the first milling cutter
     ExtrusionEntityCollection   m_millings;
@@ -307,9 +319,9 @@ public:
     }
     void                  add_ironing_range(const LayerExtrusionRange &new_ironing_range) {
         // Compress ranges.
-        if (!this->ironings.empty() && this->fills.back().region() == new_ironing_range.region() &&
-            *this->fills.back().end() == *new_ironing_range.begin())
-            this->ironings.back() = {new_ironing_range.region(), {*this->fills.back().begin(), *new_ironing_range.end()}};
+        if (!this->ironings.empty() && this->ironings.back().region() == new_ironing_range.region() &&
+            *this->ironings.back().end() == *new_ironing_range.begin())
+            this->ironings.back() = {new_ironing_range.region(), {*this->ironings.back().begin(), *new_ironing_range.end()}};
         else
             this->ironings.push_back(new_ironing_range);
     }
@@ -385,7 +397,7 @@ public:
     // These lslices are also used to detect overhangs and overlaps between successive layers, therefore it is important
     // that the 1st lslice is not compensated by the Elephant foot compensation algorithm.
 protected:
-    ExPolygons 				m_lslices;
+    ExPolygons              m_lslices;
 public:
     const ExPolygons &      lslices() const { return m_lslices; }
     ExPolygons &            set_lslices() { return m_lslices; }
@@ -409,7 +421,7 @@ public:
     // To improve robustness of detect_surfaces_type() when reslicing (working with typed slices), see GH issue #7442.
     void                    restore_untyped_slices_no_extra_perimeters();
     // Slices merged into islands, to be used by the elephant foot compensation to trim the individual surfaces with the shrunk merged slices.
-    ExPolygons              merged(float offset) const;
+    ExPolygons              merged(coordf_t offset_scaled = 0) const;
     void                    make_perimeters();
     void                    make_milling_post_process();
     void                    make_fills(FillAdaptive::Octree     *adaptive_fill_octree,

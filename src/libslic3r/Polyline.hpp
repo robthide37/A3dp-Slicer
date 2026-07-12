@@ -86,11 +86,11 @@ public:
     const Point& leftmost_point() const;
     Lines lines() const;
 
-    void clip_end(coordf_t distance);
-    void clip_start(coordf_t distance);
-    void extend_end(coordf_t distance);
-    void extend_start(coordf_t distance);
-    Points equally_spaced_points(coordf_t distance) const;
+    void clip_end(distf_t distance);
+    void clip_start(distf_t distance);
+    void extend_end(distf_t distance);
+    void extend_start(distf_t distance);
+    Points equally_spaced_points(distf_t distance) const;
     void simplify(coordf_t tolerance);
 //    template <class T> void simplify_by_visibility(const T &area);
     void split_at(const Point &point, Polyline* p1, Polyline* p2) const;
@@ -112,6 +112,8 @@ bool remove_same_neighbor(Polyline &polyline);
 bool remove_same_neighbor(Polylines &polylines);
 // remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polylines that are too small to be valid
 void ensure_valid(Polylines &polylines, coord_t resolution = SCALED_EPSILON);
+Polylines ensure_valid(Polylines &&polylines, coord_t resolution = SCALED_EPSILON);
+void ensure_valid(Polyline &polyline, coord_t resolution = SCALED_EPSILON);
 
 inline double total_length(const Polylines &polylines) {
     double total = 0;
@@ -231,16 +233,17 @@ public:
     ThickPolyline() : endpoints(std::make_pair(false, false)) {}
     ThickLines thicklines() const;
 
-    const Point& front()        const { return this->points.front(); }
-    const Point& back()         const { return this->points.back(); }
-    size_t       size()         const { return this->points.size(); }
-    bool         is_valid()     const { return this->points.size() >= 2; }
-    bool         empty()        const { return this->points.empty(); }
-    double       length()       const { return Slic3r::length(this->points); }
+    const Point& front()        const { assert(points.size() == points_width.size()); return this->points.front(); }
+    const Point& back()         const { assert(points.size() == points_width.size()); return this->points.back(); }
+    size_t       size()         const { assert(points.size() == points_width.size()); return this->points.size(); }
+    bool         is_valid()     const { assert(points.size() == points_width.size()); return this->points.size() >= 2; }
+    bool         empty()        const { assert(points.size() == points_width.size()); return this->points.empty(); }
+    double       length()       const { assert(points.size() == points_width.size()); return Slic3r::length(this->points); }
 
     void         clear() { this->points.clear(); this->points_width.clear(); }
 
     void reverse() {
+        assert(points.size() == points_width.size()); 
         std::reverse(this->points.begin(), this->points.end());
         std::reverse(this->points_width.begin(), this->points_width.end());
         std::swap(this->endpoints.first, this->endpoints.second);
@@ -287,6 +290,10 @@ typedef std::vector<Polyline3> Polylines3;
 class ArcPolyline
 {
 protected:
+    // each segment is strait if it's radius ==0 (orientation should be unknown in this case)
+    // radius is negative if the arc betweent he two point is the longest of the two. it's positive if it's the shortest.
+    // the sign of the radius and the orientation are two different way to get the same information. They MUST be in synch.
+    // note: first Segment in Path is always "strait", as it's the starting point of the following segment. 
     Geometry::ArcWelder::Path m_path;
     //bool cache_valid = true; // cache
     bool m_only_strait = true; // cache
@@ -295,25 +302,30 @@ protected:
 
     static Geometry::ArcWelder::Path _from_polyline(const Points &poly);
     static Geometry::ArcWelder::Path _from_polyline(std::initializer_list<Point> poly);
-
 public:
+#ifdef _DEBUG
+    bool is_3D = false; // to deactivate assert about epsilon dist
+#endif
     ArcPolyline(){};
     ArcPolyline(const ArcPolyline &) = default;
     ArcPolyline(ArcPolyline &&)      = default;
     ArcPolyline(const Polyline &other) : m_path(_from_polyline(other.points)) {}
     ArcPolyline(const Points &other) : m_path(_from_polyline(other)) {}
+    ArcPolyline(const Geometry::ArcWelder::Path &other);
     ArcPolyline &operator=(const ArcPolyline &) = default;
     ArcPolyline &operator=(ArcPolyline &&) = default;
 
-    void append(const Point &point) { m_path.emplace_back(Geometry::ArcWelder::Segment{point, 0.f, Geometry::ArcWelder::Orientation::Unknown}); }
+    void append(const Point &point) { m_path.emplace_back(/*Geometry::ArcWelder::Segment{*/point, 0.f, Geometry::ArcWelder::Orientation::Unknown/*}*/); }
     void append_before(const Point &point) { m_path.insert(m_path.begin(), Geometry::ArcWelder::Segment{point, 0.f, Geometry::ArcWelder::Orientation::Unknown}); }
+    // Only use this append if and only if you're sure that the previous point is the same as one from another good ArcPolyline. First point need to be added via append(Point).
+    void append(const Geometry::ArcWelder::Segment &to_copy_arc);
     void append(const Points &src);
     void append(Points &&src);
     void append(const Points::const_iterator &begin, const Points::const_iterator &end);
     void append(const ArcPolyline &src);
     void append(ArcPolyline &&src);
-    void clear() { m_path.clear(); }
-    void swap(ArcPolyline &other) { m_path.swap(other.m_path); }
+    void clear();
+    void swap(ArcPolyline &other) { m_path.swap(other.m_path); this->m_only_strait = other.m_only_strait; assert(is_valid()); }
     void reverse() { Geometry::ArcWelder::reverse(m_path); }
     
     // multipoint methods
@@ -324,7 +336,7 @@ public:
     bool         is_valid() const;
     bool         is_closed() const { return this->m_path.front().point == this->m_path.back().point; }
 
-    bool                                has_arc() const { return !m_only_strait; }
+    bool                                has_arc() const;
     // point count in the path
     size_t                              size() const { return m_path.size(); }
     const Geometry::ArcWelder::Path &   get_arc() const { return m_path; }
@@ -339,27 +351,30 @@ public:
     // need some work to work better on arc
     void                  set_front(const Point &p);
     void                  set_back(const Point &p);
+    // this one give you the index of the nearest point, or -1 if none is at epsilon.
+    // if on an arc, you may want to call foot_pt to have the projection
     int                   find_point(const Point &point, coordf_t epsilon) const;
 
 
     // Works on points & arc
-    coordf_t              length() const { return Geometry::ArcWelder::path_length<coordf_t>(m_path); }
-    bool                  at_least_length(coordf_t length) const;
+    distf_t              length() const { return Geometry::ArcWelder::path_length<distf_t>(m_path); }
+    bool                  at_least_length(distf_t length) const;
     std::pair<int, Point> foot_pt(const Point &pt) const;
     void                  split_at(Point &point, ArcPolyline &p1, ArcPolyline &p2) const;
-    void                  split_at(coordf_t distance, ArcPolyline &p1, ArcPolyline &p2) const;
-    void                  clip_start(coordf_t dist);
-    void                  clip_end(coordf_t dist);
+    void                  split_at(distf_t distance, ArcPolyline &p1, ArcPolyline &p2) const;
+    void                  clip_start(distf_t dist);
+    void                  clip_end(distf_t dist);
     Polyline              to_polyline(coord_t deviation = 0) const;
     void                  translate(const Vector &vector);
     void                  rotate(double angle); // to test for arc, but should be okay
-    Point                 get_point_from_begin(coord_t distance) const;
-    Point                 get_point_from_end(coord_t distance) const;
+    Point                 get_point_from_begin(distf_t distance) const;
+    Point                 get_point_from_end(distf_t distance) const;
 
     // douglas_peuker and create arc if with_fitting_arc (don't touch the current arcs, only try in-between)
     void make_arc(ArcFittingType with_fitting_arc, coordf_t tolerance, double fit_percent_tolerance);
     // remove strait segemnts that are too near each other, and will overlaod the firmware. Return the buffer lines it still uses a t the end.
     int simplify_straits(coordf_t min_tolerance, coordf_t min_point_distance, coordf_t mean_dist_per_line, const int buffer_size, const int buffer_init);
+    void simplify_straits(const coordf_t min_tolerance, const coordf_t min_point_distance);
 
     // remove points that are too near each other, and return false if the whole path is too small
     bool normalize();

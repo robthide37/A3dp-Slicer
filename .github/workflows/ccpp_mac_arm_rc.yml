@@ -3,31 +3,78 @@ name: C/C++ Release candidate arm macos
 on:
   push:
     branches:
-      - rc
+      - master_27
 
 jobs:
-  build:
-
+  build_dep:
     runs-on: macos-14
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
+    - name: New cmake
+      run: cmake --version
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v2
       with:
-        ref: 'rc'
-    - name: build deps & slicer
-      run: ./BuildMacOS.sh -adsi
-    - name: Upload dmg
+        cmake-version: "3.31.x"
+    - name: Use cmake
+      run: cmake --version
+    - name: Install Autoconf
+      run: |
+        brew update
+        brew install autoconf
+    - name: check autoconf version
+      run: autoconf --version
+    - name: update automake for mpfr
+      run: |
+        curl -O -L https://github.com/supermerill/SuperSlicer_deps/releases/download/automake/automake-1.16.5.tar.gz
+        tar -xzf automake-1.16.5.tar.gz
+        cd automake-*
+        ./configure
+        make
+        sudo make install
+        automake --version
+    - name: mkdir in deps
+      run: mkdir deps/build
+    - name: dep cache
+      id: cache-action
+      uses: actions/cache@v3
+      with:
+        key: macos_arm_2.7
+        path: deps/build/destdir
+    - if: steps.cache-action.outputs.cache-hit != 'true'
+      name: build deps if new cache
+      run: ./BuildMacOS.sh -ad
+
+  build:
+    runs-on: macos-14
+    needs: build_dep
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: New cmake
+      run: cmake --version
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: "3.31.x"
+    - name: Use cmake
+      run: cmake --version
+    - name: dep cache
+      id: cache-action
+      uses: actions/cache@v3
+      with:
+        key: macos_arm_2.7
+        path: deps/build/destdir
+    - name: build slicer
+      run: ./BuildMacOS.sh -asi
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rc_arm_macos.dmg
-        path: build/${{ github.event.repository.name }}.dmg
-    - name: Upload tar
+        name: rc_${{ github.event.repository.name }}-macOS-arm.dmg
+        path: build/${{ github.event.repository.name }}-macOS-arm.dmg
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rc_arm_macos.tar
-        path: build/${{ github.event.repository.name }}.tar
-    - name: Upload app
-      uses: actions/upload-artifact@v4
-      with:
-        name: rc_macos.app
-        path: build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app
+        name: rc_${{ github.event.repository.name }}-macOS-arm.tgz
+        path: build/${{ github.event.repository.name }}-macOS-arm.tgz

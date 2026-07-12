@@ -76,10 +76,16 @@ inline std::tuple<int, int> coordinate_aligned_ray_hit_count(size_t             
             //  then we want to get value of intersection[ coordinate]
             //  val_c = line.a[c] + t * (line.b[c] - line.a[c]);
             //  Note that ray and line may overlap, when  (line.b[oc] - line.a[oc]) is zero
-            //  In that case, we return negative number
+            //  In that case, we use line.a as the intersection point
             Floating distance_oc = line.b[other_coordinate] - line.a[other_coordinate];
-            Floating t     = (ray_origin[other_coordinate] - line.a[other_coordinate]) / distance_oc;
-            Floating val_c = line.a[coordinate] + t * (line.b[coordinate] - line.a[coordinate]);
+            Floating val_c;
+            if (std::abs(distance_oc) < (std::is_floating_point<Scalar>::value ? EPSILON : SCALED_EPSILON)) {
+                // Line is nearly degenerate (parallel to ray), use line.a as intersection point
+                val_c = line.a[coordinate];
+            } else {
+                Floating t = (ray_origin[other_coordinate] - line.a[other_coordinate]) / distance_oc;
+                val_c = line.a[coordinate] + t * (line.b[coordinate] - line.a[coordinate]);
+            }
             if (ray_origin[coordinate] > val_c) {
                 return {1, 0};
             } else if (ray_origin[coordinate] < val_c) {

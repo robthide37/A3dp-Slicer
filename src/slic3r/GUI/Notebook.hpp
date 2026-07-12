@@ -5,9 +5,8 @@
 #ifndef slic3r_Notebook_hpp_
 #define slic3r_Notebook_hpp_
 
-#ifdef _WIN32
-
 #include <wx/bookctrl.h>
+#include <wx/sizer.h>
 
 namespace Slic3r {
     namespace GUI {
@@ -104,7 +103,7 @@ public:
         SetSizer(mainSizer);
 
         this->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& evt)
-        {                    
+        {
             if (int page_idx = evt.GetId(); page_idx >= 0)
                 SetBtSelection(page_idx);
         });
@@ -252,7 +251,7 @@ public:
     }
 
     //// get number of pages in the dialog
-    //virtual size_t GetPageCount() const override { 
+    //virtual size_t GetPageCount() const override {
     //    return btidx_to_tabpage.size();
     //}
 
@@ -561,7 +560,7 @@ protected:
         // the base class version.
     }
 
-    virtual wxBookCtrlEvent * CreatePageChangingEvent() const override
+    virtual wxBookCtrlEvent* CreatePageChangingEvent() const override
     {
         return new wxBookCtrlEvent(wxEVT_BOOKCTRL_PAGE_CHANGING,
                                    GetId());
@@ -638,5 +637,4 @@ private:
     ButtonsListCtrl* m_ctrl{ nullptr };
 
 };
-#endif // _WIN32
 #endif // slic3r_Notebook_hpp_

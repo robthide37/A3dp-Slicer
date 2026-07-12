@@ -11,11 +11,12 @@
 #include "../MutablePolygon.hpp"
 #include "../Geometry.hpp"
 #include "../Point.hpp"
+#include "../Thread.hpp"
 
 #include <cmath>
 #include <boost/container/static_vector.hpp>
 
-#include <tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_for.h>
 
 #include "SupportCommon.hpp"
 #include "SupportLayer.hpp"
@@ -49,10 +50,10 @@ void remove_bridges_from_contacts(
     const Layer         &lower_layer,
     const LayerRegion   &layerm,
     float                fw, 
-    Polygons            &contact_polygons)
+    ExPolygons          &contact_polygons)
 {
     // compute the area of bridging perimeters
-    Polygons bridges;
+    ExPolygons bridges;
     {
         coordf_t nozzle_diameter = scale_t(print_config.nozzle_diameter.get_at(layerm.region().config().perimeter_extruder-1));
         // Surface supporting this layer, expanded by 0.5 * nozzle_diameter, as we consider this kind of overhang to be sufficiently supported.
@@ -99,23 +100,25 @@ void remove_bridges_from_contacts(
                             supported[j] = true;
                 if (supported[0] && supported[1])
                     // Offset a polyline into a thick line.
-                    polygons_append(bridges, offset(polyline, w));
+                    append(bridges, to_expolygons(offset(polyline, w)));
             }
-        bridges = union_(bridges);
+        bridges = union_ex(bridges);
     }
     // remove the entire bridges and only support the unsupported edges
     //FIXME the brided regions are already collected as layerm.bridged. Use it?
-    for (const Surface &surface : layerm.fill_surfaces())
-        if (surface.has_pos_bottom() && surface.has_mod_bridge() && surface.bridge_angle >= 0.0)
-            polygons_append(bridges, surface.expolygon);
+    for (const Surface &surface : layerm.fill_surfaces()) {
+        if (surface.has_pos_bottom() && surface.has_mod_bridge() && surface.bridge_angle >= 0.0) {
+            bridges.push_back(surface.expolygon);
+        }
+    }
     //FIXME add the gap filled areas. Extrude the gaps with a bridge flow?
     // Remove the unsupported ends of the bridges from the bridged areas.
     //FIXME add supports at regular intervals to support long bridges!
-    bridges = diff(bridges,
+    bridges = diff_ex(bridges,
             // Offset unsupported edges into polygons.
             offset(layerm.unsupported_bridge_edges(), scale_(SUPPORT_MATERIAL_MARGIN), SUPPORT_SURFACES_OFFSET_PARAMETERS));
     // Remove bridged areas from the supported areas.
-    contact_polygons = diff(contact_polygons, bridges, ApplySafetyOffset::Yes);
+    contact_polygons = diff_ex(contact_polygons, bridges, ApplySafetyOffset::Yes);
 
     #ifdef SLIC3R_DEBUG
         static int iRun = 0;
@@ -158,8 +161,8 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
         auto insert_layer = [&layer_storage, smooth_supports, closing_distance, smoothing_distance, minimum_island_radius, &support_params](
                 SupportGeneratorLayer &intermediate_layer, Polygons &bottom, Polygons &&top, SupportGeneratorLayer *top_interface_layer, 
                 const Polygons *subtract, SupporLayerType type) -> SupportGeneratorLayer* {
-            assert_valid(bottom);
-            assert_valid(top);
+            ensure_valid(bottom);
+            ensure_valid(top);
             bool has_top_interface = top_interface_layer && ! top_interface_layer->polygons.empty();
             assert(! bottom.empty() || ! top.empty() || has_top_interface);
             // Merge top into bottom, unite them with a safety offset.
@@ -196,7 +199,7 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
                     assert_valid(intermediate_layer.polygons);
                     if (subtract){
                         // Trim the base interface layer with the interface layer.
-                        layer_new.polygons = diff(std::move(layer_new.polygons), *subtract);
+                        layer_new.polygons = ensure_valid(support_params.resolution, diff(std::move(layer_new.polygons), *subtract));
                     //FIXME filter layer_new.polygons islands by a minimum area?
         //                  $interface_area = [ grep abs($_->area) >= $area_threshold, @$interface_area ];
                     }
@@ -206,9 +209,9 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
             }
             return nullptr;
         };
-        tbb::parallel_for(tbb::blocked_range<int>(0, int(intermediate_layers.size())),
+        Slic3r::parallel_for(size_t(0), intermediate_layers.size(),
             [&bottom_contacts, &top_contacts, &top_interface_layers, &top_base_interface_layers, &intermediate_layers, &insert_layer, &support_params,
-             snug_supports, &interface_layers, &base_interface_layers](const tbb::blocked_range<int>& range) {                
+             snug_supports, &interface_layers, &base_interface_layers](size_t idx_intermediate_layer) {                
                 // Gather the top / bottom contact layers intersecting with num_interface_layers resp. num_interface_layers_only intermediate layers above / below
                 // this intermediate layer.
                 // Index of the first top contact layer intersecting the current intermediate layer.
@@ -220,7 +223,7 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
                 // Index of the first top contact interface layer intersecting the current intermediate layer.
                 auto idx_top_base_interface_first = -1;
                 auto num_intermediate = int(intermediate_layers.size());
-                for (int idx_intermediate_layer = range.begin(); idx_intermediate_layer < range.end(); ++ idx_intermediate_layer) {
+                {
                     SupportGeneratorLayer &intermediate_layer = *intermediate_layers[idx_intermediate_layer];
                     assert_valid(intermediate_layer.polygons);
                     Polygons polygons_top_contact_projected_interface;
@@ -229,14 +232,14 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
                     Polygons polygons_bottom_contact_projected_base;
                     if (support_params.num_top_interface_layers > 0) {
                         // Top Z coordinate of a slab, over which we are collecting the top / bottom contact surfaces
-                        coordf_t top_z              = intermediate_layers[std::min(num_intermediate - 1, idx_intermediate_layer + int(support_params.num_top_interface_layers) - 1)]->print_z;
+                        coordf_t top_z              = intermediate_layers[std::min(num_intermediate - 1, int(idx_intermediate_layer + support_params.num_top_interface_layers) - 1)]->print_z;
                         coordf_t top_inteface_z     = std::numeric_limits<coordf_t>::max();
                         if (support_params.num_top_base_interface_layers > 0)
                             // Some top base interface layers will be generated.
                             top_inteface_z = support_params.num_top_interface_layers_only() == 0 ?
                                 // Only base interface layers to generate.
                                 - std::numeric_limits<coordf_t>::max() :
-                                intermediate_layers[std::min(num_intermediate - 1, idx_intermediate_layer + int(support_params.num_top_interface_layers_only()) - 1)]->print_z;
+                                intermediate_layers[std::min(num_intermediate - 1, int(idx_intermediate_layer + support_params.num_top_interface_layers_only()) - 1)]->print_z;
                         // Move idx_top_contact_first up until above the current print_z.
                         idx_top_contact_first = idx_higher_or_equal(top_contacts, idx_top_contact_first, [&intermediate_layer](const SupportGeneratorLayer *layer){ return layer->print_z >= intermediate_layer.print_z; }); //  - EPSILON
                         // Collect the top contact areas above this intermediate layer, below top_z.
@@ -253,14 +256,14 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
                     }
                     if (support_params.num_bottom_interface_layers > 0) {
                         // Bottom Z coordinate of a slab, over which we are collecting the top / bottom contact surfaces
-                        coordf_t bottom_z           = intermediate_layers[std::max(0, idx_intermediate_layer - int(support_params.num_bottom_interface_layers) + 1)]->bottom_z;
+                        coordf_t bottom_z           = intermediate_layers[std::max(0, int(idx_intermediate_layer - support_params.num_bottom_interface_layers) + 1)]->bottom_z;
                         coordf_t bottom_interface_z = - std::numeric_limits<coordf_t>::max();
                         if (support_params.num_bottom_base_interface_layers > 0)
                             // Some bottom base interface layers will be generated.
                             bottom_interface_z = support_params.num_bottom_interface_layers_only() == 0 ? 
                                 // Only base interface layers to generate.
                                 std::numeric_limits<coordf_t>::max() :
-                                intermediate_layers[std::max(0, idx_intermediate_layer - int(support_params.num_bottom_interface_layers_only()))]->bottom_z;
+                                intermediate_layers[std::max(0, int(idx_intermediate_layer - support_params.num_bottom_interface_layers_only()))]->bottom_z;
                         // Move idx_bottom_contact_first up until touching bottom_z.
                         idx_bottom_contact_first = idx_higher_or_equal(bottom_contacts, idx_bottom_contact_first, [bottom_z](const SupportGeneratorLayer *layer){ return layer->print_z >= bottom_z - EPSILON; });
                         // Collect the top contact areas above this intermediate layer, below top_z.
@@ -343,6 +346,13 @@ SupportGeneratorLayersPtr generate_raft_base(
     const SupportGeneratorLayersPtr   &base_layers,
     SupportGeneratorLayerStorage      &layer_storage)
 {
+    for (SupportGeneratorLayersPtr layer_ptr :
+         {top_contacts, interface_layers, base_interface_layers, base_layers}) {
+        for (auto layer : layer_ptr) {
+            assert(layer);
+            assert_valid(layer->polygons);
+        }
+    }
     // If there is brim to be generated, calculate the trimming regions.
     Polygons brim;
     if (object.has_brim()) {
@@ -397,21 +407,19 @@ SupportGeneratorLayersPtr generate_raft_base(
 
     Polygons interface_polygons;
     if (contacts != nullptr && ! contacts->polygons.empty()) {
-        polygons_append(interface_polygons, expand(contacts->polygons, inflate_factor_fine, SUPPORT_SURFACES_OFFSET_PARAMETERS));
         assert_valid(contacts->polygons);
-        ensure_valid(interface_polygons, support_params.resolution);
-        assert_valid(interface_polygons);
+        polygons_append(interface_polygons, expand(contacts->polygons, inflate_factor_fine, SUPPORT_SURFACES_OFFSET_PARAMETERS));
     }
     if (interfaces != nullptr && ! interfaces->polygons.empty()) {
-        polygons_append(interface_polygons, expand(interfaces->polygons, inflate_factor_fine, SUPPORT_SURFACES_OFFSET_PARAMETERS));
         assert_valid(interfaces->polygons);
-        assert_valid(interface_polygons);
+        polygons_append(interface_polygons, expand(interfaces->polygons, inflate_factor_fine, SUPPORT_SURFACES_OFFSET_PARAMETERS));
     }
     if (base_interfaces != nullptr && ! base_interfaces->polygons.empty()) {
-        polygons_append(interface_polygons, expand(base_interfaces->polygons, inflate_factor_fine, SUPPORT_SURFACES_OFFSET_PARAMETERS));
         assert_valid(base_interfaces->polygons);
-        assert_valid(interface_polygons);
+        polygons_append(interface_polygons, expand(base_interfaces->polygons, inflate_factor_fine, SUPPORT_SURFACES_OFFSET_PARAMETERS));
     }
+    ensure_valid(interface_polygons, support_params.resolution);
+    assert_valid(interface_polygons);
 
     // Output vector.
     SupportGeneratorLayersPtr raft_layers;
@@ -489,8 +497,8 @@ SupportGeneratorLayersPtr generate_raft_base(
                 raft = diff(raft, trimming);
             if (! interface_polygons.empty())
                 columns_base->polygons = ensure_valid(diff(columns_base->polygons, interface_polygons), support_params.resolution);
-            assert_valid(raft);
-            assert_valid(columns_base->polygons);
+            ensure_valid(raft);
+            ensure_valid(columns_base->polygons);
         }
         if (! brim.empty()) {
             assert_valid(brim);
@@ -507,7 +515,11 @@ SupportGeneratorLayersPtr generate_raft_base(
             if (base_interfaces) assert_valid(base_interfaces->polygons);
         }
     }
-
+    
+    for (auto layer : raft_layers) {
+        assert(layer);
+        assert_valid(layer->polygons);
+    }
     return raft_layers;
 }
 
@@ -708,9 +720,9 @@ static inline void tree_supports_generate_paths(
                 eec->set_can_sort_reverse(false, false);
                 // Make the tree branch stable by adding another perimeter.
                 ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
+                ensure_valid(level2, support_params.resolution);
                 if (level2.size() == 1) {
-                    Polylines polylines;
-                    extrusion_entities_append_paths(*eec, draw_perimeters(expoly, clip_length), { ExtrusionRole::SupportMaterial, flow },
+                    extrusion_entities_append_paths(*eec, ensure_valid(draw_perimeters(expoly, clip_length), support_params.resolution), { ExtrusionRole::SupportMaterial, flow },
                         // Disable reversal of the path, always start with the anchor, always print CCW.
                         false);
                     expoly = level2.front();
@@ -733,6 +745,7 @@ static inline void tree_supports_generate_paths(
         for (int idx_loop = 0; idx_loop < int(expoly.num_contours()); ++ idx_loop) {
             // Open the loop with a seam.
             const Polygon &loop = expoly.contour_or_hole(idx_loop);
+            loop.assert_valid();
             Polyline pl(loop.points);
             // Orient all contours CW, because the anchor will be added to the end of polyline while we want to start a loop with the anchor.
             if (idx_loop == 0)
@@ -790,7 +803,10 @@ static inline void tree_supports_generate_paths(
                     pl.points.emplace_back((closest_point + v * (remaining_length / l)).cast<coord_t>());
                 } else {
                     // Take the rest of the current line, continue with the other lines.
-                    pl.points.emplace_back(path[j].x(), path[j].y());
+                    Point pt_path_j(path[j].x(),path[j].y());
+                    if (!pl.points.back().coincides_with_epsilon(pt_path_j)) {
+                        pl.points.emplace_back(pt_path_j);
+                    }
                     pi = pj;
                     for (i = j; path[i].z() == idx_loop && remaining_length > 0; i = j, pi = pj) {
                         j = next_idx_modulo(i, path);
@@ -812,7 +828,10 @@ static inline void tree_supports_generate_paths(
             }
             // Start with the anchor.
             pl.reverse();
-            polylines.emplace_back(std::move(pl));
+            ensure_valid(pl, support_params.resolution);
+            if (!pl.empty()) {
+                polylines.emplace_back(std::move(pl));
+            }
         }
 
         ExtrusionEntityCollection &out = eec ? *eec : dst;
@@ -1527,6 +1546,13 @@ SupportGeneratorLayersPtr generate_support_layers(
     const SupportGeneratorLayersPtr     &interface_layers,
     const SupportGeneratorLayersPtr     &base_interface_layers)
 {
+    for (SupportGeneratorLayersPtr layer_ptr :
+         {raft_layers, top_contacts, bottom_contacts, intermediate_layers, interface_layers, base_interface_layers}) {
+        for (auto layer : layer_ptr) {
+            assert(layer);
+            assert_valid(layer->polygons);
+        }
+    }
     // Install support layers into the object.
     // A support layer installed on a PrintObject has a unique print_z.
     SupportGeneratorLayersPtr layers_sorted;
@@ -1636,6 +1662,14 @@ void generate_support_toolpaths(
     const SupportGeneratorLayersPtr     &interface_layers,
     const SupportGeneratorLayersPtr     &base_interface_layers)
 {
+    for (SupportGeneratorLayersPtr layer_ptr :
+         {raft_layers, top_contacts, bottom_contacts, intermediate_layers, interface_layers, base_interface_layers}) {
+        for (auto layer : layer_ptr) {
+            assert(layer);
+            assert_valid(layer->polygons);
+        }
+    }
+
     // loop_interface_processor with a given circle radius.
     LoopInterfaceProcessor loop_interface_processor(1.5 * support_params.support_material_interface_flow.scaled_width());
     loop_interface_processor.n_contact_loops = config.support_material_interface_contact_loops ? 1 : 0;

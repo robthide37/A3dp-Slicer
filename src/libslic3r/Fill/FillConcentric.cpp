@@ -8,6 +8,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "../ClipperUtils.hpp"
+#include "../EdgeGrid.hpp"
 #include "../ExPolygon.hpp"
 #include "../Surface.hpp"
 #include "../ExtrusionEntity.hpp"
@@ -48,14 +49,17 @@ FillConcentric::_fill_surface_single(
     Polygons   loops = to_polygons(expolygon);
     ExPolygons last { std::move(expolygon) };
     while (! last.empty()) {
-        last = offset2_ex(last, -double(distance + scale_(this->get_spacing()) /2), +double(scale_(this->get_spacing()) /2));
+        // offset3 to clean the polygon up to fill_resolution
+        last = offset_ex(offset2_ex(last, -double(distance + scale_(this->get_spacing()) / 2),
+                                    +double(scale_(this->get_spacing()) / 2) + params.fill_resolution / 2),
+                         -params.fill_resolution / 2);
         append(loops, to_polygons(last));
     }
 
     // generate paths from the outermost to the innermost, to avoid
     // adhesion problems of the first central tiny loops
     loops = union_pt_chained_outside_in(loops);
-    ensure_valid(loops, params.fill_resolution);
+    ensure_valid(loops/*, params.fill_resolution / 10*/);
 
     // split paths using a nearest neighbor search
     size_t iPathFirst = polylines_out.size();
@@ -85,10 +89,10 @@ FillConcentric::_fill_surface_single(
 }
 
 void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRole& good_role, const FillParams& params, Polygon& polygon) {
-    double flow = params.flow.mm3_per_mm() * params.flow_mult;
-    double width = params.flow.width() * params.flow_mult;
+    double flow = params.flow.mm3_per_mm();
+    double width = params.flow.width();
     double height = params.flow.height();
-    if (polygon.is_valid()) {
+    if (ensure_valid(polygon, params.fill_resolution)) {
         //default to ccw
         polygon.make_counter_clockwise();
         ExtrusionPath path(ExtrusionAttributes{good_role, ExtrusionFlow{flow, float(width), float(height)}}, false);
@@ -99,10 +103,16 @@ void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRo
 }
 
 void
-FillConcentricWGapFill::fill_surface_extrusion(
+FillConcentric::fill_surface_extrusion(
     const Surface *surface, 
     const FillParams &params,
     ExtrusionEntitiesPtr &out) const {
+
+    //with or without gapfill?
+    if (!params.add_gap_fill) {
+        //without gapfill, use the normal function
+        return Fill::fill_surface_extrusion(surface, params, out);
+    }
 
     ExtrusionEntitiesPtr out_to_check;
 
@@ -425,8 +435,8 @@ FillConcentricWGapFill::fill_surface_extrusion(
     }
 
     // check volume coverage
-    {
-        double flow_mult_exact_volume = 1;
+    if (!out_to_check.empty()) {
+        double mult_flow = 1;
         // check if not over-extruding
         if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
             // compute the path of the nozzle -> extruded volume
@@ -438,18 +448,26 @@ FillConcentricWGapFill::fill_surface_extrusion(
             // compute real volume to fill
             double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
             if (get_volume.volume != 0 && polyline_volume != 0)
-                flow_mult_exact_volume = polyline_volume / get_volume.volume;
+                mult_flow = polyline_volume / get_volume.volume;
             // failsafe, it can happen
-            if (flow_mult_exact_volume > 1.3)
-                flow_mult_exact_volume = 1.3;
-            if (flow_mult_exact_volume < 0.8)
-                flow_mult_exact_volume = 0.8;
-            BOOST_LOG_TRIVIAL(info) << "concentric Infill (with gapfil) process extrude " << get_volume.volume
+            if (mult_flow > 1.3)
+                mult_flow = 1.3;
+            if (mult_flow < 0.8)
+                mult_flow = 0.8;
+            BOOST_LOG_TRIVIAL(debug) << "concentric Infill (with gapfil) process extrude " << get_volume.volume
                                     << " mm3 for a volume of " << polyline_volume << " mm3 : we mult the flow by "
-                                    << flow_mult_exact_volume;
-            //apply to extrusions
-            ExtrusionModifyFlow modifier(flow_mult_exact_volume);
-            for (ExtrusionEntity *ee : out_to_check) ee->visit(modifier);
+                                    << mult_flow;
+#if _DEBUG
+            this->debug_verify_flow_mult = mult_flow;
+#endif
+        }
+        mult_flow *= params.flow_mult;
+        if (mult_flow != 1) {
+            // apply to extrusions
+            ExtrusionModifyFlow visitor(mult_flow);
+            for (ExtrusionEntity *ee : out_to_check) {
+                ee->visit(visitor);
+            }
         }
     }
 
@@ -473,7 +491,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
     if (params.density > 0.9999f && !params.dont_adjust) {
         coord_t                loops_count = std::max(bbox_size.x(), bbox_size.y()) / min_spacing + 1;
         Polygons               polygons    = offset(expolygon, float(min_spacing) / 2.f);
-        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_width, min_spacing, min_width, loops_count, 0, params.layer_height, *this->print_object_config, *this->print_config);
+        Arachne::WallToolPaths wallToolPaths(polygons, min_spacing, min_width, min_spacing, min_width, loops_count, 0, params.layer_height, *params.config, *this->print_config);
 
         std::vector<Arachne::VariableWidthLines>    loops = wallToolPaths.getToolPaths();
         std::vector<const Arachne::ExtrusionLine *> all_extrusions;

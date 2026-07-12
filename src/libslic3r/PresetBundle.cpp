@@ -778,7 +778,7 @@ DynamicPrintConfig PresetBundle::full_fff_config() const
                 // Get an option, do not create if it does not exist.
                 const ConfigOption *opt_src = filament_configs.front()->option(key);
                 if (opt_src != nullptr)
-                    opt_dst->set(opt_src);
+                    opt_dst->set(*opt_src);
             } else {
                 // Setting a vector value from all filament_configs.
                 for (size_t i = 0; i < filament_opts.size(); ++ i)
@@ -870,15 +870,15 @@ DynamicPrintConfig PresetBundle::full_sla_config() const
     out.erase("compatible_printers");
     out.erase("compatible_printers_condition");
     out.erase("inherits");
-    
+
     out.option<ConfigOptionString >("sla_print_settings_id",    true)->value  = this->sla_prints.get_selected_preset_name();
     out.option<ConfigOptionString >("sla_material_settings_id", true)->value  = this->sla_materials.get_selected_preset_name();
     out.option<ConfigOptionString >("printer_settings_id",      true)->value  = this->printers.get_selected_preset_name();
     out.option<ConfigOptionString >("physical_printer_settings_id", true)->value = this->physical_printers.get_selected_printer_name();
 
-    out.option<ConfigOptionBool >("sla_print_settings_id",      true)->value  = this->sla_prints.get_selected_preset().is_dirty;
-    out.option<ConfigOptionBool >("sla_material_settings_id",   true)->value  = this->sla_materials.get_selected_preset().is_dirty;
-    out.option<ConfigOptionBool >("printer_settings_id",        true)->value  = this->printers.get_selected_preset().is_dirty;
+    out.option<ConfigOptionBool >("sla_print_settings_modified",      true)->value  = this->sla_prints.get_selected_preset().is_dirty;
+    out.option<ConfigOptionBool >("sla_material_settings_modified",   true)->value  = this->sla_materials.get_selected_preset().is_dirty;
+    out.option<ConfigOptionBool >("printer_settings_modified",        true)->value  = this->printers.get_selected_preset().is_dirty;
 
     // Serialize the collected "compatible_printers_condition" and "inherits" fields.
     // There will be 1 + num_exturders fields for "inherits" and 2 + num_extruders for "compatible_printers_condition" stored.
@@ -1028,6 +1028,8 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
     std::string name = is_external ? boost::filesystem::path(name_or_path).filename().string() : name_or_path;
 
     // 2) If the loading succeeded, split and load the config into print / filament / printer settings.
+    // compute phony fields
+    config.update_phony({});
     // First load the print and printer presets.
 
     std::set<std::string>& tmp_installed_presets_ref = tmp_installed_presets;
@@ -1091,10 +1093,10 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
                     continue;
                 if (other_opt->is_scalar()) {
                     for (size_t i = 0; i < configs.size(); ++ i)
-                        configs[i].option(key, false)->set(other_opt);
+                        configs[i].option(key, false)->set(*other_opt);
                 } else if (key != "compatible_printers" && key != "compatible_prints") {
                     for (size_t i = 0; i < configs.size(); ++ i)
-                        static_cast<ConfigOptionVectorBase*>(configs[i].option(key, false))->set_at(other_opt, 0, i);
+                        static_cast<ConfigOptionVectorBase*>(configs[i].option(key, false))->set_at(*other_opt, 0, i);
                 }
             }
             // Load the configs into this->filaments and make them active.
@@ -1241,11 +1243,12 @@ static void flatten_configbundle_hierarchy(boost::property_tree::ptree &tree, co
         const_cast<pt::ptree*>(prst.node)->erase("inherits");
         if (! inherits_system.empty()) {
             // Loaded a user config bundle, where a profile inherits a system profile.
-			// User profile should be derived from a single system profile only.
-			assert(inherits_system.size() == 1);
-			if (inherits_system.size() > 1)
-				BOOST_LOG_TRIVIAL(error) << "flatten_configbundle_hierarchy: The preset " << prst.name << " inherits from more than single system preset";
-			prst.node->put("inherits", Slic3r::escape_string_cstyle(inherits_system.front()));
+            // User profile should be derived from a single system profile only.
+            assert(inherits_system.size() == 1);
+            if (inherits_system.size() > 1)
+                BOOST_LOG_TRIVIAL(error) << "flatten_configbundle_hierarchy: The preset " << prst.name
+                                         << " inherits from more than single system preset";
+            prst.node->put("inherits", Slic3r::escape_string_cstyle(inherits_system.front()));
         }
     }
 
@@ -1343,7 +1346,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
 
     const VendorProfile *vendor_profile = nullptr;
     if (flags.has(LoadConfigBundleAttribute::LoadSystem) || flags.has(LoadConfigBundleAttribute::LoadVendorOnly)) {
-        VendorProfile vp = VendorProfile::from_ini(tree, path);
+        VendorProfile vp = VendorProfile::from_ini(tree, boost::filesystem::path(path).stem().string());
         if (vp.models.size() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer model defined.") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);
@@ -1462,29 +1465,31 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
             try {
                 auto parse_config_section = [&section, &alias_name, &renamed_from, &substitution_context, &path, &flags](DynamicPrintConfig &config) {
                     substitution_context.clear();
-                    std::vector<std::pair<t_config_option_key, std::string>> opts_deleted;
+                    std::map<t_config_option_key, std::string> opts_deleted;
+                    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
                     for (auto &kvp : section.second) {
-                    	if (kvp.first == "alias")
-                    		alias_name = kvp.second.data();
-                    	else if (kvp.first == "renamed_from") {
-                    		if (! unescape_strings_cstyle(kvp.second.data(), renamed_from)) {
-    			                BOOST_LOG_TRIVIAL(error) << "Error in a Vendor Config Bundle \"" << path << "\": The preset \"" << 
-    			                    section.first << "\" contains invalid \"renamed_from\" key, which is being ignored.";
-                       		}
-                    	}
+                        if (kvp.first == "alias")
+                            alias_name = kvp.second.data();
+                        else if (kvp.first == "renamed_from") {
+                            if (! unescape_strings_cstyle(kvp.second.data(), renamed_from)) {
+                                BOOST_LOG_TRIVIAL(error) << "Error in a Vendor Config Bundle \"" << path << "\": The preset \"" << 
+                                    section.first << "\" contains invalid \"renamed_from\" key, which is being ignored.";
+                            }
+                        }
                         // Throws on parsing error. For system presets, no substituion is being done, but an exception is thrown.
                         t_config_option_key opt_key = kvp.first;
                         std::string value =  kvp.second.data();
-                        if ("gcode_label_objects" == opt_key) {
-                            std::string opt_key2 = kvp.first;
-                            std::string value2   = kvp.second.data();
-                        }
-                        PrintConfigDef::handle_legacy(opt_key, value, true);
+                        dict_opt[opt_key] = {opt_key, value};
+                    }
+                    PrintConfigDef::handle_legacy_map(dict_opt, true);
+                    for (auto &[saved_key, key_val] : dict_opt) {
+                        auto &[opt_key, value] = key_val;
+                        //PrintConfigDef::handle_legacy(opt_key, value, true);
                         // don't throw for an unknown key, just ignore it
                         if (!opt_key.empty()) {
                             config.set_deserialize(opt_key, value, substitution_context);
                         } else {
-                            opts_deleted.emplace_back(kvp.first, value);
+                            opts_deleted[saved_key] = value;
                         }
                     }
                     if (flags.has(LoadConfigBundleAttribute::ConvertFromPrusa))
@@ -1508,6 +1513,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
             }
             Preset::normalize(config);
             // Report configuration fields, which are misplaced into a wrong group.
+            auto copy = config;
             std::string incorrect_keys = Preset::remove_invalid_keys(config, *default_config);
             if (! incorrect_keys.empty())
                 BOOST_LOG_TRIVIAL(error) << "Error in a Vendor Config Bundle \"" << path << "\": The printer preset \"" << 
@@ -1552,16 +1558,16 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
                 const Preset *existing = presets->find_preset(preset_name, false);
                 if (existing != nullptr) {
                     if (existing->is_system) {
-    					assert(existing->vendor != nullptr);
+                        assert(existing->vendor != nullptr);
                         BOOST_LOG_TRIVIAL(error) << "Error in a user provided Config Bundle \"" << path << "\": The " << presets->name() << " preset \"" << 
-    						existing->name << "\" is a system preset of vendor " << existing->vendor->name << " and it will be ignored.";
+                            existing->name << "\" is a system preset of vendor " << existing->vendor->name << " and it will be ignored.";
                         continue;
                     } else {
                         assert(existing->vendor == nullptr);
                         BOOST_LOG_TRIVIAL(trace) << "A " << presets->name() << " preset \"" << existing->name << "\" was overwritten with a preset from user Config Bundle \"" << path << "\"";
                     }
                 } else {
-					BOOST_LOG_TRIVIAL(trace) << "A new " << presets->name() << " preset \"" << preset_name << "\" was imported from user Config Bundle \"" << path << "\"";
+                    BOOST_LOG_TRIVIAL(trace) << "A new " << presets->name() << " preset \"" << preset_name << "\" was imported from user Config Bundle \"" << path << "\"";
                 }
             }
             // Decide a full path to this .ini file.
@@ -1612,13 +1618,17 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
 
             substitution_context.clear();
             try {
-                std::vector<std::pair<t_config_option_key, std::string>> opts_deleted;
-                for (auto& kvp : section.second) {
+                std::map<t_config_option_key, std::string> opts_deleted;
+                std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
+                for (auto &kvp : section.second) {
                     std::string opt_key = kvp.first;
                     std::string value = kvp.second.data();
-                    PrintConfigDef::handle_legacy(opt_key, value, true);
+                }
+                PrintConfigDef::handle_legacy_map(dict_opt, true);
+                for (auto &[saved_key, key_val] : dict_opt) {
+                    auto &[opt_key, value] = key_val;
                     if (opt_key.empty()) {
-                        opts_deleted.emplace_back(kvp.first, value);
+                        opts_deleted[saved_key] = value;
                     } else {
                         config.set_deserialize(opt_key, value, substitution_context);
                     }
@@ -1636,6 +1646,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
             }
 
             // Report configuration fields, which are misplaced into a wrong group.
+            auto copy2 = config;
             std::string incorrect_keys = Preset::remove_invalid_keys(config, default_config);
             if (!incorrect_keys.empty())
                 BOOST_LOG_TRIVIAL(error) << "Error in a Vendor Config Bundle \"" << path << "\": The physical printer \"" <<

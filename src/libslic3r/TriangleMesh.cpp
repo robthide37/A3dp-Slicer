@@ -29,6 +29,7 @@
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullVertexSet.h>
 
+#include <cassert>
 #include <cmath>
 #include <deque>
 #include <queue>
@@ -41,12 +42,11 @@
 #include <boost/nowide/cstdio.hpp>
 #include <boost/predef/other/endian.h>
 
-#include <tbb/concurrent_vector.h>
+#include <oneapi/tbb/concurrent_vector.h>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
-#include <assert.h>
 
 namespace Slic3r {
 
@@ -192,6 +192,24 @@ static void trianglemesh_repair_on_import(stl_file &stl)
         stl_check_facets_exact(&stl);
 
     BOOST_LOG_TRIVIAL(debug) << "TriangleMesh::repair() finished";
+}
+
+void TriangleMesh::from_facets(std::vector<stl_facet> &&facets, bool repair)
+{
+    stl_file stl;
+    stl.stats.type                = inmemory;
+    stl.stats.number_of_facets    = uint32_t(facets.size());
+    stl.stats.original_num_facets = int(stl.stats.number_of_facets);
+
+    stl_allocate(&stl);
+    stl.facet_start               = std::move(facets);
+
+    if (repair) {
+        trianglemesh_repair_on_import(stl);
+    }
+
+    stl_generate_shared_vertices(&stl, this->its);
+    fill_initial_stats(this->its, this->m_stats);
 }
 
 bool TriangleMesh::ReadSTLFile(const char* input_file, bool repair)
@@ -911,12 +929,24 @@ Polygon its_convex_hull_2d_above(const indexed_triangle_set& its, const Transfor
                 iprev = iedge;
             }
         }
-        return Geometry::convex_hull(std::move(pts));
+        if (pts.size() > 2) {
+            Polygon polygon = Geometry::convex_hull(std::move(pts));
+            while (polygon.size() > 2 && polygon.points.front().coincides_with_epsilon(polygon.points.back())) {
+                polygon.points.pop_back();
+            }
+            if (polygon.size() > 2) {
+                return std::move(polygon);
+            }
+        }
+        return Polygon();
     };
 
     tbb::concurrent_vector<Polygon> chs;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, its.indices.size()), [&](const tbb::blocked_range<size_t>& range) {
-        chs.push_back(collect_mesh_projection_points_above(range));
+        Polygon poly = collect_mesh_projection_points_above(range);
+        if (!poly.empty()) {
+            chs.push_back(poly);
+        }
     });
 
     const Polygons polygons(std::make_move_iterator(chs.begin()), std::make_move_iterator(chs.end()));

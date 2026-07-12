@@ -496,8 +496,12 @@ get_coeff_from_angle_countour(Point& point, const ExPolygon& contour, coord_t mi
         }
     }
     //compute angle
+#if _DEBUG
     assert(is_approx(abs_angle(angle_ccw(point_before - point_nearest, point_after - point_nearest)), ccw_angle_old_test(point_nearest, point_before, point_after), 0.000000001));
-    angle = angle_ccw(point_before - point_nearest, point_after - point_nearest);//point_nearest.ccw_angle(point_before, point_after);if (angle >= PI) angle = 2 * PI - angle;
+#endif
+    angle = angle_ccw(point_before - point_nearest, \
+                   point_after - point_nearest); // point_nearest.ccw_angle(point_before, point_after);if (angle >=
+                                                 // PI) angle = 2 * PI - angle;
     assert(angle < PI);
     //compute the diff from 90°
     angle = abs(angle - PI / 2);
@@ -730,12 +734,18 @@ MedialAxis::fusion_corners(ThickPolylines& pp)
         if (crosspoint.size() != 2) continue;
 
         // check if i am at the external side of a curve
+#if _DEBUG
         assert(is_approx(abs_angle(angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[0]].points[1] - polyline.points[0])), ccw_angle_old_test(polyline.points[0], polyline.points[1], pp[crosspoint[0]].points[1]), 0.000000001));
-        double angle1 = angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[0]].points[1] - polyline.points[0]);//polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[0]].points[1]); if (angle1 >= PI) angle1 = 2 * PI - angle1;
-        assert(angle1 < PI);
+#endif
+        double angle1 = \
+    angle_ccw(polyline.points[1] - polyline.points[0], \
+              pp[crosspoint[0]].points[1] - \
+                  polyline.points[0]); // polyline.points[0].ccw_angle(polyline.points[1],
+                                       // pp[crosspoint[0]].points[1]); if (angle1 >= PI) angle1 = 2 * PI - angle1;
+        assert(angle1 <= PI);
         double angle2 = angle_ccw(polyline.points[1] - polyline.points[0], pp[crosspoint[1]].points[1] - polyline.points[0]); // polyline.points[0].ccw_angle(polyline.points[1], pp[crosspoint[1]].points[1]); if (angle2 >= PI) angle2 = 2 * PI - angle2;
-        assert(angle2 < PI);
-        if (angle1 + angle2 < PI) continue;
+        assert(angle2 <= PI);
+        if (angle1 + angle2 <= PI) continue;
 
         //check if is smaller or the other ones are not endpoits
         if (pp[crosspoint[0]].endpoints.second && length > pp[crosspoint[0]].length()) continue;
@@ -1941,7 +1951,7 @@ MedialAxis::simplify_polygon_frontier()
     }
 
     if (!this->m_expolygon.contour.points.empty())
-        this->m_expolygon.remove_point_too_near(this->m_resolution);
+        this->m_expolygon.remove_point_too_close(this->m_resolution);
 }
 
 /// Grow the extrusion to at least nozzle_diameter*1.05 (lowest safe extrusion width)
@@ -2024,7 +2034,7 @@ check_circular(ExPolygon& expolygon, coord_t max_variation) {
     if (expolygon.holes.size() > 0) return 0;
 
     //test if convex
-    if (expolygon.contour.concave_points().empty() && expolygon.contour.points.size() > 3) {
+    if (expolygon.contour.concave_points(0, PI).empty() && expolygon.contour.points.size() > 3) {
         // Computing circle center
         Point center = expolygon.contour.centroid();
         coordf_t radius_min = std::numeric_limits<float>::max(), radius_max = 0;
@@ -2068,20 +2078,22 @@ MedialAxis::build(ThickPolylines& polylines_out)
     if (this->m_expolygon.area() < this->m_min_width * this->m_min_width) return;
 
     //check for circular shape
-    coordf_t radius = check_circular(this->m_expolygon, this->m_min_width / 4);
-    if (radius > 0 && this->m_expolygon.contour.points.size() > 4) {
-        ExPolygons miniPeri = offset_ex(Polygons{ this->m_expolygon.contour }, -radius / 2);
-        if (miniPeri.size() == 1 && miniPeri[0].holes.size() == 0) {
-            ThickPolyline thickPoly;
-            thickPoly.points = miniPeri[0].contour.points;
-            thickPoly.points.push_back(thickPoly.points.front());
-            thickPoly.endpoints.first = false;
-            thickPoly.endpoints.second = false;
-            for (int i = 0; i < thickPoly.points.size(); i++) {
-                thickPoly.points_width.push_back(radius);
+    if (this->m_expolygon.contour.size() > 3) {
+        coordf_t radius = check_circular(this->m_expolygon, this->m_min_width / 4);
+        if (radius > 0 && this->m_expolygon.contour.points.size() > 4) {
+            ExPolygons miniPeri = offset_ex(Polygons{this->m_expolygon.contour}, -radius / 2);
+            if (miniPeri.size() == 1 && miniPeri[0].holes.size() == 0) {
+                ThickPolyline thickPoly;
+                thickPoly.points = miniPeri[0].contour.points;
+                thickPoly.points.push_back(thickPoly.points.front());
+                thickPoly.endpoints.first = false;
+                thickPoly.endpoints.second = false;
+                for (int i = 0; i < thickPoly.points.size(); i++) {
+                    thickPoly.points_width.push_back(radius);
+                }
+                polylines_out.insert(polylines_out.end(), thickPoly);
+                return;
             }
-            polylines_out.insert(polylines_out.end(), thickPoly);
-            return;
         }
     }
 
@@ -2388,6 +2400,88 @@ MedialAxis::build(ThickPolylines& polylines_out)
     //    }
     //    std::cout << "\n";
     //}
+    
+#if _DEBUG
+        //ensure valid
+        for (size_t i = 0; i < pp.size(); ++i) {
+            assert(pp[i].size() > 1);
+            //pp[i].douglas_peucker(this->m_resolution);
+            // TODO do simplification when same width
+            coord_t current_width = pp[i].points_width[0];
+            size_t ipt_start_same_width = 0;
+            for (size_t ipt = 1; ipt < pp[i].size(); ++ipt) {
+                //first, check if it's more than EPSILON away
+                if (pp[i].points[ipt - 1].distance_to_square(pp[i].points[ipt]) <
+                    SCALED_EPSILON * SCALED_EPSILON * 4) {
+                    // del
+                    if (pp[i].size() > 2) {
+                        pp[i].points.erase(pp[i].points.begin() + ipt);
+                        pp[i].points_width.erase(pp[i].points_width.begin() + ipt);
+                        ipt--;
+                    }
+                } else {
+                    if (current_width != pp[i].points_width[ipt]) {
+                        if (ipt - ipt_start_same_width > 2) {
+                            // simplify the current section
+                            Points to_resize(pp[i].points.begin() + ipt_start_same_width,
+                                             pp[i].points.begin() + ipt);
+                            auto it_end = Slic3r::douglas_peucker(to_resize.begin(), to_resize.end(),
+                                                                  to_resize.begin(), double(this->m_resolution));
+                            size_t resized_size = it_end - to_resize.begin();
+                            // is there points deleted?
+                            if (resized_size < to_resize.size()) {
+                                // search them and move them
+                                size_t orig_i = ipt_start_same_width;
+                                for (size_t resized_i = 0; resized_i < resized_size; ) {
+                                    if (pp[i].points[orig_i] == to_resize[resized_i]) {
+                                        // found it, move the point & width
+                                        pp[i].points[ipt_start_same_width + resized_i] = to_resize[resized_i];
+                                        pp[i].points_width[ipt_start_same_width + resized_i] = pp[i].points_width[orig_i];
+                                        // go to next point to move
+                                        resized_i++;
+                                    } else {
+                                        // didn't find it, check next point.
+                                        orig_i++;
+                                    }
+                                    assert(orig_i < pp[i].size() && orig_i < ipt_start_same_width + to_resize.size());
+                                    if (orig_i > pp[i].size()) {
+                                        BOOST_LOG_TRIVIAL(error) << "Error while simplify a variable thickness line.\n";
+                                        break;
+                                    }
+                                }
+                                // all points are now moved, erase the surplus
+                                pp[i].points.erase(pp[i].points.begin() + ipt_start_same_width + resized_size,
+                                                   pp[i].points.begin() + ipt_start_same_width + to_resize.size());
+                                pp[i].points_width.erase(pp[i].points_width.begin() + ipt_start_same_width + resized_size,
+                                                         pp[i].points_width.begin() + ipt_start_same_width + to_resize.size());
+                                ipt -=  to_resize.size() - resized_size;
+                                assert(pp[i].points[ipt - 1] == to_resize.back());
+                            } else {
+                                // nothing is simplified
+                            }
+                        }
+                        // relance
+                        if (ipt < pp[i].size()) {
+                            current_width = pp[i].points_width[ipt];
+                            ipt_start_same_width = ipt;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            assert(pp[i].size() > 1);
+            if (pp[i].size() == 2 && pp[i].front().coincides_with_epsilon(pp[i].back())) {
+                pp.erase(pp.begin() + i);
+                --i;
+            }
+        }
+    for (auto &poly : pp) {
+        for (size_t idx_pt = 1; idx_pt < poly.size(); ++idx_pt) {
+            assert(!poly.points[idx_pt - 1].coincides_with_epsilon(poly.points[idx_pt]));
+        }
+    }
+#endif
 
     polylines_out.insert(polylines_out.end(), pp.begin(), pp.end());
 
@@ -2411,7 +2505,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
     ExtrusionPath path(role, false);
     ThickLines lines = polyline.thicklines();
     Flow current_flow = flow;
-    
+
 #if _DEBUG
     for (size_t idx = 0; idx < lines.size(); ++idx)
         assert(!lines[idx].a.coincides_with_epsilon(lines[idx].b));
@@ -2462,7 +2556,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                 for (size_t j = 1; j < segments; ++j) {
                     lines.emplace(lines.begin() + i + j, pp[j], pp[j + 1], width[j], width[j]);
                 }
-                
+
                 for (int j = i; j < i + segments; j++) {
                     assert(lines[j].a_width == lines[j].b_width);
                     assert(!lines[j].a.coincides_with_epsilon(lines[j].b));
@@ -2484,7 +2578,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                 assert(mid_point.distance_to(next_point) > SCALED_EPSILON);
                 lines.emplace(lines.begin() + i + 1, mid_point, next_point, next_width, next_width);
                 // from here, 'line' variable is invalid (vector is modified);
-                
+
                 assert(lines[i].a_width == lines[i].b_width);
                 assert(lines[i+1].a_width == lines[i+1].b_width);
                 // go after the next point
@@ -2546,7 +2640,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             assert(!line.a.coincides_with_epsilon(line.b));
         }
     }
-    
+
     // merge too short lines
     for (size_t i = 0; i < lines.size(); ++i) {
         ThickLine &line = lines[i];

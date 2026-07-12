@@ -27,18 +27,24 @@ class ExPolygon
 {
 public:
     ExPolygon() = default;
-	ExPolygon(const ExPolygon &other) = default;
+    ExPolygon(const ExPolygon &other) = default;
     ExPolygon(ExPolygon &&other) = default;
-	explicit ExPolygon(const Polygon &contour) : contour(contour) {}
-	explicit ExPolygon(Polygon &&contour) : contour(std::move(contour)) {}
-	explicit ExPolygon(const Points &contour) : contour(contour) {}
-	explicit ExPolygon(Points &&contour) : contour(std::move(contour)) {}
-	explicit ExPolygon(const Polygon &contour, const Polygon &hole) : contour(contour) { holes.emplace_back(hole); }
-	explicit ExPolygon(Polygon &&contour, Polygon &&hole) : contour(std::move(contour)) { holes.emplace_back(std::move(hole)); }
-	explicit ExPolygon(const Points &contour, const Points &hole) : contour(contour) { holes.emplace_back(hole); }
-	explicit ExPolygon(Points &&contour, Polygon &&hole) : contour(std::move(contour)) { holes.emplace_back(std::move(hole)); }
-	ExPolygon(std::initializer_list<Point> contour) : contour(contour) {}
-	ExPolygon(std::initializer_list<Point> contour, std::initializer_list<Point> hole) : contour(contour), holes({ hole }) {}
+    explicit ExPolygon(const Polygon &contour) : contour(contour) {}
+    explicit ExPolygon(Polygon &&contour) : contour(std::move(contour)) {}
+    explicit ExPolygon(const Points &contour) : contour(contour) {}
+    explicit ExPolygon(Points &&contour) : contour(std::move(contour)) {}
+    explicit ExPolygon(const Polygon &contour, const Polygon &hole) : contour(contour) { holes.emplace_back(hole); }
+    explicit ExPolygon(const Polygon &contour, const Polygons &holes) : contour(contour), holes(holes) {}
+    explicit ExPolygon(Polygon &&contour, Polygon &&hole) : contour(std::move(contour)) {
+        holes.emplace_back(std::move(hole));
+    }
+    explicit ExPolygon(const Points &contour, const Points &hole) : contour(contour) { holes.emplace_back(hole); }
+    explicit ExPolygon(Points &&contour, Polygon &&hole) : contour(std::move(contour)) {
+        holes.emplace_back(std::move(hole));
+    }
+    ExPolygon(std::initializer_list<Point> contour) : contour(contour) {}
+    ExPolygon(std::initializer_list<Point> contour, std::initializer_list<Point> hole)
+        : contour(contour), holes({hole}) {}
 
     ExPolygon& operator=(const ExPolygon &other) = default;
     ExPolygon& operator=(ExPolygon &&other) = default;
@@ -78,11 +84,11 @@ public:
     bool overlaps(const ExPolygon &other) const;
 
     void douglas_peucker(coord_t tolerance);
-    void simplify_p(coord_t tolerance, Polygons* polygons) const;
+    void simplify_p(coord_t tolerance, Polygons &polygons) const;
     Polygons simplify_p(coord_t tolerance) const;
     ExPolygons simplify(coord_t tolerance) const;
-    void simplify(coord_t tolerance, ExPolygons* expolygons) const;
-    void remove_point_too_near(const coord_t tolerance);
+    void simplify(coord_t tolerance, ExPolygons &expolygons) const;
+    void remove_point_too_close(const coord_t tolerance);
     void medial_axis(double max_width, double min_width, ThickPolylines &polylines) const;
     void medial_axis(double max_width, double min_width, Polylines &polylines) const;
     Lines lines() const;
@@ -95,8 +101,11 @@ public:
 #ifdef _DEBUGINFO
     void assert_valid() const {
         contour.assert_valid();
-        for (const Polygon& hole : holes)
+        assert(contour.is_counter_clockwise());
+        for (const Polygon &hole : holes) {
             hole.assert_valid();
+            assert(hole.is_clockwise());
+        }
     }
     // to create a cpp multipoint to create test units.
     std::string to_debug_string();
@@ -140,6 +149,7 @@ inline size_t number_polygons(const ExPolygons &expolys)
 
 inline ExPolygon to_expolygon(const Polygon &other)
 {
+    assert(other.is_counter_clockwise());
     ExPolygon ex;
     ex.contour = other;
     return ex;
@@ -147,15 +157,23 @@ inline ExPolygon to_expolygon(const Polygon &other)
 
 inline ExPolygon to_expolygon(Polygon &&other)
 {
+    assert(other.is_counter_clockwise());
     ExPolygon ex;
     ex.contour = std::move(other);
     return ex;
 }
 
-inline ExPolygons to_expolygon(const Polygons &other)
+inline ExPolygons convert_to_expolygons(const Polygons &other)
 {
     ExPolygons exs;
-    for (const Polygon &po : other) exs.emplace_back(to_expolygon(po));
+    for (size_t i = 0; i < other.size(); i++) {
+        if (other[i].is_counter_clockwise()) {
+            exs.emplace_back(other[i]);
+        } else {
+            assert(!exs.empty());
+            exs.back().holes.emplace_back(other[i]);
+        }
+    }
     return exs;
 }
 
@@ -245,6 +263,19 @@ inline Linesf to_unscaled_linesf(const ExPolygons &src)
     return lines;
 }
 
+inline Points contours_to_points(const ExPolygons &src)
+{
+    Points points;
+    size_t count = 0;
+    for (const ExPolygon &expolygon : src) {
+        count += expolygon.contour.points.size();
+    }
+    points.reserve(count);
+    for (const ExPolygon &expolygon : src) {
+        append(points, expolygon.contour.points);
+    }
+    return points;
+}
 
 inline Points to_points(const ExPolygons &src)
 {
@@ -342,8 +373,14 @@ inline Polygons to_polygons(const ExPolygon &src)
     return polygons;
 }
 
+
+//inline Polygons to_polygons_unsafe(const ExPolygons &src) {
+//    // can be used for asserts, dsiplay, when it isn't fed into clipper
+//}
+
 inline Polygons to_polygons(const ExPolygons &src)
 {
+    // FIXME: put "inside" polygon after the "outside" ones, so the holes of the "outside" don't erase the "inside" contour
     Polygons polygons;
     polygons.reserve(number_polygons(src));
     for (const ExPolygon& ex_poly : src) {
@@ -352,6 +389,20 @@ inline Polygons to_polygons(const ExPolygons &src)
         polygons.push_back(ex_poly.contour);
         polygons.insert(polygons.end(), ex_poly.holes.begin(), ex_poly.holes.end());
     }
+#ifdef _DEBUG
+    // check hole ordering
+    Polygons holes;
+    for (size_t i = src.size() - 1; i < src.size(); i--) {
+        for (Polygon &hole : holes) {
+            // a big hole need to be before than the contour that lie inside.
+            assert(!hole.contains(src[i].contour.front()));
+        }
+        for (Polygon hole : src[i].holes) {
+            hole.make_counter_clockwise();
+            holes.push_back(std::move(hole));
+        }
+    }
+#endif
     return polygons;
 }
 
@@ -518,14 +569,8 @@ inline bool expolygons_contain(const ExPolygons &expolys, const Point &pt, bool 
     return false;
 }
 
-inline ExPolygons expolygons_simplify(const ExPolygons &expolys, double tolerance)
-{
-	ExPolygons out;
-	out.reserve(expolys.size());
-	for (const ExPolygon &exp : expolys)
-		exp.simplify(tolerance, &out);
-	return out;
-}
+// expolygons_simplify will simplify the geometry via douglaspeuker.
+void expolygons_simplify(ExPolygons &expolys, coord_t tolerance);
 
 // Do expolygons match? If they match, they must have the same topology,
 // however their contours may be rotated.
@@ -542,9 +587,14 @@ bool has_duplicate_points(const ExPolygon &expoly);
 bool has_duplicate_points(const ExPolygons &expolys);
 
 // remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polygons that are too small to be valid
+// note: in the future, it may limited to removing points that just to close to other ones. If you want to simplify the geomtry, use expolygons_simplify.
+// so it remove points that are too close, and may or may not remove colinear points.
 void ensure_valid(ExPolygons &expolygons, coord_t resolution = SCALED_EPSILON);
 ExPolygons ensure_valid(ExPolygons &&expolygons, coord_t resolution = SCALED_EPSILON);
 ExPolygons ensure_valid(coord_t resolution, ExPolygons &&expolygons);
+// like ensure_valid but you're sure it won't remove colinear points.
+void remove_point_too_close(ExPolygons &expolygons, coord_t resolution = SCALED_EPSILON);
+ExPolygons remove_point_too_close(ExPolygons &&expolygons, coord_t resolution = SCALED_EPSILON);
 #ifdef _DEBUGINFO
 void assert_valid(const ExPolygons &expolygons);
 #else
@@ -602,6 +652,7 @@ namespace boost { namespace polygon {
         static inline Slic3r::ExPolygon& set_points(Slic3r::ExPolygon& expolygon, iT input_begin, iT input_end) {
             expolygon.contour.points.assign(input_begin, input_end);
             // skip last point since Boost will set last point = first point
+            assert(expolygon.contour.points.front() == expolygon.contour.points.back());
             expolygon.contour.points.pop_back();
             return expolygon;
         }

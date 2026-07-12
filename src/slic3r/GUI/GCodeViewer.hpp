@@ -12,8 +12,8 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GLModel.hpp"
 
+#include <cfloat>
 #include <cstdint>
-#include <float.h>
 #include <set>
 #include <unordered_set>
 
@@ -789,6 +789,8 @@ public:
             // z offset of the model
             float m_model_z_offset{ 0.5f };
             bool m_visible{ true };
+            bool m_fixed_screen_size{ false };
+            float m_scale_factor{ 1.0f };
 
         public:
             void init();
@@ -917,6 +919,7 @@ private:
         void reset() { dirty = true; }
     };
     LegendResizer m_legend_resizer;
+    uint8_t decimal_precision = 2;
     PrintEstimatedStatistics m_print_statistics;
     PrintEstimatedStatistics::ETimeMode m_time_estimate_mode{ PrintEstimatedStatistics::ETimeMode::Normal };
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -940,7 +943,7 @@ public:
 
     // extract rendering data from the given parameters
     void load(const GCodeProcessorResult& gcode_result, const Print& print);
-    bool is_loaded(const GCodeProcessorResult& gcode_result);
+   // bool is_loaded(const GCodeProcessorResult& gcode_result);
     // recalculate ranges in dependence of what is visible and sets tool/print colors
     void refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
     void refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const;

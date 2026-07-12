@@ -164,6 +164,8 @@ public:
 	void init() { m_initialized = true; }
 	// Push a prefabricated notification from basic_notifications (see the table at the end of this file).
 	void push_notification(const NotificationType type, int timestamp = 0);
+	// Push a prefabricated notification from basic_notifications (see the table at the end of this file).
+	void push_notification(const NotificationType type, const std::string& text, int timestamp = 0);
 	// Push a NotificationType::CustomNotification with NotificationLevel::RegularNotificationLevel and 10s fade out interval.
 	void push_notification(const std::string& text, int timestamp = 0);
 	// Push a NotificationType::CustomNotification with provided notification level and 10s for RegularNotificationLevel.
@@ -217,6 +219,7 @@ public:
 	void set_sla(bool b) { set_fff(!b); }
 	// Exporting finished, show this information with path, button to open containing folder and if ejectable - eject button
 	void push_exporting_finished_notification(const std::string& path, const std::string& dir_path, bool on_removable);
+    void push_bulk_exporting_finished_notification(const std::string& dir_path, bool on_removable);
 	// notifications with progress bar
 	// print host upload
 	void push_upload_job_notification(int id, float filesize, const std::string& filename, const std::string& host, float percentage = 0);
@@ -231,6 +234,7 @@ public:
 	// Download App progress
 	void push_download_progress_notification(const std::string& text, std::function<bool()>	cancel_callback);
 	void set_download_progress_percentage(float percentage);
+    void set_download_progress_text(const std::string& updated_text);
 	// Download URL progress notif
 	void push_download_URL_progress_notification(size_t id, const std::string& text, std::function<bool(DownloaderUserAction, int)> user_action_callback);
 	void set_download_URL_progress(size_t id, float percentage);
@@ -779,10 +783,15 @@ private:
 	class ExportFinishedNotification : public PopNotification
 	{
 	public:
-		ExportFinishedNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, bool to_removable,const std::string& export_path,const std::string& export_dir_path)
-			: PopNotification(n, id_provider, evt_handler)
+		ExportFinishedNotification(
+            const NotificationData& n,
+            NotificationIDProvider& id_provider,
+            wxEvtHandler* evt_handler,
+            bool to_removable,
+            const std::string& export_dir_path
+        ):
+            PopNotification(n, id_provider, evt_handler)
 			, m_to_removable(to_removable)
-			, m_export_path(export_path)
 			, m_export_dir_path(export_dir_path)
 		    {
 				m_multiline = true;

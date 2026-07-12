@@ -11,8 +11,9 @@
 #include <random>
 #include <boost/thread.hpp>
 
-#include <tbb/task_scheduler_observer.h>
-#include <tbb/enumerable_thread_specific.h>
+#include <oneapi/tbb/task_scheduler_observer.h>
+#include <oneapi/tbb/enumerable_thread_specific.h>
+#include <oneapi/tbb/parallel_for.h>
 
 namespace Slic3r {
 
@@ -72,6 +73,10 @@ template<class Fn> inline boost::thread create_thread(Fn &&fn)
     return create_thread(attrs, std::forward<Fn>(fn));    
 }
 
+#ifdef _WIN32
+void win_exec(const std::string &command);
+#endif
+
 #ifdef _DEBUGINFO
 // TODO: sort items idx by difficulty, so we can process the most difficult first.
 // for now, only used to swi
@@ -83,14 +88,7 @@ using tbb::parallel_for;
 
 class ThreadData {
 public:
-    std::mt19937&   random_generator() {
-        if (! m_random_generator_initialized) {
-            std::random_device rd;
-            m_random_generator.seed(rd());
-            m_random_generator_initialized = true;
-        }
-        return m_random_generator;
-    }
+    std::mt19937&   random_generator();
 
     void            tbb_worker_thread_set_c_locales();
 
@@ -101,6 +99,9 @@ private:
 };
 
 ThreadData& thread_data();
+
+// Thread-safe function that returns a random number between 0 and max (inclusive, like rand() with RAND_MAX).
+int safe_rand(int max = RAND_MAX);
 
 // For unknown reasons and in sporadic cases when GCode export is processing, some participating thread
 // in tbb::parallel_pipeline has not set locales to "C", probably because this thread is newly spawned.

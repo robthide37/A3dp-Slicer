@@ -8,41 +8,86 @@
 
 namespace Slic3r::GCode {
     
+ObjectOrExtrusionLinef::ObjectOrExtrusionLinef(const Vec2d &a, const Vec2d &b, size_t object_layer_idx, size_t instance_idx, const ExtrusionEntity *ee)
+        : Linef(a, b), object_layer_idx(int(object_layer_idx)), instance_idx(int(instance_idx)), extrusion_entity_id(ee->get_id()) {}
+
+bool ExtrudedExtrusionEntity::operator==(const ExtrudedExtrusionEntity &other) const
+{
+    bool result = extrusion_entity_id == other.extrusion_entity_id &&
+        object_layer_idx == other.object_layer_idx && instance_idx == other.instance_idx;
+    return result;
+}
+
+size_t ExtrudedExtrusionEntityHash::operator()(const ExtrudedExtrusionEntity &eee) const noexcept
+{
+    std::size_t seed = std::hash<uint64_t>{}(eee.extrusion_entity_id);
+    boost::hash_combine(seed, std::hash<int>{}(eee.object_layer_idx));
+    boost::hash_combine(seed, std::hash<int>{}(eee.instance_idx));
+    return seed;
+}
+
 class ExtPeriExtrusionToLines : public ExtrusionVisitorConst {
 public:
+#ifdef _DEBUG
+    std::unordered_set<ExtrudedExtrusionEntity, ExtrudedExtrusionEntityHash> *registered_extrusion;
+    std::map<size_t, std::set<uint64_t>> all_ee_id_per_instance;
+#endif
     std::vector<ObjectOrExtrusionLinef> lines;
     size_t object_layer_idx;
     size_t instance_idx;
     const PrintInstance *instance;
     const ExtrusionEntity* root_extrusion;
     void use(const ExtrusionPath &path) override {
-        if (path.role().is_external_perimeter())
+        if (path.role().is_external_perimeter()) {
             for (const Line &line : to_lines(path.as_polyline().to_polyline())) {
                 lines.emplace_back(unscaled(Point{line.a + instance->shift}), unscaled(Point{line.b + instance->shift}),
-                                   object_layer_idx, instance_idx, root_extrusion);
+                                   object_layer_idx, instance_idx, root_extrusion ? root_extrusion : &path);
+#ifdef _DEBUG
+                if (all_ee_id_per_instance[instance_idx].find(root_extrusion ? root_extrusion->get_id() : path.get_id()) ==
+                    all_ee_id_per_instance[instance_idx].end()) {
+                    ExtrudedExtrusionEntity eee = {int(object_layer_idx), int(instance_idx), root_extrusion ? root_extrusion->get_id() : path.get_id()};
+                    this->registered_extrusion->insert(eee);
+                    all_ee_id_per_instance[instance_idx].insert(root_extrusion ? root_extrusion->get_id() :
+                                                                                 path.get_id());
+                }
+#endif
             }
+        }
     }
     void use(const ExtrusionPath3D &path3D) override {
-        if (path3D.role().is_external_perimeter())
+        if (path3D.role().is_external_perimeter()) {
             for (const Line &line : to_lines(path3D.as_polyline().to_polyline())) {
                 lines.emplace_back(unscaled(Point{line.a + instance->shift}), unscaled(Point{line.b + instance->shift}),
-                                   object_layer_idx, instance_idx, root_extrusion);
+                                   object_layer_idx, instance_idx, root_extrusion ? root_extrusion : &path3D);
+#ifdef _DEBUG
+                ExtrudedExtrusionEntity eee = {int(object_layer_idx), int(instance_idx), root_extrusion ? root_extrusion->get_id() : path3D.get_id()};
+                this->registered_extrusion->insert(eee);
+                all_ee_id_per_instance[instance_idx].insert(root_extrusion ? root_extrusion->get_id() :
+                                                                             path3D.get_id());
+#endif
             }
+        }
     }
     void use(const ExtrusionMultiPath &multipath) override {
+        root_extrusion = &multipath;
         for (const ExtrusionPath &path : multipath.paths) {
             path.visit(*this);
         }
+        root_extrusion = nullptr;
     }
     void use(const ExtrusionMultiPath3D &multipath3D) override {
+        root_extrusion = &multipath3D;
         for (const ExtrusionPath3D &path3D : multipath3D.paths) {
             path3D.visit(*this);
         }
+        root_extrusion = nullptr;
     }
     void use(const ExtrusionLoop &loop) override {
+        root_extrusion = &loop;
         for (const ExtrusionPath &path : loop.paths) {
             path.visit(*this);
         }
+        root_extrusion = nullptr;
     }
     void use(const ExtrusionEntityCollection &collection) override {
         for (const ExtrusionEntity *entity : collection.entities()) {
@@ -50,7 +95,7 @@ public:
         }
     }
     void process(const ExtrusionEntity *root) {
-        root_extrusion = root;
+        root_extrusion = nullptr;
         root->visit(*this);
     }
 };
@@ -80,6 +125,9 @@ std::pair<AABBTreeLines::LinesDistancer<ObjectOrExtrusionLinef>, size_t> TravelO
     std::vector<ObjectOrExtrusionLinef> lines;
     size_t extrusion_entity_cnt = 0;
     ExtPeriExtrusionToLines visitor;
+#ifdef _DEBUG
+    visitor.registered_extrusion = &this->m_registered_extrusion;
+#endif
     for (const ObjectLayerToPrint &object_to_print : objects_to_print) {
         visitor.object_layer_idx = &object_to_print - &objects_to_print.front();
         if (const Layer *layer = object_to_print.object_layer; layer) {
@@ -98,10 +146,6 @@ std::pair<AABBTreeLines::LinesDistancer<ObjectOrExtrusionLinef>, size_t> TravelO
                                     for (uint32_t perimeter_id : island.perimeters) {
                                         visitor.process(ee);
                                     }
-#ifdef _DEBUG
-                                    this->m_registered_extrusion.insert(
-                                        {int(visitor.object_layer_idx), int(visitor.instance_idx), ee});
-#endif
                                     ++extrusion_entity_cnt;
                                 }
                             }
@@ -127,19 +171,98 @@ void TravelObstacleTracker::init_layer(const Layer &layer, const ObjectsLayerToP
     m_extruded_extrusion.reserve(extrusion_entity_cnt);
 }
 
+class InsertExternalPeriExtruded : public ExtrusionVisitorConst {
+public:
+#ifdef _DEBUG
+    std::unordered_set<ExtrudedExtrusionEntity, ExtrudedExtrusionEntityHash> *registered_extrusion;
+    TravelObstacleTracker *tracker;
+#endif
+    std::unordered_set<ExtrudedExtrusionEntity, ExtrudedExtrusionEntityHash> &extruded_extrusion;
+    size_t object_layer_idx;
+    size_t instance_idx;
+    InsertExternalPeriExtruded(std::unordered_set<ExtrudedExtrusionEntity, ExtrudedExtrusionEntityHash> &extr_extr,
+                               size_t object_layer_idx,
+                               size_t instance_idx)
+        : extruded_extrusion(extr_extr), object_layer_idx(object_layer_idx), instance_idx(instance_idx) {}
+    void use(const ExtrusionPath &path) override {
+        if (path.role().is_external_perimeter()) {
+#ifdef _DEBUG
+            assert(registered_extrusion->find({int(object_layer_idx), int(instance_idx), path.get_id()}) != registered_extrusion->end());
+#endif
+            this->extruded_extrusion.insert({int(object_layer_idx), int(instance_idx), path.get_id()});
+        }
+    }
+    void use(const ExtrusionPath3D &path3D) override {
+        if (path3D.role().is_external_perimeter()){
+#ifdef _DEBUG
+            assert(registered_extrusion->find({int(object_layer_idx), int(instance_idx), path3D.get_id()}) != registered_extrusion->end());
+#endif
+            this->extruded_extrusion.insert({int(object_layer_idx), int(instance_idx), path3D.get_id()});
+        }
+    }
+    void use(const ExtrusionMultiPath &multipath) override {
+        bool has_external_peri = false;
+        for (const ExtrusionPath &path : multipath.paths) {
+            has_external_peri = path.role().is_external_perimeter();
+            if(has_external_peri) break;
+        }
+        if (has_external_peri) {
+#ifdef _DEBUG
+            assert(registered_extrusion->find({int(object_layer_idx), int(instance_idx), multipath.get_id()}) != registered_extrusion->end());
+#endif
+            this->extruded_extrusion.insert({int(object_layer_idx), int(instance_idx), multipath.get_id()});
+        }
+    }
+    void use(const ExtrusionMultiPath3D &multipath3D) override {
+        bool has_external_peri = false;
+        for (const ExtrusionPath3D &path3D : multipath3D.paths) {
+            has_external_peri = path3D.role().is_external_perimeter();
+            if(has_external_peri) break;
+        }
+        if (has_external_peri) {
+#ifdef _DEBUG
+            assert(registered_extrusion->find({int(object_layer_idx), int(instance_idx), multipath3D.get_id()}) != registered_extrusion->end());
+#endif
+            this->extruded_extrusion.insert({int(object_layer_idx), int(instance_idx), multipath3D.get_id()});
+        }
+    }
+    void use(const ExtrusionLoop &loop) override {
+        bool has_external_peri = false;
+        for (const ExtrusionPath &path : loop.paths) {
+            has_external_peri = path.role().is_external_perimeter();
+            if(has_external_peri) break;
+        }
+        if (has_external_peri) {
+#ifdef _DEBUG
+            assert(registered_extrusion->find({int(object_layer_idx), int(instance_idx), loop.get_id()}) != registered_extrusion->end());
+#endif
+            this->extruded_extrusion.insert({int(object_layer_idx), int(instance_idx), loop.get_id()});
+        }
+    }
+    void use(const ExtrusionEntityCollection &collection) override {
+        for (const ExtrusionEntity *entity : collection.entities()) {
+            entity->visit(*this);
+        }
+    }
+    void process(const ExtrusionEntity *root) {
+        root->visit(*this);
+    }
+};
+
 void TravelObstacleTracker::mark_extruded(const ExtrusionEntity *extrusion_entity, size_t object_layer_idx, size_t instance_idx)
 {
-    if (extrusion_entity->role().is_external_perimeter()) {
+    assert(extrusion_entity);
+    InsertExternalPeriExtruded visitor(this->m_extruded_extrusion, object_layer_idx, instance_idx);
 #ifdef _DEBUG
-    assert(m_registered_extrusion.find({int(object_layer_idx), int(instance_idx), extrusion_entity}) != m_registered_extrusion.end());
+    visitor.registered_extrusion = &this->m_registered_extrusion;
+    visitor.tracker = this;
 #endif
-        this->m_extruded_extrusion.insert({int(object_layer_idx), int(instance_idx), extrusion_entity});
-    }
+    visitor.process(extrusion_entity);
 }
 
 bool TravelObstacleTracker::is_extruded(const ObjectOrExtrusionLinef &line) const
 {
-    return m_extruded_extrusion.find({line.object_layer_idx, line.instance_idx, line.extrusion_entity}) != m_extruded_extrusion.end();
+    return m_extruded_extrusion.find({line.object_layer_idx, line.instance_idx, line.extrusion_entity_id}) != m_extruded_extrusion.end();
 }
 
 } // namespace Slic3r::GCode
@@ -194,44 +317,45 @@ Points3 generate_flat_travel(tcb::span<const Point> xy_path, const float elevati
     return result;
 }
 
-Vec2d place_at_segment(
-    const Vec2d &current_point, const Vec2d &previous_point, const double distance
-) {
-    Vec2d direction = (current_point - previous_point).normalized();
-    return previous_point + direction * distance;
-}
-
-std::vector<DistancedPoint> slice_xy_path(
-    tcb::span<const Point> xy_path, tcb::span<const double> sorted_distances
-) {
+std::vector<DistancedPoint> slice_xy_path(tcb::span<const Point> xy_path,
+                                          tcb::span<const double> sorted_distances,
+                                          coordf_t min_distance) {
     assert(xy_path.size() >= 2);
     std::vector<DistancedPoint> result;
     result.reserve(xy_path.size() + sorted_distances.size());
-    double total_distance{0};
+    coordf_t total_distance{0};
     result.emplace_back(DistancedPoint{xy_path.front(), 0});
-    Point previous_point = result.front().point;
-    std::size_t offset{0};
+    std::size_t dist_idx{0};
     for (const Point &point : xy_path.subspan(1)) {
-        Vec2d unscaled_point{unscaled(point)};
-        Vec2d unscaled_previous_point{unscaled(previous_point)};
-        const double current_segment_length = (unscaled_point - unscaled_previous_point).norm();
-        for (const double distance_to_add : sorted_distances.subspan(offset)) {
-            if (distance_to_add <= total_distance + current_segment_length) {
-                Point to_place = scaled(place_at_segment(
-                    unscaled_point, unscaled_previous_point, distance_to_add - total_distance
-                ));
-                if (to_place != previous_point && to_place != point) {
-                    result.emplace_back(DistancedPoint{to_place, distance_to_add});
+        const double current_segment_end = total_distance + point.distance_to(result.back().point);
+        for (const double distance_to_add : sorted_distances.subspan(dist_idx)) {
+            coordf_t dist_target = scale_d(distance_to_add);
+            if (dist_target < current_segment_end + min_distance) {
+                if (dist_target + min_distance > current_segment_end) {
+                    total_distance = current_segment_end;
+                    result.emplace_back(DistancedPoint{point, total_distance});
+                } else {
+                    //don't bother if it's at less than epsilon from the last point
+                    if (dist_target > total_distance + min_distance) {
+                        result.emplace_back(
+                            DistancedPoint{Line(result.back().point, point).point_at(dist_target - total_distance), dist_target});
+                        total_distance = dist_target;
+                    }
                 }
-                ++offset;
+                ++dist_idx;
             } else {
                 break;
             }
         }
-        total_distance += current_segment_length;
-        result.emplace_back(DistancedPoint{point, total_distance});
-        previous_point = point;
+        if (total_distance < current_segment_end) {
+            assert(point.distance_to(result.back().point) > SCALED_EPSILON);
+            total_distance = current_segment_end;
+            result.emplace_back(DistancedPoint{point, total_distance});
+        } else {
+            assert(result.back().point == point);
+        }
     }
+    assert(result.back().point == xy_path.back());
     return result;
 }
 
@@ -249,7 +373,7 @@ Points3 generate_elevated_travel(
     for (const DistancedPoint &point : extended_xy_path) {
         result.emplace_back(
             point.point.x(), point.point.y(),
-            scaled(initial_elevation + elevation(point.distance_from_start))
+            scaled(initial_elevation + elevation(unscaled(point.dist_from_start)))
         );
     }
 
@@ -376,8 +500,13 @@ SmoothingParams get_smoothing_params(
         config.machine_max_acceleration_z.get_at(extruder_id);
     const double deceleration_xy_distance = deceleration_time * max_xy_velocity;
 
-    const double blend_width = slope_end > deceleration_xy_distance / 2.0 ? deceleration_xy_distance :
+    double blend_width = slope_end > deceleration_xy_distance / 2.0 ? deceleration_xy_distance :
                                                                           slope_end * 2.0;
+
+    // not possible to blend into not-existing travel
+    if (travel_length < slope_end + blend_width / 2.0) {
+        blend_width = (travel_length - slope_end) * 2;
+    }
 
     const unsigned points_count = blend_width > 0 ?
         std::ceil(max_z_velocity / config.machine_max_jerk_z.get_at(extruder_id)) :
@@ -397,7 +526,8 @@ ElevatedTravelParams get_elevated_traval_params(
     const FullPrintConfig &config,
     GCodeWriter writer,
     const GCode::TravelObstacleTracker &obstacle_tracker,
-    size_t layer_id
+    size_t layer_id,
+    double desired_z_lift
 ) {
     ElevatedTravelParams elevation_params{};
     assert(writer.tool());
@@ -411,7 +541,7 @@ ElevatedTravelParams get_elevated_traval_params(
         elevation_params.blend_width = 0;
         return elevation_params;
     }
-    elevation_params.lift_height = config.travel_max_lift.get_at(extruder_id);
+    elevation_params.lift_height = desired_z_lift;
 
     const double slope_deg = config.travel_slope.get_at(extruder_id);
 

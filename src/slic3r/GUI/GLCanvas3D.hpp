@@ -6,7 +6,8 @@
 #ifndef slic3r_GLCanvas3D_hpp_
 #define slic3r_GLCanvas3D_hpp_
 
-#include <stddef.h>
+#include <cfloat>
+#include <cstddef>
 #include <memory>
 #include <chrono>
 #include <cstdint>
@@ -19,6 +20,7 @@
 #include "GLSelectionRectangle.hpp"
 #include "MeshUtils.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/Slicing.hpp"
 #include "GCodeViewer.hpp"
 #include "Camera.hpp"
 #include "SceneRaycaster.hpp"
@@ -27,9 +29,7 @@
 #include "libslic3r/Arrange/ArrangeSettingsDb_AppCfg.hpp"
 #include "ArrangeSettingsDialogImgui.hpp"
 
-#include "libslic3r/Slicing.hpp"
 
-#include <float.h>
 
 #include <wx/timer.h>
 
@@ -159,11 +159,13 @@ wxDECLARE_EVENT(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_RIGHT_CLICK, RBtnEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_REMOVE_OBJECT, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_ARRANGE, SimpleEvent);
+wxDECLARE_EVENT(EVT_GLCANVAS_ARRANGE_CURRENT_BED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_SELECT_ALL, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_QUESTION_MARK, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INCREASE_INSTANCES, Event<int>); // data: +1 => increase, -1 => decrease
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_MOVED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_FORCE_UPDATE, SimpleEvent);
+wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_TOUCHED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
@@ -218,6 +220,11 @@ class GLCanvas3D
         const ModelObject          *m_model_object{ nullptr };
         // Maximum z of the currently selected object (Model::objects[last_object_id]).
         float                       m_object_max_z{ 0.0f };
+        //min &max for all thigns, if possible
+        bool                        m_first_launch = true;
+        float                       m_min_layer_height{ 0.05f };
+        float                       m_max_layer_height{ 0.35f };
+        bool                        m_layer_height_limit_modified{ false };
         // Owned by LayersEditing.
         std::shared_ptr<SlicingParameters> m_slicing_parameters{ nullptr };
         std::vector<double>         m_layer_height_profile;
@@ -225,6 +232,7 @@ class GLCanvas3D
 
         mutable HeightProfileAdaptiveParams m_adaptive_params;
         mutable HeightProfileSmoothingParams m_smooth_params;
+
         
         static float                s_overlay_window_width;
 
@@ -256,12 +264,14 @@ class GLCanvas3D
         struct Profile
         {
             GLModel baseline;
+            GLModel baseline2;
             GLModel profile;
             GLModel background;
             struct OldCanvasWidth
             {
                 float background{ 0.0f };
                 float baseline{ 0.0f };
+                float baseline2{ 0.0f };
                 float profile{ 0.0f };
             };
             OldCanvasWidth old_canvas_width;
@@ -320,12 +330,12 @@ class GLCanvas3D
             static const Vec3d Invalid_3D_Point;
             static const int MoveThresholdPx;
 
-            Point start_position_2D;
-            Vec3d start_position_3D;
-            int move_volume_idx;
-            bool move_requires_threshold;
-            Point move_start_threshold_position_2D;
-
+            Point start_position_2D{ Invalid_2D_Point };
+            Vec3d start_position_3D{ Invalid_3D_Point };
+            Vec3d camera_start_target{ Invalid_3D_Point };
+            int move_volume_idx{ -1 };
+            bool move_requires_threshold{ false };
+            Point move_start_threshold_position_2D{ Invalid_2D_Point };
         public:
             Drag();
         };
@@ -340,10 +350,13 @@ class GLCanvas3D
 
         void set_start_position_2D_as_invalid() { drag.start_position_2D = Drag::Invalid_2D_Point; }
         void set_start_position_3D_as_invalid() { drag.start_position_3D = Drag::Invalid_3D_Point; }
+        void set_camera_start_target_as_invalid() { drag.camera_start_target = Drag::Invalid_3D_Point; }
         void set_move_start_threshold_position_2D_as_invalid() { drag.move_start_threshold_position_2D = Drag::Invalid_2D_Point; }
 
-        bool is_start_position_2D_defined() const { return (drag.start_position_2D != Drag::Invalid_2D_Point); }
-        bool is_start_position_3D_defined() const { return (drag.start_position_3D != Drag::Invalid_3D_Point); }
+        bool is_start_position_2D_defined() const { return drag.start_position_2D != Drag::Invalid_2D_Point; }
+        bool is_start_position_3D_defined() const { return drag.start_position_3D != Drag::Invalid_3D_Point; }
+        bool is_camera_start_target_defined() { return drag.camera_start_target != Drag::Invalid_3D_Point; }
+
         bool is_move_start_threshold_position_2D_defined() const { return (drag.move_start_threshold_position_2D != Drag::Invalid_2D_Point); }
         bool is_move_threshold_met(const Point& mouse_pos) const {
             return (std::abs(mouse_pos(0) - drag.move_start_threshold_position_2D(0)) > Drag::MoveThresholdPx)
@@ -462,6 +475,14 @@ class GLCanvas3D
     };
 
 public:
+
+    struct OrientSettings
+    {
+        float overhang_angle = 60.f;
+        bool  enable_rotation = false;
+        bool  min_area = true;
+    };
+
     enum ECursorType : unsigned char
     {
         Standard,
@@ -484,6 +505,8 @@ public:
     };
 */
 
+
+
     enum class ESLAViewType
     {
         Original,
@@ -495,6 +518,7 @@ private:
     wxGLContext* m_context;
     SceneRaycaster m_scene_raycaster;
     Bed3D &m_bed;
+    int m_last_active_bed_id{ -1 };
 #if ENABLE_RETINA_GL
     std::unique_ptr<RetinaHelper> m_retina_helper;
 #endif
@@ -515,21 +539,31 @@ private:
     bool m_extra_frame_requested;
     bool m_event_handlers_bound{ false };
 
+    mutable Vec2i32              m_fit_camera_button_pos = {128, 5};
+    mutable float              m_sc{1};
+
     bool m_show_objects = true;
     GLVolumeCollection m_volumes;
     bool m_show_gcode = true;
 #if ENABLE_OPENGL_ES
-    TriangleMesh m_wipe_tower_mesh;
+    std::vector<TriangleMesh> m_wipe_tower_mesh;
 #endif // ENABLE_OPENGL_ES
+    std::array<std::optional<BoundingBoxf>, MAX_NUMBER_OF_BEDS> m_wipe_tower_bounding_boxes;
+
     GCodeViewer m_gcode_viewer;
 
+    bool still_mouse_down = false;
     RenderTimer m_render_timer;
 
     Selection m_selection;
     const DynamicPrintConfig* m_config;
     Model* m_model;
+public:
     BackgroundSlicingProcess *m_process;
+private:
     bool m_requires_check_outside_state{ false };
+
+    void select_bed(int i, bool triggered_by_user);
 
     std::array<unsigned int, 2> m_old_size{ 0, 0 };
 
@@ -542,6 +576,9 @@ private:
     bool m_picking_enabled;
     bool m_moving_enabled;
     bool m_dynamic_background_enabled;
+    bool m_show_position_axle = false;
+    bool m_show_z_axle = false;
+    bool m_show_xy_plane = false;
     bool m_multisample_allowed;
     bool m_moving;
     bool m_tab_down;
@@ -572,6 +609,8 @@ private:
     Tooltip m_tooltip;
     bool m_tooltip_enabled{ true };
     Slope m_slope;
+
+    OrientSettings m_orient_settings_fff;
 
     class SLAView
     {
@@ -629,6 +668,7 @@ private:
         std::vector<std::pair<size_t, Transform3d>> m_instances;
         bool m_evaluating{ false };
         bool m_dragging{ false };
+        bool m_first_displacement{ true };
 
         std::vector<std::pair<Pointf3s, Transform3d>> m_hulls_2d_cache;
 
@@ -646,7 +686,6 @@ private:
     };
 
     SequentialPrintClearance m_sequential_print_clearance;
-    bool m_sequential_print_clearance_first_displacement{ true };
 
     struct ToolbarHighlighter
     {
@@ -688,8 +727,13 @@ private:
     };
 
     CameraTarget m_camera_target;
+    CameraTarget m_camera_pivot;
+    GLModel m_target_validation_box;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     GLModel m_background;
+    GLModel m_z_axle;
+    double m_z_axle_length;
+    GLModel m_xy_plane;
 
 public:
     GLCanvas3D(wxGLCanvas* canvas, Bed3D& bed);
@@ -761,7 +805,7 @@ public:
     const Model* get_model() const { return m_model; }
 
     const arr2::ArrangeSettingsView * get_arrange_settings_view() const { return &m_arrange_settings_dialog; }
-    void set_arrange_settings(const DynamicPrintConfig& conf, PrinterTechnology tech);
+    void set_arrange_settings_distance_from_objects(const DynamicPrintConfig& conf, PrinterTechnology tech) { m_arrange_settings_dialog.set_arrange_settings_distance_from_objects(conf, tech); }
 
     const Selection& get_selection() const { return m_selection; }
     Selection& get_selection() { return m_selection; }
@@ -770,6 +814,15 @@ public:
     GLGizmosManager& get_gizmos_manager() { return m_gizmos; }
 
     void bed_shape_changed();
+
+    OrientSettings& get_orient_settings()
+    {
+        PrinterTechnology ptech = this->current_printer_technology();
+
+        auto* ptr = &this->m_orient_settings_fff;
+
+        return *ptr;
+    }
 
     void set_clipping_plane(unsigned int id, const ClippingPlane& plane) {
         if (id < 2) {
@@ -909,30 +962,32 @@ public:
     int get_move_volume_id() const { return m_mouse.drag.move_volume_idx; }
     int get_first_hover_volume_idx() const { return m_hover_volume_idxs.empty() ? -1 : m_hover_volume_idxs.front(); }
     void set_selected_extruder(int extruder) { m_selected_extruder = extruder;}
-    
+
     class WipeTowerInfo {
     protected:
         Vec2d m_pos = {NaNd, NaNd};
         double m_rotation = 0.;
         BoundingBoxf m_bb;
+        int m_bed_index{0};
         friend class GLCanvas3D;
 
-    public:        
+    public:
         inline operator bool() const {
             return !std::isnan(m_pos.x()) && !std::isnan(m_pos.y());
         }
-        
+
         inline const Vec2d& pos() const { return m_pos; }
         inline double rotation() const { return m_rotation; }
         inline const Vec2d bb_size() const { return m_bb.size(); }
         inline const BoundingBoxf& bounding_box() const { return m_bb; }
         
         void apply_wipe_tower() const;
+        inline const int bed_index() const { return m_bed_index; }
 
-        static void apply_wipe_tower(Vec2d pos, double rot);
+        static void apply_wipe_tower(Vec2d pos, double rot, int bed_index);
     };
-    
-    WipeTowerInfo get_wipe_tower_info() const;
+
+    std::vector<WipeTowerInfo> get_wipe_tower_infos() const;
 
     // Returns the view ray line, in world coordinate, at the given mouse position.
     Linef3 mouse_ray(const Point& mouse_pos);
@@ -994,7 +1049,7 @@ public:
     void reset_sequential_print_clearance() {
         m_sequential_print_clearance.m_evaluating = false;
         if (m_sequential_print_clearance.is_dragging())
-            m_sequential_print_clearance_first_displacement = true;
+            m_sequential_print_clearance.m_first_displacement = true;
         else
             m_sequential_print_clearance.set_contours(ContoursList(), false);
         set_as_dirty();
@@ -1003,6 +1058,8 @@ public:
 
     void set_sequential_print_clearance_contours(const ContoursList& contours, bool generate_fill) {
         m_sequential_print_clearance.set_contours(contours, generate_fill);
+        if (generate_fill)
+            m_sequential_print_clearance.m_evaluating = false;
         set_as_dirty();
         request_extra_frame();
     }
@@ -1073,6 +1130,7 @@ private:
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
+    void _render_bed_selector();
     void _render_volumes_for_picking(const Camera& camera) const;
     void _render_current_gizmo() const;
     void _render_gizmos_overlay();
@@ -1082,12 +1140,19 @@ private:
     void _render_view_toolbar() const;
 #if ENABLE_SHOW_CAMERA_TARGET
     void _render_camera_target();
+    void _render_camera_pivot();
+    void _render_camera_target_validation_box();
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
     void _render_selection_sidebar_hints();
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
     bool _render_search_list(float pos_x);
-    bool _render_arrange_menu(float pos_x);
+    bool _render_arrange_menu(float pos_x, bool current_bed);
+    bool _render_orient_menu(float left, float right, float bottom, float top, bool current_bed);
+    void _render_3d_navigator();
+    void _render_fit_camera_toolbar();
+    const float get_scale() const;
+    
     void _render_thumbnail_internal(ThumbnailData& thumbnail_data, const ThumbnailsParams& thumbnail_params, const GLVolumeCollection& volumes, Camera::EType camera_type);
     // render thumbnail using an off-screen framebuffer
     void _render_thumbnail_framebuffer(ThumbnailData& thumbnail_data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, const GLVolumeCollection& volumes, Camera::EType camera_type);
@@ -1102,7 +1167,7 @@ private:
 
     // Convert the screen space coordinate to an object space coordinate.
     // If the Z screen space coordinate is not provided, a depth buffer value is substituted.
-    Vec3d _mouse_to_3d(const Point& mouse_pos, float* z = nullptr);
+    Vec3d _mouse_to_3d(const Point& mouse_pos, const float* z = nullptr);
 
     // Convert the screen space coordinate to world coordinate on the bed.
     Vec3d _mouse_to_bed_3d(const Point& mouse_pos);
@@ -1130,6 +1195,7 @@ private:
     void _set_warning_notification(EWarning warning, bool state);
 
     std::pair<bool, const GLVolume*> _is_any_volume_outside() const;
+    bool _is_sequential_print_enabled() const;
 
     // updates the selection from the content of m_hover_volume_idxs
     void _update_selection_from_hover();

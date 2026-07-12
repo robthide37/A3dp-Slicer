@@ -248,6 +248,13 @@ Points SkeletalTrapezoidation::discretize(const VD::edge_type& vd_edge, const st
         Point   left_point    = Geometry::VoronoiUtils::get_source_point(*left_cell, segments.begin(), segments.end());
         Point   right_point   = Geometry::VoronoiUtils::get_source_point(*right_cell, segments.begin(), segments.end());
         coord_t d             = (right_point - left_point).cast<int64_t>().norm();
+
+        // Handle degenerate case where left and right points are the same
+        if (d == 0) {
+            assert(false); // if triggered, please examinate what to do: prevent or repair.
+            return Points({ start }); // return degenerate value, trigger a warning log
+        }
+
         Point   middle        = (left_point + right_point) / 2;
         Point   x_axis_dir    = perp(Point(right_point - left_point));
         coord_t x_axis_length = x_axis_dir.cast<int64_t>().norm();
@@ -642,7 +649,7 @@ void SkeletalTrapezoidation::filterCentral(coord_t max_length)
 {
     for (edge_t& edge : graph.edges)
     {
-        if (isEndOfCentral(edge) && edge.to->isLocalMaximum() && !edge.to->isLocalMaximum())
+        if (isEndOfCentral(edge) && edge.from->isLocalMaximum() && !edge.to->isLocalMaximum())
         {
             filterCentral(edge.twin, 0, max_length);
         }
@@ -1583,8 +1590,8 @@ SkeletalTrapezoidation::edge_t* SkeletalTrapezoidation::getQuadMaxRedgeTo(edge_t
             ret = edge;
         }
     }
-
-    if (!ret->next && ret->to->data.distance_to_boundary - scaled<coord_t>(0.005) < ret->from->data.distance_to_boundary)
+    assert(ret);
+    if (ret && !ret->next && ret->to->data.distance_to_boundary - scaled<coord_t>(0.005) < ret->from->data.distance_to_boundary)
     {
         ret = ret->prev;
     }

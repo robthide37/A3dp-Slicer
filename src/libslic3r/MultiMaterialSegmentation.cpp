@@ -18,7 +18,7 @@
 #include <unordered_set>
 
 #include <boost/log/trivial.hpp>
-#include <tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_for.h>
 #include <mutex>
 #include <boost/thread/lock_guard.hpp>
 
@@ -807,7 +807,7 @@ static std::vector<ExPolygons> extract_colored_segments(const std::vector<Colore
                 edge->color(VD_ANNOTATION::DELETED);
 
                 if (next_vertex.color() == VD_ANNOTATION::VERTEX_ON_CONTOUR || next_vertex.color() == VD_ANNOTATION::DELETED) {
-                    assert(next_vertex.color() == VD_ANNOTATION::VERTEX_ON_CONTOUR);
+                    // assert(next_vertex.color() == VD_ANNOTATION::VERTEX_ON_CONTOUR); ? and for DELETED ?
                     break;
                 }
 
@@ -879,6 +879,10 @@ static inline std::vector<std::vector<ExPolygons>> mm_segmentation_top_and_botto
         const PrintRegionConfig &config = print_object.printing_region(i).config();
         max_top_layers    = std::max(max_top_layers, config.top_solid_layers.value);
         max_bottom_layers = std::max(max_bottom_layers, config.bottom_solid_layers.value);
+        if (config.solid_infill_every_layers == 1  && config.fill_density.value > 0) {
+            max_top_layers = 100000;
+            max_bottom_layers = 100000;
+        }
         granularity       = std::max(granularity, std::max(config.top_solid_layers.value, config.bottom_solid_layers.value) - 1);
     }
 
@@ -955,8 +959,8 @@ static inline std::vector<std::vector<ExPolygons>> mm_segmentation_top_and_botto
     };
 
     // Filter out polygons less than 0.1mm^2, because they are unprintable and causing dimples on outer primers (#7104)
-    filter_out_small_polygons(top_raw, Slic3r::sqr(scale_(0.1f)));
-    filter_out_small_polygons(bottom_raw, Slic3r::sqr(scale_(0.1f)));
+    filter_out_small_polygons(top_raw, Slic3r::sqr(scale_d(0.1f)));
+    filter_out_small_polygons(bottom_raw, Slic3r::sqr(scale_d(0.1f)));
 
 #ifdef MM_SEGMENTATION_DEBUG_TOP_BOTTOM
     {
@@ -1012,6 +1016,10 @@ static inline std::vector<std::vector<ExPolygons>> mm_segmentation_top_and_botto
                 out.extrusion_width     = std::max<double>(out.extrusion_width, perimeter_extrusion_width);
                 out.top_solid_layers    = std::max<int>(out.top_solid_layers, config.top_solid_layers);
                 out.bottom_solid_layers = std::max<int>(out.bottom_solid_layers, config.bottom_solid_layers);
+                if (config.solid_infill_every_layers.value == 1 && config.fill_density.value > 0) {
+                    out.top_solid_layers = 100000;
+                    out.bottom_solid_layers = 100000;
+                }
                 out.small_region_threshold = config.gap_fill_enabled.value ?
                                              // Gap fill enabled. Enable a single line of 1/2 extrusion width.
                                              0.5f * (perimeter_extrusion_width) :
@@ -1261,7 +1269,7 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
             // to ensure that very close polygons will be merged.
             ex_polygons = union_ex(ex_polygons);
             // Remove all expolygons and holes with an area less than 0.1mm^2
-            remove_small_and_small_holes(ex_polygons, Slic3r::sqr(scale_(0.1f)));
+            remove_small_and_small_holes(ex_polygons, Slic3r::sqr(scale_d(0.1f)));
             // Occasionally, some input polygons contained self-intersections that caused problems with Voronoi diagrams
             // and consequently with the extraction of colored segments by function extract_colored_segments.
             // Calling simplify_polygons removes these self-intersections.
@@ -1269,7 +1277,9 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
             // Such close points sometimes caused that the Voronoi diagram has self-intersecting edges around these vertices.
             // This consequently leads to issues with the extraction of colored segments by function extract_colored_segments.
             // Calling expolygons_simplify fixed these issues.
-            input_expolygons[layer_idx] = remove_duplicates(expolygons_simplify(offset_ex(ex_polygons, -10.f * float(SCALED_EPSILON)), 5 * SCALED_EPSILON), scaled<coord_t>(0.01), PI/6);
+            input_expolygons[layer_idx] = offset_ex(ex_polygons, -10.f * float(SCALED_EPSILON));
+            expolygons_simplify(input_expolygons[layer_idx], 5 * SCALED_EPSILON);
+            input_expolygons[layer_idx] = remove_duplicates(input_expolygons[layer_idx], scaled<coord_t>(0.01), PI/6);
 
 #ifdef MM_SEGMENTATION_DEBUG_INPUT
             export_processed_input_expolygons_to_svg(debug_out_path("mm-input-%d-%d.svg", layer_idx, iRun), layers[layer_idx]->regions(), input_expolygons[layer_idx]);

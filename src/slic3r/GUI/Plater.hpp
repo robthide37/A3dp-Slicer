@@ -35,6 +35,9 @@
 #include "GUI_Preview.hpp"
 #include "ProjectDirtyStateManager.hpp"
 #include "wxExtensions.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "slic3r/GUI/Camera.hpp"
+#include "slic3r/Utils/PrintHost.hpp"
 
 class wxButton;
 class ScalableButton;
@@ -62,7 +65,21 @@ namespace UndoRedo {
     struct Snapshot;
 }
 
+// for Plater::load_files
+enum class LoadFileOption : int {
+    LoadModel,
+    LoadConfig,
+    DontUpdateDirs,
+    ImperialUnits,
+    UnbakeTransformation
+};
+using LoadFileOptions = enum_bitmask<LoadFileOption>;
+ENABLE_ENUM_BITMASK_OPERATORS(LoadFileOption);
+
 namespace GUI {
+
+wxDECLARE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
+wxDECLARE_EVENT(EVT_REGENERATE_BED_THUMBNAILS, SimpleEvent);
 
 class MainFrame;
 class ConfigOptionsGroup;
@@ -76,6 +93,7 @@ class NotificationManager;
 struct Camera;
 class GLToolbar;
 class PlaterPresetComboBox;
+enum class ArrangeSelectionMode;
 
 using t_optgroups = std::vector <std::shared_ptr<ConfigOptionsGroup>>;
 
@@ -120,16 +138,11 @@ public:
     ConfigOptionsGroup*     og_freq_chng_params(PrinterTechnology tech);
     wxButton*               get_wiping_dialog_button();
     void                    update_objects_list_extruder_column(size_t extruders_count);
-    void                    show_info_sizer();
-    void                    show_sliced_info_sizer(const bool show);
+
     void                    update_sliced_info_sizer();
     void                    enable_buttons(bool enable);
     void                    set_btn_label(const ActionButtonType btn_type, const wxString& label) const;
-    bool                    show_reslice(bool show) const;
-	bool                    show_export(bool show) const;
-	bool                    show_send(bool show) const;
-    bool                    show_eject(bool show)const;
-	bool                    show_export_removable(bool show) const;
+
 	bool                    get_eject_shown() const;
     bool                    is_multifilament();
     void                    update_mode();
@@ -138,10 +151,25 @@ public:
     void                    check_and_update_searcher(bool respect_mode = false);
     void                    update_ui_from_settings();
 
-#ifdef _USE_CUSTOM_NOTEBOOK
     void                    show_mode_sizer(bool show);
-#endif
+    void                    show_btns_sizer(const bool show);
+    void                    show_info_sizer();
+    void                    show_sliced_info_sizer(const bool show);
+    bool                    show_reslice(bool show) const;
+	   bool                    show_export(bool show) const;
+	   bool                    show_send(bool show) const;
+    bool                    show_eject(bool show)const;
+	   bool                    show_export_removable(bool show) const;
+    void                    show_bulk_btns_sizer(const bool show);
 
+    void                    enable_bulk_buttons(bool enable);
+    bool                    show_export_all(bool show) const;
+    bool                    show_export_removable_all(bool show) const;
+    bool                    show_send_all(bool show) const;
+
+    void                    switch_to_autoslicing_mode();
+    void                    switch_from_autoslicing_mode();
+    
     std::vector<PlaterPresetComboBox*>&   combos_filament();
     Search::OptionsSearcher&        get_searcher();
     std::string&                    get_search_line();
@@ -150,6 +178,7 @@ private:
     struct priv;
     std::unique_ptr<priv> p;
 };
+
 
 class Plater: public wxPanel
 {
@@ -180,16 +209,23 @@ public:
     Sidebar& sidebar();
     const Model& model() const;
     Model& model();
-    const Print& fff_print() const;
-    Print& fff_print();
-    const SLAPrint& sla_print() const;
-    SLAPrint& sla_print();
-    const PrintBase* current_print() const;
+    //const Print& fff_print() const;
+    //Print& fff_print();
+    //const SLAPrint& sla_print() const;
+    //SLAPrint& sla_print();
+    
+    Print& active_fff_print();
+    SLAPrint& active_sla_print();
 
     bool new_project(std::string project_name = "");
+    std::vector<std::unique_ptr<Print>>& get_fff_prints();
+    const std::vector<GCodeProcessorResult>& get_gcode_results() const;
+
+   // void new_project();
     void load_project();
-    void load_project(const wxString& filename);
+    void load_project(const wxString& filename, bool unbake_trsf = false);
     void add_model(bool imperial_units = false);
+    void load_model_hueforge(const std::string& path = "");
     void import_zip_archive();
     void import_sl1_archive();
     void extract_config_from_project();
@@ -199,12 +235,15 @@ public:
     void convert_gcode_to_ascii();
     void convert_gcode_to_binary();
     void refresh_print();
+    void object_list_changed();
+    void generate_thumbnail(ThumbnailData& data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, Camera::EType camera_type);
+    void reload_print();
 
     //std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model = true, bool load_config = true, bool update_dirs = true, bool imperial_units = false);
     // To be called when providing a list of files to the GUI slic3r on command line.
     //std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool update_dirs = true, bool imperial_units = false);
-    std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model, bool load_config, bool update_dirs, bool imperial_units);
-    std::vector<size_t> load_files(const std::vector<std::string>& input_files,             bool load_model, bool load_config, bool update_dirs, bool imperial_units);
+    std::vector<size_t> load_files(const std::vector<boost::filesystem::path> &input_files, LoadFileOptions options);
+    std::vector<size_t> load_files(const std::vector<std::string> &input_files, LoadFileOptions options);
     // to be called on drag and drop
     bool load_files(const wxArrayString& filenames, bool delete_after_load = false);
     void notify_about_installed_presets();
@@ -301,6 +340,7 @@ public:
     void export_platter();
     void export_stl_obj(std::string path, bool extended = false, bool selection_only = false);
     void export_amf();
+    void export_all_gcodes(bool prefer_removable);
     bool export_3mf(const boost::filesystem::path& output_path = boost::filesystem::path());
     void reload_from_disk();
     void replace_with_stl();
@@ -317,11 +357,21 @@ public:
     void changed_object(ModelObject &object);
     void changed_object(int obj_idx);
     void changed_objects(const std::vector<size_t>& object_idxs);
+    void changed_all_objects();
     void schedule_background_process(bool schedule = true);
     bool is_background_process_update_scheduled() const;
     void suppress_background_process(const bool stop_background_process) ;
     void send_gcode();
-	void eject_drive();
+    void eject_drive();
+   
+    void with_mocked_fff_background_process(
+               Print &print,
+               GCodeProcessorResult &result,
+               const int bed_index,
+               const std::function<void()> &callable
+    );
+
+    std::string get_upload_filename();
 
     void take_snapshot(const std::string &snapshot_name);
     void take_snapshot(const wxString &snapshot_name);
@@ -356,6 +406,7 @@ public:
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;
     void show_action_buttons() const;
+    void show_autoslicing_action_buttons() const;
 
     wxString get_project_filename(const wxString& extension = wxEmptyString) const;
     void set_project_filename(const wxString& filename);
@@ -368,9 +419,13 @@ public:
     GLCanvas3D* canvas3D();
     const GLCanvas3D * canvas3D() const;
     GLCanvas3D* get_current_canvas3D();
-    
+
+    void render_sliders(GLCanvas3D& canvas);
+
     void arrange();
-    void arrange(Worker &w, bool selected);
+    void orient();
+    void arrange_current_bed();
+    void arrange(Worker &w, const ArrangeSelectionMode &selected);
 
     void set_current_canvas_as_dirty();
     void unbind_canvas_event_handlers();
@@ -397,6 +452,7 @@ public:
     bool can_split_to_objects() const;
     bool can_split_to_volumes() const;
     bool can_arrange() const;
+    bool can_orient() const;
     bool can_layers_editing() const;
     bool can_paste_from_clipboard() const;
     bool can_copy_to_clipboard() const;
@@ -522,6 +578,12 @@ public:
     static void show_illegal_characters_warning(wxWindow* parent);
 
 private:
+    std::optional<fs_path> get_default_output_file();
+    std::optional<wxString> check_output_path_has_error(const boost::filesystem::path& path) const;
+    std::optional<fs_path> get_output_path(const std::string &start_dir, const fs_path &default_output_file);
+    std::optional<fs_path> get_multiple_output_dir(const std::string &start_dir);
+
+    void export_gcode_to_path(const fs_path &output_path, const std::function<void(bool)> &export_callback);
     void reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages);
 
     struct priv;

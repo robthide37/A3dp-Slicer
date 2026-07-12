@@ -75,6 +75,11 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PlugMarker            , "plug"                          },
     {ImGui::DowelMarker           , "dowel"                         },
     {ImGui::SnapMarker            , "snap"                          },
+    {ImGui::HorizontalHide        , "horizontal_hide"               },
+    {ImGui::HorizontalShow        , "horizontal_show"               },
+    {ImGui::PrintIdle             , "print_idle"                    },
+    {ImGui::PrintRunning          , "print_running"                 },
+    {ImGui::PrintFinished         , "print_finished"                },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
@@ -95,6 +100,7 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::EjectButton             , "notification_eject_sd"           },
     {ImGui::EjectHoverButton        , "notification_eject_sd_hover"     },
     {ImGui::WarningMarker           , "notification_warning"            },
+    {ImGui::WarningMarkerDisabled   , "notification_warning_grey"       },
     {ImGui::ErrorMarker             , "notification_error"              },
     {ImGui::CancelButton            , "notification_cancel"             },
     {ImGui::CancelHoverButton       , "notification_cancel_hover"       },
@@ -114,6 +120,8 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::OpenHoverButton         , "notification_open_hover"         },
     {ImGui::SlaViewOriginal         , "sla_view_original"               },
     {ImGui::SlaViewProcessed        , "sla_view_processed"              },
+    {ImGui::SliceAllBtnIcon         , "slice_all"                       },
+        {ImGui::FitCamera               , "fit_camera"                       },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_extra_large = {
@@ -122,11 +130,11 @@ static const std::map<const wchar_t, std::string> font_icons_extra_large = {
 
 const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
-//const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.67f, 0.36f, 0.19f, 1.0f };
-//const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = to_ImVec4(ColorRGBA::ORANGE());
+//const ImVec4 ImGuiWrapper::COL_BLUE_DARK       = { 0.67f, 0.36f, 0.19f, 1.0f };
+//const ImVec4 ImGuiWrapper::COL_BLUE_LIGHT      = to_ImVec4(ColorRGBA::ORANGE());
 const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.13f, 0.13f, 0.13f, 0.8f };
-//const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
-//const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
+//const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_BLUE_DARK;
+//const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_BLUE_LIGHT;
 //const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = COL_BUTTON_HOVERED;
 
 bool ImGuiWrapper::COL_LOADED   = false;
@@ -1706,8 +1714,15 @@ static const ImWchar ranges_keyboard_shortcuts[] =
 std::vector<unsigned char> ImGuiWrapper::load_svg(const std::string& bitmap_name, unsigned target_width, unsigned target_height)
 {
     std::vector<unsigned char> empty_vector;
-
-    NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, { { "\"#808080\"", "\"#FFFFFF\"" } });
+    Slic3r::ColorReplaces replaces;
+    uint32_t color_int = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
+    replaces.add("#ED6B21", color_int);
+    replaces.add("#ed6b21", color_int);
+    replaces.add("#ED8D21", Slic3r::GUI::wxGetApp().app_config->create_color(0.5f, 0.93f));
+    replaces.add("#2172eb", color_int);
+    // as the platter is quite dark, then this replacment is always active
+    replaces.add("#808080", "#FFFFFF");
+    NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), "px", 96.0f, replaces);
     if (image == nullptr)
         return empty_vector;
 

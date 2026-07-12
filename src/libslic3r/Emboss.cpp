@@ -3,27 +3,29 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include <numeric>
-#include "Emboss.hpp"
-#include <stdio.h>
-#include <numeric>
 #include <cstdlib>
+#include <cstdio>
+#include <numeric>
+
 #include <boost/nowide/convert.hpp>
 #include <boost/log/trivial.hpp>
 #include <ClipperUtils.hpp> // union_ex + for boldness(polygon extend(offset))
-#include "IntersectionPoints.hpp"
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
 #include "imgui/imstb_truetype.h" // stbtt_fontinfo
-#include "Utils.hpp" // ScopeGuard
+
 
 #include <Triangulation.hpp> // CGAL project
-#include "libslic3r.h"
 
 // to heal shape
-#include "ExPolygonsIndex.hpp"
+#include "libslic3r.h"
 #include "libslic3r/AABBTreeLines.hpp" // search structure for found close points
 #include "libslic3r/Line.hpp"
 #include "libslic3r/BoundingBox.hpp"
+#include "Emboss.hpp"
+#include "ExPolygonsIndex.hpp"
+#include "IntersectionPoints.hpp"
+#include "Utils.hpp" // ScopeGuard
 
 // Experimentaly suggested ration of font ascent by multiple fonts
 // to get approx center of normal text line
@@ -272,19 +274,44 @@ bool is_valid(const FontFile &font, unsigned int index) {
 fontinfo_opt load_font_info(
     const unsigned char *data, unsigned int index)
 {
-    int font_offset = stbtt_GetFontOffsetForIndex(data, index);
-    if (font_offset < 0) {
-        assert(false);
-        // "Font index(" << index << ") doesn't exist.";
-        return {};        
+    try {
+        if (stbtt_tag4(data, '1', 0, 0, 0)) {
+            BOOST_LOG_TRIVIAL(debug) << "Loading TrueType file: start with '1'000";
+        } else if (stbtt_tag(data, "typ1")) {
+            BOOST_LOG_TRIVIAL(debug) << "Loading TrueType with type 1 font file: start with 'typ1'";
+            BOOST_LOG_TRIVIAL(error) << "Error, we don't support TrueType with type 1 font";
+        } else if (stbtt_tag(data, "OTTO")) {
+            BOOST_LOG_TRIVIAL(debug) << "Loading OpenType file: start with 'OTTO'";
+        } else if (stbtt_tag4(data, 0,1,0,0)) {
+            BOOST_LOG_TRIVIAL(debug) << "Loading OpenType file: start with 0100";
+        } else if (stbtt_tag(data, "true")) {
+            BOOST_LOG_TRIVIAL(debug) << "Loading Apple specification for TrueType fonts file: start with 'true'";
+        } else {
+            BOOST_LOG_TRIVIAL(error) << "Error, unknown font format, here are the first 4 chars: '"
+                <<data[0]<<"' '"<<data[1]<<"' '"<<data[2]<<"' '"<<data[3]
+                <<"' (in decimal:  "<<int(data[0])<<","<<int(data[1])<<","<<int(data[2])<<","<<int(data[3])<<")";
+        }
+        int font_offset = stbtt_GetFontOffsetForIndex(data, index);
+        if (font_offset < 0) {
+            assert(false);
+            // "Font index(" << index << ") doesn't exist.";
+            BOOST_LOG_TRIVIAL(error) << "Error while loading font: Font index " << font_offset << " doesn't exists";
+            return {};
+        }
+        BOOST_LOG_TRIVIAL(debug) << "Font offset: "<<font_offset;
+        stbtt_fontinfo font_info;
+        if (stbtt_InitFont(&font_info, data, font_offset) == 0) {
+            // Can't initialize font.
+            assert(false);
+            BOOST_LOG_TRIVIAL(error) << "Error while loading font: can't initialize font";
+            return {};
+        }
+        BOOST_LOG_TRIVIAL(debug) << "Font loaded";
+        return font_info;
+    } catch (std::exception e) {
+        BOOST_LOG_TRIVIAL(error) << "Error while loading font: " << e.what();
     }
-    stbtt_fontinfo font_info;
-    if (stbtt_InitFont(&font_info, data, font_offset) == 0) {
-        // Can't initialize font.
-        assert(false);
-        return {};
-    }
-    return font_info;
+    return {};
 }
 
 void remove_bad(Polygons &polygons) {
@@ -1072,6 +1099,7 @@ std::unique_ptr<FontFile> Emboss::create_font_file(
 
 std::unique_ptr<FontFile> Emboss::create_font_file(const char *file_path)
 {
+    BOOST_LOG_TRIVIAL(debug) << "open font file: " << file_path;
     FILE *file = std::fopen(file_path, "rb");
     if (file == nullptr) {
         assert(false);
@@ -1771,7 +1799,7 @@ std::optional<Vec2d> Emboss::OrthoProject::unproject(const Vec3d &p, double *dep
 namespace {
 
 
-bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, const size_t &i, const Slic3r::Polygon &polygon, bool is_first, bool is_reverse = false)
+bool point_in_distance_sqr(const distsqrf_t &distance_sq, PolygonPoint &polygon_point, const size_t &i, const Slic3r::Polygon &polygon, bool is_first, bool is_reverse = false)
 {
     size_t s  = polygon.size();
     size_t ii = (i + polygon_point.index) % s;
@@ -1780,8 +1808,8 @@ bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, c
     const Point &p = polygon[ii];
     Point p_d = p - polygon_point.point;
 
-    P2 p_d2 = p_d.cast<Coord2>();
-    Coord2 p_distance_sq = p_d2.squaredNorm();
+    Vec2d p_d2 = p_d.cast<distsqrf_t>();
+    distsqrf_t p_distance_sq = p_d2.squaredNorm();
     if (p_distance_sq < distance_sq)
         return false;
 
@@ -1802,11 +1830,11 @@ bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, c
     const Point &p2 = polygon[ii2];
 
     Point line_dir  = p2 - p;
-    P2    line_dir2 = line_dir.cast<Coord2>();
+    Vec2d    line_dir2 = line_dir.cast<distsqrf_t>();
 
-    Coord2 a = line_dir2.dot(line_dir2);
-    Coord2 b = 2 * p_d2.dot(line_dir2);
-    Coord2 c = p_d2.dot(p_d2) - distance_sq;
+    distsqrf_t a = line_dir2.dot(line_dir2);
+    distsqrf_t b = 2 * p_d2.dot(line_dir2);
+    distsqrf_t c = p_d2.dot(p_d2) - distance_sq;
 
     double discriminant = b * b - 4 * a * c;
     if (discriminant < 0) {
@@ -1841,10 +1869,10 @@ bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, c
 
 void point_in_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
 {
-    Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
+    distsqrf_t distance_sq = coord_sqr(distance);
     bool is_first = true;
     for (size_t i = 1; i < polygon.size(); ++i) {
-        if (point_in_distance(distance_sq, p, i, polygon, is_first))
+        if (point_in_distance_sqr(distance_sq, p, i, polygon, is_first))
             return;
         is_first = false;
     }
@@ -1853,11 +1881,11 @@ void point_in_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon 
 
 void point_in_reverse_distance(coord_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
 {
-    Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
+    distsqrf_t distance_sq = coord_sqr(distance);
     bool is_first = true;
     bool is_reverse = true;
     for (size_t i = polygon.size(); i > 0; --i) {
-        if (point_in_distance(distance_sq, p, i, polygon, is_first, is_reverse))
+        if (point_in_distance_sqr(distance_sq, p, i, polygon, is_first, is_reverse))
             return;
         is_first = false;
     }

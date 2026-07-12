@@ -1,3 +1,7 @@
+///|/ Copyright (c) SuperSlicer 2023-2025 Remi Durand @supermerill
+///|/ 
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_ScriptExecutor_hpp_
 #define slic3r_ScriptExecutor_hpp_
 
@@ -6,6 +10,45 @@
 
 #include <angelscript/include/angelscript.h>
 #include <angelscript/add_on/scriptbuilder/scriptbuilder.h>
+namespace AngelScript{
+    
+template<class T>
+class PtrRelease
+{
+private:
+	T* ptr = nullptr;
+public:
+	PtrRelease() {}
+	PtrRelease(const PtrRelease&) = delete;
+	PtrRelease& operator=(PtrRelease const&) = delete;
+	~PtrRelease() { if (nullptr != ptr) ptr->Release(); }
+
+	/// @brief this reset release its ownership and re-acquire another one
+	void reset(T* p) noexcept
+	{
+		assert((nullptr == p) || (ptr != p)); // auto-reset not allowed
+		if (nullptr != ptr) ptr->Release();
+		ptr = p;
+	}
+	// underlying pointer operations :
+	inline T& operator*()  const noexcept
+	{
+		assert(nullptr != ptr);
+		return *ptr;
+	}
+	inline T* operator->() const noexcept
+	{
+		assert(nullptr != ptr);
+		return ptr;
+	}
+	inline T* get()  const noexcept
+	{
+		// no assert, can return nullptr
+		return ptr;
+	}
+};
+    
+} // namespace AngelScript
 
 namespace Slic3r { namespace GUI {
 
@@ -54,6 +97,8 @@ public:
     bool                                        can_set() { return m_can_set; }
     void                                        request_refresh() { m_need_refresh = true; }
     void add_to_reset(const std::string &key) { m_to_reset_initial.push_back(key); }
+    void remove_from_reset(const std::string &key);
+    bool is_reset(const std::string &key) { return std::find(m_to_reset_initial.begin(), m_to_reset_initial.end(), key) != m_to_reset_initial.end(); }
 
     void init(const std::string &tab_key, Tab *tab);
     void call_script_function_set(const ConfigOptionDef &def, const boost::any &value);

@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <cstdint>
+#include <cassert>
 
 namespace Slic3r {
 //that's good and clean but a pain in the ass to debug with the debuggeur.
@@ -192,7 +193,7 @@ public:
     }
 
     //modifiers
-    static constexpr const ExtrusionRoleModifier Bridge{ExtrusionRoleModifier::ERM_Bridge};
+    //static constexpr const ExtrusionRoleModifier Bridge{ExtrusionRoleModifier::ERM_Bridge};
 
     static constexpr const ExtrusionRoleModifier None{};
     // Internal perimeter, not bridging.
@@ -248,7 +249,7 @@ public:
     static constexpr const ExtrusionRoleModifier Travel{ExtrusionRoleModifier::ERM_Travel};
     
     bool is_perimeter() const { return (m & ExtrusionRoleModifier::ERM_Perimeter); }
-    bool is_external_perimeter() const { return this->is_perimeter() && this->is_external(); }
+    bool is_external_perimeter() const { return this->is_perimeter() && this->is_external(); } // includes external overhang
     bool is_overhang() const { return (m & (ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Bridge)) == (ExtrusionRoleModifier::ERM_Perimeter | ExtrusionRoleModifier::ERM_Bridge); }
     bool is_infill() const { return (m & ExtrusionRoleModifier::ERM_Infill); }
     bool is_solid_infill() const { return this->is_infill() && (m & ExtrusionRoleModifier::ERM_Solid); }

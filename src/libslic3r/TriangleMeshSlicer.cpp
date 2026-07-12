@@ -10,6 +10,7 @@
 #include "Utils.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <deque>
 #include <queue>
@@ -19,8 +20,8 @@
 
 #include <boost/log/trivial.hpp>
 
-#include <tbb/parallel_for.h>
-#include <tbb/scalable_allocator.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/scalable_allocator.h>
 
 #include <ankerl/unordered_dense.h>
 
@@ -36,7 +37,6 @@
 // #define SLIC3R_TRIANGLEMESH_DEBUG
 #endif
 
-#include <assert.h>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 
@@ -1043,7 +1043,25 @@ static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polyg
                     (first_line->a_id      != -1 && first_line->a_id      == last_line->b_id)) {
                     // The current loop is complete. Add it to the output.
                     assert(first_line->a == last_line->b);
-                    loops.emplace_back(std::move(loop_pts));
+                    Points loop_pts_init = loop_pts;
+                    while (loop_pts.size() > 2 && loop_pts.front().coincides_with(loop_pts.back())) {
+                        loop_pts.pop_back();
+                    }
+                    for (size_t idx =0 ; idx < loops.size(); ++idx) {
+                        auto &loop = loops[idx];
+                        assert(!loop.points.front().coincides_with(loop.points.back()));
+                    }
+                    if (loop_pts.size() > 2) {
+                        assert(!loop_pts.front().coincides_with(loop_pts.back()));
+                        Polygon polygon(std::move(loop_pts));
+                        while (polygon.size() > 1 && polygon.front().coincides_with_epsilon(polygon.back()))
+                            polygon.points.pop_back();
+                        if (polygon.size() > 2) {
+                            loops.push_back(std::move(polygon));
+                        }
+                        for(auto &loop : loops)
+                            assert(!loop.points.front().coincides_with(loop.points.back()));
+                    }
                     #ifdef SLIC3R_TRIANGLEMESH_DEBUG
                     printf("  Discovered %s polygon of %d points\n", (p.is_counter_clockwise() ? "ccw" : "cw"), (int)p.points.size());
                     #endif
@@ -1061,7 +1079,7 @@ static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polyg
                 next_line->edge_a_id, next_line->edge_b_id, next_line->a_id, next_line->b_id,
                 next_line->a.x, next_line->a.y, next_line->b.x, next_line->b.y);
             */
-            assert(last_line->b == next_line->a);
+            assert((last_line->b - next_line->a).norm() < 10);
             loop_pts.emplace_back(next_line->a);
             last_line = next_line;
             next_line->set_skip();
@@ -1164,6 +1182,7 @@ static void chain_open_polylines_exact(std::vector<OpenPolyline> &open_polylines
                 //assert(opl->points.front().point_id == opl->points.back().point_id);
                 //assert(opl->points.front().edge_id  == opl->points.back().edge_id);
                 // Remove the duplicate last point.
+                assert(opl->points.front() == opl->points.back());
                 opl->points.pop_back();
                 if (opl->points.size() >= 3) {
                     if (try_connect_reversed && area(opl->points) < 0)
@@ -1240,6 +1259,7 @@ static void chain_open_polylines_close_gaps(std::vector<OpenPolyline> &open_poly
                 closest_end_point_lookup.erase(OpenPolylineEnd(opl, true));
                 if (current_loop_closing_distance2 == 0.) {
                     // Remove the duplicate last point.
+                    assert(opl->points.front() == opl->points.back());
                     opl->points.pop_back();
                 } else {
                     // The end points are different, keep both of them.
@@ -1931,7 +1951,7 @@ std::vector<ExPolygons> slice_mesh_ex(
         if (params.mode_below == MeshSlicingParams::SlicingMode::PositiveLargestContour)
             slicing_params.mode_below = MeshSlicingParams::SlicingMode::Positive;
         layers_p = slice_mesh(mesh, zs, slicing_params, throw_on_cancel);
-        for(Polygons &polys : layers_p) ensure_valid(polys, std::max(SCALED_EPSILON, scale_t(params.resolution) / 4));
+        for(Polygons &polys : layers_p) ensure_valid(polys);
     }
     
 //    BOOST_LOG_TRIVIAL(debug) << "slice_mesh make_expolygons in parallel - start";
@@ -1970,16 +1990,17 @@ std::vector<ExPolygons> slice_mesh_ex(
                 }
                 assert(!has_duplicate_points(expolygons));
 #endif // NDEBUG
-                //FIXME simplify
+                // simplify
                 if (this_mode == MeshSlicingParams::SlicingMode::PositiveLargestContour)
                     keep_largest_contour_only(expolygons);
                 if (resolution != 0.) {
-                    ExPolygons simplified;
-                    simplified.reserve(expolygons.size());
-                    for (const ExPolygon &ex : expolygons)
-                        append(simplified, ex.simplify(resolution));
-                    expolygons = std::move(simplified);
+                    expolygons = union_safety_offset_ex(expolygons);
+                    //for (expolygons) ex.simplify(resolution));
+                    ensure_valid(expolygons, resolution);
+                } else {
+                    ensure_valid(expolygons);
                 }
+                assert_valid(expolygons);
 #if 0
 //#ifndef NDEBUG
                 for (const ExPolygon &ex : expolygons) {
@@ -2066,7 +2087,7 @@ void slice_mesh_slabs(
         const Vec3f   fa = vertices_transformed[tri(0)];
         const Vec3f   fb = vertices_transformed[tri(1)];
         const Vec3f   fc = vertices_transformed[tri(2)];
-        assert(fa != fb && fa != fc && fb != fc);
+        //assert(fa != fb && fa != fc && fb != fc);
         const Point   a = to_2d(fa).cast<coord_t>();
         const Point   b = to_2d(fb).cast<coord_t>();
         const Point   c = to_2d(fc).cast<coord_t>();
@@ -2227,7 +2248,29 @@ Polygons project_mesh(
     std::vector<Polygons> top, bottom;
     std::vector<float>    zs { -1e10, 1e10 };
     slice_mesh_slabs(mesh, zs, trafo, &top, &bottom, throw_on_cancel);
-    return union_(top.front(), bottom.back());
+    //note: on some edge case, this union is too difficult (the complexity is too high)
+    //so we need to do it by little chunks
+    Polygons p_union;
+    const int step = 10;
+    for (Polygons *storage : {&top.front(), &bottom.back()}) {
+        if (storage->size() > 1000) {
+            int i_start, i_end;
+            for (i_start = 0, i_end = step; i_end < storage->size(); i_start = i_end, i_end += step) {
+                // don't cut before a hole, it may mess evrything.
+                while ((*storage)[i_end].is_clockwise() && i_end < storage->size()) {
+                    i_end++;
+                }
+                Polygons p2(storage->begin() + i_start, storage->begin() + i_end);
+                p_union = union_(p_union, p2);
+            }
+            assert(i_start < storage->size() && i_end >= storage->size());
+            Polygons p2(storage->begin() + i_start, storage->end());
+            p_union = union_(p_union, p2);
+        } else {
+            p_union = union_(p_union, *storage);
+        }
+    }
+    return p_union;
 }
 
 void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *upper, indexed_triangle_set *lower, bool triangulate_caps)

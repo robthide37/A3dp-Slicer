@@ -152,6 +152,8 @@ set(SLIC3R_SOURCES
     Format/SL1.cpp
     Format/SL1_SVG.hpp
     Format/SL1_SVG.cpp
+    Format/HFP.cpp
+    Format/HFP.hpp
     Format/AnycubicSLA.hpp
     Format/AnycubicSLA.cpp
     Format/CWS.hpp
@@ -367,7 +369,10 @@ set(SLIC3R_SOURCES
     PNGReadWrite.cpp
     QuadricEdgeCollapse.cpp
     QuadricEdgeCollapse.hpp
+    RegionSettings.cpp
+    RegionSettings.hpp
     Semver.cpp
+    Semver.hpp
     ShortEdgeCollapse.cpp
     ShortEdgeCollapse.hpp
     ShortestPath.cpp
@@ -437,11 +442,15 @@ set(SLIC3R_SOURCES
     MTUtils.hpp
     Zipper.hpp
     Zipper.cpp
+    Orient.cpp
+    Orient.hpp
     MinAreaBoundingBox.hpp
     MinAreaBoundingBox.cpp
     miniz_extension.hpp
     miniz_extension.cpp
     MarchingSquares.hpp
+    MultipleBeds.cpp
+    MultipleBeds.hpp
     Execution/Execution.hpp
     Execution/ExecutionSeq.hpp
     Execution/ExecutionTBB.hpp

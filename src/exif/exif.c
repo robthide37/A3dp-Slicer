@@ -246,8 +246,14 @@ int exif_removeExifSegmentFromJPEGFile(const char *inJPEGFileName,
     }
     if (!p) {
         for (i = 0; i < App1StartOffset; i++) {
-            fread(buf, 1, sizeof(char), fpr);
-            fwrite(buf, 1, sizeof(char), fpw);
+            if (fread(buf, 1, sizeof(char), fpr) != sizeof(char)) {
+                sts = EXIF_ERR_READ_FILE;
+                goto DONE;
+            }
+            if (fwrite(buf, 1, sizeof(char), fpw) < sizeof(char)) {
+                sts = EXIF_ERR_WRITE_FILE;
+                goto DONE;
+            }
         }
     } else {
         if (fread(p, 1, App1StartOffset, fpr) < (size_t)App1StartOffset) {
@@ -1249,8 +1255,14 @@ int EXIF_API_EXPORT exif_updateExifSegmentInJPEGFile(const char *inJPEGFileName,
     }
     if (!p) {
         for (i = 0; i < ofs; i++) {
-            fread(buf, 1, sizeof(char), fpr);
-            fwrite(buf, 1, sizeof(char), fpw);
+            if (fread(buf, 1, sizeof(char), fpr) != sizeof(char)) {
+                sts = EXIF_ERR_READ_FILE;
+                goto DONE;
+            }
+            if (fwrite(buf, 1, sizeof(char), fpw) < sizeof(char)) {
+                sts = EXIF_ERR_WRITE_FILE;
+                goto DONE;
+            }
         }
     } else {
         if (fread(p, 1, ofs, fpr) < (size_t)ofs) {
@@ -1362,8 +1374,14 @@ int EXIF_API_EXPORT exif_removeAdobeMetadataSegmentFromJPEGFile(const char *inJP
     }
     if (!p) {
         for (i = 0; i < (int)ofs; i++) {
-            fread(buf, 1, sizeof(char), fpr);
-            fwrite(buf, 1, sizeof(char), fpw);
+            if (fread(buf, 1, sizeof(char), fpr) != sizeof(char)) {
+                sts = EXIF_ERR_READ_FILE;
+                goto DONE;
+            }
+            if (fwrite(buf, 1, sizeof(char), fpw) < sizeof(char)) {
+                sts = EXIF_ERR_WRITE_FILE;
+                goto DONE;
+            }
         }
     } else {
         if (fread(p, 1, ofs, fpr) < (size_t)ofs) {

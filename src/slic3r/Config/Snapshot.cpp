@@ -261,6 +261,7 @@ bool Snapshot::equal_to_active(const AppConfig &app_config) const
     // 1) Check, whether this snapshot contains the same set of active vendors, printer models and variants
     // as app_config.
     {
+        std::lock_guard<std::recursive_mutex> lk(app_config.config_lock);
         std::set<std::string> matched;
         for (const VendorConfig &vc : this->vendor_configs) {
             auto it_vendor_models_variants = app_config.vendors().find(vc.name);
@@ -422,34 +423,37 @@ const Snapshot&	SnapshotDB::take_snapshot(const AppConfig &app_config, Snapshot:
         snapshot.filaments.emplace_back(app_config.get("presets", name));
     }
     // Vendor specific config bundles and installed printers.
-    for (const auto &vendor : app_config.vendors()) {
-        Snapshot::VendorConfig cfg;
-        cfg.name = vendor.first;
-        cfg.models_variants_installed = vendor.second;
-        for (auto it = cfg.models_variants_installed.begin(); it != cfg.models_variants_installed.end();)
-            if (it->second.empty())
-                cfg.models_variants_installed.erase(it ++);
-            else
-                ++ it;
-        // Read the active config bundle, parse the config version.
-        PresetBundle bundle;
-        bundle.load_configbundle((data_dir / "vendor" / (cfg.name + ".ini")).string(), PresetBundle::LoadConfigBundleAttribute::LoadVendorOnly, ForwardCompatibilitySubstitutionRule::EnableSilent);
-        for (const auto &vp : bundle.vendors)
-            if (vp.second.id == cfg.name)
-                cfg.version.config_version = vp.second.config_version;
-        // Fill-in the min/max slic3r version from the config index, if possible.
-        try {
-            // Load the config index for the vendor.
-            Index index;
-            index.load(data_dir / "vendor" / (cfg.name + ".idx"));
-            auto it = index.find(cfg.version.config_version);
-            if (it != index.end()) {
-                cfg.version.min_slic3r_version = it->min_slic3r_version;
-                cfg.version.max_slic3r_version = it->max_slic3r_version;
+    {
+        std::lock_guard<std::recursive_mutex> lk(app_config.config_lock);
+        for (const auto &vendor : app_config.vendors()) {
+            Snapshot::VendorConfig cfg;
+            cfg.name = vendor.first;
+            cfg.models_variants_installed = vendor.second;
+            for (auto it = cfg.models_variants_installed.begin(); it != cfg.models_variants_installed.end();)
+                if (it->second.empty())
+                    cfg.models_variants_installed.erase(it ++);
+                else
+                    ++ it;
+            // Read the active config bundle, parse the config version.
+            PresetBundle bundle;
+            bundle.load_configbundle((data_dir / "vendor" / (cfg.name + ".ini")).string(), PresetBundle::LoadConfigBundleAttribute::LoadVendorOnly, ForwardCompatibilitySubstitutionRule::EnableSilent);
+            for (const auto &vp : bundle.vendors)
+                if (vp.second.id == cfg.name)
+                    cfg.version.config_version = vp.second.config_version;
+            // Fill-in the min/max slic3r version from the config index, if possible.
+            try {
+                // Load the config index for the vendor.
+                Index index;
+                index.load(data_dir / "vendor" / (cfg.name + ".idx"));
+                auto it = index.find(cfg.version.config_version);
+                if (it != index.end()) {
+                    cfg.version.min_slic3r_version = it->min_slic3r_version;
+                    cfg.version.max_slic3r_version = it->max_slic3r_version;
+                }
+            } catch (const std::runtime_error & /* err */) {
             }
-        } catch (const std::runtime_error & /* err */) {
+            snapshot.vendor_configs.emplace_back(std::move(cfg));
         }
-        snapshot.vendor_configs.emplace_back(std::move(cfg));
     }
 
 	boost::filesystem::path snapshot_dir = snapshot_db_dir / snapshot.id;

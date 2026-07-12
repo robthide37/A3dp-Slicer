@@ -7,9 +7,12 @@ group:Name and Size
 	end_line
 	setting:idx:nozzle_diameter
 	update_nozzle_diameter
+
+
 group:Layer height limits
 	setting:idx:min_layer_height
 	setting:idx:max_layer_height
+	
 group:Offsets (for multi-extruder printers)
 	setting:idx:extruder_offset
 	setting:idx:extruder_temperature_offset
@@ -18,7 +21,6 @@ group:Offsets (for multi-extruder printers)
 group:Travel lift
 	setting:idx:retract_lift
 	setting:idx:travel_ramping_lift
-	setting:idx:travel_max_lift
 	setting:idx:travel_slope
 	setting:idx:travel_lift_before_obstacle
 	line:Only lift Z
@@ -46,6 +48,7 @@ group:Retraction wipe
 	setting:idx:wipe_speed
 	setting:idx:retract_before_wipe
 	setting:idx:wipe_only_crossing
+	setting:idx:wipe_return
 group:General wipe
 	line:Wipe inside
 		setting:idx:label$At start:wipe_inside_start
@@ -53,6 +56,11 @@ group:General wipe
 		setting:idx:label$Depth:wipe_inside_depth
 	end_line
 	setting:idx:wipe_extra_perimeter
+	line:Wipe lift
+		setting:idx:label$height:wipe_lift
+		setting:idx:label$length:wipe_lift_length
+	end_line
+	setting:idx:wipe_min
 	line:Seam gap
 		setting:idx:label$_:sidetext_width$5:seam_gap
 		setting:idx:label$for external perimeters:sidetext_width$5:seam_gap_external

@@ -19,9 +19,11 @@
 #include <nlohmann/detail/meta/type_traits.hpp>
 #include <nlohmann/detail/value_t.hpp>
 
-// #ifdef JSON_HAS_CPP_17
-    // #include <filesystem>
-// #endif
+#ifdef JSON_HAS_CPP_20
+    #include <filesystem>
+#else
+    #include <boost/filesystem.hpp>
+#endif
 
 namespace nlohmann
 {
@@ -448,9 +450,19 @@ void from_json(const BasicJsonType& j, std::unordered_map<Key, Value, Hash, KeyE
     }
 }
 
-#ifdef JSON_HAS_CPP_17
+#ifdef JSON_HAS_CPP_20
 template<typename BasicJsonType>
-void from_json(const BasicJsonType& j, std_path& p)
+void from_json(const BasicJsonType& j, std::filesystem::path& p)
+{
+    if (JSON_HEDLEY_UNLIKELY(!j.is_string()))
+    {
+        JSON_THROW(type_error::create(302, "type must be string, but is " + std::string(j.type_name()), j));
+    }
+    p = *j.template get_ptr<const typename BasicJsonType::string_t*>();
+}
+#else
+template<typename BasicJsonType>
+void from_json(const BasicJsonType& j, boost::filesystem::path& p)
 {
     if (JSON_HEDLEY_UNLIKELY(!j.is_string()))
     {

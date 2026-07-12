@@ -21,7 +21,6 @@
 #include "Thread.hpp"
 #include "Utils.hpp"
 #include "libslic3r.h"
-#include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "tbb/blocked_range2d.h"
 #include "tbb/parallel_reduce.h"
@@ -32,7 +31,6 @@
 #include <cstdio>
 #include <functional>
 #include <limits>
-#include <math.h>
 #include <oneapi/tbb/concurrent_vector.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <optional>
@@ -230,15 +228,22 @@ SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
 
     std::unordered_set<size_t> linked_slices_below;
     for (const auto &link : slice.overlaps_below) { linked_slices_below.insert(link.slice_idx); }
+    if (linked_slices_below.empty())
+        return connection;
 
     ExPolygons below{};
     for (const auto &linked_slice_idx_below : linked_slices_below) { below.push_back(lower_layer->lslices()[linked_slice_idx_below]); }
     Polygons below_polys = to_polygons(below);
+    if (below_polys.empty())
+        return connection;
 
     BoundingBox below_bb = get_extents(below_polys);
 
     Polygons overlap = intersection(ClipperUtils::clip_clipper_polygons_with_subject_bbox(slice_polys, below_bb),
                                     ClipperUtils::clip_clipper_polygons_with_subject_bbox(below_polys, slice_bb));
+    ensure_valid(overlap);
+    if (overlap.empty())
+        return connection;
 
     const Integrals integrals{overlap};
     connection.area += integrals.area;
@@ -509,60 +514,96 @@ ObjectPart::ObjectPart(
         this->connected_to_bed = true;
     }
 
-    const auto bottom_z = print_head_z - layer_height;
-    const auto center_z = print_head_z - layer_height / 2;
+    const coordf_t bottom_z = print_head_z - layer_height;
+    const coordf_t center_z = print_head_z - layer_height / 2;
 
-    for (const ExtrusionEntityCollection* collection : extrusion_collections) {
+    class EEAcu : public ExtrusionVisitorRecursiveConst
+    {
+    public:
+        using ExtrusionVisitorRecursiveConst::use;
+        ObjectPart *to_fill;
+        const coordf_t layer_h;
+        const coordf_t centerz;
+        const coordf_t bottomz;
+        EEAcu(ObjectPart *obj, coordf_t lh, coordf_t center_z, coordf_t bottom_z) : to_fill(obj), layer_h(lh), centerz(center_z), bottomz(bottom_z) {}
+        void use_polyline(Polyline &&polyline, float width) {
+            const Integrals integrals{{polyline}, {width}};
+            const float volume = integrals.area * layer_h;
+            to_fill->volume += volume;
+            to_fill->volume_centroid_accumulator += to_3d(integrals.x_i, centerz * integrals.area) / integrals.area * volume;
+            if (to_fill->connected_to_bed) {
+                to_fill->sticking_area += integrals.area;
+                to_fill->sticking_centroid_accumulator += to_3d(integrals.x_i, bottomz * integrals.area);
+                to_fill->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+                to_fill->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+            }
+        }
+        void use(const ExtrusionPath &path) override {
+            use_polyline(path.as_polyline().to_polyline(path.width()/10), path.width());
+        }
+        void use(const ExtrusionPath3D &path) override {
+            Polyline poly = path.as_polyline().to_polyline(path.width()/10);
+            poly.douglas_peucker(SCALED_EPSILON * 2);
+            if(poly.length() > SCALED_EPSILON)
+                use_polyline(std::move(poly), path.width());
+        }
+    };
+    
+    ObjectPart *me = this;
+    EEAcu visitor(me, layer_height, center_z, bottom_z);
+    for (const ExtrusionEntityCollection *collection : extrusion_collections) {
         if (collection->empty()) {
             continue;
         }
-        ExtrusionEntityCollection coll = collection->flatten(false);
-        for (const ExtrusionEntity* entity: coll.entities()) {
-            Polylines polylines;
-            std::vector<float> widths;
-
-            if (
-                const auto* path = dynamic_cast<const ExtrusionPath*>(entity);
-                path != nullptr
-            ) {
-                polylines.push_back(path->as_polyline().to_polyline());
-                widths.push_back(path->width());
-            } else if (
-                const auto* loop = dynamic_cast<const ExtrusionLoop*>(entity);
-                loop != nullptr
-            ) {
-                for (const ExtrusionPath& path : loop->paths) {
-                    polylines.push_back(path.as_polyline().to_polyline());
-                    widths.push_back(path.width());
-                }
-            } else if (
-                const auto* multi_path = dynamic_cast<const ExtrusionMultiPath*>(entity);
-                multi_path != nullptr
-            ) {
-                for (const ExtrusionPath& path : multi_path->paths) {
-                    polylines.push_back(path.as_polyline().to_polyline());
-                    widths.push_back(path.width());
-                }
-            } else {
-                throw std::runtime_error(
-                    "Failed to construct object part from extrusions!"
-                    " Unknown extrusion type."
-                );
-            }
-
-            const Integrals integrals{polylines, widths};
-            const float volume = integrals.area * layer_height;
-            this->volume += volume;
-            this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
-
-            if (this->connected_to_bed) {
-                this->sticking_area += integrals.area;
-                this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
-                this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
-                this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
-            }
-        }
+        collection->visit(visitor);
     }
+    //    ExtrusionEntityCollection coll = collection->flatten(false);
+    //    for (const ExtrusionEntity* entity: coll.entities()) {
+    //        Polylines polylines;
+    //        std::vector<float> widths;
+
+    //        if (
+    //            const auto* path = dynamic_cast<const ExtrusionPath*>(entity);
+    //            path != nullptr
+    //        ) {
+    //            polylines.push_back(path->as_polyline().to_polyline());
+    //            widths.push_back(path->width());
+    //        } else if (
+    //            const auto* loop = dynamic_cast<const ExtrusionLoop*>(entity);
+    //            loop != nullptr
+    //        ) {
+    //            for (const ExtrusionPath& path : loop->paths) {
+    //                polylines.push_back(path.as_polyline().to_polyline());
+    //                widths.push_back(path.width());
+    //            }
+    //        } else if (
+    //            const auto* multi_path = dynamic_cast<const ExtrusionMultiPath*>(entity);
+    //            multi_path != nullptr
+    //        ) {
+    //            for (const ExtrusionPath& path : multi_path->paths) {
+    //                polylines.push_back(path.as_polyline().to_polyline());
+    //                widths.push_back(path.width());
+    //            }
+    //        } else {
+    //            throw std::runtime_error(
+    //                "Failed to construct object part from extrusions!"
+    //                " Unknown extrusion type."
+    //            );
+    //        }
+
+    //        const Integrals integrals{polylines, widths};
+    //        const float volume = integrals.area * layer_height;
+    //        this->volume += volume;
+    //        this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
+
+    //        if (this->connected_to_bed) {
+    //            this->sticking_area += integrals.area;
+    //            this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
+    //            this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+    //            this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+    //        }
+    //    }
+    //}
 
     if (brim) {
         Integrals integrals{*brim};
@@ -762,15 +803,13 @@ std::vector<const ExtrusionEntityCollection*> gather_extrusions(const LayerSlice
     return result;
 }
 
-bool has_brim(const Layer* layer, const Params& params){
-    return
-        int(layer->id()) == params.raft_layers_count
-        && params.raft_layers_count == 0
-        && (params.brim_width_outer > 0 || params.brim_width_inner > 0);
+bool has_brim(const Layer* layer, const Params& params) {
+    return layer->id() == 0 && layer->object()->has_brim();
 }
 
 
-Polygons get_brim(const ExPolygon& slice_polygon, const float brim_width_outer, const float brim_width_inner) {
+Polygons get_brim(const Layer* layer, const size_t slice_idx, const float brim_width_outer, const float brim_width_inner) {
+    const ExPolygon& slice_polygon = layer->lslices()[slice_idx];
     // TODO: The algorithm here should take into account that multiple slices may
     // have coliding Brim areas and the final brim area is smaller,
     // thus has lower adhesion. For now this effect will be neglected.
@@ -778,7 +817,8 @@ Polygons get_brim(const ExPolygon& slice_polygon, const float brim_width_outer, 
     if (brim_width_outer > 0) {
         Polygon brim_hole = slice_polygon.contour;
         brim_hole.reverse();
-        Polygons c = expand(slice_polygon.contour, scale_t(brim_width_outer)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
+        // For very small polygons, the expand may result in empty vector, even thought the input is correct.
+        Polygons c = expand(slice_polygon.contour, scale_t(brim_width_outer));
         if (!c.empty()) {
             brim.push_back(ExPolygon{c.front(), brim_hole});
         }
@@ -793,6 +833,30 @@ Polygons get_brim(const ExPolygon& slice_polygon, const float brim_width_outer, 
             inner_brim.holes = brim_holes;
             brim.push_back(inner_brim);
         }
+    }
+    //remove brim negative
+    Polygons polys_remove = union_(layer->object()->get_brim_patch(ModelVolumeType::BRIM_NEGATIVE));
+    if (!polys_remove.empty()) {
+        brim = diff_ex(brim, polys_remove);
+    }
+    //get brim patches
+    //add them if it touch
+    // note that a brim patch can touch multiple brim initial area and the final brim area is smaller,
+    //   thus has lower adhesion. For now this effect will be neglected.
+    Polygons poly_patches = diff(union_(layer->object()->get_brim_patch(ModelVolumeType::BRIM_PATCH)), polys_remove);
+    if (!poly_patches.empty()) {
+        ExPolygons brim_and_object = brim;
+        brim_and_object.push_back(slice_polygon);
+        brim_and_object = union_ex(brim_and_object);
+        for (Polygon &polygon : poly_patches) {
+            ExPolygons merge = brim_and_object;
+            merge.emplace_back(polygon);
+            merge = union_ex(merge);
+            if (merge.size() == brim_and_object.size()) {
+                brim.emplace_back(polygon);
+            }
+        }
+        brim = union_ex(brim);
     }
     return to_polygons(brim);
 }
@@ -1005,7 +1069,7 @@ SliceMappings update_active_object_parts(const Layer                        *lay
 
         const std::optional<Polygons> brim{
              has_brim(layer, params) ?
-             std::optional{get_brim(layer->lslices()[slice_idx], params.brim_width_outer, params.brim_width_inner)} :
+             std::optional{get_brim(layer, slice_idx, params.brim_width_outer, params.brim_width_inner)} :
              std::nullopt
         };
         ObjectPart new_part{
@@ -1064,7 +1128,7 @@ SliceMappings update_active_object_parts(const Layer                        *lay
                                   centroid.head<2>().cwiseProduct(centroid.head<2>()));
                 float xy_variance      = variance.x() + variance.y();
                 float arm_len_estimate = std::max(1.0f, bottom_z - (conn.centroid_accumulator.z() / conn.area));
-                return conn.area * sqrt(xy_variance) / arm_len_estimate;
+                return conn.area * sqrtf(xy_variance) / arm_len_estimate;
             };
 
 #ifdef DETAILED_DEBUG_LOGS

@@ -1,5 +1,5 @@
 #include "FreeCADDialog.hpp"
-
+/*
 #include "I18N.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Model.hpp"
@@ -18,8 +18,8 @@
 
 #include <iostream>
 #include <ctime>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
+#include <cstdio>
 
 #include <wx/wx.h>
 #include <wx/scrolwin.h>
@@ -64,7 +64,7 @@ namespace GUI {
     class ExecVar {
     public:
         boost::process::opstream pyin;
-        boost::asio::io_service ios;
+        boost::asio::io_context ios;
         std::future<std::string> data_out;
         std::future<std::string> data_err;
         std::unique_ptr<boost::process::child> process;
@@ -986,7 +986,7 @@ void FreeCADDialog::create_geometry(wxCommandEvent& event_args) {
     Model& model = plat->model();
     if(cmb_add_replace->GetSelection() == 0)
         plat->new_project();
-    std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{ object_path.generic_string() }, true, false, false, false);
+    std::vector<size_t> objs_idx = plat->load_files(std::vector<std::string>{ object_path.generic_string() }, LoadFileOption::LoadModel | LoadFileOption::DontUpdateDirs);
     if (objs_idx.empty()) return;
     //don't save in the temp directory: erase the link to it
     for (int idx : objs_idx)
@@ -1014,3 +1014,4 @@ void FreeCADDialog::create_geometry(wxCommandEvent& event_args) {
 
 } // namespace GUI
 } // namespace Slic3r
+*/

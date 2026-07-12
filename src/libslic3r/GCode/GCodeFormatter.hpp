@@ -10,6 +10,7 @@
 #define slic3r_GFormatter_hpp_
 
 #include "../libslic3r.h"
+#include "../Point.hpp"
 
 #include <string>
 #include <string_view>
@@ -32,6 +33,11 @@ public:
     GCodeFormatter(const GCodeFormatter &precision)
         : m_gcode_precision_xyz(precision.m_gcode_precision_xyz), m_gcode_precision_e(precision.m_gcode_precision_e)
     {
+        this->buf_end     = buf + buflen;
+        this->ptr_err.ptr = this->buf;
+    }
+
+    virtual void clear() {
         this->buf_end     = buf + buflen;
         this->ptr_err.ptr = this->buf;
     }
@@ -72,27 +78,15 @@ public:
     {
         return {quantize(pt.x(), m_gcode_precision_xyz), quantize(pt.y(), m_gcode_precision_xyz), quantize(pt.z(), m_gcode_precision_xyz)};
     }
+    int quantize_int(double v, size_t ndigits = size_t(-1)) const;
 
     // retunr the pointer to the begining of the digit written (without the axis)
+    // please don't use it but the other safer methods, if available.
     char* emit_axis(const char axis, const double v, size_t digits);
-    
-    void emit_xy(const Vec2d &point)
-    {
-        this->emit_axis('X', point.x(), m_gcode_precision_xyz);
-        this->emit_axis('Y', point.y(), m_gcode_precision_xyz);
-    }
 
     // update old_x & old_y with new strings. Return false if they are both the same.
     bool emit_xy(const Vec2d &point, std::string &old_x, std::string &old_y);
-
-    void emit_xyz(const Vec3d &point)
-    {
-        this->emit_axis('X', point.x(), m_gcode_precision_xyz);
-        this->emit_axis('Y', point.y(), m_gcode_precision_xyz);
-        this->emit_z(point.z());
-    }
-
-    void emit_z(const double z) { this->emit_axis('Z', z, m_gcode_precision_xyz); }
+    bool emit_z(const double z, std::string &old_z);
 
     void emit_ij(const Vec2d &point)
     {
@@ -102,8 +96,7 @@ public:
             this->emit_axis('J', point.y(), m_gcode_precision_xyz);
     }
 
-    // return the de that isn't emmited as it's truncated
-    double emit_e(const std::string_view axis, double v);
+    void emit_e(const std::string_view axis, double v);
 
     void emit_f(double speed) { this->emit_axis('F', speed, m_gcode_precision_xyz); }
 
@@ -172,27 +165,42 @@ public:
 
     GCodeG1Formatter(const GCodeG1Formatter&) = delete;
     GCodeG1Formatter& operator=(const GCodeG1Formatter&) = delete;
+
+    void clear() override {
+        GCodeFormatter::clear();
+        this->buf[0] = 'G';
+        this->buf[1] = '1';
+        this->ptr_err.ptr += 2;
+    }
 };
 
 class GCodeG2G3Formatter : public GCodeFormatter {
+    const bool m_ccw;
 public:
     GCodeG2G3Formatter(int gcode_precision_xyz, int gcode_precision_e, bool ccw)
-        : GCodeFormatter(gcode_precision_xyz, gcode_precision_e)
+        : GCodeFormatter(gcode_precision_xyz, gcode_precision_e), m_ccw(ccw)
     {
         this->buf[0] = 'G';
-        this->buf[1] = ccw ? '3' : '2';
+        this->buf[1] = m_ccw ? '3' : '2';
         this->ptr_err.ptr += 2;
     }
     GCodeG2G3Formatter(const GCodeFormatter &precision, bool ccw)
-        : GCodeFormatter(precision)
+        : GCodeFormatter(precision), m_ccw(ccw)
     {
         this->buf[0] = 'G';
-        this->buf[1] = ccw ? '3' : '2';
+        this->buf[1] = m_ccw ? '3' : '2';
         this->ptr_err.ptr += 2;
     }
 
     GCodeG2G3Formatter(const GCodeG2G3Formatter&) = delete;
     GCodeG2G3Formatter& operator=(const GCodeG2G3Formatter&) = delete;
+
+    void clear() override {
+        GCodeFormatter::clear();
+        this->buf[0] = 'G';
+        this->buf[1] = m_ccw ? '3' : '2';
+        this->ptr_err.ptr += 2;
+    }
 };
 
 } /* namespace Slic3r */

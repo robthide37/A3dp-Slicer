@@ -478,15 +478,15 @@ Http& Http::timeout_max(long timeout)
     return *this;
 }
 
+Http& Http::set_range(const std::string& range)
+{
+    if (p) { p->set_range(range); }
+    return *this;
+}
+
 Http& Http::size_limit(size_t sizeLimit)
 {
 	if (p) { p->limit = sizeLimit; }
-	return *this;
-}
-
-Http& Http::set_range(const std::string& range)
-{
-	if (p) { p->set_range(range); }
 	return *this;
 }
 

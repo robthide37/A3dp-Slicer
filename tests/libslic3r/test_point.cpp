@@ -7,6 +7,7 @@
 
 #include <catch2/catch.hpp>
 #include <libslic3r/Point.hpp>
+#include <libslic3r/MultiPoint.hpp>
 #include "test_utils.hpp"
 
 using namespace Slic3r;
@@ -44,3 +45,12 @@ TEST_CASE("Perp distance to line does not overflow", "[Point]") {
 
     CHECK(line.distance_to(Point{1664161, 18335848}) == Approx(16671685));
 }
+
+TEST_CASE("douglas_peucker", "[MultiPoint]") {
+    Points pt_in{Point{-15395527,-2111143},Point{-13895526,-2111143},Point{-13895526,2888857},Point{-13895526,7888857},Point{-15395527,7888857},Point{-16895527,7888857},Point{-16895527,2888857},Point{-16895527,-2111143},Point{-15395527,-2111143}};
+    Points pt_check{Point{-15395527,-2111143},Point{-13895526,-2111143},Point{-13895526,7888857},Point{-16895527,7888857},Point{-16895527,-2111143},Point{-15395527,-2111143}};
+    Points pt_out;
+    douglas_peucker_impl(pt_in.begin(), pt_in.end(), std::back_inserter(pt_out), 3125, [](const Point &p) { return p; });
+    CHECK(pt_check == pt_out);
+}
+

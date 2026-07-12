@@ -46,9 +46,8 @@ public:
     // ignore bridges that are longer than that.
     coordf_t                     max_bridge_length;
 
-
     int layer_id = -1;
-    
+
     BridgeDetector(ExPolygon _expolygon, const ExPolygons &_lower_slices, coord_t _extrusion_spacing, coord_t _precision, int layer_id);
     BridgeDetector(const ExPolygons &_expolygons, const ExPolygons &_lower_slices, coord_t _extrusion_spacing, coord_t _precision, int layer_id);
     // If bridge_direction_override != 0, then the angle is used instead of auto-detect.

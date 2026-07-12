@@ -56,7 +56,7 @@ wxDEFINE_EVENT(wxCUSTOMEVT_TICKSCHANGED, wxEvent);
 
 static std::string gcode(Type type)
 {
-    const Print& print = GUI::wxGetApp().plater()->fff_print();
+    const Print& print = GUI::wxGetApp().plater()->active_fff_print();
     const PrintConfig &config = print.config();
     switch (type) {
     case ColorChange: return Slic3r::GCodeWriter::get_default_color_change_gcode(config);
@@ -509,7 +509,7 @@ bool Control::IsNewPrint()
 {
     if (GUI::wxGetApp().plater()->printer_technology() == ptSLA)
         return false;
-    const Print& print = GUI::wxGetApp().plater()->fff_print();
+    const Print& print = GUI::wxGetApp().plater()->active_fff_print();
     std::string idxs;
     for (auto object : print.objects())
         idxs += std::to_string(object->id().id) + "_";
@@ -795,15 +795,18 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
         return str;
 
     // get the layer num (gcode can have 0, but not preview)
-    bool is_preview_not_gcode = m_layers_times.size()  == m_values.size();
+    bool is_preview_not_gcode = (m_layers_times.size() == 0) ? true : (m_layers_times.size() == m_values.size());
+    //m_layers_times.size() = 0 if we're on sliced preview tab
+
     if (m_is_wipe_tower) {
         is_preview_not_gcode = (m_layers_values.size() != m_values.size());
     } else {
         //assert(m_layers_times.size() == m_values.size() - 1 || m_layers_times.size()  == m_values.size() || m_layers_times.empty());
         //assert(m_layers_values.empty());
     }
+    //is_preview_not_gcode = true then we're on sliced preview tab
     const size_t layer_number = is_preview_not_gcode ? value + 1 : value;
-    const size_t time_idx = is_preview_not_gcode ? value : value - 1;
+    const size_t time_idx = is_preview_not_gcode ? value : value;
 
     // When "Print Settings -> Multiple Extruders -> No sparse layer" is enabled, then "Smart" Wipe Tower is used for wiping.
     // As a result, each layer with tool changes is splited for min 3 parts: first tool, wiping, second tool ...
@@ -2095,7 +2098,7 @@ std::set<int> TickCodeInfo::get_used_extruders_for_tick(int tick, int only_extru
 
     if (e_mode == MultiExtruder) {
         // #ys_FIXME: get tool ordering from _correct_ place
-        const ToolOrdering& tool_ordering = GUI::wxGetApp().plater()->fff_print().get_tool_ordering();
+        const ToolOrdering& tool_ordering = GUI::wxGetApp().plater()->active_fff_print().get_tool_ordering();
 
         if (tool_ordering.empty())
             return {};
@@ -2281,7 +2284,7 @@ void Control::auto_color_change()
     int extruders_cnt = GUI::wxGetApp().extruders_edited_cnt();
 //    int extruder = 2;
 
-    const Print& print = GUI::wxGetApp().plater()->fff_print();  
+    const Print& print = GUI::wxGetApp().plater()->active_fff_print();  
     for (auto object : print.objects()) {
         // An object should to have at least 2 layers to apply an auto color change
         if (object->layer_count() < 2)

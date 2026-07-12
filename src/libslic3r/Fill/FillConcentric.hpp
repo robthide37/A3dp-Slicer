@@ -18,6 +18,7 @@ namespace Slic3r {
 class FillConcentric : public Fill
 {
 public:
+    FillConcentric() : Fill() { can_fill_surface_single = true; }
     ~FillConcentric() override = default;
 
 protected:
@@ -36,16 +37,6 @@ protected:
                               ExPolygon                      expolygon,
                               ThickPolylines                &thick_polylines_out) const override;
 
-    bool no_sort() const override { return true; }
-};
-
-
-class FillConcentricWGapFill : public Fill {
-public:
-    virtual ~FillConcentricWGapFill() {}
-
-protected:
-    Fill* clone() const override { return new FillConcentricWGapFill(*this); };
     void fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const override;
 
     bool no_sort() const override { return true; }

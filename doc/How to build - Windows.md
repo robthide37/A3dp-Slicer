@@ -30,6 +30,10 @@ c:> cd src
 c:\src> git clone https://github.com/Slic3r/Slic3r.git
 ```
 
+The build script will run for a while (over an hour, depending on your machine) and automatically perform the following steps:
+1. Configure and build [deps](#compile-the-dependencies) as RelWithDebInfo with `c:\src\REPO_NAME-deps` as the destination directory
+2. Configure and build all [application targets](#compile-slic3r) as RelWithDebInfo
+3. Launch the resulting `superslicer-console.exe` binary
 
 ## 2.A Manual Build Instructions
 

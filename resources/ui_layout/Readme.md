@@ -87,9 +87,11 @@ each parameter is separated by ':'
 		* `percents`: Array. Tell the sotfware it's a percentage (float return value)
 		* `floats_or_percents: mandatory`: Array. Tell the sotfware it's a numeric that can acept a % value (boolean return value)
 		* `strings`: Array. Tell mandatory for a filament or an extruder value. The sotfware it's a numeric an entry field where you can enter a text(string return value)
-		* `enum$STR$STR[$STR$STR]*`: tell the sotfware it's a combobox (string return value). It has to be followed by $name$label for each option you want to show.
+		* `enum$STR$STR[$STR$STR]*`: tell the software it's a combobox (string return value). It has to be followed by $name$label for each option you want to show.
+		* if you're using an int/float/percent field, you can also make it appear like a combobox (still editable) by using: `hints$VAL$STR[$VAL$STR]*` like for the enum type: VAL is the value that has to be parseable into the int/float, and the second one is the label.
 	* Also, script may depends on normal fields. When a setting it depends is modified, the scripted widget will appear modified. And resetting a widget will reset all depending fields.
 		* `depends$STR[$STR]*`: add the setting fields this scripted widget depends on. Each one has to be suffixed by a '$'
+		
 
 There is also special commands:
 * `height:INT`: change the default height of settings. Don't works with every type of setting (mostly multilne text). Set to 0 or -1 to disable.
@@ -183,31 +185,43 @@ These functions can be called everywhere.
  * int   **get_int**(string &in key)
     Can be used by type int and enum (return the index)
  * float **get_float**(string &in key)
-    Can be used by type float, percent and flaot_or_percent
+    Can be used by type float, percent (1.0 = 100%) and float_or_percent
  * float **get_computed_float**(string &in key)
     Get the float computed value of the field. Useful if it's a floatOrPercent that is computable.
  * bool  **is_percent**(string &in key)
  * void  **get_string**(string &in key, string &out get_val)
     Can be used by type string and enum (return the enum_value, not the label)
+  * bool **is_enabled**(string setting_key,)
+    Ask if this setting is currently enabled.
     
 ### to set the value of real settings
 These functions can only be called in a `set` or `reset` function. If you need to set a variable in a `get`, call ask_for_refresh() and write it in the set method.
  * void **set_bool**(string &in key, bool new_val)
  * void **set_int**(string &in key, int new_val)
-    if an enum, it's the index in the c++ enum
+    If an enum, it's the index in the c++ enum
  * void **set_float**(string &in key, float new_val)
-    if a float_or_percent, unset the percent flag at the same time
+    If a float_or_percent, unset the percent flag at the same time
  * void **set_percent**(string &in key, float new_val)
-    if a float_or_percent, set the percent flag at the same time
+    If a float_or_percent, set the percent flag at the same time
  * void **set_string**(string &in key, string &in new_val))
-    if an enum, it's one of the enum_value, as saved in a config file
- *  void **back_initial_value**(string &in key)
-    revert the setting to the last saved value (same as a click on the reset arrow)
+    If an enum, it's one of the enum_value, as saved in a config file
+  * bool **set_enabled**(string setting_key, bool will_be_enabled)
+    Set this setting as enabled or disabled (if it can support it)
+
+### to get/set the value of a real vector settings
+ * just post pend the function by _idx and add the index of the value you want to get/set at the end. exemple: `set_float_idx("angle_template", 90, 0)`
+ *  int  **size()**
+    to get the size of a vector setting
+ *  int  **clear()**
+    to erase all values from a vector
+	
 ### others
+ *  void **back_initial_value**(string &in key)
+    revert the setting to the last saved value (same as a click on the reset arrow). You can get the initial value by calling a get_XXX() method afterward.
+ *  void **back_custom_initial_value**(int, string &key)
+    revert the custom setting to the last saved value
   * void **ask_for_refresh**()
     ask for a OPTNAME_set() after the current OPTNAME_get(), to be able to set settings.
-  * bool **is_enabled**(string setting_key, int idx)
-    Ask if this setting is currently enabled. `idx` is the index of the value if the settigns is a vector, it's ignored if it's a scalar.
   * bool **is_widget_enabled**(string setting_key)
     Experimental. Ask if a widget for this setting is currently enabled. Dangerous, as it will be true if it's not constructed. 
 

@@ -5,7 +5,7 @@
   <key>CFBundleExecutable</key>
   <string>@SLIC3R_APP_KEY@</string>
   <key>CFBundleGetInfoString</key>
-  <string>@SLIC3R_APP_NAME@ Copyright (C) 2011-2019 Alessandro Ranellucci, (C) 2016-2023 Prusa Reseach, (C) 2018-2023 Remi Durand</string>
+  <string>@SLIC3R_APP_NAME@ Copyright (C) 2011-2019 Alessandro Ranellucci, (C) 2016-2025 Prusa Reseach, (C) 2018-2025 Remi Durand</string>
   <key>CFBundleIconFile</key>
   <string>@SLIC3R_APP_KEY@.icns</string>
   <key>CFBundleName</key>
@@ -139,15 +139,10 @@
       </dict>
     </array>
   <key>LSMinimumSystemVersion</key>
-  <string>10.12</string>
+  <string>13.0</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>NSHighResolutionCapable</key>
   <true/>
-  <key>LSEnvironment</key>
-  <dict>
-    <key>ASAN_OPTIONS</key>
-    <string>detect_container_overflow=0</string>
-  </dict>
 </dict>
 </plist>

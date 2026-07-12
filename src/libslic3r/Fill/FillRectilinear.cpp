@@ -7,11 +7,11 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <stdlib.h>
-#include <stdint.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <random>
 
@@ -28,6 +28,7 @@
 #include "../Geometry.hpp"
 #include "../ShortestPath.hpp"
 #include "../Surface.hpp"
+#include "../Thread.hpp"
 
 #include "FillRectilinear.hpp"
 
@@ -3086,7 +3087,7 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
         it->remove_duplicate_points();
         it->rotate(rotate_vector.first);
         // simplify the paths to avoid very short edges
-        it->douglas_peucker(params.fill_resolution);
+        it->douglas_peucker(std::max(SCALED_EPSILON * 10, params.fill_resolution / 10));
         if (it->length() <= params.fill_resolution) {
             it = polylines_out.erase(it);
         } else {
@@ -3104,13 +3105,19 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
     return true;
 }
 
-void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offset, Point refpt, double angle, coord_t x_margin, coord_t line_spacing, coord_t pattern_shift, Polylines &fill_lines, const FillParams& params) const
-{
+void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offset,
+                                      Point refpt,
+                                      double angle,
+                                      coord_t x_margin,
+                                      coord_t line_spacing,
+                                      coord_t pattern_shift,
+                                      Polylines &fill_lines,
+                                      const FillParams &params) const {
     BoundingBox bounding_box = poly_with_offset.bounding_box_src();
     // Don't produce infill lines, which fully overlap with the infill perimeter.
     coord_t     x_min = bounding_box.min.x() + x_margin;
     coord_t     x_max = bounding_box.max.x() - x_margin;
-    coord_t     min_dist = std::max(SCALED_EPSILON, line_spacing / 2);
+    coord_t     min_dist = std::max(SCALED_EPSILON, x_margin / 2);
     // extend bounding box so that our pattern will be aligned with other layers
     // align_to_grid will not work correctly with positive pattern_shift.
     coord_t pattern_shift_scaled = pattern_shift % line_spacing;
@@ -3122,12 +3129,12 @@ void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offse
     const double sin_a    = sin(angle);
     std::vector<SegmentedIntersectionLine> segs = _vert_lines_for_polygon(poly_with_offset, bounding_box, params, line_spacing);
     slice_region_by_vertical_lines(this, segs, poly_with_offset);
-    for (const SegmentedIntersectionLine &vline : segs)
+    for (const SegmentedIntersectionLine &vline : segs) {
         if (vline.pos >= x_min) {
             if (vline.pos > x_max)
                 break;
             for (auto it = vline.intersections.begin(); it != vline.intersections.end();) {
-                auto it_low  = it ++;
+                auto it_low = it++;
                 assert(it_low->type == SegmentIntersection::OUTER_LOW);
                 if (it_low->type != SegmentIntersection::OUTER_LOW)
                     continue;
@@ -3142,10 +3149,11 @@ void FillRectilinear::make_fill_lines(const ExPolygonWithOffset &poly_with_offse
                                                     Point(vline.pos, it_high->pos()).rotated(cos_a, sin_a));
                         }
                     }
-                    ++ it;
+                    ++it;
                 }
             }
         }
+    }
 }
 
 bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillParams params, const std::initializer_list<SweepParams> &sweep_params, Polylines &polylines_out) const
@@ -3370,6 +3378,9 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
     if (!fill_surface_by_lines(surface, params, 0.f, 0.f, polylines_out)) {
         printf("FillRectilinear2::fill_surface() failed to fill a region.\n");
     }
+    if (params.fill_exactly) {
+        BOOST_LOG_TRIVIAL(info) << "Sawtooth infill can't \"fill exactly\", setting ignored.";
+    }
     if (!polylines_out.empty()) {
         ExtrusionEntityCollection *eec = new ExtrusionEntityCollection();
         /// pass the no_sort attribute to the extrusion path
@@ -3387,7 +3398,7 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                                                         false));
             ExtrusionPath3D *current_extrusion = &(extrusions->paths.back());
             const Points &pts = poly.points;
-            coord_t next_zhop = tooth_spacing_min + (coord_t)abs((rand() / (float)RAND_MAX) * (tooth_spacing_max - tooth_spacing_min));
+            coord_t next_zhop = tooth_spacing_min + (coord_t)abs((safe_rand() / (float)RAND_MAX) * (tooth_spacing_max - tooth_spacing_min));
             size_t idx = 1;
 
             current_extrusion->push_back(pts[0], 0);
@@ -3473,7 +3484,7 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                     line_length = (coord_t)last.distance_to(pts[idx]);
 
                     //re-init
-                    next_zhop = tooth_spacing_min + (coord_t)abs((rand() / (float)RAND_MAX) * (tooth_spacing_max - tooth_spacing_min));
+                    next_zhop = tooth_spacing_min + (coord_t)abs((safe_rand() / (float)RAND_MAX) * (tooth_spacing_max - tooth_spacing_min));
                 }
             }
             while (idx < poly.size()) {
@@ -3481,6 +3492,12 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                 idx++;
             }
             if (current_extrusion->size() < 2) extrusions->paths.pop_back();
+#ifdef _DEBUG
+            for (ExtrusionPath3D &b : extrusions->paths) {
+                assert(b.polyline.is_3D);
+                assert(b.polyline.is_valid());
+            }
+#endif
             if (!extrusions->paths.empty()) eec->append(ExtrusionEntitiesPtr{ extrusions });
             else delete extrusions;
         }
@@ -3491,142 +3508,6 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
             delete eec;
         }
     }
-
-
-}
-
-
-void
-FillRectilinearWGapFill::split_polygon_gap_fill(const Surface &surface, const FillParams &params, ExPolygons &rectilinear, ExPolygons &gapfill) {
-
-    // remove areas for gapfill 
-    // factor=0.5 : remove area smaller than a spacing. factor=1 : max spacing for the gapfill (but not the width)
-    //choose between 2 to avoid dotted line  effect.
-    float factor1 = 0.99f;
-    float factor2 = 0.7f;
-    ExPolygons rectilinear_areas1 = offset2_ex(ExPolygons{ surface.expolygon }, -params.flow.scaled_spacing() * factor1, params.flow.scaled_spacing() * factor1);
-    ExPolygons rectilinear_areas2 = offset2_ex(ExPolygons{ surface.expolygon }, -params.flow.scaled_spacing() * factor2, params.flow.scaled_spacing() * factor2);
-    //choose the best one
-    rectilinear = rectilinear_areas1.size() <= rectilinear_areas2.size() + 1 || rectilinear_areas2.empty() ? rectilinear_areas1 : rectilinear_areas2;
-    ensure_valid(rectilinear);
-    //get gapfill
-    gapfill = diff_ex(ExPolygons{ surface.expolygon }, rectilinear);
-    ensure_valid(gapfill);
-}
-
-void
-FillRectilinearWGapFill::fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const {
-    ExtrusionEntityCollection *coll_nosort = new ExtrusionEntityCollection();
-    coll_nosort->set_can_sort_reverse(false, false); //can be sorted inside the pass but thew two pass need to be done one after the other
-    ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
-
-    //// remove areas for gapfill 
-    //// factor=0.5 : remove area smaller than a spacing. factor=1 : max spacing for the gapfill (but not the width)
-    ////choose between 2 to avoid dotted line  effect.
-    //float factor1 = 0.99f;
-    //float factor2 = 0.7f;
-    //ExPolygons rectilinear_areas1 = offset2_ex(ExPolygons{ surface->expolygon }, -params.flow.scaled_spacing() * factor1, params.flow.scaled_spacing() * factor1);
-    //ExPolygons rectilinear_areas2 = offset2_ex(ExPolygons{ surface->expolygon }, -params.flow.scaled_spacing() * factor2, params.flow.scaled_spacing() * factor2);
-    //std::cout << "FillRectilinear2WGapFill use " << (rectilinear_areas1.size() <= rectilinear_areas2.size() + 1 ? "1" : "2") << "\n";
-    //ExPolygons &rectilinear_areas = rectilinear_areas1.size() <= rectilinear_areas2.size() + 1 ? rectilinear_areas1 : rectilinear_areas2;
-    //ExPolygons gapfill_areas = diff_ex(ExPolygons{ surface->expolygon }, rectilinear_areas);
-    ExPolygons rectilinear_areas, gapfill_areas;
-    split_polygon_gap_fill(*surface, params, rectilinear_areas, gapfill_areas);
-    double rec_area = 0;
-    for (ExPolygon &p : rectilinear_areas)rec_area += p.area();
-    double gf_area = 0;
-    for (ExPolygon &p : gapfill_areas) gf_area += p.area();
-    //std::cout << unscaled(unscaled(surface->expolygon.area())) << " = " << unscaled(unscaled(rec_area)) << " + " << unscaled(unscaled(gf_area)) << "\n";
-
-    // rectilinear
-    Polylines polylines_rectilinear;
-    Surface rectilinear_surface{ *surface };
-    FillParams params_monotonic = params;
-    params_monotonic.monotonic = is_monotonic();
-    for (const ExPolygon &rectilinear_area : rectilinear_areas) {
-        rectilinear_surface.expolygon = rectilinear_area;
-        if (!fill_surface_by_lines(&rectilinear_surface, params_monotonic, 0.f, 0.f, polylines_rectilinear)) {
-            printf("FillRectilinear2::fill_surface() failed to fill a region.\n");
-        }
-    }
-    ExPolygons unextruded_areas;
-    if (!polylines_rectilinear.empty()) {
-
-        //Create extrusions
-        ExtrusionEntityCollection *eec = new ExtrusionEntityCollection();
-        /// pass the no_sort attribute to the extrusion path
-        //don't force monotonic if not top or bottom
-        if (is_monotonic())
-            eec->set_can_sort_reverse(false, false);
-        else
-            eec->set_can_sort_reverse(!this->no_sort(), !this->no_sort());
-
-        extrusion_entities_append_paths(
-            *eec, std::move(polylines_rectilinear),
-                    ExtrusionAttributes{good_role, ExtrusionFlow{params.flow.mm3_per_mm() * params.flow_mult,
-                                                                 params.flow.width() * params.flow_mult,
-                                                                 params.flow.height()}},
-                    true);
-
-        coll_nosort->append(ExtrusionEntitiesPtr{ eec });
-
-        unextruded_areas = ensure_valid(params.fill_resolution, diff_ex(rectilinear_areas, union_safety_offset_ex(eec->polygons_covered_by_spacing(params.flow.spacing_ratio(), 10))));
-    }
-    else
-        unextruded_areas = rectilinear_areas;
-
-    //gapfill
-    gapfill_areas.insert(gapfill_areas.end(), unextruded_areas.begin(), unextruded_areas.end());
-    gapfill_areas = union_safety_offset_ex(gapfill_areas);
-    ensure_valid(gapfill_areas, params.fill_resolution);
-    assert_valid(gapfill_areas);
-    if (gapfill_areas.size() > 0) {
-        const double minarea = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
-        for (int i = 0; i < gapfill_areas.size(); i++) {
-            if (gapfill_areas[i].area() < minarea) {
-                gapfill_areas.erase(gapfill_areas.begin() + i);
-                i--;
-            }
-        }
-        FillParams params2{ params };
-        params2.role = good_role;
-
-        do_gap_fill(intersection_ex(gapfill_areas, no_overlap_expolygons), params2, coll_nosort->set_entities());
-    }
-
-    
-    // check volume coverage
-    {
-        double flow_mult_exact_volume = 1;
-        // check if not over-extruding
-        if (!params.dont_adjust && params.full_infill() && !params.flow.bridge() && params.fill_exactly) {
-            // compute the path of the nozzle -> extruded volume
-            double extruded_volume = ExtrusionVolume{}.get(*coll_nosort);
-            // compute flow to remove spacing_ratio from the equation
-            // compute real volume to fill
-            double polyline_volume = compute_unscaled_volume_to_fill(surface, params);
-            if (extruded_volume != 0 && polyline_volume != 0)
-                flow_mult_exact_volume = polyline_volume / extruded_volume;
-            // failsafe, it can happen
-            if (flow_mult_exact_volume > 1.3)
-                flow_mult_exact_volume = 1.3;
-            if (flow_mult_exact_volume < 0.8)
-                flow_mult_exact_volume = 0.8;
-            BOOST_LOG_TRIVIAL(info) << "rectilinear/monotonic Infill (with gapfil) process extrude " << extruded_volume
-                                    << " mm3 for a volume of " << polyline_volume << " mm3 : we mult the flow by "
-                                    << flow_mult_exact_volume;
-            //apply to extrusions
-            ExtrusionModifyFlow{flow_mult_exact_volume}.set(*coll_nosort);
-        }
-    }
-
-    // === end ===
-    if (!coll_nosort->empty()) {
-        out.push_back(coll_nosort);
-    } else {
-        delete coll_nosort;
-    }
-
 }
 
 // Lightning infill assumes that the distance between any two sampled points is always

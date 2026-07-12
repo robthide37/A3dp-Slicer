@@ -377,7 +377,9 @@ bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, wxPro
                 mo->volumes.back()->set_transformation(Geometry::Transformation());
 
                 mo->add_instance();
-				if (!Slic3r::store_3mf(path_src.string().c_str(), &model, nullptr, OptionStore3mf{}.set_fullpath_sources(false).set_zip64(false))) {
+                OptionStore3mf opt3mf;
+                if (!Slic3r::store_3mf(path_src.string().c_str(), &model, nullptr,
+                                       opt3mf.set_fullpath_sources(false).set_zip64(false))) {
 					boost::filesystem::remove(path_src);
 					throw Slic3r::RuntimeError("Export of a temporary 3mf file failed");
 				}
@@ -392,7 +394,7 @@ bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, wxPro
 				on_progress(L("Loading repaired model"), 80);
 				DynamicPrintConfig config;
 				ConfigSubstitutionContext config_substitutions{ ForwardCompatibilitySubstitutionRule::EnableSilent };
-				bool loaded = Slic3r::load_3mf(path_dst.string().c_str(), config, config_substitutions, &model, false);
+				bool loaded = Slic3r::load_3mf(path_dst.string().c_str(), config, config_substitutions, &model, false, false);
 			    boost::filesystem::remove(path_dst);
 				if (! loaded)
 	 				throw Slic3r::RuntimeError("Import of the repaired 3mf file failed");

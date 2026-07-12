@@ -8,7 +8,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include <limits>
-#include <string.h>
+#include <cstring>
 #include <map>
 #include <string>
 #include <expat.h>
@@ -45,7 +45,7 @@ namespace pt = boost::property_tree;
 #undef NDEBUG
 #endif
 
-#include <assert.h>
+#include <cassert>
 
 // VERSION NUMBERS
 // 0 : .amf, .amf.xml and .zip.amf files saved by older slic3r. No version definition in them.
@@ -134,9 +134,7 @@ struct AMFParserContext
     static const char* get_not_null_attribute(const char** atts, const char* id) {
         const char* str = get_attribute(atts, id);
         if (str == nullptr) {
-            char error_buf[1024];
-            ::sprintf(error_buf, "Error, missing tag %s", id);
-            throw Slic3r::FileIOError(error_buf);
+            throw Slic3r::FileIOError("Error, missing tag " + std::string(id));
         }
         return str;
     }
@@ -715,7 +713,7 @@ void AMFParserContext::endElement(const char * /* name */)
         CustomGCode::Type type  = static_cast<CustomGCode::Type>(atoi(m_value[3].c_str()));
         const std::string& extra= m_value[4];
 
-        m_model.custom_gcode_per_print_z.gcodes.push_back(CustomGCode::Item{print_z, type, extruder, color, extra});
+        m_model.custom_gcode_per_print_z().gcodes.push_back(CustomGCode::Item{print_z, type, extruder, color, extra});
 
         for (std::string& val: m_value)
             val.clear();
@@ -725,9 +723,9 @@ void AMFParserContext::endElement(const char * /* name */)
     case NODE_TYPE_CUSTOM_GCODE_MODE: {
         const std::string& mode = m_value[0];
 
-        m_model.custom_gcode_per_print_z.mode = mode == CustomGCode::SingleExtruderMode ? CustomGCode::Mode::SingleExtruder :
-                                                mode == CustomGCode::MultiAsSingleMode  ? CustomGCode::Mode::MultiAsSingle  :
-                                                                                          CustomGCode::Mode::MultiExtruder;
+        m_model.custom_gcode_per_print_z().mode = mode == CustomGCode::SingleExtruderMode ? CustomGCode::Mode::SingleExtruder :
+                                                    mode == CustomGCode::MultiAsSingleMode  ? CustomGCode::Mode::MultiAsSingle  :
+                                                                                              CustomGCode::Mode::MultiExtruder;
         for (std::string& val: m_value)
             val.clear();
         break;
@@ -743,6 +741,7 @@ void AMFParserContext::endElement(const char * /* name */)
             // See https://github.com/prusa3d/PrusaSlicer/issues/7155. We'll revert it for now.
             //m_config_substitutions->substitutions = m_config->load_from_ini_string_commented(std::move(m_value[1].c_str()), m_config_substitutions->rule);
             ConfigBase::load_from_gcode_string_legacy(*m_config, std::move(m_value[1].c_str()), *m_config_substitutions);
+            //deserialize_maybe_from_prusa(ConfigBase::load_gcode_string_legacy(m_value[1].c_str()), *m_config, *config_substitutions, true, true);
         }
         else if (strncmp(m_value[0].c_str(), "slic3r.", 7) == 0) {
             const char *key = m_value[0].c_str() + 7;
@@ -763,7 +762,9 @@ void AMFParserContext::endElement(const char * /* name */)
                 if (config) {
                     std::string opt_key = key;
                     std::string value = m_value[1];
-                    PrintConfigDef::handle_legacy(opt_key, value, true);
+                    //FIXME: put them into a map, and do the handle & config deserialize after evrything is parsed.
+                    PrintConfigDef::handle_legacy_pair(opt_key, value, true);
+                    // PrintConfigDef::handle_legacy(opt_key, value, true);
                     if (opt_key.empty()) {
                         if (m_config_substitutions->rule != ForwardCompatibilitySubstitutionRule::Disable) {
                             m_config_substitutions->emplace(std::string(key), std::move(value));
@@ -1008,9 +1009,10 @@ bool extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_fi
             CallbackData* data = (CallbackData*)pOpaque;
             if (!XML_Parse(data->parser, (const char*)pBuf, (int)n, (file_ofs + n == data->stat.m_uncomp_size) ? 1 : 0) || data->ctx.error())
             {
-                char error_buf[1024];
-                ::sprintf(error_buf, "Error (%s) while parsing '%s' at line %d", data->ctx.error_message(), data->stat.m_filename, (int)XML_GetCurrentLineNumber(data->parser));
-                throw Slic3r::FileIOError(error_buf);
+                std::string error_msg = "Error (" + std::string(data->ctx.error_message()) + 
+                                       ") while parsing '" + std::string(data->stat.m_filename) + 
+                                       "' at line " + std::to_string((int)XML_GetCurrentLineNumber(data->parser));
+                throw Slic3r::FileIOError(error_msg);
             }
 
             return n;
@@ -1340,14 +1342,14 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
         stream << "  </constellation>\n";
     }
 
-    if (!model->custom_gcode_per_print_z.gcodes.empty() && options.export_modifiers)
+   if (!model->custom_gcode_per_print_z().gcodes.empty() && options.export_modifiers)
     {
         std::string out = "";
         pt::ptree tree;
 
         pt::ptree& main_tree = tree.add("custom_gcodes_per_height", "");
 
-        for (const CustomGCode::Item& code : model->custom_gcode_per_print_z.gcodes)
+       for (const CustomGCode::Item& code : model->custom_gcode_per_print_z().gcodes)
         {
             pt::ptree& code_tree = main_tree.add("code", "");
             // store custom_gcode_per_print_z gcodes information 
@@ -1368,8 +1370,8 @@ bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config
         pt::ptree& mode_tree = main_tree.add("mode", "");
         // store mode of a custom_gcode_per_print_z 
         mode_tree.put("<xmlattr>.value", 
-                      model->custom_gcode_per_print_z.mode == CustomGCode::Mode::SingleExtruder ? CustomGCode::SingleExtruderMode : 
-                      model->custom_gcode_per_print_z.mode == CustomGCode::Mode::MultiAsSingle  ?
+                      model->custom_gcode_per_print_z().mode == CustomGCode::Mode::SingleExtruder ? CustomGCode::SingleExtruderMode : 
+                      model->custom_gcode_per_print_z().mode == CustomGCode::Mode::MultiAsSingle  ?
                       CustomGCode::MultiAsSingleMode  : CustomGCode::MultiExtruderMode);
 
         if (!tree.empty())

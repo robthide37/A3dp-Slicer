@@ -44,7 +44,7 @@ namespace Slic3r {
 
 static const std::string VENDOR_PREFIX = "vendor:";
 static const std::string MODEL_PREFIX = "model:";
-static const std::string VERSION_CHECK_URL = "https://api.github.com/repos/" SLIC3R_GITHUB "/releases";
+static const std::string VERSION_CHECK_URL = "https://api.github.com/repos/" "supermerill/superslicer" "/releases";
 // Url to index archive zip that contains latest indicies
 static const std::string INDEX_ARCHIVE_URL= "https://api.github.com/repos/" SLIC3R_GITHUB "-profiles/releases";
 //to get the slic3r idx: look at the json from INDEX_ARCHIVE_URL, and request the assets_url
@@ -65,6 +65,9 @@ void AppConfig::reset()
     m_orig_version = Semver::invalid();
     m_legacy_datadir = false;
     set_defaults();
+    if (!m_data_dir.config_path.empty()) {
+        init_ui_layout();
+    }
 };
 
 uint32_t AppConfig::create_color(float saturation, float value, EAppColorType color_template)
@@ -103,8 +106,6 @@ uint32_t AppConfig::create_color(float saturation, float value, EAppColorType co
 void AppConfig::set_defaults()
 {
 
-    init_ui_layout();
-
     if (m_mode == EAppMode::Editor) {
 
         // Reset the empty fields to defaults.
@@ -113,9 +114,9 @@ void AppConfig::set_defaults()
         // Disable background processing by default as it is not stable.
         if (get("background_processing").empty())
             set("background_processing", "0");
-        // Enable support issues alerts by default
+        // Disable support issues alerts by default
         if (get("alert_when_supports_needed").empty())
-            set("alert_when_supports_needed", "1");
+            set("alert_when_supports_needed", "0");
         // If set, the "Controller" tab for the control of the printer over serial line and the serial port settings are hidden.
         // By default, Prusa has the controller hidden.
         if (get("no_controller").empty())
@@ -142,7 +143,7 @@ void AppConfig::set_defaults()
             boost::filesystem::path prg_files = "C:/Program Files";
             boost::filesystem::path freecad_path;
             if (boost::filesystem::exists(prg_files)) {
-                for (boost::filesystem::directory_entry& prg_dir : boost::filesystem::directory_iterator(prg_files)) {
+                for (const boost::filesystem::directory_entry& prg_dir : boost::filesystem::directory_iterator(prg_files)) {
                     if (prg_dir.status().type() == boost::filesystem::file_type::directory_file
                          && boost::starts_with(prg_dir.path().filename().string(), "FreeCAD")
                          && (freecad_path.empty() || freecad_path.filename().string() < prg_dir.path().filename().string())) {
@@ -177,45 +178,11 @@ void AppConfig::set_defaults()
         if (get("font_size").empty())
             set("font_size", "0");
 
+        if (get("side_panel_width").empty())
+            set("side_panel_width", "42");
+
         if (get("gcodeviewer_decimals").empty())
             set("gcodeviewer_decimals", "2");
-
-        //get default color from the ini file
-
-        //try to load colors from ui file
-        m_tags.clear();
-        std::map<std::string, std::string> key2color = { {"Gui_color_dark", "cabe39"}, {"Gui_color", "eddc21"}, {"Gui_color_light", "ffee38"} };
-        boost::property_tree::ptree tree_colors;
-        boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
-        try {
-            boost::nowide::ifstream ifs;
-            ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
-            ifs.open(path_colors.string());
-            boost::property_tree::read_ini(ifs, tree_colors);
-
-            for(std::map<std::string, std::string>::iterator it = key2color.begin(); it != key2color.end() ; ++it) {
-                std::string color_code = tree_colors.get<std::string>(it->first);
-                if (color_code.length() == 6)
-                    it->second = color_code;
-                else if (color_code.length() == 7)
-                    it->second = color_code.substr(1);
-            }
-        }
-        catch (const std::ifstream::failure& err) {
-            BOOST_LOG_TRIVIAL(error) << "The color file cannot be loaded. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
-        }
-        catch (const std::runtime_error& err) {
-            BOOST_LOG_TRIVIAL(error) << "Failed loading the color file. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
-        }
-
-        if (get("color_dark").empty())
-            set("color_dark", key2color["Gui_color_dark"]);
-
-        if (get("color").empty())
-            set("color", key2color["Gui_color"]);
-
-        if (get("color_light").empty())
-            set("color_light", key2color["Gui_color_light"]);
 
         if (get("version_check").empty())
             set("version_check", "1");
@@ -286,7 +253,7 @@ void AppConfig::set_defaults()
             set("show_collapse_button", "1");
 
         if (get("suppress_hyperlinks").empty())
-            set("suppress_hyperlinks", "1");
+            set("suppress_hyperlinks", "confirm");
 
         if (get("focus_platter_on_mouse").empty())
             set("focus_platter_on_mouse", "1");
@@ -307,7 +274,11 @@ void AppConfig::set_defaults()
            set("notify_release", "all"); // or "none" or "release"
 
         if (get("auto_switch_preview").empty())
-            set("auto_switch_preview", "2");
+            set("auto_switch_preview", "platter");
+
+
+        if (get("show_3d_navigator").empty())
+            set("show_3d_navigator", "1");
 
 #if ENABLE_ENVIRONMENT_MAP
         if (get("use_environment_map").empty())
@@ -384,6 +355,12 @@ void AppConfig::set_defaults()
     if (get("use_free_camera").empty())
         set("use_free_camera", "0");
 
+    if (get("3D_mouse_drag").empty())
+        set("3D_mouse_drag", "0");
+
+    if (get("mouse_middle_target").empty())
+        set("mouse_middle_target", "1");
+
     if (get("reverse_mouse_wheel_zoom").empty())
         set("reverse_mouse_wheel_zoom", "0");
 
@@ -414,46 +391,6 @@ void AppConfig::set_defaults()
     if (get("wifi_config_dialog_declined").empty())
         set("wifi_config_dialog_declined", "0");
 
-    {
-
-        //try to load splashscreen from ui file
-        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", ""}, {"splash_screen_gcodeviewer", ""} };
-        boost::property_tree::ptree tree_splashscreen;
-        boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
-        try {
-            boost::nowide::ifstream ifs;
-            ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
-            ifs.open(path_colors.string());
-            boost::property_tree::read_ini(ifs, tree_splashscreen);
-
-            for (std::map<std::string, std::string>::iterator it = key2splashscreen.begin(); it != key2splashscreen.end(); ++it) {
-                std::string splashscreen_filename = tree_splashscreen.get<std::string>(it->first);
-                it->second = splashscreen_filename;
-            }
-        }
-        catch (const std::ifstream::failure& err) {
-            BOOST_LOG_TRIVIAL(error) << "The splashscreen file cannot be loaded. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
-        }
-        catch (const std::runtime_error& err) {
-            BOOST_LOG_TRIVIAL(error) << "Failed loading the splashscreen file. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
-        }
-        m_default_splashscreen = { key2splashscreen["splash_screen_editor"] , key2splashscreen["splash_screen_gcodeviewer"] };
-
-        if (get("splash_screen_editor").empty())
-            set("splash_screen_editor", "default");
-
-        if (get("splash_screen_gcodeviewer").empty())
-            set("splash_screen_gcodeviewer", "default");
-
-        bool switch_to_random = get("show_splash_screen_random") == "1";
-        if (switch_to_random || key2splashscreen["splash_screen_editor"].empty())
-            set("splash_screen_editor", "random");
-        if (switch_to_random || key2splashscreen["splash_screen_gcodeviewer"].empty())
-            set("splash_screen_gcodeviewer", "random");
-        if (switch_to_random)
-            set("show_splash_screen_random", "0");
-        }
-
 #ifdef _WIN32
     if (get("use_legacy_3DConnexion").empty())
         set("use_legacy_3DConnexion", "0");
@@ -465,50 +402,15 @@ void AppConfig::set_defaults()
         set("sys_menu_enabled", "1");
 #endif // _WIN32
 
-    //tags
-    boost::property_tree::ptree tree_colors;
-    boost::filesystem::path path_colors = layout_config_path() / "colors.ini";
-    try {
-        boost::nowide::ifstream ifs;
-        ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
-        ifs.open(path_colors.string());
-        boost::property_tree::read_ini(ifs, tree_colors);
 
-        for (const auto& it : tree_colors) {
-            if (boost::starts_with(it.first, "Tag_")) {
-                std::string color_code = tree_colors.get<std::string>(it.first);
-                if (!color_code.empty()) {
-                    std::string tag = it.first.substr(4);
-                    color_code = (color_code[0] == '#' ? color_code : ("#" + color_code));
+    if (get("show_step_import_parameters").empty())
+        set("show_step_import_parameters", "1");
 
-                    // get/set into ConfigOptionDef
-                    auto it = ConfigOptionDef::names_2_tag_mode.find(tag);
-                    if (it == ConfigOptionDef::names_2_tag_mode.end()) {
-                        if (ConfigOptionDef::names_2_tag_mode.size() > 62) { //full
-                            continue;
-                        }
-                        ConfigOptionDef::names_2_tag_mode[tag] = (ConfigOptionMode)(((uint64_t)1) << ConfigOptionDef::names_2_tag_mode.size());
-                        it = ConfigOptionDef::names_2_tag_mode.find(tag);
-                    }
-                    m_tags.emplace_back(tag, tag, it->second, color_code);
-                    if (tag == "Simple")
-                        m_tags.back().description = L("Simple View Mode");
-                    if (tag == "Advanced")
-                        m_tags.back().description = L("Advanced View Mode");
-                    if (tag == "Expert")
-                        m_tags.back().description = L("Expert View Mode");
-                }
-            }
-        }
-    }
-    catch (const std::ifstream::failure& err) {
-        BOOST_LOG_TRIVIAL(error) << "The color file cannot be loaded. (2) Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
-    }
-    catch (const std::runtime_error& err) {
-        BOOST_LOG_TRIVIAL(error) << "Failed (2) loading the color file. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
-    }
+    if (get("linear_precision").empty())
+        set("linear_precision", "0.005");
 
-
+    if (get("angle_precision").empty())
+        set("angle_precision", "1.");
 
     // Remove legacy window positions/sizes
     erase("", "main_frame_maximized");
@@ -528,7 +430,205 @@ void AppConfig::set_hardware_type(HardwareType hard) {
         set("compress_png_texture", (m_hardware&hGpuAmd) == hGpuAmd ? "0" : "1");
 }
 
+void AppConfig::load_installed_repo(const boost::filesystem::path &directory) {
+    m_all_slic3r_installed.clear();
+    if (boost::filesystem::exists(directory / "installed.ini")) {
+        try {
+            boost::property_tree::ptree tree_ini;
+            boost::nowide::ifstream ifs;
+            ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
+            ifs.open((directory / "installed.ini").string());
+            boost::property_tree::read_ini(ifs, tree_ini);
+            for (auto &section : tree_ini) {
+                m_all_slic3r_installed.emplace_back();
+                m_all_slic3r_installed.back().installed_name = section.first;
+                for (auto &key_value : section.second) {
+                    m_all_slic3r_installed.back().other_keys[key_value.first] = key_value.second
+                                                                                    .get_value<std::string>();
+                }
+                std::map<std::string, std::string> &entries = m_all_slic3r_installed.back().other_keys;
+                assert(entries.find("config_path") != entries.end());
+                assert(entries.find("exe_path") != entries.end());
+                assert(entries.find("version") != entries.end());
+                m_all_slic3r_installed.back().config_path = entries["config_path"];
+                m_all_slic3r_installed.back().exe_path = entries["exe_path"];
+                m_all_slic3r_installed.back().version = Semver(entries["version"]);
+            }
+        } catch (const std::ifstream::failure &err) {
+            BOOST_LOG_TRIVIAL(error) << "The config directory dictionary " << directory.string()
+                                     << " cannot be loaded. Reason: " << err.what();
+        } catch (const std::runtime_error &err) {
+            BOOST_LOG_TRIVIAL(error) << "Failed loading the " << directory.string()
+                                     << " file. Reason: " << err.what();
+        }
+    }
+    // load old plain repo
+    if (boost::filesystem::exists(directory / (SLIC3R_APP_KEY ".ini"))) {
+        boost::nowide::ifstream inifile((directory / (SLIC3R_APP_KEY ".ini")).string());
+        if (inifile.good()) {
+            std::string first_line;
+            std::getline(inifile, first_line);
+            assert(!first_line.empty() && first_line[0] == '#');
+            m_all_slic3r_installed.emplace_back();
+            ConfigurationEntry &data = m_all_slic3r_installed.back();
+            std::regex rgx(".* ([0-9]\\.[0-9]+\\.[0-9]+\\.[0-9]+) on.*");
+            std::smatch match;
+            if (std::regex_search(first_line, match, rgx) && match.size() > 0) {
+                data.version = Semver(match[1]);
+            } else {
+                data.version = Semver("1.0.0.0");
+            }
+            data.other_keys["installed_name"] = data.installed_name = first_line;
+            data.other_keys["config_path"] = (data.config_path = directory).string();
+            data.other_keys["config_path_relative"] = "0";
+            data.other_keys["exe_path"] = (data.exe_path = "").string();
+            data.other_keys["config_path"] = data.version.to_string();
+            data.other_keys["legacy"] = "1";
+        }
+    }
+}
+
+void AppConfig::save_installed_repo()
+{
+    if (! is_main_thread_active())
+        //in win11, it seems that the gui event thread isn't named 'slic3r_main'
+        BOOST_LOG_TRIVIAL(warning) << "AppConfig::save_installed_repo() from thread '" << (get_current_thread_name()?*get_current_thread_name():"UNKNOWN") << "' instead of 'slic3r_main'\n";
+        //throw CriticalException("Calling AppConfig::save() from a worker thread!");
+
+    boost::filesystem::path path(m_data_dir_root);
+    path = path / "installed.ini";
+
+    // The config is first written to a file with a PID suffix and then moved
+    // to avoid race conditions with multiple instances of Slic3r
+    std::string path_pid = (boost::format("%1%.%2%") % path.string() % get_current_pid()).str();
+
+    std::sort(m_all_slic3r_installed.begin(), m_all_slic3r_installed.end(), [](const ConfigurationEntry &a, const ConfigurationEntry &b) { return a.installed_name < b.installed_name; });
+    std::sort(m_all_slic3r_installed.begin(), m_all_slic3r_installed.end(), [](const ConfigurationEntry &a, const ConfigurationEntry &b) { return a.version < b.version; });
+
+    std::stringstream config_ss;
+    config_ss << "# Dictionary of all " SLIC3R_APP_NAME " installation" << std::endl;
+    // Write the other categories.
+    for (const ConfigurationEntry& installation : m_all_slic3r_installed) {
+        auto it_is_legacy = installation.other_keys.find("legacy");
+        if (it_is_legacy == installation.other_keys.end() || it_is_legacy->second == "0") {
+            config_ss << std::endl << "[" << installation.installed_name << "]" << std::endl;
+            for (const auto &kvp : installation.other_keys)
+                config_ss << kvp.first << " = " << kvp.second << std::endl;
+        }
+    }
+    // One empty line before md5
+    config_ss << std::endl;
+
+    std::string config_str = config_ss.str();
+    boost::nowide::ofstream c;
+    c.open(path_pid, std::ios::out | std::ios::trunc);
+    c << config_str;
+#ifdef WIN32
+    // WIN32 specific: The final "rename_file()" call is not safe in case of an application crash, there is no atomic "rename file" API
+    // provided by Windows (sic!). Therefore we save a MD5 checksum to be able to verify file corruption. In addition,
+    // we save the config file into a backup first before moving it to the final destination.
+    c << appconfig_md5_hash_line(config_str);
+#endif
+    c.close();
+    
+#ifdef WIN32
+    // Make a backup of the configuration file before copying it to the final destination.
+    std::string error_message;
+    std::string backup_path = (boost::format("%1%.bak") % path.string()).str();
+    // Copy configuration file with PID suffix into the configuration file with "bak" suffix.
+    if (copy_file(path_pid, backup_path, error_message, false) != SUCCESS)
+        BOOST_LOG_TRIVIAL(error) << "Copying from " << path_pid << " to " << backup_path << " failed. Failed to create a backup configuration.";
+#endif
+
+    // Rename the config atomically.
+    // On Windows, the rename is likely NOT atomic, thus it may fail if PrusaSlicer crashes on another thread in the meanwhile.
+    // To cope with that, we already made a backup of the config on Windows.
+    rename_file(path_pid, path.string());
+    m_dirty = false;
+
+    // ensure some options are in sync
+    set_header_generate_with_date(get("date_in_config_file") == "1");
+}
+
+boost::filesystem::path AppConfig::ConfigurationEntry::get_config_path(const std::string &data_dir_root) const {
+    if (auto it = other_keys.find("config_path_relative"); it != other_keys.end() && it->second == "1") {
+        return boost::filesystem::path(data_dir_root) / config_path;
+    } else {
+        return config_path;
+    }
+}
+
+bool AppConfig::init_root_data_dir(const std::string &default_app_data_path) {
+    if (!m_data_dir_root.empty()) {
+        assert(!m_data_dir.config_path.empty());
+        return false;
+    }
+
+    if (has_data_dir()) {
+        // set by command line arg 'datadir'
+        m_data_dir.other_keys["installed_name"] = m_data_dir.installed_name = "command_line";
+        m_data_dir.other_keys["config_path"] = (m_data_dir.config_path = data_dir()).string();
+        m_data_dir.other_keys["config_path_relative"] = "0";
+        m_data_dir.other_keys["exe_path"] = (m_data_dir.exe_path = install_path()).string();
+        m_data_dir.other_keys["exe_path_relative"] = "0";
+        m_data_dir.other_keys["version"] = (m_data_dir.version = Semver(SLIC3R_VERSION_FULL)).to_string();
+        return false;
+    }
+
+    // Set the Slic3r data directory at the Slic3r XS module.
+    // Unix: ~/ .Slic3rP
+    // Windows : "C:\Users\username\AppData\Roaming\Slic3r" or "C:\Documents and Settings\username\Application
+    // Data\Slic3r" Mac : "~/Library/Application Support/Slic3r"
+
+    // check if there is a "configuration" directory
+#ifdef __APPLE__
+    //... next to the app bundle on MacOs
+    if (boost::filesystem::exists(boost::filesystem::path{resources_dir()} / ".." / ".." / ".." / "configuration")) {
+        m_data_dir_root = ((boost::filesystem::path{resources_dir()} / ".." / ".." / ".." / "configuration").string());
+    } else
+#endif
+        //... next to the resources directory
+        if (boost::filesystem::exists(boost::filesystem::path{resources_dir()} / ".." / "configuration")) {
+        m_data_dir_root = ((boost::filesystem::path{resources_dir()} / ".." / "configuration").string());
+    } else {
+        // use system's data dir location
+        m_data_dir_root = (default_app_data_path);
+    }
+
+    if (!boost::filesystem::exists(m_data_dir_root)) {
+        boost::filesystem::create_directories(m_data_dir_root);
+    }
+
+    // then check the main version file
+    load_installed_repo(boost::filesystem::path(m_data_dir_root));
+
+    // find ourself inside m_all_slic3r_installed
+    std::vector<ConfigurationEntry*> same_version;
+    for (ConfigurationEntry &installed : m_all_slic3r_installed) {
+        if (installed.version == Semver(SLIC3R_VERSION_FULL)) {
+            same_version.push_back(&installed);
+        }
+    }
+    m_data_dir.config_path.clear();
+    for (ConfigurationEntry *installed : same_version) {
+        if (boost::filesystem::exists(installed->exe_path) && boost::filesystem::equivalent(install_path(), installed->exe_path)) {
+            m_data_dir = *installed;
+            set_data_dir(m_data_dir.get_config_path(this->get_root_data_dir()).string());
+        }
+    }
+
+    return true;
+}
+
+void AppConfig::set_new_installation(ConfigurationEntry new_install){
+    m_data_dir = new_install;
+    set_data_dir(m_data_dir.get_config_path(this->get_root_data_dir()).string());
+    this->m_all_slic3r_installed.push_back(new_install);
+    this->save_installed_repo();
+}
+
 void AppConfig::init_ui_layout() {
+    assert(has_data_dir());
     boost::filesystem::path resources_dir_path = boost::filesystem::path(resources_dir()) / "ui_layout";
     if (!boost::filesystem::is_directory(resources_dir_path)) {
         //Error
@@ -537,7 +637,7 @@ void AppConfig::init_ui_layout() {
 
     auto get_versions = [](boost::filesystem::path& root_path, std::map<std::string, LayoutEntry>& name_2_version_description_path) {
 
-        for (boost::filesystem::directory_entry& entry : boost::filesystem::directory_iterator(root_path)) {
+        for (const boost::filesystem::directory_entry& entry : boost::filesystem::directory_iterator(root_path)) {
             if (boost::filesystem::is_directory(entry.path())) {
                 boost::filesystem::path version_path = entry.path() / "version.ini";
                 if (boost::filesystem::is_regular_file(version_path)) {
@@ -601,7 +701,7 @@ void AppConfig::init_ui_layout() {
 
     //set ui_layout to a default if not set
     if (current_name.empty() || !find_current) {
-        auto default_layout = datadir_map.find("Standard");
+         auto default_layout = datadir_map.find("Standard");
         if (default_layout == datadir_map.end()) {
             default_layout = datadir_map.find("Default");
         }
@@ -613,6 +713,114 @@ void AppConfig::init_ui_layout() {
         } else {
             throw new RuntimeError("Error, cannot find any layout for the gui.");
         }
+    }
+
+    //get default color from the ini file
+
+    //try to load colors from ui file
+    std::map<std::string, std::string> key2color = { {"Gui_color_dark", "cabe39"}, {"Gui_color", "eddc21"}, {"Gui_color_light", "ffee38"} };
+    boost::property_tree::ptree tree_colors;
+    boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
+    try {
+        std::vector<Tag> new_tags;
+        boost::nowide::ifstream ifs;
+        ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
+        ifs.open(path_colors.string());
+        boost::property_tree::read_ini(ifs, tree_colors);
+
+        for(std::map<std::string, std::string>::iterator it = key2color.begin(); it != key2color.end() ; ++it) {
+            std::string color_code = tree_colors.get<std::string>(it->first);
+            if (color_code.length() == 6)
+                it->second = color_code;
+            else if (color_code.length() == 7)
+                it->second = color_code.substr(1);
+        }
+        //tags
+        for (const auto& it : tree_colors) {
+            if (boost::starts_with(it.first, "Tag_")) {
+                std::string color_code = tree_colors.get<std::string>(it.first);
+                if (!color_code.empty()) {
+                    std::string tag = it.first.substr(4);
+                    color_code = (color_code[0] == '#' ? color_code : ("#" + color_code));
+
+                    // get/set into ConfigOptionDef
+                    auto it = ConfigOptionDef::names_2_tag_mode.find(tag);
+                    if (it == ConfigOptionDef::names_2_tag_mode.end()) {
+                        if (ConfigOptionDef::names_2_tag_mode.size() > 62) { //full
+                            continue;
+                        }
+                        ConfigOptionDef::names_2_tag_mode[tag] = (ConfigOptionMode)(((uint64_t)1) << ConfigOptionDef::names_2_tag_mode.size());
+                        it = ConfigOptionDef::names_2_tag_mode.find(tag);
+                    }
+                    new_tags.emplace_back(tag, tag, it->second, color_code);
+                    if (tag == "Simple")
+                        new_tags.back().description = L("Simple View Mode");
+                    if (tag == "Advanced")
+                        new_tags.back().description = L("Advanced View Mode");
+                    if (tag == "Expert")
+                        new_tags.back().description = L("Expert View Mode");
+                }
+            }
+        }
+        std::lock_guard<std::recursive_mutex> lk(config_lock);
+        m_tags = new_tags;
+    }
+    catch (const std::ifstream::failure& err) {
+        BOOST_LOG_TRIVIAL(error) << "The color file cannot be loaded. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
+    }
+    catch (const std::runtime_error& err) {
+        BOOST_LOG_TRIVIAL(error) << "Failed loading the color file. Reason: " << err.what() << ". \nFrom path: " << path_colors.string();
+    }
+
+    if (get("color_dark").empty())
+        set("color_dark", key2color["Gui_color_dark"]);
+
+    if (get("color").empty())
+        set("color", key2color["Gui_color"]);
+
+    if (get("color_light").empty())
+        set("color_light", key2color["Gui_color_light"]);
+
+    {
+        // try to load splashscreen from ui file
+        std::map<std::string, std::string> key2splashscreen = {{"splash_screen_editor", ""},
+                                                               {"splash_screen_gcodeviewer", ""}};
+        boost::property_tree::ptree tree_splashscreen;
+        boost::filesystem::path path_colors = boost::filesystem::path(layout_config_path()) / "colors.ini";
+        try {
+            boost::nowide::ifstream ifs;
+            ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
+            ifs.open(path_colors.string());
+            boost::property_tree::read_ini(ifs, tree_splashscreen);
+
+            for (std::map<std::string, std::string>::iterator it = key2splashscreen.begin();
+                 it != key2splashscreen.end(); ++it) {
+                std::string splashscreen_filename = tree_splashscreen.get<std::string>(it->first);
+                it->second = splashscreen_filename;
+            }
+        } catch (const std::ifstream::failure &err) {
+            BOOST_LOG_TRIVIAL(error) << "The splashscreen file cannot be loaded. Reason: " << err.what()
+                                     << ". \nFrom path: " << path_colors.string();
+        } catch (const std::runtime_error &err) {
+            BOOST_LOG_TRIVIAL(error) << "Failed loading the splashscreen file. Reason: " << err.what()
+                                     << ". \nFrom path: " << path_colors.string();
+        }
+        m_default_splashscreen = {key2splashscreen["splash_screen_editor"],
+                                  key2splashscreen["splash_screen_gcodeviewer"]};
+
+        if (get("splash_screen_editor").empty())
+            set("splash_screen_editor", "default");
+
+        if (get("splash_screen_gcodeviewer").empty())
+            set("splash_screen_gcodeviewer", "default");
+
+        bool switch_to_random = get("show_splash_screen_random") == "1";
+        if (switch_to_random || key2splashscreen["splash_screen_editor"].empty())
+            set("splash_screen_editor", "random");
+        if (switch_to_random || key2splashscreen["splash_screen_gcodeviewer"].empty())
+            set("splash_screen_gcodeviewer", "random");
+        if (switch_to_random)
+            set("show_splash_screen_random", "0");
     }
 
 }
@@ -791,6 +999,7 @@ std::string AppConfig::load(const std::string &path)
 
     // Override missing or keys with their defaults.
     this->set_defaults();
+    this->init_ui_layout();
     m_dirty = false;
     return "";
 }
@@ -920,6 +1129,7 @@ bool AppConfig::clear_section(const std::string &section)
 
 bool AppConfig::get_variant(const std::string &vendor, const std::string &model, const std::string &variant) const
 {
+    std::lock_guard<std::recursive_mutex> lk(config_lock);
     const auto it_v = m_vendors.find(vendor);
     if (it_v == m_vendors.end()) { return false; }
     const auto it_m = it_v->second.find(model);
@@ -928,6 +1138,7 @@ bool AppConfig::get_variant(const std::string &vendor, const std::string &model,
 
 bool AppConfig::set_variant(const std::string &vendor, const std::string &model, const std::string &variant, bool enable)
 {
+    std::lock_guard<std::recursive_mutex> lk(config_lock);
     if (enable) {
         if (get_variant(vendor, model, variant))
             return false;
@@ -952,8 +1163,9 @@ bool AppConfig::set_variant(const std::string &vendor, const std::string &model,
 bool AppConfig::set_vendors(const VendorMap &vendors)
 {
     if (m_vendors != vendors) {
+        std::lock_guard<std::recursive_mutex> lk(config_lock);
         m_vendors = vendors;
-    m_dirty = true;
+        m_dirty = true;
         return true;
     } else
         return false;
@@ -962,6 +1174,7 @@ bool AppConfig::set_vendors(const VendorMap &vendors)
 bool AppConfig::set_vendors(VendorMap &&vendors)
 {
     if (m_vendors != vendors) {
+        std::lock_guard<std::recursive_mutex> lk(config_lock);
         m_vendors = std::move(vendors);
         m_dirty = true;
         return true;

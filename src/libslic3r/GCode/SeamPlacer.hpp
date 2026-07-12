@@ -35,6 +35,17 @@ namespace SeamPlacerImpl {
 struct GlobalModelInfo;
 struct SeamComparator;
 
+// cache for seam modifier
+struct TriangleMeshForSeam
+{
+    TriangleMesh mesh;
+    BoundingBoxf3 bb_volume;
+    //std::vector<Vec3i32> face_edge_ids;
+    std::vector<float> zs;
+    std::vector<BoundingBox> layers_bb;
+    std::vector<Polygon> layers_contour;
+};
+
 class PolylineWithEnd : public Polyline {
 public:
     enum PolyDir {

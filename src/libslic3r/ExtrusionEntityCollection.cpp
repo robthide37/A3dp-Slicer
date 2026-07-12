@@ -38,6 +38,7 @@ ExtrusionEntityCollection& ExtrusionEntityCollection::operator= (const Extrusion
 {
     this->m_no_sort = other.m_no_sort;
     this->m_can_reverse = other.m_can_reverse;
+    this->m_id = other.m_id;
     clear();
     this->append(other.m_entities);
     return *this;
@@ -48,6 +49,7 @@ void ExtrusionEntityCollection::swap(ExtrusionEntityCollection &c)
     std::swap(this->m_entities, c.m_entities);
     std::swap(this->m_no_sort, c.m_no_sort);
     std::swap(this->m_can_reverse, c.m_can_reverse);
+    std::swap(this->m_id, c.m_id);
 }
 
 void ExtrusionEntityCollection::clear()
@@ -192,9 +194,9 @@ ExtrusionEntityCollection ExtrusionEntityCollection::flatten(bool preserve_order
 
 void ExtrusionEntityCollection::flatten(bool preserve_ordering, ExtrusionEntityCollection& out) const
 {
-    if (!this->can_sort()  && preserve_ordering) {
+    if (!this->can_sort() && preserve_ordering && this->entities().size() > 1) {
         out.append(this->flatten(preserve_ordering));
-    }else{
+    } else {
         FlatenEntities flattener(preserve_ordering);
         flattener.use(*this);
         //tranfert owner of entities.
@@ -204,7 +206,10 @@ void ExtrusionEntityCollection::flatten(bool preserve_ordering, ExtrusionEntityC
 }
 
 void FlatenEntities::use(const ExtrusionEntityCollection &coll) {
-    if ((!coll.can_sort() || !this->to_fill.can_sort()) && preserve_ordering) {
+    if (coll.entities().size() == 1) {
+        // only one element, sort or reverse are meaningless.
+        coll.entities().front()->visit(*this);
+    } else if ((!coll.can_sort() || !this->to_fill.can_sort()) && preserve_ordering) {
         FlatenEntities unsortable(coll, preserve_ordering);
         for (const ExtrusionEntity* entity : coll.entities()) {
             entity->visit(unsortable);

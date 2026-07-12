@@ -293,7 +293,7 @@ void PhysicalPrinterDialog::update_printers()
     std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
 
     wxArrayString printers;
-    Field* rs = m_optgroup->get_field("printhost_port");
+    Field *rs = m_optgroup->get_field({"printhost_port", -1});
     try {
         if (!host->get_printers(printers)) {
             std::vector<std::string> slugs;
@@ -315,7 +315,8 @@ void PhysicalPrinterDialog::update_printers()
             auto value_idx = std::find(slugs.begin(), slugs.end(), m_config->opt<ConfigOptionString>("printhost_port")->value);
             if ((val.empty() || (any_string_type.type() == val.type() && boost::any_cast<std::string>(val) == "")) && !slugs.empty() && value_idx == slugs.end()) {
                 m_config->option("printhost_port")->set_any(slugs[0]); // change_opt_value(*m_config, "printhost_port", slugs[0]);
-                choice->set_text_value(slugs[0], false);
+                //choice->set_text_value(slugs[0], false);
+                choice->set_any_value(m_config->option("printhost_port")->get_any(), false);
             } else if (value_idx != slugs.end()) {
                 choice->set_any_value(m_config->option("printhost_port")->get_any(), false);
             }
@@ -328,18 +329,19 @@ void PhysicalPrinterDialog::update_printers()
 
 void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgroup)
 {
-    m_optgroup->m_on_change = [this](t_config_option_key opt_key, bool enabled, boost::any value) {
+    m_optgroup->m_on_change = [this](const OptionKeyIdx &opt_key_idx, bool enabled, const boost::any &value) {
         assert(enabled);
-        if(opt_key == "printhost_client_cert_enabled")
+        if(opt_key_idx.key == "printhost_client_cert_enabled")
             this->m_show_cert_fields = boost::any_cast<bool>(value);
         if (!this->m_show_cert_fields && !m_config->opt_string("printhost_client_cert").empty()) {
             m_config->option("printhost_client_cert")->set_any(std::string("")); //change_opt_value(*m_config, "printhost_client_cert", std::string(""));
             //change_opt_value(*m_config, "printhost_client_cert_password", "");
             m_config->set_deserialize_strict("printhost_client_cert_password", "");
         }
-        if (opt_key == "host_type" || opt_key == "printhost_authorization_type" || opt_key == "printhost_client_cert_enabled")
+        if (opt_key_idx.key == "host_type" || opt_key_idx.key == "printhost_authorization_type" ||
+            opt_key_idx.key == "printhost_client_cert_enabled")
             this->update();
-        if (opt_key == "print_host")
+        if (opt_key_idx.key == "print_host")
             this->update_printhost_buttons();
     };
 
@@ -360,8 +362,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_printhost_browse_btn->Bind(wxEVT_BUTTON, [=](wxCommandEvent& e) {
             BonjourDialog dialog(this, Preset::printer_technology(m_printer.config));
             if (dialog.show_and_lookup()) {
-                m_optgroup->set_value("print_host", dialog.get_selected(), true, true);
-                m_optgroup->get_field("print_host")->field_changed();
+                m_optgroup->set_value({"print_host", -1}, dialog.get_selected(), true, true);
+                m_optgroup->get_field({"print_host", -1})->field_changed();
             }
         });
 
@@ -430,7 +432,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         def.tooltip = L("Use this option to enable 2-way ssl authentication with you printer.");
         this->m_show_cert_fields = !m_config->opt_string("printhost_client_cert").empty();
         def.set_default_value(new ConfigOptionBool{ this->m_show_cert_fields });
-        Option option(def, "printhost_client_cert_enabled");
+        def.opt_key = "printhost_client_cert_enabled";
+        Option option(def);
         option.opt.width = Field::def_width_wider();
         m_optgroup->append_single_option_line(option);
     }
@@ -445,8 +448,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
             static const auto filemasks = _L("Client certificate files (*.pfx, *.p12)|*.pfx;*.p12|All files|*.*");
             wxFileDialog openFileDialog(this, _L("Open Client certificate file"), "", "", filemasks, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
             if (openFileDialog.ShowModal() != wxID_CANCEL) {
-                m_optgroup->set_value("printhost_client_cert", std::move(openFileDialog.GetPath()), true, true);
-                m_optgroup->get_field("printhost_client_cert")->field_changed();
+                m_optgroup->set_value(OptionKeyIdx::scalar("printhost_client_cert"), std::move(openFileDialog.GetPath()), true, true);
+                m_optgroup->get_field(OptionKeyIdx::scalar("printhost_client_cert"))->field_changed();
             }
             });
 
@@ -491,8 +494,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
                 static const auto filemasks = _L("Certificate files (*.crt, *.pem)|*.crt;*.pem|All files|*.*");
                 wxFileDialog openFileDialog(this, _L("Open CA certificate file"), "", "", filemasks, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
                 if (openFileDialog.ShowModal() != wxID_CANCEL) {
-                    m_optgroup->set_value("printhost_cafile", openFileDialog.GetPath(), true, true);
-                    m_optgroup->get_field("printhost_cafile")->field_changed();
+                    m_optgroup->set_value(OptionKeyIdx::scalar("printhost_cafile"), openFileDialog.GetPath(), true, true);
+                    m_optgroup->get_field(OptionKeyIdx::scalar("printhost_cafile"))->field_changed();
                 }
                 });
 
@@ -550,7 +553,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     m_last_host_type = opt->value;
     m_opened_as_connect = (m_last_host_type == htPrusaConnect);
 
-    Field* printhost_field = m_optgroup->get_field("print_host");
+    Field* printhost_field = m_optgroup->get_field(OptionKeyIdx::scalar("print_host"));
     if (printhost_field)
     {
         text_ctrl* temp = dynamic_cast<text_ctrl*>(printhost_field->getWindow());
@@ -576,8 +579,9 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
 
     // Always fill in the "printhost_port" combo box from the config and select it.
     {
-        Choice* choice = dynamic_cast<Choice*>(m_optgroup->get_field("printhost_port"));
-        choice->set_values({ m_config->opt_string("printhost_port") });
+        Choice* choice = dynamic_cast<Choice*>(m_optgroup->get_field(OptionKeyIdx::scalar("printhost_port")));
+        const std::vector<std::string> choice_values = { m_config->opt_string("printhost_port") };
+        choice->set_values(choice_values);
         choice->set_selection();
     }
 
@@ -620,7 +624,7 @@ void PhysicalPrinterDialog::update(bool printer_change)
         if (opt && opt->value == htPrusaConnect) {
             m_printhost_browse_btn->Hide();
             // hide show hostname and PrusaConnect address
-            Field* printhost_field = m_optgroup->get_field("print_host");
+            Field* printhost_field = m_optgroup->get_field(OptionKeyIdx::scalar("print_host"));
             text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
             if (!m_opened_as_connect && printhost_win && m_last_host_type != htPrusaConnect){
                 m_stored_host = printhost_win->GetValue();
@@ -629,7 +633,7 @@ void PhysicalPrinterDialog::update(bool printer_change)
         } else {
             m_printhost_browse_btn->Show();
             // hide PrusaConnect address and show hostname
-            Field* printhost_field = m_optgroup->get_field("print_host");
+            Field* printhost_field = m_optgroup->get_field(OptionKeyIdx::scalar("print_host"));
             text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
             if (!m_opened_as_connect && printhost_win && m_last_host_type == htPrusaConnect) {
                 wxString temp_host = printhost_win->GetValue();
@@ -656,7 +660,7 @@ void PhysicalPrinterDialog::update(bool printer_change)
         m_optgroup->show_field("printhost_client_cert_password", this->m_show_cert_fields);
     }
     else {
-        m_optgroup->set_value("host_type", int(PrintHostType::htOctoPrint), true, false);
+        m_optgroup->set_value(OptionKeyIdx::scalar("host_type"), int(PrintHostType::htOctoPrint), true, false);
         m_optgroup->hide_field("host_type");
 
         m_optgroup->show_field("printhost_authorization_type");
@@ -679,6 +683,9 @@ void PhysicalPrinterDialog::update(bool printer_change)
         m_printhost_port_browse_btn->Enable(supports_multiple_printers);
 
         m_optgroup->show_field("printhost_port", supports_multiple_printers);
+        if (supports_multiple_printers) {
+            update_printers();
+        }
     }
 
 
@@ -763,7 +770,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
         }
     }
 
-    Field* ht = m_optgroup->get_field("host_type");
+    Field* ht = m_optgroup->get_field(OptionKeyIdx::scalar("host_type"));
     wxArrayString types;
     int last_in_conf = m_config->option("host_type")->get_int(); //  this is real position in last choice
 
@@ -788,6 +795,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
     }
 
     Choice* choice = dynamic_cast<Choice*>(ht);
+    choice->set_values(types);
     int32_t index_in_choice = (printer_change ? std::clamp(last_in_conf - ((int32_t)ht->m_opt.enum_def->values().size() - (int32_t)types.size()), 0, (int32_t)ht->m_opt.enum_def->values().size() - 1) : last_in_conf);
     choice->set_any_value(index_in_choice, false);
     if (link.supported && link.label == _(ht->m_opt.enum_def->label(index_in_choice)))
@@ -879,7 +887,7 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
         return;
     }
 
-    Field* printhost_field = m_optgroup->get_field("print_host");
+    Field* printhost_field = m_optgroup->get_field(OptionKeyIdx::scalar("print_host"));
     text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
     const auto opt = m_config->option<ConfigOptionEnum<PrintHostType>>("host_type");
     if (opt && opt->value == htPrusaConnect) {

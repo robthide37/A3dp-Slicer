@@ -49,8 +49,8 @@ public:
     ExtrusionEntitiesPtr& set_entities() { return m_entities; }
     ExtrusionEntityCollection() : m_no_sort(false), ExtrusionEntity(true) {}
     ExtrusionEntityCollection(bool can_sort, bool can_reverse) : m_no_sort(!can_sort), ExtrusionEntity(can_reverse) {}
-    ExtrusionEntityCollection(const ExtrusionEntityCollection &other) : m_no_sort(other.m_no_sort), ExtrusionEntity(other.m_can_reverse) { this->append(other.entities()); }
-    ExtrusionEntityCollection(ExtrusionEntityCollection &&other) : m_entities(std::move(other.m_entities)), m_no_sort(other.m_no_sort), ExtrusionEntity(other.m_can_reverse) {}
+    ExtrusionEntityCollection(const ExtrusionEntityCollection &other) : m_no_sort(other.m_no_sort), ExtrusionEntity(other.m_id, other.m_can_reverse) { this->append(other.entities()); }
+    ExtrusionEntityCollection(ExtrusionEntityCollection &&other) : m_entities(std::move(other.m_entities)), m_no_sort(other.m_no_sort), ExtrusionEntity(other.m_id, other.m_can_reverse) {}
     explicit ExtrusionEntityCollection(const ExtrusionPaths &paths);
     ExtrusionEntityCollection& operator=(const ExtrusionEntityCollection &other);
     ExtrusionEntityCollection& operator=(ExtrusionEntityCollection &&other) {
@@ -58,6 +58,7 @@ public:
         this->m_entities = std::move(other.m_entities);
         this->m_no_sort  = other.m_no_sort;
         this->m_can_reverse = other.m_can_reverse;
+        this->m_id = other.m_id;
         return *this;
     }
     ~ExtrusionEntityCollection() override { clear(); }
@@ -201,6 +202,7 @@ class FlatenEntities : public ExtrusionVisitorConst {
     ExtrusionEntityCollection to_fill;
     bool preserve_ordering;
 public:
+    using ExtrusionVisitorConst::use;
     FlatenEntities(bool preserve_ordering) : preserve_ordering(preserve_ordering) {}
     FlatenEntities(ExtrusionEntityCollection pattern, bool preserve_ordering) : preserve_ordering(preserve_ordering) {
         to_fill.set_can_sort_reverse(pattern.can_sort(), pattern.can_reverse());
@@ -212,8 +214,8 @@ public:
         return to_fill;
     };
     ExtrusionEntityCollection&& flatten(const ExtrusionEntityCollection &to_flatten) &&;
-    virtual void default_use(const ExtrusionEntity &entity) override { to_fill.append(entity); }
-    virtual void use(const ExtrusionEntityCollection &coll) override;
+    void default_use(const ExtrusionEntity &entity) override { to_fill.append(entity); }
+    void use(const ExtrusionEntityCollection &coll) override;
 };
 
 inline void extrusion_entities_append_paths(ExtrusionEntityCollection &dst, Polylines &polylines, ExtrusionRole role, double mm3_per_mm, float width, float height, bool can_reverse = true)

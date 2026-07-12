@@ -34,6 +34,7 @@
 #include <wx/combobox.h>
 #include <wx/checkbox.h>
 #include <wx/display.h>
+#include <wx/wupdlock.h>
 
 #include <boost/locale.hpp>
 #include <boost/locale/generator.hpp>
@@ -48,6 +49,7 @@
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/FileParserError.hpp"
 #include "NotificationManager.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 
 #ifdef _WIN32
 #include "BitmapComboBox.hpp"
@@ -194,10 +196,10 @@ void View3D::render()
 // Note: BackgroundSlicingProcess & GCodeProcessorResult are stored inside the (priv) platter, they won't disapear. Hence why it's by reference.
 Preview::Preview(
     wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config,
-    BackgroundSlicingProcess& process, GCodeProcessorResult& gcode_result, std::function<void()> schedule_background_process_func)
+    BackgroundSlicingProcess& process, std::vector<GCodeProcessorResult>* gcode_results, std::function<void()> schedule_background_process_func)
     : m_config(config)
     , m_process(process)
-    , m_gcode_result(gcode_result)
+    , m_gcode_results(gcode_results)
     , m_schedule_background_process(schedule_background_process_func)
 {
     if (init(parent, bed, model))
@@ -208,6 +210,11 @@ void Preview::set_layers_slider_values_range(int bottom, int top)
 {
     m_layers_slider->SetHigherValue(std::min(top, m_layers_slider->GetMaxValue()));
     m_layers_slider->SetLowerValue(std::max(bottom, m_layers_slider->GetMinValue()));
+}
+
+GCodeProcessorResult* Preview::active_gcode_result()
+{
+    return &(*m_gcode_results)[s_multiple_beds.get_active_bed()];
 }
 
 bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
@@ -347,7 +354,7 @@ void Preview::reload_print(bool keep_volumes)
     }
 
     //test if gcode is up-to-date
-    if (m_canvas->is_gcode_preview_dirty(m_gcode_result))
+   if (m_canvas->is_gcode_preview_dirty(*active_gcode_result()))
         refresh_print();
     else
         load_print();
@@ -402,6 +409,13 @@ void Preview::edit_layers_slider(wxKeyEvent& evt)
     if (m_layers_slider != nullptr) m_layers_slider->OnChar(evt);
 }
 
+float Preview::get_layers_slider_width(bool disregard_visibility) const
+{
+    if (!s_multiple_beds.is_autoslicing() && m_layers_slider && (m_layers_slider->IsShown() || disregard_visibility))
+        return m_layers_slider->GetMaxWidth();
+    return 0.0f;
+}
+
 void Preview::bind_event_handlers()
 {
     Bind(wxEVT_SIZE, &Preview::on_size, this);
@@ -427,7 +441,8 @@ void Preview::hide_layers_slider()
 
 bool Preview::can_display_gcode()
 {
-    return !m_gcode_result.moves.empty();
+
+   return !active_gcode_result()->moves.empty();
 }
 
 bool Preview::can_display_volume()
@@ -453,8 +468,8 @@ wxBoxSizer* Preview::create_layers_slider_sizer()
     m_layers_slider = new DoubleSlider::Control(this, wxID_ANY, 0, 0, 0, 100);
     std::lock_guard lock(m_layers_slider->lock_render());
 
-    m_layers_slider->SetDrawMode(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA,
-        wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("complete_objects"));
+    m_layers_slider->SetDrawMode(wxGetApp().get_current_printer_technology() == ptSLA,
+        wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_bool("complete_objects") || wxGetApp().preset_bundle->fff_prints.get_edited_preset().config.opt_float("parallel_objects_step") > 0);
     m_layers_slider->enable_action_icon(wxGetApp().is_editor());
 
     sizer->Add(m_layers_slider, 0, wxEXPAND, 0);
@@ -472,10 +487,10 @@ wxBoxSizer* Preview::create_layers_slider_sizer()
     Bind(DoubleSlider::wxCUSTOMEVT_TICKSCHANGED, [this](wxEvent&) {
         Model& model = wxGetApp().plater()->model();
         Info custom_gcode_per_print_z = m_layers_slider->GetTicksValues();
-        auto num_of_old_gcodes = model.custom_gcode_per_print_z.gcodes.size();
-        model.custom_gcode_per_print_z = custom_gcode_per_print_z;
-        std::string operation_message = (num_of_old_gcodes == model.custom_gcode_per_print_z.gcodes.size()) ? "Edit" :
-                                        (num_of_old_gcodes < model.custom_gcode_per_print_z.gcodes.size())  ? "Add" :
+        auto num_of_old_gcodes = model.custom_gcode_per_print_z().gcodes.size();
+        model.custom_gcode_per_print_z() = custom_gcode_per_print_z;
+        std::string operation_message = (num_of_old_gcodes == model.custom_gcode_per_print_z().gcodes.size()) ? "Edit" :
+                                        (num_of_old_gcodes < model.custom_gcode_per_print_z().gcodes.size())  ? "Add" :
                                                                                                               "Remove";
 
         m_schedule_background_process();
@@ -551,35 +566,49 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool sho
     bool   snap_to_min = force_sliders_full_range || m_layers_slider->is_lower_at_min();
     bool   snap_to_max = force_sliders_full_range || m_layers_slider->is_higher_at_max();
 
+    int current_lower_tick = m_layers_slider->GetLowerValue();
+    int current_higher_tick = m_layers_slider->GetHigherValue();
+    if (layers_z.size() == m_layers_slider->GetMaxValue() + 2) {
+        // new array is bigger by one
+        if (current_lower_tick == current_higher_tick || !snap_to_min) {
+            current_lower_tick++;
+        }
+        current_higher_tick++;
+    } else if (layers_z.size() == m_layers_slider->GetMaxValue()) {
+        // new array is smaller by one
+        current_lower_tick = std::max(current_lower_tick - 1, 0);
+        current_higher_tick =  std::max(current_higher_tick - 1, 0);
+    }
+
     // Detect and set manipulation mode for double slider
     update_layers_slider_mode();
     
     Plater* plater = wxGetApp().plater();
-    CustomGCode::Info ticks_info_from_model = plater->model().custom_gcode_per_print_z;
+     CustomGCode::Info ticks_info_from_model = plater->model().custom_gcode_per_print_z();
     if (wxGetApp().is_editor())
-        ticks_info_from_model = plater->model().custom_gcode_per_print_z;
+        ticks_info_from_model = plater->model().custom_gcode_per_print_z();
     else {
         ticks_info_from_model.mode = CustomGCode::Mode::SingleExtruder;
-        ticks_info_from_model.gcodes = m_canvas->get_custom_gcode_per_print_z();
+        ticks_info_from_model.gcodes = active_gcode_result()->custom_gcode_per_print_z;
     }
     //check incoherencies
     check_layers_slider_values(ticks_info_from_model.gcodes, layers_z);
 
     //first of all update extruder colors to avoid crash, when we are switching printer preset from MM to SM
-    m_layers_slider->SetExtruderColors(plater->get_extruder_colors_from_plater_config(wxGetApp().is_editor() ? std::optional<std::reference_wrapper<const GCodeProcessorResult>>() : m_gcode_result));
+     m_layers_slider->SetExtruderColors(plater->get_extruder_colors_from_plater_config(wxGetApp().is_editor() ? std::optional<std::reference_wrapper<const GCodeProcessorResult>>() : *active_gcode_result()));
     m_layers_slider->SetSliderValues(layers_z);
     assert(m_layers_slider->GetMinValue() == 0);
     m_layers_slider->SetMaxValue(layers_z.empty() ? 0 : layers_z.size() - 1);
 
-    int idx_low = 0;
-    int idx_high = m_layers_slider->GetMaxValue();
+    int idx_low = std::max(current_lower_tick, 0);
+    int idx_high = snap_to_max ? m_layers_slider->GetMaxValue() : std::min(current_higher_tick, m_layers_slider->GetMaxValue());
     if (!layers_z.empty()) {
-        if (!snap_to_min) {
+        if (!snap_to_min && idx_low < layers_z.size() && !is_approx(layers_z[idx_low], z_low, 0.0000001)) {
             int idx_new = find_close_layer_idx(layers_z, z_low, DoubleSlider::epsilon()/*1e-6*/);
             if (idx_new != -1)
                 idx_low = idx_new;
         }
-        if (!snap_to_max) {
+        if (!snap_to_max && idx_high < layers_z.size() && !is_approx(layers_z[idx_high], z_high, 0.0000001)) {
             int idx_new = find_close_layer_idx(layers_z, z_high, DoubleSlider::epsilon()/*1e-6*/);
             if (idx_new != -1)
                 idx_high = idx_new;
@@ -593,29 +622,29 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool sho
     m_layers_slider->SetDrawMode(sla_print_technology, sequential_print);
     if (show_gcode_data) {
         if (sla_print_technology) {
-            m_layers_slider->SetLayersTimes(plater->sla_print().print_statistics().layers_times);
+           m_layers_slider->SetLayersTimes(plater->active_sla_print().print_statistics().layers_times);
         } else {
-            if (plater->fff_print().print_statistics().is_computing_gcode || !plater->fff_print().finished()) {
+           if (plater->active_fff_print().print_statistics().is_computing_gcode || !plater->active_fff_print().finished()) {
                 // do not fetch uncomplete data
                 m_layers_slider->SetLayersTimes({}, 0);
             } else {
-                auto print_mode_stat = m_gcode_result.print_statistics.modes.front();
+               auto print_mode_stat = active_gcode_result()->print_statistics.modes.front();
                 m_layers_slider->SetLayersTimes(print_mode_stat.layers_times, print_mode_stat.time);
             }
         }
         // create area array
         // area not computed for sla_print_technology //TODO
         if (!sla_print_technology) {
-            if (plater->fff_print().print_statistics().is_computing_gcode || !plater->fff_print().finished()) {
+           if (plater->active_fff_print().print_statistics().is_computing_gcode || !plater->active_fff_print().finished()) {
                 // do not fetch uncomplete data
                 m_layers_slider->SetLayersAreas({});
             } else {
                 const std::vector<std::pair<coordf_t, float>> &layerz_to_area =
-                    plater->fff_print().print_statistics().layer_area_stats;
+               plater->active_fff_print().print_statistics().layer_area_stats;
                 std::vector<float> areas;
                 for (auto [z, area] : layerz_to_area) areas.push_back(area);
                 m_layers_slider->SetLayersAreas(areas);
-                assert(areas.size() == m_gcode_result.print_statistics.modes.front().layers_times.size());
+                //assert(areas.size() == plater->active_sla_print().print_statistics.modes.front().layers_times.size());
             }
         }
     } else {
@@ -631,13 +660,23 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool sho
             break;
         }
 
+    auto get_print_obj_idxs = [plater]() ->std::string {
+        if (plater->printer_technology() == ptSLA)
+            return "sla";
+        const Print& print = GUI::wxGetApp().plater()->active_fff_print();
+        std::string idxs;
+        for (auto object : print.objects())
+            idxs += std::to_string(object->id().id) + "_";
+        return idxs;
+    };
+
     // Suggest the auto color change, if model looks like sign
     if (!color_change_already_exists &&
         wxGetApp().app_config->get_bool("allow_auto_color_change") &&
         m_layers_slider->IsNewPrint())
     {
-        const Print& print = wxGetApp().plater()->fff_print();
-
+        const Print& print = wxGetApp().plater()->active_fff_print();
+      
         //bool is_possible_auto_color_change = false;
         for (auto object : print.objects()) {
             double object_x = double(object->size().x());
@@ -786,9 +825,8 @@ void Preview::update_layers_slider_from_canvas(wxKeyEvent& event)
     m_layers_slider->fire_update_if_needed();
 }
 
-void Preview::update_moves_slider()
-{
-    const GCodeViewer::SequentialView& view = m_canvas->get_gcode_sequential_view();
+void Preview::update_moves_slider() {
+    const GCodeViewer::SequentialView &view = m_canvas->get_gcode_sequential_view();
     // this should not be needed, but it is here to try to prevent rambling crashes on Mac Asan
     if (view.endpoints.last < view.endpoints.first)
         return;
@@ -802,7 +840,7 @@ void Preview::update_moves_slider()
     alternate_values.reserve(view.endpoints.last - view.endpoints.first + 1);
     unsigned int last_gcode_id = view.gcode_ids[view.endpoints.first];
     for (unsigned int i = view.endpoints.first; i <= view.endpoints.last; ++i) {
-        //assert(view.gcode_ids.size() > i); //can happen in 0th layer (before first layer)
+        // assert(view.gcode_ids.size() > i); //can happen in 0th layer (before first layer)
         if (view.gcode_ids.size() > i) {
             if (i > view.endpoints.first) {
                 // skip consecutive moves with same gcode id (resulting from processing G2 and G3 lines)
@@ -825,9 +863,11 @@ void Preview::update_moves_slider()
     m_moves_slider->SetSliderAlternateValues(alternate_values);
     m_moves_slider->SetMaxValue(int(values.size()) - 1);
     m_moves_slider->SetSelectionSpan(values.front() - 1 - view.endpoints.first,
-                                     max_is_max ? m_moves_slider->GetMaxValue() : values.back() - 1 - view.endpoints.first);
+                                     max_is_max ? m_moves_slider->GetMaxValue() :
+                                                  values.back() - 1 - view.endpoints.first);
     m_moves_slider->fire_update_if_needed();
 }
+
 
 void Preview::enable_moves_slider(bool enable)
 {
@@ -868,6 +908,8 @@ void Preview::load_print_as_fff(bool keep_z_range)
     }
 
     if (wxGetApp().is_editor() && !has_layers) {
+        m_canvas->reset_gcode_toolpaths();
+        m_canvas->load_gcode_shells();
         hide_layers_slider();
         m_left_sizer->Hide(m_bottom_toolbar_panel);
         m_left_sizer->Layout();
@@ -877,18 +919,18 @@ void Preview::load_print_as_fff(bool keep_z_range)
     }
 
     GCodeViewer::EViewType gcode_view_type = m_canvas->get_gcode_view_preview_type();
-    bool gcode_preview_data_valid = !m_gcode_result.moves.empty();
-    gcode_preview_data_valid = gcode_preview_data_valid && current_force_state != ForceState::ForceExtrusions;
-    // Collect colors per extruder.
+   bool gcode_preview_data_valid = !active_gcode_result()->moves.empty();
+
+   // Collect colors per extruder.
     std::vector<std::string> colors;
     std::vector<CustomGCode::Item> color_print_values = {};
     // set color print values, if it si selected "ColorPrint" view type
     if (gcode_view_type == GCodeViewer::EViewType::ColorPrint) {
-        colors = wxGetApp().plater()->get_colors_for_color_print(m_gcode_result);
+       colors = wxGetApp().plater()->get_colors_for_color_print(*active_gcode_result());
 
         if (!gcode_preview_data_valid) {
             if (wxGetApp().is_editor())
-                color_print_values = wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes;
+                color_print_values = wxGetApp().plater()->model().custom_gcode_per_print_z().gcodes;
             else
                 color_print_values = m_canvas->get_custom_gcode_per_print_z();
             colors.push_back("#808080"); // gray color for pause print or custom G-code 
@@ -909,7 +951,6 @@ void Preview::load_print_as_fff(bool keep_z_range)
                 color = "#FFFFFF";
             }
 
-            colors.emplace_back(color);
         }
         color_print_values.clear();
     }
@@ -922,62 +963,50 @@ void Preview::load_print_as_fff(bool keep_z_range)
     std::vector<double> zs;
 
     if (IsShown()) {
-        if (current_force_state == ForceState::ForceGcode)
-            m_canvas->set_items_show(false, true);
-        else if (current_force_state == ForceState::ForceExtrusions)
-            m_canvas->set_items_show(true, false);
-        else
-            m_canvas->set_items_show(true, true);
+        m_canvas->set_items_show(false, true);
+
 
         m_canvas->set_selected_extruder(0);
-        bool gcode_not_extrusions = false;
-        if (current_force_state == ForceState::ForceGcode || (gcode_preview_data_valid && current_force_state != ForceState::ForceExtrusions)) {
-            // Load the real G-code preview.
-            if (current_force_state == ForceState::NoForce)
-                m_canvas->set_items_show(false, true);
-            m_canvas->load_gcode_preview(m_gcode_result, colors);
+        if (gcode_preview_data_valid) {
+
+            m_canvas->load_gcode_preview(*active_gcode_result(), colors);
             m_left_sizer->Layout();
             Refresh();
             zs = m_canvas->get_gcode_layers_zs();
             if (!zs.empty())
                 m_left_sizer->Show(m_bottom_toolbar_panel);
             m_loaded = true;
-            gcode_not_extrusions = true;
-        }
-        else if (wxGetApp().is_editor()) {
-            // Load the initial preview based on slices, not the final G-code.
-            if (current_force_state == ForceState::NoForce)
-                m_canvas->set_items_show(true, false);
-            m_canvas->load_preview(colors, color_print_values);
-            m_left_sizer->Hide(m_bottom_toolbar_panel);
-            m_left_sizer->Layout();
-            Refresh();
-            zs = m_canvas->get_volumes_print_zs(true);
-            gcode_not_extrusions = false;
+            //gcode_not_extrusions = true;
         }
         else {
             m_left_sizer->Hide(m_bottom_toolbar_panel);
             m_left_sizer->Layout();
+
             Refresh();
         }
 
         if (!zs.empty() && !m_keep_current_preview_type) {
+        
             unsigned int number_extruders = wxGetApp().is_editor() ?
                 (unsigned int)print->extruders().size() :
                 m_canvas->get_gcode_extruders_count();
+                
             std::vector<Item> gcodes = wxGetApp().is_editor() ?
-                wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes :
+           wxGetApp().plater()->model().custom_gcode_per_print_z().gcodes :
                 m_canvas->get_custom_gcode_per_print_z();
+                
             const bool contains_color_gcodes = std::any_of(std::begin(gcodes), std::end(gcodes),
                 [](auto const& item) { return item.type == CustomGCode::Type::ColorChange || item.type == CustomGCode::Type::ToolChange; });
+            
             const GCodeViewer::EViewType choice = contains_color_gcodes ?
                 GCodeViewer::EViewType::ColorPrint :
                 (number_extruders > 1) ? GCodeViewer::EViewType::Tool : GCodeViewer::EViewType::FeatureType;
+                
             if (choice != gcode_view_type) {
                 m_canvas->set_gcode_view_preview_type(choice);
                 if (wxGetApp().is_gcode_viewer())
                     m_keep_current_preview_type = true;
-                // refresh_print();
+              refresh_print();
             }
         }
 
@@ -985,10 +1014,32 @@ void Preview::load_print_as_fff(bool keep_z_range)
             // all layers filtered out
             hide_layers_slider();
             m_canvas_widget->Refresh();
-        } else {
-            update_layers_slider(zs, gcode_not_extrusions, keep_z_range);
         }
+        else
+            update_layers_slider(zs, keep_z_range);
     }
+}
+
+void Preview::render_sliders(GLCanvas3D& canvas)
+{
+    const Size  cnv_size        = canvas.get_canvas_size();
+    const int   canvas_width    = cnv_size.get_width();
+    const int   canvas_height   = cnv_size.get_height();
+    const float extra_scale     = cnv_size.get_scale_factor();
+
+    GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
+#if ENABLE_HACK_GCODEVIEWER_SLOW_ON_MAC
+    // When the application is run as GCodeViewer the collapse toolbar is enabled but invisible, as it is renderer
+    // outside of the screen
+    const bool  is_collapse_btn_shown = wxGetApp().is_editor() ? collapse_toolbar.is_enabled() : false;
+#else
+    const bool  is_collapse_btn_shown = collapse_toolbar.is_enabled();
+#endif // ENABLE_HACK_GCODEVIEWER_SLOW_ON_MAC
+
+  //  if (m_layers_slider)
+    //    m_layers_slider->render(canvas_width, canvas_height, extra_scale, is_collapse_btn_shown ? collapse_toolbar.get_height() : 0.f);
+    //if (m_moves_slider)
+      //  m_moves_slider->Render(canvas_width, canvas_height, extra_scale);
 }
 
 void Preview::reset_gcode_toolpaths()

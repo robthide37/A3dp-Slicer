@@ -59,10 +59,9 @@ public:
     std::string postamble() const;
     std::string set_temperature(int16_t temperature, bool wait = false, int tool = -1);
     std::string set_bed_temperature(uint32_t temperature, bool wait = false);
+    void set_pressure_advance(double pa);
+    std::string write_pressure_advance(double pa);
     std::string set_chamber_temperature(uint32_t temperature, bool wait = false);
-    void        set_pressure_advance(double pa);
-    // write the pressure advance if needed on gcode string
-    void        write_pressure_advance(std::string& gcode);
     void        set_acceleration(uint32_t acceleration);
     void        set_travel_acceleration(uint32_t acceleration);
     uint32_t    get_acceleration() const;
@@ -79,27 +78,36 @@ public:
     std::string toolchange_prefix() const;
     std::string toolchange(uint16_t tool_id);
     // in mm/s
-    std::string set_speed(const double speed, const std::string_view comment = {}, const std::string_view cooling_marker = {});
+    std::string set_speed_mm_s(const double speed, const std::string_view comment = {}, const std::string_view cooling_marker = {});
     // in mm/s
-    double      get_speed() const;
+    double      get_speed_mm_s() const;
     std::string travel_to_xy(const Vec2d &point, const double speed = 0.0, const std::string_view comment = {});
     std::string travel_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const bool is_ccw, const double speed, const std::string_view comment);
-    std::string travel_to_xyz(const Vec3d &point, const double speed = 0.0, const std::string_view comment = {});
-    std::string travel_to_z(double z, const std::string_view comment = {});
-    std::string get_travel_to_z_gcode(double z, const std::string_view comment = {});
-    bool        will_move_z(double z) const;
-    std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
-    std::string extrude_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, double dE, const bool is_ccw, const std::string_view comment = {}); //BBS: generate G2 or G3 extrude which moves by arc
-    std::string extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment = {});
+    std::string travel_to_xyz(const Vec3d &point, const bool is_lift, const double speed = 0.0, const std::string_view comment = {});
+    std::string travel_to_z(const double z, const std::string_view comment = {});
+    // low-level method to force a z travel, disregarding the lift and other thigns. Prefer using "travel_to_z" "lift" and "unlift".
+    std::string get_travel_to_z_gcode(const double z, const std::string_view comment = {});
+    bool        will_move_z(const double z) const;
+    std::string extrude_to_xy(const Vec2d &point, const double dE, const std::string_view comment = {});
+    std::string extrude_arc_to_xy(const Vec2d& point, const Vec2d& center_offset, const double dE, const bool is_ccw, const std::string_view comment = {}); //BBS: generate G2 or G3 extrude which moves by arc
+    std::string extrude_arc_to_xyz(const Vec3d& point, const Vec2d& center_offset, const double dE, const bool is_ccw, const std::string_view comment = {}); //BBS: generate G2 or G3 extrude which moves by arc
+    std::string extrude_to_xyz(const Vec3d &point, const double dE, const std::string_view comment = {});
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
     std::string unretract();
     void        set_extra_lift(double extra_zlift) { this->m_extra_lift = extra_zlift; }
     double      get_extra_lift() const { return this->m_extra_lift; }
-    double      get_lift() const { return this->m_lifted; } // for placeholder
-    double      set_lift() const { return this->m_lifted; } // for placeholder
+    double      get_lift() const { return this->m_lifted; } // for placeholder & ramping lift
+    void        set_lift(double new_lift) { this->m_lifted = new_lift; } // for ramping lift
+    double      will_lift(int layer_id) const;
     std::string lift(int layer_id);
     std::string unlift();
+    // extrude a bit of filament without moving, then deduce it from the next extrusion.
+    std::string pre_extrude(const double dE, const std::string_view comment = {});
+
+    // this 'de' should be too small to print, but should be be accounted for.
+    // for exemple, if the retraction miss this ammount, the unretraction mays be a little bit too far (by one unit)
+    void        add_de_delayed(double too_small_de) { m_de_left += too_small_de; }
 
     // Current position of the printer, in G-code coordinates.
     // Z coordinate of current position contains zhop. If zhop is applied (this->zhop() > 0),
@@ -110,23 +118,26 @@ public:
     // The new position Z coordinate contains the Z-hop.
     // GCodeWriter expects the custom script to NOT change print_z, only Z-hop, thus the print_z is maintained
     // by this function while the current Z-hop accumulator is updated.
-    void        update_position(const Vec3d &new_pos);
+    void        update_position_by_lift(const Vec3d &new_pos);
 
     // Returns whether this flavor supports separate print and travel acceleration.
     static bool supports_separate_travel_acceleration(GCodeFlavor flavor);
 
     // To be called by the CoolingBuffer from another thread.
     static std::string set_fan(const GCodeConfig& config, uint16_t extruder_idx, uint8_t speed, const std::string_view comment = "");
-    //static std::string set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, uint8_t speed, uint8_t tool_fan_offset, bool is_fan_percentage, const std::string_view comment = {});
     // To be called by the main thread. It always emits the G-code, it does remember the previous state to be able to reset after the wipe tower (but remove that when the wipe tower will be extrusions and not string).
     // Keeping the state is left to the CoolingBuffer, which runs asynchronously on another thread.
     std::string set_fan(uint8_t speed, uint16_t default_tool = 0);
+
     uint8_t get_fan() { return m_last_fan_speed; }
 
     GCodeFormatter get_default_gcode_formatter() const { return GCodeFormatter(m_config.gcode_precision_xyz, m_config.gcode_precision_e); }
 
     static std::string get_default_pause_gcode(const GCodeConfig &config);
     static std::string get_default_color_change_gcode(const GCodeConfig &config);
+
+protected:
+    void _extrude_e(GCodeFormatter &w, double dE);
 
 private:
 	// Extruders are sorted by their ID, so that binary search is possible.
@@ -147,6 +158,7 @@ private:
     uint8_t         m_last_fan_speed = 0;
     int16_t         m_last_temperature = 0;
     int16_t         m_last_temperature_with_offset = 0;
+    bool            m_last_temperature_with_offset_waited = false;
     int16_t         m_last_bed_temperature = 0;
     bool            m_last_bed_temperature_reached = true;
     int16_t         m_last_chamber_temperature = 0;
@@ -154,10 +166,12 @@ private:
     double          m_extra_lift = 0;
     // current lift, to remove from m_pos to have the current height.
     double          m_lifted = 0;
+    double          m_pre_extrude = 0;
     Vec3d           m_pos = Vec3d::Zero();
-    // cached string representation of x & y m_pos
+    // cached string representation of x & y & z m_pos
     std::string     m_pos_str_x;
     std::string     m_pos_str_y;
+    std::string     m_pos_str_z;
     // stored de that wasn't written, because of the rounding
     double          m_de_left = 0;
     
@@ -165,6 +179,8 @@ private:
     GCodeFormatter  m_formatter {0,0};
     
     std::string _retract(double length, std::optional<double> restart_extra, std::optional<double> restart_extra_toolchange, const std::string_view comment = {});
+    // write the pressure advance if needed on gcode string
+    void _write_pressure_advance(std::string &gcode);
 
 };
 

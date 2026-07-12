@@ -10,6 +10,8 @@
 
 #include <boost/log/trivial.hpp>
 
+#include "MultipleBeds.hpp"
+
 namespace Slic3r {
 
 BuildVolume::BuildVolume(const std::vector<Vec2d> &bed_shape, const double max_print_height) : m_bed_shape(bed_shape), m_max_print_height(max_print_height)
@@ -26,7 +28,7 @@ BuildVolume::BuildVolume(const std::vector<Vec2d> &bed_shape, const double max_p
     BoundingBoxf bboxf = get_extents(bed_shape);
     m_bboxf = BoundingBoxf3{ to_3d(bboxf.min, 0.), to_3d(bboxf.max, max_print_height) };
 
-    if (bed_shape.size() >= 4 && std::abs((m_area - double(m_bbox.size().x()) * double(m_bbox.size().y()))) < sqr(SCALED_EPSILON)) {
+    if (bed_shape.size() >= 4 && std::abs((m_area - double(m_bbox.size().x()) * double(m_bbox.size().y()))) < (SCALED_EPSILON*SCALED_EPSILON)) {
         // Square print bed, use the bounding box for collision detection.
         m_type = Type::Rectangle;
         m_circle.center = 0.5 * (m_bbox.min.cast<double>() + m_bbox.max.cast<double>());
@@ -65,7 +67,7 @@ BuildVolume::BuildVolume(const std::vector<Vec2d> &bed_shape, const double max_p
     if (bed_shape.size() >= 3 && m_type == Type::Invalid) {
         // Circle check is not used for Convex / Custom shapes, fill it with something reasonable.
         m_circle = Geometry::smallest_enclosing_circle_welzl(m_convex_hull.points);
-        m_type   = (m_convex_hull.area() - m_area) < sqr(SCALED_EPSILON) ? Type::Convex : Type::Custom;
+        m_type   = (m_convex_hull.area() - m_area) < (SCALED_EPSILON*SCALED_EPSILON) ? Type::Convex : Type::Custom;
         // Initialize the top / bottom decomposition for inside convex polygon check. Do it with two different epsilons applied.
         auto convex_decomposition = [](const Polygon &in, double epsilon) {
             Polygon src = expand(in, float(epsilon)).front();
@@ -243,6 +245,7 @@ BuildVolume::ObjectState object_state_templ(const indexed_triangle_set &its, con
                             assert(sign(p1) == s[iprev]);
                             assert(sign(p2) == s[iedge]);
                             assert((p1.z() - world_min_z) * (p2.z() - world_min_z) < 0);
+                            assert(std::abs(p2.z() - p1.z()) > EPSILON);
                             // Edge crosses the z plane. Calculate intersection point with the plane.
                             const float t = (world_min_z - p1.z()) / (p2.z() - p1.z());
                             (is_inside(Vec3f(p1.x() + (p2.x() - p1.x()) * t, p1.y() + (p2.y() - p1.y()) * t, world_min_z)) ? inside : outside) = true;
@@ -273,8 +276,27 @@ BuildVolume::ObjectState object_state_templ(const indexed_triangle_set &its, con
     return inside ? (outside ? BuildVolume::ObjectState::Colliding : BuildVolume::ObjectState::Inside) : BuildVolume::ObjectState::Outside;
 }
 
-BuildVolume::ObjectState BuildVolume::object_state(const indexed_triangle_set& its, const Transform3f& trafo, bool may_be_below_bed, bool ignore_bottom) const
+
+
+BuildVolume::ObjectState BuildVolume::object_state(const indexed_triangle_set& its, const Transform3f& trafo_orig, bool may_be_below_bed, bool ignore_bottom, int* bed_idx) const
 {
+    ObjectState out = ObjectState::Outside;
+    if (bed_idx)
+        *bed_idx = -1;
+
+    // When loading an old project with more than the maximum number of beds,
+    // we still want to move the objects to the respective positions.
+    // Max beds number is momentarily increased when doing the rearrange, so use it.
+    const int max_bed = s_multiple_beds.get_loading_project_flag()
+                        ? s_multiple_beds.get_number_of_beds() - 1
+                        : std::min(s_multiple_beds.get_number_of_beds(), s_multiple_beds.get_max_beds() - 1);
+
+    for (int bed_id = 0; bed_id <= max_bed; ++bed_id) {
+
+
+    Transform3f trafo = trafo_orig;
+    trafo.pretranslate(-s_multiple_beds.get_bed_translation(bed_id).cast<float>());
+
     switch (m_type) {
     case Type::Rectangle:
     {
@@ -287,28 +309,44 @@ BuildVolume::ObjectState BuildVolume::object_state(const indexed_triangle_set& i
         // The following test correctly interprets intersection of a non-convex object with a rectangular build volume.
         //return rectangle_test(its, trafo, to_2d(build_volume.min), to_2d(build_volume.max), build_volume.max.z());
         //FIXME This test does NOT correctly interprets intersection of a non-convex object with a rectangular build volume.
-        return object_state_templ(its, trafo, may_be_below_bed, [build_volumef](const Vec3f &pt) { return build_volumef.contains(pt); });
+        out = object_state_templ(its, trafo, may_be_below_bed, [build_volumef](const Vec3f& pt) { return build_volumef.contains(pt); });
+        break;
     }
     case Type::Circle:
     {
         Geometry::Circlef circle { unscaled<float>(m_circle.center), unscaled<float>(m_circle.radius + SceneEpsilon) };
-        return m_max_print_height == 0.0 ? 
-            object_state_templ(its, trafo, may_be_below_bed, [circle](const Vec3f &pt) { return circle.contains(to_2d(pt)); }) :
-            object_state_templ(its, trafo, may_be_below_bed, [circle, z = m_max_print_height + SceneEpsilon](const Vec3f &pt) { return pt.z() < z && circle.contains(to_2d(pt)); });
+        out = m_max_print_height == 0.0 ?
+            object_state_templ(its, trafo, may_be_below_bed, [circle](const Vec3f& pt) { return circle.contains(to_2d(pt)); }) :
+            object_state_templ(its, trafo, may_be_below_bed, [circle, z = m_max_print_height + SceneEpsilon](const Vec3f& pt) { return pt.z() < z && circle.contains(to_2d(pt)); });
+        break;
     }
     case Type::Convex:
     //FIXME doing test on convex hull until we learn to do test on non-convex polygons efficiently.
     case Type::Custom:
-        return m_max_print_height == 0.0 ? 
-            object_state_templ(its, trafo, may_be_below_bed, [this](const Vec3f &pt) { return Geometry::inside_convex_polygon(m_top_bottom_convex_hull_decomposition_scene, to_2d(pt).cast<double>()); }) :
-            object_state_templ(its, trafo, may_be_below_bed, [this, z = m_max_print_height + SceneEpsilon](const Vec3f &pt) { return pt.z() < z && Geometry::inside_convex_polygon(m_top_bottom_convex_hull_decomposition_scene, to_2d(pt).cast<double>()); });
+        out = m_max_print_height == 0.0 ?
+            object_state_templ(its, trafo, may_be_below_bed, [this](const Vec3f& pt) { return Geometry::inside_convex_polygon(m_top_bottom_convex_hull_decomposition_scene, to_2d(pt).cast<double>()); }) :
+            object_state_templ(its, trafo, may_be_below_bed, [this, z = m_max_print_height + SceneEpsilon](const Vec3f& pt) { return pt.z() < z && Geometry::inside_convex_polygon(m_top_bottom_convex_hull_decomposition_scene, to_2d(pt).cast<double>()); });
+        break;
     case Type::Invalid:
     default:
-        return ObjectState::Inside;
+        out = ObjectState::Inside;
+        break;
     }
+
+    if (out != ObjectState::Outside) {
+        if (bed_idx)
+            *bed_idx = bed_id;
+        break;
+    }    
+
+
+
+    }
+
+    return out;
 }
 
-BuildVolume::ObjectState BuildVolume::volume_state_bbox(const BoundingBoxf3& volume_bbox, bool ignore_bottom) const
+BuildVolume::ObjectState BuildVolume::volume_state_bbox(const BoundingBoxf3 volume_bbox_orig, bool ignore_bottom, int* bed_idx) const
 {
     assert(m_type == Type::Rectangle);
     BoundingBox3Base<Vec3d> build_volume = this->bounding_volume().inflated(SceneEpsilon);
@@ -316,9 +354,25 @@ BuildVolume::ObjectState BuildVolume::volume_state_bbox(const BoundingBoxf3& vol
         build_volume.max.z() = std::numeric_limits<double>::max();
     if (ignore_bottom)
         build_volume.min.z() = -std::numeric_limits<double>::max();
-    return build_volume.max.z() <= - SceneEpsilon ? ObjectState::Below :
-           build_volume.contains(volume_bbox) ? ObjectState::Inside : 
-           build_volume.intersects(volume_bbox) ? ObjectState::Colliding : ObjectState::Outside;
+
+    ObjectState state = ObjectState::Outside;
+    int obj_bed_id = -1;
+    for (int bed_id = 0; bed_id <= std::min(s_multiple_beds.get_number_of_beds(), s_multiple_beds.get_max_beds() - 1); ++bed_id) {
+        BoundingBoxf3 volume_bbox = volume_bbox_orig;
+        volume_bbox.translate(-s_multiple_beds.get_bed_translation(bed_id));
+
+        state = build_volume.max.z() <= -SceneEpsilon ? ObjectState::Below :
+            build_volume.contains(volume_bbox) ? ObjectState::Inside :
+            build_volume.intersects(volume_bbox) ? ObjectState::Colliding : ObjectState::Outside;
+        if (state != ObjectState::Outside) {
+            obj_bed_id = bed_id;
+            break;
+        }
+    }
+
+    if (bed_idx)
+        *bed_idx = obj_bed_id;
+    return state;
 }
 
 bool BuildVolume::all_paths_inside(const GCodeProcessorResult& paths, const BoundingBoxf3& paths_bbox, bool ignore_bottom) const

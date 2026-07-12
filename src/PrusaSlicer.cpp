@@ -356,7 +356,11 @@ int CLI::run(int argc, char **argv)
     
     // Loop through transform options.
     bool user_center_specified = false;
-    arr2::ArrangeBed bed = arr2::to_arrange_bed(get_bed_shape(m_print_config));
+
+    const Vec2crd gap{s_multiple_beds.get_bed_gap()};
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(get_bed_shape(m_print_config), gap);
+    arr2::ArrangeSettings arrange_cfg;
+    arrange_cfg.set_distance_from_objects(min_object_distance(&m_print_config));
     int dups = 1;
     
     for (auto const &opt_key : m_transforms) {
@@ -365,15 +369,6 @@ int CLI::run(int argc, char **argv)
             for (auto &model : m_models)
                 for (ModelObject *o : model.objects)
                     m.add_object(*o);
-            // Rearrange instances unless --dont-arrange is supplied
-            //should be done later
-            //if (! m_config.opt_bool("dont_arrange")) {
-            //    m.add_default_instances();
-            //    if (this->has_print_action())
-            //        arrange_objects(m, bed, arrange_cfg);
-            //    else
-            //        arrange_objects(m, arr2::InfiniteBed{}, arrange_cfg);
-            //}
             m_models.clear();
             m_models.emplace_back(std::move(m));
         } else if (opt_key == "duplicate") {
@@ -783,6 +778,7 @@ bool CLI::setup(int argc, char **argv)
     // See Invoking prusa-slicer from $PATH environment variable crashes #5542
     // boost::filesystem::path path_to_binary = boost::filesystem::system_complete(argv[0]);
     boost::filesystem::path path_to_binary = boost::dll::program_location();
+    boost::filesystem::path install_path = path_to_binary.parent_path();
 
     // Path from the Slic3r binary to its resources.
 #ifdef __APPLE__
@@ -804,7 +800,23 @@ bool CLI::setup(int argc, char **argv)
     // Path from Slic3r binary to resources:
     boost::filesystem::path path_resources = boost::filesystem::canonical(path_to_binary).parent_path() / "../resources";
 #endif
+#if !defined(_WIN32) && !defined(__APPLE__)
+    //test if launched from appiamge
+    const char* appimage_env = std::getenv("APPIMAGE");
+    if (appimage_env != nullptr && appimage_env[0] != '\0') {
+        try {
+            boost::filesystem::path appimage_path = boost::filesystem::canonical(boost::filesystem::path(appimage_env));
+            if (boost::filesystem::exists(appimage_path)) {
+                BOOST_LOG_TRIVIAL(trace) << "appimage detected, change install path from '" << install_path
+                                         << "' to '" << appimage_env << "\n";
+                install_path = appimage_path;
+            }
+        } catch (std::exception &) {}
+    }
+#endif
 
+    set_install_path(install_path);
+    set_binary_file(path_to_binary);
     set_resources_dir(path_resources.string());
     set_var_dir((path_resources / "icons").string());
     set_local_dir((path_resources / "localization").string());

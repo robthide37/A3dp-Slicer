@@ -26,6 +26,7 @@ wxDEFINE_EVENT(EVT_GLTOOLBAR_ADD, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLTOOLBAR_DELETE, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLTOOLBAR_DELETE_ALL, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLTOOLBAR_ARRANGE, SimpleEvent);
+wxDEFINE_EVENT(EVT_GLTOOLBAR_ARRANGE_CURRENT_BED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLTOOLBAR_COPY, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLTOOLBAR_PASTE, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLTOOLBAR_MORE, SimpleEvent);
@@ -1332,8 +1333,7 @@ bool GLToolbar::generate_icons_texture()
 //    if (sprite_size_px % 2 != 0)
 //        sprite_size_px += 1;
 
-    uint32_t color = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f, AppConfig::EAppColorType::Platter);
-    bool res = m_icons_texture.load_from_svg_files_as_sprites_array(filenames, states, sprite_size_px, false, color);
+    bool res = m_icons_texture.load_from_svg_files_as_sprites_array(filenames, states, sprite_size_px, false);
     if (res)
         m_icons_texture_dirty = false;
 

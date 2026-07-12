@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Config.hpp"
 
 namespace Slic3r
 {
@@ -30,7 +31,7 @@ class WipeTower
 public:
     static const std::string never_skip_tag() { return "_GCODE_WIPE_TOWER_NEVER_SKIP_TAG"; }
 	static std::pair<double, double> get_wipe_tower_cone_base(double width, double height, double depth, double angle_deg);
-	static std::vector<std::vector<float>> extract_wipe_volumes(const PrintConfig& config);
+	static std::vector<std::vector<float>> extract_wipe_volumes(const ConfigBase& config);
 
     struct Extrusion
     {
@@ -129,18 +130,20 @@ public:
     // Construct ToolChangeResult from current state of WipeTower and WipeTowerWriter.
     // WipeTowerWriter is moved from !
     ToolChangeResult construct_tcr(WipeTowerWriter& writer,
-                                   bool priming,
-                                   size_t old_tool) const;
+                                   bool priming, size_t old_tool) const;
+
+    WipeTower(const Vec2f &pos,
+              const PrintConfig &config,
+              const PrintObjectConfig &default_object_config,
+              const PrintRegionConfig &default_region_config,
+              const std::vector<std::vector<float>> &wiping_matrix,
+              size_t initial_tool);
 
 	// x			-- x coordinates of wipe tower in mm ( left bottom corner )
 	// y			-- y coordinates of wipe tower in mm ( left bottom corner )
 	// width		-- width of wipe tower in mm ( default 60 mm - leave as it is )
 	// wipe_area	-- space available for one toolchange in mm
-    WipeTower(const PrintConfig& config,
-              const PrintObjectConfig& default_object_config,
-              const PrintRegionConfig& default_region_config,
-              const std::vector<std::vector<float>>& wiping_matrix,
-              size_t initial_tool);
+    
 
 	// Set the extruder properties.
     void set_extruder(size_t idx);
@@ -156,10 +159,6 @@ public:
 	std::vector<std::pair<float, float>> get_z_and_depth_pairs() const;
     float get_brim_width() const { return m_wipe_tower_brim_width_real; }
 	float get_wipe_tower_height() const { return m_wipe_tower_height; }
-
-
-
-
 
 	// Switch to a next layer.
 	void set_layer(
@@ -274,7 +273,7 @@ private:
 		SHAPE_REVERSED = -1
 	};
 
-    const float Width_To_Nozzle_Ratio = 1.25f; // desired line width (oval) in multiples of nozzle diameter - may not be actually neccessary to adjust
+
     const float WT_EPSILON            = 1e-3f;
     float filament_area() const {
         return m_filpar[0].filament_area; // all extruders are assumed to have the same filament diameter at this point
@@ -325,7 +324,7 @@ private:
     Vec2f m_bed_bottom_left; // bottom-left corner coordinates (for rectangular beds)
 
     float m_nozzle_diameter = 0.4f;
-    float m_perimeter_width = 0.4f * Width_To_Nozzle_Ratio; // Width of an extrusion line, also a perimeter spacing for 100% infill.
+    float m_perimeter_width = 0.5f; // Width of an extrusion line, also a perimeter spacing for 100% infill.
     float m_extrusion_flow = 0.038f; //0.029f;// Extrusion flow is derived from m_perimeter_width, layer height and filament diameter.
 
 	// Extruder specific parameters.

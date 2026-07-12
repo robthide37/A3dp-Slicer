@@ -335,7 +335,10 @@ enum class ModelVolumeType : int {
     PARAMETER_MODIFIER,
     SUPPORT_BLOCKER,
     SUPPORT_ENFORCER,
-    SEAM_POSITION,
+    SEAM_POSITION_CENTER,
+    SEAM_POSITION_CENTER_Z,
+    SEAM_POSITION_INSIDE_CENTER, //TODO
+    SEAM_POSITION_INSIDE, //TODO
     BRIM_PATCH,
     BRIM_NEGATIVE,
 };
@@ -859,9 +862,10 @@ public:
 	bool                is_support_enforcer()   const { return m_type == ModelVolumeType::SUPPORT_ENFORCER; }
 	bool                is_support_blocker()    const { return m_type == ModelVolumeType::SUPPORT_BLOCKER; }
     bool                is_support_modifier()   const { return m_type == ModelVolumeType::SUPPORT_BLOCKER || m_type == ModelVolumeType::SUPPORT_ENFORCER; }
-    bool                is_seam_position()      const { return m_type == ModelVolumeType::SEAM_POSITION; }
+    bool                is_seam_position()      const { return m_type == ModelVolumeType::SEAM_POSITION_CENTER || m_type == ModelVolumeType::SEAM_POSITION_CENTER_Z || m_type == ModelVolumeType::SEAM_POSITION_INSIDE_CENTER || m_type == ModelVolumeType::SEAM_POSITION_INSIDE; }
     bool                is_brim_patch()         const { return m_type == ModelVolumeType::BRIM_PATCH; }
     bool                is_brim_negative()      const { return m_type == ModelVolumeType::BRIM_NEGATIVE; }
+    bool                is_brim()               const { return m_type == ModelVolumeType::BRIM_PATCH || m_type == ModelVolumeType::BRIM_NEGATIVE; }
     bool                is_text()               const { return text_configuration.has_value(); }
     bool                is_svg() const { return emboss_shape.has_value()  && !text_configuration.has_value(); }
     bool                is_the_only_one_part() const; // behave like an object
@@ -1166,6 +1170,12 @@ public:
     void set_rotation(const Vec3d& rotation) { m_transformation.set_rotation(rotation); }
     void set_rotation(Axis axis, double rotation) { m_transformation.set_rotation(axis, rotation); }
 
+    void rotate(Matrix3d rotation_matrix) {
+        auto rotation = m_transformation.get_rotation_matrix();
+        rotation      = rotation_matrix * rotation;
+        set_rotation(Geometry::Transformation(rotation).get_rotation());
+    }
+    
     Vec3d get_scaling_factor() const { return m_transformation.get_scaling_factor(); }
     double get_scaling_factor(Axis axis) const { return m_transformation.get_scaling_factor(axis); }
 
@@ -1231,30 +1241,22 @@ private:
 };
 
 
-class ModelWipeTower final : public ObjectBase
+// Note: The following class does not have to inherit from ObjectID, it is currently
+// only used for arrangement. It might be good to refactor this in future.
+class ModelWipeTower
 {
 public:
-	Vec2d		position;
-	double 		rotation;
+	Vec2d		position = Vec2d(180., 140.);
+	double 		rotation = 0.;
 
-private:
-	friend class cereal::access;
-	friend class UndoRedo::StackImpl;
-	friend class Model;
+    bool operator==(const ModelWipeTower& other) const { return position == other.position && rotation == other.rotation; }
+    bool operator!=(const ModelWipeTower& other) const { return !((*this) == other); }
 
-    // Constructors to be only called by derived classes.
-    // Default constructor to assign a unique ID.
+    // Assignment operator does not touch the ID!
+    ModelWipeTower& operator=(const ModelWipeTower& rhs) { position = rhs.position; rotation = rhs.rotation; return *this; }
+
     explicit ModelWipeTower() {}
-    // Constructor with ignored int parameter to assign an invalid ID, to be replaced
-    // by an existing ID copied from elsewhere.
-    explicit ModelWipeTower(int) : ObjectBase(-1) {}
-    // Copy constructor copies the ID.
 	explicit ModelWipeTower(const ModelWipeTower &cfg) = default;
-
-	// Disabled methods.
-	ModelWipeTower(ModelWipeTower &&rhs) = delete;
-	ModelWipeTower& operator=(const ModelWipeTower &rhs) = delete;
-    ModelWipeTower& operator=(ModelWipeTower &&rhs) = delete;
 
     // For serialization / deserialization of ModelWipeTower composed into another class into the Undo / Redo stack as a separate object.
     template<typename Archive> void serialize(Archive &ar) { ar(position, rotation); }
@@ -1273,12 +1275,30 @@ public:
     ModelMaterialMap    materials;
     // Objects are owned by a model. Each model may have multiple instances, each instance having its own transformation (shift, scale, rotation).
     ModelObjectPtrs     objects;
+
+    ModelWipeTower& wipe_tower();
+    const ModelWipeTower& wipe_tower() const;
+    const ModelWipeTower& wipe_tower(const int bed_index) const;
+    ModelWipeTower& wipe_tower(const int bed_index);
+    std::vector<ModelWipeTower>& get_wipe_tower_vector() { return wipe_tower_vector; }
+    const std::vector<ModelWipeTower>& get_wipe_tower_vector() const { return wipe_tower_vector; }
+
+    CustomGCode::Info& custom_gcode_per_print_z();
+    const CustomGCode::Info& custom_gcode_per_print_z() const;
+    std::vector<CustomGCode::Info>& get_custom_gcode_per_print_z_vector() { return custom_gcode_per_print_z_vector; }
+
+private:
     // Wipe tower object.
-    ModelWipeTower	    wipe_tower;
+    std::vector<ModelWipeTower> wipe_tower_vector = std::vector<ModelWipeTower>(MAX_NUMBER_OF_BEDS);
 
     // Extensions for color print
-    CustomGCode::Info custom_gcode_per_print_z;
-    
+    std::vector<CustomGCode::Info> custom_gcode_per_print_z_vector = std::vector<CustomGCode::Info>(MAX_NUMBER_OF_BEDS);
+
+public:
+
+    // Properties from loading, can be used to save.
+    bool baked_transformation = true;
+
     // Default constructor assigns a new ID to the model.
     Model() { assert(this->id().valid()); }
     ~Model() { this->clear_objects(); this->clear_materials(); }
@@ -1294,14 +1314,16 @@ public:
 
     enum class LoadAttribute : int {
         AddDefaultInstances,
-        CheckVersion
+        CheckVersion,
+        UnbakeTransformation
     };
     using LoadAttributes = enum_bitmask<LoadAttribute>;
 
     static Model read_from_file(
         const std::string& input_file, 
         DynamicPrintConfig* config = nullptr, ConfigSubstitutionContext* config_substitutions = nullptr,
-        LoadAttributes options = LoadAttribute::AddDefaultInstances);
+        LoadAttributes options = LoadAttribute::AddDefaultInstances, std::optional<std::pair<double, double>> step_deflections = std::nullopt);
+        
     static Model read_from_archive(
         const std::string& input_file, 
         DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions,
@@ -1379,8 +1401,7 @@ private:
 	friend class cereal::access;
 	friend class UndoRedo::StackImpl;
 	template<class Archive> void serialize(Archive &ar) {
-		Internal::StaticSerializationWrapper<ModelWipeTower> wipe_tower_wrapper(wipe_tower);
-		ar(materials, objects, wipe_tower_wrapper);
+		ar(materials, objects, wipe_tower_vector);
     }
 };
 

@@ -14,19 +14,23 @@
 
 namespace Slic3r {
 
+bool Surface::has(SurfaceType type) const {
+    return (this->surface_type & type) == type;
+}
+
 bool
 Surface::has_fill_void() const {
-    return (this->surface_type & stDensVoid) != 0;
+    return has(stDensVoid);
 }
 
 bool
 Surface::has_fill_sparse() const {
-    return (this->surface_type & stDensSparse) != 0;
+    return has(stDensSparse);
 }
 
 bool
 Surface::has_fill_solid() const {
-    return (this->surface_type & stDensSolid) != 0;
+    return has(stDensSolid);
 }
 
 bool
@@ -38,30 +42,30 @@ Surface::has_pos_external() const
 bool
 Surface::has_pos_top() const
 {
-    return (this->surface_type & stPosTop) != 0;
+    return has(stPosTop);
 }
 
 bool
 Surface::has_pos_internal() const
 {
-    return (this->surface_type & stPosInternal) != 0;
+    return has(stPosInternal);
 }
 
 bool
 Surface::has_pos_bottom() const
 {
-    return (this->surface_type & stPosBottom) != 0;
+    return has(stPosBottom);
 }
 
 bool
 Surface::has_mod_bridge() const
 {
-    return (this->surface_type & stModBridge) != 0;
+    return has(stModBridge);
 }
 bool
 Surface::has_mod_overBridge() const
 {
-    return (this->surface_type & stModOverBridge) != 0;
+    return has(stModOverBridge);
 }
 
 BoundingBox get_extents(const Surface &surface)
@@ -94,32 +98,36 @@ BoundingBox get_extents(const SurfacesConstPtr &surfaces)
 void ensure_valid(Surfaces &surfaces, coord_t resolution /*= SCALED_EPSILON*/)
 {
     for (size_t i = 0; i < surfaces.size(); ++i) {
-        surfaces[i].expolygon.douglas_peucker(resolution);
-        if (surfaces[i].expolygon.contour.size() < 3) {
+        ExPolygons to_simplify = {surfaces[i].expolygon};
+        ensure_valid(to_simplify, resolution);
+        if (to_simplify.empty()) {
             surfaces.erase(surfaces.begin() + i);
             --i;
+        } else if (to_simplify.size() == 1) {
+            surfaces[i].expolygon = to_simplify.front();
         } else {
-            for (size_t i_hole = 0; i_hole < surfaces[i].expolygon.holes.size(); ++i_hole) {
-                if (surfaces[i].expolygon.holes[i_hole].size() < 3) {
-                    surfaces[i].expolygon.holes.erase(surfaces[i].expolygon.holes.begin() + i_hole);
-                    --i_hole;
-                }
+            surfaces[i].expolygon = to_simplify.front();
+            for (size_t idx = 1; idx < to_simplify.size(); idx++) {
+                surfaces.insert(surfaces.begin() + i + idx,
+                                Surface{surfaces[i], to_simplify[idx]});
+                i++;
             }
         }
     }
 }
 
-const char* surface_type_to_color_name(const SurfaceType surface_type)
+const std::string surface_type_to_color_name(const SurfaceType surface_type, float saturation)
 {
-    if ((surface_type & stPosTop) != 0) return "rgb(255,0,0)"; // "red";
-    if (surface_type == (stPosBottom | stDensSolid | stModBridge)) return "rgb(0,0,255)"; // "blue";
-    if ((surface_type & stPosBottom) != 0) return "rgb(0,255,0)"; // "green";
-    if (surface_type == (stPosInternal | stDensSolid | stModBridge)) return "rgb(0,255,255)"; // cyan
-    if (surface_type == (stPosInternal | stDensSolid | stModOverBridge)) return "rgb(0,255,128)"; // green-cyan
-    if (surface_type == (stPosInternal | stDensSolid)) return "rgb(255,0,255)"; // magenta
-    if (surface_type == (stPosInternal | stDensVoid)) return "rgb(128,128,128)"; // gray
-    if (surface_type == (stPosInternal | stDensSparse)) return "rgb(255,255,128)"; // yellow 
-    if ((surface_type & stPosPerimeter) != 0) return "rgb(128,0,0)"; // maroon
+    if ((surface_type & stPosTop) != 0) return (std::string("rgb(")+std::to_string(int(saturation*255))+",0,0)"); // "red";
+    if (surface_type == (stPosBottom | stDensSolid | stModBridge)) return (std::string("rgb(0,0,")+std::to_string(int(saturation*255))+")"); // "blue";
+    if ((surface_type & stPosBottom) != 0) return (std::string("rgb(0,")+std::to_string(int(saturation*255))+",0)"); // "green";
+    if (surface_type == (stPosInternal | stDensSparse | stModBridge)) return (std::string("rgb(")+std::to_string(int(saturation*64))+","+std::to_string(int(saturation*128))+","+std::to_string(int(saturation*255))+")"); // light blue
+    if (surface_type == (stPosInternal | stDensSolid | stModBridge)) return (std::string("rgb(0,")+std::to_string(int(saturation*255))+","+std::to_string(int(saturation*255))+")"); // cyan
+    if (surface_type == (stPosInternal | stDensSolid | stModOverBridge)) return (std::string("rgb(0,")+std::to_string(int(saturation*255))+",128)"); // green-cyan
+    if (surface_type == (stPosInternal | stDensSolid)) return (std::string("rgb(")+std::to_string(int(saturation*255))+",0,"+std::to_string(int(saturation*255))+")"); // magenta
+    if (surface_type == (stPosInternal | stDensVoid)) return (std::string("rgb(")+std::to_string(int(saturation*128))+","+std::to_string(int(saturation*128))+","+std::to_string(int(saturation*128))+")"); // gray
+    if ((surface_type & (stPosInternal | stDensSparse)) == (stPosInternal | stDensSparse)) return (std::string("rgb(")+std::to_string(int(saturation*255))+","+std::to_string(int(saturation*255))+",128)"); // yellow 
+    if ((surface_type & stPosPerimeter) != 0) return (std::string("rgb(")+std::to_string(int(saturation*128))+",0,0)"); // maroon
     return "rgb(64,64,64)"; //dark gray
 }
 
@@ -148,6 +156,8 @@ void export_surface_type_legend_to_svg(SVG &svg, const Point &pos)
     pos_x = pos_x0;
     pos_y = pos(1)+scale_(2.8);
     svg.draw_legend(Point(pos_x, pos_y), "internal"       , surface_type_to_color_name(stPosInternal | stDensSparse));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "dense bridge", surface_type_to_color_name(stPosInternal | stDensSparse | stModBridge));
     pos_x += step_x;
     svg.draw_legend(Point(pos_x, pos_y), "internal solid" , surface_type_to_color_name(stPosInternal | stDensSolid));
     pos_x += step_x;

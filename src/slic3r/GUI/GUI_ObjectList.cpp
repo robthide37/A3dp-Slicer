@@ -18,8 +18,11 @@
 #include "GalleryDialog.hpp"
 #include "MainFrame.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
+#include "Gizmos/GLGizmosManager.hpp"
 #include "Gizmos/GLGizmoCut.hpp"
 #include "Gizmos/GLGizmoScale.hpp"
+
+#include "libslic3r/MultipleBeds.hpp"
 
 #include "OptionsGroup.hpp"
 #include "Tab.hpp"
@@ -670,8 +673,9 @@ void ObjectList::update_extruder_in_config(const wxDataViewItem& item)
     const int extruder = m_objects_model->GetExtruderNumber(item);
     m_config->set_key_value("extruder", new ConfigOptionInt(extruder));
 
-    // update scene
-    wxGetApp().plater()->update();
+    // Refresh the print state before reloading the scene so wipe tower preview
+    // reacts immediately to extruder changes from the object list.
+    wxGetApp().plater()->update((unsigned int)Plater::UpdateParams::FORCE_BACKGROUND_PROCESSING_UPDATE);
 }
 
 static wxString get_item_name(const std::string& name, const bool is_text_volume)
@@ -1647,7 +1651,12 @@ void ObjectList::load_from_files(const wxArrayString& input_files, ModelObject& 
 
 static TriangleMesh create_mesh(const std::string& type_name, const BoundingBoxf3& bb)
 {
-    const double side = wxGetApp().plater()->canvas3D()->get_size_proportional_to_max_bed_size(0.1);
+    const double side_from_bed = wxGetApp().plater()->canvas3D()->get_size_proportional_to_max_bed_size(0.2);
+
+    BoundingBoxf3 side_bb(Vec3d(0,0,0), Vec3d(10,10,10));
+    const double side_zoom = wxGetApp().plater()->get_camera().calc_zoom_to_bounding_box_factor(side_bb);
+    const double side_from_zoom = 3 * (side_zoom / wxGetApp().plater()->get_camera().get_zoom());
+    const double side = std::min(side_from_zoom, side_from_bed);
 
     indexed_triangle_set mesh;
     if (type_name == "Box")
@@ -1660,6 +1669,10 @@ static TriangleMesh create_mesh(const std::string& type_name, const BoundingBoxf
         // Centered around 0, sitting on the print bed.
         // The cylinder has the same volume as the box above.
         mesh = its_make_cylinder(0.564 * side, bb.size().z()>0 ? bb.size().z() : side);
+    else if (type_name == "SmallCylinder")
+        // Centered around 0, sitting on the print bed.
+        // The cylinder has the same volume as the box above.
+        mesh = its_make_cylinder(0.1 * side, bb.size().z()>0 ? bb.size().z() : side);
     else if (type_name == "Circle")
         // Centered around 0, sitting on the print bed.
         mesh = its_make_cylinder(5, 0.1);
@@ -1723,17 +1736,32 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
         offset = Vec3d(inst_center.x(), inst_center.y(), 0.5 * mesh_bb.size().z() + instance_bb.min.z() - v->get_instance_offset().z());
     }
     else {
-        // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
-        offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - v->get_instance_offset();
+        // if the center of view (camera target) is more or less near the object, use it.
+        const Vec3d &camera_target = wxGetApp().plater()->get_camera().get_target();
+        BoundingBoxf3 big_mesh_bb = selection.get_unscaled_instance_bounding_box();
+        Vec3d bb_size = big_mesh_bb.max - big_mesh_bb.min;
+        big_mesh_bb.min -= bb_size/2;
+        big_mesh_bb.max += bb_size/2;
+        big_mesh_bb.min.z() = -999999999;
+        big_mesh_bb.max.z() = 999999999;
+        big_mesh_bb.offset(wxGetApp().plater()->canvas3D()->get_size_proportional_to_max_bed_size(0.02));
+        if (big_mesh_bb.contains(camera_target)) {
+            offset = camera_target - v->get_instance_offset();//Vec3d(instance_bb.max.x(), instance_bb.min.y(), 0);
+        } else {
+            // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding
+            // box, lift to print bed.
+            offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() -
+                v->get_instance_offset();
+        }
     }
     new_volume->set_offset(v->get_instance_transformation().get_matrix_no_offset().inverse() * offset);
 
     std::string base_name = "Generic";
-    if (type == ModelVolumeType::SEAM_POSITION) base_name = "Seam";
-    if (type == ModelVolumeType::BRIM_PATCH) base_name = "Brim";
+    if (new_volume->is_seam_position()) base_name = "Seam";
+    if (new_volume->is_brim())          base_name = "Brim";
     if (type == ModelVolumeType::SUPPORT_ENFORCER) base_name = "Support";
     if (type == ModelVolumeType::SUPPORT_BLOCKER) base_name = "Blocker";
-    const wxString name = _(L(base_name)) + "-" + _(type_name);
+    const wxString name = _L(base_name) + "-" + (boost::starts_with(type_name, "Small") ? _(type_name.substr(5)): _(type_name));
     new_volume->name = into_u8(name);
     // set a default extruder value, since user can't add it manually
     new_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
@@ -1756,7 +1784,7 @@ void ObjectList::load_generic_subobject(const std::string& type_name, const Mode
         update_info_items(obj_idx);
 
     selection_changed();
-    if (type == ModelVolumeType::SEAM_POSITION)
+    if (new_volume->is_seam_position())
         this->update_after_undo_redo();
 }
 
@@ -1806,7 +1834,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         snapshot_label += ", " + wxString::FromUTF8(paths[i].filename().string().c_str());
 
     take_snapshot(snapshot_label);
-    if (! wxGetApp().plater()->load_files(paths, true, false, true, false).empty())
+    if (! wxGetApp().plater()->load_files(paths, LoadFileOption::LoadModel).empty())
         wxGetApp().mainframe->update_title();
 }
 
@@ -1839,6 +1867,9 @@ void ObjectList::load_mesh_object(const TriangleMesh &mesh, const std::string &n
     bb.center());
 
     new_object->ensure_on_bed();
+
+    if (! s_multiple_beds.get_loading_project_flag())
+        new_object->instances.front()->set_offset(new_object->instances.front()->get_offset() + s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
 
 #ifdef _DEBUG
     check_model_ids_validity(model);
@@ -2384,6 +2415,38 @@ void ObjectList::layers_editing()
     Expand(layers_item);
 }
 
+void ObjectList::layers_editing(int obj_idx)
+{
+    wxDataViewItem item = m_objects_model->GetItemById(obj_idx);
+
+    if (!item)
+        return;
+
+    const wxDataViewItem obj_item = m_objects_model->GetTopParent(item);
+    wxDataViewItem layers_item = m_objects_model->GetLayerRootItem(obj_item);
+
+    if (!layers_item.IsOk())
+    {
+        t_layer_config_ranges& ranges = object(obj_idx)->layer_config_ranges;
+
+        if (ranges.empty()) {
+            take_snapshot(_(L("Add Layers")));
+            ranges[{ 0.0f, 2.0f }].assign_config(get_default_layer_config(obj_idx));
+        }
+
+        layers_item = add_layer_root_item(obj_item);
+    }
+
+    if (!layers_item.IsOk())
+        return;
+
+    wxGetApp().obj_layers()->reset_selection();
+    wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event("", false);
+
+    select_item(layers_item);
+    Expand(layers_item);
+}
+
 wxDataViewItem ObjectList::add_layer_root_item(const wxDataViewItem obj_item)
 {
     const int obj_idx = m_objects_model->GetIdByItem(obj_item);
@@ -2738,7 +2801,7 @@ void ObjectList::part_selection_changed()
                                                             info_type == InfoItemType::CustomSeam       ? GLGizmosManager::EType::Seam :
                                                             GLGizmosManager::EType::MmuSegmentation;
                         if (gizmos_mgr.get_current_type() != gizmo_type)
-                            gizmos_mgr.open_gizmo(gizmo_type);
+                            gizmos_mgr.open_gizmo(gizmo_type, false);
                         break;
                     }
                     case InfoItemType::Sinking:
@@ -3368,8 +3431,9 @@ static double get_max_layer_height(const int extruder_idx)
     double max_layer_height = config.get_computed_value("max_layer_height", extruder_idx_zero_based);
 
     // In case max_layer_height is set to zero, it should default to 75 % of nozzle diameter:
-    if (max_layer_height < EPSILON)
+    if (max_layer_height < EPSILON || config.is_enabled("max_layer_height")) {
         max_layer_height = 0.75 * config.opt_float("nozzle_diameter", extruder_idx_zero_based);
+    }
 
     return max_layer_height;
 }
@@ -3546,6 +3610,13 @@ bool ObjectList::edit_layer_range(const t_layer_height_range& range, coordf_t la
         config->set_key_value("layer_height", new ConfigOptionFloat(layer_height));
         changed_object(obj_idx);
         return true;
+    } else {
+        const wxString msg_text = format_wxstr(
+            _L("The layer height need to be btween the minimum and maximum layer height, which are %1% and %2%."),
+            Slic3r::to_string_nozero(get_min_layer_height(extruder_idx), 6),
+            Slic3r::to_string_nozero(get_max_layer_height(extruder_idx), 6));
+        MessageDialog dialog(GUI::wxGetApp().plater(), msg_text, _(L("Maximum and minimum layer height")), wxICON_WARNING | wxOK);
+        dialog.ShowModal();
     }
 
     return false;
@@ -4305,10 +4376,18 @@ void ObjectList::change_part_type()
     }
 
     if (printer_technology() != ptSLA) {
-        names.Add(_L("Seam Position"));
-        types.emplace_back(ModelVolumeType::SEAM_POSITION);
+        names.Add(_L("Seam Position (nearest)"));
+        types.emplace_back(ModelVolumeType::SEAM_POSITION_CENTER);
+        names.Add(_L("Seam Position (nearest, between min & max z)"));
+        types.emplace_back(ModelVolumeType::SEAM_POSITION_CENTER_Z);
+        //names.Add(_L("Seam Position (inside)"));
+        //types.emplace_back(ModelVolumeType::SEAM_POSITION_INSIDE_CENTER);
+        names.Add(_L("Seam Position (inside shape)"));
+        types.emplace_back(ModelVolumeType::SEAM_POSITION_INSIDE);
         names.Add(_L("Brim Patch"));
         types.emplace_back(ModelVolumeType::BRIM_PATCH);
+        names.Add(_L("Brim Blocker"));
+        types.emplace_back(ModelVolumeType::BRIM_NEGATIVE);
     }
     int selection = 0;
     if (auto it = std::find(types.begin(), types.end(), type); it != types.end())
@@ -4719,9 +4798,9 @@ void ObjectList::simplify()
 
     if (gizmos_mgr.get_current_type() == GLGizmosManager::Simplify) {
         // close first
-        gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
+        gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify, false);
     }
-    gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify);
+    gizmos_mgr.open_gizmo(GLGizmosManager::EType::Simplify, true);
 }
 
 void ObjectList::update_item_error_icon(const int obj_idx, const int vol_idx) const 
@@ -4851,8 +4930,9 @@ void ObjectList::set_extruder_for_selected_items(const int extruder) const
         wxGetApp().plater()->canvas3D()->ensure_on_bed(obj_idx, printer_technology() != ptSLA);
     }
 
-    // update scene
-    wxGetApp().plater()->update();
+    // Refresh the print state before reloading the scene so wipe tower preview
+    // reacts immediately to extruder changes from the object list.
+    wxGetApp().plater()->update((unsigned int)Plater::UpdateParams::FORCE_BACKGROUND_PROCESSING_UPDATE);
 }
 
 wxDataViewItemArray ObjectList::reorder_volumes_and_get_selection(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection/* = nullptr*/)

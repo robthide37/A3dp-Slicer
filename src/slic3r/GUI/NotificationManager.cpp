@@ -529,13 +529,16 @@ void NotificationManager::PopNotification::render_hypertext(ImGuiWrapper& imgui,
 	}
 	ImGui::PopStyleColor(3);
 
-	//hover color
-	ImVec4 orange_color = ImVec4(.99f, .313f, .0f, 1.0f);
+	// hover color (hypertext is always blue)
+	//wxColour orange_color = color_from_int(wxGetApp().app_config->create_color(1.f, 0.99f, AppConfig::EAppColorType::Main));
+	//ImVec4 blue_color_vec = ImVec4(orange_color.Red(), orange_color.Green(), orange_color.Blue(), 1.0f);
+	ImVec4 blue_color_vec = ImVec4(.0f, .313f, 1.0f, 1.0f);
+		//ImVec4(.99f, .313f, .0f, 1.0f);
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
-		orange_color.y += 0.2f;
+		blue_color_vec.y += 0.2f;
 
 	//text
-	push_style_color(ImGuiCol_Text, orange_color, m_state == EState::FadingOut, m_current_fade_opacity);
+	push_style_color(ImGuiCol_Text, blue_color_vec, m_state == EState::FadingOut, m_current_fade_opacity);
 	ImGui::SetCursorPosX(text_x);
 	ImGui::SetCursorPosY(text_y);
 	imgui.text(text.c_str());
@@ -546,7 +549,7 @@ void NotificationManager::PopNotification::render_hypertext(ImGuiWrapper& imgui,
 	lineEnd.y -= 2;
 	ImVec2 lineStart = lineEnd;
 	lineStart.x = ImGui::GetItemRectMin().x;
-	ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32((int)(orange_color.x * 255), (int)(orange_color.y * 255), (int)(orange_color.z * 255), (int)(orange_color.w * 255.f * (m_state == EState::FadingOut ? m_current_fade_opacity : 1.f))));
+	ImGui::GetWindowDrawList()->AddLine(lineStart, lineEnd, IM_COL32((int)(blue_color_vec.x * 255), (int)(blue_color_vec.y * 255), (int)(blue_color_vec.z * 255), (int)(blue_color_vec.w * 255.f * (m_state == EState::FadingOut ? m_current_fade_opacity : 1.f))));
 
 }
 
@@ -2124,6 +2127,15 @@ void NotificationManager::push_notification(const NotificationType type, int tim
 	if (it != std::end(basic_notifications))
 		push_notification_data(*it, timestamp);
 }
+
+void NotificationManager::push_notification(const NotificationType type, const std::string& text, int timestamp) {
+    auto it = std::find_if(std::begin(basic_notifications), std::end(basic_notifications),
+                           boost::bind(&NotificationData::type, boost::placeholders::_1) == type);
+    assert(it != std::end(basic_notifications));
+    if (it != std::end(basic_notifications)) {
+        push_notification_data(NotificationData{it->type, it->level, it->duration, text, it->hypertext, it->callback, it->text2}, timestamp);
+    }
+}
 void NotificationManager::push_notification(const std::string& text, int timestamp)
 {
 	push_notification_data({ NotificationType::CustomNotification, NotificationLevel::RegularNotificationLevel, 10, text }, timestamp);
@@ -2134,7 +2146,7 @@ void NotificationManager::push_notification(NotificationType type,
                                             const std::string& text,
                                             const std::string& hypertext,
                                             std::function<bool(wxEvtHandler*)> callback,
-											const std::string& text_after,
+                                            const std::string &text_after,
                                             int timestamp)
 {
 	int duration = get_standard_duration(level);
@@ -2326,7 +2338,15 @@ void NotificationManager::push_exporting_finished_notification(const std::string
 {
 	close_notification_of_type(NotificationType::ExportFinished);
 	NotificationData data{ NotificationType::ExportFinished, NotificationLevel::RegularNotificationLevel, on_removable ? 0 : 20,  _u8L("Exporting finished.") + "\n" + path };
-	push_notification_data(std::make_unique<NotificationManager::ExportFinishedNotification>(data, m_id_provider, m_evt_handler, on_removable, path, dir_path), 0);
+	push_notification_data(std::make_unique<NotificationManager::ExportFinishedNotification>(data, m_id_provider, m_evt_handler, on_removable, dir_path), 0);
+	set_slicing_progress_hidden();
+}
+
+void NotificationManager::push_bulk_exporting_finished_notification(const std::string& dir_path, bool on_removable)
+{
+	close_notification_of_type(NotificationType::ExportFinished);
+	NotificationData data{ NotificationType::ExportFinished, NotificationLevel::RegularNotificationLevel, on_removable ? 0 : 20,  _u8L("Bulk export finished.") + "\n" + dir_path};
+	push_notification_data(std::make_unique<NotificationManager::ExportFinishedNotification>(data, m_id_provider, m_evt_handler, on_removable, dir_path), 0);
 	set_slicing_progress_hidden();
 }
 
@@ -2489,6 +2509,22 @@ void NotificationManager::set_download_progress_percentage(float percentage)
 			return;
 		}
 	}
+}
+void NotificationManager::set_download_progress_text(const std::string &updated_text) {
+    for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {
+        if (notification->get_type() == NotificationType::AppDownload) {
+            ProgressBarWithCancelNotification *pbwcn = dynamic_cast<ProgressBarWithCancelNotification *>(
+                notification.get());
+            auto percentage = pbwcn->get_percentage();
+            if (!updated_text.empty()) {
+                pbwcn->update(NotificationData{NotificationType::AppDownload,
+                                               NotificationLevel::ProgressBarNotificationLevel, 10, updated_text});
+            }
+            pbwcn->set_percentage(percentage);
+            wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+            return;
+        }
+    }
 }
 
 void NotificationManager::push_download_URL_progress_notification(size_t id, const std::string& text, std::function<bool(DownloaderUserAction, int)> user_action_callback)

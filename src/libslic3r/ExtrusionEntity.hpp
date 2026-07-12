@@ -14,10 +14,10 @@
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 
-#include <assert.h>
+#include <cassert>
+#include <numeric>
 #include <optional>
 #include <string_view>
-#include <numeric>
 
 namespace Slic3r {
 
@@ -59,10 +59,14 @@ public:
 class ExtrusionEntity
 {
 protected:
+    static inline std::atomic_int64_t id_generator;
+    uint64_t m_id; // for travel map
     // even if no_sort, allow to reverse() us (and our entities if they allow it, but they should) 
     bool m_can_reverse;
-    ExtrusionEntity(bool can_reverse) : m_can_reverse(can_reverse) {}
+    ExtrusionEntity(bool can_reverse) : m_can_reverse(can_reverse) , m_id(++id_generator) {}
+    ExtrusionEntity(uint64_t id, bool can_reverse) : m_can_reverse(can_reverse), m_id(id) {}
 public:
+    uint64_t get_id() const { return m_id; }
     virtual ExtrusionRole role() const = 0;
     virtual bool is_collection() const { return false; }
     virtual bool is_loop() const { return false; }
@@ -154,6 +158,10 @@ struct OverhangAttributes {
     float start_distance_from_prev_layer;
     float end_distance_from_prev_layer;
     float proximity_to_curled_lines; //value between 0 and 1
+    bool has_full_overhangs_flow = false;
+    bool has_full_overhangs_speed = false;
+    bool has_dynamic_overhangs_flow = false;
+    bool has_dynamic_overhangs_speed = false;
 };
 
 struct ExtrusionAttributes : ExtrusionFlow
@@ -162,9 +170,13 @@ struct ExtrusionAttributes : ExtrusionFlow
     ExtrusionAttributes(ExtrusionRole role) : role{ role } {}
     ExtrusionAttributes(ExtrusionRole role, const Flow &flow) : role{ role }, ExtrusionFlow{ flow } {}
     ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow) : role{ role }, ExtrusionFlow{ flow } {}
+    ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow, OverhangAttributes overhang)
+        : role{role}, ExtrusionFlow{flow}, overhang_attributes(overhang) {}
 
     // What is the role / purpose of this extrusion?
     ExtrusionRole   role{ ExtrusionRole::None };
+    // set to true to prevent seam on this path.
+    bool no_seam = false;
     // OVerhangAttributes are currently computed for perimeters if dynamic overhangs are enabled. 
     // They are used to control fan and print speed in export.
     std::optional<OverhangAttributes> overhang_attributes;
@@ -183,13 +195,23 @@ public:
 
     //ExtrusionPath(ExtrusionRole role) : ExtrusionEntity(true), m_attributes{role} {}
     ExtrusionPath(const ExtrusionAttributes &attributes, bool can_reverse = true) : ExtrusionEntity(can_reverse), m_attributes(attributes) {}
-    ExtrusionPath(const ExtrusionPath &rhs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(rhs.polyline), m_attributes(rhs.m_attributes) {}
-    ExtrusionPath(ExtrusionPath &&rhs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(std::move(rhs.polyline)), m_attributes(rhs.m_attributes) {}
+    ExtrusionPath(const ExtrusionPath &rhs) : ExtrusionEntity(rhs.m_id, rhs.m_can_reverse), polyline(rhs.polyline), m_attributes(rhs.m_attributes) {}
+    ExtrusionPath(ExtrusionPath &&rhs) : ExtrusionEntity(rhs.m_id, rhs.m_can_reverse), polyline(std::move(rhs.polyline)), m_attributes(rhs.m_attributes) {}
     ExtrusionPath(const ArcPolyline &polyline, const ExtrusionAttributes &attribs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(polyline), m_attributes(attribs) {}
     ExtrusionPath(ArcPolyline &&polyline, const ExtrusionAttributes &attribs, bool can_reverse = true) : ExtrusionEntity(can_reverse), polyline(std::move(polyline)), m_attributes(attribs) {}
 
-    ExtrusionPath& operator=(const ExtrusionPath &rhs) { this->polyline = rhs.polyline; m_attributes = rhs.m_attributes; return *this; }
-    ExtrusionPath& operator=(ExtrusionPath &&rhs) { this->polyline = std::move(rhs.polyline); m_attributes = rhs.m_attributes; return *this; }
+    ExtrusionPath &operator=(const ExtrusionPath &rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->polyline = rhs.polyline;
+        m_attributes = rhs.m_attributes;
+        return *this;
+    }
+    ExtrusionPath &operator=(ExtrusionPath &&rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->polyline = std::move(rhs.polyline);
+        m_attributes = rhs.m_attributes;
+        return *this;
+    }
 
 	ExtrusionEntity* clone() const override { return new ExtrusionPath(*this); }
     // Create a new object, initialize it with this object using the move semantics.
@@ -267,32 +289,38 @@ typedef std::vector<ExtrusionPath> ExtrusionPaths;
 ExtrusionPaths clip_end(ExtrusionPaths& paths, coordf_t distance);
 
 class ExtrusionPath3D : public ExtrusionPath {
+protected:
+    void init() {
+#ifdef _DEBUG
+        polyline.is_3D = true;
+#endif
+    }
 public:
     std::vector<coord_t> z_offsets;
 
     //ExtrusionPath3D(ExtrusionRole role) : ExtrusionPath(role) { /*std::cout << "new path3D\n"; */};
-    ExtrusionPath3D(const ExtrusionAttributes &attributes, bool can_reverse) : ExtrusionPath(attributes, can_reverse) { /*std::cout << "new path3D++\n";*/ };
-    ExtrusionPath3D(const ExtrusionPath &rhs) : ExtrusionPath(rhs) { /*std::cout << "new path3D from path "<<size()<<"?"<<z_offsets.size()<<"\n";*/ }
-    ExtrusionPath3D(ExtrusionPath &&rhs) : ExtrusionPath(rhs) { /*std::cout << "new path3D from path " << size() << "?" << z_offsets.size()<<"\n";*/ }
-    ExtrusionPath3D(const ExtrusionPath3D &rhs) : ExtrusionPath(rhs), z_offsets(rhs.z_offsets) { /*std::cout << "new path3D from path3D " << size() << "?" << z_offsets.size()<<"\n";*/ }
-    ExtrusionPath3D(ExtrusionPath3D &&rhs) : ExtrusionPath(rhs), z_offsets(std::move(rhs.z_offsets)) { /*std::cout << "new2 path3D from path3D " << size() << "?" << z_offsets.size()<<"\n";*/ }
-    //    ExtrusionPath(ExtrusionRole role, const Flow &flow) : m_role(role), mm3_per_mm(flow.mm3_per_mm()), width(flow.width), height(flow.height), feedrate(0.0f), extruder_id(0) {};
+    ExtrusionPath3D(const ExtrusionAttributes &attributes, bool can_reverse) : ExtrusionPath(attributes, can_reverse) { init(); };
+    ExtrusionPath3D(const ExtrusionPath &rhs) : ExtrusionPath(rhs) { init();  }
+    ExtrusionPath3D(ExtrusionPath &&rhs) : ExtrusionPath(rhs) { init();  }
+    ExtrusionPath3D(const ExtrusionPath3D &rhs) : ExtrusionPath(rhs), z_offsets(rhs.z_offsets) { init();  }
+    ExtrusionPath3D(ExtrusionPath3D &&rhs) : ExtrusionPath(rhs), z_offsets(std::move(rhs.z_offsets)) { init();  }
+
 
     ExtrusionPath3D &operator=(const ExtrusionPath3D &rhs)
     {
-        this->m_attributes.role = rhs.role();
-        this->m_attributes.mm3_per_mm = rhs.mm3_per_mm();
-        this->m_attributes.width      = rhs.width();
-        this->m_attributes.height     = rhs.height(); 
-        this->polyline = rhs.polyline; z_offsets = rhs.z_offsets; return *this;
+        this->m_can_reverse = rhs.m_can_reverse; 
+        this->m_attributes = rhs.m_attributes;
+        this->polyline = rhs.polyline;
+        z_offsets = rhs.z_offsets;
+        return *this;
     }
     ExtrusionPath3D &operator=(ExtrusionPath3D &&rhs)
     {
-        this->m_attributes.role       = rhs.role();
-        this->m_attributes.mm3_per_mm = rhs.mm3_per_mm();
-        this->m_attributes.width      = rhs.width();
-        this->m_attributes.height     = rhs.height(); 
-        this->polyline = std::move(rhs.polyline); z_offsets = std::move(rhs.z_offsets); return *this;
+        this->m_can_reverse = rhs.m_can_reverse; 
+        this->m_attributes = rhs.m_attributes;
+        this->polyline = std::move(rhs.polyline);
+        z_offsets = std::move(rhs.z_offsets);
+        return *this;
     }
     virtual ExtrusionPath3D* clone() const override { return new ExtrusionPath3D(*this); }
     virtual ExtrusionPath3D* clone_move() override { return new ExtrusionPath3D(std::move(*this)); }
@@ -305,6 +333,10 @@ public:
         polyline.append(p);
         z_offsets.push_back(z_offset);
     }
+    void reverse() override {
+        this->polyline.reverse();
+        std::reverse(this->z_offsets.begin(), this->z_offsets.end());
+    }
 
     //TODO: simplify only for points that have the same z-offset
     void simplify(double tolerance, ArcFittingType use_arc_fitting, double fitting_arc_tolerance) override;
@@ -312,19 +344,28 @@ public:
 typedef std::vector<ExtrusionPath3D> ExtrusionPaths3D;
 
 // Single continuous extrusion path, possibly with varying extrusion thickness, extrusion height or bridging / non bridging.
+// it's like an unsortable collection of only unreversable THING
 template <typename THING = ExtrusionEntity>
 class ExtrusionMultiEntity : public ExtrusionEntity {
 public:
     std::vector<THING> paths;
 
     ExtrusionMultiEntity(): ExtrusionEntity(false) {};
-    ExtrusionMultiEntity(const ExtrusionMultiEntity &rhs) : paths(rhs.paths), ExtrusionEntity(rhs.m_can_reverse) {}
-    ExtrusionMultiEntity(ExtrusionMultiEntity &&rhs) : paths(std::move(rhs.paths)), ExtrusionEntity(rhs.m_can_reverse) {}
+    ExtrusionMultiEntity(const ExtrusionMultiEntity &rhs) : paths(rhs.paths), ExtrusionEntity(rhs.m_id, rhs.m_can_reverse) {}
+    ExtrusionMultiEntity(ExtrusionMultiEntity &&rhs) : paths(std::move(rhs.paths)), ExtrusionEntity(rhs.m_id, rhs.m_can_reverse) {}
     ExtrusionMultiEntity(const std::vector<THING> &paths) : paths(paths), ExtrusionEntity(false) {};
     ExtrusionMultiEntity(const THING &path): ExtrusionEntity(false) { this->paths.push_back(path); }
 
-    ExtrusionMultiEntity& operator=(const ExtrusionMultiEntity &rhs) { this->paths = rhs.paths; return *this; }
-    ExtrusionMultiEntity& operator=(ExtrusionMultiEntity &&rhs) { this->paths = std::move(rhs.paths); return *this; }
+    ExtrusionMultiEntity &operator=(const ExtrusionMultiEntity &rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = rhs.paths;
+        return *this;
+    }
+    ExtrusionMultiEntity &operator=(ExtrusionMultiEntity &&rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = std::move(rhs.paths);
+        return *this;
+    }
 
     bool is_loop() const override { return false; }
     virtual const Point& first_point() const override { return this->paths.front().polyline.front(); }
@@ -382,8 +423,9 @@ public:
     ArcPolyline as_polyline() const override {
         ArcPolyline out;
         if (!paths.empty()) {
-            for (const ExtrusionPath& path : paths) {
-                out.append(path.as_polyline());
+            out = paths.front().as_polyline();
+            for (size_t i = 1; i < paths.size(); ++i) {
+                out.append(paths[i].as_polyline());
             }
         }
         return out;
@@ -401,6 +443,7 @@ public:
 };
 
 // Single continuous extrusion path, possibly with varying extrusion thickness, extrusion height or bridging / non bridging.
+// it's like an unsortable collection of only unreversable ExtrusionPaths
 class ExtrusionMultiPath : public ExtrusionMultiEntity<ExtrusionPath> {
 public:
 
@@ -410,8 +453,16 @@ public:
     ExtrusionMultiPath(const ExtrusionPaths &paths) : ExtrusionMultiEntity(paths) {};
     ExtrusionMultiPath(const ExtrusionPath &path) :ExtrusionMultiEntity(path) {}
 
-    ExtrusionMultiPath& operator=(const ExtrusionMultiPath& rhs) { this->paths = rhs.paths; return *this; }
-    ExtrusionMultiPath& operator=(ExtrusionMultiPath&& rhs) { this->paths = std::move(rhs.paths); return *this; }
+    ExtrusionMultiPath &operator=(const ExtrusionMultiPath &rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = rhs.paths;
+        return *this;
+    }
+    ExtrusionMultiPath &operator=(ExtrusionMultiPath &&rhs) {
+        this->m_can_reverse = rhs.m_can_reverse;
+        this->paths = std::move(rhs.paths);
+        return *this;
+    }
 
     void set_can_reverse(bool can_reverse) { m_can_reverse = can_reverse; }
 
@@ -477,8 +528,8 @@ public:
     // Create a new object, initialize it with this object using the move semantics.
     virtual ExtrusionEntity* clone_move() override { return new ExtrusionLoop(std::move(*this)); }
     double          area() const;
-    bool            is_counter_clockwise() const { return this->area() > 0; }
-    bool            is_clockwise() const { return this->area() < 0; }
+    bool            is_counter_clockwise() const;
+    bool            is_clockwise() const;
     // Used by PerimeterGenerator to reorient extrusion loops. (old make_clockwise() and make_counter_clockwise())
     void            reverse() override;
     const Point&    first_point() const override { return this->paths.front().polyline.front(); }
@@ -641,6 +692,7 @@ struct HasThisRoleVisitor : public HasRoleVisitor{
 class ConfigOptionFloatOrPercent;
 class SimplifyVisitor : public ExtrusionVisitor{
     ArcFittingType                    m_use_arc_fitting;
+    bool                              m_ignore_holes;
     coordf_t                          m_scaled_resolution;
     const ConfigOptionFloatOrPercent* m_arc_fitting_tolearance;
     // when an entity is too small, this is set to true do the collection that is higher in the stack can merge & delete.
@@ -648,11 +700,11 @@ class SimplifyVisitor : public ExtrusionVisitor{
     bool                              m_last_deleted = false;
 public:
     using ExtrusionVisitor::use;
-    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance)
-        : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance)
+    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, bool ignore_holes, const ConfigOptionFloatOrPercent *arc_fitting_tolearance)
+        : m_scaled_resolution(scaled_resolution), m_ignore_holes(ignore_holes), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance)
     {}
-    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, const ConfigOptionFloatOrPercent *arc_fitting_tolearance, coord_t min_path_size)
-        : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance), m_min_path_size(min_path_size)
+    SimplifyVisitor(coordf_t scaled_resolution, ArcFittingType use_arc_fitting, bool ignore_holes, const ConfigOptionFloatOrPercent *arc_fitting_tolearance, coord_t min_path_size)
+        : m_scaled_resolution(scaled_resolution), m_ignore_holes(ignore_holes), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance), m_min_path_size(min_path_size)
     {}
     
     virtual void use(ExtrusionPath& path) override;
@@ -682,13 +734,17 @@ public:
 
 class ExtrusionVolume : public ExtrusionVisitorRecursiveConst {
     bool _with_gap_fill = true;
+    double _flow_ratio = 1.;
 public:
     using ExtrusionVisitorRecursiveConst::use;
     double volume = 0; //unscaled
-    ExtrusionVolume(bool with_gap_fill = true) : _with_gap_fill(with_gap_fill) {}
+    ExtrusionVolume() {}
+    void set_use_gap_fill(bool with_gap_fill = true) { _with_gap_fill = (with_gap_fill); }
+    void set_flow_mult(double mult) { _flow_ratio = (mult); }
     void use(const ExtrusionPath &path) override {
         if(path.role() == ExtrusionRole::GapFill && !_with_gap_fill) return;
-        volume += unscaled(path.length()) * path.mm3_per_mm(); }
+        volume += unscaled(path.length()) * path.mm3_per_mm() * _flow_ratio;
+    }
     void use(const ExtrusionPath3D &path3D) override { volume += unscaled(path3D.length()) * path3D.mm3_per_mm(); }
     double get(const ExtrusionEntityCollection &coll);
 };
@@ -698,8 +754,14 @@ class ExtrusionModifyFlow : public ExtrusionVisitorRecursive {
 public:
     using ExtrusionVisitorRecursive::use;
     ExtrusionModifyFlow(double flow_mult) : _flow_mult(flow_mult) {}
-    void use(ExtrusionPath &path) override { path.attributes_mutable().mm3_per_mm *= _flow_mult; path.attributes_mutable().width *= _flow_mult; }
-    void use(ExtrusionPath3D &path3D) override { path3D.attributes_mutable().mm3_per_mm *= _flow_mult; path3D.attributes_mutable().width *= _flow_mult; }
+    void use(ExtrusionPath &path) override {
+        path.attributes_mutable().mm3_per_mm *= _flow_mult;
+        path.attributes_mutable().width *= _flow_mult;
+    }
+    void use(ExtrusionPath3D &path3D) override {
+        path3D.attributes_mutable().mm3_per_mm *= _flow_mult;
+        path3D.attributes_mutable().width *= _flow_mult;
+    }
     void set(ExtrusionEntityCollection &coll);
 };
 
@@ -711,26 +773,8 @@ struct LoopAssertVisitor : public ExtrusionVisitorRecursiveConst {
     LoopAssertVisitor() : m_check_length(true) {}
     LoopAssertVisitor(bool check_length) : m_check_length(check_length) {}
     virtual void default_use(const ExtrusionEntity& entity) override {};
-    virtual void use(const ExtrusionPath &path) override {
-        release_assert(path.length() > SCALED_EPSILON);
-        for (size_t idx = 1; idx < path.size(); ++idx)
-            release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-    }
-    virtual void use(const ExtrusionLoop& loop) override {
-        for (auto it = std::next(loop.paths.begin()); it != loop.paths.end(); ++it) {
-            release_assert(std::prev(it)->polyline.back() == it->polyline.front());
-        }
-        Point last_pt = loop.last_point();
-        for (const ExtrusionPath &path : loop.paths) {
-            release_assert(path.polyline.size() >= 2);
-            release_assert(!m_check_length || path.length() > SCALED_EPSILON);
-            release_assert(path.first_point() == last_pt);
-            for (size_t idx = 1; idx < path.size(); ++idx)
-                release_assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-            last_pt = path.last_point();
-        }
-        release_assert(loop.paths.front().first_point() == loop.paths.back().last_point());
-    }
+    virtual void use(const ExtrusionPath &path) override;
+    virtual void use(const ExtrusionLoop& loop) override;
 };
 #define DEBUGINFO_VISIT(ENTITY,VISITOR) (ENTITY).visit(VISITOR);
 #endif

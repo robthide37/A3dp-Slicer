@@ -25,6 +25,7 @@ namespace Slic3r {
 class FillPlanePath : public Fill
 {
 public:
+    FillPlanePath() : Fill() { can_fill_surface_single = true; }
     ~FillPlanePath() override = default;
 
 protected:
@@ -59,7 +60,7 @@ protected:
         double          m_scale_out;
     };
 
-    virtual void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double resolution, InfillPolylineOutput &output) const = 0;
+    virtual void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const coordf_t resolution, InfillPolylineOutput &output) const = 0;
 };
 
 class FillArchimedeanChords : public FillPlanePath
@@ -70,7 +71,7 @@ public:
 
 protected:
     bool centered() const override { return true; }
-    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double resolution, InfillPolylineOutput &output) const override;
+    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const coordf_t resolution, InfillPolylineOutput &output) const override;
 };
 
 class FillHilbertCurve : public FillPlanePath
@@ -81,7 +82,7 @@ public:
 
 protected:
     bool centered() const override { return false; }
-    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double resolution, InfillPolylineOutput &output) const override;
+    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const coordf_t resolution, InfillPolylineOutput &output) const override;
 };
 
 class FillOctagramSpiral : public FillPlanePath
@@ -92,7 +93,7 @@ public:
 
 protected:
     bool centered() const override { return true; }
-    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const double resolution, InfillPolylineOutput &output) const override;
+    void generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y, const coordf_t resolution, InfillPolylineOutput &output) const override;
 };
 
 } // namespace Slic3r

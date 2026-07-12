@@ -3,7 +3,6 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
-// #include "Jobs/ArrangeJob2.hpp"
 #include "GLCanvas3D.hpp"
 #include "GUI.hpp"
 #include "GUI_ObjectList.hpp"
@@ -12,8 +11,9 @@
 #include <wx/scrolwin.h>
 #include <wx/display.h>
 #include <wx/file.h>
+#include <wx/wupdlock.h>
 #include "wxExtensions.hpp"
-
+#include "Jobs/ArrangeJob2.hpp"
 #if ENABLE_SCROLLABLE
 static wxSize get_screen_size(wxWindow* window)
 {
@@ -28,16 +28,17 @@ namespace GUI {
 
 void CalibrationOverBridgeDialog::create_buttons(wxStdDialogButtonSizer* buttons){
     wxButton* bt1 = new wxButton(this, wxID_FILE1, _L("'Above the Bridges' flow calibration"));
-    wxButton* bt2 = new wxButton(this, wxID_FILE1, _L("'Top Fill' flow calibration"));
+    wxButton* bt2 = new wxButton(this, wxID_FILE2, _L("'Top Fill' flow calibration"));
     bt1->Bind(wxEVT_BUTTON, &CalibrationOverBridgeDialog::create_geometry1, this);
     bt2->Bind(wxEVT_BUTTON, &CalibrationOverBridgeDialog::create_geometry2, this);
     buttons->Add(bt1);
+    buttons->AddSpacer(20);
     buttons->Add(bt2);
 }
 
 void CalibrationOverBridgeDialog::create_geometry1(wxCommandEvent& event_args) {
     Plater* plat = this->main_frame->plater();
-    if (!plat->new_project(L("'Above the Bridges flow calibration")))
+    if (!plat->new_project(L("Above the Bridges flow calibration")))
         return;
     create_geometry(true);
 }
@@ -48,10 +49,13 @@ void CalibrationOverBridgeDialog::create_geometry2(wxCommandEvent& event_args) {
     create_geometry(false);
 }
 void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
+    // wait for slicing end if needed
+    wxGetApp().Yield();
+
     Plater* plat = this->main_frame->plater();
     Model& model = plat->model();
 
-    //GLCanvas3D::set_warning_freeze(true);
+    std::unique_ptr<wxWindowUpdateLocker> freeze_gui = std::make_unique<wxWindowUpdateLocker>(this);
     bool autocenter = gui_app->app_config->get("autocenter") == "1";
     if (autocenter) {
         //disable aut-ocenter for this calibration.
@@ -64,7 +68,8 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "over-bridge_tuning" / "over-bridge_flow_ratio_test.amf").string(),
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "over-bridge_tuning" / "over-bridge_flow_ratio_test.amf").string(),
             (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "over-bridge_tuning" / "over-bridge_flow_ratio_test.amf").string(),
-            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "over-bridge_tuning" / "over-bridge_flow_ratio_test.amf").string()}, true, false, false, false);
+            (boost::filesystem::path(Slic3r::resources_dir()) / "calibration" / "over-bridge_tuning" / "over-bridge_flow_ratio_test.amf").string()},
+        LoadFileOption::LoadModel | LoadFileOption::DontUpdateDirs);
 
     assert(objs_idx.size() == 6);
     const DynamicPrintConfig* print_config = this->gui_app->get_tab(Preset::TYPE_FFF_PRINT)->get_config();
@@ -83,7 +88,7 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     }
     for (size_t i = 0; i < 6; i++)
         model.objects[objs_idx[i]]->scale(xyz_scale * 1.5f, xyz_scale * 1.5f, xyz_scale);
-    
+
     // it's rotated but not around the good origin: correct that
     double init_z_rotate_angle = Geometry::deg2rad(plat->config()->opt_float("init_z_rotate"));
     Matrix3d rot_matrix = Eigen::Quaterniond(Eigen::AngleAxisd(init_z_rotate_angle, Vec3d{0,0,1})).toRotationMatrix();
@@ -105,25 +110,9 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     }
 
     /// --- translate ---;
-    bool has_to_arrange = init_z_rotate_angle != 0;
-    const ConfigOptionFloat* extruder_clearance_radius = print_config->option<ConfigOptionFloat>("extruder_clearance_radius");
-    const ConfigOptionPoints* bed_shape = printer_config->option<ConfigOptionPoints>("bed_shape");
+    bool has_to_arrange = true;
     const float brim_width = print_config->option<ConfigOptionFloat>("brim_width")->get_float();
     const float skirt_width = print_config->option("skirts")->get_int() == 0 ? 0 : print_config->option("skirt_distance")->get_float() + print_config->option("skirts")->get_int() * nozzle_diameter * 2;
-    Vec2d bed_size = BoundingBoxf(bed_shape->get_values()).size();
-    Vec2d bed_min = BoundingBoxf(bed_shape->get_values()).min;
-    float offsetx = 3 + 30 * xyz_scale + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
-    float offsety = 3 + 25 * xyz_scale + extruder_clearance_radius->value + brim_width + (brim_width > extruder_clearance_radius->value ? brim_width - extruder_clearance_radius->value : 0);
-    model.objects[objs_idx[0]]->translate({ bed_min.x() + bed_size.x() / 2 - offsetx / 2, bed_min.y() + bed_size.y() / 2 - offsety, (nozzle_diameter / 0.4) });
-    model.objects[objs_idx[1]]->translate({ bed_min.x() + bed_size.x() / 2 - offsetx / 2, bed_min.y() + bed_size.y() / 2          , (nozzle_diameter / 0.4) });
-    model.objects[objs_idx[2]]->translate({ bed_min.x() + bed_size.x() / 2 - offsetx / 2, bed_min.y() + bed_size.y() / 2 + offsety, (nozzle_diameter / 0.4) });
-    model.objects[objs_idx[3]]->translate({ bed_min.x() + bed_size.x() / 2 + offsetx / 2, bed_min.y() + bed_size.y() / 2 - offsety, (nozzle_diameter / 0.4) });
-    model.objects[objs_idx[4]]->translate({ bed_min.x() + bed_size.x() / 2 + offsetx / 2, bed_min.y() + bed_size.y() / 2          , (nozzle_diameter / 0.4) });
-    model.objects[objs_idx[5]]->translate({ bed_min.x() + bed_size.x() / 2 + offsetx / 2, bed_min.y() + bed_size.y() / 2 + offsety, (nozzle_diameter / 0.4) });
-
-    // if not enough space, forget about complete_objects
-    if (bed_size.y() < offsety * 2 + 30 * xyz_scale + brim_width * 2 + skirt_width * 2 + 5 || bed_size.x() < offsetx + 35 * xyz_scale + brim_width * 2 + skirt_width * 2 + 5)
-        has_to_arrange = true;
 
     /// --- main config, please modify object config when possible ---
     DynamicPrintConfig new_print_config = *print_config; //make a copy
@@ -136,17 +125,18 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     /// --- custom config ---
     for (size_t i = 0; i < 6; i++) {
         model.objects[objs_idx[i]]->config.set_key_value("perimeters", new ConfigOptionInt(2));
-        model.objects[objs_idx[i]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(0));
+        model.objects[objs_idx[i]]->config.set_key_value("bottom_solid_layers", new ConfigOptionInt(1)); // at least the first, to prevent adhesion issues.
         model.objects[objs_idx[i]]->config.set_key_value("top_solid_layers", new ConfigOptionInt(3));
         model.objects[objs_idx[i]]->config.set_key_value("fill_density", new ConfigOptionPercent(5.5));
         model.objects[objs_idx[i]]->config.set_key_value("fill_pattern", new ConfigOptionEnum<InfillPattern>(ipRectilinear));
         model.objects[objs_idx[i]]->config.set_key_value("infill_dense", new ConfigOptionBool(false));
         model.objects[objs_idx[i]]->config.set_key_value("ironing", new ConfigOptionBool(false));
         //calibration setting. Use 100 & 5 step as it's the numbers printed on the samples
-        if(over_bridge)
+        if (over_bridge) {
             model.objects[objs_idx[i]]->config.set_key_value("over_bridge_flow_ratio", new ConfigOptionPercent(/*print_config->option<ConfigOptionPercent>("over_bridge_flow_ratio")->get_abs_value(100)*/100 + i * 5));
-        else
+        } else {
             model.objects[objs_idx[i]]->config.set_key_value("fill_top_flow_ratio", new ConfigOptionPercent(/*print_config->option<ConfigOptionPercent>("fill_top_flow_ratio")->get_abs_value(100)*/100 + i * 5));
+        }
         model.objects[objs_idx[i]]->config.set_key_value("layer_height", new ConfigOptionFloat(nozzle_diameter / 2));
         model.objects[objs_idx[i]]->config.set_key_value("external_infill_margin", new ConfigOptionFloatOrPercent(400,true));
         model.objects[objs_idx[i]]->config.set_key_value("top_fill_pattern", new ConfigOptionEnum<InfillPattern>(ipSmooth));
@@ -161,18 +151,15 @@ void CalibrationOverBridgeDialog::create_geometry(bool over_bridge) {
     //update everything, easier to code.
     ObjectList* obj = this->gui_app->obj_list();
     obj->update_after_undo_redo();
-
+    freeze_gui.reset();
     // arrange if needed, after new settings, to take them into account
     if (has_to_arrange) {
         //update print config (done at reslice but we need it here)
         if (plat->printer_technology() == ptFFF)
-            plat->fff_print().apply(plat->model(), *plat->config());
-        plat->arrange();
-        // std::shared_ptr<ProgressIndicatorStub> fake_statusbar = std::make_shared<ProgressIndicatorStub>();
-        // ArrangeJob arranger(std::dynamic_pointer_cast<ProgressIndicator>(fake_statusbar), plat);
-        // arranger.prepare_all();
-        // arranger.process();
-        // arranger.finalize();
+            plat->active_fff_print().apply(plat->model(), *plat->config());
+        Worker &ui_job_worker = plat->get_ui_job_worker();
+        plat->arrange(ui_job_worker, ArrangeSelectionMode::CurrentBedFull);
+        ui_job_worker.wait_for_current_job(20000);
     }
 
     plat->reslice();

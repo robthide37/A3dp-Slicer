@@ -21,10 +21,13 @@ std::string get_downloads_path_mac();
 
 struct DownloadAppData
 {
-	std::string				url;
-	bool					start_after;
-	std::optional<Semver> version;
-	size_t				    size;
+    std::string             url;
+    std::string             asset_url;
+    std::string             asset_name;
+    bool                    start_after;
+    bool                    replace_current;
+    std::optional<Semver>   version;
+    size_t                  size;
 	boost::filesystem::path target_path;
 };
 
@@ -64,7 +67,9 @@ private:
 wxDECLARE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
 wxDECLARE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
 wxDECLARE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS, wxCommandEvent);
+wxDECLARE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_NAME, wxCommandEvent);
 wxDECLARE_EVENT(EVT_SLIC3R_APP_DOWNLOAD_FAILED, wxCommandEvent);
 wxDECLARE_EVENT(EVT_SLIC3R_APP_OPEN_FAILED, wxCommandEvent);
+wxDECLARE_EVENT(EVT_SLIC3R_APP_REPLACE_SUCCESS, wxCommandEvent);
 } //namespace Slic3r 
 #endif

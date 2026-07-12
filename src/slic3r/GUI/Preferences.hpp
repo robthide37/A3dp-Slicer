@@ -27,12 +27,6 @@ class wxRadioButton;
 
 namespace Slic3r {
 
-	enum  NotifyReleaseMode {
-		NotifyReleaseAll,
-		NotifyReleaseOnly,
-		NotifyReleaseNone
-	};
-
 namespace GUI {
 
 class ConfigOptionsGroup;
@@ -59,7 +53,7 @@ class PreferencesDialog : public DPIDialog
 	// to retreive the group to get the field, or request a refresh
 	std::map<std::string, std::shared_ptr<ConfigOptionsGroup>> m_optkey_to_optgroup;
 
-    ConfigOptionDef def_combobox_auto_switch_preview; //is this useful here?
+    //ConfigOptionDef def_combobox_auto_switch_preview; //is this useful here?
 	wxSizer*                            m_icon_size_sizer {nullptr};
 	wxSlider*							m_icon_size_slider {nullptr};
 	wxRadioButton*						m_rb_old_settings_layout_mode {nullptr};
@@ -118,13 +112,13 @@ protected:
 	std::vector<ConfigOptionsGroup*> optgroups();
 
 	void append_bool_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
-								const std::string& opt_key,
+								const t_config_option_key& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
 								bool def_val,
 								ConfigOptionMode mode = ConfigOptionMode::comNone);
 	void append_int_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
-								const std::string& opt_key,
+								const t_config_option_key& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
 								int option_width,
@@ -134,14 +128,14 @@ protected:
 								int32_t max = std::numeric_limits<int32_t>::max());
 	
 	void append_color_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
-								const std::string& opt_key,
+								const t_config_option_key& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
 								std::string color_str,
 								ConfigOptionMode mode = ConfigOptionMode::comNone);
 	template<typename EnumType>
 	void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
-								const std::string& opt_key,
+								const t_config_option_key& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
 								ConfigOption* def_val,

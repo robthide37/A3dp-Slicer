@@ -9,6 +9,12 @@
 
 namespace Slic3r {
 
+int GCodeFormatter::quantize_int(double v, size_t ndigits) const {
+    if (ndigits == size_t(-1)) {
+        ndigits = m_gcode_precision_xyz;
+    }
+    return int(std::round(v * pow_10[ndigits]));
+}
 
 bool GCodeFormatter::emit_xy(const Vec2d &point, std::string &old_x, std::string &old_y)
 {
@@ -23,8 +29,18 @@ bool GCodeFormatter::emit_xy(const Vec2d &point, std::string &old_x, std::string
     return !same_point;
 }
 
+bool GCodeFormatter::emit_z(const double pt_z, std::string &old_z)
+{
+    char* start_digit = this->emit_axis('Z', pt_z, m_gcode_precision_xyz);
+    std::string z_str = std::string(start_digit, this->ptr_err.ptr);
+    bool same_point = (z_str == old_z);
+    // update str
+    old_z = z_str;
+    return !same_point;
+}
+
 // return the de that isn't emmited as it's truncated
-double GCodeFormatter::emit_e(const std::string_view axis, double v)
+void GCodeFormatter::emit_e(const std::string_view axis, double v)
 {
     if (!axis.empty()) {
         // not gcfNoExtrusion
@@ -32,10 +48,11 @@ double GCodeFormatter::emit_e(const std::string_view axis, double v)
 #ifdef _DEBUG
         double written_e = atof(std::string(start_digit, this->ptr_err.ptr).c_str());
         assert(std::abs(v - written_e) < 0.000002);  // shoulde be already taken into account by m_tool->extrude
-        return v - written_e;
+        double delta_return = v - written_e;
+        if((delta_return < 0.00000001) & (delta_return > -0.00000001)) delta_return = 0;
+        assert(delta_return == 0 ); // should be already taken into account by tool->extrude
 #endif
     }
-    return 0;
 }
 
 char* GCodeFormatter::emit_axis(const char axis, const double value, size_t digits) {

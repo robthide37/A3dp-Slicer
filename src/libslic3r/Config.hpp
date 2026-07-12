@@ -22,21 +22,21 @@
 #ifndef slic3r_Config_hpp_
 #define slic3r_Config_hpp_
 
-#include <assert.h>
-#include <map>
+#include <cassert>
+#include <cfloat>
 #include <climits>
-#include <limits>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
+#include <limits>
 #include <iostream>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <vector>
-#include <float.h>
 #include "libslic3r.h"
 #include "clonable_ptr.hpp"
 #include "Exception.hpp"
@@ -126,18 +126,31 @@ namespace Slic3r {
 
     struct GraphSettings
     {
+        // title to the graph window
         std::string title;
+        // a text written in the graph window, to explain how to use it for hte specified setting
         std::string description;
+        // label displayed on the left of the y axis (rotated)
         std::string y_label;
+        // label displayed below the x axis
         std::string x_label;
+        // what's displayed instead of the graph when there is no points
         std::string null_label;
+        // default values for min & max x, it's enforced if label_min_x & label_max_x are empty
         double min_x, max_x, step_x;
+        // default values for min & max y, it's enforced if label_min_y & label_max_y are empty
         double min_y, max_y, step_y;
+        // label for the box that allow to change the min x (hidden if empty)
         std::string label_min_x;
+        // label for the box that allow to change the max x (hidden if empty)
         std::string label_max_x;
+        // label for the box that allow to change the min y (hidden if empty)
         std::string label_min_y;
+        // label for the box that allow to change the max y (hidden if empty)
         std::string label_max_y;
+        // the kinds of graph types allowed. the button that allow toc hange them is hidden if only one is available.
         std::vector<GraphData::GraphType> allowed_types;
+        // the values when you click on the "reset" button (dynamically set to the current data stored in the setting)
         GraphData reset_vals;
     };
 }
@@ -187,6 +200,52 @@ namespace Slic3r {
 // Name of the configuration option.
 typedef std::string                 t_config_option_key;
 typedef std::vector<std::string>    t_config_option_keys;
+
+// Name of the configuration option.+ the idx of the element used (if only an elemnt is needed)
+// idx is -1 if it's not a vector, or if the whole vector is used.
+struct OptionKeyIdx
+{
+#ifdef __APPLE__
+    // apple 'set<X> t2 = t1' needs the assignment operator, that needs to have no const data
+    t_config_option_key key;
+    int32_t idx;
+#else
+    const t_config_option_key key;
+    // idx, -1 if the option is a scalar or it's for the whole vector and not a specific item
+    const int32_t idx;
+#endif
+
+    //C++20
+#if __cplusplus >= 202002L
+    auto operator<=>(const OptionKeyIdx&) const = default;
+#else
+    auto tie() const { return std::tie(key,idx); }
+    bool operator==(const OptionKeyIdx &other) const { return idx == other.idx && key == other.key; }
+    bool operator<(const OptionKeyIdx& other) const { return tie() < other.tie(); }
+#endif
+    static inline OptionKeyIdx scalar(const t_config_option_key &key) {
+        return OptionKeyIdx{key, -1};
+    }
+};
+// hash for unordered_map
+//inline void hash_combine(std::size_t& seed) { }
+//template <typename T, typename... Rest>
+//inline void hash_combine(size_t& seed, const T& v, Rest... rest)
+//{
+//    seed ^= ::qHash(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+//    (hashCombine(seed, rest), ...);
+//}
+//namespace std {
+//template<> struct hash<OptionKeyIdx>
+//{
+//    std::size_t operator()(const OptionKeyIdx &t) const {
+//        std::size_t ret = 0;
+//        hash_combine(ret, __VA_ARGS__);
+//        return ret;
+//    }
+//};
+//}
+//typedef std::string                 t_config_option_key_id;
 
 extern std::string  escape_string_cstyle(const std::string &str);
 extern std::string  escape_strings_cstyle(const std::vector<std::string> &strs);
@@ -429,6 +488,9 @@ inline PrinterTechnology operator&=(PrinterTechnology& a, PrinterTechnology b) {
     a = a & b; return a;
 }
 
+PrinterTechnology parse_printer_technology(const std::string &);
+std::string to_string(PrinterTechnology);
+
 // defined here isntead of PrintConfig to be more visible.
 enum OutputFormat : uint16_t {
     ofUnknown = 0,
@@ -536,7 +598,9 @@ public:
     virtual bool                deserialize(const std::string &str, bool append = false) = 0;
     virtual ConfigOption*       clone() const = 0;
     // Set a value from a ConfigOption. The two options should be compatible.
-    virtual void                set(const ConfigOption *option, int32_t idx = -1) = 0;
+    virtual void                set(const ConfigOption &option, int32_t idx = -1) = 0;
+    // DEPRECATED: please use set()
+    ConfigOption&               operator=(const ConfigOption *opt) { this->set(*opt); return *this; }
     // Getters, idx is ignored if it's a scalar value.
     virtual int32_t             get_int(size_t idx = 0)        const { throw BadOptionTypeException("Calling ConfigOption::get_int on a non-int ConfigOption"); }
     virtual double              get_float(size_t idx = 0)      const { throw BadOptionTypeException("Calling ConfigOption::get_float on a non-float ConfigOption"); }
@@ -557,12 +621,13 @@ public:
         return this;
     }
     // Like FCO_EXTRUDER_ARRAY that is a copy of the def, this is the copy of the def to replicate is_nullable()
-    bool                        can_be_disabled()		const { return (flags & FCO_CAN_DISABLED) != 0; }
+    bool                        can_be_disabled() const { return (flags & FCO_CAN_DISABLED) != 0; }
     // should only be set by configdef when a new item is requested. It also set it as disabled if you set the arg to true.
     ConfigOption*               set_can_be_disabled(bool force_disabled = false) { this->flags |= FCO_CAN_DISABLED; if(force_disabled) set_enabled(false); return this; }
 
     virtual bool                operator==(const ConfigOption &rhs) const = 0;
     bool                        operator!=(const ConfigOption &rhs) const { return ! (*this == rhs); }
+    virtual bool                operator<(const ConfigOption &rhs) const = 0;
     virtual size_t              hash()          const throw() = 0;
     bool                        is_scalar()     const { return (int(this->type()) & int(coVectorType)) == 0; }
     bool                        is_vector()     const { return ! this->is_scalar(); }
@@ -604,13 +669,13 @@ public:
     void       set_any(boost::any anyval, int32_t idx = -1) override { value = boost::any_cast<T>(anyval); }
     size_t     size() const override { return 1; }
     
-    void set(const ConfigOption *rhs, int32_t idx = -1) override
+    void set(const ConfigOption &rhs, int32_t idx = -1) override
     {
-        if (rhs->type() != this->type())
+        if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Assigning an incompatible type");
-        assert(dynamic_cast<const ConfigOptionSingle*>(rhs));
-        this->value = static_cast<const ConfigOptionSingle*>(rhs)->value;
-        this->flags = rhs->flags;
+        assert(dynamic_cast<const ConfigOptionSingle*>(&rhs));
+        this->value = static_cast<const ConfigOptionSingle&>(rhs).value;
+        this->flags = rhs.flags;
     }
 
     bool operator==(const ConfigOption &rhs) const override
@@ -623,6 +688,16 @@ public:
             && this->is_enabled() == rhs.is_enabled()
             && this->is_phony() == rhs.is_phony();
         // should compare all flags?
+    }
+
+    bool operator<(const ConfigOption &rhs) const override {
+        if (rhs.type() != this->type()) {
+            throw ConfigurationError("ConfigOptionSingle: Comparing incompatible types");
+        }
+        assert(dynamic_cast<const ConfigOptionSingle<T> *>(&rhs));
+        return this->is_enabled() < rhs.is_enabled() ||
+            (this->is_enabled() == rhs.is_enabled() &&
+             this->value < static_cast<const ConfigOptionSingle<T> *>(&rhs)->value);
     }
 
     bool operator==(const T &rhs) const throw() { return this->value == rhs; }
@@ -688,7 +763,7 @@ public:
     virtual void set(const std::vector<const ConfigOption*> &rhs) = 0;
     // Set a single vector item from either a scalar option or the first value of a vector option.vector of ConfigOptions. 
     // This function is useful to split values from multiple extrder / filament settings into separate configurations.
-    virtual void set_at(const ConfigOption *rhs, size_t i, size_t j) = 0;
+    virtual void set_at(const ConfigOption &rhs, size_t i, size_t j) = 0;
     // Resize the vector of values, copy the newly added values from opt_default if provided.
     virtual void resize(size_t n, const ConfigOption *opt_default = nullptr) = 0;
     // Clear the values vector.
@@ -719,12 +794,12 @@ public:
     {
         return this->m_enabled == rhs.m_enabled;
     }
+
     ConfigOption *set_enabled(bool enabled, int32_t idx = -1) override
     {
         assert (m_enabled.size() == size());
         // reset evrything, use the default.
         if (idx < 0) {
-            assert(!enabled);
             for(size_t i=0; i<this->m_enabled.size(); ++i)
                 this->m_enabled[i] = enabled;
             ConfigOption::set_enabled(enabled);
@@ -799,19 +874,19 @@ public:
 
     const std::vector<T> &get_values() const { return m_values; }
 
-    void set(const ConfigOption *rhs, int32_t idx = -1) override
+    void set(const ConfigOption &rhs, int32_t idx = -1) override
     {
-        if (rhs->type() != this->type())
+        if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionVector: Assigning an incompatible type");
-        assert(dynamic_cast<const ConfigOptionVector<T>*>(rhs));
+        assert(dynamic_cast<const ConfigOptionVector<T>*>(&rhs));
         assert(idx < int32_t(size()));
         if (idx < 0) {
-            this->m_values = static_cast<const ConfigOptionVector<T>*>(rhs)->m_values;
-            this->m_enabled = static_cast<const ConfigOptionVector<T>*>(rhs)->m_enabled;
+            this->m_values = static_cast<const ConfigOptionVector<T>&>(rhs).m_values;
+            this->m_enabled = static_cast<const ConfigOptionVector<T>&>(rhs).m_enabled;
         } else {
             this->set_at(rhs, idx, idx);
         }
-        this->flags = rhs->flags;
+        this->flags = rhs.flags;
         assert (m_enabled.size() == this->m_values.size());
     }
 
@@ -863,7 +938,7 @@ public:
 
     // Set a single vector item from either a scalar option or the first value of a vector option.vector of ConfigOptions. 
     // This function is useful to split values from multiple extrder / filament settings into separate configurations.
-    void set_at(const ConfigOption *rhs, size_t i, size_t j) override
+    void set_at(const ConfigOption &rhs, size_t i, size_t j) override
     {
         // Fill with default value up to the needed position
         if (this->m_values.size() <= i) {
@@ -871,18 +946,18 @@ public:
             this->m_values.resize(i + 1, this->default_value);
             this->m_enabled.resize(i + 1, ConfigOption::is_enabled());
         }
-        if (rhs->type() == this->type()) {
+        if (rhs.type() == this->type()) {
             // Assign the first value of the rhs vector.
-            auto other = static_cast<const ConfigOptionVector<T>*>(rhs);
-            if (other->empty())
+            const ConfigOptionVector<T> &other = static_cast<const ConfigOptionVector<T>&>(rhs);
+            if (other.empty())
                 throw ConfigurationError("ConfigOptionVector::set_at(): Assigning from an empty vector");
-            this->m_values[i] = other->get_at(j);
-            this->m_enabled[i] = other->is_enabled(j);
-            ConfigOption::set_enabled(other->is_enabled(-1));
-        } else if (rhs->type() == this->scalar_type()) {
-            auto other = static_cast<const ConfigOptionSingle<T>*>(rhs);
-            this->m_values[i] = other->value;
-            this->m_enabled[i] = other->is_enabled();
+            this->m_values[i] = other.get_at(j);
+            this->m_enabled[i] = other.is_enabled(j);
+            ConfigOption::set_enabled(other.is_enabled(-1));
+        } else if (rhs.type() == this->scalar_type()) {
+            const ConfigOptionSingle<T> &other = static_cast<const ConfigOptionSingle<T>&>(rhs);
+            this->m_values[i] = other.value;
+            this->m_enabled[i] = other.is_enabled();
             set_default_enabled();
         }
         else
@@ -940,14 +1015,23 @@ public:
             this->m_enabled.erase(this->m_enabled.begin() + n, this->m_enabled.end());
         } else if (n > this->m_values.size()) {
             if (this->m_values.empty()) {
-                if (opt_default == nullptr)
-                    this->m_values.resize(n, this->default_value);
-                else if (opt_default->type() != this->type())
-                    throw ConfigurationError("ConfigOptionVector::resize(): Extending with an incompatible type.");
-                else if(auto other = static_cast<const ConfigOptionVector<T>*>(opt_default); other->m_values.empty())
-                    this->m_values.resize(n, other->default_value);
-                else
-                    this->m_values.resize(n, other->get_at(0));
+                if (opt_default == nullptr) {
+                    if (this->m_values.size() == 0) {
+                        this->m_values.resize(n, this->default_value);
+                    } else {
+                        this->m_values.resize(n, this->m_values.front());
+                    }
+                } else {
+                    if (opt_default->type() != this->type()) {
+                        throw ConfigurationError(
+                            "ConfigOptionVector::resize(): Extending with an incompatible type.");
+                    } else if (auto other = static_cast<const ConfigOptionVector<T> *>(opt_default);
+                               other->m_values.empty()) {
+                        this->m_values.resize(n, other->default_value);
+                    } else {
+                        this->m_values.resize(n, other->get_at(0));
+                    }
+                }
             } else {
                 // Resize by duplicating the first value.
                 this->m_values.resize(n, this->get_at(0));
@@ -991,6 +1075,17 @@ public:
         assert(dynamic_cast<const ConfigOptionVector<T>*>(&rhs));
         return this->has_same_enabled(*static_cast<const ConfigOptionVector<T> *>(&rhs)) &&
                this->m_values == static_cast<const ConfigOptionVector<T> *>(&rhs)->m_values;
+    }
+
+    bool operator<(const ConfigOption &rhs) const override {
+        if (rhs.type() != this->type()) {
+            throw ConfigurationError("ConfigOptionVector: Comparing incompatible types");
+        }
+        assert(dynamic_cast<const ConfigOptionVector<T> *>(&rhs));
+        return this->m_values < static_cast<const ConfigOptionVector<T> *>(&rhs)->m_values ||
+            (this->m_values == static_cast<const ConfigOptionVector<T> *>(&rhs)->m_values &&
+             this->m_enabled < static_cast<const ConfigOptionVector<T> *>(&rhs)->m_enabled);
+        // should compare all flags?
     }
 
     bool operator==(const std::vector<T> &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->m_values == rhs; }
@@ -1038,8 +1133,8 @@ public:
         //if (this->nullable())
         //	throw ConfigurationError("Cannot override a nullable ConfigOption.");
         if (rhs->type() != this->type())
-			throw ConfigurationError("ConfigOptionVector.apply_override() applied to different types.");
-		auto rhs_vec = static_cast<const ConfigOptionVector<T>*>(rhs);
+            throw ConfigurationError("ConfigOptionVector.apply_override() applied to different types.");
+        auto rhs_vec = static_cast<const ConfigOptionVector<T> *>(rhs);
         assert(this->size() == rhs_vec->size());
         bool modified = false;
         if (idx >= 0 && idx < this->size()) {
@@ -1068,12 +1163,15 @@ public:
                 }
             }
         }
-    	return modified;
+        return modified;
     }
 
 private:
-	friend class cereal::access;
-	template<class Archive> void serialize(Archive & ar) { ar(this->m_values); ar(cereal::base_class<ConfigOptionVectorBase>(this)); }
+    friend class cereal::access;
+    template<class Archive> void serialize(Archive &ar) {
+        ar(this->m_values);
+        ar(cereal::base_class<ConfigOptionVectorBase>(this));
+    }
 };
 
 class ConfigOptionFloat : public ConfigOptionSingle<double>
@@ -1118,12 +1216,6 @@ public:
         return !iss.fail();
     }
 
-    ConfigOptionFloat& operator=(const ConfigOption *opt)
-    {   
-        this->set(opt);
-        return *this;
-    }
-
 private:
 	friend class cereal::access;
     template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double>>(this)); }
@@ -1145,13 +1237,6 @@ public:
     bool                    operator==(const ConfigOptionFloats &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
     bool operator<(const ConfigOptionFloats &rhs) const throw()
         { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
-    bool 					operator==(const ConfigOption &rhs) const override {
-        if (rhs.type() != this->type())
-            throw ConfigurationError("ConfigOptionFloats: Comparing incompatible types");
-        assert(dynamic_cast<const ConfigOptionVector<double>*>(&rhs));
-        return this->has_same_enabled(*static_cast<const ConfigOptionVector<double> *>(&rhs)) &&
-               this->m_values == static_cast<const ConfigOptionVector<double> *>(&rhs)->get_values();
-    }
     double                  get_float(size_t idx = 0) const override { return get_at(idx); }
 
     std::string serialize() const override
@@ -1200,13 +1285,6 @@ public:
         set_default_enabled();
         assert(this->m_values.size() == this->m_enabled.size());
         return true;
-    }
-
-    ConfigOptionFloats& operator=(const ConfigOption *opt)
-    {   
-        this->set(opt);
-        assert(this->m_values.size() == this->m_enabled.size());
-        return *this;
     }
 
 protected:
@@ -1270,12 +1348,6 @@ public:
         return !iss.fail();
     }
 
-    ConfigOptionInt& operator=(const ConfigOption *opt)
-    {   
-        this->set(opt);
-        return *this;
-    }
-
 private:
 	friend class cereal::access;
     template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int32_t>>(this)); }
@@ -1294,7 +1366,6 @@ public:
     static ConfigOptionType static_type() { return coInts; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionInts(*this); }
-    ConfigOptionInts&  operator= (const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionInts &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
     bool                    operator< (const ConfigOptionInts &rhs) const throw() { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
     int32_t                 get_int(size_t idx = 0) const override { return get_at(idx); }
@@ -1369,7 +1440,6 @@ public:
     static ConfigOptionType static_type() { return coString; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionString(*this); }
-    ConfigOptionString&     operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionString &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                    operator< (const ConfigOptionString &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     bool 					empty() const { return this->value.empty(); }
@@ -1400,11 +1470,10 @@ private:
 class ConfigOptionStringVersion : public ConfigOptionString
 {
 public:
-    ConfigOptionStringVersion() : ConfigOptionString(std::string{}) {}
-    explicit ConfigOptionStringVersion(std::string value) : ConfigOptionString(std::move(value)) {}
+    ConfigOptionStringVersion() : ConfigOptionString(std::string{}) { this->set_phony(false); }
+    explicit ConfigOptionStringVersion(std::string value) : ConfigOptionString(std::move(value)) { this->set_phony(false); }
     ConfigOption*           clone() const override { return new ConfigOptionStringVersion(*this); }
-    ConfigOptionStringVersion&     operator=(const ConfigOption *opt) { this->set(opt); return *this; }
-    
+
     std::string serialize() const override
     {
         return escape_string_cstyle(std::string("SUSI_") + SLIC3R_VERSION_FULL); 
@@ -1425,7 +1494,6 @@ public:
     static ConfigOptionType static_type() { return coStrings; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionStrings(*this); }
-    ConfigOptionStrings&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionStrings &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
     bool                    operator< (const ConfigOptionStrings &rhs) const throw() { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
 
@@ -1476,7 +1544,6 @@ public:
     static ConfigOptionType static_type() { return coPercent; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionPercent(*this); }
-    ConfigOptionPercent&    operator= (const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionPercent &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                    operator< (const ConfigOptionPercent &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value < rhs.value); }
     
@@ -1529,7 +1596,6 @@ public:
     static ConfigOptionType static_type() { return coPercents; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionPercents(*this); }
-    ConfigOptionPercents& operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool operator==(const ConfigOptionPercents &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
     bool operator<(const ConfigOptionPercents &rhs) const throw()
         { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
@@ -1575,13 +1641,18 @@ public:
     static ConfigOptionType     static_type() { return coFloatOrPercent; }
     ConfigOptionType            type()  const override { return static_type(); }
     ConfigOption*               clone() const override { return new ConfigOptionFloatOrPercent(*this); }
-    ConfigOptionFloatOrPercent& operator=(const ConfigOption* opt) { this->set(opt); return *this; }
     bool                        operator==(const ConfigOption &rhs) const override
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionFloatOrPercent: Comparing incompatible types");
         assert(dynamic_cast<const ConfigOptionFloatOrPercent*>(&rhs));
         return *this == *static_cast<const ConfigOptionFloatOrPercent*>(&rhs);
+    }
+    bool operator<(const ConfigOption &rhs) const override {
+        if (rhs.type() != this->type())
+            throw ConfigurationError("ConfigOptionFloatOrPercent: Comparing incompatible types");
+        assert(dynamic_cast<const ConfigOptionFloatOrPercent *>(&rhs));
+        return *this < *static_cast<const ConfigOptionFloatOrPercent *>(&rhs);
     }
     bool                        operator==(const ConfigOptionFloatOrPercent &rhs) const throw()
         { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value && this->percent == rhs.percent; }
@@ -1606,11 +1677,13 @@ public:
         this->percent  = fl_or_per.percent;
     }
 
-    void set(const ConfigOption *rhs, int32_t idx = -1) override {
-        if (rhs->type() != this->type())
+    void set(const ConfigOption &rhs, int32_t idx = -1) override {
+        if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionFloatOrPercent: Assigning an incompatible type");
-        assert(dynamic_cast<const ConfigOptionFloatOrPercent*>(rhs));
-        *this = *static_cast<const ConfigOptionFloatOrPercent*>(rhs);
+        assert(dynamic_cast<const ConfigOptionSingle*>(&rhs));
+        this->value = static_cast<const ConfigOptionFloatOrPercent&>(rhs).value;
+        this->percent = static_cast<const ConfigOptionFloatOrPercent&>(rhs).percent;
+        this->flags = rhs.flags;
     }
 
     std::string serialize() const override
@@ -1661,14 +1734,6 @@ public:
     ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionFloatsOrPercents(*this); }
     bool                    operator==(const ConfigOptionFloatsOrPercents &rhs) const throw()
         { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
-    bool                    operator==(const ConfigOption &rhs) const override
-    {
-        if (rhs.type() != this->type())
-            throw ConfigurationError("ConfigOptionFloatsOrPercents: Comparing incompatible types");
-        assert(dynamic_cast<const ConfigOptionVector<FloatOrPercent> *>(&rhs));
-        return this->has_same_enabled(*static_cast<const ConfigOptionVector<FloatOrPercent> *>(&rhs)) &&
-               this->m_values == static_cast<const ConfigOptionVector<FloatOrPercent> *>(&rhs)->get_values();
-    }
     bool                    operator<(const ConfigOptionFloatsOrPercents &rhs) const throw()
         { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values < rhs.m_values); }
     double                  get_abs_value(size_t i, double ratio_over) const {
@@ -1727,12 +1792,6 @@ public:
         return true;
     }
 
-    ConfigOptionFloatsOrPercents& operator=(const ConfigOption *opt)
-    {   
-        this->set(opt);
-        return *this;
-    }
-
 protected:
     // Special "nil" value to be stored into the vector if this->supports_nil().
     static FloatOrPercent   NIL_VALUE() { return FloatOrPercent{ std::numeric_limits<double>::max(), false }; }
@@ -1764,7 +1823,6 @@ public:
     static ConfigOptionType static_type() { return coPoint; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionPoint(*this); }
-    ConfigOptionPoint&      operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionPoint &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                    operator< (const ConfigOptionPoint &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value <  rhs.value); }
 
@@ -1824,7 +1882,6 @@ public:
     static ConfigOptionType static_type() { return coPoints; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionPoints(*this); }
-    ConfigOptionPoints&     operator= (const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionPoints &rhs) const throw()
     {
         return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values;
@@ -1925,7 +1982,6 @@ public:
     static ConfigOptionType static_type() { return coPoint3; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionPoint3(*this); }
-    ConfigOptionPoint3&     operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionPoint3 &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                    operator< (const ConfigOptionPoint3 &rhs) const throw() 
     {
@@ -1977,7 +2033,6 @@ public:
     static ConfigOptionType static_type() { return coGraph; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionGraph(*this); }
-    ConfigOptionGraph&      operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionGraph &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                    operator< (const ConfigOptionGraph &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value <  rhs.value); }
     
@@ -2025,7 +2080,6 @@ public:
     static ConfigOptionType static_type() { return coGraphs; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionGraphs(*this); }
-    ConfigOptionGraphs&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionGraphs &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
     bool operator<(const ConfigOptionGraphs &rhs) const throw()
     {
@@ -2126,7 +2180,6 @@ public:
     int32_t                 get_int(size_t idx = 0) const override { return this->value ? 1 : 0; }
     double                  get_float(size_t idx = 0) const override { return this->value ? 1. : 0.; }
     ConfigOption*           clone()     const override { return new ConfigOptionBool(*this); }
-    ConfigOptionBool&       operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionBool &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() &&this->value == rhs.value; }
     bool                    operator< (const ConfigOptionBool &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && int(this->value) < int(rhs.value)); }
 
@@ -2187,7 +2240,6 @@ public:
     static ConfigOptionType static_type() { return coBools; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { assert(this->m_values.size() == this->m_enabled.size()); return new ConfigOptionBools(*this); }
-    ConfigOptionBools& operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionBools &rhs) const throw() { return this->m_enabled == rhs.m_enabled && this->m_values == rhs.m_values; }
     bool                    operator< (const ConfigOptionBools &rhs) const throw() { return this->m_enabled < rhs.m_enabled || (this->m_enabled == rhs.m_enabled && this->m_values <  rhs.m_values); }
     bool                    get_bool(size_t idx = 0) const override { return ConfigOptionVector<unsigned char>::get_at(idx) != 0; }
@@ -2284,7 +2336,6 @@ public:
     static ConfigOptionType static_type() { return coEnum; }
     ConfigOptionType        type()  const override { return static_type(); }
     ConfigOption*           clone() const override { return new ConfigOptionEnum<T>(*this); }
-    ConfigOptionEnum<T>&    operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionEnum<T> &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                    operator< (const ConfigOptionEnum<T> &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && int(this->value) < int(rhs.value)); }
     int32_t                 get_int(size_t idx = 0) const override { return int32_t(this->value); }
@@ -2301,12 +2352,20 @@ public:
         return this->is_enabled() == rhs.is_enabled() && this->value == (T)rhs.get_int();
     }
 
-    void set(const ConfigOption *rhs, int32_t idx = -1) override {
-        if (rhs->type() != this->type())
+    bool operator<(const ConfigOption &rhs) const override {
+        if (rhs.type() != this->type())
+            throw ConfigurationError("ConfigOptionEnum<T>: Comparing incompatible types");
+        // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
+        return this->is_enabled() < rhs.is_enabled() ||
+            (this->is_enabled() == rhs.is_enabled() && this->value < (T) rhs.get_int());
+    }
+
+    void set(const ConfigOption &rhs, int32_t idx = -1) override {
+        if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnum<T>: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        this->value = (T)rhs->get_int();
-        this->flags = rhs->flags;
+        this->value = (T)rhs.get_int();
+        this->flags = rhs.flags;
     }
 
     std::string serialize() const override
@@ -2365,7 +2424,6 @@ public:
     static ConfigOptionType     static_type() { return coEnum; }
     ConfigOptionType            type()  const override { return static_type(); }
     ConfigOption*               clone() const override { return new ConfigOptionEnumGeneric(*this); }
-    ConfigOptionEnumGeneric&    operator= (const ConfigOption *opt) { this->set(opt); return *this; }
     bool                        operator==(const ConfigOptionEnumGeneric &rhs) const throw() { return this->is_enabled() == rhs.is_enabled() && this->value == rhs.value; }
     bool                        operator< (const ConfigOptionEnumGeneric &rhs) const throw() { return this->is_enabled() < rhs.is_enabled() || (this->is_enabled() == rhs.is_enabled() && this->value <  rhs.value); }
 
@@ -2377,13 +2435,21 @@ public:
         return this->is_enabled() == rhs.is_enabled() && this->value == rhs.get_int();
     }
 
+    bool operator<(const ConfigOption &rhs) const override {
+        if (rhs.type() != this->type())
+            throw ConfigurationError("ConfigOptionEnumGeneric: Comparing incompatible types");
+        // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
+        return this->is_enabled() < rhs.is_enabled() ||
+            (this->is_enabled() == rhs.is_enabled() && this->value < rhs.get_int());
+    }
+
     void set_enum_int(int32_t val) override { this->value = val; }
-    void set(const ConfigOption *rhs, int32_t idx = -1) override {
-        if (rhs->type() != this->type())
+    void set(const ConfigOption &rhs, int32_t idx = -1) override {
+        if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionEnumGeneric: Assigning an incompatible type");
         // rhs could be of the following type: ConfigOptionEnumGeneric or ConfigOptionEnum<T>
-        this->value = rhs->get_int();
-        this->flags = rhs->flags;
+        this->value = rhs.get_int();
+        this->flags = rhs.flags;
     }
 
     std::string serialize() const override
@@ -2420,6 +2486,7 @@ public:
     bool                            has_values() const { return ! m_values.empty(); }
     bool                            has_labels() const { return ! m_labels.empty(); }
     const std::vector<std::string>& values() const { return m_values; }
+    // idx is a value of an index in the combobox in the gui, not an enum value. Use enum_to_index before.
     const std::string&              value(int idx) const { return m_values[idx]; }
     // Used for open enums (gui_type is set to GUIType::i_enum_open" resp. GUIType::f_enum_open).
     // If values not defined, use labels.
@@ -2439,7 +2506,8 @@ public:
     // Such a mapping may fail, thus an optional is returned.
     std::optional<int> enum_to_index(int enum_val) const;
 
-    // Look up an index of value / label of this combo box based on value string. 
+    // Look up an index of value / label of this combo box based on value string.
+    // strval = value(idx) <=> idx = value_to_index(strval)
     std::optional<int> value_to_index(const std::string &value) const;
 
     // Look up an index of label of this combo box. Used for open enums.
@@ -2695,6 +2763,7 @@ public:
     // true if it's not a real option but a simplified/composite one that use angelscript for interaction.
     bool                                is_script = false;
     boost::any                          default_script_value;
+    // list of opt_key#idx strings that changes our computed value
     std::vector<std::string>            depends_on; // from Option
 
     // Definition of values / labels for a combo box.
@@ -2845,8 +2914,11 @@ public:
     template<typename TYPE>
     const TYPE* 				option(const t_config_option_key& opt_key) const
     {
-        const ConfigOption* opt = this->optptr(opt_key);
-        return (opt == nullptr || opt->type() != TYPE::static_type()) ? nullptr : static_cast<const TYPE*>(opt);
+        const ConfigOption *opt = this->optptr(opt_key);
+        const TYPE *opt_type = (opt == nullptr || opt->type() != TYPE::static_type()) ?
+            nullptr :
+            static_cast<const TYPE *>(opt);
+        return opt_type;
     }
 
     const ConfigOption* 		option_throw(const t_config_option_key& opt_key) const
@@ -2896,11 +2968,13 @@ public:
     virtual t_config_option_keys    keys() const = 0;
 
 protected:
-    // Verify whether the opt_key has not been obsoleted or renamed.
-    // Both opt_key and value may be modified by handle_legacy().
-    // If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by handle_legacy().
-    // handle_legacy() is called internally by set_deserialize().
+    //// Verify whether the opt_key has not been obsoleted or renamed.
+    //// Both opt_key and value may be modified by handle_legacy().
+    //// If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by handle_legacy().
+    //// handle_legacy() is called internally by set_deserialize().
+#ifdef _DEBUGINFO
     virtual void                    handle_legacy(t_config_option_key &/*opt_key*/, std::string &/*value*/) const {}
+#endif
     // Verify whether the opt_key has to be converted or isn't present in prusaslicer
     // Both opt_key and value may be modified by to_prusa().
     // If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by to_prusa().
@@ -2908,7 +2982,7 @@ protected:
     // Called after a config is loaded as a whole.
     // Perform composite conversions, for example merging multiple keys into one key.
     // For conversion of single options, the handle_legacy() method above is called.
-    virtual void                    handle_legacy_composite(std::vector<std::pair<t_config_option_key, std::string>> &opt_deleted) {}
+    virtual void                    handle_legacy_composite(std::map<t_config_option_key, std::string> &opt_deleted) {}
 
 public:
 	using ConfigOptionResolver::option;
@@ -2922,7 +2996,8 @@ public:
     TYPE* option(const t_config_option_key &opt_key, bool create = false)
     { 
         ConfigOption *opt = this->optptr(opt_key, create);
-        return (opt == nullptr || opt->type() != TYPE::static_type()) ? nullptr : static_cast<TYPE*>(opt);
+        TYPE* opt_type = (opt == nullptr || opt->type() != TYPE::static_type()) ? nullptr : static_cast<TYPE*>(opt);
+        return opt_type;
     }
 
     ConfigOption* option_throw(const t_config_option_key &opt_key, bool create = false)
@@ -2981,7 +3056,7 @@ public:
     void set(const std::string &opt_key, const std::string &value, bool create = false)
     	{ this->option_throw<ConfigOptionString>(opt_key, create)->value = value; }
 
-    // Set a configuration value from a string, it will call an overridable handle_legacy() 
+    // Set a configuration value from a string, it will NOT call an overridable handle_legacy(), so please call it before.
     // to resolve renamed and removed configuration keys.
     bool set_deserialize_nothrow(const t_config_option_key &opt_key_src, const std::string &value_src, ConfigSubstitutionContext& substitutions, bool append = false);
 	// May throw BadOptionTypeException() if the operation fails.
@@ -3053,10 +3128,10 @@ public:
     template<typename ENUM>
     ENUM                opt_enum(const t_config_option_key &opt_key) const                      { return static_cast<ENUM>(this->option(opt_key)->get_int()); }
 
-    bool                opt_bool(const t_config_option_key &opt_key) const                      { return this->option<ConfigOptionBool>(opt_key)->value != 0; }
-    bool                opt_bool(const t_config_option_key &opt_key, size_t idx) const          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx) != 0; }
-    bool&               opt_bool(const t_config_option_key &opt_key)                            { return this->option<ConfigOptionBool>(opt_key)->value; }
-    uint8_t&            opt_bool(const t_config_option_key &opt_key, size_t idx)          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx); }
+    bool                opt_bool(const t_config_option_key &opt_key) const                      { auto opt = this->option<ConfigOptionBool>(opt_key); assert(opt); return opt->value;  }
+    bool                opt_bool(const t_config_option_key &opt_key, size_t idx) const          { auto opt = this->option<ConfigOptionBools>(opt_key); assert(opt); return opt->get_at(idx) != 0; }
+    //bool&               opt_bool(const t_config_option_key &opt_key)                            { return this->option<ConfigOptionBool>(opt_key)->value; }
+    //uint8_t&            opt_bool(const t_config_option_key &opt_key, size_t idx)          { return this->option<ConfigOptionBools>(opt_key)->get_at(idx); }
 
     void setenv_() const;
     ConfigSubstitutions load(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule);
@@ -3204,6 +3279,14 @@ public:
     // Be careful, as this method does not test the existence of opt_key in this->def().
     bool                    set_key_value(const std::string &opt_key, ConfigOption *opt)
     {
+        // ensure set_can_be_disabled is set
+        if (def()) {
+            const ConfigOptionDef* opt_def = def()->get(opt_key);
+            if (opt_def && opt_def->can_enable && !opt->can_be_disabled()) {
+                opt->set_can_be_disabled();
+            }
+        }
+        // replace or insert
         assert(opt != nullptr);
         auto it = this->options.find(opt_key);
         if (it == this->options.end()) {

@@ -11,7 +11,7 @@
 #include <locale>
 #include <ctime>
 #include <cstdarg>
-#include <stdio.h>
+#include <cstdio>
 
 #include "Platform.hpp"
 #include "Time.hpp"
@@ -177,6 +177,31 @@ std::string var(const std::string &file_name)
     return file.string();
 }
 
+static boost::filesystem::path g_binary_file;
+
+void set_binary_file(const boost::filesystem::path &file)
+{
+    g_binary_file = file;
+}
+
+const boost::filesystem::path& binary_file()
+{
+    return g_binary_file;
+}
+
+
+static boost::filesystem::path g_install_path;
+
+void set_install_path(const boost::filesystem::path &file)
+{
+    g_install_path = file;
+}
+
+const boost::filesystem::path& install_path()
+{
+    return g_install_path;
+}
+
 static std::string g_resources_dir;
 
 void set_resources_dir(const std::string &dir)
@@ -239,9 +264,11 @@ void set_data_dir(const std::string &dir)
 
 const std::string& data_dir()
 {
+    assert(!g_data_dir.empty());
     return g_data_dir;
 }
 
+bool has_data_dir() { return !g_data_dir.empty(); }
 std::string custom_shapes_dir()
 {
     return (boost::filesystem::path(g_data_dir) / "shapes").string();
@@ -251,17 +278,42 @@ static std::atomic<bool> debug_out_path_called(false);
 
 std::string debug_out_path(const char *name, ...)
 {
-	static constexpr const char *SLIC3R_DEBUG_OUT_PATH_PREFIX = "out/";
-    if (! debug_out_path_called.exchange(true)) {
-		std::string path = boost::filesystem::system_complete(SLIC3R_DEBUG_OUT_PATH_PREFIX).string();
+    static constexpr const char *SLIC3R_DEBUG_OUT_PATH_PREFIX = "out/";
+    if (!debug_out_path_called.exchange(true)) {
+        std::string path = boost::filesystem::system_complete(SLIC3R_DEBUG_OUT_PATH_PREFIX).string();
         printf("Debugging output files will be written to %s\n", path.c_str());
     }
-	char buffer[2048];
-	va_list args;
-	va_start(args, name);
-	std::vsprintf(buffer, name, args);
-	va_end(args);
-	return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
+    char buffer[2048];
+    va_list args;
+    va_start(args, name);
+    std::vsnprintf(buffer, 2048, name, args);
+    va_end(args);
+    return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
+}
+std::string debug_out_path_uniqueid(std::string name, ...) {
+    static int uniqueid = 0;
+    //search for .svg
+    size_t dot_pos = name.find_last_of('.');
+    if (dot_pos == std::string::npos) {
+        name += std::string("_");
+        name += std::to_string(uniqueid++);
+        name += std::string(".svg");
+    } else {
+        name = name.substr(0, dot_pos) + std::string("_") + std::to_string(uniqueid++) + name.substr(dot_pos);
+    }
+    
+    static constexpr const char *SLIC3R_DEBUG_OUT_PATH_PREFIX = "out/";
+    if (!debug_out_path_called.exchange(true)) {
+        std::string path = boost::filesystem::system_complete(SLIC3R_DEBUG_OUT_PATH_PREFIX).string();
+        printf("Debugging output files will be written to %s\n", path.c_str());
+    }
+    char buffer[2048];
+    va_list args;
+    va_start(args, name);
+    //name = debug_out_path(name.c_str(), args);
+    std::vsnprintf(buffer, 2048, name.c_str(), args);
+    va_end(args);
+    return std::string(SLIC3R_DEBUG_OUT_PATH_PREFIX) + std::string(buffer);
 }
 
 #ifdef _WIN32

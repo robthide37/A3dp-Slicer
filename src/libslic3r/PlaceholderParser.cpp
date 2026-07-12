@@ -16,7 +16,7 @@
 #include <sstream>
 #include <map>
 #ifdef _MSC_VER
-    #include <stdlib.h>  // provides **_environ
+    #include <cstdlib>  // provides **_environ
 #else
     #include <unistd.h>  // provides **environ
 #endif
@@ -274,6 +274,7 @@ namespace client
         void                set_i_lite(int v) { assert(this->type() != TYPE_STRING); Data tmp; tmp.i = v; m_data.set(tmp); m_type = TYPE_INT; }
         int                 as_i() const { return this->type() == TYPE_INT ? this->i() : int(this->d()); }
         int                 as_i_rounded() const { return this->type() == TYPE_INT ? this->i() : int(std::round(this->d())); }
+        int                 as_i_ceiled() const { return this->type() == TYPE_INT ? this->i() : int(std::ceil(this->d())); }
         double&             d()       { return m_data.d; }
         double              d() const { return m_data.d; }
         void                set_d(double v) { this->reset(); this->set_d_lite(v); }
@@ -381,6 +382,24 @@ namespace client
                 return expr(static_cast<int>(std::round(this->d())), start_pos, this->it_range.end());
             default:
                 this->throw_exception("Cannot round a non-numeric value.");
+            }
+            assert(false);
+            // Suppress compiler warnings.
+            return expr();
+        }
+
+        expr ceil(const Iterator start_pos) const
+        { 
+            switch (this->type()) {
+            case TYPE_EMPTY:
+                // Inside an if / else block to be skipped.
+                return expr();
+            case TYPE_INT:
+                return expr(this->i(), start_pos, this->it_range.end());
+            case TYPE_DOUBLE:
+                return expr(static_cast<int>(std::ceil(this->d())), start_pos, this->it_range.end());
+            default:
+                this->throw_exception("Cannot ceil a non-numeric value.");
             }
             assert(false);
             // Suppress compiler warnings.
@@ -1707,7 +1726,7 @@ namespace client
                 return;
 
             check_writable(ctx, lhs);
-            assert(lhs.opt->is_vector());
+            assert(lhs.opt && lhs.opt->is_vector());
             if (rhs.has_index() || ! rhs.opt->is_vector())
                 ctx->throw_exception("Cannot assign scalar to a vector", lhs.it_range);
             if (lhs.opt->type() != rhs.opt->type()) {
@@ -1725,7 +1744,7 @@ namespace client
                     ctx->throw_exception("Left hand side / right hand side vectors are not compatible.", lhs.it_range);
                 }
             }
-            const_cast<ConfigOption*>(lhs.opt)->set(rhs.opt);
+            const_cast<ConfigOption*>(lhs.opt)->set(*rhs.opt);
         }
 
         static bool vector_variable_new_from_copy(
@@ -1795,8 +1814,12 @@ namespace client
         static void evaluate_index(expr &expr_index, int &output)
         {
             if (expr_index.type() != expr::TYPE_EMPTY) {
-                if (expr_index.type() != expr::TYPE_INT)                
-                    expr_index.throw_exception("Non-integer index is not allowed to address a vector variable.");
+                if (expr_index.type() != expr::TYPE_INT) {
+                    //allow fake int inside double (for custom variables)
+                    if (expr_index.type() != expr::TYPE_DOUBLE || expr_index.i() != expr_index.d()) {
+                        expr_index.throw_exception("Non-integer index is not allowed to address a vector variable.");
+                    }
+                }
                 output = expr_index.i();
             }
         }
@@ -2163,6 +2186,8 @@ namespace client
                 { out = value.unary_integer(out.it_range.begin()); }
         static void round(expr &value, expr &out)
                 { out = value.round(out.it_range.begin()); }
+        static void ceil(expr &value, expr &out)
+                { out = value.ceil(out.it_range.begin()); }
         // For indicating "no optional parameter".
         static void noexpr(expr &out) { out.reset(); }
 
@@ -2431,6 +2456,7 @@ namespace client
                                                                     [ px::bind(&expr::digits<true>, _val, _2, _3) ]
                 |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
+                |   (kw["ceil"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::ceil,   _1, _val) ]
                 |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test, _r1, _1, _val)] // Deprecated same as !is_enabled
                 |   (kw["is_enabled"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_enabled_test, _r1, _1, _val)]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
@@ -2522,6 +2548,7 @@ namespace client
                 ("random")
                 ("repeat")
                 ("round")
+                ("ceil")
                 ("not")
                 ("one_of")
                 ("or")

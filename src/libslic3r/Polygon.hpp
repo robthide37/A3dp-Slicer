@@ -36,7 +36,7 @@ public:
     Polygon() = default;
     explicit Polygon(const Points &points) : MultiPoint(points) {
         assert(points.size() != 1);
-        if (points.size() > 1 && this->front().coincides_with_epsilon(this->back()))
+        if (points.size() > 1 && this->front().coincides_with(this->back()))
             this->points.pop_back();
     }
     explicit Polygon(Points &&points) : MultiPoint(points) {
@@ -77,14 +77,14 @@ public:
     const Point& last_point() const { return this->points.front(); }
     virtual bool is_loop() const { return true; }
 
-    double length() const;
+    distf_t length() const;
     Lines lines() const;
     Polyline split_at_vertex(const Point &point) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_index(size_t index) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_first_point() const { return this->split_at_index(0); }
-    Points   equally_spaced_points(double distance) const { return this->split_at_first_point().equally_spaced_points(distance); }
+    Points   equally_spaced_points(distf_t distance) const { return this->split_at_first_point().equally_spaced_points(distance); }
 
     static double area(const Points &pts);
     double area() const;
@@ -92,7 +92,7 @@ public:
     bool is_clockwise() const;
     bool make_counter_clockwise();
     bool make_clockwise();
-    bool is_valid() const { return this->points.size() >= 3; }
+    bool is_valid() const { assert_valid(); return this->points.size() >= 3; }
     void douglas_peucker(coord_t tolerance) override;
 
     // Does an unoriented polygon contain a point?
@@ -102,7 +102,7 @@ public:
         { return (this->point_projection(point).first - point).cast<double>().squaredNorm() < eps * eps; }
 
     // Works on CCW polygons only, CW contour will be reoriented to CCW by Clipper's simplify_polygons()!
-    Polygons simplify(double tolerance) const;
+    Polygons simplify(distf_t tolerance) const;
     void densify(float min_length, std::vector<float>* lengths = nullptr);
     void triangulate_convex(Polygons* polygons) const;
     Point centroid() const;
@@ -111,13 +111,14 @@ public:
     bool first_intersection(const Line& line, Point* intersection) const;
     bool intersections(const Line &line, Points *intersections) const;
 
-    // Considering CCW orientation of this polygon, find all convex resp. concave points
-    // with the angle at the vertex larger than a threshold.
-    // Zero angle_threshold means to accept all convex resp. concave points.
-    Points convex_points(double angle_threshold = 0.) const;
-    Points concave_points(double angle_threshold = 0.) const;
-    std::vector<size_t> concave_points_idx(double angle = PI) const;
-    std::vector<size_t> convex_points_idx(double angle = PI) const;
+    // Considering CCW orientation of this polygon
+    // (it means that a ccw (contour) is mostly convex, while a cw (hole) is mostly concave),
+    // find all convex resp. concave points
+    // with the angle at the vertex between two threshold.
+    Points convex_points(double min_angle /*=0*/, double max_angle /*=PI*/) const;
+    Points concave_points(double min_angle, double max_angle) const;
+    std::vector<size_t> concave_points_idx(double min_angle, double max_angle) const;
+    std::vector<size_t> convex_points_idx(double min_angle, double max_angle) const;
     // Projection of a point onto the polygon.
     std::pair<Point, size_t> point_projection(const Point &point) const override;
     std::vector<float> parameter_by_length() const;
@@ -125,16 +126,12 @@ public:
     /// return number of point removed
     size_t remove_collinear(coord_t max_offset);
     size_t remove_collinear_angle(double angle);
+    void remove_point_too_close(const coord_t tolerance);
 
 #ifdef _DEBUGINFO
-    void assert_valid() const override {
-        assert(size() > 2);
-        for (size_t i_pt = 1; i_pt < size(); ++i_pt)
-            release_assert(!points[i_pt - 1].coincides_with_epsilon(points[i_pt]));
-        release_assert(!points.front().coincides_with_epsilon(points.back()));
-    }
+    void assert_valid() const override;
 #else
-    void assert_valid() const {}
+    void assert_valid() const;
 #endif
 
     using iterator = Points::iterator;
@@ -163,17 +160,22 @@ bool        has_duplicate_points(const Polygons &polys);
 bool remove_same_neighbor(Polygon &polygon);
 bool remove_same_neighbor(Polygons &polygons);
 // remove any point that are at epsilon  (or resolution) 'distance' (douglas_peuckere algo for now) and all polygons that are too small to be valid
+
 void ensure_valid(Polygons &polygons, coord_t resolution = SCALED_EPSILON);
 Polygons ensure_valid(Polygons &&polygons, coord_t resolution = SCALED_EPSILON);
 Polygons ensure_valid(coord_t resolution, Polygons &&polygons);
+// return false if the polygon isn't valid and need to be removed.
+bool ensure_valid(Polygon &polygon, coord_t resolution = SCALED_EPSILON);
+// like ensure_valid but you're sure it won't remove colinear points.
+void remove_point_too_close(Polygons &polygons, coord_t resolution = SCALED_EPSILON);
 #ifdef _DEBUGINFO
 void assert_valid(const Polygons &polygons);
 #else
 inline void assert_valid(const Polygons &polygons) {}
 #endif
 
-inline double total_length(const Polygons &polylines) {
-    double total = 0;
+inline distf_t total_length(const Polygons &polylines) {
+    distf_t total = 0;
     for (Polygons::const_iterator it = polylines.begin(); it != polylines.end(); ++it)
         total += it->length();
     return total;
@@ -212,8 +214,8 @@ inline void polygons_append(Polygons &dst, Polygons &&src)
     }
 }
 
-Polygons polygons_simplify(Polygons &&polys, double tolerance, bool strictly_simple = true);
-Polygons polygons_simplify(const Polygons &polys, double tolerance, bool strictly_simple = true);
+Polygons polygons_simplify(Polygons &&polys, distf_t tolerance, bool strictly_simple = true);
+Polygons polygons_simplify(const Polygons &polys, distf_t tolerance, bool strictly_simple = true);
 
 inline void polygons_rotate(Polygons &polys, double angle)
 {
@@ -283,12 +285,25 @@ inline Polyline to_polyline(const Polygon &polygon)
     return out;
 }
 
+// to have easier time with svg output.
+inline Polylines to_polylines(const Polygon &polygon)
+{
+    Polylines out;
+    assert(!polygon.empty());
+    if (!polygon.empty()) {
+        out.push_back(to_polyline(polygon));
+    }
+    return out;
+}
+
 inline Polylines to_polylines(const Polygons &polygons)
 {
     Polylines out;
     out.reserve(polygons.size());
-    for (const Polygon &polygon : polygons)
-        out.emplace_back(to_polyline(polygon));
+    for (const Polygon &polygon : polygons) {
+        assert(!polygon.empty());
+        out.push_back(to_polyline(polygon));
+    }
     return out;
 }
 
@@ -298,6 +313,7 @@ inline Polylines to_polylines(Polygons &&polys)
     polylines.assign(polys.size(), Polyline());
     size_t idx = 0;
     for (auto it = polys.begin(); it != polys.end(); ++ it) {
+        assert(!it->empty());
         Polyline &pl = polylines[idx ++];
         pl.points = std::move(it->points);
         pl.points.push_back(pl.points.front());
@@ -340,8 +356,8 @@ inline Polygons to_polygons(VecOfPoints &&paths)
 // however their contours may be rotated.
 bool polygons_match(const Polygon &l, const Polygon &r);
 
-Polygon make_circle(double radius, double error);
-Polygon make_circle_num_segments(double radius, size_t num_segments);
+Polygon make_circle(distf_t radius, distf_t error);
+Polygon make_circle_num_segments(distf_t radius, size_t num_segments);
 
 /// <summary>
 /// Define point laying on polygon
@@ -411,6 +427,7 @@ namespace boost { namespace polygon {
                 ++input_begin;
             }
             // skip last point since Boost will set last point = first point
+            assert(polygon.points.front() == polygon.points.back());
             polygon.points.pop_back();
             return polygon;
         }

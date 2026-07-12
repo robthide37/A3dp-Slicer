@@ -12,12 +12,14 @@
 #include <wx/combo.h>
 #include <wx/dataview.h>
 #include <wx/button.h>
+#include <wx/bmpbuttn.h>
 #include <wx/sizer.h>
 #include <wx/menu.h>
 #include <wx/bmpcbox.h>
 #include <wx/bmpbndl.h>
 #include <wx/statbmp.h>
 #include <wx/timer.h>
+#include <wx/dcmemory.h>
 
 #include <vector>
 #include <functional>
@@ -30,7 +32,10 @@ inline void         sys_color_changed_menu(wxMenu* /* menu */) {}
 #endif // no __linux__
 
 #ifdef _MSW_DARK_MODE
-#define _USE_CUSTOM_NOTEBOOK      1
+#define _USE_CUSTOM_NOTEBOOK 1
+#endif
+#ifdef __APPLE__
+#define _USE_CUSTOM_NOTEBOOK 1
 #endif
 
 wxMenuItem* append_menu_item(wxMenu* menu, int id, const wxString& string, const wxString& description,

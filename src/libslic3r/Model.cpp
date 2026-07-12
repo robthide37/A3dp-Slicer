@@ -24,6 +24,7 @@
 #include "MTUtils.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "TriangleSelector.hpp"
+#include "MultipleBeds.hpp"
 
 #include "Format/AMF.hpp"
 #include "Format/OBJ.hpp"
@@ -32,7 +33,7 @@
 #include "Format/STEP.hpp"
 #include "Format/SVG.hpp"
 
-#include <float.h>
+#include <cfloat>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -40,7 +41,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/iostream.hpp>
 
-#include <tbb/concurrent_vector.h>
+#include <oneapi/tbb/concurrent_vector.h>
 
 #include "SVG.hpp"
 #include <Eigen/Dense>
@@ -70,7 +71,13 @@ Model& Model::assign_copy(const Model &rhs)
     }
 
     // copy custom code per height
-    this->custom_gcode_per_print_z = rhs.custom_gcode_per_print_z;
+    this->custom_gcode_per_print_z_vector = rhs.custom_gcode_per_print_z_vector;
+    this->wipe_tower_vector = rhs.wipe_tower_vector;
+
+
+    // copy extra properties
+    this->baked_transformation = rhs.baked_transformation;
+
     return *this;
 }
 
@@ -91,7 +98,13 @@ Model& Model::assign_copy(Model &&rhs)
     rhs.objects.clear();
 
     // copy custom code per height
-    this->custom_gcode_per_print_z = std::move(rhs.custom_gcode_per_print_z);
+    this->custom_gcode_per_print_z_vector = std::move(rhs.custom_gcode_per_print_z_vector);
+    this->wipe_tower_vector = rhs.wipe_tower_vector;
+
+
+    // copy extra properties
+    this->baked_transformation = rhs.baked_transformation;
+
     return *this;
 }
 
@@ -136,13 +149,53 @@ bool Model::equals(const Model& rhs) const {
     }
 
     // copy custom code per height
-    if (this->custom_gcode_per_print_z != rhs.custom_gcode_per_print_z)
+   if (this->custom_gcode_per_print_z() != rhs.custom_gcode_per_print_z())
             return false;
+
+    // copy extra properties
+    if(this->baked_transformation != rhs.baked_transformation)
+        return false;
+
     return true;
 }
 
+ModelWipeTower& Model::wipe_tower()
+{
+    return const_cast<ModelWipeTower&>(const_cast<const Model*>(this)->wipe_tower());
+}
+
+const ModelWipeTower& Model::wipe_tower() const
+{
+    return wipe_tower_vector[s_multiple_beds.get_active_bed()];
+}
+
+const ModelWipeTower& Model::wipe_tower(const int bed_index) const
+{
+    return wipe_tower_vector[bed_index];
+}
+
+ModelWipeTower& Model::wipe_tower(const int bed_index)
+{
+    return wipe_tower_vector[bed_index];
+}
+
+CustomGCode::Info& Model::custom_gcode_per_print_z()
+{
+    return const_cast<CustomGCode::Info&>(const_cast<const Model*>(this)->custom_gcode_per_print_z());
+}
+
+const CustomGCode::Info& Model::custom_gcode_per_print_z() const
+{
+    return custom_gcode_per_print_z_vector[s_multiple_beds.get_active_bed()];
+}
+
+
 // Loading model from a file, it may be a simple geometry file as STL or OBJ, however it may be a project file as well.
-Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, LoadAttributes options)
+Model Model::read_from_file(const std::string& input_file,
+                            DynamicPrintConfig* config,
+                            ConfigSubstitutionContext* config_substitutions,
+                            LoadAttributes options,
+                            std::optional<std::pair<double, double>> step_deflections)
 {
     Model model;
 
@@ -159,12 +212,11 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
     else if (boost::algorithm::iends_with(input_file, ".obj"))
         result = load_obj(input_file.c_str(), &model);
     else if (boost::algorithm::iends_with(input_file, ".step") || boost::algorithm::iends_with(input_file, ".stp"))
-        result = load_step(input_file.c_str(), &model);
+        result = load_step(input_file.c_str(), &model, step_deflections);
     else if (boost::algorithm::iends_with(input_file, ".amf") || boost::algorithm::iends_with(input_file, ".amf.xml"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
     else if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
-        //FIXME options & LoadAttribute::CheckVersion ? 
-        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, false);
+        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion, options & LoadAttribute::UnbakeTransformation);
     else if (boost::algorithm::iends_with(input_file, ".svg"))
         result = load_svg(input_file, model);
     else
@@ -175,22 +227,29 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
 
     if (model.objects.empty())
         throw Slic3r::RuntimeError("The supplied file couldn't be read because it's empty");
-    
-    for (ModelObject *o : model.objects)
-        o->input_file = input_file;
-    
+
+    if (!boost::ends_with(input_file, ".printRequest"))
+        for (ModelObject *o : model.objects)
+            o->input_file = input_file;
+
     if (options & LoadAttribute::AddDefaultInstances)
         model.add_default_instances();
 
-    CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, config);
-    CustomGCode::check_mode_for_custom_gcode_per_print_z(model.custom_gcode_per_print_z);
+    for (CustomGCode::Info& info : model.custom_gcode_per_print_z_vector) {
+        CustomGCode::update_custom_gcode_per_print_z_from_config(info, config);
+        CustomGCode::check_mode_for_custom_gcode_per_print_z(info);
+    }
 
     config_substitutions->sort_and_remove_duplicates();
     return model;
 }
 
 // Loading model from a file (3MF or AMF), not from a simple geometry file (STL or OBJ).
-Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, LoadAttributes options)
+Model Model::read_from_archive(const std::string& input_file,
+                               DynamicPrintConfig* config,
+                               ConfigSubstitutionContext* config_substitutions,
+                               LoadAttributes options
+                               )
 {
     assert(config != nullptr);
     assert(config_substitutions != nullptr);
@@ -199,9 +258,13 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
 
     bool result = false;
     if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
-        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion);
+        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model,
+                          options & LoadAttribute::CheckVersion, options & LoadAttribute::UnbakeTransformation);
     else if (boost::algorithm::iends_with(input_file, ".zip.amf"))
-        result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
+        result = load_amf(input_file.c_str(), config, config_substitutions, &model,
+                          options & LoadAttribute::CheckVersion);
+    else if (boost::algorithm::iends_with(input_file, ".hfp"))
+        result = false;
     else
         throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");
 
@@ -225,8 +288,10 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
     if (options & LoadAttribute::AddDefaultInstances)
         model.add_default_instances();
 
-    CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, config);
-    CustomGCode::check_mode_for_custom_gcode_per_print_z(model.custom_gcode_per_print_z);
+    for (CustomGCode::Info& info : model.custom_gcode_per_print_z_vector) {
+        CustomGCode::update_custom_gcode_per_print_z_from_config(info, config);
+        CustomGCode::check_mode_for_custom_gcode_per_print_z(info);
+    }
 
     handle_legacy_sla(*config);
 
@@ -399,8 +464,10 @@ double Model::max_z() const
 unsigned int Model::update_print_volume_state(const BuildVolume &build_volume)
 {
     unsigned int num_printable = 0;
+    s_multiple_beds.clear_inst_map();
     for (ModelObject* model_object : this->objects)
         num_printable += model_object->update_instances_print_volume_state(build_volume);
+    s_multiple_beds.inst_map_updated();
     return num_printable;
 }
 
@@ -466,7 +533,11 @@ bool Model::looks_like_multipart_object() const
             return false;
 
         BoundingBoxf3 bb_this = obj->volumes[0]->mesh().bounding_box();
-        BoundingBoxf3 tbb_this = obj->instances[0]->transform_bounding_box(bb_this);
+
+        // FIXME: There is sadly the case when instances are empty (AMF files). The normalization of instances in that
+        // case is performed only after this function is called. For now (shortly before the 2.7.2 release), let's
+        // just do this non-invasive check. Reordering all the functions could break it much more.
+        BoundingBoxf3 tbb_this = (! obj->instances.empty() ? obj->instances[0]->transform_bounding_box(bb_this) : bb_this);
 
         if (!tbb.defined)
             tbb = tbb_this;
@@ -1641,11 +1712,15 @@ unsigned int ModelObject::update_instances_print_volume_state(const BuildVolume 
         OUTSIDE = 2
     };
     for (ModelInstance* model_instance : this->instances) {
+        int bed_idx = -1;
         unsigned int inside_outside = 0;
         for (const ModelVolume* vol : this->volumes)
             if (vol->is_model_part()) {
                 const Transform3d matrix = model_instance->get_matrix() * vol->get_matrix();
-                BuildVolume::ObjectState state = build_volume.object_state(vol->mesh().its, matrix.cast<float>(), true /* may be below print bed */);
+                int bed = -1;
+                BuildVolume::ObjectState state = build_volume.object_state(vol->mesh().its, matrix.cast<float>(), true /* may be below print bed */, true /*ignore_bottom*/, &bed);
+                if (bed_idx == -1) // instance will be assigned to the bed the first volume is assigned to.
+                    bed_idx = bed;
                 if (state == BuildVolume::ObjectState::Inside)
                     // Volume is completely inside.
                     inside_outside |= INSIDE;
@@ -1664,6 +1739,8 @@ unsigned int ModelObject::update_instances_print_volume_state(const BuildVolume 
             inside_outside == INSIDE ? ModelInstancePVS_Inside : ModelInstancePVS_Fully_Outside;
         if (inside_outside == INSIDE)
             ++num_printable;
+        if (bed_idx != -1)
+            s_multiple_beds.set_instance_bed(model_instance->id(), model_instance->printable, bed_idx);
     }
     return num_printable;
 }
@@ -1857,6 +1934,7 @@ int ModelVolume::get_repaired_errors_count() const
 
 const TriangleMesh& ModelVolume::get_convex_hull() const
 {
+    assert(m_convex_hull.get());
     return *m_convex_hull.get();
 }
 
@@ -1877,7 +1955,15 @@ ModelVolumeType ModelVolume::type_from_string(const std::string &s)
     if (s == "SupportBlocker")
 		return ModelVolumeType::SUPPORT_BLOCKER;
     if (s == "SeamPosition")
-        return ModelVolumeType::SEAM_POSITION;
+        return ModelVolumeType::SEAM_POSITION_CENTER;
+    if (s == "SeamPositionCenter")
+        return ModelVolumeType::SEAM_POSITION_CENTER;
+    if (s == "SeamPositionCenterZ")
+        return ModelVolumeType::SEAM_POSITION_CENTER_Z;
+    if (s == "SeamPositionInsideCenter")
+        return ModelVolumeType::SEAM_POSITION_INSIDE_CENTER;
+    if (s == "SeamPositionInside")
+        return ModelVolumeType::SEAM_POSITION_INSIDE;
     if (s == "BrimPatch")
         return ModelVolumeType::BRIM_PATCH;
     if (s == "BrimNegative")
@@ -1895,7 +1981,10 @@ std::string ModelVolume::type_to_string(const ModelVolumeType t)
 	case ModelVolumeType::PARAMETER_MODIFIER: return "ParameterModifier";
 	case ModelVolumeType::SUPPORT_ENFORCER:   return "SupportEnforcer";
 	case ModelVolumeType::SUPPORT_BLOCKER:    return "SupportBlocker";
-    case ModelVolumeType::SEAM_POSITION:      return "SeamPosition";
+    case ModelVolumeType::SEAM_POSITION_CENTER:         return "SeamPositionCenter";
+    case ModelVolumeType::SEAM_POSITION_CENTER_Z:       return "SeamPositionCenterZ";
+    case ModelVolumeType::SEAM_POSITION_INSIDE_CENTER:  return "SeamPositionInsideCenter";
+    case ModelVolumeType::SEAM_POSITION_INSIDE:         return "SeamPositionInside";
     case ModelVolumeType::BRIM_PATCH:         return "BrimPatch";
     case ModelVolumeType::BRIM_NEGATIVE:      return "BrimNegative";
     default:
@@ -2094,7 +2183,7 @@ BoundingBoxf3 ModelInstance::transform_bounding_box(const BoundingBoxf3 &bbox, b
 
 Vec3d ModelInstance::transform_vector(const Vec3d& v, bool dont_translate) const
 {
-    return dont_translate ? get_matrix_no_offset() * v : get_matrix() * v;
+    return dont_translate ? (this->get_matrix_no_offset() * v) : (this->get_matrix() * v);
 }
 
 void ModelInstance::transform_polygon(Polygon* polygon) const

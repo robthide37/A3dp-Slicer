@@ -44,6 +44,7 @@ private:
     std::string m_model_filename;
     // absolute path for m_model_filename
     boost::filesystem::path m_model_path;
+    bool m_models_overlap;
     // Print volume bounding box exteded with axes and model.
     BoundingBoxf3 m_extended_bounding_box;
     // Print bed polygon
@@ -54,6 +55,7 @@ private:
     GLModel m_gridlines;
     GLModel m_gridlines_big;
     GLModel m_gridlines_small;
+    GLModel m_gridlines_camera;
     GLModel m_contourlines;
     mutable GLTexture m_texture;
     ColorRGBA m_model_color{ 0.235f, 0.235f, 0.235f, 1.0f };
@@ -67,6 +69,9 @@ private:
 
     float m_scale_factor{ 1.0f };
 
+    std::vector<std::unique_ptr<GLModel>> m_digits_models;
+    std::unique_ptr<GLTexture> m_digits_texture;
+
 public:
     Bed3D();
     ~Bed3D() = default;
@@ -75,7 +80,11 @@ public:
     // Return true if the bed shape changed, so the calee will update the UI.
     //FIXME if the build volume max print height is updated, this function still returns zero
     // as this class does not use it, thus there is no need to update the UI.
-    bool set_shape(const Pointfs& bed_shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false);
+    bool set_shape(const Pointfs& bed_shape,
+                   const double max_print_height,
+                   const std::string& custom_texture,
+                   const std::string& custom_model,
+                   bool force_as_custom = false);
 
     // Build volume geometry for various collision detection tasks.
     const BuildVolume& build_volume() const { return m_build_volume; }
@@ -93,7 +102,13 @@ public:
     bool contains(const Point& point) const;
     Point point_projection(const Point& point) const;
 
-    void render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_texture);
+    void render(GLCanvas3D &canvas,
+                const Transform3d &view_matrix,
+                const Transform3d &projection_matrix,
+                bool bottom,
+                float scale_factor,
+                bool show_texture,
+                double show_camera_grid = 0.);
     void render_axes();
     void render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor);
 
@@ -103,13 +118,19 @@ private:
     void init_triangles();
     void init_gridlines();
     void init_contourlines();
-    static std::tuple<Type, std::string, std::string, bool> detect_type(const Pointfs& shape);
+    void init_internal_model_from_file();
+    static std::tuple<Type, std::string, std::string> detect_type(const Pointfs& shape);
     void render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
-        bool show_texture, bool picking);
-    void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture);
-    void render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix);
-    void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix);
-    void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking);
+        bool show_texture, bool picking, bool active);
+    
+    void render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool is_active);
+    
+    void render_texture(bool bottom, GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool is_active);
+    
+    void render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool is_active);
+    
+    void render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_texture, bool picking, bool is_active);
+    
     void render_default(bool bottom, bool picking, bool show_texture, const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_contour(const Transform3d& view_matrix, const Transform3d& projection_matrix);
     void render_grid(bool bottom, bool has_model);

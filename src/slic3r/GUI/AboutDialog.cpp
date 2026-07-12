@@ -101,10 +101,12 @@ void CopyrightsDialog::fill_entries()
         { "Slic3r"          , "2022 Slic3r"                                 , "https://github.com/slic3r/slic3r" },
         { "Prusaslicer"     , "2022 PrusaResearch"                          , "https://github.com/prusa3d/PrusaSlicer" },
         { "wxWidgets"       , "2019 wxWidgets"                              , "https://www.wxwidgets.org/" },
-        { "OpenGL"          , "1997-2019 The Khronos Group Inc"            , "https://www.opengl.org/" },
+        { "OpenGL"          , "1997-2019 The Khronos Group Inc"             , "https://www.opengl.org/" },
         { "GNU gettext"     , "1998, 2019 Free Software Foundation, Inc."   , "https://www.gnu.org/software/gettext/" },
         { "PoEdit"          , "2019 Vaclav Slava­k"                          , "https://poedit.net/" },
         { "ImGUI"           , "2014-2019 Omar Cornut"                       , "https://github.com/ocornut/imgui" },
+        { "ImGuizmo"        ,                                       ""      , "https://github.com/CedricGuillemet/ImGuizmo" },
+
         { "Eigen"           , ""                                            , "http://eigen.tuxfamily.org" },
         { "ADMesh"          , "1995, 1996  Anthony D. Martin; "
                               "2015, ADMesh contributors"                   , "https://admesh.readthedocs.io/en/latest/" },
@@ -276,6 +278,19 @@ AboutDialog::AboutDialog()
         version->SetFont(version_font);
         vsizer->Add(version, 0, wxALIGN_LEFT | wxBOTTOM, 10);
     }
+    // id
+    {
+        auto version_string = _L("Slicer ID")+ " '" + std::string(SLIC3R_APP_KEY) + "'";
+        wxStaticText* version = new wxStaticText(this, wxID_ANY, version_string.c_str(), wxDefaultPosition, wxDefaultSize);
+        wxFont version_font = GetFont();
+        #ifdef __WXMSW__
+        version_font.SetPointSize(version_font.GetPointSize()-1);
+        #else
+            version_font.SetPointSize(11);
+        #endif
+        version->SetFont(version_font);
+        vsizer->Add(version, 0, wxALIGN_LEFT | wxBOTTOM, 10);
+    }
     
     // text
     m_html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO/*NEVER*/);
@@ -290,20 +305,20 @@ AboutDialog::AboutDialog()
         std::array<int, 7> size = {fs,fs,fs,fs,fs,fs,fs};
         m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), size.data());
         m_html->SetBorders(2);
-        const wxString copyright_str    = _L("Copyright");
-        // TRN AboutDialog: "Slic3r %1% GNU Affero General Public License"
-        const wxString is_lecensed_str  = _L("is licensed under the");
-        const wxString license_str      = _L("GNU Affero General Public License, version 3");
-        const wxString based_on_str     = _L("SuperSlicer is based on PrusaSlicer, based on Slic3r by Alessandro Ranellucci and the RepRap community.");
-        const wxString contributors_str = _L("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik, Durand Rémi and numerous others.");
-        const wxString manual_str       = _L("Manual by Gary Hodgson. Inspired by the RepRap community.");
-        const wxString icon_str         = _L("Slic3r logo designed by Corey Daniels.");
+        const std::string copyright_str = _u8L(("Copyright"));
+        // TRN "Slic3r _is licensed under the_ License"
+        const std::string is_lecensed_str = _u8L(("is licensed under the"));
+        const std::string license_str = _u8L(("GNU Affero General Public License, version 3"));
+        const std::string based_on_str = _u8L(("SuperSlicer is a skinned version of Slic3r, based on PrusaSlicer by Prusa and the original Slic3r by Alessandro Ranellucci & the RepRap community."));
+        const std::string contributors_str = _u8L(("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik, Durand Rémi and numerous others."));
+        const std::string manual_str = _u8L(("Manual by Gary Hodgson. Inspired by the RepRap community."));
+        const std::string icon_str = _u8L(("Slic3r logo designed by Corey Daniels."));
         const auto text = format_wxstr(
             "<html>"
             "<body bgcolor= %1% link= %2%>"
             "<font color=%3%>"
-            " &copy; 2018-2023 Durand Rémi. <br />"
-            "%5% &copy; 2016-2023 Prusa Research. <br />"
+            " &copy; 2018-2025 Durand Rémi. <br />"
+            "%5% &copy; 2016-2025 Prusa Research. <br />"
             "%5% &copy; 2011-2018 Alessandro Ranellucci. <br />"
             "<a href=\"http://slic3r.org/\">Slic3r</a> %6% "
             "<a href=\"http://www.gnu.org/licenses/agpl-3.0.html\">%7%</a>."

@@ -6,7 +6,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
 
-#include <boost/regex.hpp>
+#include <regex>
 
 namespace Slic3r::GCode {
 
@@ -250,6 +250,60 @@ std::string LabelObjects::stop_object(const PrintInstance& print_instance) const
     return out;
 }
 
+
+int LabelObjects::get_object_id(const PrintObject &object) const {
+    assert(!object.instances().empty());
+    const PrintInstance &print_instance = object.instances().front();
+    assert(m_label_data.find(&print_instance) != m_label_data.end());
+    auto it = m_label_data.find(&print_instance);
+    if (it != m_label_data.end()) {
+        const LabelData &label = m_label_data.at(&print_instance);
+        return label.object_id;
+    }
+    return -1;
+}
+
+std::string LabelObjects::get_object_name(const PrintObject &object) const {
+    assert(!object.instances().empty());
+    const PrintInstance &print_instance = object.instances().front();
+    assert(m_label_data.find(&print_instance) != m_label_data.end());
+    auto it = m_label_data.find(&print_instance);
+    if (it != m_label_data.end()) {
+        const LabelData &label = m_label_data.at(&print_instance);
+        return label.object_name;
+    }
+    return "";
+}
+
+int LabelObjects::get_unique_id(const PrintInstance &print_instance) const {
+    assert(m_label_data.find(&print_instance) != m_label_data.end());
+    auto it = m_label_data.find(&print_instance);
+    if (it != m_label_data.end()) {
+        const LabelData &label = m_label_data.at(&print_instance);
+        return label.unique_id;
+    }
+    return -1;
+}
+
+int LabelObjects::get_copy_id(const PrintInstance &print_instance) const {
+    assert(m_label_data.find(&print_instance) != m_label_data.end());
+    auto it = m_label_data.find(&print_instance);
+    if (it != m_label_data.end()) {
+        const LabelData &label = m_label_data.at(&print_instance);
+        return label.copy_id;
+    }
+    return -1;
+}
+
+std::string LabelObjects::get_unique_name(const PrintInstance &print_instance) const {
+    assert(m_label_data.find(&print_instance) != m_label_data.end());
+    auto it = m_label_data.find(&print_instance);
+    if (it != m_label_data.end()) {
+        const LabelData &label = m_label_data.at(&print_instance);
+        return label.unique_name;
+    }
+    return "";
+}
 
 
 } // namespace Slic3r::GCode

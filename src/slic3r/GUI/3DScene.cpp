@@ -33,10 +33,10 @@
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include <boost/log/trivial.hpp>
 
@@ -245,7 +245,6 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     , is_outside(false)
     , hover(HS_None)
     , is_modifier(false)
-    , is_wipe_tower(false)
     , is_extrusion_path(false)
     , force_native_color(false)
     , force_neutral_color(false)
@@ -432,7 +431,7 @@ bool GLVolume::is_sla_pad() const { return this->composite_id.volume_id == -int(
 
 bool GLVolume::is_sinking() const
 {
-    if (is_modifier || GUI::wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA)
+    if (is_modifier || GUI::wxGetApp().get_current_printer_technology() == ptSLA)
         return false;
     const BoundingBoxf3& box = transformed_convex_hull_bounding_box();
     return box.min.z() < SINKING_Z_THRESHOLD && box.max.z() >= SINKING_Z_THRESHOLD;
@@ -504,15 +503,15 @@ int GLVolumeCollection::load_object_volume(
     return int(this->volumes.size() - 1);
 }
 
-#if ENABLE_OPENGL_ES
-int GLVolumeCollection::load_wipe_tower_preview(
+#if SLIC3R_OPENGL_ES
+GLVolume* GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle,
-    float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh)
+    float rotation_angle, bool size_unknown, float brim_width, size_t idx, TriangleMesh* out_mesh)
 #else
-int GLVolumeCollection::load_wipe_tower_preview(
+GLVolume* GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle,
-    float rotation_angle, bool size_unknown, float brim_width)
-#endif // ENABLE_OPENGL_ES
+    float rotation_angle, bool size_unknown, float brim_width, size_t idx)
+#endif // SLIC3R_OPENGL_ES
 {
     if (height == 0.0f)
         height = 0.1f;
@@ -596,10 +595,9 @@ int GLVolumeCollection::load_wipe_tower_preview(
         mesh.merge(cone_mesh);
     }
 
-
-    volumes.emplace_back(new GLVolume(color));
-    GLVolume& v = *volumes.back();
-#if ENABLE_OPENGL_ES
+    GLVolume* result{new GLVolume(color)};
+    GLVolume& v = *result;
+#if SLIC3R_OPENGL_ES
     if (out_mesh != nullptr)
         *out_mesh = mesh;
 #endif // ENABLE_OPENGL_ES
@@ -609,12 +607,13 @@ int GLVolumeCollection::load_wipe_tower_preview(
     v.set_convex_hull(mesh.convex_hull_3d());
     v.set_volume_offset(Vec3d(pos_x, pos_y, 0.0));
     v.set_volume_rotation(Vec3d(0., 0., (M_PI / 180.) * rotation_angle));
-    v.composite_id = GLVolume::CompositeID(INT_MAX, 0, 0);
+    v.composite_id = GLVolume::CompositeID(INT_MAX - idx, 0, 0);
     v.geometry_id.first = 0;
-    v.geometry_id.second = wipe_tower_instance_id().id;
-    v.is_wipe_tower = true;
+    v.geometry_id.second = wipe_tower_instance_id(idx).id;
+    v.wipe_tower_bed_index = idx;
     v.shader_outside_printer_detection_enabled = !size_unknown;
-    return int(volumes.size() - 1);
+
+    return result;
 }
 
 // Load SLA auxiliary GLVolumes (for support trees or pad).
@@ -776,9 +775,24 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     if (disable_cullface)
         glsafe(::glDisable(GL_CULL_FACE));
 
+    const ModelObjectPtrs& model_objects = GUI::wxGetApp().model().objects;
+    const std::vector<std::string> extruders_colors = GUI::wxGetApp().plater()->get_extruder_colors_from_plater_config();
+    const bool is_render_as_mmu_painted_enabled = !model_objects.empty() && !extruders_colors.empty();
+
     for (GLVolumeWithIdAndZ& volume : to_render) {
-        const Transform3d& world_matrix = volume.first->world_matrix();
-        volume.first->set_render_color(true);
+        if (!volume.first->is_active)
+            continue;
+
+        const Transform3d world_matrix = volume.first->world_matrix();
+        const Matrix3d world_matrix_inv_transp = world_matrix.linear().inverse().transpose();
+        const Matrix3d view_normal_matrix = view_matrix.linear() * world_matrix_inv_transp;
+        const int obj_idx = volume.first->object_idx();
+        const int vol_idx = volume.first->volume_idx();
+        const bool render_as_mmu_painted = is_render_as_mmu_painted_enabled && !volume.first->selected &&
+            !volume.first->is_outside && volume.first->hover == GLVolume::HS_None && !volume.first->is_wipe_tower() && obj_idx >= 0 && vol_idx >= 0 &&
+            !model_objects[obj_idx]->volumes[vol_idx]->mm_segmentation_facets.empty() &&
+            type != GLVolumeCollection::ERenderType::Transparent; // to filter out shells (not very nice)
+        volume.first->set_render_color(false);
 
         // render sinking contours of non-hovered volumes
         shader->stop_using();
@@ -804,7 +818,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         shader->set_uniform("print_volume.xy_data", m_print_volume.data);
         shader->set_uniform("print_volume.z_data", m_print_volume.zs);
         shader->set_uniform("volume_world_matrix", world_matrix);
-        shader->set_uniform("slope.actived", m_slope.active && !volume.first->is_modifier && !volume.first->is_wipe_tower);
+       shader->set_uniform("slope.actived", m_slope.active && !volume.first->is_modifier && !volume.first->is_wipe_tower());
         shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(world_matrix.matrix().block(0, 0, 3, 3).inverse().transpose().cast<float>()));
         shader->set_uniform("slope.normal_z", m_slope.normal_z);
 
@@ -821,7 +835,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         const Transform3d model_matrix = world_matrix;
         shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
-        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+        //const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
         volume.first->render();
 
@@ -849,10 +863,8 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
             }
             sink_shader->start_using();
         }
-        shader->start_using();
     }
 
-    shader->stop_using();
     if (edges_shader != nullptr) {
         edges_shader->start_using();
         if (m_show_non_manifold_edges && GUI::wxGetApp().app_config->get_bool("non_manifold_edges")) {
@@ -862,6 +874,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         }
         edges_shader->stop_using();
     }
+    
     shader->start_using();
 
     if (disable_cullface)
@@ -922,7 +935,7 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
     }
 
     for (const std::unique_ptr<GLVolume> &volume : volumes) {
-        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->is_sla_pad() || volume->is_sla_support())
+        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower() || volume->is_sla_pad() || volume->is_sla_support())
             continue;
 
         int extruder_id = volume->extruder_id - 1;
@@ -1559,8 +1572,12 @@ void ExtrusionToVert::use(const ExtrusionEntityCollection &collection) {
 
 void ExtrusionToVertMap::use(const ExtrusionPath& path) { _3DScene::extrusionentity_to_verts(path, print_z, copy, get_geometry(path)); }
 void ExtrusionToVertMap::use(const ExtrusionPath3D& path3D) { _3DScene::extrusionentity_to_verts(path3D, print_z, copy, get_geometry(path3D)); }
-void ExtrusionToVertMap::use(const ExtrusionMultiPath& multipath) { _3DScene::extrusionentity_to_verts(multipath, print_z, copy, get_geometry(multipath)); }
-void ExtrusionToVertMap::use(const ExtrusionMultiPath3D& multipath3D) { _3DScene::extrusionentity_to_verts(multipath3D, print_z, copy, get_geometry(multipath3D)); }
+void ExtrusionToVertMap::use(const ExtrusionMultiPath& multipath) {
+    for (const ExtrusionPath &path : multipath.paths) _3DScene::extrusionentity_to_verts(path, print_z, copy, get_geometry(path));
+    /*_3DScene::extrusionentity_to_verts(multipath, print_z, copy, get_geometry(multipath)); */}
+void ExtrusionToVertMap::use(const ExtrusionMultiPath3D& multipath3D) {
+    for (const ExtrusionPath3D &path3D : multipath3D.paths) _3DScene::extrusionentity_to_verts(path3D, print_z, copy, get_geometry(path3D));
+    /*_3DScene::extrusionentity_to_verts(multipath3D, print_z, copy, get_geometry(multipath3D)); */}
 void ExtrusionToVertMap::use(const ExtrusionLoop& loop) { for (const ExtrusionPath &path : loop.paths) _3DScene::extrusionentity_to_verts(path, print_z, copy, get_geometry(path)); }//_3DScene::extrusionentity_to_verts(loop, print_z, copy, get_geometry(loop)); }
 void ExtrusionToVertMap::use(const ExtrusionEntityCollection& collection) { for (const ExtrusionEntity* extrusion_entity : collection.entities()) extrusion_entity->visit(*this); }
 GUI::GLModel::Geometry& ExtrusionToVertMap::get_geometry(const ExtrusionEntity& e) {

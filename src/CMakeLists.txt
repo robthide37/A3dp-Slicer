@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
 project(Slic3r-native)
 
+# fix macos-15-intel's clang bug with angelscript
+if(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    add_compile_definitions(AS_MAX_PORTABILITY)
+endif()
+
 add_subdirectory(build-utils)
 if (NOT APPLE)
     add_subdirectory(test-utils)
@@ -35,13 +40,17 @@ if (SLIC3R_ENABLE_FORMAT_STEP)
 endif ()
 
 if (SLIC3R_GUI)
+set(CMAKE_CXX_STANDARD 17)
+
     add_subdirectory(imgui)
+    add_subdirectory(imguizmo)
     add_subdirectory(hidapi)
     include_directories(hidapi/include)
     add_subdirectory(exif)
     include_directories(exif/include)
     add_subdirectory(angelscript)
     # include_directories(angelscript/include)
+
 
     if(WIN32)
         message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
@@ -53,11 +62,19 @@ if (SLIC3R_GUI)
             set(wxWidgets_USE_STATIC OFF)
         endif()
     endif()
+    set(wxWidgets_USE_DEBUG ON)
+    set(wxWidgets_USE_UNICODE ON)
+    set(wxUSE_WEBVIEW_EDGE ON)
+    set(wxUSE_SCINTILLA ON)
 
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
             endif ()
-    find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla)
+    if(WIN32)
+        find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc scintilla webview)
+    else()
+        find_package(wxWidgets 3.2 MODULE REQUIRED COMPONENTS base core adv html gl stc webview)
+    endif()
 
     include(${wxWidgets_USE_FILE})
 
@@ -115,6 +132,7 @@ if (WIN32)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/Slic3r.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.rc @ONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/gcodeviewer.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}-gcodeviewer.rc @ONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/PrusaSlicer.manifest.in ${CMAKE_CURRENT_BINARY_DIR}/${SLIC3R_APP_KEY}.manifest @ONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/winInstaller.wxs.in ${CMAKE_CURRENT_BINARY_DIR}/winInstaller.wxs @ONLY)
 endif ()
 if (APPLE)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/osx/Info.plist.in ${CMAKE_CURRENT_BINARY_DIR}/Info.plist @ONLY)
@@ -160,8 +178,11 @@ endif ()
 
 # Add the Slic3r GUI library, libcurl, OpenGL and GLU libraries.
 if (SLIC3R_GUI)
-#    target_link_libraries(PrusaSlicer ws2_32 uxtheme setupapi libslic3r_gui ${wxWidgets_LIBRARIES})
-target_link_libraries(Slic3r libslic3r_gui)
+if (MSVC)
+    target_link_libraries(Slic3r ws2_32 uxtheme setupapi libslic3r_gui ${wxWidgets_LIBRARIES})
+    else ()
+        target_link_libraries(Slic3r libslic3r_gui ${wxWidgets_LIBRARIES})
+endif()
     if (MSVC)
         # Generate debug symbols even in release mode.
         target_link_options(Slic3r PUBLIC "$<$<CONFIG:RELEASE>:/DEBUG>")
@@ -284,11 +305,11 @@ else ()
     else ()
         set(BIN_RESOURCES_DIR "${CMAKE_CURRENT_BINARY_DIR}/../resources")
     endif ()
-     add_custom_command(TARGET Slic3r POST_BUILD
-        # COMMAND ln -sfn "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}" # make[3]: stat: src/Slic3r: Too many levels of symbolic links
-		 COMMAND cp -r "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}"
-         COMMENT "Symlinking the resources directory into the build tree"
-         VERBATIM)
+    add_custom_command(TARGET Slic3r POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E remove_directory "${BIN_RESOURCES_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}"
+        COMMENT "Copying the resources directory into the build tree"
+        VERBATIM)
 endif ()
 
 # Slic3r binary install target

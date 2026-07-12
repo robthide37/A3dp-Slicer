@@ -85,9 +85,16 @@ Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_he
     } else {
         throw Slic3r::InvalidArgument("Unknown role");
     }
-    if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
-        config_width = object.config().first_layer_extrusion_width;
-        config_spacing = object.config().first_layer_extrusion_spacing;
+    if (first_layer) {
+        if ((role == frInfill || role == frSolidInfill || role == frTopSolidInfill)
+                && object.config().first_layer_infill_extrusion_width.is_enabled()
+                ) {
+            config_width = object.config().first_layer_infill_extrusion_width;
+            config_spacing = object.config().first_layer_infill_extrusion_spacing;
+        } else if (object.config().first_layer_extrusion_width.is_enabled()) {
+            config_width = object.config().first_layer_extrusion_width;
+            config_spacing = object.config().first_layer_extrusion_spacing;
+        }
     }
 
     if (config_width.value == 0) {
@@ -107,27 +114,36 @@ Flow PrintRegion::flow(const PrintObject &object, FlowRole role, double layer_he
     return flow;
 }
 
-float  PrintRegion::width(FlowRole role, bool first_layer, const PrintObject& object) const
+float PrintRegion::width(FlowRole role, bool first_layer, const PrintObject& object) const
 {
     const ConfigOptionFloatOrPercent* config_width = nullptr;
     // otherwise, get extrusion width from configuration
     // (might be an absolute value, or a percent value, or zero for auto)
-    if (first_layer && object.config().first_layer_extrusion_width.value > 0) {
-        config_width = &object.config().first_layer_extrusion_width;
-    } else if (role == frExternalPerimeter) {
-        config_width = &m_config.external_perimeter_extrusion_width;
-    } else if (role == frPerimeter) {
-        config_width = &m_config.perimeter_extrusion_width;
-    } else if (role == frInfill) {
-        config_width = &m_config.infill_extrusion_width;
-    } else if (role == frSolidInfill) {
-        config_width = &m_config.solid_infill_extrusion_width;
-    } else if (role == frTopSolidInfill) {
-        config_width = &m_config.top_infill_extrusion_width;
-    } else if (role == frSupportMaterial || role == frSupportMaterialInterface) {
-        config_width = &object.config().support_material_extrusion_width;
-    } else {
-        throw Slic3r::InvalidArgument("Unknown role");
+    if (first_layer) {
+        if ((role == frInfill || role == frSolidInfill || role == frTopSolidInfill)
+                && object.config().first_layer_infill_extrusion_width.is_enabled()
+                ) {
+            config_width = &object.config().first_layer_infill_extrusion_width;
+        } else if (object.config().first_layer_extrusion_width.is_enabled()) {
+            config_width = &object.config().first_layer_extrusion_width;
+        }
+    }
+    if (!config_width) {
+        if (role == frExternalPerimeter) {
+            config_width = &m_config.external_perimeter_extrusion_width;
+        } else if (role == frPerimeter) {
+            config_width = &m_config.perimeter_extrusion_width;
+        } else if (role == frInfill) {
+            config_width = &m_config.infill_extrusion_width;
+        } else if (role == frSolidInfill) {
+            config_width = &m_config.solid_infill_extrusion_width;
+        } else if (role == frTopSolidInfill) {
+            config_width = &m_config.top_infill_extrusion_width;
+        } else if (role == frSupportMaterial || role == frSupportMaterialInterface) {
+            config_width = &object.config().support_material_extrusion_width;
+        } else {
+            throw Slic3r::InvalidArgument("Unknown role");
+        }
     }
 
     if (!config_width || config_width->value == 0)
@@ -155,17 +171,19 @@ coordf_t PrintRegion::nozzle_dmr_avg(const PrintConfig &print_config) const
 void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_config, const PrintObjectConfig &object_config, const PrintRegionConfig &region_config, std::set<uint16_t> &object_extruders)
 {
     // These checks reflect the same logic used in the GUI for enabling/disabling extruder selection fields.
-    auto num_extruders = (int)print_config.nozzle_diameter.size();
+    auto num_extruders = (int) print_config.nozzle_diameter.size();
     auto emplace_extruder = [num_extruders, &object_extruders](int extruder_id) {
-    	int i = std::max(0, extruder_id - 1);
+        int i = std::max(0, extruder_id - 1);
         object_extruders.insert((i >= num_extruders) ? 0 : i);
     };
-    if (region_config.perimeters.value > 0 || object_config.brim_width.value > 0 || object_config.brim_width_interior > 0)
-    	emplace_extruder(region_config.perimeter_extruder);
+    if (region_config.perimeters.value > 0 || object_config.brim_width.value > 0 ||
+        object_config.brim_width_interior > 0)
+        emplace_extruder(region_config.perimeter_extruder);
     if (region_config.fill_density.value > 0)
-    	emplace_extruder(region_config.infill_extruder);
-    if (region_config.top_solid_layers.value > 0 || region_config.bottom_solid_layers.value > 0)
-    	emplace_extruder(region_config.solid_infill_extruder);
+        emplace_extruder(region_config.infill_extruder);
+    if (region_config.top_solid_layers.value > 0 || region_config.bottom_solid_layers.value > 0 ||
+        (region_config.solid_infill_every_layers.value > 0 && region_config.fill_density.value > 0))
+        emplace_extruder(region_config.solid_infill_extruder);
 }
 
 void PrintRegion::collect_object_printing_extruders(const Print& print, std::set<uint16_t> &object_extruders) const

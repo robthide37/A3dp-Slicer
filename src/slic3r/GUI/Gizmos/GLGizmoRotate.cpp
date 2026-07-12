@@ -217,7 +217,7 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
 
 void GLGizmoRotate3D::on_render_input_window(float x, float y, float bottom_limit)
 {
-    if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
+    if (wxGetApp().get_current_printer_technology() != ptSLA)
         return;
 
     RotoptimzeWindow popup{m_imgui, m_rotoptimizewin_state, {x, y, bottom_limit}};
@@ -573,6 +573,13 @@ std::string GLGizmoRotate3D::on_get_name() const
 bool GLGizmoRotate3D::on_is_activable() const
 {
     const Selection& selection = m_parent.get_selection();
+
+    // not activable if volume selected is a seam modifier
+    ModelVolume* volume = get_selected_volume(selection);
+    if (volume && volume->type() == ModelVolumeType::SEAM_POSITION_CENTER) {
+        return false;
+    }
+
     return !selection.is_any_cut_volume() && !selection.is_any_connector() && !selection.is_empty();
 }
 

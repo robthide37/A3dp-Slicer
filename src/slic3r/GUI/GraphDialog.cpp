@@ -1,6 +1,7 @@
 #include "GraphDialog.hpp"
 
 #include "BitmapCache.hpp"
+#include "format.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "I18N.hpp"
@@ -17,9 +18,9 @@ namespace Slic3r { namespace GUI {
 
 int scale(const int val) { return val * Slic3r::GUI::wxGetApp().em_unit(); }
 #ifdef __WXGTK3__
-int ITEM_WIDTH() { return scale(10); }
+int ITEM_WIDTH() { return scale(12); }
 #else
-int ITEM_WIDTH() { return scale(6); }
+int ITEM_WIDTH() { return scale(8); }
 #endif
 
 static void update_ui(wxWindow *window) { Slic3r::GUI::wxGetApp().UpdateDarkUI(window); }
@@ -79,54 +80,28 @@ GraphDialog::GraphDialog(wxWindow *parent, const GraphData &parameters, const Gr
 #define style wxSP_ARROW_KEYS
 #endif
 
+static const double pow10_9to9[] = {0.000000001, 0.00000001, 0.0000001, 0.000001,  0.00001,   0.0001, 0.001,
+                                        0.01,        0.1,        1,         10,        100,       1000,   10000,
+                                        100000,      1000000,    10000000,  100000000, 1000000000};
 
-double text_enter_event(wxSpinCtrlDouble *widget,
+double use_double_event(SpinInputDouble *widget,
                                     double &          last_val,
                                     const double &    curr_min,
                                     const double &    curr_max,
                                     double            min,
                                     double            max,
                                     double            step,
-                                    wxCommandEvent &  evt)
+                                    wxSpinDoubleEvent &  evt)
 {
     // m_widget_max_x->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
     double old_val = last_val;
-    last_val         = std::atof(evt.GetString().c_str());
+    last_val         = evt.GetValue();
     last_val         = int32_t(last_val / step) * step;
     last_val         = std::min(std::max(last_val, min), max);
-    if (curr_min >= curr_max)
+    if (curr_min + EPSILON >= curr_max)
         last_val = old_val;
     widget->SetValue(last_val);
     double precision = 0.000001f;
-    while (precision < (curr_max - curr_min)) precision *= 10;
-    return precision / 1000;
-}
-double spin_move(wxSpinCtrlDouble * widget,
-                             double &           last_val,
-                             const double &     curr_min,
-                             const double &     curr_max,
-                             double             min,
-                             double             max,
-                             double             step,
-                             wxSpinDoubleEvent &evt)
-{
-    double       old_val     = last_val;
-    const double evt_dbl_val = std::atof(evt.GetString().c_str());
-    // if second call, from our SetValue, ignore.
-    if (std::abs(evt_dbl_val - last_val) < 0.0000001)
-        return 0;
-    double incr = step;
-    while (last_val > incr * 20) incr *= 10;
-    if (evt_dbl_val > last_val) {
-        last_val += incr;
-    } else {
-        last_val -= incr;
-    }
-    last_val = std::min(std::max(last_val, min), max);
-    if (curr_min >= curr_max)
-        last_val = old_val;
-    widget->SetValue(last_val);
-    float precision = 0.000001f;
     while (precision < (curr_max - curr_min)) precision *= 10;
     return precision / 1000;
 }
@@ -159,13 +134,22 @@ GraphPanel::GraphPanel(wxWindow *parent, GraphData data, const GraphSettings &se
     //}
     //stream.clear();
     //stream.get();
-    
+
     // min & max
     Pointfs data_points = data.data();
     if (!data_points.empty()) {
         for (Vec2d &point : data_points) {
+            m_last_min_x = std::min(m_last_min_x, (point.x()));
+            m_last_max_x = std::max(m_last_max_x, (point.x()));
             m_last_min_y = std::min(m_last_min_y, (point.y()));
             m_last_max_y = std::max(m_last_max_y, (point.y()));
+        }
+        if (m_last_min_x >= m_last_max_x) {
+            m_last_max_x = std::max(m_last_min_x, m_last_max_x) * 1.1f;
+            m_last_min_x = std::min(m_last_min_x, m_last_max_x) * 0.9f;
+        } else {
+            m_last_min_x = int(m_last_min_x * 10 - 1 + EPSILON) / 10.f;
+            m_last_max_x = int(1.9f + m_last_max_x * 10 - EPSILON) / 10.f;
         }
         if (m_last_min_y >= m_last_max_y) {
             m_last_max_y = std::max(m_last_min_y, m_last_max_y) * 1.1f;
@@ -174,28 +158,23 @@ GraphPanel::GraphPanel(wxWindow *parent, GraphData data, const GraphSettings &se
             m_last_min_y = int(m_last_min_y * 10 - 1 + EPSILON) / 10.f;
             m_last_max_y = int(1.9f + m_last_max_y * 10 - EPSILON) / 10.f;
         }
-        if (m_last_max_y == m_last_min_y) {
-            m_last_max_y = settings.max_y;
-        }
-    } else {
-        m_last_min_y = settings.min_y;
-        m_last_max_y = settings.max_y;
-    }
-    
-    if (!data_points.empty()) {
-        if (data_points.size() == 1) {
+        if (settings.label_min_x.empty()) {
             m_last_min_x = settings.min_x;
-        } else {
-            m_last_min_x = std::max(settings.min_x, data_points.begin()->x() - settings.step_x);
         }
-        if (data_points.rbegin()->x() <= m_last_min_x + settings.step_x) {
+        if (m_last_max_x == m_last_min_x || settings.label_max_x.empty()) {
             m_last_max_x = settings.max_x;
-        } else {
-            m_last_max_x = std::min(settings.max_x, data_points.rbegin()->x() + settings.step_x);
+        }
+        if (settings.label_min_y.empty()) {
+            m_last_min_y = settings.min_y;
+        }
+        if (m_last_max_y == m_last_min_y || settings.label_max_y.empty()) {
+            m_last_max_y = settings.max_y;
         }
     } else {
         m_last_min_x = settings.min_x;
         m_last_max_x = settings.max_x;
+        m_last_min_y = settings.min_y;
+        m_last_max_y = settings.max_y;
     }
 
     std::vector<std::pair<float, float>> buttons;
@@ -220,26 +199,33 @@ GraphPanel::GraphPanel(wxWindow *parent, GraphData data, const GraphSettings &se
         _(settings.description)));
     sizer_chart->Add(m_chart, 0, wxALL, 5);
 
-
-    if (!settings.label_min_x.empty())
-        m_widget_min_x = new wxSpinCtrlDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+    if (!settings.label_min_x.empty()) {
+        m_widget_min_x = new SpinInputDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
                                               wxSize(ITEM_WIDTH(), -1), style | wxTE_PROCESS_ENTER, settings.min_x,
                                               settings.max_x, m_last_min_x, settings.step_x);
-    if (!settings.label_max_x.empty())
-        m_widget_max_x = new wxSpinCtrlDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+        m_widget_min_x->SetToolTip(format_wxstr(_L("Minimum: %1%"), Slic3r::to_string_nozero(settings.min_x, 4)));
+    }
+    if (!settings.label_max_x.empty()) {
+        m_widget_max_x = new SpinInputDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
                                               wxSize(ITEM_WIDTH(), -1), style | wxTE_PROCESS_ENTER, settings.min_x,
                                               settings.max_x, m_last_max_x, settings.step_x);
+        m_widget_max_x->SetToolTip(format_wxstr(_L("Maximum: %1%"), Slic3r::to_string_nozero(settings.max_x, 4)));
+    }
     // note: wxTE_PROCESS_ENTER allow the wxSpinCtrl to receive wxEVT_TEXT_ENTER events
- 
-    if (!settings.label_min_y.empty())
-        m_widget_min_y = new wxSpinCtrlDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+
+    if (!settings.label_min_y.empty()) {
+        m_widget_min_y = new SpinInputDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
                                               wxSize(ITEM_WIDTH(), -1), style | wxTE_PROCESS_ENTER, settings.min_y,
                                               settings.max_y, m_last_min_y, settings.step_y);
-    if (!settings.label_max_y.empty())
-        m_widget_max_y = new wxSpinCtrlDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+        m_widget_min_y->SetToolTip(format_wxstr(_L("Minimum: %1%"), Slic3r::to_string_nozero(settings.min_y, 4)));
+    }
+    if (!settings.label_max_y.empty()) {
+        m_widget_max_y = new SpinInputDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
                                               wxSize(ITEM_WIDTH(), -1), style | wxTE_PROCESS_ENTER, settings.min_y,
                                               settings.max_y, m_last_max_y, settings.step_y);
-    
+        m_widget_max_y->SetToolTip(format_wxstr(_L("Maximum: %1%"), Slic3r::to_string_nozero(settings.max_y, 4)));
+    }
+
     m_chart->set_xy_range(m_last_min_x, m_last_min_y, m_last_max_x, m_last_max_y);
 
 #ifdef _WIN32
@@ -282,17 +268,35 @@ GraphPanel::GraphPanel(wxWindow *parent, GraphData data, const GraphSettings &se
         }
         sizer_chart->Add(size_line);
     }
-    
-    
+
     wxBoxSizer *size_line = new wxBoxSizer(wxHORIZONTAL);
     wxButton *bt_reset = new wxButton(this, wxID_ANY, _L("Reset"));
     bt_reset->SetToolTip(_L("Reset all points to defaults."));
     size_line->Add(bt_reset);
     size_line->AddSpacer(20);
     wxButton *bt_type = new wxButton(this, wxID_ANY, _L("Change Type"));
-    bt_type->SetToolTip(_L("Change the graph type into square, linear or spline."));
+    bt_type->SetToolTip(_L("Change the graph type into square (threshold), linear or spline shape."));
     size_line->Add(bt_type);
-    sizer_chart->Add(size_line);
+    size_line->AddSpacer(20);
+    wxStaticText* help_text = new wxStaticText(this, wxID_ANY, wxString(_("Help")));
+    help_text->SetToolTip(_L("You can drag the control points. The value of the point dragged is shown on bottom right."
+    "\nYou can left click on a point to select it (it will turn yellow), you can then modify it in the bottom right boxes."
+    "\nTo delete a point, left-click it."
+    "\nTo add a point, left-click where you want to add it."));
+    size_line->Add(help_text, 0, wxALIGN_CENTER_VERTICAL);
+    size_line->AddStretchSpacer();
+    // x & y input fied for selection
+    m_widget_x = new SpinInputDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                                            wxSize(ITEM_WIDTH(), -1), style | wxTE_PROCESS_ENTER,
+                                            m_last_min_x, m_last_max_x, m_last_min_x, settings.step_x);
+    m_widget_y = new SpinInputDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                                            wxSize(ITEM_WIDTH(), -1), style | wxTE_PROCESS_ENTER,
+                                            m_last_min_y, m_last_max_y, m_last_min_y, settings.step_y);
+    size_line->Add(new wxStaticText(this, wxID_ANY, wxString(_("Selected") + " :")), 0, wxALIGN_CENTER_VERTICAL);
+    size_line->Add(m_widget_x);
+    size_line->Add(m_widget_y);
+
+    sizer_chart->Add(size_line, 0, wxEXPAND);
     
     sizer_chart->SetSizeHints(this);
     SetSizer(sizer_chart);
@@ -325,173 +329,111 @@ GraphPanel::GraphPanel(wxWindow *parent, GraphData data, const GraphSettings &se
     }));
 
     if (!settings.label_max_x.empty()) {
-        m_widget_max_x->Bind(wxEVT_TEXT_ENTER, [this, settings](wxCommandEvent &evt) {
-            // m_widget_max_x->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
-            // double old_speed = m_last_max_x;
-            // m_last_max_x = std::atof(evt.GetString().c_str());
-            // m_last_max_x = int32_t(m_last_max_x / settings.step_x)  * settings.step_x;
-            // m_last_max_x = std::min(std::max(m_last_max_x, settings.min_x), settings.max_x);
-            // m_last_max_x = std::max(m_last_max_x, m_last_min_x + settings.step_x);
-            // m_widget_max_x->SetValue(m_last_max_x);
-            // double precision = 0.000001f;
-            // while(precision < (m_last_max_x - m_last_min_x)) precision *= 10;
-            // m_chart->set_x_label(_(settings.x_label), float(precision/1000));
-            // m_chart->set_xy_range(m_last_min_x, std::numeric_limits<float>::quiet_NaN(), m_last_max_x,
-            // std::numeric_limits<float>::quiet_NaN());
-            double new_precision = text_enter_event(m_widget_max_x, m_last_max_x, m_last_min_x, m_last_max_x,
-                                                    settings.min_x, settings.max_x, settings.step_x, evt);
-            if (new_precision != 0) {
-                m_chart->set_x_label(_(settings.x_label), new_precision);
-                m_chart->set_xy_range(m_last_min_x, std::numeric_limits<float>::quiet_NaN(), m_last_max_x,
-                                      std::numeric_limits<float>::quiet_NaN());
-            }
-        });
+
         // m_widget_max_x->Bind(wxEVT_TEXT, [this, settings](wxCommandEvent &evt) {
         m_widget_max_x->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
-            // const double evt_dbl_val = std::atof(evt.GetString().c_str());
-            //// if second call, from our SetValue, ignore.
-            // if(std::abs(evt_dbl_val - m_last_max_x) < 0.0000001) return;
-            // double incr = settings.step_x;
-            // while (m_last_max_x > incr * 20)
-            //    incr *= 10;
-            // if (evt_dbl_val > m_last_max_x) {
-            //    m_last_max_x += incr;
-            //} else {
-            //    m_last_max_x -= incr;
-            //}
-            // m_last_max_x = std::min(std::max(m_last_max_x, settings.min_x), settings.max_x);
-            // m_last_max_x = std::max(m_last_max_x, m_last_min_x + settings.step_x);
-            // float precision = 0.000001f;
-            // while(precision < (m_last_max_x - m_last_min_x)) precision *= 10;
-            double new_precision = spin_move(m_widget_max_x, m_last_max_x, m_last_min_x, m_last_max_x, settings.min_x,
+            double new_precision = use_double_event(m_widget_max_x, m_last_max_x, m_last_min_x, m_last_max_x, settings.min_x,
                                              settings.max_x, settings.step_x, evt);
             if (new_precision != 0) {
                 m_chart->set_x_label(_(settings.x_label), new_precision);
                 m_chart->set_xy_range(m_last_min_x, std::numeric_limits<float>::quiet_NaN(), m_last_max_x,
                                       std::numeric_limits<float>::quiet_NaN());
+                m_widget_x->SetRange(m_last_min_x, m_last_max_x);
             }
         });
     }
     if (!settings.label_min_x.empty()) {
-        m_widget_min_x->Bind(wxEVT_TEXT_ENTER, [this, settings](wxCommandEvent &evt) {
-            // double old_speed = m_last_min_x;
-            // m_last_min_x = std::atof(evt.GetString().c_str());
-            // m_last_min_x = int32_t(m_last_min_x / settings.step_x)  * settings.step_x;
-            // m_last_min_x = std::min(std::max(m_last_min_x, settings.min_x), settings.max_x);
-            // m_last_min_x = std::min(m_last_min_x, m_last_max_x - settings.step_x);
-            // m_widget_min_x->SetValue(m_last_min_x);
-            // double precision = 0.000001f;
-            // while(precision < (m_last_max_x - m_last_min_x)) precision *= 10;
-            // m_chart->set_x_label(_(settings.x_label), float(precision/1000));
-            // m_chart->set_xy_range(m_last_min_x, std::numeric_limits<float>::quiet_NaN(), m_last_max_x,
-            // std::numeric_limits<float>::quiet_NaN());
-            double new_precision = text_enter_event(m_widget_min_x, m_last_min_x, m_last_min_x, m_last_max_x,
-                                                    settings.min_x, settings.max_x, settings.step_x, evt);
-            if (new_precision != 0) {
-                m_chart->set_x_label(_(settings.x_label), new_precision);
-                m_chart->set_xy_range(m_last_min_x, std::numeric_limits<float>::quiet_NaN(), m_last_max_x,
-                                      std::numeric_limits<float>::quiet_NaN());
-            }
-        });
-        // m_widget_min_x->Bind(wxEVT_TEXT, [this, settings](wxCommandEvent &evt) {
         m_widget_min_x->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
-            // double evt_dbl_val = std::atof(evt.GetString().c_str());
-            //// if second call, from our SetValue, ignore.
-            // if(std::abs(evt_dbl_val - m_last_min_x) < 0.0000001) return;
-            // double incr = settings.step_x;
-            // while (m_last_min_x > incr * 20)
-            //    incr *= 10;
-            // if (evt_dbl_val > m_last_min_x) {
-            //    m_last_min_x += incr;
-            //} else {
-            //    m_last_min_x -= incr;
-            //}
-            // m_last_min_x = std::min(std::max(m_last_min_x, settings.min_x), settings.max_x);
-            // m_last_min_x = std::min(m_last_min_x, m_last_max_x - settings.step_x);
-            // float precision = 0.000001f;
-            // while(precision < (m_last_max_x - m_last_min_x)) precision *= 10;
-            // m_chart->set_x_label(_(settings.x_label), precision / 1000);
-            // m_widget_min_x->SetValue(m_last_min_x);
-            // m_chart->set_xy_range(m_last_min_x, std::numeric_limits<float>::quiet_NaN(), m_last_max_x,
-            // std::numeric_limits<float>::quiet_NaN());
-            double new_precision = spin_move(m_widget_min_x, m_last_min_x, m_last_min_x, m_last_max_x, settings.min_x,
+            double new_precision = use_double_event(m_widget_min_x, m_last_min_x, m_last_min_x, m_last_max_x, settings.min_x,
                                              settings.max_x, settings.step_x, evt);
             if (new_precision != 0) {
                 m_chart->set_x_label(_(settings.x_label), new_precision);
                 m_chart->set_xy_range(m_last_min_x, std::numeric_limits<float>::quiet_NaN(), m_last_max_x,
                                       std::numeric_limits<float>::quiet_NaN());
+                m_widget_x->SetRange(m_last_min_x, m_last_max_x);
             }
         });
     }
-    // these work for wxSpinCtrl but not for wxSpinCtrlDouble
-    //m_widget_max_y->Bind(wxEVT_SPINCTRL, [this, settings](wxSpinEvent &evt) { // this one works 
-    //m_widget_max_y->Bind(wxEVT_SPIN_UP, [this](wxSpinEvent &evt) {
-    //        std::cout<<"up";
-    //    });
-    //m_widget_max_y->Bind(wxEVT_SPIN_DOWN, [this](wxSpinEvent &evt) {
-    //        std::cout<<"down";
-    //    });
-    
-    //m_widget_min_y->Bind(wxEVT_TEXT, [this, settings](wxCommandEvent &) {
-    //    double precision = 0.000001f;
-    //    while(precision < (m_widget_max_y->GetValue() - m_widget_min_y->GetValue())) precision *= 10;
-    //    m_chart->set_y_label(_(settings.y_label), float(precision/1000));
-    //    m_chart->set_xy_range(std::numeric_limits<float>::quiet_NaN(), m_widget_min_y->GetValue(), std::numeric_limits<float>::quiet_NaN(), m_widget_max_y->GetValue());
-    //});
-    //m_widget_min_y->Bind(wxEVT_CHAR, [](wxKeyEvent &) {});   // do nothing - prevents the user to change the value
-    //m_widget_max_y->Bind(wxEVT_TEXT, [this, settings](wxCommandEvent &) {
-    //    double precision = 0.000001f;
-    //    while(precision < (m_widget_max_y->GetValue() - m_widget_min_y->GetValue())) precision *= 10;
-    //    m_chart->set_y_label(_(settings.y_label), float(precision/1000));
-    //    m_chart->set_xy_range(std::numeric_limits<float>::quiet_NaN(), m_widget_min_y->GetValue(), std::numeric_limits<float>::quiet_NaN(), m_widget_max_y->GetValue());
-    //});
     if (!settings.label_min_y.empty()) {
-        m_widget_min_y->Bind(wxEVT_TEXT_ENTER, [this, settings](wxCommandEvent &evt) {
-            double new_precision = text_enter_event(m_widget_min_y, m_last_min_y, m_last_min_y, m_last_max_y,
-                                                    settings.min_y, settings.max_y, settings.step_y, evt);
-            if (new_precision != 0) {
-                m_chart->set_y_label(_(settings.y_label), new_precision);
-                m_chart->set_xy_range(std::numeric_limits<float>::quiet_NaN(), m_last_min_y,
-                                      std::numeric_limits<float>::quiet_NaN(), m_last_max_y);
-            }
-        });
         m_widget_min_y->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
-            double new_precision = spin_move(m_widget_min_y, m_last_min_y, m_last_min_y, m_last_max_y, settings.min_y,
+            double new_precision = use_double_event(m_widget_min_y, m_last_min_y, m_last_min_y, m_last_max_y, settings.min_y,
                                              settings.max_y, settings.step_y, evt);
             if (new_precision != 0) {
                 m_chart->set_y_label(_(settings.y_label), new_precision);
                 m_chart->set_xy_range(std::numeric_limits<float>::quiet_NaN(), m_last_min_y,
                                       std::numeric_limits<float>::quiet_NaN(), m_last_max_y);
+                m_widget_y->SetRange(m_last_min_y, m_last_max_y);
             }
         });
     }
     
     if (!settings.label_max_y.empty()) {
-        m_widget_max_y->Bind(wxEVT_TEXT_ENTER, [this, settings](wxCommandEvent &evt) {
-            double new_precision = text_enter_event(m_widget_max_y, m_last_max_y, m_last_min_y, m_last_max_y,
-                                                    settings.min_y, settings.max_y, settings.step_y, evt);
-            if (new_precision != 0) {
-                m_chart->set_y_label(_(settings.y_label), new_precision);
-                m_chart->set_xy_range(std::numeric_limits<float>::quiet_NaN(), m_last_min_y,
-                                      std::numeric_limits<float>::quiet_NaN(), m_last_max_y);
-            }
-        });
         m_widget_max_y->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
-            double new_precision = spin_move(m_widget_max_y, m_last_max_y, m_last_min_y, m_last_max_y, settings.min_y,
+            double new_precision = use_double_event(m_widget_max_y, m_last_max_y, m_last_min_y, m_last_max_y, settings.min_y,
                                              settings.max_y, settings.step_y, evt);
             if (new_precision != 0) {
                 m_chart->set_y_label(_(settings.y_label), new_precision);
                 m_chart->set_xy_range(std::numeric_limits<float>::quiet_NaN(), m_last_min_y,
                                       std::numeric_limits<float>::quiet_NaN(), m_last_max_y);
+                m_widget_y->SetRange(m_last_min_y, m_last_max_y);
             }
         });
     }
-    //m_widget_max_y->Bind(wxEVT_CHAR, [](wxKeyEvent &) {});   // do nothing - prevents the user to change the value
-    //Bind(EVT_SLIC3R_CHART_CHANGED, [this](wxCommandEvent &) {
-    //    //int nb_samples = m_chart->get_value_samples(10.f).size();
-    //    //m_last_max_x = 10 * nb_samples;
-    //    //m_widget_max_x->SetValue(m_last_max_x);
-    //});
+
+    // for selected value
+    m_widget_x->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
+        double new_x = m_widget_x->GetValue();
+        new_x = int(new_x / m_widget_x->GetIncrement()) * m_widget_x->GetIncrement();
+        if (m_widget_x->GetValue() != new_x) {
+            m_widget_x->SetValue(new_x);
+        }
+        wxPoint2DDouble pos = m_chart->get_selected_point_position();
+        pos.m_x = new_x;
+        m_chart->set_selected_point_position(pos);
+    });
+
+    m_widget_y->Bind(wxEVT_SPINCTRLDOUBLE, [this, settings](wxSpinDoubleEvent &evt) {
+        double new_y = m_widget_y->GetValue();
+        new_y = int(new_y / m_widget_y->GetIncrement()) * m_widget_y->GetIncrement();
+        if (m_widget_y->GetValue() != new_y) {
+            m_widget_y->SetValue(new_y);
+        }
+        wxPoint2DDouble pos = m_chart->get_selected_point_position();
+        pos.m_y = new_y;
+        m_chart->set_selected_point_position(pos);
+    });
+
+    m_chart->set_selection_point_callback([this](std::optional<wxPoint2DDouble> val) {
+        m_widget_x->Enable(val.has_value());
+        m_widget_y->Enable(val.has_value());
+        if (val) {
+            m_widget_x->SetValue(val->m_x);
+            m_widget_y->SetValue(val->m_y);
+        }
+    });
+    m_widget_x->Enable(false);
+    m_widget_y->Enable(false);
+
+    update_ui(bt_reset);
+    update_ui(bt_type);
+    if (m_widget_min_x) {
+        update_ui(m_widget_min_x);
+    }
+    if (m_widget_max_x) {
+        update_ui(m_widget_max_x);
+    }
+    if (m_widget_min_y) {
+        update_ui(m_widget_min_y);
+    }
+    if (m_widget_max_y) {
+        update_ui(m_widget_max_y);
+    }
+    if (m_widget_x) {
+        update_ui(m_widget_x);
+    }
+    if (m_widget_y) {
+        update_ui(m_widget_y);
+    }
     Refresh(true); // erase background
 }
 
@@ -517,7 +459,11 @@ GraphData GraphPanel::get_data()
     assert(m_chart->get_max_x() > m_chart->get_min_x());
     for (size_t idx = 0; idx < buttons.size(); ++idx) {
         const std::pair<float, float> &pt = buttons[idx];
-        data.graph_points.emplace_back(pt.first, pt.second);
+        // get good position, as the graph_points are ordered
+        size_t idx_insert = 0;
+        for (idx_insert = 0; idx_insert < data.graph_points.size() && data.graph_points[idx_insert].x() < pt.first;
+             idx_insert++) {}
+        data.graph_points.emplace(data.graph_points.begin() + idx_insert, pt.first, pt.second);
         if (data.begin_idx == size_t(-1) && m_chart->get_min_x() <= pt.first) {
             data.begin_idx = idx;
         }

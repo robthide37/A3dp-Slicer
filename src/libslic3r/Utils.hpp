@@ -43,6 +43,17 @@ const std::string& var_dir();
 // Return a full resource path for a file_name.
 std::string var(const std::string &file_name);
 
+// Set the path of the binary that execute this code
+void set_binary_file(const boost::filesystem::path &path);
+// Return a full path to the binary directory.
+const boost::filesystem::path& binary_file();
+
+// Set the path of the installation of this binary.
+// appimage execute from temporary location, this ensure that even in appimage the instalaltion directory is unique for an installation.
+void set_install_path(const boost::filesystem::path &path);
+// Return a full path to the installation path-key
+const boost::filesystem::path& install_path();
+
 // Set a path with various static definition data (for example the initial config bundles).
 void set_resources_dir(const std::string &path);
 // Return a full path to the resources directory.
@@ -70,11 +81,14 @@ const std::string& custom_gcodes_dir();
 void set_data_dir(const std::string &path);
 // Return a full path to the GUI resource files.
 const std::string& data_dir();
+bool has_data_dir();
 
 // Format an output path for debugging purposes.
 // Writes out the output path prefix to the console for the first time the function is called,
 // so the user knows where to search for the debugging output.
 std::string debug_out_path(const char *name, ...);
+//this one add an extra unique id as the last parameter. You NEED to have a %i or %d to capture it.
+std::string debug_out_path_uniqueid(std::string name, ...);
 
 // A special type for strings encoded in the local Windows 8-bit code page.
 // This type is only needed for Perl bindings to relay to Perl that the string is raw, not UTF-8 encoded.

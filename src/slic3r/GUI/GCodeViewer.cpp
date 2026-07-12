@@ -30,6 +30,7 @@
 #include "GLToolbar.hpp"
 #include "GUI_Preview.hpp"
 #include "GUI_ObjectManipulation.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 
 #include <imgui/imgui_internal.h>
 
@@ -50,6 +51,9 @@
 
 namespace Slic3r {
 namespace GUI {
+
+
+using Mat4x4 = std::array<float, 16>;
 
 static unsigned char buffer_id(EMoveType type) {
     return static_cast<unsigned char>(type) - static_cast<unsigned char>(EMoveType::Retract);
@@ -222,7 +226,10 @@ void GCodeViewer::COG::render()
         const double inv_zoom = camera.get_inv_zoom();
         model_matrix = model_matrix * Geometry::scale_transform(inv_zoom);
     }
-    const Transform3d& view_matrix = camera.get_view_matrix();
+    
+    Transform3d view_matrix = camera.get_view_matrix();
+    view_matrix.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+    
     shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
@@ -847,13 +854,20 @@ void GCodeViewer::SequentialView::Marker::render()
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
     const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d& view_matrix = camera.get_view_matrix();
-    const Transform3d model_matrix = m_world_transform.cast<double>();
+
+    Transform3d view_matrix = camera.get_view_matrix();
+    view_matrix.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+
+    float scale_factor = m_scale_factor;
+    if (m_fixed_screen_size)
+        scale_factor *= 10.0f * camera.get_inv_zoom();
+    const Transform3d model_matrix = (Geometry::translation_transform((m_world_position + m_model_z_offset * Vec3f::UnitZ()).cast<double>()) *
+        Geometry::translation_transform(scale_factor * m_model.get_bounding_box().size().z() * Vec3d::UnitZ()) * Geometry::rotation_transform({ M_PI, 0.0, 0.0 })) *
+        Geometry::scale_transform(scale_factor);
     shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
     shader->set_uniform("view_normal_matrix", view_normal_matrix);
-
     m_model.render();
 
     shader->stop_using();
@@ -1404,25 +1418,24 @@ void GCodeViewer::init()
     m_gl_data_initialized = true;
 }
 
-bool GCodeViewer::is_loaded(const GCodeProcessorResult& gcode_result) {
-    return (m_last_result_id == gcode_result.id);
-}
-
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print)
 {
-    if (!m_gcode_result.has_value())
-        m_gcode_result = gcode_result;
+
+    m_gcode_result = wxGetApp().plater_->get_gcode_results()[s_multiple_beds.get_active_bed()];
+
     assert(&m_gcode_result->get() == &gcode_result);
     if (!m_print.has_value())
         m_print = print;
     assert(&m_print->get() == &print);
 
+    // update decimal_precision, in case the gcodeviewer_decimals changed (it shouldn't)
+    this->decimal_precision = uint8_t(std::max(0, std::min(6, atoi(Slic3r::GUI::get_app_config()->get("gcodeviewer_decimals").c_str()))));
+
     // avoid processing if called with the same gcode_result
     // unless you changed the path merge mode
-    if (m_last_result_id == gcode_result.id && (m_current_mode == m_last_mode))
-            //(m_last_view_type != EViewType::VolumetricRate && m_view_type != EViewType::VolumetricRate &&
-             //m_last_view_type != EViewType::VolumetricFlow && m_view_type != EViewType::VolumetricFlow)))
+    if (m_last_result_id == gcode_result.id && ! s_beds_switched_since_last_gcode_load && wxGetApp().is_editor() && ! s_reload_preview_after_switching_beds) {
         return;
+    }
 
     m_last_result_id = gcode_result.id;
     m_last_view_type = m_view_type;
@@ -1436,13 +1449,21 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     if (wxGetApp().is_gcode_viewer())
         m_custom_gcode_per_print_z = gcode_result.custom_gcode_per_print_z;
 
+
+    if (wxGetApp().is_editor()) {
+        m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(gcode_result, m_paths_bounding_box);
+        if (!m_contained_in_bed) {
+            s_print_statuses[s_multiple_beds.get_active_bed()] = PrintStatus::toolpath_outside;
+        }
+    }
+    
     m_max_print_height = gcode_result.max_print_height;
     m_z_offset = gcode_result.z_offset;
+    s_beds_switched_since_last_gcode_load = false;
 
     load_toolpaths(gcode_result);
     load_wipetower_shell(print);
     
-
     if (m_layers.empty())
         return;
 
@@ -1519,12 +1540,16 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
 
     wxBusyCursor busy;
 
-    if (m_view_type == EViewType::Tool && !gcode_result.extruder_colors.empty())
-        // update tool colors from config stored in the gcode
-        decode_colors(gcode_result.extruder_colors, m_tool_colors);
-    else
+    if (m_view_type == EViewType::Tool && !gcode_result.extruder_colors.empty()) {
+        assert(str_tool_colors.size() == gcode_result.extruder_colors.size());
         // update tool colors
         decode_colors(str_tool_colors, m_tool_colors);
+        // update (override) tool colors from config stored in the gcode where it's defined.
+        decode_colors(gcode_result.extruder_colors, m_tool_colors);
+    } else {
+        // update tool colors
+        decode_colors(str_tool_colors, m_tool_colors);
+    }
 
     ColorRGBA default_color;
     decode_color("#FF8000", default_color);
@@ -1533,12 +1558,16 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
     while (m_tool_colors.size() < std::max(size_t(1), gcode_result.extruders_count))
         m_tool_colors.push_back(default_color);
 
-    if (!gcode_result.filament_colors.empty())
-        // update tool colors from config stored in the gcode
+    if (!gcode_result.filament_colors.empty()) {
+        assert(str_tool_colors.size() == gcode_result.filament_colors.size());
+        // update filament colors
+        decode_colors(str_tool_colors, m_filament_colors);
+        // update(override) filament colors from config stored in the gcode
         decode_colors(gcode_result.filament_colors, m_filament_colors);
-    else
+    } else {
         // use tool colors
         decode_colors(str_tool_colors, m_filament_colors);
+    }
 
     // ensure there are enough colors defined
     while (m_filament_colors.size() < std::max(size_t(1), gcode_result.extruders_count)) {
@@ -2305,8 +2334,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         }
     }
 
-    if (wxGetApp().is_editor())
-        m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(gcode_result, m_paths_bounding_box);
+    m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(GCodeProcessorResult(), m_paths_bounding_box);
+    if (!m_contained_in_bed) {
+        s_print_statuses[s_multiple_beds.get_active_bed()] = PrintStatus::toolpath_outside;
+    }
 
     m_cog.reset();
 
@@ -3060,17 +3091,15 @@ void GCodeViewer::load_wipetower_shell(const Print& print)
         // adds wipe tower's volume
         const double max_z = print.objects()[0]->model_object()->get_model()->max_z();
         const PrintConfig& config = print.config();
-        const size_t extruders_count = config.nozzle_diameter.size();
-        if (extruders_count > 1 && config.wipe_tower && !config.complete_objects) {
-            //FIXME using first nozzle diameter instead of the "right" one.
-            const WipeTowerData& wipe_tower_data = print.wipe_tower_data(extruders_count, config.nozzle_diameter.get_at(0));
+        if (print.has_wipe_tower()) {
+            const WipeTowerData& wipe_tower_data = print.wipe_tower_data();
             const float depth = wipe_tower_data.depth;
             const std::vector<std::pair<float, float>> z_and_depth_pairs = wipe_tower_data.z_and_depth_pairs;
             const float brim_width = wipe_tower_data.brim_width;
             if (depth != 0.) {
-                m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, z_and_depth_pairs,
-                    max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle, false, brim_width);
-                const std::unique_ptr<GLVolume> &volume = m_shells.volumes.volumes.back();
+                m_shells.volumes.load_wipe_tower_preview(wxGetApp().plater()->model().wipe_tower().position.x(), wxGetApp().plater()->model().wipe_tower().position.y(), config.wipe_tower_width, depth, z_and_depth_pairs,
+                    max_z, config.wipe_tower_cone_angle, wxGetApp().plater()->model().wipe_tower().rotation, false, brim_width, 0);
+                GLVolume* volume = m_shells.volumes.volumes.back().get();
                 volume->color.a(0.25f);
                 volume->force_native_color = true;
                 volume->set_render_color(true);
@@ -3275,7 +3304,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
     //fix error (all paths in m_buffers may be out of the m_layers_z_range)
     //FIXME better than this dumb stop-gap
     if (global_endpoints.first > global_endpoints.last) {
-        global_endpoints = { 0, m_moves_count };
+        global_endpoints = { 0, 0 };//m_moves_count };
         top_layer_endpoints = global_endpoints;
     }
 
@@ -3359,15 +3388,24 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         if (found)
             break;
     }
-    
+
     // update_print_min_max if activated
     Extrusions::Range *range = const_cast<GCodeViewer::Extrusions::Ranges&>(m_extrusions.ranges).get(m_view_type); // this break const-correctness
     if (range && !range->is_whole_print_mode()) {
         range->reset_print_min_max();
-        for (const auto &[tbuffer_id, ibuffer_id, path_id, sub_path_id] : paths) {
-            const Path &path = m_buffers[tbuffer_id].paths[path_id];
-            if (path.type == EMoveType::Extrude) {
-                range->update_print_min_max(path.get_value(m_view_type));
+        if (m_view_type == EViewType::LayerTime) {
+            for (size_t i = 0; i < m_layers_times.size(); ++i) {
+                for (size_t layer_id = m_layers_z_range[0];
+                     layer_id < m_layers_z_range[1] && layer_id < m_layers_times[i].size(); ++layer_id) {
+                    range->update_print_min_max(m_layers_times[i][layer_id]);
+                }
+            }
+        } else {
+            for (const auto &[tbuffer_id, ibuffer_id, path_id, sub_path_id] : paths) {
+                const Path &path = m_buffers[tbuffer_id].paths[path_id];
+                if (path.type == EMoveType::Extrude) {
+                    range->update_print_min_max(path.get_value(m_view_type));
+                }
             }
         }
     }
@@ -3690,9 +3728,22 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 }
 
+
 void GCodeViewer::render_toolpaths()
 {
     const Camera& camera = wxGetApp().plater()->get_camera();
+    
+    Transform3d tr = camera.get_view_matrix();
+    tr.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+    
+    // Directly get the Matrix4f instead of using unnecessary conversion
+    Matrix4f view_matrix = tr.matrix().cast<float>();
+    Matrix4f projection_matrix = camera.get_projection_matrix().matrix().cast<float>();
+
+    // Use the view_matrix and projection_matrix directly
+    const Matrix4f& final_view_matrix = view_matrix;
+    const Matrix4f& final_projection_matrix = projection_matrix;
+
 #if !ENABLE_GL_CORE_PROFILE
     const double zoom = camera.get_zoom();
 #endif // !ENABLE_GL_CORE_PROFILE
@@ -3866,8 +3917,8 @@ void GCodeViewer::render_toolpaths()
 
         shader->start_using();
 
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("view_model_matrix", final_view_matrix);
+       shader->set_uniform("projection_matrix", final_projection_matrix);
         shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 
         if (buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
@@ -3888,6 +3939,9 @@ void GCodeViewer::render_toolpaths()
             const int normal_id   = shader->get_attrib_location("v_normal");
             const int uniform_color = shader->get_uniform_location("uniform_color");
 
+            if (buffer.render_paths.empty()) {
+                continue;
+            }
             auto it_path = buffer.render_paths.begin();
             for (unsigned int ibuffer_id = 0; ibuffer_id < static_cast<unsigned int>(buffer.indices.size()); ++ibuffer_id) {
                 const IBuffer& i_buffer = buffer.indices[ibuffer_id];
@@ -3956,7 +4010,7 @@ void GCodeViewer::render_toolpaths()
 #if ENABLE_GCODE_VIEWER_STATISTICS
     auto render_sequential_range_cap = [this, &camera]
 #else
-    auto render_sequential_range_cap = [&camera]
+           auto render_sequential_range_cap = [&camera, final_projection_matrix, final_view_matrix]
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
     (const SequentialRangeCap& cap) {
         const TBuffer* buffer = cap.buffer;
@@ -3965,9 +4019,9 @@ void GCodeViewer::render_toolpaths()
             return;
 
         shader->start_using();
-
-        shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        
+        shader->set_uniform("view_model_matrix", final_view_matrix);
+        shader->set_uniform("projection_matrix", final_projection_matrix);
         shader->set_uniform("view_normal_matrix", (Matrix3d)Matrix3d::Identity());
 
         const int position_id = shader->get_attrib_location("v_position");
@@ -4032,7 +4086,10 @@ void GCodeViewer::render_shells()
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
     const Camera& camera = wxGetApp().plater()->get_camera();
-    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
+
+    Transform3d tr = camera.get_view_matrix();
+    tr.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+
     shader->set_uniform("emission_factor", 0.0f);
     shader->stop_using();
 }
@@ -4096,7 +4153,7 @@ void GCodeViewer::render_legend(float& legend_height)
 
     bool imperial_units = wxGetApp().app_config->get_bool("use_inches");
 
-    auto append_item = [icon_size, percent_bar_size, &imgui, imperial_units](EItemType type, const ColorRGBA& color, const std::string& label,
+    auto append_item = [icon_size, percent_bar_size, &imgui, imperial_units, decimal_preci = this->decimal_precision](EItemType type, const ColorRGBA& color, const std::string& label,
         bool visible = true, const std::string& time = "", float percent = 0.0f, float max_percent = 0.0f, const std::array<float, 4>& offsets = { 0.0f, 0.0f, 0.0f, 0.0f },
         double used_filament_m = 0.0, double used_filament_g = 0.0,
         std::function<void()> callback = nullptr) {
@@ -4171,9 +4228,11 @@ void GCodeViewer::render_legend(float& legend_height)
                 ::sprintf(buf, "%.1f%%", 100.0f * percent);
                 ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
                 ImGui::SameLine(offsets[2]);
-                imgui.text(format("%1$.2f %2%", used_filament_m, (imperial_units ? inches : metres)));
+                std::string str_dist_m = Slic3r::to_string_nozero(used_filament_m, decimal_preci);
+                imgui.text(str_dist_m + " " + (imperial_units ? inches : metres));
                 ImGui::SameLine(offsets[3]);
-                imgui.text(format("%1$.2f %2%", used_filament_g, grams));
+                std::string str_weight_g = Slic3r::to_string_nozero(used_filament_g, decimal_preci);
+                imgui.text(str_weight_g + " " + grams);
             }
         }
         else {
@@ -4194,9 +4253,11 @@ void GCodeViewer::render_legend(float& legend_height)
             }
             else if (used_filament_m > 0.0) {
                 ImGui::SameLine(offsets[0]);
-                imgui.text(format("%1$.2f %2%", used_filament_m, (imperial_units ? inches : metres)));
+                std::string str_dist_m = Slic3r::to_string_nozero(used_filament_m, decimal_preci);
+                imgui.text(str_dist_m + " " + (imperial_units ? inches : metres));
                 ImGui::SameLine(offsets[1]);
-                imgui.text(format("%1$.2f %2%", used_filament_g, grams));
+                std::string str_weight_g = Slic3r::to_string_nozero(used_filament_g, decimal_preci);
+                imgui.text(str_weight_g + " " + grams);
             }
         }
 
@@ -4334,10 +4395,10 @@ void GCodeViewer::render_legend(float& legend_height)
 
         std::string longest_used_filament_string;
         for (double item : used_filaments_m) {
-            char buffer[64];
-            ::sprintf(buffer, imperial_units ? "%.2f in" : "%.2f m", item);
-            if (::strlen(buffer) > longest_used_filament_string.length())
-                longest_used_filament_string = buffer;
+            std::string str = Slic3r::to_string_nozero(item, this->decimal_precision);
+            if (str.size() + (imperial_units ? 3 : 2) > longest_used_filament_string.size()) {
+                longest_used_filament_string = str + (imperial_units ? " in" : " m");
+            }
         }
 
         offsets = calculate_offsets(labels, times, { _u8L("Feature type"), _u8L("Time"), longest_percentage_string, longest_used_filament_string }, icon_size);
@@ -4367,10 +4428,10 @@ void GCodeViewer::render_legend(float& legend_height)
 
         std::string longest_used_filament_string;
         for (double item : used_filaments_m) {
-            char buffer[64];
-            ::sprintf(buffer, imperial_units ? "%.2f in" : "%.2f m", item);
-            if (::strlen(buffer) > longest_used_filament_string.length())
-                longest_used_filament_string = buffer;
+            std::string str = Slic3r::to_string_nozero(item, this->decimal_precision);
+            if (str.size() + (imperial_units ? 3 : 2) > longest_used_filament_string.size()) {
+                longest_used_filament_string = str + (imperial_units ? " in" : " m");
+            }
         }
 
         offsets = calculate_offsets(labels, times, { "Extruder NNN", longest_used_filament_string }, icon_size);
@@ -4409,10 +4470,10 @@ void GCodeViewer::render_legend(float& legend_height)
         }
         std::string longest_used_filament_string;
         for (double item : used_filaments_m) {
-            char buffer[64];
-            ::sprintf(buffer, imperial_units ? "%.2f in" : "%.2f m", item);
-            if (::strlen(buffer) > longest_used_filament_string.length())
-                longest_used_filament_string = buffer;
+            std::string str = Slic3r::to_string_nozero(item, this->decimal_precision);
+            if (str.size() + (imperial_units ? 3 : 2) > longest_used_filament_string.size()) {
+                longest_used_filament_string = str + (imperial_units ? " in" : " m");
+            }
         }
         //i don't know why but it's too small without it
         longest_name += std::string("eee");
@@ -4506,8 +4567,9 @@ void GCodeViewer::render_legend(float& legend_height)
         
         std::array<unsigned int, 2> saved_layers_z_range = m_layers_z_range;
         if (m_gcode_result.has_value() && m_print.has_value()) {
-            this->load(m_gcode_result->get(), m_print->get());
-            this->refresh(m_gcode_result->get(), m_last_str_tool_colors);
+           this->load(wxGetApp().plater_->get_gcode_results()[s_multiple_beds.get_active_bed()], wxGetApp().plater_->active_fff_print());
+            
+            this->refresh(wxGetApp().plater_->get_gcode_results()[s_multiple_beds.get_active_bed()], m_last_str_tool_colors);
         } else {
             wxGetApp().plater()->refresh_print();
         }
@@ -4599,7 +4661,7 @@ void GCodeViewer::render_legend(float& legend_height)
         }
         case EViewType::ColorPrint:
         {
-            const std::vector<CustomGCode::Item>& custom_gcode_per_print_z = wxGetApp().is_editor() ? wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes : m_custom_gcode_per_print_z;
+           const std::vector<CustomGCode::Item>& custom_gcode_per_print_z = wxGetApp().is_editor() ? wxGetApp().plater()->model().custom_gcode_per_print_z().gcodes : m_custom_gcode_per_print_z;
             size_t total_items = 1;
             for (unsigned char i : m_extruder_ids) {
                 total_items += color_print_ranges(i, custom_gcode_per_print_z).size();
@@ -4624,7 +4686,9 @@ void GCodeViewer::render_legend(float& legend_height)
                         }
                         else if (i == items_cnt) {
                             append_item(EItemType::Rect, cp_values[i - 1].first, above_label(cp_values[i - 1].second.second));
+                            continue;
                         }
+                        assert(i < items_cnt);
                         append_item(EItemType::Rect, cp_values[i - 1].first, fromto_label(cp_values[i - 1].second.second, cp_values[i].second.first));
                     }
                 }
@@ -4652,7 +4716,7 @@ void GCodeViewer::render_legend(float& legend_height)
                                 append_item(EItemType::Rect, cp_values[j - 1].first, label);
                                 continue;
                             }
-
+                            assert(j < items_cnt);
                             label += " " + fromto_label(cp_values[j - 1].second.second, cp_values[j].second.first);
                             append_item(EItemType::Rect, cp_values[j - 1].first, label);
                         }
@@ -4695,7 +4759,7 @@ void GCodeViewer::render_legend(float& legend_height)
         auto generate_partial_times = [this, get_used_filament_from_volume](const TimesList& times, const std::vector<double>& used_filaments) {
             PartialTimes items;
 
-            std::vector<CustomGCode::Item> custom_gcode_per_print_z = wxGetApp().is_editor() ? wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes : m_custom_gcode_per_print_z;
+           std::vector<CustomGCode::Item> custom_gcode_per_print_z = wxGetApp().is_editor() ? wxGetApp().plater()->model().custom_gcode_per_print_z().gcodes : m_custom_gcode_per_print_z;
             std::vector<ColorRGBA> last_color(m_extruders_count);
             for (size_t i = 0; i < m_extruders_count; ++i) {
                 last_color[i] = m_tool_colors[i];
@@ -5339,11 +5403,13 @@ void GCodeViewer::render_legend(float& legend_height)
     if (need_refresh_paths) {
         std::array<unsigned int, 2> saved_layers_z_range = m_layers_z_range;
         if (m_gcode_result.has_value() && m_print.has_value()) {
-            this->load(m_gcode_result->get(), m_print->get());
-            this->refresh(m_gcode_result->get(), m_last_str_tool_colors);
+            
+           this->load(wxGetApp().plater_->get_gcode_results()[s_multiple_beds.get_active_bed()], wxGetApp().plater_->active_fff_print());
+           this->refresh(wxGetApp().plater_->get_gcode_results()[s_multiple_beds.get_active_bed()], m_last_str_tool_colors);
         } else {
             wxGetApp().plater()->refresh_print();
         }
+        
         wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
         wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
         wxGetApp().plater()->update_preview_moves_slider();

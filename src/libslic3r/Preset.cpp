@@ -1,10 +1,11 @@
-///|/ Copyright (c) Prusa Research 2017 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
+///|/ Copyright (c) SuperSlicer 2025 Durand rémi @supermerill
+///|/ Copyright (c) Prusa Research 2017 - 2024 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
 ///|/ Copyright (c) 2021 Martin Budden
 ///|/ Copyright (c) 2021 Ilya @xorza
 ///|/ Copyright (c) 2019 John Drake @foxox
 ///|/ Copyright (c) 2018 Martin Loidl @LoidlM
 ///|/
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include <cassert>
 
@@ -24,6 +25,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <regex>
 #include <stdexcept>
 #include <unordered_map>
 #include <boost/format.hpp>
@@ -42,6 +44,7 @@
 #include <boost/log/trivial.hpp>
 
 #include "libslic3r.h"
+#include "Config.hpp"
 #include "Utils.hpp"
 #include "PlaceholderParser.hpp"
 #include "GCode/Thumbnails.hpp"
@@ -49,6 +52,8 @@
 #include "PresetBundle.hpp"
 
 using boost::property_tree::ptree;
+
+// todo: arc_fitting and mlin_gcode_resolution switch from print to printer
 
 namespace Slic3r {
 
@@ -85,13 +90,91 @@ ConfigFileType guess_config_file_type(const ptree &tree)
            (bundle > config) ? CONFIG_FILE_TYPE_CONFIG_BUNDLE : CONFIG_FILE_TYPE_CONFIG;
 }
 
+/*static*/ std::string VendorProfile::get_http_url_rest(const std::string &config_update_rest) {
+    if (config_update_rest.empty()) {
+        return "";
+    }
+    size_t pos_http = config_update_rest.find("://");
+    std::string http_part;
+    std::string domain_part;
+    std::string rest_api_root;
+    //extract http part
+    if (pos_http != std::string::npos) {
+        http_part = config_update_rest.substr(0, pos_http + 3);
+        domain_part = config_update_rest.substr(pos_http + 3);
+    } else {
+        http_part = "";
+        domain_part = config_update_rest;
+    }
+    //extract domain
+    size_t pos_slash = domain_part.find("/");
+    size_t pos_dot = domain_part.find(".");
+    if (pos_dot == std::string::npos) {
+        if (http_part.empty()) {
+            //no http nor domain, use github
+            http_part = "https://";
+            rest_api_root = domain_part;
+            domain_part = "api.github.com/repos";
+            if (!rest_api_root.empty() && rest_api_root[0] == '/') {
+                rest_api_root = rest_api_root.substr(1);
+            }
+            if (!rest_api_root.empty() && rest_api_root[rest_api_root.size() - 1] == '/') {
+                rest_api_root.pop_back();
+            }
+        } else {
+            assert(false);
+            // i don't understand what is it.
+            // use it as-is.
+        }
+    } else {
+        // extract domain
+        if (pos_slash != std::string::npos) {
+            assert(pos_slash <= pos_dot + 4);
+            assert(pos_slash > pos_dot);
+            rest_api_root = domain_part.substr(pos_slash + 1);
+            domain_part = domain_part.substr(0, pos_slash);
+        } else {
+            //no rest api... weird .. but okay...
+            if (!domain_part.empty() && domain_part[rest_api_root.size() - 1] == '/') {
+                domain_part.pop_back();
+            }
+        }
+    }
+    if (domain_part == "github.com") {
+        //we need the api
+        domain_part = "api.github.com/repos";
+    }
+    http_part += domain_part;
+    assert(domain_part.empty() || domain_part.front() != '/');
+    assert(domain_part.empty() || domain_part.back() != '/');
+    assert(domain_part.empty() || domain_part.front() != '.');
+    assert(domain_part.empty() || domain_part.back() != '.');
+    if (!rest_api_root.empty()) {
+        assert(rest_api_root.front() != '/');
+        assert(rest_api_root.back() != '/');
+        http_part += "/";
+        http_part += rest_api_root;
+    }
+    return http_part;
+}
+
+const std::regex VP_FOR_FILENAME("[^0-9a-zA-Z_\\-. ]");
+std::string VendorProfile::usable_id() const {
+    return std::regex_replace(id, VP_FOR_FILENAME, "-");
+}
 
 VendorProfile VendorProfile::from_ini(const boost::filesystem::path &path, bool load_all)
 {
+    const std::string id = path.stem().string();
+
+    if (! boost::filesystem::exists(path)) {
+        throw Slic3r::RuntimeError((boost::format("Cannot load Vendor Config Bundle `%1%`: File not found: `%2%`.") % id % path).str());
+    }
+
     ptree tree;
     boost::nowide::ifstream ifs(path.string());
     boost::property_tree::read_ini(ifs, tree);
-    return VendorProfile::from_ini(tree, path, load_all);
+    return VendorProfile::from_ini(tree, id, load_all);
 }
 
 static const std::unordered_map<std::string, std::string> pre_family_model_map {{
@@ -104,17 +187,13 @@ static const std::unordered_map<std::string, std::string> pre_family_model_map {
     { "SL1",        "SL1" },
 }};
 
-VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem::path &path, bool load_all)
+VendorProfile VendorProfile::from_ini(const ptree &tree, const std::string &base_id, bool load_all)
 {
     static const std::string printer_model_key = "printer_model:";
     static const std::string filaments_section = "default_filaments";
     static const std::string materials_section = "default_sla_materials";
 
-    const std::string id = path.stem().string();
-
-    if (! boost::filesystem::exists(path)) {
-        throw Slic3r::RuntimeError((boost::format("Cannot load Vendor Config Bundle `%1%`: File not found: `%2%`.") % id % path).str());
-    }
+    std::string id = base_id;
 
     VendorProfile res(id);
 
@@ -130,6 +209,15 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
 
     // Load the header
     const auto &vendor_section = get_or_throw(tree, "vendor")->second;
+
+    // fix id if set (can be useful when when getting from internet or loading from a stream)
+    const auto id_node = vendor_section.find("id");
+    if (id_node != vendor_section.not_found()) {
+        std::string id_from_vendor = id_node->second.data();
+        res.id = id = id_from_vendor;
+    }
+
+    // name, full_name and technologies
     res.name = get_or_throw(vendor_section, "name")->second.data();
     auto full_name_node = vendor_section.find("full_name");
     res.full_name = (full_name_node == vendor_section.not_found()) ? res.name : full_name_node->second.data();
@@ -137,26 +225,37 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
     std::vector<std::string> technologies;
     if (Slic3r::unescape_strings_cstyle(technologies_field, technologies) && !technologies.empty()) {
         for (const std::string &technology : technologies) {
-            if (technology == "FFF")
-                res.technologies.push_back(PrinterTechnology::ptFFF);
-            else if (technology == "SLA")
-                res.technologies.push_back(PrinterTechnology::ptSLA);
-            else if (technology == "SLS")
-                res.technologies.push_back(PrinterTechnology::ptSLS);
-            else
-                BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: Malformed technologies field: `%2%`") % id % technologies_field;
+            PrinterTechnology tech = parse_printer_technology(technology);
+            if (tech != ptUnknown) {
+                res.technologies.push_back(tech);
+            } else {
+                BOOST_LOG_TRIVIAL(error)
+                    << boost::format("Vendor bundle: `%1%`: Malformed technologies field: `%2%`") % id %
+                        technologies_field;
+            }
         }
     } else {
         //default to FFF if not present
         res.technologies.push_back(PrinterTechnology::ptFFF);
     }
 
-    auto config_version_str = get_or_throw(vendor_section, "config_version")->second.data();
-    auto config_version = Semver::parse(config_version_str);
-    if (! config_version) {
-        throw Slic3r::RuntimeError((boost::format("Vendor Config Bundle `%1%` is not valid: Cannot parse config_version: `%2%`.") % id % config_version_str).str());
-    } else {
-        res.config_version = std::move(*config_version);
+    // description
+    const auto description_node = vendor_section.find("description");
+    if (description_node != vendor_section.not_found()) {
+        res.description = description_node->second.data();
+    }
+
+    //it's now possible to have no version (only the vendor header)
+    const auto config_version_node = vendor_section.find("config_version");
+    if (config_version_node != vendor_section.not_found()) {
+        auto config_version = Semver::parse(config_version_node->second.data());
+        if (! config_version) {
+            throw Slic3r::RuntimeError((boost::format("Vendor Config Bundle `%1%` is not valid: Cannot parse config_version: `%2%`.") % id % config_version_node->second.data()).str());
+        } else {
+            res.config_version = std::move(*config_version);
+        }
+    } else if(load_all) {
+        throw Slic3r::RuntimeError((boost::format("Vendor Config Bundle `%1%` is not valid: Missing secion or key: `%2%`.") % id % "config_version").str());
     }
 
     // Load URLs
@@ -164,10 +263,35 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
     if (config_update_url != vendor_section.not_found()) {
         res.config_update_url = config_update_url->second.data();
     }
+    
+    const auto config_update_rest = vendor_section.find("config_update_rest");
+    const auto config_update_github = vendor_section.find("config_update_github");
+    if (config_update_rest != vendor_section.not_found()) {
+        res.config_update_rest = config_update_rest->second.data();
+    } else if (config_update_github != vendor_section.not_found()) {
+        res.config_update_rest = config_update_github->second.data();
+    }
 
     const auto changelog_url = vendor_section.find("changelog_url");
     if (changelog_url != vendor_section.not_found()) {
         res.changelog_url = changelog_url->second.data();
+    }
+
+    //slicer
+
+    const auto slicer_name_node = vendor_section.find("slicer");
+    if (slicer_name_node != vendor_section.not_found()) {
+        res.slicer = slicer_name_node->second.data();
+    }
+
+    const auto slicer_version_node = vendor_section.find("slicer_version");
+    if (slicer_version_node != vendor_section.not_found()) {
+        auto slicer_version = Semver::parse(slicer_version_node->second.data());
+        if (! slicer_version) {
+            res.slicer_version = Semver::zero();
+        } else {
+            res.slicer_version = std::move(*slicer_version);
+        }
     }
 
     //get family column size
@@ -320,10 +444,12 @@ void Preset::normalize(DynamicPrintConfig &config)
             if (key == "compatible_prints" || key == "compatible_printers")
                 continue;
             auto *opt = config.option(key, false);
+            auto *opt_default = defaults.option(key);
             /*assert(opt != nullptr);
             assert(opt->is_vector());*/
-            if (opt != nullptr && opt->is_vector())
-                static_cast<ConfigOptionVectorBase*>(opt)->resize(n, defaults.option(key));
+            if (opt != nullptr && opt->is_vector() && opt_default != nullptr) {
+                static_cast<ConfigOptionVectorBase*>(opt)->resize(n, opt_default);
+            }
         }
         // The following keys are mandatory for the UI, but they are not part of FullPrintConfig, therefore they are handled separately.
         for (const char *key : {"filament_settings_id"}) {
@@ -484,6 +610,8 @@ static std::vector<std::string> s_Preset_print_options {
         "perimeters_hole",
         "spiral_vase",
         "slice_closing_radius",
+        "slice_merge_dent",
+        "slice_merge_min_width",
         "slicing_mode",
         "top_solid_layers",
         "top_solid_min_thickness",
@@ -491,22 +619,30 @@ static std::vector<std::string> s_Preset_print_options {
         "bottom_solid_min_thickness",
         "solid_over_perimeters",
         "duplicate_distance",
+        "ensure_vertical_shell_thickness",
         "extra_perimeters",
+        "extra_perimeters_below_area",
+        "extra_perimeters_count",
         "extra_perimeters_odd_layers",
         "extra_perimeters_on_overhangs",
         "avoid_crossing_curled_overhangs",
         "only_one_perimeter_first_layer",
         "only_one_perimeter_top",
         "only_one_perimeter_top_other_algo",
-//        "ensure_vertical_shell_thickness", 
         "allow_empty_layers",
         "avoid_crossing_perimeters", 
         "avoid_crossing_not_first_layer",
         "avoid_crossing_top",
+        "avoid_travel_island",
+        "avoid_travel_island_weight",
         "thin_perimeters", "thin_perimeters_all",
+        "overhangs",
+        "overhangs_extrusion_spacing",
+        "overhangs_type",
         "overhangs_speed",
         "overhangs_speed_enforce",
         "overhangs_max_slope",
+        "overhangs_flow_ratio",
         "overhangs_bridge_threshold",
         "overhangs_bridge_upper_layers",
         "overhangs_width",
@@ -526,7 +662,10 @@ static std::vector<std::string> s_Preset_print_options {
         "staggered_inner_seams",
         // external_perimeters
         "external_perimeters_first",
-        "external_perimeters_vase",
+        "external_perimeters_first_force",
+        "seam_slope_type",
+        "seam_slope_min_height",
+        "seam_slope_max_length",
         "external_perimeters_nothole",
         "external_perimeters_hole",
         // fill pattern
@@ -542,6 +681,7 @@ static std::vector<std::string> s_Preset_print_options {
         "infill_every_layers",
 //      "infill_only_where_needed",
         "solid_infill_every_layers",
+        "internal_bridge_min_width",
         // ironing
         "ironing",
         "ironing_type",
@@ -574,6 +714,7 @@ static std::vector<std::string> s_Preset_print_options {
         "first_layer_min_speed",
         "first_layer_speed_over_raft",
         "infill_speed",
+        "overhangs_dynamic_flow",
         "overhangs_dynamic_speed",
         "perimeter_speed",
         "small_perimeter_speed",
@@ -586,6 +727,7 @@ static std::vector<std::string> s_Preset_print_options {
         "top_solid_infill_speed",
         "travel_speed", "travel_speed_z",
         "max_print_speed",
+        "autospeed_min_thin_flow",
         "max_volumetric_speed",
         // gapfill
         "gap_fill_enabled",
@@ -596,7 +738,9 @@ static std::vector<std::string> s_Preset_print_options {
         "gap_fill_min_area",
         "gap_fill_min_length",
         "gap_fill_min_width",
+        "gap_fill_no_overhang",
         "gap_fill_overlap",
+        "gap_fill_perimeter",
         "gap_fill_speed",
         // fuzzy
         "fuzzy_skin",
@@ -645,6 +789,7 @@ static std::vector<std::string> s_Preset_print_options {
         // support
         "support_material", "support_material_auto", "support_material_threshold", "support_material_enforce_layers",
         "raft_contact_distance",
+        "raft_contact_distance_type",
         "raft_expansion",
         "raft_first_layer_density", 
         "raft_first_layer_expansion",
@@ -680,6 +825,7 @@ static std::vector<std::string> s_Preset_print_options {
         "print_custom_variables",
         "complete_objects",
         "parallel_objects_step",
+        "parallel_objects_step_max_z",
         "complete_objects_one_skirt",
         "complete_objects_sort",
         "extruder_clearance_radius", 
@@ -694,6 +840,8 @@ static std::vector<std::string> s_Preset_print_options {
         "extrusion_width", 
         "first_layer_extrusion_spacing", 
         "first_layer_extrusion_width", 
+        "first_layer_infill_extrusion_spacing", 
+        "first_layer_infill_extrusion_width", 
         "perimeter_round_corners",
         "perimeter_extrusion_spacing",
         "perimeter_extrusion_width",
@@ -724,10 +872,13 @@ static std::vector<std::string> s_Preset_print_options {
         "first_layer_flow_ratio",
         "enforce_full_fill_volume",
         "external_infill_margin", "bridged_infill_margin",
-        "small_area_infill_flow_compensation", "small_area_infill_flow_compensation_model",
+        "internal_bridge_expansion",
+        "small_area_infill_flow_compensation_model",
+        "first_layer_strong_start",
         // compensation
         "first_layer_size_compensation",
         "first_layer_size_compensation_layers",
+        "first_layer_size_compensation_no_collapse",
         "xy_size_compensation",
         "xy_inner_size_compensation",
         "hole_size_compensation",
@@ -744,6 +895,7 @@ static std::vector<std::string> s_Preset_print_options {
         "wipe_tower_cone_angle",
         "wipe_tower_extra_spacing",
         "wipe_tower_extruder",
+        "wipe_tower_extrusion_width",
         "wipe_tower_no_sparse_layers",
         "wipe_tower_speed",
         "wipe_tower_wipe_starting_speed",
@@ -757,6 +909,7 @@ static std::vector<std::string> s_Preset_print_options {
         "perimeter_loop",
         "perimeter_loop_seam",
         "infill_connection", "infill_connection_solid", "infill_connection_top", "infill_connection_bottom", "infill_connection_bridge",
+        "infill_filled_bottom", "infill_filled_solid", "infill_filled_top",
         "first_layer_infill_speed",
         // thin wall
         "thin_walls",
@@ -778,6 +931,8 @@ static std::vector<std::string> s_Preset_print_options {
         "print_first_layer_temperature",
         "print_retract_length",
         "print_temperature",
+        "print_bed_temperature",
+        "print_first_layer_bed_temperature",
         "print_retract_lift",
         "external_perimeter_cut_corners",
         "external_perimeter_overlap",
@@ -806,6 +961,8 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_multitool_ramming",
         "filament_multitool_ramming_volume",
         "filament_multitool_ramming_flow", 
+        "filament_fill_top_flow_ratio",
+        "filament_first_layer_flow_ratio",
         "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
         "filament_unloading_speed", "filament_toolchange_delay", "filament_unloading_speed_start", "filament_unload_time", "filament_cooling_moves",
         "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
@@ -822,17 +979,10 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_toolchange_part_fan_speed",
         "filament_dip_insertion_speed",
         "filament_dip_extraction_speed",  //skinnydip params end
-        // Temperature
-        "bed_temperature",
-        "first_layer_bed_temperature",
-        "first_layer_temperature",
-        "idle_temperature", 
-        "temperature",
-        // pressure advance        "filament_bridge_pa", //pa
+        "filament_bridge_pa", //pa
         "filament_bridge_internal_pa",
-        "filament_bridge_pa",
         "filament_brim_pa",
-        "filament_default_pa",
+        "filament_pressure_advance",
         "filament_external_perimeter_pa",
         "filament_first_layer_pa",
         "filament_first_layer_pa_over_raft",
@@ -847,7 +997,12 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_thin_walls_pa",
         "filament_top_solid_infill_pa",
         "filament_travel_pa", //pa end
-        "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", 
+        // Temperature
+        "bed_temperature",
+        "first_layer_bed_temperature",
+        "first_layer_temperature",
+        "idle_temperature", 
+        "temperature",
         // "cooling",
         // "fan_always_on", (now default_fan_speed)
         // "min_fan_speed", (now fan_printer_min_speed)
@@ -882,13 +1037,19 @@ static std::vector<std::string> s_Preset_filament_options {
         "filament_retract_restart_extra_toolchange",
         "filament_seam_gap",
         "filament_travel_lift_before_obstacle",
-        "filament_travel_max_lift",
+        // "filament_travel_max_lift",
         "filament_travel_ramping_lift",
         "filament_travel_slope",
-        "filament_wipe", "filament_wipe_only_crossing", "filament_wipe_extra_perimeter", "filament_wipe_speed",
+        "filament_wipe",
+        "filament_wipe_extra_perimeter",
+        "filament_wipe_only_crossing", "filament_wipe_speed",
+        "filament_wipe_return",
         "filament_wipe_inside_depth",
         "filament_wipe_inside_end",
         "filament_wipe_inside_start",
+        "filament_wipe_lift",
+        "filament_wipe_lift_length",
+        "filament_wipe_min",
         // Profile compatibility
         "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
         //merill adds
@@ -909,6 +1070,8 @@ static std::vector<std::string> s_Preset_machine_limits_options {
 
 static std::vector<std::string> s_Preset_printer_options {
     "arc_fitting",
+    "arc_fitting_ignore_holes",
+    "arc_fitting_resolution",
     "arc_fitting_tolerance", //TODO: keep?
     "autoemit_temperature_commands",
     "printer_technology",
@@ -943,6 +1106,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "toolchange_gcode",
     "color_change_gcode", "pause_print_gcode", "template_custom_gcode","feature_gcode",
     "between_objects_gcode",
+    "between_objects_gcode_before_move",
     //printer fields
     "printer_custom_variables",
     "printer_vendor",
@@ -1585,7 +1749,8 @@ bool PresetCollection::delete_preset(const std::string& name)
     m_presets.erase(it);
 
     // update selected preset
-    this->select_preset_by_name(selected_preset_name, true);
+    // // supermerill: why reloading our preset? 
+    //this->select_preset_by_name(selected_preset_name, true);
 
     return true;
 }
@@ -1805,111 +1970,12 @@ bool PresetCollection::update_dirty()
     return was_dirty != is_dirty;
 }
 
-template<class T>
-void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& vec, const ConfigBase &other, const ConfigBase &this_c)
-{
-    const T* opt_init = static_cast<const T*>(other.option(opt_key));
-    const T* opt_cur = static_cast<const T*>(this_c.option(opt_key));
-    int opt_init_max_id = opt_init->size() - 1;
-    for (int i = 0; i < int(opt_cur->size()); i++)
-    {
-        int init_id = i <= opt_init_max_id ? i : 0;
-        if (opt_init_max_id < 0 || opt_cur->get_at(i) != opt_init->get_at(init_id))
-            vec.emplace_back(opt_key + "#" + std::to_string(i));
-    }
-}
-
-// list of options with vector variable, which is independent from number of extruders
-// //Superslicer: use opt.is_vector_extruder() instead.
-//static const std::set<std::string> independent_from_extruder_number_options = {
-//    "bed_shape",
-//    "compatible_printers",
-//    "compatible_prints",
-//    "filament_ramming_parameters",
-//    "gcode_substitutions",
-//    "post_process",
-//};
-//
-//bool PresetCollection::is_independent_from_extruder_number_option(const std::string& opt_key)
-//{
-//    return independent_from_extruder_number_options.find(opt_key) != independent_from_extruder_number_options.end();
-//}
-
-// Use deep_diff to correct return of changed options, considering individual options for each extruder.
-inline t_config_option_keys deep_diff(const ConfigBase &config_this, const ConfigBase &config_other, bool ignore_phony)
-{
-    t_config_option_keys diff;
-    for (const t_config_option_key &opt_key : config_this.keys()) {
-        const ConfigOption *this_opt  = config_this.option(opt_key);
-        const ConfigOption *other_opt = config_other.option(opt_key);
-        //dirty if both exist, they aren't both phony and value is different
-        if (this_opt != nullptr && other_opt != nullptr 
-            && (ignore_phony || !(this_opt->is_phony() && other_opt->is_phony()))
-            && ((*this_opt != *other_opt) || (this_opt->is_phony() != other_opt->is_phony())))
-        {
-            const ConfigOptionVectorBase *this_opt_vector = nullptr;
-            if (this_opt->is_vector()) {
-                this_opt_vector = static_cast<const ConfigOptionVectorBase*>(this_opt);
-            }
-            if (opt_key == "default_filament_profile") {
-                // Ignore this field, it is not presented to the user, therefore showing a "modified" flag for this parameter does not help.
-                // Also the length of this field may differ, which may lead to a crash if the block below is used.
-            } else if (this_opt_vector && !this_opt_vector->is_extruder_size()) {
-                // Scalar variable, or a vector variable, which is independent from number of extruders,
-                // thus the vector is presented to the user as a single input.
-                // Merill: these are 'button' special settings.
-                // note that thumbnails are not here because it has individual # entries
-                diff.emplace_back(opt_key);
-            } else if (opt_key == "thumbnails") {
-                // "thumbnails" can not contain extensions in old config but they are valid and use PNG extension by default
-                // So, check if "thumbnails" is really changed
-                // We will compare full thumbnails instead of exactly config values
-                auto [thumbnails, er]         = GCodeThumbnails::make_and_check_thumbnail_list(config_this);
-                auto [thumbnails_new, er_new] = GCodeThumbnails::make_and_check_thumbnail_list(config_other);
-                if (thumbnails != thumbnails_new || er != er_new)
-                    // if those strings are actually the same, erase them from the list of dirty oprions
-                    diff.emplace_back(opt_key);
-            } else {
-                switch (other_opt->type()) {
-                case coInts:    add_correct_opts_to_diff<ConfigOptionInts       >(opt_key, diff, config_other, config_this);  break;
-                case coBools:   add_correct_opts_to_diff<ConfigOptionBools      >(opt_key, diff, config_other, config_this);  break;
-                case coFloats:  add_correct_opts_to_diff<ConfigOptionFloats     >(opt_key, diff, config_other, config_this);  break;
-                case coStrings: add_correct_opts_to_diff<ConfigOptionStrings    >(opt_key, diff, config_other, config_this);  break;
-                case coPercents:add_correct_opts_to_diff<ConfigOptionPercents   >(opt_key, diff, config_other, config_this);  break;
-                case coFloatsOrPercents:add_correct_opts_to_diff<ConfigOptionFloatsOrPercents>(opt_key, diff, config_other, config_this);  break;
-                case coPoints:  add_correct_opts_to_diff<ConfigOptionPoints     >(opt_key, diff, config_other, config_this);  break;
-                default:        diff.emplace_back(opt_key);     break;
-                }
-                // "nozzle_diameter" is a vector option which contain info about diameter for each nozzle
-                // But in the same time size of this vector indicates about count of extruders,
-                // So, we need to add it to the diff if its size is changed.
-                if (opt_key == "nozzle_diameter" && 
-                    static_cast<const ConfigOptionFloats*>(this_opt)->size() != static_cast<const ConfigOptionFloats*>(other_opt)->size())
-                    diff.emplace_back(opt_key);
-                if (opt_key == "milling_diameter" && 
-                    static_cast<const ConfigOptionFloats*>(this_opt)->size() != static_cast<const ConfigOptionFloats*>(other_opt)->size())
-                    diff.emplace_back(opt_key);
-            }
-        }
-    }
-    return diff;
-}
-
 static constexpr const std::initializer_list<const char*> optional_keys { "compatible_prints", "compatible_printers" };
-
 bool PresetCollection::is_dirty(const Preset *edited, const Preset *reference)
 {
     if (edited != nullptr && reference != nullptr) {
         // Only compares options existing in both configs.
-        //don't consider phony field for equals (false param)
-        bool is_dirty = !reference->config.equals(edited->config, false);
-        if (is_dirty && edited->type != Preset::TYPE_FFF_FILAMENT) {
-            // for non-filaments preset check deep difference for compared configs
-            // there can be cases (as for thumbnails), when configs can logically equal
-            // even when their values are not equal.
-            is_dirty = !deep_diff(edited->config, reference->config, false).empty();
-        }
-        if (is_dirty)
+        if (! reference->config.equals(edited->config, false))
             return true;
         // The "compatible_printers" option key is handled differently from the others:
         // It is not mandatory. If the key is missing, it means it is compatible with any printer.
@@ -1920,21 +1986,74 @@ bool PresetCollection::is_dirty(const Preset *edited, const Preset *reference)
     }
     return false;
 }
+template<class T>
+void add_correct_opts_to_diff(const t_config_option_key &opt_key,
+                              std::map<OptionKeyIdx, uint16_t> &vec,
+                              const ConfigOption *option_cur,
+                              const ConfigOption *option_init) {
+    const T* opt_init = static_cast<const T*>(option_init);
+    const T* opt_cur = static_cast<const T*>(option_cur);
+    int opt_init_max_id = opt_init->size() - 1;
+    // emplace the whole vector if size changed.
+    if (opt_init->size() != opt_cur->size()) {
+        vec.emplace(OptionKeyIdx::scalar(opt_key), PresetCollection::DIRTY_VECTOR_CHANGE_SIZE);
+    }
+    for (int32_t i = 0; i < int32_t(opt_cur->size()); i++) {
+        // if (new one & we need to report new idx) or if hte value isn't the same.
+        if (i >= opt_init->size()) {
+            uint16_t status = PresetCollection::DIRTY_VECTOR_ADDED_IDX;
+            if (opt_cur->get_at(i) == opt_init->get_at(0)) {
+                status |= PresetCollection::DIRTY_VECTOR_SAME_AS_FIRST;
+            }
+            vec.emplace(OptionKeyIdx{opt_key, i}, status);
+        } else if (opt_cur->get_at(i) != opt_init->get_at(i)) {
+            vec.emplace(OptionKeyIdx{opt_key, i}, 0);
+        }
+    }
+}
 
-std::vector<std::string> PresetCollection::dirty_options(const Preset *edited, const Preset *reference, const bool deep_compare /*= false*/, const bool ignore_phony)
-{
-    std::vector<std::string> changed;
+// Use deep_diff to correct return of changed options, considering individual options for each extruder.
+inline std::map<OptionKeyIdx, uint16_t> deep_diff(const ConfigBase &config_this,
+                                                  const ConfigBase &config_other,
+                                                  bool ignore_phony) {
+    std::map<OptionKeyIdx, uint16_t> diff;
+    for (const t_config_option_key &opt_key : config_this.keys()) {
+        const ConfigOption *this_opt  = config_this.option(opt_key);
+        const ConfigOption *other_opt = config_other.option(opt_key);
+        //dirty if both exist, they aren't both phony and value is different
+        if (this_opt != nullptr && other_opt != nullptr 
+            && (ignore_phony || !(this_opt->is_phony() && other_opt->is_phony()))
+            && ((*this_opt != *other_opt) || (this_opt->is_phony() != other_opt->is_phony())))
+        {
+            switch (other_opt->type()) {
+            case coInts:    add_correct_opts_to_diff<ConfigOptionInts       >(opt_key, diff, this_opt, other_opt);  break;
+            case coBools:   add_correct_opts_to_diff<ConfigOptionBools      >(opt_key, diff, this_opt, other_opt);  break;
+            case coFloats:  add_correct_opts_to_diff<ConfigOptionFloats     >(opt_key, diff, this_opt, other_opt);  break;
+            case coStrings: add_correct_opts_to_diff<ConfigOptionStrings    >(opt_key, diff, this_opt, other_opt);  break;
+            case coPercents:add_correct_opts_to_diff<ConfigOptionPercents   >(opt_key, diff, this_opt, other_opt);  break;
+            case coFloatsOrPercents:add_correct_opts_to_diff<ConfigOptionFloatsOrPercents>(opt_key, diff, this_opt, other_opt);  break;
+            case coPoints:  add_correct_opts_to_diff<ConfigOptionPoints     >(opt_key, diff, this_opt, other_opt);  break;
+            case coGraphs:  add_correct_opts_to_diff<ConfigOptionGraphs     >(opt_key, diff, this_opt, other_opt);  break;
+            default: diff.emplace(OptionKeyIdx::scalar(opt_key), 0); break;
+            }
+        }
+    }
+    return diff;
+}
+
+std::map<OptionKeyIdx, uint16_t> PresetCollection::dirty_options(const Preset *edited,
+                                                         const Preset *reference,
+                                                         const bool ignore_phony /*= false*/) {
+    std::map<OptionKeyIdx, uint16_t> changed;
     if (edited != nullptr && reference != nullptr) {
         // Only compares options existing in both configs.
-        changed = deep_compare ?
-                deep_diff(edited->config, reference->config, !ignore_phony) :
-                reference->config.diff(edited->config, !ignore_phony);
+        changed = deep_diff(edited->config, reference->config, ignore_phony);
         // The "compatible_printers" option key is handled differently from the others:
         // It is not mandatory. If the key is missing, it means it is compatible with any printer.
         // If the key exists and it is empty, it means it is compatible with no printer.
         for (auto &opt_key : optional_keys)
             if (reference->config.has(opt_key) != edited->config.has(opt_key))
-                changed.emplace_back(opt_key);
+                changed.emplace(OptionKeyIdx::scalar(opt_key), 0);
     }
     return changed;
 }
@@ -2827,7 +2946,7 @@ size_t ExtruderFilaments::update_compatible_internal(const PresetWithVendorProfi
                 continue;// Ignore this field, because this parameter is not related to the extruder but to whole printer.
             auto* opt = active_printer_config.option(key, false);
             if (opt != nullptr && opt->is_vector())
-                static_cast<ConfigOptionVectorBase*>(opt)->set_at(opt, 0, m_extruder_id);
+                static_cast<ConfigOptionVectorBase*>(opt)->set_at(*opt, 0, m_extruder_id);
         }
     }
     PresetWithVendorProfile active_printer_adjusted(printer_preset_adjusted, active_printer.vendor);

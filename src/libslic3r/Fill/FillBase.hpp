@@ -10,10 +10,10 @@
 #ifndef slic3r_FillBase_hpp_
 #define slic3r_FillBase_hpp_
 
-#include <assert.h>
-#include <memory.h>
-#include <float.h>
-#include <stdint.h>
+#include <cassert>
+#include <cfloat>
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
 
 #include <type_traits>
@@ -58,11 +58,15 @@ struct FillParams
     // bridge offset from the centerline. (scaled)
     coord_t       bridge_offset = -1;
 
-    // Fill extruding flow multiplier, fraction in <0, 1>. Used by "over bridge compensation"
+    // Fill extruding flow multiplier, fraction in <0, 1>. Used by various flow ratio (top, bot, over-bridges), this is applied after the fill_exactly's flow compensation.
     float       flow_mult   { 1.0f };
 
     // Don't connect the fill lines around the inner perimeter.
     InfillConnection connection{ icConnected };
+
+    // If full_infill(), the empty space can be filled with a gapfill pass.
+    //TODO: save the region areas where it needs to be added, to avoid splitting infill.
+    bool add_gap_fill = false;
 
     // Length of an infill anchor along the perimeter.
     // 1000mm is roughly the maximum length line that fits into a 32bit coord_t.
@@ -134,6 +138,8 @@ public:
     coord_t     loop_clipping;
     // In scaled coordinates. Bounding box of the 2D projection of the object.
     BoundingBox bounding_box;
+    // true if it's possibel to call fill_surface instead of fill_surface_extrusion
+    float       can_fill_surface_single = false;
 
     // Octree builds on mesh for usage in the adaptive cubic infill
     FillAdaptive::Octree* adapt_fill_octree = nullptr;
@@ -169,7 +175,8 @@ public:
 
     // This method have to fill the ExtrusionEntityCollection. It call fill_surface by default
     virtual void fill_surface_extrusion(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const;
-    
+    // called & use fill_surface_extrusion and put gap fill after in empty spaces.
+    void fill_surface_extrusion_with_gap_fill(const Surface *surface, const FillParams &params, ExtrusionEntitiesPtr &out) const;
     // Perform the fill.
     virtual Polylines fill_surface(const Surface *surface, const FillParams &params) const;
     virtual ThickPolylines fill_surface_arachne(const Surface *surface, const FillParams &params) const;

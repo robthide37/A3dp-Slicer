@@ -132,26 +132,36 @@ BundleMap BundleMap::load()
     BundleMap res;
 
     const auto vendor_dir = (boost::filesystem::path(Slic3r::data_dir()) / "vendor").make_preferred();
+#ifndef USE_GTHUB_PRESET_UPDATE
     const auto archive_dir = (boost::filesystem::path(Slic3r::data_dir()) / "cache" / "vendor").make_preferred();
     const auto rsrc_vendor_dir = (boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
     const auto cache_dir = boost::filesystem::path(Slic3r::data_dir()) / "cache"; // for Index
+#endif
     // Load Prusa bundle from the datadir/vendor directory or from datadir/cache/vendor (archive) or from resources/profiles.
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     // prusa bundle mandatory check at startup
-    auto prusa_bundle_path = (vendor_dir / ALLOW_PRUSA_FIRST).replace_extension(".ini");
+    auto prusa_bundle_path = (vendor_dir / MAIN_VENDOR).replace_extension(".ini");
     BundleLocation prusa_bundle_loc = BundleLocation::IN_VENDOR;
+#ifndef USE_GTHUB_PRESET_UPDATE
     if (! boost::filesystem::exists(prusa_bundle_path)) {
-        prusa_bundle_path = (archive_dir / ALLOW_PRUSA_FIRST).replace_extension(".ini");
+        prusa_bundle_path = (archive_dir / MAIN_VENDOR).replace_extension(".ini");
         prusa_bundle_loc = BundleLocation::IN_ARCHIVE;
     }
     if (!boost::filesystem::exists(prusa_bundle_path)) {
-        prusa_bundle_path = (rsrc_vendor_dir / ALLOW_PRUSA_FIRST).replace_extension(".ini");
+        prusa_bundle_path = (rsrc_vendor_dir / MAIN_VENDOR).replace_extension(".ini");
         prusa_bundle_loc = BundleLocation::IN_RESOURCES;
     }
+#else
+    if (!boost::filesystem::exists(prusa_bundle_path)) {
+        // auto-install
+        boost::filesystem::copy(boost::filesystem::path(resources_dir()) / "profiles" / MAIN_VENDOR,
+                                prusa_bundle_path);
+    }
+#endif
     {
         Bundle prusa_bundle;
         if (prusa_bundle.load(std::move(prusa_bundle_path), prusa_bundle_loc, true))
-            res.emplace(ALLOW_PRUSA_FIRST, std::move(prusa_bundle));
+            res.emplace(MAIN_VENDOR, std::move(prusa_bundle));
     }
 #endif
 
@@ -159,10 +169,15 @@ BundleMap BundleMap::load()
     // and then additionally from datadir/cache/vendor (archive) and resources/profiles.
     // Should we concider case where archive has older profiles than resources (shouldnt happen)? -> YES, it happens during re-configuration when running older PS after newer version
     typedef std::pair<const fs::path&, BundleLocation> DirData;
+#ifndef USE_GTHUB_PRESET_UPDATE
     std::vector<DirData> dir_list { {vendor_dir, BundleLocation::IN_VENDOR},  {archive_dir, BundleLocation::IN_ARCHIVE},  {rsrc_vendor_dir, BundleLocation::IN_RESOURCES} };
     for ( auto dir : dir_list) {
         if (!fs::exists(dir.first))
             continue;
+#else
+    DirData dir = {vendor_dir, BundleLocation::IN_VENDOR};
+    if (fs::exists(dir.first)) {
+#endif
       try {
         for (const auto &dir_entry : boost::filesystem::directory_iterator(dir.first)) {
             if (Slic3r::is_ini_file(dir_entry)) {
@@ -170,11 +185,12 @@ BundleMap BundleMap::load()
 
                 // Don't load this bundle if we've already loaded it.
                 if (res.find(id) != res.end()) { continue; }
-
+                
+#ifndef USE_GTHUB_PRESET_UPDATE
                 // Fresh index should be in archive_dir, otherwise look for it in cache 
                 // Then if not in archive or cache - it could be 3rd party profile that user just copied to vendor folder (both ini and cache)
                 
-                fs::path idx_path (archive_dir / (id + ".idx"));
+                fs::path idx_path (rsrc_vendor_dir / (id + ".idx"));
                 if (!boost::filesystem::exists(idx_path)) {
                     BOOST_LOG_TRIVIAL(error) << format("Missing index %1% when loading bundle %2%. Going to search for it in cache folder.", idx_path.string(), id);
                     idx_path = fs::path(cache_dir / (id + ".idx"));
@@ -202,6 +218,7 @@ BundleMap BundleMap::load()
                     continue;
                 }
                 const auto recommended = recommended_it->config_version;
+#endif
                 VendorProfile vp;
                 try {
                     vp = VendorProfile::from_ini(dir_entry, true);
@@ -210,9 +227,11 @@ BundleMap BundleMap::load()
                     BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to corrupted profile file %2%. Message: %3%", id, dir_entry.path().string(), e.what());
                     continue;
                 }
+#ifndef USE_GTHUB_PRESET_UPDATE
                 // Don't load
                 if (vp.config_version > recommended)
                     continue;
+#endif
 
                 Bundle bundle;
                 if (bundle.load(dir_entry.path(), dir.second))
@@ -227,10 +246,10 @@ BundleMap BundleMap::load()
 
     return res;
 }
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
 Bundle& BundleMap::prusa_bundle()
 {
-    auto it = find(ALLOW_PRUSA_FIRST);
+    auto it = find(MAIN_VENDOR);
     if (it == end()) {
         throw Slic3r::RuntimeError("ConfigWizard: Internal error in BundleMap: MAIN_BUNDLE not loaded");
     }
@@ -600,14 +619,26 @@ PageWelcome::PageWelcome(ConfigWizard *parent)
     , cbox_integrate(append(
         new wxCheckBox(this, wxID_ANY, _L("Perform desktop integration (Sets this binary to be searchable by the system)."))
     ))
+    , bt_new_vendor(append(
+        new wxButton(this, wxID_ANY, _L("Add more vendors"))))
+    , run_reason(ConfigWizard::RunReason::RR_USER)
 {
     welcome_text->Hide();
-    cbox_reset->Hide();
-    cbox_integrate->Hide();    
+    bt_new_vendor->Hide();
+    cbox_integrate->Hide();
+    bt_new_vendor->Bind(wxEVT_BUTTON, [this, parent](wxCommandEvent &) {
+        ConfigWizard::RunReason rr = this->run_reason;
+        parent->EndModal(wxID_CANCEL);
+        wxCommandEvent *evt = new wxCommandEvent(EVT_WIZARD_SHOW_DIALOG);
+        // set args for GUI_App::run_wizard
+        evt->SetInt(int(rr) + 8*(GUI_App::RunVendorBundleManage::RVBM_ALWAYS));
+        GUI::wxGetApp().QueueEvent(evt);
+    });
 }
 
 void PageWelcome::set_run_reason(ConfigWizard::RunReason run_reason)
 {
+    this->run_reason = run_reason;
     const bool data_empty = run_reason == ConfigWizard::RR_DATA_EMPTY;
     welcome_text->Show(data_empty);
     cbox_reset->Show(!data_empty);
@@ -706,11 +737,11 @@ std::set<std::string> PagePrinters::get_selected_models()
 
 void PagePrinters::set_run_reason(ConfigWizard::RunReason run_reason)
 {
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     if (is_primary_printer_page
         && (run_reason == ConfigWizard::RR_DATA_EMPTY || run_reason == ConfigWizard::RR_DATA_LEGACY)
         && printer_pickers.size() > 0 
-        && printer_pickers[0]->vendor_id == ALLOW_PRUSA_FIRST) {
+        && printer_pickers[0]->vendor_id == MAIN_VENDOR) {
         printer_pickers[0]->select_one(0, true);
     }
 #else
@@ -1694,11 +1725,11 @@ PageMode::PageMode(ConfigWizard *parent)
     radio_advanced = new wxRadioButton(this, wxID_ANY, _L("Advanced mode"));
     radio_expert = new wxRadioButton(this, wxID_ANY, _L("Expert mode"));
 
-    std::string mode { "simple" };
+    std::string mode { "Simple" };
     wxGetApp().app_config->get("", "view_mode", mode);
 
-    if (mode == "advanced") { radio_advanced->SetValue(true); }
-    else if (mode == "expert") { radio_expert->SetValue(true); }
+    if (mode == "Advanced") { radio_advanced->SetValue(true); }
+    else if (mode == "Expert") { radio_expert->SetValue(true); }
     else { radio_simple->SetValue(true); }
 
     append(radio_simple);
@@ -1717,15 +1748,15 @@ void PageMode::serialize_mode(AppConfig *app_config) const
 {
     std::string mode = "";
 
-    if (radio_simple->GetValue()) { mode = "simple"; }
-    if (radio_advanced->GetValue()) { mode = "advanced"; }
-    if (radio_expert->GetValue()) { mode = "expert"; }
+    if (radio_simple->GetValue()) { mode = "Simple"; }
+    if (radio_advanced->GetValue()) { mode = "Advanced"; }
+    if (radio_expert->GetValue()) { mode = "Expert"; }
 
     app_config->set("view_mode", mode);
     app_config->set("use_inches", check_inch->GetValue() ? "1" : "0");
 }
 
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
 PageVendors::PageVendors(ConfigWizard *parent)
     : ConfigWizardPage(parent, _L("Other Vendors"), _L("Other Vendors"))
 {
@@ -1746,7 +1777,7 @@ PageVendors::PageVendors(ConfigWizard *parent)
 
     for (const std::pair<std::wstring, const VendorProfile*>& v : vendors) {
         const VendorProfile* vendor = v.second;
-        if (vendor->id == ALLOW_PRUSA_FIRST) { continue; }
+        if (vendor->id == MAIN_VENDOR) { continue; }
         if (vendor && vendor->templates_profile)
             continue;
 
@@ -1757,8 +1788,12 @@ PageVendors::PageVendors(ConfigWizard *parent)
             wizard_p()->on_3rdparty_install(vendor, cbox->IsChecked());
         });
 
-        const auto &acvendors = appconfig.vendors();
-        const bool enabled = acvendors.find(vendor->id) != acvendors.end();
+        /*const*/ bool enabled;
+        {
+            std::lock_guard<std::recursive_mutex> lk(appconfig.config_lock);
+            const AppConfig::VendorMap &acvendors = appconfig.vendors();
+            enabled = acvendors.find(vendor->id) != acvendors.end();
+        }
         if (enabled) {
             cbox->SetValue(true);
 
@@ -1990,6 +2025,7 @@ void PageDiameters::apply_custom_config(DynamicPrintConfig &config)
 
     config.set_key_value("extrusion_width", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("first_layer_extrusion_width", new ConfigOptionFloatOrPercent(140, true));
+    config.set_key_value("first_layer_infill_extrusion_width", (new ConfigOptionFloatOrPercent(140, true))->set_can_be_disabled(true));
     config.set_key_value("perimeter_extrusion_width", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("external_perimeter_extrusion_width", new ConfigOptionFloatOrPercent(100, true));
     config.set_key_value("infill_extrusion_width", new ConfigOptionFloatOrPercent(100, true));
@@ -2001,6 +2037,7 @@ void PageDiameters::apply_custom_config(DynamicPrintConfig &config)
     //configure spacing where needed
     config.set_key_value("extrusion_spacing", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("first_layer_extrusion_spacing", new ConfigOptionFloatOrPercent(140, true));
+    config.set_key_value("first_layer_infill_extrusion_spacing", new ConfigOptionFloatOrPercent(140, true));
     config.set_key_value("perimeter_extrusion_spacing", new ConfigOptionFloatOrPercent(105, true));
     config.set_key_value("external_perimeter_extrusion_spacing", new ConfigOptionFloatOrPercent(100, true));
     config.set_key_value("infill_extrusion_spacing", new ConfigOptionFloatOrPercent(100, true));
@@ -2096,7 +2133,7 @@ void PageTemperatures::apply_custom_config(DynamicPrintConfig &config)
 // Index
 
 ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
-    : wxPanel(parent)
+    : wxScrolledWindow(parent)
     , bg(ScalableBitmap(parent, SLIC3R_APP_KEY "_192px_transparent.png", 192))
     , bullet_black(ScalableBitmap(parent, "bullet_black.png"))
     , bullet_blue(ScalableBitmap(parent, "bullet_blue.png"))
@@ -2109,6 +2146,11 @@ ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
     SetDoubleBuffered(true);// SetDoubleBuffered exists on Win and Linux/GTK, but is missing on OSX
 #endif //__WXOSX__
     SetMinSize(bg.GetSize());
+
+    // scrollling: only vertical, by 30 pixels at a time.
+    SetScrollRate(30, 30);
+    EnableScrolling(false, true); // does nothing
+    ShowScrollbars(wxSHOW_SB_NEVER, wxSHOW_SB_DEFAULT);
 
     const wxSize size = GetTextExtent("m");
     em_w = size.x;
@@ -2226,45 +2268,59 @@ void ConfigWizardIndex::clear()
     item_active = NO_ITEM;
 }
 
-void ConfigWizardIndex::on_paint(wxPaintEvent & evt)
+void ConfigWizardIndex::on_paint(wxPaintEvent &evt)
 {
-    const auto size = GetClientSize();
-    if (size.GetHeight() == 0 || size.GetWidth() == 0) { return; }
-   
+    const wxSize size = GetClientSize();
+    if (size.GetHeight() == 0 || size.GetWidth() == 0) {
+        return;
+    }
+    const wxPoint start = GetViewStart() * 30; // GetViewStart is in scroll unit
+
     wxPaintDC dc(this);
-    
+    DoPrepareDC(dc);
+
     const auto bullet_w = bullet_black.GetWidth();
     const auto bullet_h = bullet_black.GetHeight();
     const int yoff_icon = bullet_h < em_h ? (em_h - bullet_h) / 2 : 0;
     const int yoff_text = bullet_h > em_h ? (bullet_h - em_h) / 2 : 0;
     const int yinc = item_height();
-   
+
     int index_width = 0;
+    wxCoord index_height = yinc * items.size();
 
     unsigned y = 0;
     for (size_t i = 0; i < items.size(); i++) {
-        const Item& item = items[i];
-        unsigned x = em_w/2 + item.indent * em_w;
+        const Item &item = items[i];
+        unsigned x = em_w / 2 + item.indent * em_w;
 
-        if (i == item_active || (item_hover >= 0 && i == (size_t)item_hover)) {
+        if (i == item_active || (item_hover >= 0 && i == (size_t) item_hover)) {
             dc.DrawBitmap(bullet_blue.get_bitmap(), x, y + yoff_icon, false);
+        } else if (i < item_active) {
+            dc.DrawBitmap(bullet_black.get_bitmap(), x, y + yoff_icon, false);
+        } else if (i > item_active) {
+            dc.DrawBitmap(bullet_white.get_bitmap(), x, y + yoff_icon, false);
         }
-        else if (i < item_active)  { dc.DrawBitmap(bullet_black.get_bitmap(), x, y + yoff_icon, false); }
-        else if (i > item_active)  { dc.DrawBitmap(bullet_white.get_bitmap(), x, y + yoff_icon, false); }
 
-        x += + bullet_w + em_w/2;
+        x += +bullet_w + em_w / 2;
         const auto text_size = dc.GetTextExtent(item.label);
         dc.SetTextForeground(wxGetApp().get_label_clr_default());
         dc.DrawText(item.label, x, y + yoff_text);
 
         y += yinc;
-        index_width = std::max(index_width, (int)x + text_size.x);
+        index_width = std::max(index_width, (int) x + text_size.x);
     }
-    
-    //draw logo
-    if (int y = size.y - bg.GetHeight(); y>=0) {
+
+    // draw logo
+    if (int y = start.y + size.y - bg.GetHeight(); y >= 0) {
         dc.DrawBitmap(bg.get_bitmap(), 0, y, false);
         index_width = std::max(index_width, bg.GetWidth() + em_w / 2);
+    }
+
+    index_height = std::max(index_height, bg.GetHeight() + em_w / 2);
+
+    wxSize virtual_size = GetVirtualSize();
+    if (virtual_size.GetWidth() != index_width && virtual_size.GetHeight() != index_height) {
+        SetVirtualSize(index_width, index_height);
     }
 
     if (GetMinSize().x < index_width) {
@@ -2277,7 +2333,8 @@ void ConfigWizardIndex::on_paint(wxPaintEvent & evt)
 
 void ConfigWizardIndex::on_mouse_move(wxMouseEvent &evt)
 {
-    const wxClientDC dc(this);
+    wxClientDC dc(this);
+    DoPrepareDC(dc);
     const wxPoint pos = evt.GetLogicalPosition(dc);
 
     const ssize_t item_hover_new = pos.y / item_height();
@@ -2386,14 +2443,13 @@ void ConfigWizard::priv::load_pages()
     index->clear();
 
     index->add_page(page_welcome);
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     // Printers
     if (page_fff)
         index->add_page(page_fff);
     if (page_msla)
         index->add_page(page_msla);
     if (!only_sla_mode) {
-        index->add_page(page_vendors);
 
         // Copy pages names from map to vector, so we can sort it without case sensitivity
         std::vector<std::pair<std::wstring, std::string>> sorted_vendors;
@@ -2435,7 +2491,7 @@ void ConfigWizard::priv::load_pages()
             update_materials(T_ANY);
             index->add_page(page_filaments);
         }
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     }
 #endif
     if (any_sla_selected) { index->add_page(page_sla_materials); }
@@ -2556,7 +2612,7 @@ void ConfigWizard::priv::set_start_page(ConfigWizard::StartPage start_page)
 {
     switch (start_page) {
         case ConfigWizard::SP_PRINTERS:
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
             if (page_fff) {
                 index->go_to(page_fff);
                 btn_next->SetFocus();
@@ -2591,12 +2647,12 @@ void ConfigWizard::priv::set_start_page(ConfigWizard::StartPage start_page)
     }
 }
 
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
 void ConfigWizard::priv::create_3rdparty_pages()
 {
     for (const auto &pair : bundles) {
         const VendorProfile *vendor = pair.second.vendor_profile;
-        if (vendor->id == ALLOW_PRUSA_FIRST) { continue; }
+        if (vendor->id == MAIN_VENDOR) { continue; }
 
         bool is_fff_technology = false;
         bool is_sla_technology = false;
@@ -2766,7 +2822,7 @@ void ConfigWizard::priv::select_default_materials_for_printer_models(Technology 
                         appconfig_new.set(appconfig_section, material, "1");
     };
 
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     PagePrinters* page_printers = technology & T_FFF ? page_fff : page_msla;
     if (page_printers)
         select_default_materials_for_printer_page(page_printers, technology);
@@ -2815,7 +2871,7 @@ void ConfigWizard::priv::select_default_materials_for_printer_models(Technology 
     ((technology & T_FFF) ? page_filaments : page_sla_materials)->reload_presets();
 }
 
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
 void ConfigWizard::priv::on_3rdparty_install(const VendorProfile *vendor, bool install)
 {
     auto it = pages_3rdparty.find(vendor->id);
@@ -3037,8 +3093,16 @@ static std::string get_first_added_preset(const std::map<std::string, std::strin
 bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes)
 {
     wxString header, caption = _L("Configuration is edited in ConfigWizard");
-    const auto enabled_vendors = appconfig_new.vendors();
-    const auto enabled_vendors_old = app_config->vendors();
+    /*const*/ AppConfig::VendorMap enabled_vendors;
+    /*const*/ AppConfig::VendorMap enabled_vendors_old;
+    {
+        std::lock_guard<std::recursive_mutex> lk(appconfig_new.config_lock);
+        enabled_vendors = appconfig_new.vendors();
+    }
+    {
+        std::lock_guard<std::recursive_mutex> lk(app_config->config_lock);
+        enabled_vendors_old = app_config->vendors();
+    }
 
     bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;
@@ -3072,13 +3136,13 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         }
         return ptAny;
     };
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     // Prusa printers are considered first, then 3rd party.
-    if (preferred_pt = get_preferred_printer_technology(ALLOW_PRUSA_FIRST, bundles.prusa_bundle());
+    if (preferred_pt = get_preferred_printer_technology(MAIN_VENDOR, bundles.prusa_bundle());
         preferred_pt == ptAny || (preferred_pt == ptSLA && suppress_sla_printer)) {
 #endif
         for (const auto& bundle : bundles) {
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
             if (bundle.second.is_prusa_bundle) { continue; }
 #endif
             if (PrinterTechnology pt = get_preferred_printer_technology(bundle.first, bundle.second); pt == ptAny)
@@ -3088,7 +3152,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
             if(!(preferred_pt == ptAny || (preferred_pt == ptSLA && suppress_sla_printer)))
                 break;
         }
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     }
 #endif
     if (preferred_pt == ptSLA && !wxGetApp().may_switch_to_SLA_preset(caption))
@@ -3101,6 +3165,9 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (!check_unsaved_preset_changes)
         act_btns |= ActionButtons::SAVE;
 
+#ifndef USE_GTHUB_PRESET_UPDATE
+    ///////////////////////// -supermerill: old prusa code for the old way to update profiles /////////////////////////
+    ///////////////////////// not used anymore 
     // Install bundles from resources or cache / vendor if needed:
     std::vector<std::string> install_bundles;
     for (const auto &pair : bundles) {
@@ -3134,7 +3201,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (!check_unsaved_preset_changes)
         if ((check_unsaved_preset_changes = install_bundles.size() > 0))
             header = _L_PLURAL("A new vendor was installed and one of its printers will be activated", "New vendors were installed and one of theirs printers will be activated", install_bundles.size());
-
+#endif
 #ifdef __linux__
     // Desktop integration on Linux
     BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->m_downloader->get_perform_registration_linux();
@@ -3171,17 +3238,21 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (check_unsaved_preset_changes &&
         !wxGetApp().check_and_keep_current_preset_changes(caption, header, act_btns, &apply_keeped_changes))
         return false;
-
+    
+#ifndef USE_GTHUB_PRESET_UPDATE
+    ///////////////////////// -supermerill: old prusa code for the old way to update profiles /////////////////////////
+    ///////////////////////// not used anymore 
     if (install_bundles.size() > 0) {
         // Install bundles from resources or cache / vendor.
         // Don't create snapshot - we've already done that above if applicable.
         
-        bool install_result = updater->install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), false);
+        bool install_result = install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), false);
         if (!install_result)
             return false;
     } else {
         BOOST_LOG_TRIVIAL(info) << "No bundles need to be installed from resources or cache / vendor";
     }
+#endif
 
     if (page_welcome->reset_user_profile()) {
         BOOST_LOG_TRIVIAL(info) << "Resetting user profiles...";
@@ -3218,20 +3289,20 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
             variant.clear();
         return std::string();
     };
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     // Prusa printers are considered first, then 3rd party.
     if (preferred_model = get_preferred_printer_model("PrusaResearch", bundles.prusa_bundle(), preferred_variant);
         preferred_model.empty()) {
 #endif
         for (const auto& bundle : bundles) {
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
             if (bundle.second.is_prusa_bundle) { continue; }
 #endif
             if (preferred_model = get_preferred_printer_model(bundle.first, bundle.second, preferred_variant);
                 !preferred_model.empty())
                     break;
         }
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     }
 #endif
     // if unsaved changes was not cheched till this moment
@@ -3366,7 +3437,7 @@ void ConfigWizard::priv::update_presets_in_config(const std::string& section, co
 
 bool ConfigWizard::priv::check_fff_selected()
 {
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     bool ret = false;
     if (page_fff) {
         ret = page_fff->any_selected();
@@ -3385,7 +3456,7 @@ bool ConfigWizard::priv::check_fff_selected()
 
 bool ConfigWizard::priv::check_sla_selected()
 {
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     bool ret = false;
     if (page_msla) {
         ret = page_msla->any_selected();
@@ -3465,9 +3536,9 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 
     p->add_page(p->page_welcome = new PageWelcome(this));
 
-#ifdef ALLOW_PRUSA_FIRST
-    const auto prusa_it = p->bundles.find(ALLOW_PRUSA_FIRST);
-    wxCHECK_RET(prusa_it != p->bundles.cend(), "Vendor " ALLOW_PRUSA_FIRST " not found");
+#ifdef MAIN_VENDOR
+    const auto prusa_it = p->bundles.find(MAIN_VENDOR);
+    wxCHECK_RET(prusa_it != p->bundles.cend(), "Vendor " MAIN_VENDOR " not found");
     const VendorProfile* vendor_prusa = prusa_it->second.vendor_profile;
 
     p->page_fff = nullptr;
@@ -3500,7 +3571,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     if (!p->only_sla_mode) {
         // Pages for 3rd party vendors
         p->create_3rdparty_pages();   // Needs to be done _before_ creating PageVendors
-        p->add_page(p->page_vendors = new PageVendors(this));
+        //p->add_page(p->page_vendors = new PageVendors(this));
         p->add_page(p->page_custom = new PageCustom(this));
         p->custom_printer_selected = p->page_custom->custom_wanted();
     }
@@ -3589,7 +3660,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     });
 
     p->btn_sel_all->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &) {
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
         p->any_sla_selected = true;
         p->load_pages();
         if(p->page_fff)
@@ -3688,7 +3759,7 @@ void ConfigWizard::on_dpi_changed(const wxRect &suggested_rect)
                                     p->btn_next->GetId(),
                                     p->btn_prev->GetId() });
 
-#ifdef ALLOW_PRUSA_FIRST
+#ifdef MAIN_VENDOR
     for (auto printer_picker : p->page_fff->printer_pickers)
         msw_buttons_rescale(this, em, printer_picker->get_button_indexes());
 #else

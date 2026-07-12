@@ -656,7 +656,8 @@ void gcode_spread_points(
 	for (ExtrusionPoints::const_iterator it = points.begin(); it != points.end(); ++ it)
 		rmax = std::max(rmax, it->radius);
 	size_t n_rows_max  = size_t(ceil(rmax * 2.f + 2.f));
-	size_t n_cells_max = sqr(n_rows_max);
+    assert(n_rows_max < std::numeric_limits<int32_t>::max());
+	size_t n_cells_max = n_rows_max * n_rows_max;
 	std::vector<std::pair<float, float> > spans;
 	std::vector<Cell>  cells(n_cells_max, Cell());
 	std::vector<float> areas_sum(n_cells_max, 0.f);

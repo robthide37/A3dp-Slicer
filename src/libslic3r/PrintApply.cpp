@@ -38,7 +38,7 @@ namespace Slic3r {
             assert((model_volume_dst->is_support_modifier() && model_volume_src->is_support_modifier()) || model_volume_dst->type() == model_volume_src->type());
             model_object_dst.volumes.emplace_back(model_volume_dst);
             if (model_volume_dst->is_support_modifier() || model_volume_dst->is_seam_position() ||
-                model_volume_dst->is_brim_patch() || model_volume_dst->is_brim_negative()) {
+                model_volume_dst->is_brim()) {
                 // For support modifiers, the type may have been switched from blocker to enforcer and vice versa.
                 model_volume_dst->set_type(model_volume_src->type());
                 model_volume_dst->set_transformation(model_volume_src->get_transformation());
@@ -47,7 +47,7 @@ namespace Slic3r {
         } else {
             // The volume was not found in the old list. Create a new copy.
             assert(model_volume_src->is_support_modifier() || model_volume_src->is_seam_position() ||
-                   model_volume_src->is_brim_patch() || model_volume_src->is_brim_negative());
+                   model_volume_src->is_brim());
             model_object_dst.volumes.emplace_back(new ModelVolume(*model_volume_src));
             model_object_dst.volumes.back()->set_model_object(&model_object_dst);
         }
@@ -1048,6 +1048,12 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             num_extruders_changed = true;
         }
     }
+
+    // Check the position and rotation of the wipe tower.
+    if (model.wipe_tower() != m_model.wipe_tower()) {
+        update_apply_status(this->invalidate_step(psSkirtBrim));
+    }
+    m_model.wipe_tower() = model.wipe_tower();
     
     ModelObjectStatusDB model_object_status_db;
 
@@ -1069,18 +1075,18 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 		for (const ModelObject *model_object : m_model.objects)
 			model_object_status_db.add(*model_object, ModelObjectStatus::New);
     } else {
-        if (m_model.custom_gcode_per_print_z != model.custom_gcode_per_print_z) {
-            const CustomGCode::Mode current_mode = m_model.custom_gcode_per_print_z.mode;
-            const CustomGCode::Mode next_mode    = model.custom_gcode_per_print_z.mode;
+       if (m_model.custom_gcode_per_print_z() != model.custom_gcode_per_print_z()) {
+          const CustomGCode::Mode current_mode = m_model.custom_gcode_per_print_z().mode;
+          const CustomGCode::Mode next_mode    = model.custom_gcode_per_print_z().mode;
 
             const bool multi_extruder_differ = (current_mode == next_mode) && (current_mode == CustomGCode::MultiExtruder || next_mode == CustomGCode::MultiExtruder);
             // Tool change G-codes are applied as color changes for a single extruder printer, no need to invalidate tool ordering.
             // FIXME The tool ordering may be invalidated unnecessarily if the custom_gcode_per_print_z.mode is not applicable
             // to the active print / model state, and then it is reset, so it is being applicable, but empty, thus the effect is the same.
-            const bool tool_change_differ    = num_extruders > 1 && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z.gcodes, model.custom_gcode_per_print_z.gcodes, CustomGCode::ToolChange);
+          const bool tool_change_differ    = num_extruders > 1 && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z().gcodes, model.custom_gcode_per_print_z().gcodes, CustomGCode::ToolChange);
             // For multi-extruder printers, we perform a tool change before a color change.
             // So, in that case, we must invalidate tool ordering and wipe tower even if custom color change g-codes differ.
-            const bool color_change_differ   = num_extruders > 1 && (next_mode == CustomGCode::MultiExtruder) && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z.gcodes, model.custom_gcode_per_print_z.gcodes, CustomGCode::ColorChange);
+          const bool color_change_differ   = num_extruders > 1 && (next_mode == CustomGCode::MultiExtruder) && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z().gcodes, model.custom_gcode_per_print_z().gcodes, CustomGCode::ColorChange);
 
             update_apply_status(
                 (num_extruders_changed || tool_change_differ || multi_extruder_differ || color_change_differ) ?
@@ -1088,7 +1094,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             	this->invalidate_steps({ psWipeTower, psGCodeExport }) :
             	// There is no change in Tool Changes stored in custom_gcode_per_print_z, therefore there is no need to update Tool Ordering.
             	this->invalidate_step(psGCodeExport));
-            m_model.custom_gcode_per_print_z = model.custom_gcode_per_print_z;
+          m_model.custom_gcode_per_print_z() = model.custom_gcode_per_print_z();
         }
         if (model_object_list_equal(m_model, model)) {
             // The object list did not change.
@@ -1179,7 +1185,10 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         bool layer_height_ranges_differ = ! layer_height_ranges_equal(model_object.layer_config_ranges, model_object_new.layer_config_ranges, model_object_new.layer_height_profile.empty());
         bool model_origin_translation_differ = model_object.origin_translation != model_object_new.origin_translation;
         auto print_objects_range        = print_object_status_db.get_range(model_object);
-        bool seam_position_differ       = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SEAM_POSITION);
+        bool seam_position_differ       = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SEAM_POSITION_CENTER)
+            || model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SEAM_POSITION_CENTER_Z)
+            || model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SEAM_POSITION_INSIDE_CENTER)
+            || model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SEAM_POSITION_INSIDE);
         bool brim_patch_differ          = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::BRIM_PATCH) ||
                                           model_volume_list_changed(model_object, model_object_new, ModelVolumeType::BRIM_NEGATIVE);
         // The list actually can be empty if all instances are out of the print bed.

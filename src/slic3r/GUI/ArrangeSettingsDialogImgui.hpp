@@ -8,6 +8,7 @@
 #include "libslic3r/Arrange/ArrangeSettingsView.hpp"
 #include "ImGuiWrapper.hpp"
 #include "libslic3r/AnyPtr.hpp"
+#include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -17,6 +18,7 @@ class ArrangeSettingsDialogImgui: public arr2::ArrangeSettingsView {
     arr2::ArrangeSettingsDb& m_db;
 
     std::function<void()> m_on_arrange_btn;
+    std::function<void()> m_on_arrange_bed_btn;
     std::function<void()> m_on_reset_btn;
 
     std::function<bool()> m_show_xl_combo_predicate = [] { return true; };
@@ -24,7 +26,7 @@ class ArrangeSettingsDialogImgui: public arr2::ArrangeSettingsView {
 public:
     ArrangeSettingsDialogImgui(ImGuiWrapper *imgui, arr2::ArrangeSettingsDb& db);
 
-    void render(float pos_x, float pos_y);
+    void render(float pos_x, float pos_y, bool current_bed);
 
     void show_xl_align_combo(std::function<bool()> pred)
     {
@@ -34,6 +36,11 @@ public:
     void on_arrange_btn(std::function<void()> on_arrangefn)
     {
         m_on_arrange_btn = on_arrangefn;
+    }
+
+    void on_arrange_bed_btn(std::function<void()> on_arrangefn)
+    {
+        m_on_arrange_bed_btn = on_arrangefn;
     }
 
     void on_reset_btn(std::function<void()> on_resetfn)
@@ -49,7 +56,7 @@ public:
     bool  is_rotation_enabled() const override { return m_db.is_rotation_enabled(); }
     
     // update arrange dist from current print conf.
-    void set_arrange_settings(const DynamicPrintConfig &conf, PrinterTechnology tech);
+    void set_arrange_settings_distance_from_objects(const DynamicPrintConfig &conf, PrinterTechnology tech);
 
     XLPivots get_xl_alignment() const override { return m_db.get_xl_alignment(); }
     GeometryHandling get_geometry_handling() const override { return m_db.get_geometry_handling(); }

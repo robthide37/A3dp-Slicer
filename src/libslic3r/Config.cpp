@@ -25,7 +25,8 @@
 #include "Utils.hpp"
 #include "LocalesUtils.hpp"
 
-#include <assert.h>
+#include <cassert>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -44,7 +45,6 @@
 #include <boost/nowide/fstream.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/format.hpp>
-#include <string.h>
 
 #include <LibBGCode/binarize/binarize.hpp>
 
@@ -56,6 +56,33 @@
 
 namespace Slic3r {
 
+PrinterTechnology parse_printer_technology(const std::string &technology) {
+    if (technology == "FFF")
+        return PrinterTechnology::ptFFF;
+    else if (technology == "SLA")
+        return PrinterTechnology::ptSLA;
+    else if (technology == "SLS")
+        return PrinterTechnology::ptSLS;
+    else if (technology == "MILL")
+        return PrinterTechnology::ptMill;
+    else if (technology == "LASER")
+        return PrinterTechnology::ptLaser;
+    return PrinterTechnology::ptUnknown;
+}
+
+std::string to_string(PrinterTechnology tech) {
+    if (tech == PrinterTechnology::ptFFF)
+        return "FFF";
+    else if (tech == PrinterTechnology::ptSLA)
+        return "SLA";
+    else if (tech == PrinterTechnology::ptSLS)
+        return "SLS";
+    else if (tech == PrinterTechnology::ptMill)
+        return "MILL";
+    else if (tech == PrinterTechnology::ptLaser)
+        return "LASER";
+    return "Unknown";
+}
 
 std::string toString(OptionCategory opt) {
     switch (opt) {
@@ -360,26 +387,24 @@ size_t GraphData::data_size() const
 }
 
 double GraphData::interpolate(double x_value) const{
-    double y_value = 0.;
+    double y_value = 1.0f;
     if (this->data_size() < 1) {
         // nothing
-    } else if (this->graph_points.size() == 1 || this->graph_points.front().x() >= x_value) {
+    } else if (this->graph_points.size() == 1 || this->graph_points[begin_idx].x() >= x_value) {
         y_value = this->graph_points.front().y();
-    } else if (this->graph_points.back().x() <= x_value) {
-        y_value = this->graph_points.back().y();
+    } else if (this->graph_points[end_idx - 1].x() <= x_value) {
+        y_value = this->graph_points[end_idx - 1].y();
     } else {
         // find first and second datapoint
         for (size_t idx = this->begin_idx; idx < this->end_idx; ++idx) {
             const auto &data_point = this->graph_points[idx];
-            if (data_point.x() == x_value) {
+            if (is_approx(data_point.x(), x_value)) {
                 // lucky point
-                y_value = data_point.y();
-                break;
+                return data_point.y();
             } else if (data_point.x() < x_value) {
                 // not yet, iterate
             } else if (idx == 0) {
-                y_value = data_point.y();
-                break;
+                return data_point.y();
             } else {
                 // interpolate
                 const auto &data_point_before = this->graph_points[idx - 1];
@@ -455,7 +480,7 @@ double GraphData::interpolate(double x_value) const{
                 } else {
                     assert(false);
                 }
-                break;
+                return y_value;
             }
         }
     }
@@ -719,12 +744,14 @@ void ConfigDef::finalize()
             assert(def.enum_def->is_valid_closed_enum());
             assert(! def.is_gui_type_enum_open());
             def.enum_def->finalize_closed_enum();
-        } else if (def.is_gui_type_enum_open()) {
+        } else if (def.type != coEnum && def.is_gui_type_enum_open()) {
             assert(def.enum_def);
             assert(def.enum_def->is_valid_open_enum());
             assert(def.gui_type != ConfigOptionDef::GUIType::i_enum_open || def.type == coInt || def.type == coInts);
             assert(def.gui_type != ConfigOptionDef::GUIType::f_enum_open || def.type == coFloat || def.type == coPercent || def.type == coFloatOrPercent);
             assert(def.gui_type != ConfigOptionDef::GUIType::select_open || def.type == coString || def.type == coStrings);
+        } else if (def.type == coString && def.gui_type == ConfigOptionDef::GUIType::select_close) {
+            assert(def.enum_def);
         } else {
             assert(! def.enum_def);
         }
@@ -1023,7 +1050,7 @@ void ConfigOptionDef::set_enum_as_closed_for_scripted_enum(const std::vector<std
 void ConfigOptionDef::set_enum_values(GUIType gui_type, const std::initializer_list<std::pair<std::string_view, std::string_view>> il)
 {
     this->enum_def_new();
-    assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open);
+    assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open || gui_type == GUIType::select_close);
     this->gui_type = gui_type;
     enum_def->set_values(il);
 }
@@ -1123,13 +1150,13 @@ void ConfigBase::apply_only(const ConfigBase &other, const t_config_option_keys 
                 continue;
             throw UnknownOptionException(opt_key);
         }
-		const ConfigOption *other_opt = other.option(opt_key);
-		if (other_opt == nullptr) {
+        const ConfigOption *other_opt = other.option(opt_key);
+        if (other_opt == nullptr) {
             // The key was not found in the source config, therefore it will not be initialized!
-//			printf("Not found, therefore not initialized: %s\n", opt_key.c_str());
+//          printf("Not found, therefore not initialized: %s\n", opt_key.c_str());
         } else {
             try {
-                my_opt->set(other_opt);
+                my_opt->set(*other_opt);
             } catch (ConfigurationException& e) {
                 throw ConfigurationException(std::string(e.what()) + ", when ConfigBase::apply_only on " + opt_key);
             }
@@ -1219,15 +1246,21 @@ bool ConfigBase::set_deserialize_nothrow(const t_config_option_key &opt_key_src,
     //note: should be done BEFORE calling set_deserialize
     // Both opt_key and value may be modified by handle_legacy().
     // If the opt_key is no more valid in this version of Slic3r, opt_key is cleared by handle_legacy().
+#ifdef DEBUGINFO
     this->handle_legacy(opt_key, value);
     if (opt_key.empty()) {
         assert(false);
         // Ignore the option.
         return true;
     }
+#endif
     assert(opt_key == opt_key_src);
     assert(value == value_src);
-    return this->set_deserialize_raw(opt_key, value, substitutions_ctxt, append);
+    try {
+        return this->set_deserialize_raw(opt_key, value, substitutions_ctxt, append);
+    } catch (UnknownOptionException e) {
+        return true;
+    }
 }
 
 void ConfigBase::set_deserialize(const t_config_option_key &opt_key_src, const std::string &value_src, ConfigSubstitutionContext& substitutions_ctxt, bool append)
@@ -1334,11 +1367,11 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
                         static_cast<ConfigOptionBool*>(opt)->value = ConfigHelpers::enum_looks_like_true_value(value);
                     } else {
                         // Just use the default of the option.
-                        opt->set(optdef->default_value.get());
+                        opt->set(*optdef->default_value);
                     }
                 } else {
                     // Deserialize failed, substitute with a default value.
-                    opt->set(optdef->default_value.get());
+                    opt->set(*optdef->default_value);
                 }
                 success = true;
                 substituted = true;
@@ -1614,14 +1647,18 @@ ConfigSubstitutions ConfigBase::load_from_ini_string_commented(std::string &&dat
 
 ConfigSubstitutions ConfigBase::load(const boost::property_tree::ptree &tree, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
+    for (const boost::property_tree::ptree::value_type &v : tree) {
+        dict_opt[v.first] = {v.first, v.second.get_value<std::string>()};
+    }
+    PrintConfigDef::handle_legacy_map(dict_opt, false);
+    std::map<t_config_option_key, std::string> opt_deleted;
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
     for (const boost::property_tree::ptree::value_type &v : tree) {
-        t_config_option_key opt_key = v.first;
+        const t_config_option_key &saved_key = v.first;
+        assert(dict_opt.find(saved_key) != dict_opt.end());
+        const auto& [opt_key, value] = dict_opt.at(saved_key);
         try {
-            std::string value = v.second.get_value<std::string>();
-            t_config_option_key saved_key = opt_key;
-            PrintConfigDef::handle_legacy(opt_key, value, false);
             if (!opt_key.empty()) {
                 if (!PrintConfigDef::is_defined(opt_key)) {
                     if (substitutions_ctxt.rule != ForwardCompatibilitySubstitutionRule::Disable) {
@@ -1631,7 +1668,7 @@ ConfigSubstitutions ConfigBase::load(const boost::property_tree::ptree &tree, Fo
                     this->set_deserialize(opt_key, value, substitutions_ctxt);
                 }
             } else {
-                opt_deleted.emplace_back(saved_key, value);
+                opt_deleted[saved_key] = value;
             }
         } catch (UnknownOptionException & /* e */) {
             // ignore
@@ -1703,6 +1740,28 @@ std::map<t_config_option_key, std::string> ConfigBase::load_gcode_string_legacy(
         opt_key_values.emplace(std::string(key, key_end), std::string(value, end));
         end = start;
     }
+
+    // extract version
+    if (auto it = opt_key_values.find("print_version"); it == opt_key_values.end() || it->second.empty()) {
+        // check it began with same
+        if (15 <= strlen(str) && strncmp("; generated by ", str, 40)) {
+            std::string str_version(str+15, 70);
+            std::vector<std::string> args;
+            boost::split(args, str_version, boost::is_any_of(" "));
+            if (args.size() > 1) {
+                std::string version_str;
+                if (args[0] == "SuperSlicer" || args[0] == "Slic3r") {
+                    version_str = "SUSI_";
+                } else if (args[0] == "PrusaSlicer") {
+                    version_str = "PRSA_";
+                }
+                if (!version_str.empty()) {
+                    version_str += args[1];
+                    opt_key_values["print_version"] = version_str;
+                }
+            }
+        }
+    }
     return opt_key_values;
 }
 
@@ -1712,42 +1771,47 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
     if (str == nullptr)
         return 0;
     
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::map<t_config_option_key, std::string> opt_deleted;
     // Walk line by line in reverse until a non-configuration key appears.
     const char *data_start = str;
     // boost::nowide::ifstream seems to cook the text data somehow, so less then the 64k of characters may be retrieved.
     const char *end = data_start + strlen(str);
     size_t num_key_value_pairs = 0;
-    for (auto [key, value] : load_gcode_string_legacy(str)) {
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
+    std::map<t_config_option_key, std::string> parsed_map = load_gcode_string_legacy(str);
+    for (const auto& [key, value] : parsed_map) {
+        dict_opt[key] = {key, value};
+    }
+    PrintConfigDef::handle_legacy_map(dict_opt, false);
+    for (auto& [saved_key, saved_value] : parsed_map) {
+        assert(dict_opt.find(saved_key) != dict_opt.end());
+        const auto& [opt_key, value] = dict_opt.at(saved_key);
         try {
-            std::string opt_key = key;
-            t_config_option_key saved_key = opt_key;
-            PrintConfigDef::handle_legacy(opt_key, value, false);
             if (!opt_key.empty()) {
                 if (!PrintConfigDef::is_defined(opt_key)) {
                     if (substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable) {
-                        substitutions.add(ConfigSubstitution(key, value));
+                        substitutions.add(ConfigSubstitution(saved_key, value));
                     }
                 } else {
                     config.set_deserialize(opt_key, value, substitutions);
                     ++num_key_value_pairs;
                 }
             } else {
-                opt_deleted.emplace_back(saved_key, value);
+                opt_deleted[saved_key] = value;
             }
         }
         catch (UnknownOptionException & /* e */) {
             // log & ignore
             if (substitutions.rule != ForwardCompatibilitySubstitutionRule::Disable)
-                substitutions.add(ConfigSubstitution(key, value));
+                substitutions.add(ConfigSubstitution(saved_key, value));
         } catch (BadOptionValueException & e) {
             if (substitutions.rule == ForwardCompatibilitySubstitutionRule::Disable)
                 throw e;
             // log the error
             const ConfigDef* def = config.def();
             if (def == nullptr) throw e;
-            const ConfigOptionDef* optdef = def->get(key);
-            substitutions.emplace(optdef, std::move(value), ConfigOptionUniquePtr(optdef->default_value->clone()));
+            const ConfigOptionDef* optdef = def->get(saved_key);
+            substitutions.emplace(optdef, std::move(saved_value), ConfigOptionUniquePtr(optdef->default_value->clone()));
         }
     }
 
@@ -1871,7 +1935,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
     size_t                    key_value_pairs = 0;
     
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::map<t_config_option_key, std::string> opt_deleted;
     if (has_delimiters)
     {
         // Slic3r starting with 2.4.0 (and Prusaslicer from 2.4.0-alpha0) delimits the config section stored into G-code with 
@@ -1893,6 +1957,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename
         if (! end_found)
             throw Slic3r::RuntimeError(format("Configuration block closing tag \"; (.+)r_config = end\" not found when reading %1%", filename));
         std::string key, value;
+        std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
         while (reader.getline(line)) {
             if (boost::algorithm::ends_with(line, "r_config = begin")) {
                 begin_found = true;
@@ -1905,25 +1970,28 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename
                 value = line.substr(pos + 1);
                 boost::trim(key);
                 boost::trim(value);
-                try {
-                    std::string opt_key = key;
-                    PrintConfigDef::handle_legacy(opt_key, value, false);
-                    if (!opt_key.empty()) {
-                        if (!PrintConfigDef::is_defined(opt_key)) {
-                            if (substitutions_ctxt.rule != ForwardCompatibilitySubstitutionRule::Disable) {
-                                substitutions_ctxt.add(ConfigSubstitution(key, value));
-                            }
-                        } else {
-                            this->set_deserialize(opt_key, value, substitutions_ctxt);
-                            ++ key_value_pairs;
+                dict_opt[key] = {key, value};
+            }
+        }
+        PrintConfigDef::handle_legacy_map(dict_opt, false);
+        for (const auto &[saved_key, key_val] : dict_opt) {
+            const auto &[opt_key, value] = key_val;
+            try {
+                if (!opt_key.empty()) {
+                    if (!PrintConfigDef::is_defined(opt_key)) {
+                        if (substitutions_ctxt.rule != ForwardCompatibilitySubstitutionRule::Disable) {
+                            substitutions_ctxt.add(ConfigSubstitution(key, value));
                         }
                     } else {
-                        opt_deleted.emplace_back(key, value);
+                        this->set_deserialize(opt_key, value, substitutions_ctxt);
+                        ++key_value_pairs;
                     }
-                } catch (UnknownOptionException & /* e */) {
-                    // ignore
-                    assert(false);
+                } else {
+                    opt_deleted[key] = value;
                 }
+            } catch (UnknownOptionException & /* e */) {
+                // ignore
+                assert(false);
             }
         }
         if (! begin_found) 
@@ -1985,17 +2053,20 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
     if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
     
-    std::vector<std::pair<t_config_option_key, std::string>> opt_deleted;
+    std::map<t_config_option_key, std::string> opt_deleted;
     // extracts data from block
-    for (const auto& [key, value] : slicer_metadata_block.raw_data) {
-        t_config_option_key test_key = key;
-        std::string test_val = value;
-        PrintConfigDef::handle_legacy(test_key, test_val, true);
-        if (test_key.empty()) {
-            opt_deleted.emplace_back(key, test_val);
+    std::unordered_map<t_config_option_key, std::pair<t_config_option_key, std::string>> dict_opt;
+    for (const auto &[key, value] : slicer_metadata_block.raw_data) {
+        dict_opt[key] = { key, value };
+    }
+    for (const auto &[saved_key, saved_value] : slicer_metadata_block.raw_data) {
+        assert(dict_opt.find(saved_key) != dict_opt.end());
+        const auto& [opt_key, value] = dict_opt.at(saved_key);
+        if (opt_key.empty()) {
+            opt_deleted[saved_key] = saved_value;
+        } else {
+            this->set_deserialize(opt_key, value, substitutions_ctxt);
         }
-
-        this->set_deserialize(key, value, substitutions_ctxt);
     }
 
     // Do legacy conversion on a completely loaded dictionary.
@@ -2272,7 +2343,7 @@ void StaticConfig::set_defaults()
             const ConfigOptionDef   *def = defs->get(key);
             ConfigOption            *opt = this->option(key);
             if (def != nullptr && opt != nullptr && def->default_value)
-                opt->set(def->default_value.get());
+                opt->set(*def->default_value);
         }
     }
 }

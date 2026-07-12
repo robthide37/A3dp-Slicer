@@ -40,7 +40,7 @@
 #include "BuildVolume.hpp"
 #include "format.hpp"
 
-#include <float.h>
+#include <cfloat>
 
 #include <algorithm>
 #include <limits>
@@ -52,7 +52,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/regex.hpp>
 
-#include <tbb/parallel_for.h>
+#include <oneapi/tbb/parallel_for.h>
 
 namespace Slic3r {
 
@@ -87,6 +87,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
     static std::unordered_set<std::string> steps_gcode = {
         "allow_empty_layers",
         "autoemit_temperature_commands",
+        "autospeed_min_thin_flow",
         "avoid_crossing_perimeters",
         "avoid_crossing_perimeters_max_detour",
         "avoid_crossing_not_first_layer",
@@ -94,6 +95,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "bed_temperature",
         "before_layer_gcode",
         "between_objects_gcode",
+        "between_objects_gcode_before_move",
         "binary_gcode",
         "bridge_fan_speed",
         "chamber_temperature",
@@ -107,6 +109,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "disable_fan_first_layers",
         "duplicate_distance",
         "overhangs_dynamic_fan_speed",
+        "filament_pressure_advance",
         "enforce_retract_first_layer",
         "end_gcode",
         "end_filament_gcode",
@@ -131,11 +134,13 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "fan_printer_min_speed",
         "filament_colour",
         "filament_compressibility_factor",
-        "filament_name",
         "filament_custom_variables",
         "filament_diameter",
         "filament_density",
+        "filament_fill_top_flow_ratio",
+        "filament_first_layer_flow_ratio",
         "filament_load_time",
+        "filament_name",
         "filament_notes",
         "filament_cost",
         "filament_spool_weight",
@@ -185,9 +190,12 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "output_filename_format",
         "overhangs_fan_speed",
         "parallel_objects_step",
+        "parallel_objects_step_max_z",
         "pause_print_gcode",
         "post_process",
         "print_custom_variables",
+        "print_bed_temperature",
+        "print_first_layer_bed_temperature",
         "printer_custom_variables",
         "perimeter_fan_speed",
         "printer_notes",
@@ -197,7 +205,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "travel_ramping_lift",
         "travel_initial_part_length",
         "travel_slope",
-        "travel_max_lift",
+        // "travel_max_lift",
         "travel_lift_before_obstacle",
         "retract_before_travel",
         "retract_before_wipe",
@@ -255,7 +263,11 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         "wipe_inside_depth",
         "wipe_inside_end",
         "wipe_inside_start",
+        "wipe_lift",
+        "wipe_lift_length",
+        "wipe_min",
         "wipe_only_crossing",
+        "wipe_return",
         "wipe_speed",
     };
 
@@ -346,6 +358,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
             || opt_key == "wipe_tower_cone_angle"
             || opt_key == "wipe_tower_bridging"
             || opt_key == "wipe_tower_extra_spacing"
+            || opt_key == "wipe_tower_extrusion_width"
             || opt_key == "wipe_tower_no_sparse_layers"
             || opt_key == "wipe_tower_extruder"
             || opt_key == "wipe_tower_per_color_wipe"
@@ -370,6 +383,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
             osteps.emplace_back(posSupportMaterial);
         } else if (
             opt_key == "arc_fitting"
+            || opt_key == "arc_fitting_ignore_holes"
+            || opt_key == "arc_fitting_resolution"
             || opt_key == "arc_fitting_tolerance"
             || opt_key == "min_layer_height"
             || opt_key == "max_layer_height"
@@ -440,25 +455,42 @@ bool Print::is_step_done(PrintObjectStep step) const
 }
 
 // returns 0-based indices of used extruders
-std::set<uint16_t> Print::object_extruders(const PrintObjectPtrs &objects) const
+std::set<uint16_t> Print::object_extruders(const PrintObjectPtrs &objects, float z /*= -1*/) const
 {
     std::set<uint16_t> extruders;
-    for (const PrintObject *object : objects)
-        for (const PrintRegion& region : object->all_regions())
+    for (const PrintObject *object : objects) {
+        std::vector<std::reference_wrapper<const PrintRegion>> ok_regions;
+        if (z < 0) {
+            ok_regions = object->all_regions();
+        } else {
+            std::set<const PrintRegion*> region_set;
+            for (const Layer *layer : object->layers()) {
+                if (layer->print_z - layer->height - EPSILON < z && z < layer->print_z + EPSILON ) {
+                    for (const LayerRegion *lr : layer->regions()) {
+                        if (lr->has_extrusions()) {
+                            region_set.insert(&lr->region());
+                        }
+                    }
+                }
+            }
+            for (const PrintRegion *lr : region_set) {
+                ok_regions.emplace_back(*lr);
+            }
+            assert(ok_regions.size() == region_set.size());
+        }
+        for (const PrintRegion &region : ok_regions) {
             region.collect_object_printing_extruders(*object->print(), extruders);
+        }
+    }
     return extruders;
 }
-std::set<uint16_t> Print::object_extruders() const
+std::set<uint16_t> Print::object_extruders(float z /*= -1*/) const
 {
-    std::set<uint16_t> extruders;
-    for (const PrintObject *object : m_objects)
-        for (const PrintRegion& region : object->all_regions())
-            region.collect_object_printing_extruders(*object->print(), extruders);
-    return extruders;
+    return object_extruders(m_objects, z);
 }
 
 // returns 0-based indices of used extruders
-std::set<uint16_t> Print::support_material_extruders() const
+std::set<uint16_t> Print::support_material_extruders(float z /*= -1*/) const
 {
     std::set<uint16_t> extruders;
     bool support_uses_current_extruder = false;
@@ -466,14 +498,26 @@ std::set<uint16_t> Print::support_material_extruders() const
 
     for (PrintObject *object : m_objects) {
         if (object->has_support_material()) {
-        	assert(object->config().support_material_extruder >= 0);
-            if (object->config().support_material_extruder == 0)
-                support_uses_current_extruder = true;
-            else {
-                uint16_t i = (uint16_t)object->config().support_material_extruder - 1;
-                extruders.insert((i >= num_extruders) ? 0 : i);
+            bool has_support = true;
+            bool has_support_interface = object->config().support_material_interface_layers > 0;
+            if (z >= 0) {
+                has_support = false;
+                for (const SupportLayer *suppl : object->support_layers()) {
+                    if (suppl->print_z - suppl->height - EPSILON < z && z < suppl->print_z + EPSILON && suppl->has_extrusions()) {
+                        has_support = true;
+                    }
+                }
             }
-            if (object->config().support_material_interface_layers > 0) {
+            if (has_support) {
+                assert(object->config().support_material_extruder >= 0);
+                if (object->config().support_material_extruder == 0)
+                    support_uses_current_extruder = true;
+                else {
+                    uint16_t i = (uint16_t) object->config().support_material_extruder - 1;
+                    extruders.insert((i >= num_extruders) ? 0 : i);
+                }
+            }
+            if (has_support && has_support_interface) {
                 assert(object->config().support_material_interface_extruder >= 0);
                 if (object->config().support_material_interface_extruder == 0)
                     support_uses_current_extruder = true;
@@ -493,16 +537,19 @@ std::set<uint16_t> Print::support_material_extruders() const
 }
 
 // returns 0-based indices of used extruders
-std::set<uint16_t> Print::extruders() const
+std::set<uint16_t> Print::extruders(float z /*= -1*/) const
 {
-    std::set<uint16_t> extruders = this->object_extruders(m_objects);
-    append(extruders, this->support_material_extruders());
+    std::set<uint16_t> extruders = this->object_extruders(m_objects, z);
+    append(extruders, this->support_material_extruders(z));
 
-    // The wipe tower extruder can also be set. When the wipe tower is enabled and it will be generated,
-    // append its extruder into the list too.
-    if (has_wipe_tower() && config().wipe_tower_extruder != 0 && extruders.size() > 1) {
-        assert(config().wipe_tower_extruder > 0 && config().wipe_tower_extruder < int(config().nozzle_diameter.size()));
-        extruders.insert(uint16_t(config().wipe_tower_extruder.value - 1)); // the config value is 1-based
+    if (z < 0) {
+        // The wipe tower extruder can also be set. When the wipe tower is enabled and it will be generated,
+     // append its extruder into the list too.
+        if (has_wipe_tower() && config().wipe_tower_extruder != 0 && extruders.size() > 1) {
+            assert(config().wipe_tower_extruder > 0 &&
+                   config().wipe_tower_extruder < int(config().nozzle_diameter.size()));
+            extruders.insert(uint16_t(config().wipe_tower_extruder.value - 1)); // the config value is 1-based
+        }
     }
 
     return extruders;
@@ -563,7 +610,7 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print &print, Poly
     std::vector<size_t> intersecting_idxs;
 
 	std::map<ObjectID, Polygon> map_model_object_to_convex_hull;
-    const double dist_grow = min_object_distance(static_cast<const ConfigBase*>(&print.full_print_config()), 0) * 2;
+    const double dist_grow = min_object_distance(static_cast<const ConfigBase*>(&print.full_print_config()), 0);
 	for (const PrintObject *print_object : print.objects()) {
         const double object_grow = (print.config().complete_objects && !print_object->config().brim_per_object) ? dist_grow : std::max(dist_grow, print_object->config().brim_width.value);
 	    assert(! print_object->model_object()->instances.empty());
@@ -701,7 +748,7 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
     if (extruders.empty())
         return { PrintBase::PrintValidationError::pveNoPrint, _u8L("The supplied settings will cause an empty print.") };
 
-    if (m_config.complete_objects || m_config.parallel_objects_step > 0) {
+    if (m_config.complete_objects /*|| m_config.parallel_objects_step > 0*/) {
     	if (! sequential_print_horizontal_clearance_valid(*this, const_cast<Polygons*>(&m_sequential_print_clearance_contours)))
             return { PrintBase::PrintValidationError::pveWrongPosition, _u8L("Some objects are too close; your extruder will collide with them.") };
         if (m_config.complete_objects && ! sequential_print_vertical_clearance_valid(*this))
@@ -724,7 +771,7 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
                      "Either remove all but the last object, or enable sequential mode by \"complete_objects\".") };
         assert(m_objects.size() == 1 || config().complete_objects.value);
         if (m_objects.front()->all_regions().size() > 1)
-            return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Spiral Vase option can only be used when printing single material objects.") };
+            return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Spiral Vase option can only be used when printing single material objects, and without any modifiers that may break the vase.") };
     }
 
     //if (m_config.machine_limits_usage == MachineLimitsUsage::EmitToGCode && m_config.gcode_flavor == gcfKlipper)
@@ -797,8 +844,8 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
             && m_config.gcode_flavor != gcfMarlinFirmware
             && m_config.gcode_flavor != gcfKlipper )
             return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/Sprinter and Repetier G-code flavors.") };
-        if (! m_config.use_relative_e_distances)
-            return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).") };
+        //if (! m_config.use_relative_e_distances)
+            //return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).") };
         if (m_config.ooze_prevention && m_config.single_extruder_multi_material)
             return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("Ooze prevention is currently not supported with the wipe tower enabled.") };
         if (m_config.use_volumetric_e)
@@ -937,7 +984,7 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::vec
                     double max_layer_height = config().max_layer_height.get_abs_value(extruder_id, nozzle_diameter);
                     if (max_layer_height < EPSILON || !config().max_layer_height.is_enabled()) max_layer_height = nozzle_diameter * 0.75;
                     if (min_layer_height > max_layer_height) return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("Min layer height can't be greater than Max layer height") };
-                    if (max_layer_height > nozzle_diameter) return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("Max layer height can't be greater than nozzle diameter") };
+                    //if (max_layer_height > nozzle_diameter) return { PrintBase::PrintValidationError::pveWrongSettings, _u8L("Max layer height can't be greater than nozzle diameter") };
                     double skirt_width = Flow::new_from_config_width(frPerimeter,
                         *Flow::extrusion_width_option("skirt", m_default_region_config),
                         *Flow::extrusion_spacing_option("skirt", m_default_region_config),
@@ -1159,6 +1206,26 @@ public:
 };
 #endif
 
+#ifdef _DEBUG
+    struct PointAssertVisitor : public ExtrusionVisitorRecursiveConst {
+        virtual void default_use(const ExtrusionEntity& entity) override {};
+        virtual void use(const ExtrusionPath &path) override {
+            for (size_t idx = 1; idx < path.size(); ++idx)
+                assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+        }
+        virtual void use(const ExtrusionLoop& loop) override {
+            Point last_pt = loop.last_point();
+            for (const ExtrusionPath &path : loop.paths) {
+                assert(path.polyline.size() >= 2);
+                assert(path.first_point() == last_pt);
+                for (size_t idx = 1; idx < path.size(); ++idx)
+                    assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
+                last_pt = path.last_point();
+            }
+            assert(loop.paths.front().first_point() == loop.paths.back().last_point());
+        }
+    } ptvisitor;
+#endif
 // Slicing process, running at a background thread.
 void Print::process()
 {
@@ -1172,6 +1239,12 @@ void Print::process()
             m_objects[idx]->make_perimeters();
         }
     );
+#ifdef _DEBUG
+    for (PrintObject* obj : m_objects)
+        for (Layer* lay : obj->layers())
+            for (LayerRegion* lr : lay->regions())
+                lr->perimeters().visit(ptvisitor);
+#endif
     secondary_status_counter_reset();
     Slic3r::parallel_for(size_t(0), m_objects.size(),
         [this](const size_t idx) {
@@ -1186,6 +1259,7 @@ void Print::process()
     );
 
     // The following step writes to m_shared_regions, it should not run in parallel.
+    //FIXME: only run it when the support is needed.
     secondary_status_counter_reset();
     for (PrintObject *obj : m_objects)
         obj->generate_support_spots();
@@ -1234,8 +1308,8 @@ void Print::process()
     if (this->has_wipe_tower()) {
         // These values have to be updated here, not during wipe tower generation.
         // When the wipe tower is moved/rotated, it is not regenerated.
-        m_wipe_tower_data.position = { m_config.wipe_tower_x, m_config.wipe_tower_y };
-        m_wipe_tower_data.rotation_angle = m_config.wipe_tower_rotation_angle;
+        m_wipe_tower_data.position = model().wipe_tower().position;
+        m_wipe_tower_data.rotation_angle = model().wipe_tower().rotation;
     }
     auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(objects(), m_wipe_tower_data);
 
@@ -1244,24 +1318,6 @@ void Print::process()
         BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
 
 #ifdef _DEBUG
-    struct PointAssertVisitor : public ExtrusionVisitorRecursiveConst {
-        virtual void default_use(const ExtrusionEntity& entity) override {};
-        virtual void use(const ExtrusionPath &path) override {
-            for (size_t idx = 1; idx < path.size(); ++idx)
-                assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-        }
-        virtual void use(const ExtrusionLoop& loop) override {
-            Point last_pt = loop.last_point();
-            for (const ExtrusionPath &path : loop.paths) {
-                assert(path.polyline.size() >= 2);
-                assert(path.first_point() == last_pt);
-                for (size_t idx = 1; idx < path.size(); ++idx)
-                    assert(!path.polyline.get_point(idx - 1).coincides_with_epsilon(path.polyline.get_point(idx)));
-                last_pt = path.last_point();
-            }
-            assert(loop.paths.front().first_point() == loop.paths.back().last_point());
-        }
-    } ptvisitor;
     for (PrintObject* obj : m_objects)
         for (Layer* lay : obj->layers())
             for (LayerRegion* lr : lay->regions())
@@ -1269,6 +1325,17 @@ void Print::process()
 #endif
     //simplify / make arc fitting
     {
+        
+#if _DEBUG
+        class GetLoopsVisitor : public ExtrusionVisitorRecursive {
+        public:
+            using ExtrusionVisitorRecursive::use;
+            std::vector<ExtrusionLoop*> loops;
+            virtual void use(ExtrusionLoop& loop) override {
+                loops.push_back(&loop);
+            }
+        } get_loops;
+#endif
         const bool spiral_mode = config().spiral_vase;
         const bool enable_arc_fitting = config().arc_fitting.value != ArcFittingType::Disabled && !spiral_mode;
         if (enable_arc_fitting) {
@@ -1282,8 +1349,8 @@ void Print::process()
         }
         //also simplify object skirt & brim
         if (enable_arc_fitting && (!this->m_skirt.empty() || !this->m_brim.empty())) {
-            coordf_t scaled_resolution = scale_d(config().resolution.value);
-            if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
+            coordf_t scaled_resolution = scale_d(config().arc_fitting_resolution.get_abs_value(config().resolution.value));
+            if (scaled_resolution == 0) scaled_resolution = SCALED_EPSILON * 2 ;
             const ConfigOptionFloatOrPercent& arc_fitting_tolerance = config().arc_fitting_tolerance;
 
             this->set_status(0, L("Optimizing skirt & brim %s%%"), { std::to_string(0) }, PrintBase::SlicingStatus::SECONDARY_STATE);
@@ -1291,6 +1358,10 @@ void Print::process()
             GetPathsVisitor visitor;
             this->m_skirt.visit(visitor);
             this->m_brim.visit(visitor);
+#if _DEBUG
+            this->m_skirt.visit(get_loops);
+            for (auto loop : get_loops.loops) assert(loop->is_counter_clockwise());
+#endif
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, visitor.paths.size() + visitor.paths3D.size()),
                 [this, &visitor, scaled_resolution, &arc_fitting_tolerance, &atomic_count](const tbb::blocked_range<size_t>& range) {
@@ -1307,6 +1378,13 @@ void Print::process()
                     }
                 }
             );
+#if _DEBUG
+            get_loops.loops.clear();
+            this->m_skirt.visit(get_loops);
+            for (auto loop : get_loops.loops) {
+                assert(loop->is_counter_clockwise());
+            }
+#endif
         }
     }
     
@@ -1351,33 +1429,6 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     return path.c_str();
 }
 
-Polygons get_brim_patch(const PrintObject &obj, ModelVolumeType brim_type, const PrintInstance *instance = nullptr) {
-    Polygons polys;
-    for (const ModelVolume *v : obj.model_object()->volumes) {
-        assert(v);
-        if (v->type() == brim_type) {
-            if (instance == nullptr) {
-                for (const PrintInstance &inst : obj.instances()) {
-                    Polygons vol_outline;
-                    auto transl = Transform3d::Identity();
-                    assert(inst.model_instance);
-                    vol_outline = project_mesh(v->mesh().its,
-                                               transl * inst.model_instance->get_matrix() * v->get_matrix(), [] {});
-                    append(polys, vol_outline);
-                }
-            } else {
-                Polygons vol_outline;
-                auto transl = Transform3d::Identity();
-                assert(instance->model_instance);
-                vol_outline = project_mesh(v->mesh().its,
-                                            transl * instance->model_instance->get_matrix() * v->get_matrix(), [] {});
-                append(polys, vol_outline);
-            }
-        }
-    }
-    return polys;
-}
-
 bool has_brim_patch(const PrintObject &obj, ModelVolumeType brim_type)
 {
     bool found = false;
@@ -1402,8 +1453,21 @@ bool has_brim_patch(const std::vector<PrintObject*> &objs_group, ModelVolumeType
     return found;
 }
 
+struct ExtrusionDirectionSetter : public ExtrusionVisitorRecursive {
+    using ExtrusionVisitorRecursive::use;
+    bool m_set_cw;
+    ExtrusionDirectionSetter() : m_set_cw(true) {}
+    ExtrusionDirectionSetter(bool set_cw) : m_set_cw(set_cw) {}
+    virtual void default_use(ExtrusionEntity& entity) override {};
+    virtual void use(ExtrusionLoop& loop) override {
+        if (loop.is_counter_clockwise() == m_set_cw ) {
+            loop.reverse();
+        }
+    }
+};
+
 void Print::_make_skirt_brim() {
-    
+
     if (this->set_started(psSkirtBrim)) {
         this->set_status(printstep_2_percent[PrintStep::psSkirtBrim], L("Generating skirt and brim"));
         m_skirt.clear();
@@ -1448,6 +1512,10 @@ void Print::_make_skirt_brim() {
             brim_per_object = brim_per_object || obj->config().brim_per_object.value;
             bool added = false;
             for (std::vector<PrintObject*> &obj_group : obj_groups) {
+                bool same_first_layer_extrusion_width = obj_group.front()->config().first_layer_extrusion_width.is_enabled() == obj->config().first_layer_extrusion_width.is_enabled();
+                if (same_first_layer_extrusion_width && obj_group.front()->config().first_layer_extrusion_width.is_enabled()){
+                    same_first_layer_extrusion_width = obj_group.front()->config().first_layer_extrusion_width.value == obj->config().first_layer_extrusion_width.value;
+                }
                 if (obj_group.front()->config().brim_ears.value == obj->config().brim_ears.value
                     && obj_group.front()->config().brim_ears_max_angle.value == obj->config().brim_ears_max_angle.value
                     && obj_group.front()->config().brim_ears_pattern.value == obj->config().brim_ears_pattern.value
@@ -1456,7 +1524,7 @@ void Print::_make_skirt_brim() {
                     && obj_group.front()->config().brim_separation.value == obj->config().brim_separation.value
                     && obj_group.front()->config().brim_width.value == obj->config().brim_width.value
                     && obj_group.front()->config().brim_width_interior.value == obj->config().brim_width_interior.value
-                    && obj_group.front()->config().first_layer_extrusion_width.value == obj->config().first_layer_extrusion_width.value) {
+                    && same_first_layer_extrusion_width) {
                     added = true;
                     obj_group.push_back(obj);
                 }
@@ -1484,7 +1552,7 @@ void Print::_make_skirt_brim() {
                         }
                     }
                     if (has_brim_patch(*object, ModelVolumeType::BRIM_NEGATIVE)) {
-                        for(Polygon &poly : get_brim_patch(*object, ModelVolumeType::BRIM_NEGATIVE)){
+                        for(Polygon &poly : object->get_brim_patch(ModelVolumeType::BRIM_NEGATIVE)){
                             brim_area.push_back(ExPolygon(std::move(poly)));
                         }
                     }
@@ -1503,7 +1571,7 @@ void Print::_make_skirt_brim() {
                         append(set_extruders, this->support_material_extruders());
                         Flow        flow = this->brim_flow(set_extruders.empty() ? get_print_region(0).config().perimeter_extruder - 1 : *set_extruders.begin(), obj->config());
                         //if complete objects
-                        if (config().complete_objects) {
+                        if (config().complete_objects || config().parallel_objects_step.value > 0) {
                             //don't consider other objects/instances, as they aren't colliding.
                             brim_area.clear();
                             const std::vector<PrintInstance> copies = obj->instances();
@@ -1519,7 +1587,7 @@ void Print::_make_skirt_brim() {
                             if (brim_config.brim_width_interior > 0) {
                                 make_brim_interior(*this, flow, { obj }, brim_area, obj->m_brim);
                             }
-                            make_brim_patch(*this, flow, get_brim_patch(*obj, ModelVolumeType::BRIM_PATCH), brim_area, obj->m_brim);
+                            make_brim_patch(*this, flow, obj->get_brim_patch(ModelVolumeType::BRIM_PATCH), brim_area, obj->m_brim);
                             obj->m_instances = copies;
                         } else {
                             brim_area = union_ex(brim_area);
@@ -1538,7 +1606,7 @@ void Print::_make_skirt_brim() {
                                 if (brim_config.brim_width_interior > 0) {
                                     make_brim_interior(*this, flow, { obj }, brim_area, entity_brim);
                                 }
-                                make_brim_patch(*this, flow, get_brim_patch(*obj, ModelVolumeType::BRIM_PATCH), brim_area, entity_brim);
+                                make_brim_patch(*this, flow, obj->get_brim_patch(ModelVolumeType::BRIM_PATCH), brim_area, entity_brim);
                                 obj->m_brim.append(std::move(entity_brim));
                             }
                             obj->m_instances = copies;
@@ -1562,7 +1630,7 @@ void Print::_make_skirt_brim() {
                         // create a brim per instance
                         for (const PrintInstance &instance : obj->instances()) {
                             ExtrusionEntityCollection entity_brim;
-                            make_brim_patch(*this, flow, get_brim_patch(*obj, ModelVolumeType::BRIM_PATCH, &instance), brim_area, entity_brim);
+                            make_brim_patch(*this, flow, obj->get_brim_patch(ModelVolumeType::BRIM_PATCH, &instance), brim_area, entity_brim);
                             obj->m_brim.append(std::move(entity_brim));
                         }
                     }
@@ -1571,14 +1639,44 @@ void Print::_make_skirt_brim() {
             }
         }
         // store brim hull (used for make_skirt... that is made before)
-        // m_first_layer_convex_hull is sued to set the 'first_layer_print_min' placeholder in gcode macros
-        for (Polygon& poly : to_polygons(brim_area))
-            append(m_first_layer_convex_hull.points, std::move(poly.points));
+        // m_first_layer_convex_hull is used to set the 'first_layer_print_min' placeholder in gcode macros
+        append(m_first_layer_convex_hull.points, to_points(brim_area));
         this->finalize_first_layer_convex_hull();
+
+        // everything should be extruded ccw, so only chajnge dir if cw is requested
+        if (this->m_default_region_config.perimeter_direction.value == pdCW_CCW ||
+            this->m_default_region_config.perimeter_direction.value == pdCW_CW) {
+            ExtrusionDirectionSetter visitor(true);
+            this->m_skirt.visit(visitor);
+            if (m_skirt_first_layer) {
+                this->m_skirt_first_layer->visit(visitor);
+            }
+            this->m_brim.visit(visitor);
+        }
+        for (PrintObject *object : m_objects) {
+            const PrintRegionConfig &region_config = object->default_region_config(this->m_default_region_config);
+            if (region_config.perimeter_direction.value == pdCW_CCW ||
+                region_config.perimeter_direction.value == pdCW_CW) {
+                ExtrusionDirectionSetter visitor(true);
+                // using firend privilege. If you remove it, just create & call a printobject function.
+                object->m_skirt.visit(visitor);
+                if (object->m_skirt_first_layer) {
+                    object->m_skirt_first_layer->visit(visitor);
+                }
+            }
+                // only global setting is useful for brim
+            if (this->m_default_region_config.perimeter_direction.value == pdCW_CCW ||
+                this->m_default_region_config.perimeter_direction.value == pdCW_CW) {
+                ExtrusionDirectionSetter visitor(true);
+                object->m_brim.visit(visitor);
+            }
+        }
+
         // Brim depends on skirt (brim lines are trimmed by the skirt lines), therefore if
         // the skirt gets invalidated, brim gets invalidated as well and the following line is called.
         this->set_done(psSkirtBrim);
     }
+
 }
 
 void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollection &out, std::optional<ExtrusionEntityCollection>& out_first_layer)
@@ -1613,26 +1711,25 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                 // Collect the outer contour points only, ignore holes for the calculation of the convex hull.
                 append(object_points, expoly.contour.points);
         }
+        // simplify
+        object_points = Slic3r::Geometry::convex_hull(object_points).points;
         // Get support layers up to skirt_height_z.
         for (const SupportLayer *layer : object->support_layers()) {
             if (layer->print_z > skirt_height_z)
                 break;
-            layer->support_fills.collect_points(object_points);
+            for (const ExPolygon &expoly : layer->support_islands)
+                append(object_points, expoly.contour.points);
+            // simplify
+            object_points = Slic3r::Geometry::convex_hull(object_points).points;
         }
         // if brim, it superseed object & support for first layer
         if (config().skirt_distance_from_brim) {
             // get first layer support
             if (!object->support_layers().empty() && object->support_layers().front()->print_z == object->m_layers[0]->print_z) {
                 Points support_points;
-                for (const ExtrusionEntity* extrusion_entity : object->support_layers().front()->support_fills.entities()) {
-                    ArcPolylines polys;
-                    extrusion_entity->collect_polylines(polys);
-                    for (const ArcPolyline &polyline : polys) {
-                        assert(!polyline.has_arc());
-                        append(support_points, polyline.to_polyline().points);
-                    }
-                }
-                Polygon hull_support = Slic3r::Geometry::convex_hull(support_points);
+                for (const ExPolygon &expoly : object->support_layers().front()->support_islands)
+                    append(support_points, expoly.contour.points);
+                const Polygon hull_support = Slic3r::Geometry::convex_hull(support_points);
                 for (const Polygon& poly : offset(hull_support, scale_(object->config().brim_width)))
                     append(object_points, poly.points);
             }
@@ -1643,7 +1740,7 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
             // get brim patchs
             if (has_brim_patch(*object, ModelVolumeType::BRIM_PATCH)) {
                 assert(!object->instances().empty());
-                for (Polygon &poly : get_brim_patch(*object, ModelVolumeType::BRIM_PATCH, &object->instances().front())) {
+                for (Polygon &poly : object->get_brim_patch(ModelVolumeType::BRIM_PATCH, &object->instances().front())) {
                     // remove shift
                     for (Point &pt : poly.points)
                         pt -= object->instances().front().shift;
@@ -1651,6 +1748,16 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                 }
             }
         }
+        // simplify
+        Polygon polygon = Slic3r::Geometry::convex_hull(object_points);
+        coord_t scaled_resolution_internal_coarse = std::min(std::max(SCALED_EPSILON * 10,
+                                                                      scale_t(this->config().resolution_internal)),
+                                                             this->skirt_flow(0).scaled_width());
+        if (!ensure_valid(polygon, scaled_resolution_internal_coarse)) {
+            assert(false);
+            return;
+        }
+        object_points = polygon.points;
         // Repeat points for each object copy.
         for (const PrintInstance &instance : object->instances()) {
             Points copy_points = object_points;
@@ -1835,8 +1942,8 @@ Points Print::first_layer_wipe_tower_corners() const
             pts.emplace_back(center + r*Vec2d(std::cos(alpha)/cone_x_scale, std::sin(alpha)));
 
         for (Vec2d& pt : pts) {
-            pt = Eigen::Rotation2Dd(Geometry::deg2rad(m_config.wipe_tower_rotation_angle.value)) * pt;
-            pt += Vec2d(m_config.wipe_tower_x.value, m_config.wipe_tower_y.value);
+            pt = Eigen::Rotation2Dd(Geometry::deg2rad(model().wipe_tower().rotation)) * pt;
+            pt += model().wipe_tower().position;
             pts_scaled.emplace_back(Point(scale_(pt.x()), scale_(pt.y())));
         }
     }
@@ -2007,47 +2114,107 @@ void Print::alert_when_supports_needed()
     }
 }
 
-// Wipe tower support.
-bool Print::has_wipe_tower() const
-{
-    return 
-        ! m_config.spiral_vase.value &&
-        m_config.wipe_tower.value && 
-        m_config.nozzle_diameter.size() > 1;
+bool Print::has_wipe_tower() const {
+    if (config().nozzle_diameter.size() <= 1 || !config().wipe_tower || config().complete_objects ||
+        config().spiral_vase.value) {
+        return false;
+    }
+    bool has_parallel_objects_step = config().parallel_objects_step.value > 0;
+    if (has_parallel_objects_step && config().parallel_objects_step.value > 0) {
+        // check if the print has multiple extruders below has_parallel_objects_step_max_z
+        const float max_z = config().parallel_objects_step.value + EPSILON;
+        bool can_wipe_tower = true;
+        int extruder = -1;
+        auto check_extruder = [&extruder, &can_wipe_tower](int extr) -> bool {
+            if (extr <= 0) {
+                return false;
+            }
+            if (extruder == -1) {
+                extruder = extr;
+                return false;
+            }
+            can_wipe_tower = extruder == extr;
+            return !can_wipe_tower;
+        };
+        for (const PrintObject *obj : this->objects()) {
+            for (const Layer *layer : obj->layers()) {
+                if (layer->print_z > max_z)
+                    continue;
+                for (const LayerRegion *lr : layer->regions()) {
+                    if (lr->has_extrusions()) {
+                        if (!lr->perimeters().empty() &&
+                            check_extruder(lr->region().config().perimeter_extruder.value)) {
+                            goto finish_search; // !can_wipe_tower
+                        } else if ((!lr->fills().empty() || !lr->ironings().empty() || !lr->thin_fills().empty()) &&
+                                   (check_extruder(lr->region().config().infill_extruder.value) ||
+                                    check_extruder(lr->region().config().solid_infill_extruder.value))) {
+                            goto finish_search; // !can_wipe_tower
+                        //} else if (lr->has_extrusions() && check_extruder(lr->region().extruder_id)) {
+                        //    goto finish_search; // !can_wipe_tower
+                        }
+                    }
+                }
+            }
+        }
+        for (const PrintObject *obj : this->objects()) {
+            for (const SupportLayer *slayer : obj->support_layers()) {
+                if (slayer->print_z > max_z)
+                    continue;
+                if (!slayer->support_fills.empty() &&
+                    (check_extruder(obj->config().support_material_extruder.value) ||
+                     check_extruder(obj->config().support_material_interface_extruder.value))) {
+                    goto finish_search; // !can_wipe_tower
+                }
+            }
+        }
+    finish_search:;
+        has_parallel_objects_step = !can_wipe_tower;
+    }
+    return !has_parallel_objects_step;
 }
 
-const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt, double nozzle_diameter) const
+const WipeTowerData& Print::wipe_tower_data(const ConfigBase* config, double nozzle_diameter) const
 {
     // If the wipe tower wasn't created yet, make sure the depth and brim_width members are set to default.
-    if (! is_step_done(psWipeTower) && extruders_cnt !=0) {
-        const_cast<Print*>(this)->m_wipe_tower_data.brim_width = m_config.wipe_tower_brim_width;
+    if (! is_step_done(psWipeTower) && config != &this->m_config) {
+        size_t extruders_cnt = config->option("nozzle_diameter")->size();
 
         // Calculating depth should take into account currently set wiping volumes.
         // For a long time, the initial preview would just use 900/width per toolchange (15mm on a 60mm wide tower)
         // and it worked well enough. Let's try to do slightly better by accounting for the purging volumes.
-        std::vector<std::vector<float>> wipe_volumes = WipeTower::extract_wipe_volumes(m_config);
+        std::vector<std::vector<float>> wipe_volumes = WipeTower::extract_wipe_volumes(*config);
         std::vector<float> max_wipe_volumes;
         for (const std::vector<float>& v : wipe_volumes)
             max_wipe_volumes.emplace_back(*std::max_element(v.begin(), v.end()));
         float maximum = std::accumulate(max_wipe_volumes.begin(), max_wipe_volumes.end(), 0.f);
         maximum = maximum * extruders_cnt / max_wipe_volumes.size();
 
-        float width = float(m_config.wipe_tower_width);
-        float unscaled_brim_width = m_config.wipe_tower_brim_width.get_abs_value(nozzle_diameter);
+        float unscaled_brim_width = config->option<ConfigOptionFloatOrPercent>("wipe_tower_brim_width")->get_abs_value(nozzle_diameter);
         // use min layer height, as it's what wil disctate the wipe tower width.
-        float layer_height = 0;
-        if (m_objects.empty()) {
+        float first_layer_height = 0;
+        //if (m_objects.empty()) {
             // if no objects, then no extruder selected: use the first one.
-            layer_height = default_object_config().first_layer_height.get_abs_value(config().nozzle_diameter.get_at(0));
-        } else {
-            layer_height = get_min_first_layer_height();
-        }
+            //first_layer_height = default_object_config().first_layer_height.get_abs_value(config->option("nozzle_diameter")->get_float(0));
+            first_layer_height = config->option<ConfigOptionFloatOrPercent>("first_layer_height")->get_abs_value(config->option("nozzle_diameter")->get_float(0));
+        //} else {
+        //    first_layer_height = get_min_first_layer_height();
+        //}
         // FIXME: get layer height from layers instead of config.
-        layer_height = std::min(layer_height, float(default_object_config().layer_height.value));
-
-        const_cast<Print*>(this)->m_wipe_tower_data.depth = (maximum/layer_height)/width;
-        const_cast<Print*>(this)->m_wipe_tower_data.height = -1.f; // unknown yet
+        //float layer_height = std::min(first_layer_height, float(default_object_config().layer_height.value));
+        float layer_height = float(config->option("layer_height")->get_float());
+        if (first_layer_height > 0 && first_layer_height < layer_height) {
+            layer_height = first_layer_height;
+        }
+        
+        const_cast<Print*>(this)->m_wipe_tower_data.position = Vec2d{config->option("wipe_tower_x")->get_float(), config->option("wipe_tower_y")->get_float()};
+        const_cast<Print*>(this)->m_wipe_tower_data.width = float(config->option("wipe_tower_width")->get_float());
+        const_cast<Print*>(this)->m_wipe_tower_data.rotation_angle = float(config->option("wipe_tower_rotation_angle")->get_float());
+        const_cast<Print*>(this)->m_wipe_tower_data.depth = (maximum/layer_height)/this->m_wipe_tower_data.width;
         const_cast<Print*>(this)->m_wipe_tower_data.brim_width = unscaled_brim_width;
+        const_cast<Print*>(this)->m_wipe_tower_data.cone_angle = float(config->option("wipe_tower_cone_angle")->get_float());
+        const_cast<Print*>(this)->m_wipe_tower_data.first_layer_height = first_layer_height;
+        const_cast<Print*>(this)->m_wipe_tower_data.height = -1.f; // unknown yet
+        const_cast<Print*>(this)->m_wipe_tower_data.z_and_depth_pairs.clear(); // unknown yet
     }
 
     return this->m_wipe_tower_data;
@@ -2105,7 +2272,8 @@ void Print::_make_wipe_tower()
     this->throw_if_canceled();
 
     // Initialize the wipe tower.
-    WipeTower wipe_tower(m_config, m_default_object_config, m_default_region_config, wipe_volumes, m_wipe_tower_data.tool_ordering.first_extruder());
+    WipeTower wipe_tower(model().wipe_tower().position.cast<float>(), m_config, m_default_object_config,
+                         m_default_region_config, wipe_volumes, m_wipe_tower_data.tool_ordering.first_extruder());
 
     // Set the extruder & material properties at the wipe tower object.
     for (size_t i = 0; i < m_config.nozzle_diameter.size(); ++ i)
@@ -2284,6 +2452,9 @@ DynamicConfig PrintStatistics::config() const
             this->estimated_print_time_str.at(static_cast<uint8_t>(PrintEstimatedStatistics::ETimeMode::Stealth)));
         config.set_key_value("silent_print_time", new ConfigOptionString(silent_print_time));
     }
+    std::string normal_print_time = short_time(this->estimated_normal_print_time);
+
+
     config.set_key_value("used_filament",             new ConfigOptionFloat(this->total_used_filament / 1000.));
     config.set_key_value("extruded_volume",           new ConfigOptionFloat(this->total_extruded_volume));
     config.set_key_value("total_cost",                new ConfigOptionFloat(this->total_cost));

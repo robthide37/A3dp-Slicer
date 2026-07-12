@@ -212,10 +212,10 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
     if (slowdown_below_layer_time > 0) {
         out += std::string("\n\n");
         out += format_wxstr(_L("If estimated layer time is below ~%1%s"), slowdown_below_layer_time);
-        if (max_fan_speed > 0 && max_fan_speed > min_fan_speed) {
+        if (max_fan_speed > 0 && max_fan_speed > min_fan_speed && fan_below_layer_time > slowdown_below_layer_time) {
             out += " ";
             out += format_wxstr(_L("fan will run by default to %1%%%"), max_fan_speed);
-
+            
             if (disable_fan_first_layers > 1) {
                 out += " (";
                 out += format_wxstr(_L("except for the first %1% layers where the fan is disabled"), disable_fan_first_layers);
@@ -229,7 +229,7 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
                 out += ")";
             out += " and";
         }
-            
+        
         out += " ";
         out += format_wxstr(_L("print speed will be reduced so that no less than %1%s are spent on that layer"), slowdown_below_layer_time);
         if (min_print_speed > 0) {
@@ -240,6 +240,21 @@ std::string PresetHints::cooling_description(const Preset &preset_fil, const Pre
                 out += " ";
                 out += format_wxstr(_L("(however, speed will never be reduced below %1%mm/s)"), min_print_speed);
             }
+        }
+        
+        if (fan_below_layer_time > 0
+            && fan_below_layer_time > slowdown_below_layer_time
+            && max_fan_speed > min_fan_speed) {
+            
+            out += format_wxstr(_L("\n\nIf estimated layer time is below ~%1%s, but still greater than ~%2%s, "
+                                   "fan will run at a proportionally increasing speed between %3%%% and %4%%%"),
+                                fan_below_layer_time, slowdown_below_layer_time, min_fan_speed, max_fan_speed);
+            out += ".\n";
+            out += format_wxstr(_L("If the fan speed is set, it will proportionally increasing speed between this value and %1%%%."), max_fan_speed);
+            out += "\n";
+            out += format_wxstr(_L("If the fan speed is set and is higher than %1%%%, it won't be changed."), max_fan_speed);
+            out += "\n";
+            out += format_wxstr(_L("Also, the fan speed over %1% won't be touched by this feature."), format_wxstr("%1%, %2%, %3%, %4%", _L("Top surfaces"), _L("Ironings"), _L("Bridges"), _L("Internal bridges")));
         }
     }
 
@@ -319,6 +334,8 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
     const auto &external_perimeter_extrusion_spacing= *print_config.option<ConfigOptionFloatOrPercent>("external_perimeter_extrusion_spacing");
     const auto &first_layer_extrusion_width         = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width");
     const auto &first_layer_extrusion_spacing       = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_spacing");
+    const auto &first_layer_infill_extrusion_width  = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_infill_extrusion_width");
+    const auto &first_layer_infill_extrusion_spacing= *print_config.option<ConfigOptionFloatOrPercent>("first_layer_infill_extrusion_spacing");
     const auto &infill_extrusion_width              = *print_config.option<ConfigOptionFloatOrPercent>("infill_extrusion_width");
     const auto &infill_extrusion_spacing            = *print_config.option<ConfigOptionFloatOrPercent>("infill_extrusion_spacing");
     const auto &perimeter_extrusion_width           = *print_config.option<ConfigOptionFloatOrPercent>("perimeter_extrusion_width");
@@ -355,9 +372,9 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
         // First test the maximum volumetric extrusion speed for non-bridging extrusions.
         bool first_layer = idx_type == 0;
         bool bridging    = idx_type == 2;
-        const ConfigOptionFloatOrPercent* first_layer_extrusion_width_ptr = (first_layer && first_layer_extrusion_width.value > 0) ?
+        const ConfigOptionFloatOrPercent* first_layer_extrusion_width_ptr = (first_layer && first_layer_extrusion_width.is_enabled()) ?
             &first_layer_extrusion_width : nullptr;
-        const ConfigOptionFloatOrPercent* first_layer_extrusion_spacing_ptr = (first_layer && first_layer_extrusion_spacing.value > 0) ?
+        const ConfigOptionFloatOrPercent* first_layer_extrusion_spacing_ptr = (first_layer && first_layer_extrusion_width.is_enabled()) ?
             &first_layer_extrusion_spacing : nullptr;
         const float                       lh  = float(first_layer ? first_layer_height : layer_height);
         const float                       bfr = bridging ? bridge_flow_ratio : 0.f;
@@ -623,8 +640,8 @@ std::string PresetHints::top_bottom_shell_thickness_explanation(const PresetBund
 
     int     top_solid_layers                = print_config.option("top_solid_layers")->get_int();
     int     bottom_solid_layers             = print_config.option("bottom_solid_layers")->get_int();
-    bool    has_top_layers 					= top_solid_layers > 0;
-    bool    has_bottom_layers 				= bottom_solid_layers > 0;
+    bool    has_top_layers 					= top_solid_layers > 0 || (print_config.option("solid_infill_every_layers")->get_int() == 1 && print_config.option("fill_density")->get_float() > 0);
+    bool    has_bottom_layers 				= bottom_solid_layers > 0 || (print_config.option("solid_infill_every_layers")->get_int() == 1 && print_config.option("fill_density")->get_float() > 0);
     double  top_solid_min_thickness        	= print_config.opt_float("top_solid_min_thickness");
     double  bottom_solid_min_thickness  	= print_config.opt_float("bottom_solid_min_thickness");
     double  layer_height                    = print_config.opt_float("layer_height");
