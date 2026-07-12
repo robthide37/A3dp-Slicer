@@ -27,7 +27,7 @@ jobs:
       working-directory: ./deps/build
       run: |
         cmake .. -G "Visual Studio 17 2022" -A x64
-        msbuild /m ALL_BUILD.vcxproj
+        msbuild /m:2 ALL_BUILD.vcxproj
 
   build:
     runs-on: windows-2022
@@ -73,19 +73,19 @@ jobs:
       run: cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="d:\a\${{ github.event.repository.name }}\${{ github.event.repository.name }}\deps\build\destdir\usr\local"
     - name: make
       working-directory: ./build
-      run: msbuild /m /P:Configuration=Release INSTALL.vcxproj
+      run: msbuild /m:2 /P:Configuration=Release INSTALL.vcxproj
     - name: make .mo
       working-directory: ./build
-      run: msbuild /m /P:Configuration=Release gettext_po_to_mo.vcxproj
+      run: msbuild /m:2 /P:Configuration=Release gettext_po_to_mo.vcxproj
     - name: make .pot
       working-directory: ./build
-      run: msbuild /m /P:Configuration=Release gettext_make_pot.vcxproj
+      run: msbuild /m:2 /P:Configuration=Release gettext_make_pot.vcxproj
     - name: create OCCT wrapper
       working-directory: ./build
-      run: msbuild /m /P:Configuration=Release src\occt_wrapper\OCCTWrapper.vcxproj
+      run: msbuild /m:2 /P:Configuration=Release src\occt_wrapper\OCCTWrapper.vcxproj
     - name: copy dll
       working-directory: ./build
-      run: msbuild /m /P:Configuration=Release src\slic3rDllsCopy.vcxproj
+      run: msbuild /m:2 /P:Configuration=Release src\slic3rDllsCopy.vcxproj
     - name: create package directory
       working-directory: ./build
       shell: powershell
