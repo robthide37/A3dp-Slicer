@@ -53,12 +53,12 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: deps_win
-        path: deps/destdir.zip
+        path: deps
     - name: extract deps
       working-directory: deps
       run: |
         mkdir destdir
-        7z x destdir.zip -odestdir
+        7z x deps_win.zip -odestdir
     - name: echo dir deps
       run: dir deps
     - name: echo dir deps destdir
