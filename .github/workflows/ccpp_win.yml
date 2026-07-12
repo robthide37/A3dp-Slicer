@@ -57,7 +57,6 @@ jobs:
     - name: extract deps
       working-directory: deps
       run: |
-        mkdir destdir
         7z x deps_win.zip -odestdir
     - name: echo dir deps
       run: dir deps
