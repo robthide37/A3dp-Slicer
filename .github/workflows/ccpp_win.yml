@@ -133,7 +133,17 @@ jobs:
         name: nightly_win64
         path: build/package/
 
-# MSI CREATION
+  create_msi:
+    runs-on: windows-2022
+    needs: build
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: nightly_win64
+        path: build/package
   # create_msi:
     # runs-on: windows-2022
     # needs: build

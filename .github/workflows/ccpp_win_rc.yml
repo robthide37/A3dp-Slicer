@@ -133,7 +133,17 @@ jobs:
         name: rc_win64
         path: build/package/
 
-# MSI CREATION (need files from the slic3r build, can't be its own step)
+  create_msi:
+    runs-on: windows-2022
+    needs: build
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: rc_win64
+        path: build/package
   # create_msi:
     # runs-on: windows-2022
     # needs: build
