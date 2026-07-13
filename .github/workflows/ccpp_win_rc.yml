@@ -196,7 +196,7 @@ jobs:
       working-directory: ./build
       run: |
         set MSIFileName=${{ github.event.repository.name }}_%InstallerVersion%.msi
-        candle.exe -dSourceDir="package" -dInstallerVersion="%InstallerVersion%" -dReleaseSuffix="%ReleaseSuffix%" src\winInstaller.wxs files.wxs
+        candle.exe -dSourceDir="package" -dInstallerVersion="%InstallerVersion%" -dReleaseSuffix="%ReleaseSuffix%" winInstaller.wxs files.wxs
         light.exe -b package -ext WixUIExtension winInstaller.wixobj files.wixobj -o %MSIFileName% -sw1076
     - run: dir ./build
     - name: Upload MSI artifact
