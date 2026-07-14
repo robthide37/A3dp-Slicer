@@ -132,7 +132,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: rc_win64
-        path: build/package/
+        path: |
+          build/package/
+          build/src/winInstaller.wxs
 
   create_msi:
     runs-on: windows-2022
@@ -196,7 +198,7 @@ jobs:
       working-directory: ./build
       run: |
         set MSIFileName=${{ github.event.repository.name }}_%InstallerVersion%.msi
-        candle.exe -dSourceDir="package" -dInstallerVersion="%InstallerVersion%" -dReleaseSuffix="%ReleaseSuffix%" src/platform/msw/winInstaller.wxs.in files.wxs
+        candle.exe -dSourceDir="package" -dInstallerVersion="%InstallerVersion%" -dReleaseSuffix="%ReleaseSuffix%" src/winInstaller.wxs files.wxs
         light.exe -b package -ext WixUIExtension winInstaller.wixobj files.wixobj -o %MSIFileName% -sw1076
     - run: dir ./build
     - name: Upload MSI artifact
