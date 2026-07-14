@@ -146,7 +146,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: rc_win64
-        path: build/package
+        path: build
   # create_msi:
     # runs-on: windows-2022
     # needs: build
