@@ -24,6 +24,12 @@
 # therefore, unfortunatelly, the installation cannot be copied/moved elsewhere without re-installing wxWidgets.
 #
 cmake_minimum_required(VERSION 3.12)
+
+# Allow CMake 4.x to configure deps with old cmake_minimum_required
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 4.0)
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.0)
+endif()
+
 project(Slic3r-deps)
 
 # timestamp of the extracted content from archive set to the extraction date. OLD to set to the timestamp from the archive.

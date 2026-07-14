@@ -20,7 +20,7 @@ jobs:
     - name: Setup cmake
       uses: jwlawson/actions-setup-cmake@v2
       with:
-        cmake-version: "3.31.x"
+        cmake-version: "3.24.x"
     - name: Use cmake
       run: cmake --version
     - name: Install Autoconf
@@ -61,7 +61,7 @@ jobs:
     - name: Setup cmake
       uses: jwlawson/actions-setup-cmake@v2
       with:
-        cmake-version: "3.31.x"
+        cmake-version: "3.24.x"
     - name: Use cmake
       run: cmake --version
     - name: dep cache
