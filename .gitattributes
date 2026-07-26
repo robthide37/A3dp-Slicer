@@ -1,0 +1,27 @@
+# Shell scripts must stay LF (Linux CI will choke on CRLF)
+*.sh text eol=lf
+*.sh.in text eol=lf
+
+# CMake files
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+
+# YAML workflow files
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Source code
+*.c text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.cc text eol=lf
+
+# Python
+*.py text eol=lf
+
+# Build scripts
+*.in text eol=lf
+BuildLinux.sh text eol=lf
+BuildMacOS.sh text eol=lf
+BuildLinuxImage.sh.in text eol=lf
