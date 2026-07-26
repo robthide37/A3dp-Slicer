@@ -30,6 +30,8 @@ jobs:
       run: sudo apt install libwebkit2gtk-4.0-dev
     - name: install libs
       run: sudo ./BuildLinux.sh -u
+    - name: Install patchelf
+      run: sudo apt install -y patchelf
     - name: dep cache
       id: cache-action
       uses: actions/cache@v3

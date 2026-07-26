@@ -11,6 +11,7 @@ set -e
 # 20 Nov 2023, wschadow, minor changes
 #
 # 14 Jul 2026, added set -e for error detection; updated appimagetool URL
+# 24 Jul 2026, added library bundling with patchelf for self-contained AppImage
 
 
 #old fuse2 tool APPIMAGETOOLURL="https://github.com/AppImage/AppImageKit/releases/latest/download/appimagetool-x86_64.AppImage"
@@ -23,7 +24,95 @@ wget --no-check-certificate -q "${APPIMAGETOOLURL}" -O ../appimagetool.AppImage 
     exit 1
 }
 chmod +x ../appimagetool.AppImage
-sed -i -e 's#/usr#././#g' bin/@SLIC3R_APP_CMD@
+
+# ---------------------------------------------------------------------------
+# Bundle all dynamic libraries into the AppImage for self-contained execution
+# ---------------------------------------------------------------------------
+echo "=== Bundling dynamic libraries ==="
+mkdir -p usr/lib
+
+# Collect all .so paths needed by a binary/library into a flat list.
+# Uses an iterative breadth-first approach to avoid subshell issues.
+BUNDLED_LIST=""
+
+bundle_deps() {
+    local target="$1"
+    # Get direct dependencies
+    local deps
+    deps=$(ldd "$target" 2>/dev/null | grep "=> /" | awk '{print $2}')
+
+    for dep_path in $deps; do
+        # Skip if empty or doesn't exist
+        [ -z "$dep_path" ] && continue
+        [ ! -f "$dep_path" ] && continue
+
+        local dep_name
+        dep_name=$(basename "$dep_path")
+
+        # Skip if already bundled
+        if echo "$BUNDLED_LIST" | grep -q "^${dep_name}$"; then
+            continue
+        fi
+
+        # Copy the library into usr/lib
+        cp "$dep_path" "usr/lib/$dep_name"
+        echo "  Bundled: $dep_name"
+        BUNDLED_LIST="$BUNDLED_LIST
+$dep_name"
+    done
+}
+
+# Iterative approach: keep bundling until no new libs are found
+MAX_ITERATIONS=5
+iteration=0
+while [ $iteration -lt $MAX_ITERATIONS ]; do
+    before_count=$(echo "$BUNDLED_LIST" | grep -c "." 2>/dev/null || true)
+
+    # Bundle deps of the main binary
+    bundle_deps "bin/@SLIC3R_APP_CMD@"
+
+    # Bundle deps of OCCTWrapper.so
+    if [ -f "bin/OCCTWrapper.so" ]; then
+        bundle_deps "bin/OCCTWrapper.so"
+    fi
+
+    # Bundle deps of every newly copied library (transitive)
+    for lib in usr/lib/*.so; do
+        [ -f "$lib" ] || continue
+        bundle_deps "$lib"
+    done
+
+    after_count=$(echo "$BUNDLED_LIST" | grep -c "." 2>/dev/null || true)
+
+    if [ "$before_count" = "$after_count" ]; then
+        echo "  No new libraries found (iteration $iteration)"
+        break
+    fi
+    iteration=$((iteration + 1))
+done
+
+lib_count=$(ls -1 usr/lib/*.so 2>/dev/null | wc -l || echo 0)
+echo "  Total libraries bundled: $lib_count"
+
+# ---------------------------------------------------------------------------
+# Set rpath so the binary finds bundled libraries at runtime
+# ---------------------------------------------------------------------------
+if command -v patchelf &> /dev/null; then
+    echo "Setting rpath with patchelf..."
+    patchelf --set-rpath '$ORIGIN/../usr/lib' "bin/@SLIC3R_APP_CMD@"
+    if [ -f "bin/OCCTWrapper.so" ]; then
+        patchelf --set-rpath '$ORIGIN/../usr/lib' "bin/OCCTWrapper.so"
+    fi
+else
+    echo "WARNING: patchelf not found, using objcopy fallback..."
+    objcopy --add-rpath '$ORIGIN/../usr/lib' "bin/@SLIC3R_APP_CMD@"
+    if [ -f "bin/OCCTWrapper.so" ]; then
+        objcopy --add-rpath '$ORIGIN/../usr/lib' "bin/OCCTWrapper.so"
+    fi
+fi
+
+echo "=== Library bundling complete ==="
+
 cp @SLIC3R_APP_CMD@ AppRun
 chmod +x AppRun
 
