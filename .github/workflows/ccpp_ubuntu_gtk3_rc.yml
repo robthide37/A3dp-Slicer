@@ -3,6 +3,7 @@ name: C/C++ Release candidate ubuntu-GTK3
 on:
   push:
     branches:
+      - test
       - master_27
 
 jobs:

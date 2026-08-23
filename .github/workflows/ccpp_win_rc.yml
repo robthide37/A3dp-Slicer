@@ -3,6 +3,7 @@ name: C/C++ Release candidate windows x64
 on:
   push:
     branches:
+      - test
       - master_27
       - debug_win
       - rc
