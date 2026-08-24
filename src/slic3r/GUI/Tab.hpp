@@ -497,8 +497,15 @@ public:
 
     void            update_wiping_button_visibility();
 	virtual void	activate_option(const OptionKeyIdx& opt_key_idx, const wxString& category);
-	void			cache_config_diff(const std::vector<std::string>& selected_options, const DynamicPrintConfig* config = nullptr);
-	void			apply_config_from_cache();
+	void            cache_config_diff(const std::vector<std::string>& selected_options, const DynamicPrintConfig* config = nullptr);
+	void            apply_config_from_cache();
+	// Temporarily stash ("hold") the unsaved changes of the currently edited preset so that the user
+	// can switch to another preset (e.g. another extruder's material) without being forced to save,
+	// discard or transfer them. apply_held_preset() restores the stashed changes when the same
+	// preset is selected again.
+	void            stash_held_config(const std::string& preset_name, const std::vector<std::string>& selected_options);
+	void            apply_held_preset();
+	std::map<std::string, DynamicPrintConfig> m_preset_held_configs; // held (temp) preset modifications, keyed by "<preset type>:<preset name>"
 
 	const std::map<wxString, std::string>& get_category_icon_map() { return m_category_icon; }
 

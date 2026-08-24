@@ -813,6 +813,9 @@ UnsavedChangesDialog::UnsavedChangesDialog(Preset::Type type, PresetCollection* 
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, _L("Switching Presets: Unsaved Changes"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER, "unsavedcahnges2")
 {
     m_app_config_key = "default_action_on_select_preset";
+    // This dialog is opened for a preset switch, so the "Hold" (temporarily stash the changes)
+    // action is available.
+    m_show_hold_btn = true;
 
     build(type, dependent_presets, new_selected_preset);
 
@@ -824,7 +827,8 @@ UnsavedChangesDialog::UnsavedChangesDialog(Preset::Type type, PresetCollection* 
     }
     else {
         m_exit_action = def_action == ActTransfer   ? Action::Transfer  :
-                        def_action == ActSave       ? Action::Save      : Action::Discard;
+                        def_action == ActSave       ? Action::Save      :
+                        def_action == ActHold       ? Action::Hold      : Action::Discard;
         const PresetCollection& printers = wxGetApp().preset_bundle->printers;
         if (m_exit_action == Action::Save || 
             (m_exit_action == Action::Transfer && dependent_presets && (type == dependent_presets->type() ?
@@ -896,6 +900,12 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     }
     if (!m_transfer_btn && (ActionButtons::KEEP & m_buttons))
         add_btn(&m_transfer_btn, m_move_btn_id, "paste_menu", Action::Transfer, _L("Keep"));
+
+    // "Hold" (temp) button: stash the selected unsaved changes so the user can switch to another
+    // preset (e.g. another extruder's material) without saving, discarding or transferring them.
+    // The changes are restored automatically when this preset is selected again.
+    if (m_show_hold_btn && m_transfer_btn)
+        add_btn(&m_hold_btn, m_hold_btn_id, "copy_menu", Action::Hold, _L("Hold"));
 
     { // "Don't save" / "Discard" button
         std::string btn_icon    = (ActionButtons::DONT_SAVE & m_buttons) ? "" : (dependent_presets || (ActionButtons::KEEP & m_buttons)) ? "switch_presets" : "exit";
@@ -974,7 +984,8 @@ void UnsavedChangesDialog::show_info_line(Action action, std::string preset_name
             text = ActionButtons::DONT_SAVE & m_buttons ? _L("All settings changes will not be saved") :_L("All settings changes will be discarded.");
         else {
             if (preset_name.empty())
-                text = action == Action::Save           ? _L("Save the selected options.") : 
+                text = action == Action::Save           ? _L("Save the selected options.") :
+                       action == Action::Hold           ? _L("Temporarily hold the selected settings, you can change other presets now and they will be restored when you come back to this one.") :
                        ActionButtons::KEEP & m_buttons  ? _L("Keep the selected settings.") :
                                                           _L("Transfer the selected settings to the newly selected preset.");
             else
@@ -999,7 +1010,8 @@ void UnsavedChangesDialog::update_config(Action action)
         return;
 
     std::string act = action == Action::Transfer ? ActTransfer :
-                      action == Action::Discard  ? ActDiscard   : ActSave;
+                      action == Action::Discard  ? ActDiscard   :
+                      action == Action::Hold     ? ActHold      : ActSave;
     wxGetApp().app_config->set(m_app_config_key, act);
 }
 
@@ -1288,6 +1300,8 @@ void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent
     }
     if (m_discard_btn)
         m_discard_btn ->Bind(wxEVT_ENTER_WINDOW, [this]                                    (wxMouseEvent& e) { show_info_line(Action::Discard); e.Skip(); });
+    if (m_hold_btn)
+        m_hold_btn    ->Bind(wxEVT_ENTER_WINDOW, [this]                                    (wxMouseEvent& e) { show_info_line(Action::Hold); e.Skip(); });
 
     if (type == Preset::TYPE_INVALID || !dependent_presets) {
         PrinterTechnology printer_technology = wxGetApp().get_current_printer_technology();

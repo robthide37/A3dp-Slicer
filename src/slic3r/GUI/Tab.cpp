@@ -1747,6 +1747,41 @@ void Tab::apply_config_from_cache()
         update_dirty();
 }
 
+// Key for the held (temporarily stashed) preset modifications map: preset type + unit separator (0x1F,
+// cannot occur in a preset name) + preset name.
+static std::string held_preset_key(Preset::Type type, const std::string& name)
+{
+    return std::to_string((int)type) + "\x1f" + name;
+}
+
+void Tab::stash_held_config(const std::string& preset_name, const std::vector<std::string>& selected_options)
+{
+    // Store the selected unsaved options of the currently edited preset into a temporary stash,
+    // so they can be restored with apply_held_preset() when this preset is selected again.
+    DynamicPrintConfig& stash = m_preset_held_configs[held_preset_key(type(), preset_name)];
+    stash = DynamicPrintConfig(); // reset any previously held values for this preset
+    for (const auto& opt_key : selected_options)
+        if (const ConfigOption* opt = m_presets->get_edited_preset().config.option(opt_key))
+            stash.set_key_value(opt_key, opt->clone());
+}
+
+void Tab::apply_held_preset()
+{
+    // If the currently selected preset has stashed (held) modifications, restore them.
+    if (m_preset_held_configs.empty())
+        return;
+
+    const std::string& selected_name = Preset::remove_suffix_modified(m_presets->get_selected_preset().name);
+    auto it = m_preset_held_configs.find(held_preset_key(type(), selected_name));
+    if (it == m_preset_held_configs.end())
+        return;
+
+    m_presets->get_edited_preset().config.apply(it->second);
+    m_preset_held_configs.erase(it);
+
+    update_dirty();
+}
+
 
 // Call a callback to update the selection of presets on the plater:
 // To update the content of the selection boxes,
@@ -3648,6 +3683,9 @@ void TabFilament::load_current_preset()
     if (selected_extr_filament_name != selected_filament_name) {
         m_presets->select_preset_by_name(selected_extr_filament_name, false);
 
+        // restore "Hold"en (temporarily stashed) modifications of the newly selected filament
+        apply_held_preset();
+
         // To avoid inconsistance between value of active_extruder in FilamentTab and TabPresetComboBox,
         // which can causes a crash on switch preset from MM printer to SM printer
         m_presets_choice->set_active_extruder(m_active_extruder);
@@ -4774,6 +4812,9 @@ bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
         // check if there is something in the cache to move to the new selected preset
         apply_config_from_cache();
 
+        // restore "Hold"en (temporarily stashed) modifications of the newly selected preset
+        apply_held_preset();
+
         load_current_preset();
     }
 
@@ -4835,6 +4876,15 @@ bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr
         }
         else
             wxGetApp().get_tab(presets->type())->cache_config_diff(selected_options);
+    }
+    else if (dlg.hold()) // "Hold": temporarily stash the selected changes, so the user can switch
+                         // to another preset (e.g. another extruder's material) without saving,
+                         // discarding or transferring them. apply_held_preset() restores them
+                         // when the same preset is selected again.
+    {
+        std::vector<std::string> selected_options = dlg.get_selected_options();
+        if (!selected_options.empty())
+            wxGetApp().get_tab(presets->type())->stash_held_config(presets->get_selected_preset().name, selected_options);
     }
 
     return true;

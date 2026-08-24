@@ -262,7 +262,10 @@ enum class Action {
     Undef,
     Transfer,
     Discard,
-    Save
+    Save,
+    // Hold the unsaved changes in a temporary stash (they are restored when the same preset is selected again),
+    // instead of saving, discarding or transferring them.
+    Hold
 };
 
 //------------------------------------------
@@ -274,6 +277,7 @@ class UnsavedChangesDialog : public DPIDialog
     ScalableButton*         m_save_btn      { nullptr };
     ScalableButton*         m_transfer_btn  { nullptr };
     ScalableButton*         m_discard_btn   { nullptr };
+    ScalableButton*         m_hold_btn      { nullptr };
     wxStaticText*           m_action_line   { nullptr };
     wxStaticText*           m_info_line     { nullptr };
     wxCheckBox*             m_remember_choice   { nullptr };
@@ -281,12 +285,14 @@ class UnsavedChangesDialog : public DPIDialog
     int                     m_save_btn_id       { wxID_ANY };
     int                     m_move_btn_id       { wxID_ANY };
     int                     m_continue_btn_id   { wxID_ANY };
+    int                     m_hold_btn_id       { wxID_ANY };
 
     std::string             m_app_config_key;
 
     static constexpr char ActTransfer[] = "transfer";
     static constexpr char ActDiscard[]  = "discard";
     static constexpr char ActSave[]     = "save";
+    static constexpr char ActHold[]     = "hold";
 
     // selected action after Dialog closing
     Action m_exit_action {Action::Undef};
@@ -294,6 +300,9 @@ class UnsavedChangesDialog : public DPIDialog
     std::vector<std::pair<std::string, Preset::Type>>  names_and_types;
     // additional action buttons used in dialog
     int m_buttons { ActionButtons::TRANSFER | ActionButtons::SAVE };
+    // Show the "Hold" (temporarily keep the changes) button, available when the dialog is opened
+    // for a preset switch (type != Preset::TYPE_INVALID).
+    bool m_show_hold_btn { false };
 
 public:
 
@@ -315,6 +324,7 @@ public:
     bool save_preset() const        { return m_exit_action == Action::Save;     }
     bool transfer_changes() const   { return m_exit_action == Action::Transfer; }
     bool discard() const            { return m_exit_action == Action::Discard;  }
+    bool hold() const               { return m_exit_action == Action::Hold;     }
 
     // get full bundle of preset names and types for saving
     const std::vector<std::pair<std::string, Preset::Type>>& get_names_and_types() { return names_and_types; }
